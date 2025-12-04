@@ -4,6 +4,7 @@
  */
 
 @import './styles/unified-design-system.css';
+@import './styles/header-fix.css';
 
 @tailwind base;
 @tailwind components;

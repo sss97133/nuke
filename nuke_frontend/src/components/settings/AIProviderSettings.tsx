@@ -4,12 +4,12 @@ import { useToast } from '../../hooks/useToast';
 
 interface AIProvider {
   id?: string;
-  provider: 'openai' | 'anthropic' | 'custom';
+  provider: 'openai' | 'anthropic' | 'google' | 'gemini' | 'custom';
   api_key_encrypted?: string;
   model_name: string;
   is_default: boolean;
   is_active: boolean;
-  cost_per_request_cents: number;
+  cost_per_request_cents?: number;
 }
 
 const AIProviderSettings: React.FC = () => {
@@ -142,10 +142,14 @@ const AIProviderSettings: React.FC = () => {
   };
 
   const defaultModels = [
-    { provider: 'openai' as const, modelName: 'gpt-4o', displayName: 'GPT-4o' },
+    { provider: 'openai' as const, modelName: 'gpt-4o', displayName: 'GPT-4o (Recommended)' },
+    { provider: 'openai' as const, modelName: 'gpt-4o-mini', displayName: 'GPT-4o Mini (Cheaper)' },
     { provider: 'openai' as const, modelName: 'gpt-4-turbo', displayName: 'GPT-4 Turbo' },
-    { provider: 'anthropic' as const, modelName: 'claude-3-5-sonnet-20241022', displayName: 'Claude 3.5 Sonnet' },
-    { provider: 'anthropic' as const, modelName: 'claude-3-opus-20240229', displayName: 'Claude 3 Opus' }
+    { provider: 'anthropic' as const, modelName: 'claude-3-5-sonnet-20241022', displayName: 'Claude 3.5 Sonnet (Recommended)' },
+    { provider: 'anthropic' as const, modelName: 'claude-3-haiku-20240307', displayName: 'Claude 3 Haiku (Cheaper)' },
+    { provider: 'anthropic' as const, modelName: 'claude-3-opus-20240229', displayName: 'Claude 3 Opus (Best)' },
+    { provider: 'google' as const, modelName: 'gemini-1.5-pro', displayName: 'Gemini 1.5 Pro (Recommended)' },
+    { provider: 'google' as const, modelName: 'gemini-1.5-flash', displayName: 'Gemini 1.5 Flash (Cheaper)' }
   ];
 
   if (loading) {
@@ -155,29 +159,21 @@ const AIProviderSettings: React.FC = () => {
   return (
     <div className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 className="heading-3">Developer API Keys (Optional)</h3>
+        <div>
+          <h3 className="heading-3">AI Provider API Keys</h3>
+        </div>
         <button
           onClick={() => setShowAddForm(true)}
           className="button button-primary"
           style={{ fontSize: '8pt', padding: '6px 12px' }}
         >
-          + Add Provider
+          + Add Key
         </button>
       </div>
       <div className="card-body">
-        <p className="text" style={{ marginBottom: 'var(--space-4)' }}>
-          <strong>For developers only:</strong> If you're building integrations or want to use your own API keys, you can add them here. 
-          Regular users don't need to add keys - the platform handles all AI processing automatically.
-        </p>
         {showAddForm && (
-          <div style={{
-            padding: 'var(--space-3)',
-            border: '1px solid var(--border)',
-            borderRadius: '4px',
-            marginBottom: 'var(--space-3)',
-            background: 'var(--grey-50)'
-          }}>
-            <h4 className="text font-bold" style={{ marginBottom: 'var(--space-2)' }}>Add AI Provider</h4>
+          <div style={{ marginBottom: '12px', padding: '12px', background: '#f5f5f5', border: '1px solid #e0e0e0' }}>
+            <div className="text font-bold" style={{ marginBottom: '8px', fontSize: '9pt' }}>Add API Key</div>
             <ProviderForm
               provider={{
                 provider: 'openai',
@@ -197,22 +193,18 @@ const AIProviderSettings: React.FC = () => {
         )}
 
         {providers.length === 0 && !showAddForm && (
-          <div className="text text-muted" style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
-            No AI providers configured. Add one to get started.
+          <div style={{ textAlign: 'center', padding: '24px', background: '#fafafa', border: '1px dashed #ccc' }}>
+            <div style={{ fontSize: '24pt', marginBottom: '8px' }}>🔑</div>
+            <div className="text font-bold" style={{ marginBottom: '4px', fontSize: '9pt' }}>No API Keys</div>
+            <div className="text text-small text-muted" style={{ fontSize: '8pt' }}>
+              Click "+ Add Key" to configure OpenAI, Anthropic, or Google.<br/>
+              Or leave empty to use system keys automatically.
+            </div>
           </div>
         )}
 
         {providers.map(provider => (
-          <div
-            key={provider.id}
-            style={{
-              padding: 'var(--space-3)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              marginBottom: 'var(--space-2)',
-              background: provider.is_default ? 'var(--primary-dim)' : 'var(--white)'
-            }}
-          >
+          <div key={provider.id} style={{ marginBottom: '8px', padding: '12px', background: '#fff', border: '1px solid #e0e0e0' }}>
             {editingProvider?.id === provider.id ? (
               <ProviderForm
                 provider={provider}
@@ -224,50 +216,39 @@ const AIProviderSettings: React.FC = () => {
                 defaultModels={defaultModels}
               />
             ) : (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-                  <div>
-                    <div className="text font-bold">
-                      {provider.provider === 'openai' && '🤖'}
-                      {provider.provider === 'anthropic' && '🧠'}
-                      {provider.provider === 'custom' && '⚙️'}
-                      {' '}
-                      {provider.model_name}
-                      {provider.is_default && (
-                        <span style={{
-                          marginLeft: '8px',
-                          padding: '2px 6px',
-                          background: 'var(--primary)',
-                          color: 'white',
-                          fontSize: '7pt',
-                          borderRadius: '2px'
-                        }}>
-                          DEFAULT
-                        </span>
-                      )}
-                    </div>
-                    <div className="text text-small text-muted">
-                      Provider: {provider.provider} • Cost: ${(provider.cost_per_request_cents / 100).toFixed(2)} per request
-                    </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
+                    {provider.provider === 'openai' && '🤖 '}
+                    {provider.provider === 'anthropic' && '🧠 '}
+                    {provider.provider === 'google' && '🔷 '}
+                    {provider.provider === 'gemini' && '🔷 '}
+                    {provider.provider === 'custom' && '⚙️ '}
+                    {provider.provider.toUpperCase()}
+                    {provider.is_default && ' (PRIMARY)'}
                   </div>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                      onClick={() => setEditingProvider(provider)}
-                      className="button button-secondary"
-                      style={{ fontSize: '8pt', padding: '4px 8px' }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => provider.id && handleDelete(provider.id)}
-                      className="button button-secondary"
-                      style={{ fontSize: '8pt', padding: '4px 8px' }}
-                    >
-                      Delete
-                    </button>
+                  <div style={{ fontSize: '8pt', color: '#666', fontFamily: 'monospace' }}>
+                    {(() => {
+                      if (!provider.api_key_encrypted) return '••••••••';
+                      try {
+                        const decoded = atob(provider.api_key_encrypted);
+                        return decoded.length >= 8 ? `${decoded.substring(0,4)}••••${decoded.slice(-4)}` : '••••••••';
+                      } catch {
+                        const raw = provider.api_key_encrypted;
+                        return raw.length >= 8 ? `${raw.substring(0,4)}••••${raw.slice(-4)}` : '••••••••';
+                      }
+                    })()}
                   </div>
                 </div>
-              </>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button onClick={() => setEditingProvider(provider)} className="button button-secondary" style={{ fontSize: '8pt', padding: '4px 8px' }}>
+                    Edit
+                  </button>
+                  <button onClick={() => provider.id && handleDelete(provider.id)} className="button button-secondary" style={{ fontSize: '8pt', padding: '4px 8px' }}>
+                    Delete
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         ))}
@@ -280,7 +261,7 @@ interface ProviderFormProps {
   provider: AIProvider;
   onSave: (provider: AIProvider, apiKey?: string) => void;
   onCancel: () => void;
-  defaultModels: Array<{ provider: 'openai' | 'anthropic' | 'custom'; modelName: string; displayName: string }>;
+  defaultModels: Array<{ provider: 'openai' | 'anthropic' | 'google' | 'custom'; modelName: string; displayName: string }>;
 }
 
 const ProviderForm: React.FC<ProviderFormProps> = ({ provider, onSave, onCancel, defaultModels }) => {
@@ -288,111 +269,45 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ provider, onSave, onCancel,
   const [apiKey, setApiKey] = useState('');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
       <div>
-        <label className="text text-small font-bold" style={{ display: 'block', marginBottom: '4px' }}>
-          Provider
-        </label>
-        <select
-          value={formData.provider}
-          onChange={(e) => setFormData({ ...formData, provider: e.target.value as any })}
-          className="form-select"
-          style={{ width: '100%', fontSize: '9pt', padding: '6px 8px' }}
-        >
+        <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '4px' }}>Provider</label>
+        <select value={formData.provider} onChange={(e) => setFormData({ ...formData, provider: e.target.value as any })} className="form-select" style={{ width: '100%', fontSize: '9pt', padding: '4px' }}>
           <option value="openai">OpenAI</option>
           <option value="anthropic">Anthropic</option>
-          <option value="google">Google (Gemini)</option>
-          <option value="gemini">Gemini (alias)</option>
-          <option value="custom">Custom</option>
+          <option value="google">Google</option>
         </select>
       </div>
 
       <div>
-        <label className="text text-small font-bold" style={{ display: 'block', marginBottom: '4px' }}>
-          Model Name
-        </label>
-        <select
-          value={formData.model_name}
-          onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
-          className="form-select"
-          style={{ width: '100%', fontSize: '9pt', padding: '6px 8px' }}
-        >
-          {defaultModels
-            .filter(m => m.provider === formData.provider)
-            .map(m => (
-              <option key={m.modelName} value={m.modelName}>{m.displayName}</option>
-            ))}
-          <option value="">Custom model name...</option>
+        <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '4px' }}>Model</label>
+        <select value={formData.model_name} onChange={(e) => setFormData({ ...formData, model_name: e.target.value })} className="form-select" style={{ width: '100%', fontSize: '9pt', padding: '4px' }}>
+          {defaultModels.filter(m => m.provider === formData.provider).map(m => (
+            <option key={m.modelName} value={m.modelName}>{m.displayName}</option>
+          ))}
         </select>
-        {formData.model_name === '' && (
-          <input
-            type="text"
-            value={formData.model_name}
-            onChange={(e) => setFormData({ ...formData, model_name: e.target.value })}
-            placeholder="Enter model name"
-            className="form-input"
-            style={{ width: '100%', fontSize: '9pt', padding: '6px 8px', marginTop: '4px' }}
-          />
-        )}
       </div>
 
-      <div>
-        <label className="text text-small font-bold" style={{ display: 'block', marginBottom: '4px' }}>
-          API Key
-        </label>
+      <div style={{ gridColumn: '1 / -1' }}>
+        <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '4px' }}>API Key</label>
         <input
           type="password"
           value={apiKey}
-          onChange={(e) => {
-            setApiKey(e.target.value);
-            setFormData({ ...formData, api_key_encrypted: e.target.value });
-          }}
-          placeholder={provider.api_key_encrypted ? "Enter new key to update" : "sk-..."}
+          onChange={(e) => { setApiKey(e.target.value); setFormData({ ...formData, api_key_encrypted: e.target.value }); }}
+          placeholder={provider.api_key_encrypted ? "Enter new key" : "sk-..."}
           className="form-input"
-          style={{ width: '100%', fontSize: '9pt', padding: '6px 8px' }}
+          style={{ width: '100%', fontSize: '9pt', padding: '6px' }}
         />
       </div>
 
-      <div>
-        <label className="text text-small font-bold" style={{ display: 'block', marginBottom: '4px' }}>
-          Cost per Request (cents)
-        </label>
-        <input
-          type="number"
-          value={formData.cost_per_request_cents}
-          onChange={(e) => setFormData({ ...formData, cost_per_request_cents: parseInt(e.target.value) || 0 })}
-          className="form-input"
-          style={{ width: '100%', fontSize: '9pt', padding: '6px 8px' }}
-        />
+      <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <input type="checkbox" checked={formData.is_default} onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })} id={`default-${provider.id || 'new'}`} />
+        <label htmlFor={`default-${provider.id || 'new'}`} style={{ fontSize: '8pt' }}>Set as primary</label>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <input
-          type="checkbox"
-          checked={formData.is_default}
-          onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
-          id={`default-${provider.id || 'new'}`}
-        />
-        <label htmlFor={`default-${provider.id || 'new'}`} className="text text-small">
-          Set as default provider
-        </label>
-      </div>
-
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-        <button
-          onClick={() => onSave(formData, apiKey)}
-          className="button button-primary"
-          style={{ fontSize: '9pt', padding: '6px 12px' }}
-        >
-          Save
-        </button>
-        <button
-          onClick={onCancel}
-          className="button button-secondary"
-          style={{ fontSize: '9pt', padding: '6px 12px' }}
-        >
-          Cancel
-        </button>
+      <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '8px', marginTop: '8px' }}>
+        <button onClick={() => onSave(formData, apiKey)} className="button button-primary" style={{ fontSize: '8pt', padding: '6px 12px' }}>Save</button>
+        <button onClick={onCancel} className="button button-secondary" style={{ fontSize: '8pt', padding: '6px 12px' }}>Cancel</button>
       </div>
     </div>
   );

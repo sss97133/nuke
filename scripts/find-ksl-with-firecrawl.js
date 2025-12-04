@@ -3,8 +3,15 @@
  * Find KSL listings using Firecrawl to bypass bot protection
  */
 
-const FIRECRAWL_KEY = 'REDACTED-ROTATE-THIS-KEY';
+require('dotenv').config();
+
+const FIRECRAWL_KEY = process.env.FIRECRAWL_API_KEY;
 const SEARCH_URL = process.argv[2] || 'https://cars.ksl.com/v2/search/make/Chevrolet/yearFrom/1970/yearTo/1991';
+
+if (!FIRECRAWL_KEY) {
+  console.error('ERROR: FIRECRAWL_API_KEY environment variable is required');
+  process.exit(1);
+}
 
 async function findListings() {
   console.log('🔍 Finding KSL listings with Firecrawl...\n');

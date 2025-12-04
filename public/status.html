@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>System Status</title>
+  <meta http-equiv="refresh" content="5">
+  <style>
+    body { background: #000; color: #0f0; font-family: monospace; padding: 40px; font-size: 16px; }
+    .metric { margin: 20px 0; }
+    .big { font-size: 48px; font-weight: bold; }
+    .label { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>SYSTEM STATUS</h1>
+  <p class="label">Auto-refreshing every 5 seconds...</p>
+  
+  <div class="metric">
+    <div class="label">TIER 1 IMAGE ANALYSIS</div>
+    <div class="big" id="images">Loading...</div>
+  </div>
+
+  <div class="metric">
+    <div class="label">LMC CATALOG PARTS</div>
+    <div class="big" id="parts">Loading...</div>
+  </div>
+
+  <div class="metric">
+    <div class="label">ACTIVE VEHICLES</div>
+    <div class="big" id="vehicles">Loading...</div>
+  </div>
+
+  <script>
+    async function load() {
+      const res = await fetch('https://qkgaybvrernstplzjaam.supabase.co/functions/v1/system-stats');
+      const data = await res.json();
+      document.getElementById('images').textContent = 
+        `${data.images.analyzed.toLocaleString()} / ${data.images.total.toLocaleString()} (${data.images.percent}%)`;
+      document.getElementById('parts').textContent = 
+        data.catalog.total_parts.toLocaleString();
+      document.getElementById('vehicles').textContent = 
+        data.vehicles.active.toLocaleString();
+    }
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>
+

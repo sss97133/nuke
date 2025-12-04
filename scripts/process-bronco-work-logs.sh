@@ -3,8 +3,18 @@
 # Process Bronco work logs at Ernie's Upholstery
 # Limit to 10 sessions to control OpenAI costs
 
-export SUPABASE_URL="https://qkgaybvrernstplzjaam.supabase.co"
-export SUPABASE_SERVICE_ROLE_KEY="REDACTED-ROTATE-THIS-KEY"
+# Load environment variables
+if [ -f .env ]; then
+  export $(cat .env | grep -v '^#' | xargs)
+fi
+
+# Validate required environment variables
+if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+  echo "ERROR: VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables are required"
+  exit 1
+fi
+
+export SUPABASE_URL="$VITE_SUPABASE_URL"
 
 cd /Users/skylar/nuke/scripts
 

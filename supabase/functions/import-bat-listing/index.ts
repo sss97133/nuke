@@ -256,6 +256,9 @@ serve(async (req) => {
         },
         user_id: null // System-generated event
       });
+    
+    // TODO: Extract and save auction_timeline_events from scraper
+    // Future enhancement: Parse BaT comment thread for individual bid/comment events
 
     return new Response(
       JSON.stringify({

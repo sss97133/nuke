@@ -8,6 +8,10 @@ import React, { useState, useCallback, useRef } from 'react';
 import type { Upload, X, Image, MapPin, Calendar, Info, Loader2 } from 'lucide-react';
 import type { ImageExifService } from '../../services/imageExifServiceStub';
 import { ImageUploadService } from '../../services/imageUploadService';
+import { processBulkUpload, type BulkUploadResult } from '../../services/duplicateDetectionService';
+import { globalUploadStatusService } from '../../services/globalUploadStatusService';
+import { supabase } from '../../lib/supabase';
+import AutoFixResults from './AutoFixResults';
 
 interface BulkImageUploaderProps {
   vehicleId: string;
@@ -22,6 +26,8 @@ interface ImagePreview {
   uploading?: boolean;
   uploaded?: boolean;
   error?: string;
+  isDuplicate?: boolean;
+  duplicateReason?: string;
 }
 
 export function BulkImageUploader({ 
@@ -33,6 +39,9 @@ export function BulkImageUploader({
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [extractedData, setExtractedData] = useState<any>(null);
+  const [duplicateResult, setDuplicateResult] = useState<BulkUploadResult | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [autoFixResults, setAutoFixResults] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,16 +54,39 @@ export function BulkImageUploader({
     }
     
     setIsProcessing(true);
+    setStatusMessage(`Processing ${files.length} images...`);
     console.log(`Processing ${files.length} images...`);
     
     try {
-      // Create preview objects
+      // Step 1: Detect duplicates BEFORE creating previews
+      const dupResult = await processBulkUpload(files, vehicleId, (progress, status) => {
+        setUploadProgress(progress);
+        setStatusMessage(status);
+      });
+      
+      setDuplicateResult(dupResult);
+      
+      // Step 2: Create preview objects only for unique files
+      const duplicateFileNames = new Set(dupResult.duplicates.map(d => d.fileName));
+      const uniqueFiles = files.filter(f => !duplicateFileNames.has(f.name));
+      
       const newImages: ImagePreview[] = files.map(file => ({
         file,
         url: URL.createObjectURL(file),
+        isDuplicate: duplicateFileNames.has(file.name),
+        duplicateReason: dupResult.duplicates.find(d => d.fileName === file.name)?.reason
       }));
       
       setImages(prev => [...prev, ...newImages]);
+      
+      // Show summary
+      if (dupResult.rejected > 0) {
+        setStatusMessage(
+          `✅ ${dupResult.uploaded} unique images ready | ⚠️ ${dupResult.rejected} duplicates rejected`
+        );
+      } else {
+        setStatusMessage(`✅ All ${dupResult.uploaded} images are unique`);
+      }
       
       // Extract EXIF data in batches to avoid memory issues
       const batchSize = 50;
@@ -128,16 +160,29 @@ export function BulkImageUploader({
   const uploadImages = async () => {
     if (images.length === 0) return;
     
+    // Filter out duplicates before uploading
+    const uniqueImages = images.filter(img => !img.isDuplicate);
+    
+    if (uniqueImages.length === 0) {
+      alert('No unique images to upload. All selected images are duplicates.');
+      return;
+    }
+    
+    // Create global upload job - this allows user to navigate away
+    const uploadJobId = globalUploadStatusService.createJob(vehicleId, uniqueImages.length);
+    console.log(`Created upload job ${uploadJobId} for ${uniqueImages.length} images`);
+    
     setIsProcessing(true);
+    setStatusMessage(`🚀 Upload started! You can navigate away - progress will continue in background.`);
     const uploadedUrls: string[] = [];
     const errors: string[] = [];
     
     try {
-      // Upload sequentially with progress tracking
-      // ImageUploadService handles: EXIF extraction, variants, timeline events
+      // Upload with global progress tracking (no local state updates per image)
       let uploaded = 0;
+      let failed = 0;
       
-      for (const img of images) {
+      for (const img of uniqueImages) {
         try {
           // Determine category from filename hints
           const fileName = img.file.name.toLowerCase();
@@ -158,35 +203,103 @@ export function BulkImageUploader({
           
           if (result.success && result.imageUrl) {
             uploadedUrls.push(result.imageUrl);
+            uploaded++;
           } else {
             errors.push(`${img.file.name}: ${result.error || 'Unknown error'}`);
+            failed++;
           }
           
-          uploaded++;
-          setUploadProgress(Math.round((uploaded / images.length) * 100));
+          // Update GLOBAL progress (not local state) - prevents page reloads!
+          globalUploadStatusService.updateJobProgress(uploadJobId, uploaded, failed, errors);
+          
+          // Only update local UI every 10 images to reduce re-renders
+          if (uploaded % 10 === 0 || uploaded === uniqueImages.length) {
+            setUploadProgress(Math.round(((uploaded + failed) / uniqueImages.length) * 100));
+          }
         } catch (error) {
           console.error(`Error uploading ${img.file.name}:`, error);
           errors.push(`${img.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          uploaded++;
-          setUploadProgress(Math.round((uploaded / images.length) * 100));
+          failed++;
+          
+          // Update global progress
+          globalUploadStatusService.updateJobProgress(uploadJobId, uploaded, failed, errors);
         }
       }
       
+      // Final update to global progress
+      globalUploadStatusService.updateJobProgress(uploadJobId, uploaded, failed, errors);
+      
       if (errors.length > 0) {
         console.warn(`Upload completed with ${errors.length} errors:`, errors);
-        alert(`Uploaded ${uploadedUrls.length} images successfully.\n\nErrors (${errors.length}):\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...and ${errors.length - 5} more` : ''}`);
+        setStatusMessage(`⚠️ Uploaded ${uploaded} images. ${failed} failed.`);
+      } else {
+        setStatusMessage(`✅ All ${uploaded} images uploaded successfully!`);
       }
       
       onImagesUploaded?.(uploadedUrls);
-      console.log(`Uploaded ${uploadedUrls.length} images successfully`);
+      console.log(`✅ Upload job ${uploadJobId} complete: ${uploaded} uploaded, ${failed} failed`);
       
-      // Clear after successful upload
-      setImages([]);
-      setUploadProgress(0);
+      // AUTO-FIX: Trigger profile correction after upload
+      if (uploaded > 0) {
+        setStatusMessage(`🔍 Auto-checking profile data...`);
+        try {
+          const { data: allImages } = await supabase
+            .from('vehicle_images')
+            .select('id')
+            .eq('vehicle_id', vehicleId)
+            .limit(5);
+          
+          if (allImages && allImages.length > 0) {
+            const fixResponse = await supabase.functions.invoke('auto-fix-vehicle-profile', {
+              body: {
+                vehicle_id: vehicleId,
+                image_ids: allImages.map(img => img.id)
+              }
+            });
+            
+            const fixResult = fixResponse.data;
+            
+            if (fixResult.success && fixResult.fixes && fixResult.fixes.length > 0) {
+              const corrected = fixResult.fixes.filter((f: any) => f.action === 'corrected');
+              const added = fixResult.fixes.filter((f: any) => f.action === 'added');
+              
+              // Store fix results for display
+              setAutoFixResults(fixResult.fixes);
+              
+              if (corrected.length > 0 || added.length > 0) {
+                const fixSummary = [];
+                if (corrected.length > 0) fixSummary.push(`${corrected.length} corrected`);
+                if (added.length > 0) fixSummary.push(`${added.length} added`);
+                
+                setStatusMessage(`✅ Upload complete! 🔧 Auto-fixed: ${fixSummary.join(', ')}`);
+                
+                // Show what was fixed
+                console.log('Auto-fix results:', fixResult.fixes);
+              } else {
+                setStatusMessage(`✅ Upload complete! Profile data verified correct.`);
+              }
+            } else {
+              setStatusMessage(`✅ Upload complete! Profile data looks good.`);
+            }
+          }
+        } catch (autoFixError) {
+          console.error('Auto-fix failed:', autoFixError);
+          // Don't block on auto-fix failure
+        }
+      }
+      
+      // Clear after successful upload (slight delay so user sees completion)
+      setTimeout(() => {
+        setImages([]);
+        setUploadProgress(0);
+        setDuplicateResult(null);
+        setStatusMessage('');
+      }, 2000);
       
     } catch (error) {
       console.error('Error uploading images:', error);
-      alert('Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      setStatusMessage('❌ Upload failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      // Don't remove the job on error - let user see what failed
     } finally {
       setIsProcessing(false);
     }
@@ -198,6 +311,14 @@ export function BulkImageUploader({
   
   return (
     <div className="space-y-4">
+      {/* Auto-Fix Results */}
+      {autoFixResults && autoFixResults.length > 0 && (
+        <AutoFixResults 
+          fixes={autoFixResults}
+          onClose={() => setAutoFixResults(null)}
+        />
+      )}
+      
       {/* Upload Area */}
       <div 
         onClick={() => fileInputRef.current?.click()}
@@ -219,6 +340,55 @@ export function BulkImageUploader({
           className="hidden"
         />
       </div>
+      
+      {/* Status Message */}
+      {statusMessage && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700">
+          {statusMessage}
+        </div>
+      )}
+      
+      {/* Duplicate Detection Results */}
+      {duplicateResult && duplicateResult.rejected > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <h4 className="font-semibold text-yellow-900 mb-2 flex items-center gap-2">
+            ⚠️ Duplicate Detection Results
+          </h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span>Total Files Selected:</span>
+              <span className="font-semibold">{duplicateResult.total}</span>
+            </div>
+            <div className="flex items-center justify-between text-green-700">
+              <span>Unique Images (will upload):</span>
+              <span className="font-semibold">{duplicateResult.uploaded}</span>
+            </div>
+            <div className="flex items-center justify-between text-red-700">
+              <span>Duplicates (rejected):</span>
+              <span className="font-semibold">{duplicateResult.rejected}</span>
+            </div>
+            
+            {duplicateResult.duplicates.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-yellow-900 font-medium">
+                  View Rejected Files ({duplicateResult.duplicates.length})
+                </summary>
+                <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+                  {duplicateResult.duplicates.map((dup, idx) => (
+                    <div key={idx} className="text-xs bg-white p-2 rounded border border-yellow-100">
+                      <div className="font-medium truncate">{dup.fileName}</div>
+                      <div className="text-yellow-700">{dup.reason}</div>
+                      {dup.duplicateOf && (
+                        <div className="text-gray-500">Duplicate of: {dup.duplicateOf}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Extracted Data Summary */}
       {extractedData && (
@@ -283,15 +453,38 @@ export function BulkImageUploader({
                 <img 
                   src={img.url} 
                   alt={`Preview ${index}`}
-                  className="w-full h-24 object-cover rounded"
+                  className={`w-full h-24 object-cover rounded ${img.isDuplicate ? 'opacity-50 grayscale' : ''}`}
                 />
+                
+                {/* Duplicate indicator */}
+                {img.isDuplicate && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-red-500/80 rounded">
+                    <div className="text-white text-center p-1">
+                      <div className="font-bold text-xs">DUPLICATE</div>
+                      <div className="text-xs">{img.duplicateReason}</div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Upload status indicators */}
+                {img.uploaded && !img.isDuplicate && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-green-500/80 rounded">
+                    <div className="text-white font-bold">✓</div>
+                  </div>
+                )}
+                {img.uploading && !img.isDuplicate && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-blue-500/80 rounded">
+                    <Loader2 className="w-6 h-6 text-white animate-spin" />
+                  </div>
+                )}
+                
                 <button
                   onClick={() => removeImage(index)}
                   className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <X className="w-3 h-3" />
                 </button>
-                {img.exifData?.dateTime && (
+                {img.exifData?.dateTime && !img.isDuplicate && (
                   <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1">
                     {new Date(img.exifData.dateTime).toLocaleDateString()}
                   </div>

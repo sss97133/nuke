@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { MyOrganizationsService, MyOrganization } from '../../services/myOrganizationsService';
+import { MyOrganizationsService } from '../../services/myOrganizationsService';
+import type { MyOrganization } from '../../services/myOrganizationsService';
 
 interface OrganizationContextFilterProps {
   selectedOrganizationId: string | null;

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const https = require('https');
 
 const url = 'https://fspbjrzdulesxohceznc.supabase.co/rest/v1/vehicles?select=id&limit=1';

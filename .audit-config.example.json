@@ -1,0 +1,57 @@
+{
+  "comment": "Autonomous Data Auditor Configuration",
+  "comment2": "Copy to .audit-config.json and customize",
+  
+  "budget": {
+    "daily_cost_limit": 50.00,
+    "per_vehicle_limit": 2.00,
+    "approval_threshold": 0.50
+  },
+  
+  "execution": {
+    "max_vehicles_per_run": 50,
+    "min_confidence_auto_fix": 85,
+    "batch_size": 10
+  },
+  
+  "features": {
+    "enable_vin_decode": true,
+    "enable_listing_scrape": true,
+    "enable_image_ocr": false,
+    "enable_ai_analysis": true
+  },
+  
+  "priorities": {
+    "comment": "Fields to prioritize (1=critical, 5=optional)",
+    "vin": 1,
+    "sale_price": 2,
+    "year": 1,
+    "make": 1,
+    "model": 1,
+    "mileage": 2,
+    "engine_size": 3,
+    "drivetrain": 3,
+    "color": 4,
+    "transmission": 3
+  },
+  
+  "quality_thresholds": {
+    "min_audit_score": 60,
+    "target_score": 85,
+    "excellent_score": 95
+  },
+  
+  "notifications": {
+    "comment": "Future feature - send alerts",
+    "enabled": false,
+    "email": "admin@n-zero.dev",
+    "slack_webhook": null
+  },
+  
+  "schedule": {
+    "comment": "Suggested cron schedule",
+    "daily_audit": "0 2 * * *",
+    "weekly_deep_audit": "0 3 * * 0"
+  }
+}
+

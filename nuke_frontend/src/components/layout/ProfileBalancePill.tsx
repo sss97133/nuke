@@ -27,8 +27,31 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
   const [balance, setBalance] = useState<CashBalance | null>(null);
   const [expanded, setExpanded] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // Check admin status
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    
+    const checkAdmin = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('admin_users')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .eq('is_active', true)
+          .single();
+        
+        setIsAdmin(!error && !!data);
+      } catch (error) {
+        setIsAdmin(false);
+      }
+    };
+    
+    checkAdmin();
+  }, [session?.user?.id]);
 
   // Load balance
   useEffect(() => {
@@ -215,42 +238,25 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
         </div>
       </div>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu - FIXED positioning to prevent overlap */}
       {showMenu && dropdownPosition && (
         <>
-          {/* Backdrop to prevent clicks and ensure dropdown is on top */}
+          <div className="profile-dropdown-backdrop" onClick={() => setShowMenu(false)} />
           <div
-            onClick={() => setShowMenu(false)}
+            className="profile-dropdown-menu"
             style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 9998,
-              backgroundColor: 'transparent'
-            }}
-          />
-          <div
-            style={{
-              position: 'fixed',
               top: `${dropdownPosition.top}px`,
-              right: `${dropdownPosition.right}px`,
-              minWidth: '200px',
-              backgroundColor: '#fff',
-              border: '2px solid #000',
-              boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
-              zIndex: 9999
+              right: `${dropdownPosition.right}px`
             }}
           >
-          {/* Menu items - consolidated navigation */}
           {[
             { label: 'Capsule', action: '/capsule' },
             { label: 'Profile', action: `/profile/${session?.user?.id || ''}` },
             { label: 'Vehicles', action: '/vehicles' },
             { label: 'Auctions', action: '/auctions' },
             { label: 'Organizations', action: '/organizations' },
-            { label: 'Photos', action: '/capsule?tab=photos' }
+            { label: 'Photos', action: '/capsule?tab=photos' },
+            ...(isAdmin ? [{ label: 'Admin', action: '/admin' }] : [])
           ].map((item, i) => (
             <button
               key={i}
@@ -258,19 +264,6 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
                 navigate(item.action);
                 setShowMenu(false);
               }}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: 'none',
-                borderBottom: i < 9 ? '1px solid #eee' : 'none',
-                backgroundColor: 'transparent',
-                textAlign: 'left',
-                fontSize: '9pt',
-                cursor: 'pointer',
-                fontFamily: '"MS Sans Serif", sans-serif'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e5e5e5'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               {item.label}
             </button>

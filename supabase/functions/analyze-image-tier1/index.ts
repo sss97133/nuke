@@ -1,19 +1,17 @@
 /**
  * TIER 1: BASIC ORGANIZATION (Ultra-Cheap & Fast)
  * 
- * Model: GPT-4o-mini
- * Cost: ~$0.0001 per image
+ * Priority: 
+ * 1. Gemini 1.5 Flash (Free/Cheap, High Quality)
+ * 2. Claude 3 Haiku (Cheap, Fast)
+ * 3. GPT-4o-mini (Cheap, High Quality)
  * 
  * Purpose: Quick categorization and quality assessment
- * - Angle detection
- * - Basic category
- * - Image quality
- * - Major components
- * - Basic condition
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,23 +33,68 @@ serve(async (req) => {
 
     console.log(`Tier 1 analysis: ${image_id}`)
 
+    let analysis = null
+    let provider = 'none'
+    let usageStats = null
+    
     // Get user API key or fallback to system key
     const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
-    const apiKeyResult = await getUserApiKey(
-      supabase,
-      user_id || null,
-      'openai',
-      'OPENAI_API_KEY'
-    )
+    
+    const errors = []
 
-    if (!apiKeyResult.apiKey) {
-      throw new Error('No API key available (neither user nor system key configured)')
+    // 1. Try Gemini
+    const geminiKeyResult = await getUserApiKey(supabase, user_id || null, 'google', 'GEMINI_API_KEY')
+    if (geminiKeyResult.apiKey) {
+      try {
+        console.log(`Using Gemini (${geminiKeyResult.source})`)
+        const result = await runTier1AnalysisGemini(image_url, estimated_resolution || 'medium', geminiKeyResult.apiKey)
+        analysis = result.data
+        usageStats = result.usage
+        provider = 'gemini'
+      } catch (e) {
+        console.error('Gemini analysis failed:', e)
+        errors.push(`Gemini: ${e.message}`)
+      }
     }
 
-    console.log(`Using ${apiKeyResult.source} API key for analysis`)
+    // 2. Try Anthropic if Gemini failed
+    if (!analysis) {
+      const anthropicKeyResult = await getUserApiKey(supabase, user_id || null, 'anthropic', 'ANTHROPIC_API_KEY')
+      if (anthropicKeyResult.apiKey) {
+        try {
+          console.log(`Using Anthropic (${anthropicKeyResult.source})`)
+          const result = await runTier1AnalysisAnthropic(image_url, estimated_resolution || 'medium', anthropicKeyResult.apiKey)
+          analysis = result.data
+          usageStats = result.usage
+          provider = 'anthropic'
+        } catch (e) {
+          console.error('Anthropic analysis failed:', e)
+          errors.push(`Anthropic: ${e.message}`)
+        }
+      }
+    }
 
-    // Quick analysis with OpenAI (using user's key if available)
-    const analysis = await runTier1Analysis(image_url, estimated_resolution || 'medium', apiKeyResult.apiKey)
+    // 3. Try OpenAI if others failed
+    if (!analysis) {
+      const openaiKeyResult = await getUserApiKey(supabase, user_id || null, 'openai', 'OPENAI_API_KEY')
+      if (openaiKeyResult.apiKey) {
+        try {
+          console.log(`Using OpenAI (${openaiKeyResult.source})`)
+          const result = await runTier1AnalysisOpenAI(image_url, estimated_resolution || 'medium', openaiKeyResult.apiKey)
+          analysis = result.data
+          usageStats = result.usage
+          provider = 'openai'
+        } catch (e) {
+          console.error('OpenAI analysis failed:', e)
+          errors.push(`OpenAI: ${e.message}`)
+        }
+      }
+    }
+
+    if (!analysis) {
+      if (errors.length === 0) errors.push('No valid API keys available')
+      throw new Error(`Analysis failed. ${errors.join(', ')}`)
+    }
     
     // Check for SPID sheet if vehicle_id is provided
     let spidData = null
@@ -61,12 +104,15 @@ serve(async (req) => {
         const spidResponse = await detectSPIDSheet(image_url, vehicle_id, supabase, user_id)
         if (spidResponse?.is_spid_sheet && spidResponse.confidence > 70) {
           spidData = spidResponse.extracted_data
-          console.log('✅ SPID sheet detected in tier1 analysis:', spidData)
+          console.log('✅ SPID sheet detected in tier1 analysis:', {
+            vin: spidData.vin,
+            model_code: spidData.model_code,
+            rpo_codes: spidData.rpo_codes?.length || 0,
+            confidence: spidResponse.confidence
+          })
           
-          // Save SPID data to dedicated table (triggers auto-verification)
-          const { error: spidSaveError } = await supabase
-            .from('vehicle_spid_data')
-            .upsert({
+          // Insert SPID data - this triggers comprehensive verification via database trigger
+          const { error: spidError } = await supabase.from('vehicle_spid_data').upsert({
               vehicle_id: vehicle_id,
               image_id: image_id,
               vin: spidData.vin || null,
@@ -75,27 +121,60 @@ serve(async (req) => {
               sequence_number: spidData.sequence_number || null,
               paint_code_exterior: spidData.paint_code_exterior || null,
               paint_code_interior: spidData.paint_code_interior || null,
+              rpo_codes: spidData.rpo_codes || [],
               engine_code: spidData.engine_code || null,
               transmission_code: spidData.transmission_code || null,
               axle_ratio: spidData.axle_ratio || null,
-              rpo_codes: spidData.rpo_codes || [],
               extraction_confidence: spidResponse.confidence,
               raw_text: spidResponse.raw_text || null,
-              extraction_model: 'gpt-4o'
-            }, {
-              onConflict: 'vehicle_id',
-              ignoreDuplicates: false
-            })
+              extraction_model: provider
+            }, { onConflict: 'vehicle_id', ignoreDuplicates: false })
           
-          if (spidSaveError) {
-            console.error('Failed to save SPID data:', spidSaveError)
+          if (spidError) {
+            console.error('Failed to store SPID data:', spidError)
           } else {
-            console.log('✅ SPID data saved - auto-verification triggered')
+            console.log('✅ SPID data stored - verification triggered automatically')
+            
+            // Trigger VIN decoding if VIN was extracted
+            if (spidData.vin) {
+              console.log(`🔍 Triggering VIN decode for: ${spidData.vin}`)
+              // The database trigger handles this, but we can also call directly for faster response
+              try {
+                const decodeResponse = await fetch(
+                  `${Deno.env.get('SUPABASE_URL')}/functions/v1/decode-vin`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${Deno.env.get('SERVICE_ROLE_KEY')}`
+                    },
+                    body: JSON.stringify({
+                      vin: spidData.vin,
+                      vehicle_id: vehicle_id,
+                      source: 'spid'
+                    })
+                  }
+                )
+                
+                if (decodeResponse.ok) {
+                  const decodeData = await decodeResponse.json()
+                  console.log('✅ VIN decoded:', {
+                    valid: decodeData.valid,
+                    year: decodeData.year,
+                    make: decodeData.make,
+                    model: decodeData.model
+                  })
+                } else {
+                  console.warn('VIN decode failed:', await decodeResponse.text())
+                }
+              } catch (decodeErr) {
+                console.warn('Failed to trigger VIN decode:', decodeErr)
+              }
+            }
           }
         }
       } catch (err) {
         console.warn('SPID detection failed in tier1:', err)
-        // Don't fail the whole analysis if SPID detection fails
       }
     }
     
@@ -115,6 +194,8 @@ serve(async (req) => {
           tier_1_analysis: analysis,
           processing_tier_reached: 1,
           scanned_at: new Date().toISOString(),
+          provider: provider,
+          usage: usageStats,
           ...(spidData ? { spid: spidData } : {})
         },
         image_category: analysis.category || 'exterior',
@@ -127,38 +208,18 @@ serve(async (req) => {
         updateData.estimated_resolution = estimated_resolution
       }
       
-      const { data: updatedImage, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from('vehicle_images')
         .update(updateData)
         .eq('id', image_id)
-        .select()
-        .single()
       
-      if (updateError) {
-        console.error('Failed to update image with analysis results:', updateError)
-        throw new Error(`Database update failed: ${updateError.message}`)
-      }
+      if (updateError) throw new Error(`Database update failed: ${updateError.message}`)
       
-      if (!updatedImage) {
-        console.error('Image update returned no data')
-        throw new Error('Image update returned no data')
-      }
-      
-      console.log('✅ Analysis results saved to database:', {
-        image_id,
-        has_tier1: !!updatedImage.ai_scan_metadata?.tier_1_analysis,
-        angle: updatedImage.angle,
-        category: updatedImage.category,
-        has_spid: !!spidData
-      })
+      console.log('✅ Analysis saved:', { image_id, provider, cost: usageStats?.cost })
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        tier: 1,
-        ...analysis
-      }),
+      JSON.stringify({ success: true, tier: 1, provider, usage: usageStats, ...analysis }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
@@ -171,11 +232,7 @@ serve(async (req) => {
   }
 })
 
-async function runTier1Analysis(imageUrl: string, estimatedResolution: string, openaiKey: string) {
-  if (!openaiKey) throw new Error('OpenAI API key not provided')
-
-  const prompt = `Analyze this vehicle image and provide basic organization data.
-
+const ANALYSIS_PROMPT = `Analyze this vehicle image and provide basic organization data.
 Return ONLY valid JSON with this structure:
 {
   "angle": "front_3quarter|front_center|rear_3quarter|rear_center|driver_side|passenger_side|overhead|undercarriage|interior_front|interior_rear|engine_bay|trunk|detail_shot|work_progress",
@@ -190,15 +247,117 @@ Return ONLY valid JSON with this structure:
     "overall_score": 1-10
   },
   "basic_observations": "Brief description"
+}`
+
+async function runTier1AnalysisGemini(imageUrl: string, estimatedResolution: string, apiKey: string) {
+  const imgResp = await fetch(imageUrl)
+  if (!imgResp.ok) throw new Error('Failed to fetch image for Gemini')
+  
+  const arrayBuffer = await imgResp.arrayBuffer()
+  const bytes = new Uint8Array(arrayBuffer)
+  
+  // Use Deno's standard library base64 encoder (robust, no stack limits)
+  const encodedBase64 = base64Encode(bytes)
+  const mimeType = imgResp.headers.get('content-type') || 'image/jpeg'
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: ANALYSIS_PROMPT },
+          { inline_data: { mime_type: mimeType, data: encodedBase64 } }
+        ]
+      }],
+      generationConfig: { response_mime_type: "application/json" }
+    })
+  })
+
+  if (!response.ok) {
+    const txt = await response.text()
+    throw new Error(`Gemini API error: ${response.status} - ${txt}`)
+  }
+
+  const data = await response.json()
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+  if (!text) throw new Error('Gemini returned no text')
+  
+  // Usage tracking
+  const usage = data.usageMetadata || {}
+  const usageStats = {
+    promptTokens: usage.promptTokenCount || 0,
+    outputTokens: usage.candidatesTokenCount || 0,
+    totalTokens: usage.totalTokenCount || 0,
+    cost: calculateCost('gemini', 'gemini-2.0-flash', usage.promptTokenCount || 0, usage.candidatesTokenCount || 0)
+  }
+
+  return { data: processAnalysisResult(text, estimatedResolution), usage: usageStats }
 }
 
-Be fast and accurate. This is for organization only.`
+async function runTier1AnalysisAnthropic(imageUrl: string, estimatedResolution: string, apiKey: string) {
+  const imageResponse = await fetch(imageUrl)
+  if (!imageResponse.ok) throw new Error('Failed to fetch image for Anthropic')
+  
+  const imageBuffer = await imageResponse.arrayBuffer()
+  const bytes = new Uint8Array(imageBuffer)
+  
+  // Use Deno's robust base64 encoder
+  const base64Image = base64Encode(bytes)
+  
+  let mediaType = imageResponse.headers.get('content-type') || 'image/jpeg'
+  if (mediaType.includes('jpg')) mediaType = 'image/jpeg'
 
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: "claude-3-haiku-20240307",
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: mediaType, data: base64Image }
+            },
+            { type: "text", text: ANALYSIS_PROMPT }
+          ]
+        }
+      ]
+    })
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Anthropic API error: ${response.status} - ${errorText}`)
+  }
+
+  const data = await response.json()
+  const content = data.content[0].text
+  
+  const usage = data.usage || {}
+  const usageStats = {
+    promptTokens: usage.input_tokens || 0,
+    outputTokens: usage.output_tokens || 0,
+    totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
+    cost: calculateCost('anthropic', 'claude-3-haiku', usage.input_tokens || 0, usage.output_tokens || 0)
+  }
+
+  return { data: processAnalysisResult(content, estimatedResolution), usage: usageStats }
+}
+
+async function runTier1AnalysisOpenAI(imageUrl: string, estimatedResolution: string, apiKey: string) {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openaiKey}`
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: "gpt-4o-mini",
@@ -208,13 +367,8 @@ Be fast and accurate. This is for organization only.`
         {
           role: "user",
           content: [
-            { type: "text", text: prompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: imageUrl
-              }
-            }
+            { type: "text", text: ANALYSIS_PROMPT },
+            { type: "image_url", image_url: { url: imageUrl } }
           ]
         }
       ]
@@ -222,23 +376,56 @@ Be fast and accurate. This is for organization only.`
   })
 
   if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`)
+    const txt = await response.text()
+    throw new Error(`OpenAI API error: ${response.status} - ${txt}`)
   }
 
   const data = await response.json()
-  const content = data.choices[0].message.content
-  
-  // Extract JSON from response
+  const usage = data.usage || {}
+  const usageStats = {
+    promptTokens: usage.prompt_tokens || 0,
+    outputTokens: usage.completion_tokens || 0,
+    totalTokens: usage.total_tokens || 0,
+    cost: calculateCost('openai', 'gpt-4o-mini', usage.prompt_tokens || 0, usage.completion_tokens || 0)
+  }
+
+  return { data: processAnalysisResult(data.choices[0].message.content, estimatedResolution), usage: usageStats }
+}
+
+function calculateCost(provider: string, model: string, inputTokens: number, outputTokens: number) {
+  let cost = 0;
+  // Prices per 1M tokens (as of late 2024/early 2025 estimates)
+  if (provider === 'gemini') {
+    // Gemini 1.5 Flash: Free tier available, otherwise ~$0.35/1M input, $1.05/1M output
+    // Assuming paid tier for scale
+    cost = (inputTokens / 1000000 * 0.35) + (outputTokens / 1000000 * 1.05);
+  } else if (provider === 'openai') {
+    // gpt-4o-mini: $0.15 / 1M input, $0.60 / 1M output
+    cost = (inputTokens / 1000000 * 0.15) + (outputTokens / 1000000 * 0.60);
+  } else if (provider === 'anthropic') {
+    // claude-3-haiku: $0.25 / 1M input, $1.25 / 1M output
+    cost = (inputTokens / 1000000 * 0.25) + (outputTokens / 1000000 * 1.25);
+  }
+  return Number(cost.toFixed(6));
+}
+
+function processAnalysisResult(jsonString: string, estimatedResolution: string) {
   let result;
   try {
-    result = JSON.parse(content)
+    result = JSON.parse(jsonString)
   } catch (e) {
-    console.error('Failed to parse JSON response:', content)
-    throw new Error('Invalid JSON response from AI')
+    const match = jsonString.match(/```json\n([\s\S]*)\n```/) || jsonString.match(/\{[\s\S]*\}/)
+    if (match) {
+      try {
+        result = JSON.parse(match[1] || match[0])
+      } catch (e2) {
+        throw new Error('Invalid JSON from AI')
+      }
+    } else {
+      throw new Error('Invalid JSON from AI')
+    }
   }
-  
-  // Ensure image_quality exists
+
   if (!result.image_quality) {
     result.image_quality = {
       lighting: 'adequate',
@@ -249,10 +436,7 @@ Be fast and accurate. This is for organization only.`
     }
   }
   
-  // Enhance with resolution info
   result.image_quality.estimated_resolution = estimatedResolution
-  
-  // Determine if suitable for expert analysis
   result.image_quality.suitable_for_expert = (
     estimatedResolution === 'high' &&
     result.image_quality.focus === 'sharp' &&

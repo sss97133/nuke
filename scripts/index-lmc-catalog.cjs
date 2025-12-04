@@ -1,10 +1,26 @@
 #!/usr/bin/env node
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const pdfParse = require('pdf-parse');
 
-const SUPABASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co';
-const SUPABASE_SERVICE_KEY = 'REDACTED-ROTATE-THIS-KEY';
-const GEMINI_API_KEY = 'AIzaSyCTXqzxp5oRPoW745dHZjGDQ2yFOd4fvDQ';
+// Load credentials from environment variables
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// Validate required environment variables
+if (!SUPABASE_URL) {
+  console.error('ERROR: VITE_SUPABASE_URL environment variable is required');
+  process.exit(1);
+}
+if (!SUPABASE_SERVICE_KEY) {
+  console.error('ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+  process.exit(1);
+}
+if (!GEMINI_API_KEY) {
+  console.error('ERROR: GEMINI_API_KEY environment variable is required');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 const PDF_URL = 'https://qkgaybvrernstplzjaam.supabase.co/storage/v1/object/public/reference-docs/lmc%20catalog/ccComplete.pdf';

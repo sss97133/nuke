@@ -214,8 +214,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[Contextual Batch Analyzer] Error:', error)
+    console.error('[Contextual Batch Analyzer] Stack:', error.stack)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        stack: error.stack
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
@@ -247,6 +251,10 @@ async function loadCompleteContext(
     .select('id, image_url, taken_at')
     .in('id', imageIds)
     .order('taken_at', { ascending: true })
+
+  if (!images || images.length === 0) {
+    throw new Error('No images found for the provided image IDs')
+  }
 
   const takenDates = images.map(img => img.taken_at).filter(Boolean)
   const earliest = takenDates[0] ? new Date(takenDates[0]) : new Date()
@@ -483,9 +491,74 @@ VALUE CALCULATION (use real dollar amounts):
 - Market Comparison: What would a shop charge for this exact work?
 - Total Event Value: What is this work session worth in real dollars?
 
-Provide detailed reasoning for all value calculations. Use market knowledge of typical labor rates and times.
+CRITICAL: You MUST respond with VALID JSON matching this EXACT structure:
 
-Respond in JSON format matching the SituationalAnalysis interface.`
+{
+  "who": {
+    "primary_actor": "string",
+    "skill_level": "professional" | "skilled_enthusiast" | "diy_learner" | "helper",
+    "involvement_type": "hands_on_work" | "supervision" | "documentation" | "assistance"
+  },
+  "what": {
+    "work_performed": "string - detailed description",
+    "work_category": "maintenance" | "repair" | "restoration" | "modification" | "inspection" | "documentation",
+    "components_affected": ["array", "of", "strings"],
+    "tools_equipment_used": ["array"],
+    "parts_materials": ["array"]
+  },
+  "when": {
+    "session_date": "YYYY-MM-DD",
+    "estimated_duration_hours": number,
+    "time_of_day_indicator": "morning" | "afternoon" | "evening" | "night" | "unknown",
+    "is_continuation": boolean,
+    "continuation_of": "string or null",
+    "is_preparation": boolean,
+    "preparation_for": "string or null"
+  },
+  "where": {
+    "work_location": "professional_shop" | "home_garage" | "driveway" | "mobile" | "unknown",
+    "location_indicators": ["array"],
+    "environment_quality": "professional" | "well_equipped" | "basic" | "minimal"
+  },
+  "why": {
+    "primary_motivation": "string",
+    "problem_being_solved": "string or null",
+    "goal_being_achieved": "string",
+    "preventive_vs_reactive": "preventive" | "reactive" | "improvement" | "emergency",
+    "necessity_level": "critical" | "important" | "beneficial" | "optional"
+  },
+  "value_assessment": {
+    "labor_value": {
+      "estimated_hours": number,
+      "skill_rate_per_hour": number,
+      "total_labor_value": number
+    },
+    "documentation_value": {
+      "photo_quality": "excellent" | "good" | "adequate" | "poor",
+      "documentation_completeness": number,
+      "estimated_value": number
+    },
+    "vehicle_impact": {
+      "impact_type": "increases_value" | "maintains_value" | "prevents_loss" | "neutral",
+      "estimated_impact_amount": number,
+      "explanation": "string"
+    },
+    "market_comparison": {
+      "shop_cost_equivalent": number,
+      "savings_realized": number,
+      "parts_cost_estimate": number
+    },
+    "total_event_value": number,
+    "value_confidence": number
+  },
+  "narrative_summary": "One paragraph story",
+  "relationship_to_vehicle_history": "string",
+  "patterns_detected": ["array"],
+  "confidence_score": number (0-100),
+  "reasoning": "string"
+}
+
+Return ONLY the JSON object. No markdown, no explanations, just pure JSON.`
       },
       ...context.imageBatch.image_urls.slice(0, 20).map(url => ({
         type: 'image' as const,
@@ -505,11 +578,10 @@ Respond in JSON format matching the SituationalAnalysis interface.`
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-opus-20240229',
       max_tokens: 4000,
       system: systemPrompt,
-      messages: [userMessage],
-      response_format: { type: 'json_object' }
+      messages: [userMessage]
     })
   })
 
@@ -545,8 +617,9 @@ function calculateUserCommitmentScore(
   context: BatchContext,
   analysis: SituationalAnalysis
 ): UserCommitmentScore {
-  // Time investment score (0-30 points)
-  const timeInvestmentScore = Math.min(30, (analysis.estimated_work_hours || 0) * 2)
+  // Time investment score (0-30 points) - from the new 5 W's structure
+  const estimatedHours = analysis.when?.estimated_duration_hours || analysis.value_assessment?.labor_value?.estimated_hours || 0
+  const timeInvestmentScore = Math.min(30, estimatedHours * 2)
 
   // Consistency score (0-25 points)
   const consistencyScore = context.userPatterns.total_contributions >= 20 ? 25
@@ -555,10 +628,11 @@ function calculateUserCommitmentScore(
     : context.userPatterns.total_contributions >= 2 ? 10
     : 5
 
-  // Quality score (0-25 points) - based on work quality indicators
-  const qualityScore = analysis.work_quality_indicator === 'professional' ? 25
-    : analysis.work_quality_indicator === 'skilled_diy' ? 20
-    : analysis.work_quality_indicator === 'amateur' ? 10
+  // Quality score (0-25 points) - based on skill level from WHO section
+  const skillLevel = analysis.who?.skill_level || 'diy_learner'
+  const qualityScore = skillLevel === 'professional' ? 25
+    : skillLevel === 'skilled_enthusiast' ? 20
+    : skillLevel === 'diy_learner' ? 10
     : 5
 
   // Engagement score (0-20 points) - based on batch frequency
@@ -598,38 +672,25 @@ async function saveContextualAnalysis(
   analysis: SituationalAnalysis,
   commitmentScore: UserCommitmentScore
 ) {
-  // Save to timeline event metadata
+  // Save the complete 5 W's analysis to timeline event metadata
   const { error } = await supabase
     .from('timeline_events')
     .update({
       metadata: {
         contextual_analysis: {
-          situation_summary: analysis.situation_summary,
-          work_type: analysis.work_type,
-          work_category: analysis.work_category,
-          primary_activity: analysis.primary_activity,
-          components_involved: analysis.components_involved,
-          temporal_relationships: {
-            is_continuation: analysis.is_continuation,
-            continuation_of: analysis.continuation_of,
-            is_preparation: analysis.is_preparation,
-            preparation_for: analysis.preparation_for,
-            is_standalone: analysis.is_standalone
-          },
-          time_investment: {
-            estimated_work_hours: analysis.estimated_work_hours,
-            estimated_session_duration_hours: analysis.estimated_session_duration_hours
-          },
-          user_involvement: {
-            level: analysis.user_involvement_level,
-            skill_indicators: analysis.user_skill_indicators,
-            commitment_indicators: analysis.user_commitment_indicators
-          },
-          contextual_insights: {
-            relationship_to_previous_work: analysis.relationship_to_previous_work,
-            relationship_to_vehicle_history: analysis.relationship_to_vehicle_history,
-            patterns_detected: analysis.patterns_detected
-          },
+          // The 5 W's
+          who: analysis.who,
+          what: analysis.what,
+          when: analysis.when,
+          where: analysis.where,
+          why: analysis.why,
+          // Value Assessment
+          value_assessment: analysis.value_assessment,
+          // Narrative and Context
+          narrative_summary: analysis.narrative_summary,
+          relationship_to_vehicle_history: analysis.relationship_to_vehicle_history,
+          patterns_detected: analysis.patterns_detected,
+          // Metadata
           confidence_score: analysis.confidence_score,
           reasoning: analysis.reasoning,
           analyzed_at: new Date().toISOString()
@@ -644,7 +705,8 @@ async function saveContextualAnalysis(
           factors: commitmentScore.factors,
           calculated_at: new Date().toISOString()
         }
-      }
+      },
+      contextual_analysis_status: 'completed'
     })
     .eq('id', eventId)
 
@@ -660,12 +722,16 @@ async function updateTimelineEvent(
   analysis: SituationalAnalysis,
   commitmentScore: UserCommitmentScore
 ) {
-  // Update event title and description with contextual understanding
+  // Update event title and description with contextual understanding from 5 W's
+  const components = analysis.what?.components_affected?.join(', ') || 'Unknown components'
+  const workPerformed = analysis.what?.work_performed || analysis.narrative_summary
+  const estimatedHours = analysis.when?.estimated_duration_hours || analysis.value_assessment?.labor_value?.estimated_hours || 0
+  
   const { error } = await supabase
     .from('timeline_events')
     .update({
-      title: analysis.situation_summary || analysis.primary_activity,
-      description: `${analysis.situation_summary}\n\nWork type: ${analysis.work_type}\nComponents: ${analysis.components_involved.join(', ')}\nEstimated time: ${analysis.estimated_work_hours || 0} hours\nUser commitment level: ${commitmentScore.level} (${commitmentScore.overall_commitment}/100)`
+      title: workPerformed?.substring(0, 100) || 'Work session',
+      description: `${analysis.narrative_summary}\n\nWork category: ${analysis.what?.work_category}\nComponents: ${components}\nEstimated time: ${estimatedHours} hours\nTotal value: $${analysis.value_assessment?.total_event_value || 0}\nUser commitment level: ${commitmentScore.level} (${commitmentScore.overall_commitment}/100)`
     })
     .eq('id', eventId)
 

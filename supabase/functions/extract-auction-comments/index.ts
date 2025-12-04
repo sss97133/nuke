@@ -1,0 +1,192 @@
+/**
+ * EXTRACT AUCTION COMMENTS
+ * Pulls all comments from a BaT auction and analyzes them
+ */
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+    )
+
+    const { auction_url, auction_event_id } = await req.json()
+    if (!auction_url) throw new Error('Missing auction_url')
+
+    console.log(`Extracting comments from: ${auction_url}`)
+
+    // Use Firecrawl to get JavaScript-rendered page
+    const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
+    let html = ''
+    
+    if (firecrawlKey) {
+      const fcResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${firecrawlKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: auction_url,
+          waitFor: 3000,
+          formats: ['html']
+        })
+      })
+      
+      if (fcResp.ok) {
+        const fcData = await fcResp.json()
+        html = fcData.data?.html || ''
+      }
+    }
+    
+    // Fallback to direct fetch if Firecrawl fails
+    if (!html) {
+      const response = await fetch(auction_url)
+      html = await response.text()
+    }
+    
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+
+    // Extract auction metadata
+    const auctionEndMatch = html.match(/Auction ended?[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i)
+    const auctionEndDate = auctionEndMatch ? new Date(auctionEndMatch[1]) : new Date()
+
+    // Extract all comments
+    const commentElements = doc.querySelectorAll('.comment')
+    const comments = []
+    
+    for (let i = 0; i < commentElements.length; i++) {
+      const el = commentElements[i]
+      
+      // Extract fields
+      const dateText = el.querySelector('.comment-datetime')?.textContent?.trim() || ''
+      const authorEl = el.querySelector('[data-bind*="authorName"]')
+      const author = authorEl?.textContent?.trim() || 'Unknown'
+      const textEl = el.querySelector('p')
+      const text = textEl?.textContent?.trim() || ''
+      
+      if (!text) continue // Skip empty
+      
+      // Parse date (format: "Nov 21 at 3:38 PM")
+      const posted_at = parseBaTDate(dateText, auctionEndDate)
+      const hours_until_close = (auctionEndDate.getTime() - posted_at.getTime()) / (1000 * 60 * 60)
+      
+      // Detect comment type
+      const isSeller = el.classList.contains('bat_seller_comment')
+      const isBid = text.includes('bid placed by')
+      const isSold = text.includes('Sold on') || text.includes('sold for')
+      
+      const comment_type = 
+        isSold ? 'sold' :
+        isBid ? 'bid' :
+        isSeller ? 'seller_response' :
+        text.includes('?') ? 'question' :
+        'observation'
+      
+      // Extract bid amount
+      const bidMatch = text.match(/\$([0-9,]+)\s+bid placed by/)
+      const bid_amount = bidMatch ? parseFloat(bidMatch[1].replace(/,/g, '')) : null
+      
+      // Extract likes
+      const authorLikesEl = el.querySelector('.total-likes')
+      const authorLikes = extractNumber(authorLikesEl?.textContent)
+      
+      const commentLikesEl = el.querySelector('.comment-actions-approve')
+      const commentLikes = extractNumber(commentLikesEl?.textContent)
+      
+      // Media detection
+      const has_video = text.toLowerCase().includes('cold start') || text.toLowerCase().includes('video')
+      const has_image = el.querySelector('img') !== null
+      
+      comments.push({
+        auction_event_id,
+        sequence_number: i + 1,
+        posted_at: posted_at.toISOString(),
+        hours_until_close: Math.max(0, hours_until_close),
+        author_username: author,
+        is_seller: isSeller,
+        author_total_likes: authorLikes,
+        comment_type,
+        comment_text: text,
+        word_count: text.split(/\s+/).length,
+        has_question: text.includes('?'),
+        has_media: has_video || has_image,
+        bid_amount,
+        comment_likes: commentLikes
+      })
+    }
+
+    console.log(`Extracted ${comments.length} comments`)
+
+    // Store comments
+    if (comments.length > 0) {
+      const { error } = await supabase
+        .from('auction_comments')
+        .insert(comments)
+      
+      if (error) throw error
+    }
+
+    // Trigger AI analysis on comments (async, don't wait)
+    if (comments.length > 0) {
+      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-auction-comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify({ auction_event_id })
+      }).catch(e => console.error('Failed to trigger analysis:', e))
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      comments_extracted: comments.length,
+      auction_event_id
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
+  } catch (error) {
+    console.error('Error:', error)
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+})
+
+function parseBaTDate(dateStr: string, referenceDate: Date): Date {
+  // "Nov 21 at 3:38 PM" -> actual date
+  const match = dateStr.match(/([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)\s+(AM|PM)/)
+  if (!match) return new Date()
+  
+  const [, month, day, hour, minute, ampm] = match
+  const year = referenceDate.getFullYear()
+  
+  const date = new Date(`${month} ${day}, ${year}`)
+  let hours = parseInt(hour)
+  if (ampm === 'PM' && hours !== 12) hours += 12
+  if (ampm === 'AM' && hours === 12) hours = 0
+  
+  date.setHours(hours, parseInt(minute))
+  return date
+}
+
+function extractNumber(text: string | null | undefined): number {
+  if (!text) return 0
+  const match = text.match(/(\d+)/)
+  return match ? parseInt(match[1]) : 0
+}
+

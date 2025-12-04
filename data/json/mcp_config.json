@@ -18,11 +18,10 @@
       "args": [
         "-y",
         "@supabase/mcp-server-supabase@latest",
-        "--project-ref=qkgaybvrernstplzjaam",
-        "--access-token=REDACTED-ROTATE-THIS-KEY"
+        "--project-ref=qkgaybvrernstplzjaam"
       ],
       "env": {
-        "supabase_access_token": "REDACTED-ROTATE-THIS-KEY"
+        "supabase_access_token": "${SUPABASE_ACCESS_TOKEN}"
       }
     },
     "playwright": {
@@ -43,7 +42,7 @@
       "command": "npx",
       "args": ["-y", "firecrawl-mcp"],
       "env": {
-        "FIRECRAWL_API_KEY": "REDACTED-ROTATE-THIS-KEY"
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
       }
     },
     "mendable-mcp": {

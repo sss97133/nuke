@@ -59,8 +59,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. SET SERVICE KEY (REPLACE WITH YOUR KEY!)
-ALTER DATABASE postgres SET app.settings.service_role_key = 'REDACTED-ROTATE-THIS-KEY';
+-- 3. SET SERVICE KEY (REPLACE WITH YOUR ACTUAL SERVICE ROLE KEY!)
+-- Get your service role key from: https://supabase.com/dashboard/project/YOUR_PROJECT/settings/api
+ALTER DATABASE postgres SET app.settings.service_role_key = 'YOUR_SERVICE_ROLE_KEY_HERE';
 
 -- 4. SETUP DAILY SCRAPING
 CREATE EXTENSION IF NOT EXISTS pg_cron;

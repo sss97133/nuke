@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { VehicleValuationService } from '../../services/vehicleValuationService';
 import TradePanel from '../../components/trading/TradePanel';
 import { VehicleDeduplicationService } from '../../services/vehicleDeduplicationService';
+import { ValueProvenancePopup } from '../../components/ValueProvenancePopup';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -70,6 +71,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const pendingDetailsRef = useRef<HTMLDivElement | null>(null);
   const [showOriginDetails, setShowOriginDetails] = useState(false);
   const originDetailsRef = useRef<HTMLDivElement | null>(null);
+  const [showProvenancePopup, setShowProvenancePopup] = useState(false);
 
   // Only fetch if not provided via props (eliminates duplicate query)
   useEffect(() => {
@@ -767,15 +769,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         className="vehicle-price-header"
       style={{
         background: 'var(--surface)',
-        border: 'none',
-        borderTop: 'none',
-        borderRight: 'none',
-        borderLeft: 'none',
         borderBottom: '1px solid var(--border)',
-        padding: '2px 8px',
+        padding: '3px 8px',
         margin: 0,
-        marginTop: 0,
-        marginBottom: 0,
         marginLeft: 'calc(-1 * var(--space-2))',
         marginRight: 'calc(-1 * var(--space-2))',
         position: 'sticky',
@@ -786,20 +782,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         maxWidth: '100vw',
         zIndex: 97,
         boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
-        height: '28px',
-        minHeight: '28px',
-        maxHeight: '28px',
         display: 'flex',
         alignItems: 'center',
-        lineHeight: '28px',
         boxSizing: 'border-box'
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center', gap: '6px', width: '100%', overflow: 'hidden', height: '100%' }}>
-        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', overflow: 'hidden', height: '100%' }}>
-          <div style={{ fontSize: '8pt', fontWeight: 700, lineHeight: '28px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center', gap: '6px', width: '100%' }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', overflow: 'hidden' }}>
+          <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {identityLabel}
-          </div>
+          </span>
           {vehicle && (vehicle as any).profile_origin && (() => {
             // Don't show origin badge if we're showing organization name (avoid duplication)
             const isAutomatedImport = vehicle?.profile_origin === 'dropbox_import' && 
@@ -812,7 +804,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             if (isOrgName) return null;
             
             return (
-              <div style={{ fontSize: '7pt', color: mutedTextColor, padding: '1px 6px', background: 'var(--grey-100)', borderRadius: '3px', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '7pt', color: mutedTextColor, padding: '1px 6px', background: 'var(--grey-100)', borderRadius: '3px', whiteSpace: 'nowrap' }}>
                 {(() => {
                   const origin = (vehicle as any).profile_origin;
                   const originLabels: Record<string, string> = {
@@ -824,7 +816,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   };
                   return originLabels[origin] || origin;
                 })()}
-              </div>
+              </span>
             );
           })()}
           <div style={{ position: 'relative', fontSize: '7pt', color: mutedTextColor, display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
@@ -844,16 +836,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   background: '#f0fdf4',
                   color: '#15803d',
                   fontWeight: 600,
-                  padding: '2px 8px',
+                  padding: '1px 8px',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '8pt',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
+                  fontSize: '8pt'
                 }}
               >
-                <span>✓</span> Your Vehicle
+                Your Vehicle
               </button>
             ) : isPending ? (
               <div style={{ position: 'relative' }} ref={pendingDetailsRef}>
@@ -869,7 +858,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     background: '#fef3c7',
                     color: '#92400e',
                     fontWeight: 600,
-                    padding: '2px 8px',
+                    padding: '1px 8px',
                     borderRadius: '4px',
                     cursor: 'pointer',
                     fontSize: '8pt'
@@ -1237,7 +1226,21 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               style={{ fontSize: '9pt', fontWeight: 700, color: baseTextColor, lineHeight: 1, display: 'flex', alignItems: 'center', gap: 6 }}
               title={priceWasCorrected ? 'Price was auto-corrected from listing (e.g., $15 -> $15,000)' : undefined}
             >
-              {priceText}
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowProvenancePopup(true);
+                }}
+                style={{
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  textDecorationStyle: 'dotted',
+                  textDecorationColor: 'rgba(0,0,0,0.3)'
+                }}
+                title="Click to see data source and confidence"
+              >
+                {priceText}
+              </span>
               {priceWasCorrected && (
                 <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 500 }}>*</span>
               )}
@@ -1256,6 +1259,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   whiteSpace: 'nowrap'
                 }}>
                   {auctionContext.badge.text}
+                </span>
+              )}
+              
+              {/* VIN Authority Badge */}
+              {vehicle.vin && vehicle.vin.length >= 11 && (
+                <span 
+                  style={{
+                    fontSize: '6pt',
+                    fontWeight: 700,
+                    color: '#22c55e',
+                    background: '#dcfce7',
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    letterSpacing: '0.5px',
+                    lineHeight: 1
+                  }}
+                  title="Factory specs verified via VIN decode"
+                >
+                  VIN VERIFIED
                 </span>
               )}
               
@@ -1414,6 +1436,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showProvenancePopup && vehicle && primaryAmount !== null && (
+        <ValueProvenancePopup
+          vehicleId={vehicle.id}
+          field="current_value"
+          value={primaryAmount}
+          onClose={() => setShowProvenancePopup(false)}
+          onUpdate={(newValue) => {
+            // Optionally refresh the vehicle data or update local state
+            setShowProvenancePopup(false);
+            window.location.reload(); // Simple refresh for now
+          }}
+        />
       )}
     </div>
   );

@@ -7,6 +7,7 @@
  * that aren't tracked in vehicle_images table, then creates proper records.
  */
 
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://qkgaybvrernstplzjaam.supabase.co';

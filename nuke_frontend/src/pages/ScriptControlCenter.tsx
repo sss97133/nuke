@@ -95,6 +95,38 @@ export default function ScriptControlCenter() {
     }
   }, [autoRefresh]);
 
+  async function triggerScript(scriptName: string) {
+    console.log('Triggering:', scriptName);
+    
+    // Map script names to Edge Function endpoints or actions
+    const actions: Record<string, () => Promise<void>> = {
+      'Tier 1 Organization': async () => {
+        // Trigger batch processing
+        const { data, error } = await supabase.rpc('process_tier1_batch');
+        if (error) alert('Error: ' + error.message);
+        else alert('Triggered Tier 1 batch processing! Check progress in Monitor.');
+        loadScriptStatus();
+      },
+      'Tier 2 Parts': async () => {
+        alert('Tier 2 is scheduled to run automatically on suitable images. Check Monitor for progress.');
+      },
+      'Gap Identification': async () => {
+        alert('Gap finder runs automatically during Tier 2 analysis.');
+      },
+      'Profile Completeness': async () => {
+        // Could trigger a completeness recalculation
+        alert('Completeness scores update automatically on vehicle changes.');
+      }
+    };
+
+    const action = actions[scriptName];
+    if (action) {
+      await action();
+    } else {
+      alert('Script trigger not implemented yet for: ' + scriptName);
+    }
+  }
+
   async function loadScriptStatus() {
     try {
       const statusList: ScriptStatus[] = [];
@@ -316,23 +348,16 @@ export default function ScriptControlCenter() {
                   <button
                     className="button button-primary cursor-button"
                     style={{ flex: 1, fontSize: '8pt', padding: '8px' }}
-                    onClick={() => alert('Start script: ' + script.name)}
+                    onClick={() => triggerScript(script.name)}
                   >
-                    Start
-                  </button>
-                  <button
-                    className="button button-secondary cursor-button"
-                    style={{ flex: 1, fontSize: '8pt', padding: '8px', color: 'var(--error)', borderColor: 'var(--error)' }}
-                    onClick={() => alert('Stop script: ' + script.name)}
-                  >
-                    Stop
+                    Trigger Now
                   </button>
                   <button
                     className="button button-secondary cursor-button"
                     style={{ fontSize: '8pt', padding: '8px' }}
-                    onClick={() => alert('View details: ' + script.name)}
+                    onClick={() => window.open('/admin/image-processing', '_blank')}
                   >
-                    Details
+                    Monitor
                   </button>
                 </div>
 

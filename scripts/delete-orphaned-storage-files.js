@@ -5,6 +5,7 @@
  * Removes the 23 orphaned images from storage since they have no database records
  */
 
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://qkgaybvrernstplzjaam.supabase.co';

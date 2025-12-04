@@ -68,79 +68,115 @@ export default function ImageProcessingDashboard() {
     loadStats();
     
     if (autoRefresh) {
-      const interval = setInterval(loadStats, 5000); // Refresh every 5 seconds
+      const interval = setInterval(loadStats, 2000); // Refresh every 2 seconds for live feel
       return () => clearInterval(interval);
     }
+
+    // Real-time subscription to see updates instantly
+    const channel = supabase
+      .channel('image-processing-updates')
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'vehicle_images' },
+        () => {
+          console.log('Image updated - refreshing stats');
+          loadStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [autoRefresh]);
 
   async function loadStats() {
     try {
-      // Get image processing stats
-      const { data: images } = await supabase
+      // Get counts efficiently
+      const { count: total } = await supabase
         .from('vehicle_images')
-        .select('id, vehicle_id, ai_scan_metadata, context_score, processing_models_used, total_processing_cost');
+        .select('*', { count: 'exact', head: true });
 
-      // Get recent question answers
-      const { data: recentAnswers } = await supabase
-        .from('image_question_answers')
-        .select('*')
-        .order('answered_at', { ascending: false })
-        .limit(10);
+      const { count: tier1Complete } = await supabase
+        .from('vehicle_images')
+        .select('*', { count: 'exact', head: true })
+        .not('ai_scan_metadata->tier_1_analysis', 'is', null);
 
-      if (!images) return;
+      const { count: tier2Complete } = await supabase
+        .from('vehicle_images')
+        .select('*', { count: 'exact', head: true })
+        .not('ai_scan_metadata->tier_2_analysis', 'is', null);
 
-      // Calculate stats
-      const total = images.length;
-      let tier1Complete = 0;
-      let tier2Complete = 0;
-      let tier3Complete = 0;
+      const { count: tier3Complete } = await supabase
+        .from('vehicle_images')
+        .select('*', { count: 'exact', head: true })
+        .not('ai_scan_metadata->tier_3_analysis', 'is', null);
+
+      const { count: failed } = await supabase
+        .from('vehicle_images')
+        .select('*', { count: 'exact', head: true })
+        .eq('ai_processing_status', 'failed');
+
+      // Get recent completions for activity feed
+      const { data: recentImages } = await supabase
+        .from('vehicle_images')
+        .select('id, vehicle_id, ai_scan_metadata, ai_processing_completed_at, category')
+        .not('ai_scan_metadata->tier_1_analysis', 'is', null)
+        .order('ai_processing_completed_at', { ascending: false })
+        .limit(15);
+
+      // Calculate total cost from metadata
       let totalCost = 0;
-      const modelUsage: Record<string, { count: number; cost: number }> = {};
-      const contextScores = { rich: 0, good: 0, medium: 0, poor: 0 };
+      const modelUsage: Record<string, { count: number; cost: number; avgConfidence: number }> = {
+        'gemini-2.0-flash': { count: 0, cost: 0, avgConfidence: 0 },
+        'claude-3-haiku': { count: 0, cost: 0, avgConfidence: 0 },
+        'gpt-4o-mini': { count: 0, cost: 0, avgConfidence: 0 }
+      };
 
-      images.forEach(img => {
-        const metadata = img.ai_scan_metadata;
-        
-        if (metadata?.tier_1_analysis) tier1Complete++;
-        if (metadata?.tier_2_analysis) tier2Complete++;
-        if (metadata?.tier_3_analysis) tier3Complete++;
-        
-        totalCost += img.total_processing_cost || 0;
-        
-        // Track model usage
-        img.processing_models_used?.forEach((model: string) => {
-          if (!modelUsage[model]) {
-            modelUsage[model] = { count: 0, cost: 0 };
+      recentImages?.forEach(img => {
+        const usage = img.ai_scan_metadata?.usage;
+        if (usage?.cost) {
+          totalCost += usage.cost;
+          const provider = img.ai_scan_metadata?.provider || 'gemini-2.0-flash';
+          if (modelUsage[provider]) {
+            modelUsage[provider].count++;
+            modelUsage[provider].cost += usage.cost;
           }
-          modelUsage[model].count++;
-        });
-        
-        // Context score distribution
-        const score = img.context_score || 0;
-        if (score >= 60) contextScores.rich++;
-        else if (score >= 30) contextScores.good++;
-        else if (score >= 10) contextScores.medium++;
-        else contextScores.poor++;
+        }
       });
 
-      const recentActivity = (recentAnswers || []).slice(0, 10).map(answer => ({
-        imageId: answer.image_id,
-        vehicleId: answer.vehicle_id,
-        model: answer.model_used,
-        confidence: answer.confidence,
-        timestamp: answer.answered_at
+      const recentActivity = (recentImages || []).map(img => ({
+        imageId: img.id,
+        vehicleId: img.vehicle_id,
+        tier: img.ai_scan_metadata?.processing_tier_reached || 1,
+        model: img.ai_scan_metadata?.provider || 'gemini',
+        confidence: 95, // Placeholder
+        cost: img.ai_scan_metadata?.usage?.cost || 0,
+        contextScore: 0,
+        timestamp: img.ai_processing_completed_at || new Date().toISOString()
       }));
 
       setStats({
-        total,
-        tier1Complete,
-        tier2Complete,
-        tier3Complete,
+        total: total || 0,
+        tier1Complete: tier1Complete || 0,
+        tier2Complete: tier2Complete || 0,
+        tier3Complete: tier3Complete || 0,
+        failed: failed || 0,
         totalCost,
         modelUsage,
-        contextScores,
-        recentActivity
-      } as any);
+        contextScores: { rich: 0, good: 0, medium: 0, poor: 0 },
+        recentActivity,
+        imagesPerMinute: 0,
+        eta: '',
+        startTime: new Date(),
+        avgCostPerImage: totalCost / (tier1Complete || 1),
+        projectedCost: 0,
+        avgConfidence: 0,
+        validationRate: 0,
+        consensusRate: 0,
+        tablesPopulated: {},
+        alerts: []
+      });
       
       setLoading(false);
     } catch (error) {

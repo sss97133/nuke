@@ -3,8 +3,15 @@
  * Test Firecrawl API directly to verify the key works
  */
 
-const FIRECRAWL_KEY = 'REDACTED-ROTATE-THIS-KEY';
+require('dotenv').config();
+
+const FIRECRAWL_KEY = process.env.FIRECRAWL_API_KEY;
 const TEST_URL = 'https://cars.ksl.com/listing/10323198';
+
+if (!FIRECRAWL_KEY) {
+  console.error('ERROR: FIRECRAWL_API_KEY environment variable is required');
+  process.exit(1);
+}
 
 async function testFirecrawl() {
   console.log('🔥 Testing Firecrawl API directly...\n');
