@@ -328,15 +328,26 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
     return Math.min(modValue, 15000); // Cap at $15k
   };
 
-  const calculateConfidence = (vehicle: any, tags: any[], imageCount: number) => {
-    let confidence = 70; // Base confidence
+  const calculateConfidence = (vehicle: any, tags: any[], imageCount: number, hasReceipts: boolean = false) => {
+    // HONEST CONFIDENCE - no fake 70% base
+    // Per VALUE_PROVENANCE_POPUP_USAGE.md:
+    // - No evidence = 30% (or hide)
+    // - Manual entry = 50%
+    // - CSV/estimate = 75%
+    // - Verified receipts = 95%
+    
+    if (hasReceipts) return 95; // Verified receipts
+    
+    let confidence = 30; // No evidence baseline (was 70% - WRONG)
 
-    if (vehicle.vin) confidence += 10;
-    if (vehicle.mileage) confidence += 5;
-    if (tags.length > 5) confidence += 10; // Good documentation
-    if (imageCount > 10) confidence += 5; // Good photo coverage
+    // Small bonuses for basic data quality
+    if (vehicle.vin) confidence += 10; // VIN verified
+    if (vehicle.mileage) confidence += 5; // Mileage known
+    if (tags.length > 5) confidence += 5; // Some documentation
+    if (imageCount > 10) confidence += 5; // Photo coverage
 
-    return Math.min(confidence, 95);
+    // Don't show estimates below 50% - too unreliable
+    return Math.min(confidence, 55); // Cap at 55% for estimates without receipts
   };
 
   const buildDataSources = (vehicle: any, tags: any[], imageCount: number) => {

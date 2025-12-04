@@ -1089,8 +1089,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                            !vehicle?.uploaded_by);
                 const isOrgName = isAutomatedImport && vehicle?.origin_organization_id;
                 
+                // Check if this is a discovered vehicle (scraped, not owned)
+                const isDiscoveredVehicle = Boolean(
+                  (vehicle as any)?.discovery_url || 
+                  (vehicle as any)?.discovery_source ||
+                  ['craigslist_scrape', 'ksl_import', 'bat_import', 'url_scraper'].includes((vehicle as any)?.profile_origin)
+                );
+                
+                const relationshipLabel = isDiscoveredVehicle ? 'Discovered by ' : '';
+                
                 return (
-                  <button
+                  <>
+                    {relationshipLabel && (
+                      <span style={{ fontSize: '8pt', color: mutedTextColor, marginRight: '4px' }}>
+                        {relationshipLabel}
+                      </span>
+                    )}
+                    <button
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
@@ -1121,6 +1136,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   >
                     {responsibleName}
                   </button>
+                  </>
                 );
               })()
             ) : (
