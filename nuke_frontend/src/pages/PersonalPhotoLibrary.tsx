@@ -319,10 +319,23 @@ export const PersonalPhotoLibrary: React.FC = () => {
   const handleSubmitToVehicle = async () => {
     if (!submitVehicleId || selectedPhotos.size === 0) return;
     
+    // Get vehicle details for confirmation
+    const v = vehicles.find(vh => vh.id === submitVehicleId);
+    const label = v ? `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'selected vehicle' : 'selected vehicle';
+    
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `Submit ${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} to:\n\n` +
+      `${v?.year || '?'} ${v?.make || '?'} ${v?.model || '?'}\n\n` +
+      `This will link the images to this vehicle.\n\n` +
+      `Continue?`
+    );
+    
+    if (!confirmed) {
+      return;
+    }
+    
     try {
-      const v = vehicles.find(vh => vh.id === submitVehicleId);
-      const label = v ? `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'selected vehicle' : 'selected vehicle';
-      
       await PersonalPhotoLibraryService.bulkLinkToVehicle(Array.from(selectedPhotos), submitVehicleId);
       showToast(`Submitted ${selectedPhotos.size} photo${selectedPhotos.size > 1 ? 's' : ''} to ${label}.`, 'success');
       setSelectedPhotos(new Set());
