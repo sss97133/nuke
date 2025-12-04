@@ -1,10 +1,17 @@
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 // Use the remote Supabase instance
-const supabase = createClient(
-  'https://qkgaybvrernstplzjaam.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2ODQ4MDAsImV4cCI6MjA1MTI2MDgwMH0.aBKzuFGaB_uEcaWJhEWVJjKhPKhGFKFKFKFKFKFKFKF'
-);
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error('ERROR: VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables are required');
+  process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 async function deleteVehicle() {
   try {

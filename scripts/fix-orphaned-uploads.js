@@ -5,6 +5,7 @@
  * Recovers 23 images from failed upload by creating proper database records
  */
 
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://qkgaybvrernstplzjaam.supabase.co';

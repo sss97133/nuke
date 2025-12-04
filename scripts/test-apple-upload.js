@@ -5,6 +5,7 @@
  * This simulates what would happen when uploading photos with EXIF dates
  */
 
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = 'https://qkgaybvrernstplzjaam.supabase.co';

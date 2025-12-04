@@ -6,9 +6,20 @@
 BATCH_SIZE=${1:-10}
 MAX_BATCHES=${2:-5}
 
-SUPABASE_URL="https://qkgaybvrernstplzjaam.supabase.co"
-SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODM2OTAyMSwiZXhwIjoyMDUzOTQ1MDIxfQ.NEbqSnSamR5f7Fqon25ierv5yJgdDy_o2nrixOej_Xg"
-DB_PASSWORD="RbzKq32A0uhqvJMQ"
+# Load environment variables
+if [ -f .env ]; then
+  export $(cat .env | grep -v '^#' | xargs)
+fi
+
+# Validate required environment variables
+if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+  echo "ERROR: VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables are required"
+  exit 1
+fi
+
+SUPABASE_URL="$VITE_SUPABASE_URL"
+SERVICE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
+DB_PASSWORD="${Supabase_Database_Password:-}"
 
 echo "🔍 Stage 2: Detailed Component Extraction"
 echo "   Batch size: $BATCH_SIZE"

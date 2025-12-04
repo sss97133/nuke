@@ -1,10 +1,19 @@
 // Disable the problematic profile trigger that's interfering with vehicle creation
 // This trigger is trying to create profiles automatically but failing due to username constraint
 
+import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://qkgaybvrernstplzjaam.supabase.co';
-const serviceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyODMxOTEzMCwiZXhwIjoyMDQzODk1MTMwfQ.lIJluCkGxr5VGkbqJmLmiIiLBIXVuWNSBvsfkLc3D64';
+config();
+
+// Load credentials from environment
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!serviceRoleKey) {
+  console.error('ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+  process.exit(1);
+}
 
 // Use service role key to execute admin operations
 const supabase = createClient(supabaseUrl, serviceRoleKey);

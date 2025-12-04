@@ -1,12 +1,6 @@
 /**
  * REFERENCE DOCUMENT INDEXING PIPELINE
- * 
- * Processes uploaded PDFs (service manuals, parts catalogs, etc.)
- * - Extracts text with OCR
- * - Chunks intelligently by section
- * - Generates embeddings for vector search
- * - Stores with exact page citations
- * - Extracts structured data (specs, paint codes, etc.)
+ * Powered by Gemini 1.5 Pro (2M Context Window)
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
@@ -27,131 +21,64 @@ serve(async (req) => {
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
-    const { document_id, pdf_url, user_id } = await req.json()
-    if (!document_id && !pdf_url) throw new Error('Missing document_id or pdf_url')
+    const { document_id, pdf_url, user_id, mode, page_start, page_end } = await req.json()
+    if (!pdf_url) throw new Error('Missing pdf_url')
 
-    console.log(`Indexing document: ${document_id || pdf_url}`)
+    const processingMode = mode || 'structure' // 'structure' | 'extract_parts'
+    console.log(`Indexing: ${pdf_url} [${processingMode}] Pages: ${page_start || 'all'}-${page_end || 'all'}`)
 
-    // 1. Get document metadata
-    let documentRecord
-    if (document_id) {
-      const { data } = await supabase
-        .from('library_documents')
-        .select('*, reference_libraries(*)')
-        .eq('id', document_id)
+    // Get API Key
+    const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
+    const geminiKeyResult = await getUserApiKey(supabase, user_id || null, 'google', 'GEMINI_API_KEY')
+    
+    if (!geminiKeyResult.apiKey) throw new Error('GEMINI_API_KEY required')
+
+    // Get or create catalog source
+    let catalogId = document_id
+    if (!catalogId) {
+      const { data: existing } = await supabase
+        .from('catalog_sources')
+        .select('id')
+        .eq('base_url', pdf_url)
         .single()
-      documentRecord = data
-    }
-
-    // 2. Download PDF if needed
-    const pdfBuffer = pdf_url ? await fetch(pdf_url).then(r => r.arrayBuffer()) : null
-
-    // 3. Extract text using GPT-4o Vision (page-by-page sampling)
-    // For large PDFs, we extract key sections identified by TOC
-    const extractionPlan = await analyzePDFStructure(pdfBuffer || pdf_url)
-
-    console.log(`Extraction plan: ${extractionPlan.priority_sections.length} sections, ${extractionPlan.estimated_chunks} chunks`)
-
-    // 4. Extract priority sections only
-    const chunks = []
-    for (const section of extractionPlan.priority_sections) {
-      const sectionChunks = await extractSection(
-        pdfBuffer || pdf_url,
-        section,
-        documentRecord
-      )
-      chunks.push(...sectionChunks)
       
-      console.log(`  Extracted ${section.title}: ${sectionChunks.length} chunks`)
-    }
-
-    // 5. Generate embeddings (OpenAI ada-002)
-    const openaiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openaiKey) throw new Error('OpenAI API key required for embeddings')
-
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i]
-      
-      // Generate embedding
-      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'text-embedding-ada-002',
-          input: chunk.text
-        })
-      })
-
-      const embeddingData = await embeddingResponse.json()
-      const embedding = embeddingData.data[0].embedding
-
-      // Store chunk
-      await supabase.from('reference_chunks').insert({
-        document_id: document_id,
-        chunk_index: i,
-        page_number: chunk.page,
-        section_heading: chunk.section,
-        content: chunk.text,
-        embedding: embedding,
-        metadata: {
-          subsection: chunk.subsection,
-          has_diagram: chunk.has_diagram,
-          has_table: chunk.has_table,
-          part_numbers: chunk.part_numbers
-        }
-      })
-
-      if (i % 10 === 0) {
-        console.log(`  Embedded ${i}/${chunks.length} chunks`)
+      if (existing) {
+        catalogId = existing.id
+      } else {
+        const { data: newCatalog } = await supabase
+          .from('catalog_sources')
+          .insert({
+            name: pdf_url.split('/').pop()?.replace(/%20/g, ' ') || 'Catalog',
+            provider: pdf_url.includes('lmc') ? 'LMC' : 'Unknown',
+            base_url: pdf_url
+          })
+          .select()
+          .single()
+        
+        catalogId = newCatalog.id
       }
     }
 
-    // 6. Extract structured data
-    const structuredData = await extractStructuredData(chunks, documentRecord)
+    // Upload PDF to Gemini
+    console.log('Uploading to Gemini...')
+    const pdfResp = await fetch(pdf_url)
+    const pdfBytes = await pdfResp.arrayBuffer()
+    const fileUri = await uploadToGeminiFileAPI(pdfBytes, 'application/pdf', geminiKeyResult.apiKey)
+    console.log('Uploaded:', fileUri)
 
-    console.log(`Extracted structured data: ${JSON.stringify({
-      specs: structuredData.specs?.length || 0,
-      paint_codes: structuredData.paint_codes?.length || 0,
-      rpo_codes: structuredData.rpo_codes?.length || 0
-    })}`)
-
-    // 7. Store structured data
-    if (structuredData.specs?.length > 0) {
-      await storeSpecs(supabase, structuredData.specs, document_id)
-    }
-    if (structuredData.paint_codes?.length > 0) {
-      await storePaintCodes(supabase, structuredData.paint_codes, document_id)
-    }
-    if (structuredData.rpo_codes?.length > 0) {
-      await storeRPOCodes(supabase, structuredData.rpo_codes, document_id)
-    }
-
-    // 8. Update document status
-    if (document_id) {
-      await supabase
-        .from('library_documents')
-        .update({
-          page_count: extractionPlan.total_pages,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', document_id)
+    let result
+    if (processingMode === 'structure') {
+      result = await analyzeStructure(fileUri, geminiKeyResult.apiKey)
+      console.log(`Structure: ${result.total_pages} pages, ${result.sections?.length || 0} sections`)
+    } else if (processingMode === 'extract_parts') {
+      const start = page_start || 1
+      const end = page_end || 50
+      result = await extractParts(fileUri, start, end, geminiKeyResult.apiKey, supabase, catalogId)
+      console.log(`Extracted ${result.parts?.length || 0} parts from pages ${start}-${end}`)
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        document_id,
-        chunks_indexed: chunks.length,
-        sections_extracted: extractionPlan.priority_sections.length,
-        structured_data: {
-          specs: structuredData.specs?.length || 0,
-          paint_codes: structuredData.paint_codes?.length || 0,
-          rpo_codes: structuredData.rpo_codes?.length || 0
-        }
-      }),
+      JSON.stringify({ success: true, catalogId, mode: processingMode, result }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
@@ -164,59 +91,143 @@ serve(async (req) => {
   }
 })
 
-async function analyzePDFStructure(pdfSource: any) {
-  // Use GPT-4o to analyze TOC and determine priority sections
-  // For now, return a simple plan
-  return {
-    total_pages: 1500, // Estimated
-    priority_sections: [
-      { title: 'Body & Frame', start_page: 245, end_page: 350, priority: 10 },
-      { title: 'Specifications', start_page: 1400, end_page: 1500, priority: 9 },
-      { title: 'Trim & Accessories', start_page: 400, end_page: 450, priority: 8 }
-    ],
-    estimated_chunks: 150
-  }
+async function uploadToGeminiFileAPI(data: ArrayBuffer, mimeType: string, apiKey: string) {
+  const initResp = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'start',
+      'X-Goog-Upload-Header-Content-Length': data.byteLength.toString(),
+      'X-Goog-Upload-Header-Content-Type': mimeType,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ file: { display_name: 'catalog' } })
+  })
+  
+  const uploadUrl = initResp.headers.get('x-goog-upload-url')
+  if (!uploadUrl) throw new Error('No upload URL from Gemini')
+
+  const uploadResp = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'upload, finalize',
+      'X-Goog-Upload-Offset': '0',
+      'Content-Length': data.byteLength.toString()
+    },
+    body: data
+  })
+
+  if (!uploadResp.ok) throw new Error(`Upload failed: ${uploadResp.status}`)
+  
+  const fileData = await uploadResp.json()
+  return fileData.file.uri
 }
 
-async function extractSection(pdfSource: any, section: any, documentRecord: any) {
-  // Extract text from pages in this section
-  // Chunk into semantic units
-  // For now, return placeholder
-  const chunks = []
+async function analyzeStructure(fileUri: string, apiKey: string) {
+  const prompt = `Analyze this automotive parts catalog.
   
-  for (let page = section.start_page; page <= Math.min(section.end_page, section.start_page + 10); page++) {
-    chunks.push({
-      page,
-      section: section.title,
-      subsection: null,
-      text: `[Extracted text from page ${page} of ${section.title}]`,
-      has_diagram: false,
-      has_table: false,
-      part_numbers: []
+Extract:
+1. Total page count
+2. Table of contents (sections with page ranges)
+3. Vehicle coverage (years/models)
+4. Document type (parts catalog, service manual, etc.)
+
+Return JSON:
+{
+  "total_pages": number,
+  "title": "string",
+  "vehicle_coverage": ["1973-1987 Chevy/GMC Trucks"],
+  "sections": [
+    {"name": "Exterior Trim", "start_page": 45, "end_page": 120}
+  ]
+}`
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        role: "user",
+        parts: [
+          { file_data: { file_uri: fileUri, mime_type: "application/pdf" } },
+          { text: prompt }
+        ]
+      }],
+      generationConfig: { response_mime_type: "application/json" }
     })
+  })
+
+  if (!response.ok) throw new Error(`Gemini error: ${response.status}`)
+  const data = await response.json()
+  return JSON.parse(data.candidates[0].content.parts[0].text)
+}
+
+async function extractParts(fileUri: string, pageStart: number, pageEnd: number, apiKey: string, supabase: any, catalogId: string) {
+  const prompt = `Extract ALL parts from pages ${pageStart} to ${pageEnd} of this catalog.
+
+For EACH part, extract:
+- Part Number (SKU)
+- Name/Description
+- Price (if visible)
+- Compatible Years
+- Compatible Models
+- Page Number
+- Diagram Reference (if any)
+
+Return JSON array:
+{
+  "parts": [
+    {
+      "part_number": "38-9630",
+      "name": "Bumper Bolt Kit",
+      "description": "Chrome bumper mounting bolt kit",
+      "price": "24.95",
+      "years": "1973-1987",
+      "models": ["C10", "K10", "Blazer"],
+      "page": 45,
+      "diagram_ref": "Fig 3-A"
+    }
+  ]
+}`
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        role: "user",
+        parts: [
+          { file_data: { file_uri: fileUri, mime_type: "application/pdf" } },
+          { text: prompt }
+        ]
+      }],
+      generationConfig: { response_mime_type: "application/json", temperature: 0 }
+    })
+  })
+
+  if (!response.ok) throw new Error(`Gemini error: ${response.status}`)
+  const data = await response.json()
+  const extracted = JSON.parse(data.candidates[0].content.parts[0].text)
+
+  // Store parts
+  if (extracted.parts) {
+    for (const part of extracted.parts) {
+      await supabase.from('catalog_parts').insert({
+        catalog_id: catalogId,
+        part_number: part.part_number,
+        name: part.name,
+        description: part.description,
+        price_current: part.price ? parseFloat(part.price.replace(/[^0-9.]/g, '')) : null,
+        application_data: {
+          years: part.years,
+          models: part.models,
+          page: part.page,
+          diagram_ref: part.diagram_ref
+        }
+      })
+    }
   }
-  
-  return chunks
-}
 
-async function extractStructuredData(chunks: any[], documentRecord: any) {
-  // Use GPT-4o to extract specs, paint codes, RPO codes from chunks
-  return {
-    specs: [],
-    paint_codes: [],
-    rpo_codes: []
-  }
+  return extracted
 }
-
-async function storeSpecs(supabase: any, specs: any[], documentId: string) {
-  // Store in oem_vehicle_specs or similar
-}
-
-async function storePaintCodes(supabase: any, codes: any[], documentId: string) {
-  // Store in extracted_paint_colors
-}
-
-async function storeRPOCodes(supabase: any, codes: any[], documentId: string) {
-  // Store in extracted_rpo_codes
-}
-

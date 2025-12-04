@@ -1,0 +1,21 @@
+{
+  "scripts": {
+    "audit": "tsx scripts/run-autonomous-audit.ts",
+    "audit:dry-run": "tsx scripts/run-autonomous-audit.ts --dry-run",
+    "audit:verbose": "VERBOSE=true tsx scripts/run-autonomous-audit.ts",
+    "process-stuck": "tsx scripts/process-stuck-images.ts stuck",
+    "process-failed": "tsx scripts/process-stuck-images.ts failed"
+  },
+  "dependencies": {
+    "@mendable/firecrawl-js": "^4.8.2",
+    "@supabase/supabase-js": "^2.86.0",
+    "canvas": "^3.2.0",
+    "cheerio": "^1.1.2",
+    "dotenv": "^17.2.3",
+    "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.4.449"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0"
+  }
+}

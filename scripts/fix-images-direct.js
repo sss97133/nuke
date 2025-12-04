@@ -4,9 +4,10 @@
  * Use service role to bypass RLS and add missing images
  */
 
+require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
-const SUPABASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
 // Note: In production, you'd use the service role key, but for now we'll work with what we have
 
 async function fixImagesDirectly() {

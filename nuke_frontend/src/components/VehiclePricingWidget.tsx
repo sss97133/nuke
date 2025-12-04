@@ -819,13 +819,10 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
               </div>
               <div style={{ marginTop: 'var(--space-1)', paddingTop: 'var(--space-1)', borderTop: '1px solid var(--border-light)' }}>
                 <div className="text" style={{ fontSize: '6pt', fontWeight: 'bold' }}>
-                  Database Tables:
+                  Evidence
                 </div>
-                <div className="text text-muted" style={{ fontSize: '6pt', marginTop: '2px' }}>
-                  • vehicle_builds (receipts)<br/>
-                  • build_line_items (parts)<br/>
-                  • build_benchmarks (comparables)<br/>
-                  • image_tags (AI analysis)
+                <div className="text text-muted" style={{ fontSize: '7pt', marginTop: '4px' }}>
+                  Click value to see sources
                 </div>
               </div>
             </div>

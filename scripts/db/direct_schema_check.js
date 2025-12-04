@@ -1,3 +1,4 @@
+require('dotenv').config();
 const https = require('https');
 
 const supabaseUrl = 'qkgaybvrernstplzjaam.supabase.co';

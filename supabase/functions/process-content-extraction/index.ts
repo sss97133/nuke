@@ -261,45 +261,34 @@ async function processListingURL(supabase: any, item: QueueItem) {
       }
     }
 
-    // Update vehicle data (merge intelligently)
-    const updates: any = {};
+    // Process through forensic system (REPLACED direct updates)
+    const { data: forensicResult } = await supabase.rpc('process_scraped_data_forensically', {
+      p_vehicle_id: item.vehicle_id,
+      p_scraped_data: scrapedData,
+      p_source_url: item.raw_content,
+      p_scraper_name: scrapeResult.source || 'comment_extraction',
+      p_context: { comment: item.context, comment_id: item.comment_id }
+    });
+
+    // Build consensus for each field (auto-assigns if high confidence)
+    const fieldsUpdated: string[] = [];
+    const criticalFields = ['vin', 'mileage', 'exterior_color', 'interior_color', 'transmission', 'engine'];
     
-    if (!vehicle.vin && scrapedData.vin) {
-      updates.vin = scrapedData.vin;
-    }
-    if (!vehicle.mileage && scrapedData.mileage) {
-      updates.mileage = scrapedData.mileage;
-    }
-    if (!vehicle.exterior_color && scrapedData.exterior_color) {
-      updates.exterior_color = scrapedData.exterior_color;
-    }
-    if (!vehicle.interior_color && scrapedData.interior_color) {
-      updates.interior_color = scrapedData.interior_color;
-    }
-    if (!vehicle.transmission && scrapedData.transmission) {
-      updates.transmission = scrapedData.transmission;
-    }
-    if (!vehicle.engine && scrapedData.engine) {
-      updates.engine = scrapedData.engine;
-    }
-    
-    // Handle price data
-    if (scrapedData.sold_price && !vehicle.sale_price) {
-      updates.sale_price = scrapedData.sold_price;
-    }
-    if (scrapedData.sold_date && !vehicle.auction_end_date) {
-      updates.auction_end_date = scrapedData.sold_date;
-    }
-    if (scrapedData.listing_url) {
-      updates.listing_url = scrapedData.listing_url;
+    for (const field of criticalFields) {
+      if (scrapedData[field]) {
+        const { data: consensus } = await supabase.rpc('build_field_consensus', {
+          p_vehicle_id: item.vehicle_id,
+          p_field_name: field,
+          p_auto_assign: true  // Auto-assign if confidence >= 80%
+        });
+        
+        if (consensus?.auto_assigned) {
+          fieldsUpdated.push(field);
+        }
+      }
     }
 
-    if (Object.keys(updates).length > 0) {
-      await supabase
-        .from('vehicles')
-        .update(updates)
-        .eq('id', item.vehicle_id);
-    }
+    const updates = fieldsUpdated;
 
     // Create timeline event for the listing discovery
     await supabase
@@ -322,16 +311,21 @@ async function processListingURL(supabase: any, item: QueueItem) {
     // Calculate points
     let points = 10; // Base points for finding a listing
     points += imageCount * 2; // 2 points per image
-    points += Object.keys(updates).length * 5; // 5 points per field updated
+    points += updates.length * 5; // 5 points per field updated
     
-    const qualityScore = vinMatch ? 0.95 : (shouldMerge ? 0.75 : 0.5);
+    // Quality score from forensic system
+    const qualityScore = forensicResult?.evidence_collected 
+      ? Math.min(0.95, 0.5 + (forensicResult.evidence_collected * 0.05))
+      : (vinMatch ? 0.95 : (shouldMerge ? 0.75 : 0.5));
 
     return {
       success: true,
       data: {
         images_imported: imageCount,
-        fields_updated: Object.keys(updates),
-        vin_match: vinMatch
+        fields_updated: updates,
+        vin_match: vinMatch,
+        forensic_evidence: forensicResult?.evidence_collected || 0,
+        anomalies: forensicResult?.anomalies_detected || 0
       },
       points,
       quality_score: qualityScore
@@ -419,11 +413,15 @@ async function processVIN(supabase: any, item: QueueItem) {
     };
   }
 
-  // Update VIN
-  const { error } = await supabase
-    .from('vehicles')
-    .update({ vin })
-    .eq('id', item.vehicle_id);
+  // Process VIN through forensic system (REPLACED direct update)
+  const { data: vinResult, error } = await supabase.rpc('update_vehicle_field_forensically', {
+    p_vehicle_id: item.vehicle_id,
+    p_field_name: 'vin',
+    p_new_value: vin,
+    p_source: 'user_comment_extraction',
+    p_context: item.context,
+    p_auto_assign: true
+  });
 
   if (error) {
     return { success: false, error: error.message };
@@ -431,9 +429,13 @@ async function processVIN(supabase: any, item: QueueItem) {
 
   return {
     success: true,
-    data: { vin },
-    points: 25, // VINs are very valuable
-    quality_score: 0.9
+    data: { 
+      vin, 
+      confidence: vinResult?.consensus?.consensus_confidence || 90,
+      modification_detected: vinResult?.modification_detected || false
+    },
+    points: 25,
+    quality_score: (vinResult?.consensus?.consensus_confidence || 90) / 100
   };
 }
 
@@ -488,15 +490,17 @@ async function processPriceData(supabase: any, item: QueueItem) {
   const contextLower = item.context.toLowerCase();
   const isSoldPrice = contextLower.includes('sold') || contextLower.includes('final');
 
-  const updates: any = {};
-  if (isSoldPrice) {
-    updates.sale_price = price;
-  }
-
-  const { error } = await supabase
-    .from('vehicles')
-    .update(updates)
-    .eq('id', item.vehicle_id);
+  // Process price through forensic system (REPLACED direct update)
+  const fieldName = isSoldPrice ? 'sale_price' : 'asking_price';
+  
+  const { data: result, error } = await supabase.rpc('update_vehicle_field_forensically', {
+    p_vehicle_id: item.vehicle_id,
+    p_field_name: fieldName,
+    p_new_value: price.toString(),
+    p_source: 'user_comment_extraction',
+    p_context: item.context,
+    p_auto_assign: isSoldPrice  // Only auto-assign sold prices (higher confidence)
+  });
 
   if (error) {
     return { success: false, error: error.message };
@@ -504,9 +508,13 @@ async function processPriceData(supabase: any, item: QueueItem) {
 
   return {
     success: true,
-    data: { price, type: isSoldPrice ? 'sale' : 'asking' },
+    data: { 
+      price, 
+      type: isSoldPrice ? 'sale' : 'asking',
+      confidence: result?.consensus?.consensus_confidence || (isSoldPrice ? 85 : 60)
+    },
     points: isSoldPrice ? 20 : 10,
-    quality_score: isSoldPrice ? 0.85 : 0.6
+    quality_score: (result?.consensus?.consensus_confidence || (isSoldPrice ? 85 : 60)) / 100
   };
 }
 

@@ -1,15 +1,23 @@
 #!/bin/bash
 
-# START PROCESSING NOW - Direct execution with hardcoded credentials
+# START PROCESSING NOW - Load credentials from environment
 
 cd /Users/skylar/nuke
 
+# Load environment variables
+if [ -f .env ]; then
+  export $(cat .env | grep -v '^#' | xargs)
+fi
+
+# Validate required environment variables
+if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+  echo "ERROR: VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables are required"
+  echo "Please check your .env file"
+  exit 1
+fi
+
 echo "🚀 Starting image processing..."
 echo ""
-
-# Export credentials directly
-export VITE_SUPABASE_URL="https://qkgaybvrernstplzjaam.supabase.co"
-export SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyNzc3NTQzMCwiZXhwIjoxNzQzMzUxNDMwfQ.JvLlgbw5T7yfS6eL8Ct5W0tPJRgzkkBWkEeQI7xJGJg"
 
 echo "Processing 2,742 images with Claude 3 Haiku..."
 echo "Cost: ~\$8-11"

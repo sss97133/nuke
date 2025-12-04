@@ -59,8 +59,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 3. SET SERVICE KEY (REPLACE WITH YOUR KEY!)
-ALTER DATABASE postgres SET app.settings.service_role_key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODM2OTAyMSwiZXhwIjoyMDUzOTQ1MDIxfQ.NEbqSnSamR5f7Fqon25ierv5yJgdDy_o2nrixOej_Xg';
+-- 3. SET SERVICE KEY (REPLACE WITH YOUR ACTUAL SERVICE ROLE KEY!)
+-- Get your service role key from: https://supabase.com/dashboard/project/YOUR_PROJECT/settings/api
+ALTER DATABASE postgres SET app.settings.service_role_key = 'YOUR_SERVICE_ROLE_KEY_HERE';
 
 -- 4. SETUP DAILY SCRAPING
 CREATE EXTENSION IF NOT EXISTS pg_cron;

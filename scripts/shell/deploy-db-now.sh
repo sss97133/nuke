@@ -1,8 +1,19 @@
 #!/bin/bash
 # Deploy Professional Financial System via Supabase REST API
 
-SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODM2OTAyMSwiZXhwIjoyMDUzOTQ1MDIxfQ.NEbqSnSamR5f7Fqon25ierv5yJgdDy_o2nrixOej_Xg"
-PROJECT_URL="https://qkgaybvrernstplzjaam.supabase.co"
+# Load environment variables
+if [ -f .env ]; then
+  export $(cat .env | grep -v '^#' | xargs)
+fi
+
+# Validate required environment variables
+if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+  echo "ERROR: VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables are required"
+  exit 1
+fi
+
+SERVICE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
+PROJECT_URL="$VITE_SUPABASE_URL"
 
 # Read SQL file and execute via Supabase client
 node -e "

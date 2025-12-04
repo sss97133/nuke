@@ -93,45 +93,27 @@ const SeriesSelector: React.FC<SeriesSelectorProps> = ({
     }, 150);
   };
 
-  // Don't show if no hierarchy data available
-  if (!make || !normalizedModel || availableSeries.length === 0) {
-    return (
-      <div className={className}>
-        <label htmlFor="series" className="form-label">Series</label>
-        <input
-          type="text"
-          id="series"
-          name="series"
-          value={seriesQuery}
-          onChange={(e) => {
-            setSeriesQuery(e.target.value);
-            onSeriesChange(e.target.value);
-          }}
-          disabled={disabled}
-          className="form-input"
-          placeholder={placeholder}
-        />
-      </div>
-    );
-  }
+  // If no hierarchy data available, show simple input
+  const hasHierarchyData = make && normalizedModel && availableSeries.length > 0;
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`form-group ${className}`}>
       <label htmlFor="series" className="form-label">Series</label>
-      <div className="relative">
-        <input
-          ref={inputRef}
-          type="text"
-          id="series"
-          name="series"
-          value={seriesQuery}
-          onChange={(e) => handleInputChange(e.target.value)}
-          onFocus={() => setShowSuggestions(true)}
-          onBlur={handleBlur}
-          disabled={disabled}
-          className="form-input"
-          placeholder={placeholder}
-        />
+      {hasHierarchyData ? (
+        <div className="relative">
+          <input
+            ref={inputRef}
+            type="text"
+            id="series"
+            name="series"
+            value={seriesQuery}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={handleBlur}
+            disabled={disabled}
+            className="form-input"
+            placeholder={placeholder}
+          />
         
         {/* Series Suggestions Dropdown */}
         {showSuggestions && filteredSuggestions.length > 0 && (
@@ -161,7 +143,22 @@ const SeriesSelector: React.FC<SeriesSelectorProps> = ({
             ))}
           </div>
         )}
-      </div>
+        </div>
+      ) : (
+        <input
+          type="text"
+          id="series"
+          name="series"
+          value={seriesQuery}
+          onChange={(e) => {
+            setSeriesQuery(e.target.value);
+            onSeriesChange(e.target.value);
+          }}
+          disabled={disabled}
+          className="form-input"
+          placeholder={placeholder}
+        />
+      )}
     </div>
   );
 };

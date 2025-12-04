@@ -27,6 +27,9 @@ import Dashboard from './pages/Dashboard';
 import ImageProcessingDashboard from './pages/ImageProcessingDashboard';
 import LiveImageAnalysisMonitor from './components/admin/LiveImageAnalysisMonitor';
 import ScriptControlCenter from './pages/ScriptControlCenter';
+import LiveProcessingMonitor from './pages/LiveProcessingMonitor';
+import SystemStatus from './pages/SystemStatus';
+import CatalogBrowser from './pages/CatalogBrowserV2';
 import VehicleMakeModelDemo from './pages/VehicleMakeModelDemo';
 import VehicleDataNormalization from './pages/VehicleDataNormalization';
 import Profile from './pages/Profile';
@@ -95,6 +98,7 @@ import ShippingSettings from './pages/admin/ShippingSettings';
 import X402Settings from './pages/admin/X402Settings';
 import BatchImageAnalysis from './pages/admin/BatchImageAnalysis';
 import ExtractionMonitor from './pages/admin/ExtractionMonitor';
+import TestContextualAnalysisPage from './pages/TestContextualAnalysisPage';
 import InvestorDashboardPage from './pages/InvestorDashboard';
 import MergeProposalsDashboard from './pages/MergeProposalsDashboard';
 import Library from './pages/Library';
@@ -359,13 +363,17 @@ function App() {
             <Route path="/review/ai-detections" element={<CurationQueue />} />
             
             {/* Admin & Development */}
-            <Route path="/admin" element={<AdminMissionControl />} />
+            <Route path="/admin" element={<SystemStatus />} />
             <Route path="/admin/old" element={<AdminDashboard />} />
+            <Route path="/admin/mission-control" element={<AdminMissionControl />} />
             <Route path="/admin/scripts" element={<ScriptControlCenter />} />
             <Route path="/admin/image-processing" element={<ImageProcessingDashboard />} />
             <Route path="/admin/live-analysis" element={<LiveImageAnalysisMonitor />} />
+            <Route path="/admin/live" element={<LiveProcessingMonitor />} />
+            <Route path="/admin/status" element={<SystemStatus />} />
             <Route path="/admin/batch-analysis" element={<BatchImageAnalysis />} />
             <Route path="/admin/extraction-monitor" element={<ExtractionMonitor />} />
+            <Route path="/admin/test-contextual" element={<TestContextualAnalysisPage />} />
             <Route path="/admin/verifications" element={<AdminVerifications />} />
             <Route path="/admin/ownership-verifications" element={<OwnershipVerificationDashboard />} />
             <Route path="/admin/merge-proposals" element={<MergeProposalsDashboard />} />
@@ -374,6 +382,7 @@ function App() {
             <Route path="/admin/shipping-settings" element={<ShippingSettings />} />
             <Route path="/admin/x402-settings" element={<X402Settings />} />
             <Route path="/admin/extraction-review" element={<ExtractionReview />} />
+            <Route path="/admin/catalog" element={<CatalogBrowser />} />
             
             {/* Transaction & Signature Routes */}
             <Route path="/sign/:token" element={<SignDocument />} />

@@ -315,39 +315,26 @@ serve(async (req) => {
           }
         }
 
-        // Create new vehicle if not found
+        // Create new vehicle if not found (REFITTED - minimal insert)
         if (!vehicleId) {
-          const vehicleInsert: any = {
-            year: yearNum,
-            make: finalMake.charAt(0).toUpperCase() + finalMake.slice(1),
-            model: finalModel,
-            vin: data.vin || null,
-            color: data.color || data.exterior_color || null,
-            mileage: data.mileage || null,
-            transmission: data.transmission || null,
-            drivetrain: data.drivetrain || null,
-            engine_size: data.engine_size || data.engine || null,
-            discovery_source: 'craigslist_scrape',
-            discovery_url: queueItem.listing_url,
-            profile_origin: 'craigslist_scrape',
-            origin_metadata: {
-              listing_url: queueItem.listing_url,
-              asking_price: data.asking_price || data.price,
-              imported_at: new Date().toISOString(),
-              image_urls: data.images || []
-            },
-            notes: data.description || null,
-            is_public: true,
-            status: 'active',
-            uploaded_by: importUserId
-          }
-
-          if (data.trim) vehicleInsert.trim = data.trim
-          if (data.series) vehicleInsert.series = data.series
-
           const { data: newVehicle, error: vehicleError } = await supabase
             .from('vehicles')
-            .insert(vehicleInsert)
+            .insert({
+              year: yearNum,
+              make: finalMake.charAt(0).toUpperCase() + finalMake.slice(1),
+              model: finalModel,
+              discovery_source: 'craigslist_scrape',
+              discovery_url: queueItem.listing_url,
+              profile_origin: 'craigslist_scrape',
+              origin_metadata: {
+                listing_url: queueItem.listing_url,
+                imported_at: new Date().toISOString()
+              },
+              notes: data.description || null,
+              is_public: true,
+              status: 'active',
+              uploaded_by: importUserId
+            })
             .select('id')
             .single()
 
@@ -371,6 +358,27 @@ serve(async (req) => {
             vehicleId = newVehicle.id
             isNew = true
             stats.created++
+
+            // FORENSIC ENRICHMENT (replaces manual field assignment)
+            await supabase.rpc('process_scraped_data_forensically', {
+              p_vehicle_id: vehicleId,
+              p_scraped_data: data,
+              p_source_url: queueItem.listing_url,
+              p_scraper_name: 'craigslist-queue',
+              p_context: { description: data.description }
+            })
+
+            // Build consensus for all fields
+            const fields = ['vin', 'color', 'mileage', 'transmission', 'drivetrain', 'engine_size', 'trim', 'series']
+            for (const field of fields) {
+              if (data[field]) {
+                await supabase.rpc('build_field_consensus', {
+                  p_vehicle_id: vehicleId,
+                  p_field_name: field,
+                  p_auto_assign: true
+                })
+              }
+            }
 
             // Extract and cache favicon for this source (non-blocking)
             extractAndCacheFavicon(

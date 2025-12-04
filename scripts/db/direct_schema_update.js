@@ -1,7 +1,14 @@
+require('dotenv').config();
 const fetch = require('node-fetch');
 
-const supabaseUrl = 'https://qkgaybvrernstplzjaam.supabase.co';
-const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODM2OTAyMSwiZXhwIjoyMDUzOTQ1MDIxfQ.iCr_1fFe9u9VwseiVLCXdjsuMg_3rbtQSWgfh4cneVo';
+// Load credentials from environment
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseServiceKey) {
+  console.error('ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+  process.exit(1);
+}
 
 async function applyDirectSchemaUpdate() {
   console.log('Applying schema updates using direct REST API...');

@@ -5,6 +5,10 @@ export interface Comment {
   event_id: string;
   user_id: string;
   comment_text: string;
+  image_id?: string;
+  work_order_id?: string;
+  thumbnail_url?: string;
+  context_type?: 'image' | 'work_order' | 'receipt' | 'general';
   created_at: string;
   updated_at: string;
   user_profile?: {
@@ -50,6 +54,10 @@ export class CommentService {
           event_id,
           user_id,
           comment_text,
+          image_id,
+          work_order_id,
+          thumbnail_url,
+          context_type,
           created_at,
           updated_at,
           user_profile:auth.users(id, raw_user_meta_data)
@@ -78,28 +86,50 @@ export class CommentService {
   static async addComment(
     eventId: string,
     commentText: string,
-    userId: string
+    userId: string,
+    options?: {
+      imageId?: string;
+      workOrderId?: string;
+      thumbnailUrl?: string;
+    }
   ): Promise<{ success: boolean; data?: Comment; error?: string }> {
     try {
+      console.log('💬 Adding comment:', { eventId, text: commentText.substring(0, 50), userId, options });
+      
+      const insertData: any = {
+        event_id: eventId,
+        user_id: userId,
+        comment_text: commentText.trim(),
+      };
+      
+      // Add optional context
+      if (options?.imageId) insertData.image_id = options.imageId;
+      if (options?.workOrderId) insertData.work_order_id = options.workOrderId;
+      if (options?.thumbnailUrl) insertData.thumbnail_url = options.thumbnailUrl;
+      
       const { data, error } = await supabase
         .from('timeline_event_comments')
-        .insert({
-          event_id: eventId,
-          user_id: userId,
-          comment_text: commentText.trim(),
-        })
+        .insert(insertData)
         .select(`
           id,
           event_id,
           user_id,
           comment_text,
+          image_id,
+          work_order_id,
+          thumbnail_url,
+          context_type,
           created_at,
           updated_at
         `)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Comment insert error:', error);
+        throw error;
+      }
 
+      console.log('✅ Comment added successfully:', data);
       return { success: true, data: data as Comment };
     } catch (error) {
       console.error('Error adding comment:', error);
