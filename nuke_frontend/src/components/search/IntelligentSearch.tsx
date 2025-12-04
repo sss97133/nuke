@@ -150,15 +150,19 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
 
     // Check if query is a Craigslist URL - check DB first, then import if needed
     const craigslistUrlPattern = /https?:\/\/([^.]+)\.craigslist\.org\/[^/]+\/d\/[^/]+\/[^/]+\.html/i;
+    const kslUrlPattern = /https?:\/\/cars\.ksl\.com\/listing\/\d+/i;
     const isCraigslistUrl = craigslistUrlPattern.test(trimmedQuery);
+    const isKSLUrl = kslUrlPattern.test(trimmedQuery);
     
     console.log('🔍 Is Craigslist URL?', isCraigslistUrl);
+    console.log('🔍 Is KSL URL?', isKSLUrl);
     console.log('🔍 Pattern test result:', craigslistUrlPattern.test(trimmedQuery));
     console.log('🔍 Pattern matches:', trimmedQuery.match(craigslistUrlPattern));
     
-    if (isCraigslistUrl) {
-      console.log('🚀🚀🚀 DETECTED CRAIGSLIST URL - STARTING IMPORT 🚀🚀🚀');
-      alert('CRAIGSLIST URL DETECTED - Starting import...');
+    if (isCraigslistUrl || isKSLUrl) {
+      const source = isCraigslistUrl ? 'CRAIGSLIST' : 'KSL';
+      console.log(`🚀🚀🚀 DETECTED ${source} URL - STARTING IMPORT 🚀🚀🚀`);
+      alert(`${source} URL DETECTED - Starting import...`);
       setIsSearching(true);
       try {
         // Get current user
@@ -268,14 +272,16 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           drivetrain: scrapedData.drivetrain || null,
           engine_size: scrapedData.engine_size || scrapedData.engine || null,
           asking_price: scrapedData.asking_price || scrapedData.price || null,
-          discovery_source: 'craigslist_scrape',
+          discovery_source: isKSLUrl ? 'ksl_import' : 'craigslist_scrape',
           discovery_url: searchQuery.trim(),
-          profile_origin: 'craigslist_scrape',
+          profile_origin: isKSLUrl ? 'ksl_import' : 'craigslist_scrape',
+          source: isKSLUrl ? 'KSL Cars' : 'Craigslist',
           origin_metadata: {
             listing_url: searchQuery.trim(),
             asking_price: scrapedData.asking_price || scrapedData.price,
             imported_at: new Date().toISOString(),
-            image_urls: scrapedData.images || []
+            image_urls: scrapedData.images || [],
+            source_platform: isKSLUrl ? 'ksl' : 'craigslist'
           },
           description: scrapedData.description || null, // Save to description field (not notes)
           notes: scrapedData.description || null, // Also save to notes for backwards compatibility
@@ -314,7 +320,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         });
 
         // Create timeline event for discovery (blocking to ensure it's created)
-        const sourceName = 'Craigslist';
+        const sourceName = isKSLUrl ? 'KSL Cars' : 'Craigslist';
         const askingPrice = scrapedData.asking_price || scrapedData.price;
         try {
           const { error: timelineError } = await supabase.from('timeline_events').insert({
