@@ -45,8 +45,7 @@ jobs:
       - name: Deploy to Vercel Production
         working-directory: ./nuke_frontend
         run: |
-          echo "🚀 Deploying prebuilt artifacts to Vercel production..."
-          echo "Using dist/ from npm run build (no vercel pull/build needed)"
+          echo "🚀 Deploying to Vercel production..."
           
           # Check if dist/ exists
           if [ ! -d "dist" ]; then
@@ -54,11 +53,14 @@ jobs:
             exit 1
           fi
           
-          echo "✅ dist/ directory found, deploying..."
+          echo "✅ dist/ directory found"
+          echo "📦 Contents:"
+          ls -la dist/ | head -10
           
-          # Deploy prebuilt artifacts directly with better error handling
+          # Use vercel deploy with --prod flag (not --prebuilt, which requires project linking)
+          # This will use the vercel.json config and deploy the dist/ folder
           set +e  # Don't exit on error immediately
-          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          DEPLOY_OUTPUT=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
           DEPLOY_EXIT=$?
           set -e  # Re-enable exit on error
           
@@ -69,7 +71,13 @@ jobs:
           if [ $DEPLOY_EXIT -ne 0 ]; then
             echo "❌ Vercel deployment failed with exit code: $DEPLOY_EXIT"
             echo "Full output above ⬆️"
-            exit 1
+            echo ""
+            echo "Trying alternative: deploy from dist/ directory..."
+            cd dist
+            vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 || {
+              echo "❌ Alternative deployment also failed"
+              exit 1
+            }
           fi
           
           # Extract deployment URL (try multiple patterns)
