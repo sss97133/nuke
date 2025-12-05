@@ -650,13 +650,19 @@ const VehicleTimeline: React.FC<{
                                                 .lt('taken_at', new Date(new Date(dayYmd).getTime() + 86400000).toISOString());
                                               
                                               // Check if there's an existing event for this date
-                                              const { data: existingEvent } = await supabase
+                                              const { data: existingEvent, error: eventError } = await supabase
                                                 .from('timeline_events')
                                                 .select('id')
                                                 .eq('vehicle_id', vehicleId)
                                                 .eq('event_date', dayYmd)
                                                 .limit(1)
-                                                .single();
+                                                .maybeSingle();
+                                              
+                                              // Handle query errors gracefully
+                                              if (eventError) {
+                                                console.warn('Error checking for existing event:', eventError);
+                                                // Continue to show day popup on error
+                                              }
                                               
                                               if (existingEvent) {
                                                 // Open existing event receipt

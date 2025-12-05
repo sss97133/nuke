@@ -95,7 +95,7 @@ jobs:
             echo "❌ Missing baseUrl in tsconfig.app.json"
             exit 1
           fi
-          if ! grep -q '"@/\*"' nuke_frontend/tsconfig.app.json; then
+          if ! grep -qE '"@/\*"' nuke_frontend/tsconfig.app.json; then
             echo "❌ Missing @/* path mapping in tsconfig.app.json"
             exit 1
           fi
