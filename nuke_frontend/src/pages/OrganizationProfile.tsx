@@ -1479,6 +1479,7 @@ export default function OrganizationProfile() {
                             vehicleModel={vehicle.vehicle_model}
                             vehicleVin={vehicle.vehicle_vin}
                             organizationId={organizationId!}
+                            organizationName={organization?.business_name}
                             laborRate={organization?.labor_rate || 125}
                           />
                         ))}

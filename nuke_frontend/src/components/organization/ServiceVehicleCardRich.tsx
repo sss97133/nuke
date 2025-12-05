@@ -11,8 +11,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { ServiceReportModal } from './ServiceReportModal';
 
 interface ServiceStats {
   totalSessions: number;
@@ -32,6 +32,7 @@ interface ServiceVehicleCardRichProps {
   vehicleModel?: string;
   vehicleVin?: string;
   organizationId: string;
+  organizationName?: string;
   laborRate?: number;
 }
 
@@ -42,11 +43,12 @@ export function ServiceVehicleCardRich({
   vehicleModel = '',
   vehicleVin,
   organizationId,
+  organizationName,
   laborRate = 125
 }: ServiceVehicleCardRichProps) {
-  const navigate = useNavigate();
   const [stats, setStats] = useState<ServiceStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     loadServiceStats();
@@ -138,6 +140,7 @@ export function ServiceVehicleCardRich({
   }
 
   return (
+    <>
     <div 
       style={{ 
         padding: '0', 
@@ -149,7 +152,7 @@ export function ServiceVehicleCardRich({
         cursor: 'pointer',
         transition: 'border-color 0.12s ease'
       }}
-      onClick={() => navigate(`/vehicle/${vehicleId}`)}
+      onClick={() => setReportOpen(true)}
       onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent)'}
       onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
     >
@@ -269,6 +272,19 @@ export function ServiceVehicleCardRich({
         </div>
       </div>
     </div>
+
+    <ServiceReportModal
+      isOpen={reportOpen}
+      onClose={() => setReportOpen(false)}
+      vehicleId={vehicleId}
+      vehicleYear={vehicleYear}
+      vehicleMake={vehicleMake}
+      vehicleModel={vehicleModel}
+      organizationId={organizationId}
+      organizationName={organizationName}
+      laborRate={laborRate}
+    />
+    </>
   );
 }
 
