@@ -381,6 +381,15 @@ export class ImageUploadService {
       // Images are evidence/documentation that attach to real work events
       // They are displayed in image gallery, not as timeline events
 
+      // 🔗 AUTO-MATCH UNORGANIZED IMAGES TO VEHICLES
+      // If image was uploaded without vehicleId, try to auto-match it
+      if (isImage && dbResult?.id && !vehicleId) {
+        // Trigger auto-matching in background (non-blocking)
+        this.autoMatchImage(dbResult.id, user.id).catch(err => {
+          console.warn('Auto-match failed (non-blocking):', err);
+        });
+      }
+
       // 🤖 TRIGGER AI ANALYSIS AUTOMATICALLY ON UPLOAD
       // This MUST trigger for every image upload - no exceptions
       if (isImage && dbResult?.id) {
@@ -566,6 +575,76 @@ export class ImageUploadService {
 
     } catch (error: any) {
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Auto-match an unorganized image to vehicles using GPS, date, and filename
+   * This runs in the background after upload if vehicleId was not provided
+   */
+  private static async autoMatchImage(imageId: string, userId: string): Promise<void> {
+    try {
+      // Use the database function for efficient matching
+      const { data: matches, error } = await supabase
+        .rpc('auto_match_image_to_vehicles', {
+          p_image_id: imageId,
+          p_max_gps_distance_meters: 50,
+          p_max_date_difference_days: 30,
+          p_min_confidence: 0.5
+        });
+
+      if (error) {
+        console.warn('Auto-match RPC failed, falling back to client-side matching:', error);
+        // Fallback to client-side matching
+        const { ImageVehicleMatcher } = await import('./imageVehicleMatcher');
+        const match = await ImageVehicleMatcher.matchImage(imageId, { userId });
+        if (match && match.vehicleId) {
+          await ImageVehicleMatcher.applyMatches([match]);
+          console.log(`✅ Auto-matched image ${imageId} to vehicle ${match.vehicleId} (confidence: ${(match.confidence * 100).toFixed(0)}%)`);
+        }
+        return;
+      }
+
+      if (!matches || matches.length === 0) {
+        console.log(`No auto-match found for image ${imageId}`);
+        return;
+      }
+
+      // Get the best match (highest confidence)
+      const bestMatch = matches[0];
+      
+      // Apply the match
+      const { error: updateError } = await supabase
+        .from('vehicle_images')
+        .update({
+          vehicle_id: bestMatch.vehicle_id,
+          organization_status: 'organized',
+          organized_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', imageId);
+
+      if (updateError) {
+        console.error('Failed to apply auto-match:', updateError);
+        return;
+      }
+
+      console.log(`✅ Auto-matched image ${imageId} to vehicle ${bestMatch.vehicle_id} (confidence: ${(bestMatch.confidence * 100).toFixed(0)}%)`);
+      console.log('Match reasons:', bestMatch.match_reasons);
+
+      // Notify UI that image was matched
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('image_auto_matched', {
+          detail: {
+            imageId,
+            vehicleId: bestMatch.vehicle_id,
+            confidence: bestMatch.confidence,
+            reasons: bestMatch.match_reasons
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Auto-match error:', error);
     }
   }
 }
