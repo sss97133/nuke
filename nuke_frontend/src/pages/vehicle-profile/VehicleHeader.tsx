@@ -41,6 +41,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const { isVerifiedOwner, contributorRole } = permissions || {};
+  const isVerified = isVerifiedOwner || isOwner;
   const [rpcSignal, setRpcSignal] = useState<any | null>(initialPriceSignal || null);
   const [trendPct, setTrendPct] = useState<number | null>(null);
   const [trendPeriod, setTrendPeriod] = useState<'live' | '1w' | '30d' | '6m' | '1y' | '5y'>('30d');
@@ -1136,6 +1137,43 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   );
                 }
                 
+                // For user-uploaded vehicles, show "Claim this vehicle" button instead of uploader name
+                if (!isOrgName && !isVerified && onClaimClick) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onClaimClick();
+                      }}
+                      style={{
+                        border: '2px solid var(--border)',
+                        background: 'var(--white)',
+                        color: 'var(--text)',
+                        fontWeight: 700,
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        fontSize: '8pt',
+                        borderRadius: '3px',
+                        transition: 'all 0.12s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--grey-100)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--white)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                      title="Upload title document to claim ownership"
+                    >
+                      Claim this vehicle
+                    </button>
+                  );
+                }
+                
+                // For organizations or verified owners, show the name/link
                 return (
                   <button
                     type="button"
