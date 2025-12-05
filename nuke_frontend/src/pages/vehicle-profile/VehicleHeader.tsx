@@ -375,7 +375,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if ((vehicle as any).auction_outcome === 'reserve_not_met') {
       return { amount: null, label: 'Reserve Not Met' };
     }
-    // Estimate
+    // Estimate - prefer valuation service if available (includes modifications)
+    if (valuation && typeof valuation.estimatedValue === 'number' && valuation.estimatedValue > 0) {
+      return { amount: valuation.estimatedValue, label: 'Estimated Value' };
+    }
+    // Fallback to database current_value
     if (typeof vehicle.current_value === 'number') {
       return { amount: vehicle.current_value, label: 'Estimated Value' };
     }
