@@ -37,13 +37,4 @@ CREATE TRIGGER auto_vin_decode_trigger
   WHEN (NEW.vin IS NOT NULL)
   EXECUTE FUNCTION trigger_vin_decode();
 
-COMMENT ON FUNCTION trigger_vin_decode() IS 'Automatically queues VIN decode via NHTSA when VIN is set on a vehicle. Requires app.settings.supabase_url and app.settings.service_role_key to be configured.';
-
--- Setup instructions:
--- Run these commands to configure the trigger:
--- ALTER DATABASE postgres SET app.settings.supabase_url = 'https://YOUR_PROJECT_REF.supabase.co';
--- ALTER DATABASE postgres SET app.settings.service_role_key = 'YOUR_SERVICE_ROLE_KEY';
---
--- To verify settings are configured:
--- SELECT current_setting('app.settings.supabase_url', true) as supabase_url;
--- SELECT current_setting('app.settings.service_role_key', true) IS NOT NULL as has_service_key;
+COMMENT ON FUNCTION trigger_vin_decode() IS 'Automatically queues VIN decode via NHTSA when VIN is set on a vehicle';
