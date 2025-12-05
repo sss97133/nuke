@@ -17,7 +17,6 @@ export const UploadProgressBar: React.FC = () => {
   );
   
   const completedUploads = uploads.filter(u => u.status === 'completed');
-  const failedUploads = uploads.filter(u => u.status === 'failed');
 
   if (uploads.length === 0) return null;
 

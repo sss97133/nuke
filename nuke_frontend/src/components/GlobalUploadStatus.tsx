@@ -154,7 +154,6 @@ const GlobalUploadStatus: React.FC<GlobalUploadStatusProps> = ({ className = '' 
         <div className="border-t bg-gray-50 max-h-64 overflow-y-auto">
           {Array.from(allUploads.entries()).map(([vehicleId, files]) => {
             const vehicleCompleted = files.filter(f => f.status === 'success').length;
-            const vehicleFailed = files.filter(f => f.status === 'error').length;
             const vehicleUploading = files.filter(f => f.status === 'uploading' || f.status === 'pending').length;
             const vehicleProgress = files.length > 0 ? Math.round((vehicleCompleted / files.length) * 100) : 0;
 

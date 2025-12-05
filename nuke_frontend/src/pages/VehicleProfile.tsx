@@ -143,8 +143,26 @@ const VehicleProfile: React.FC = () => {
     canUpload
   } = useVehiclePermissions(vehicleId || null, session, vehicle);
 
-  // Additional permission checks
-  const isVerifiedOwner = false; // TODO: Implement when ownership_verifications table is ready
+  // Additional permission checks - use database function for claim status
+  const [claimStatus, setClaimStatus] = useState<any>(null);
+  
+  useEffect(() => {
+    if (vehicleId && session?.user?.id) {
+      supabase
+        .rpc('get_vehicle_claim_status', {
+          p_vehicle_id: vehicleId,
+          p_user_id: session.user.id
+        })
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setClaimStatus(data);
+          }
+        })
+        .catch(err => console.warn('Error checking claim status:', err));
+    }
+  }, [vehicleId, session?.user?.id]);
+  
+  const isVerifiedOwner = claimStatus?.user_has_claim === true || false;
   const isDbUploader = Boolean(session?.user?.id && vehicle?.uploaded_by === session.user.id);
 
   // Consolidated permissions object
