@@ -35,13 +35,14 @@ interface SoldVehicle {
 
 interface Props {
   organizationId: string;
+  title?: string; // Optional custom title (e.g., "Service Archive" for service orgs)
 }
 
 type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'date' | 'price' | 'year' | 'make' | 'model';
 type SortDirection = 'asc' | 'desc';
 
-export default function SoldInventoryBrowser({ organizationId }: Props) {
+export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inventory Archive' }: Props) {
   const navigate = useNavigate();
   
   const [soldVehicles, setSoldVehicles] = useState<SoldVehicle[]>([]);
@@ -303,12 +304,12 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
           style={{ fontSize: '11pt', fontWeight: 700, cursor: 'pointer' }}
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          Sold Inventory Archive
+          {title}
           <span style={{ float: 'right', fontSize: '9pt' }}>{isExpanded ? '▼' : '▶'}</span>
         </div>
         {isExpanded && (
           <div className="card-body" style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '9pt' }}>
-            No sold vehicles yet
+            {title.includes('Service') ? 'No completed service work yet' : 'No sold vehicles yet'}
           </div>
         )}
       </div>
@@ -323,7 +324,7 @@ export default function SoldInventoryBrowser({ organizationId }: Props) {
         style={{ fontSize: '11pt', fontWeight: 700, cursor: 'pointer' }}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        Sold Inventory Archive
+        {title}
         <span style={{ float: 'right', fontSize: '9pt' }}>{isExpanded ? '▼' : '▶'}</span>
       </div>
 

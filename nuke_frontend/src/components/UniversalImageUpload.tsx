@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { ForensicReceiptService } from '../services/forensicReceiptService';
 
 interface Photo {
   file: File;
@@ -285,6 +286,9 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
       let uploadedCount = 0;
       const totalPhotos = photos.length;
       
+      // Track uploaded images by vehicle for forensic analysis
+      const uploadedByVehicle: Record<string, string[]> = {};
+      
       for (const session of sessions) {
         const vehicleId = session.manualVehicleId || session.suggestedVehicle?.id;
         
@@ -292,6 +296,10 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
           alert(`Please select a vehicle for session starting at ${formatTime(session.startTime)}`);
           setUploading(false);
           return;
+        }
+        
+        if (!uploadedByVehicle[vehicleId]) {
+          uploadedByVehicle[vehicleId] = [];
         }
         
         // Upload all photos in this session
@@ -310,13 +318,18 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
               .from('vehicle-images')
               .getPublicUrl(fileName);
             
-            // Create image record
+            // Create image record with full EXIF data
             const { data: imageData, error: imageError } = await supabase
               .from('vehicle_images')
               .insert({
                 vehicle_id: vehicleId,
                 image_url: publicUrl,
                 uploaded_by: user.id,
+                taken_at: photo.timestamp.toISOString(),
+                latitude: photo.gps?.lat || null,
+                longitude: photo.gps?.lng || null,
+                exif_data: photo.exif,
+                ai_processing_status: 'pending', // Queue for AI analysis
                 metadata: {
                   gps: photo.gps,
                   timestamp: photo.timestamp.toISOString(),
@@ -328,34 +341,49 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
             
             if (imageError) throw imageError;
             
-            // Create timeline event for this photo
-            await supabase
-              .from('vehicle_timeline_events')
-              .insert({
-                vehicle_id: vehicleId,
-                user_id: user.id,
-                event_type: 'image_added',
-                title: 'Work Photo',
-                event_date: photo.timestamp.toISOString(),
-                metadata: {
-                  image_id: imageData.id,
-                  gps: photo.gps,
-                  location: session.location,
-                  session_id: session.id,
-                },
-              });
+            // Track for forensic analysis
+            if (imageData?.id) {
+              uploadedByVehicle[vehicleId].push(imageData.id);
+            }
             
             uploadedCount++;
-            setUploadProgress((uploadedCount / totalPhotos) * 100);
+            setUploadProgress((uploadedCount / totalPhotos) * 80); // Reserve 20% for forensic analysis
           } catch (error) {
             console.error('Error uploading photo:', error);
           }
         }
       }
       
-      alert(`Successfully uploaded ${uploadedCount} photos!`);
+      // 🔬 FORENSIC ANALYSIS: Process uploaded images into work sessions and synthetic receipts
+      console.log('🔬 Triggering forensic analysis for uploaded images...');
+      setUploadProgress(85);
+      
+      for (const [vehicleId, imageIds] of Object.entries(uploadedByVehicle)) {
+        if (imageIds.length > 0) {
+          try {
+            const result = await ForensicReceiptService.processUploadedImages(
+              vehicleId,
+              imageIds,
+              user.id
+            );
+            
+            if (result.success) {
+              console.log(`🔬 Forensic analysis complete for vehicle ${vehicleId}:`, {
+                sessions: result.sessions.length,
+                receiptsCreated: result.sessions.filter(s => s.syntheticReceipt).length,
+                orgsMatched: result.sessions.filter(s => s.matchedOrganization).length
+              });
+            }
+          } catch (err) {
+            console.error('Forensic analysis failed:', err);
+          }
+        }
+      }
+      
+      setUploadProgress(100);
+      alert(`Successfully uploaded ${uploadedCount} photos! Forensic analysis complete.`);
       onClose();
-      window.location.reload(); // Refresh to show new photos
+      window.location.reload(); // Refresh to show new photos and work sessions
     } catch (error) {
       console.error('Error uploading photos:', error);
       alert('Error uploading photos. Please try again.');

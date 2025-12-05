@@ -216,6 +216,47 @@ serve(async (req) => {
       if (updateError) throw new Error(`Database update failed: ${updateError.message}`)
       
       console.log('✅ Analysis saved:', { image_id, provider, cost: usageStats?.cost })
+      
+      // 🔍 FORENSIC: Auto-detect receipt/document images and trigger extraction
+      // If image is categorized as documentation or contains receipt-like content, extract it
+      const isDocumentation = analysis.category === 'documentation' || 
+                              analysis.category === 'work_progress' ||
+                              (analysis.basic_observations && (
+                                analysis.basic_observations.toLowerCase().includes('receipt') ||
+                                analysis.basic_observations.toLowerCase().includes('invoice') ||
+                                analysis.basic_observations.toLowerCase().includes('work order') ||
+                                analysis.basic_observations.toLowerCase().includes('bill')
+                              ));
+      
+      if (isDocumentation && vehicle_id && image_id) {
+        console.log('📄 Receipt/document detected - triggering extraction...');
+        
+        // Get image URL
+        const { data: imageData } = await supabase
+          .from('vehicle_images')
+          .select('image_url')
+          .eq('id', image_id)
+          .single();
+        
+        if (imageData?.image_url) {
+          // Trigger smart-receipt-linker asynchronously (non-blocking)
+          supabase.functions.invoke('smart-receipt-linker', {
+            body: {
+              documentId: image_id,
+              vehicleId: vehicle_id,
+              documentUrl: imageData.image_url
+            }
+          }).then(({ data, error }) => {
+            if (error) {
+              console.warn('⚠️ Receipt extraction trigger failed (non-blocking):', error);
+            } else {
+              console.log('✅ Receipt extraction triggered:', data);
+            }
+          }).catch(err => {
+            console.warn('⚠️ Receipt extraction error (non-blocking):', err);
+          });
+        }
+      }
     }
 
     return new Response(
@@ -235,7 +276,7 @@ serve(async (req) => {
 const ANALYSIS_PROMPT = `Analyze this vehicle image and provide basic organization data.
 Return ONLY valid JSON with this structure:
 {
-  "angle": "front_3quarter|front_center|rear_3quarter|rear_center|driver_side|passenger_side|overhead|undercarriage|interior_front|interior_rear|engine_bay|trunk|detail_shot|work_progress",
+  "angle": "front_3quarter|front_center|rear_3quarter|rear_center|driver_side|passenger_side|overhead|undercarriage|interior_front|interior_rear|engine_bay|trunk|detail_shot|work_progress|document",
   "category": "exterior_body|interior|engine_mechanical|undercarriage|wheels_tires|trunk_storage|documentation|work_progress",
   "components_visible": ["hood", "door_driver", "fender_front", "wheel", etc],
   "condition_glance": "excellent_clean|good_maintained|average_wear|poor_neglected|damaged|under_restoration",
@@ -246,8 +287,10 @@ Return ONLY valid JSON with this structure:
     "suitable_for_expert": true|false,
     "overall_score": 1-10
   },
-  "basic_observations": "Brief description"
-}`
+  "basic_observations": "Brief description. IMPORTANT: If this image contains a receipt, invoice, work order, or document, mention it explicitly (e.g., 'Receipt from shop', 'Work order visible', 'Invoice document')"
+}
+
+CRITICAL: If this image shows a receipt, invoice, work order, bill, or any document with text/numbers, set category to "documentation" and mention it in basic_observations.`
 
 async function runTier1AnalysisGemini(imageUrl: string, estimatedResolution: string, apiKey: string) {
   const imgResp = await fetch(imageUrl)
