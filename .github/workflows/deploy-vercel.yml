@@ -68,16 +68,31 @@ jobs:
           echo "$DEPLOY_OUTPUT"
           echo "--- End Output ---"
           
+          # If primary deployment failed, try fallback and capture its output
           if [ $DEPLOY_EXIT -ne 0 ]; then
             echo "❌ Vercel deployment failed with exit code: $DEPLOY_EXIT"
             echo "Full output above ⬆️"
             echo ""
             echo "Trying alternative: deploy from dist/ directory..."
             cd dist
-            vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1 || {
+            FALLBACK_OUTPUT=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+            FALLBACK_EXIT=$?
+            
+            if [ $FALLBACK_EXIT -ne 0 ]; then
               echo "❌ Alternative deployment also failed"
+              echo "--- Fallback Deployment Output ---"
+              echo "$FALLBACK_OUTPUT"
+              echo "--- End Output ---"
               exit 1
-            }
+            fi
+            
+            echo "✅ Fallback deployment succeeded!"
+            echo "--- Fallback Deployment Output ---"
+            echo "$FALLBACK_OUTPUT"
+            echo "--- End Output ---"
+            
+            # Use fallback output for URL extraction
+            DEPLOY_OUTPUT="$FALLBACK_OUTPUT"
           fi
           
           # Extract deployment URL (try multiple patterns)
