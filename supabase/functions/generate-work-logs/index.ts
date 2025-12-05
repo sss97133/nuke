@@ -32,6 +32,13 @@ interface LaborTask {
   difficulty: number; // 1-10
 }
 
+interface ParticipantSuggestion {
+  name: string;
+  role: 'mechanic' | 'assistant' | 'supervisor' | 'owner' | 'witness' | 'other';
+  evidence: string;
+  confidence: number;
+}
+
 interface WorkLogResult {
   title: string;
   description: string;
@@ -46,6 +53,7 @@ interface WorkLogResult {
   tags: string[];
   confidence: number;
   concerns: string[];
+  participantSuggestions?: ParticipantSuggestion[];
 }
 
 const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -89,10 +97,10 @@ Deno.serve(async (req: Request) => {
     const orgName = org?.business_name || 'Unknown Shop';
     const laborRate = org?.labor_rate || 125;
 
-    // Get image URLs
+    // Get image URLs and metadata
     const { data: images } = await supabase
       .from('vehicle_images')
-      .select('image_url, taken_at')
+      .select('id, image_url, taken_at, category, exif_data, user_id')
       .in('id', imageIds)
       .order('taken_at', { ascending: true });
 
@@ -100,17 +108,213 @@ Deno.serve(async (req: Request) => {
       throw new Error('No images found');
     }
 
+    // ============================================
+    // PARTICIPANT ATTRIBUTION: Image Maker (Participant #1)
+    // ============================================
+    const { data: deviceAttributions } = await supabase
+      .from('device_attributions')
+      .select(`
+        device_fingerprint,
+        ghost_user_id,
+        actual_contributor_id,
+        uploaded_by_user_id,
+        attribution_source,
+        confidence_score,
+        ghost_users (
+          camera_make,
+          camera_model,
+          lens_model,
+          software_version,
+          display_name,
+          claimed_by_user_id
+        )
+      `)
+      .in('image_id', imageIds)
+      .limit(1)
+      .single();
+
+    const imageMaker = {
+      user_id: deviceAttributions?.actual_contributor_id || images[0]?.user_id || null,
+      ghost_user_id: deviceAttributions?.ghost_user_id || null,
+      device_fingerprint: deviceAttributions?.device_fingerprint || 'Unknown-Unknown-Unknown-Unknown',
+      camera_make: deviceAttributions?.ghost_users?.camera_make || null,
+      camera_model: deviceAttributions?.ghost_users?.camera_model || null,
+      lens_model: deviceAttributions?.ghost_users?.lens_model || null,
+      software_version: deviceAttributions?.ghost_users?.software_version || null,
+      display_name: deviceAttributions?.ghost_users?.display_name || 'Unknown Photographer',
+      is_claimed: deviceAttributions?.ghost_users?.claimed_by_user_id ? true : false,
+      attribution_source: deviceAttributions?.attribution_source || 'unknown',
+      confidence_score: deviceAttributions?.confidence_score || 50
+    };
+
+    // Get uploaded_by user info
+    const uploadedByUserId = deviceAttributions?.uploaded_by_user_id || images[0]?.user_id;
+    let uploadedBy = { user_id: uploadedByUserId, username: null };
+    if (uploadedByUserId) {
+      const { data: uploaderProfile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', uploadedByUserId)
+        .single();
+      uploadedBy.username = uploaderProfile?.username || null;
+    }
+
+    // ============================================
+    // IMAGE SESSION METADATA
+    // ============================================
+    const sessionStart = images[0]?.taken_at;
+    const sessionEnd = images[images.length - 1]?.taken_at;
+    const sessionDate = eventDate;
+    
+    // Calculate time span
+    let timeSpan = null;
+    if (sessionStart && sessionEnd) {
+      const start = new Date(sessionStart);
+      const end = new Date(sessionEnd);
+      const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+      timeSpan = {
+        start: start.toISOString(),
+        end: end.toISOString(),
+        duration_minutes: durationMinutes
+      };
+    }
+
+    // Aggregate EXIF data
+    const exifData = images
+      .filter(img => img.exif_data)
+      .map(img => img.exif_data)
+      .reduce((acc, exif) => {
+        if (exif?.Make && !acc.camera_make) acc.camera_make = exif.Make;
+        if (exif?.Model && !acc.camera_model) acc.camera_model = exif.Model;
+        if (exif?.LensModel && !acc.lens_model) acc.lens_model = exif.LensModel;
+        if (exif?.Software && !acc.software_version) acc.software_version = exif.Software;
+        if (exif?.GPS?.latitude && exif?.GPS?.longitude) {
+          acc.gps_coordinates = acc.gps_coordinates || [];
+          acc.gps_coordinates.push({
+            lat: exif.GPS.latitude,
+            lon: exif.GPS.longitude
+          });
+        }
+        return acc;
+      }, {} as any);
+
+    // ============================================
+    // VEHICLE HISTORY (Recent work)
+    // ============================================
+    const { data: recentEvents } = await supabase
+      .from('timeline_events')
+      .select('event_date, title, description, quality_rating, metadata')
+      .eq('vehicle_id', vehicleId)
+      .lt('event_date', eventDate)
+      .order('event_date', { ascending: false })
+      .limit(10);
+
+    const vehicleHistory = (recentEvents || []).map(ev => ({
+      date: ev.event_date,
+      title: ev.title,
+      description: ev.description,
+      work_category: ev.metadata?.work_category || null,
+      quality_rating: ev.quality_rating || null
+    }));
+
+    // ============================================
+    // ASSIGNED PARTICIPANTS (if event already exists)
+    // ============================================
+    const { data: existingEvent } = await supabase
+      .from('timeline_events')
+      .select('id')
+      .eq('vehicle_id', vehicleId)
+      .eq('event_date', eventDate)
+      .maybeSingle();
+
+    let assignedParticipants: any[] = [];
+    if (existingEvent?.id) {
+      const { data: participants } = await supabase
+        .from('event_participants')
+        .select(`
+          user_id,
+          role,
+          name,
+          company,
+          ghost_users!event_participants_ghost_user_id_fkey (
+            id,
+            display_name,
+            claimed_by_user_id
+          )
+        `)
+        .eq('event_id', existingEvent.id);
+      
+      assignedParticipants = (participants || []).map(p => ({
+        user_id: p.user_id,
+        ghost_user_id: p.ghost_users?.id || null,
+        name: p.name || p.ghost_users?.display_name || 'Unknown',
+        role: p.role,
+        company: p.company || null,
+        is_ghost: p.ghost_users?.id ? true : false
+      }));
+    }
+
     console.log(`Analyzing ${images.length} images for ${vehicleName} at ${orgName}`);
+    console.log(`Image Maker: ${imageMaker.display_name} (${imageMaker.device_fingerprint})`);
+    console.log(`Uploaded by: ${uploadedBy.username || uploadedBy.user_id || 'Unknown'}`);
+    console.log(`Session: ${sessionDate} (${timeSpan?.duration_minutes || 'unknown'} minutes)`);
+
+    // Build participant context string
+    const participantContext = `
+PARTICIPANT ATTRIBUTION:
+- Primary Documenter (Image Maker): ${imageMaker.display_name}
+  Device: ${imageMaker.device_fingerprint}
+  ${imageMaker.is_claimed ? '(Device claimed by real user)' : '(Unclaimed device - ghost user)'}
+  Attribution Confidence: ${imageMaker.confidence_score}%
+  
+- Uploaded By: ${uploadedBy.username || uploadedBy.user_id || 'Unknown'}
+  ${uploadedBy.user_id !== imageMaker.user_id ? '(Different from image maker)' : '(Same as image maker)'}
+
+${assignedParticipants.length > 0 ? `
+- Assigned Participants:
+${assignedParticipants.map(p => `  - ${p.name} (${p.role})${p.company ? ` - ${p.company}` : ''}`).join('\n')}
+` : ''}
+`;
+
+    // Build vehicle history context
+    const historyContext = vehicleHistory.length > 0 ? `
+RECENT WORK HISTORY:
+${vehicleHistory.slice(0, 5).map(h => `- ${h.date}: ${h.title}${h.quality_rating ? ` (Quality: ${h.quality_rating}/10)` : ''}`).join('\n')}
+` : '';
+
+    // Build session context
+    const sessionContext = `
+IMAGE SESSION:
+- Date: ${sessionDate}
+- Photo Count: ${images.length}
+${timeSpan ? `- Time Span: ${new Date(timeSpan.start).toLocaleTimeString()} - ${new Date(timeSpan.end).toLocaleTimeString()} (${timeSpan.duration_minutes} minutes)` : ''}
+${exifData.gps_coordinates && exifData.gps_coordinates.length > 0 ? `- Location: GPS coordinates available (${exifData.gps_coordinates.length} images with location data)` : ''}
+`;
 
     const systemPrompt = `You are an expert automotive shop foreman and parts specialist at ${orgName}.
 
-Shop Details:
+SHOP DETAILS:
 - Specialization: ${org?.business_type || 'Automotive restoration and repair'}
 - Standard labor rate: $${laborRate}/hr
 - Mitchell Labor Guide certified
 - ASE Master Technician level expertise
 
-Task: Analyze photos from work session on a ${vehicleName}. Generate detailed professional work log with STRUCTURED parts data for customer shopping.
+VEHICLE:
+- ${vehicleName}
+${vehicleHistory.length > 0 ? historyContext : ''}
+
+${participantContext}
+
+${sessionContext}
+
+TASK: Analyze these photos from a work session. The images were documented by ${imageMaker.display_name}${imageMaker.is_claimed ? ' (verified photographer)' : ' (unclaimed device - photographer unknown)'}. Generate detailed professional work log with STRUCTURED parts data for customer shopping.
+
+CRITICAL CONTEXT:
+- Consider who documented vs who performed the work (may be different)
+- If you see multiple people in photos, note them as potential participants
+- Cross-reference with recent work history to understand build progression
+- Factor in organization specialization when estimating labor
+- Account for session duration when estimating work scope
 
 Required Analysis:
 1. Identify ALL work performed (step-by-step, specific tasks)
@@ -193,7 +397,15 @@ Return ONLY valid JSON with this EXACT schema:
   "conditionNotes": "Significant improvement to interior condition. Factory-quality installation with modern materials maintaining vintage aesthetic.",
   "tags": ["upholstery", "interior", "restoration", "custom-fabrication"],
   "confidence": 0.92,
-  "concerns": ["Small gap visible in passenger door panel seam - recommend inspection"]
+  "concerns": ["Small gap visible in passenger door panel seam - recommend inspection"],
+  "participantSuggestions": [
+    {
+      "name": "Mike Johnson",
+      "role": "mechanic",
+      "evidence": "Visible in photos performing upholstery work",
+      "confidence": 0.85
+    }
+  ]
 }
 
 PARTS EXTRACTION RULES:
@@ -251,7 +463,17 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
           content: [
             { 
               type: 'text', 
-              text: `Analyze these ${images.length} photos from work on a ${vehicleName} at ${orgName}. Extract detailed parts data with brands, part numbers, and prices for customer shopping. Break down labor by task. Generate professional work log.`
+              text: `Analyze these ${images.length} photos from work on a ${vehicleName} at ${orgName}.
+
+${participantContext}
+
+${sessionContext}
+
+${vehicleHistory.length > 0 ? historyContext : ''}
+
+Extract detailed parts data with brands, part numbers, and prices for customer shopping. Break down labor by task. Generate professional work log.
+
+IMPORTANT: If you see people in the photos, suggest them as participants in participantSuggestions array.`
             },
             ...images.slice(0, 15).map(img => ({
               type: 'image_url',
@@ -323,6 +545,8 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
     }
 
     console.log('Work log generated:', workLog.title);
+    console.log('Image Maker:', imageMaker.display_name, `(${imageMaker.is_claimed ? 'claimed' : 'ghost'})`);
+    console.log('Uploaded by:', uploadedBy.username || uploadedBy.user_id);
 
     // Insert/update timeline event in VEHICLE timeline (timeline_events table)
     // This is what the receipt component queries
@@ -352,6 +576,8 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
       value_impact: workLog.valueImpact,
       ai_confidence_score: workLog.confidence,
       concerns: workLog.concerns && workLog.concerns.length > 0 ? workLog.concerns : null,
+      // Participant attribution
+      documented_by: imageMaker.user_id || null, // Real user if device claimed
       metadata: {
         vehicle_name: vehicleName,
         organization_id: organizationId,
@@ -359,7 +585,19 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
         parts_identified: workLog.partsExtracted?.map(p => p.name) || [],
         condition_notes: workLog.conditionNotes,
         tags: workLog.tags,
-        ai_generated: true
+        ai_generated: true,
+        // Participant attribution metadata
+        image_maker: {
+          user_id: imageMaker.user_id,
+          ghost_user_id: imageMaker.ghost_user_id,
+          device_fingerprint: imageMaker.device_fingerprint,
+          display_name: imageMaker.display_name,
+          is_claimed: imageMaker.is_claimed
+        },
+        uploaded_by: {
+          user_id: uploadedBy.user_id,
+          username: uploadedBy.username
+        }
       }
     };
 
@@ -520,6 +758,89 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
         concerns: workLog.concerns && workLog.concerns.length > 0 ? workLog.concerns : null
       })
       .eq('id', timelineEventId);
+
+    // ============================================
+    // SAVE PARTICIPANTS
+    // ============================================
+    
+    // Participant #1: Image Maker (Primary Documenter)
+    // Check if already exists (by user_id if claimed, or by name if ghost)
+    if (imageMaker.user_id || imageMaker.ghost_user_id) {
+      // Check if image maker already exists
+      let existingImageMaker = null;
+      if (imageMaker.user_id) {
+        const { data } = await supabase
+          .from('event_participants')
+          .select('id')
+          .eq('event_id', timelineEventId)
+          .eq('user_id', imageMaker.user_id)
+          .maybeSingle();
+        existingImageMaker = data;
+      } else {
+        // For ghost users, check by name
+        const { data } = await supabase
+          .from('event_participants')
+          .select('id')
+          .eq('event_id', timelineEventId)
+          .eq('name', imageMaker.display_name)
+          .is('user_id', null)
+          .maybeSingle();
+        existingImageMaker = data;
+      }
+
+      if (!existingImageMaker) {
+        // Insert image maker as participant #1
+        const { error: participantError } = await supabase
+          .from('event_participants')
+          .insert({
+            event_id: timelineEventId,
+            user_id: imageMaker.user_id || null,
+            role: 'other', // Image maker/documenter role
+            name: imageMaker.display_name,
+            notes: `Primary documenter (Participant #1). Device: ${imageMaker.device_fingerprint}. ${imageMaker.is_claimed ? 'Device claimed by real user' : 'Ghost user (unclaimed device)'}. Attribution confidence: ${imageMaker.confidence_score}%`
+          });
+        
+        if (participantError) {
+          console.error('Failed to save image maker as participant:', participantError);
+        } else {
+          console.log('Saved image maker as participant:', imageMaker.display_name);
+        }
+      }
+    }
+
+    // AI-Suggested Participants (if any)
+    if (workLog.participantSuggestions && workLog.participantSuggestions.length > 0) {
+      const suggestedParticipants = workLog.participantSuggestions
+        .filter(s => s.confidence >= 0.7) // Only high-confidence suggestions
+        .map(suggestion => ({
+          event_id: timelineEventId,
+          user_id: null, // Will need to be matched/assigned manually
+          role: suggestion.role,
+          name: suggestion.name,
+          notes: `AI-suggested. Evidence: ${suggestion.evidence}. Confidence: ${(suggestion.confidence * 100).toFixed(0)}%`
+        }));
+
+      if (suggestedParticipants.length > 0) {
+        // Insert with conflict handling (don't duplicate)
+        for (const participant of suggestedParticipants) {
+          const { data: existing } = await supabase
+            .from('event_participants')
+            .select('id')
+            .eq('event_id', timelineEventId)
+            .eq('name', participant.name)
+            .eq('role', participant.role)
+            .maybeSingle();
+
+          if (!existing) {
+            await supabase
+              .from('event_participants')
+              .insert(participant);
+          }
+        }
+        
+        console.log(`Saved ${suggestedParticipants.length} AI-suggested participants`);
+      }
+    }
 
     return new Response(
       JSON.stringify({
