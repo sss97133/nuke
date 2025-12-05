@@ -20,6 +20,9 @@ import MarketplaceComplianceForm from '../components/organization/MarketplaceCom
 import OrganizationNotifications from '../components/organization/OrganizationNotifications';
 import VehicleInquiryModal from '../components/organization/VehicleInquiryModal';
 import { extractImageMetadata } from '../utils/imageMetadata';
+import { DynamicTabBar } from '../components/organization/DynamicTabBar';
+import { OrganizationServiceTab } from '../components/organization/OrganizationServiceTab';
+import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import '../design-system.css';
 
 interface Organization {
@@ -142,7 +145,9 @@ export default function OrganizationProfile() {
   const [offering, setOffering] = useState<Offering | null>(null);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'vehicles' | 'images' | 'inventory' | 'contributors' | 'marketplace' | 'notifications'>('overview');
+  const [activeTab, setActiveTab] = useState<string>('overview');
+  const [intelligence, setIntelligence] = useState<OrganizationIntelligence | null>(null);
+  const [tabs, setTabs] = useState<TabConfig[]>([]);
   const [showTrade, setShowTrade] = useState(false);
   const [showOwnershipModal, setShowOwnershipModal] = useState(false);
   const [showContributeModal, setShowContributeModal] = useState(false);
@@ -454,6 +459,56 @@ export default function OrganizationProfile() {
       }
       
       setOrganization(org);
+      
+      // Load organization intelligence (respects explicit settings)
+      (async () => {
+        try {
+          console.log('[OrgProfile] Loading intelligence for:', organizationId);
+          const intelligence = await OrganizationIntelligenceService.getIntelligence(organizationId);
+          console.log('[OrgProfile] Intelligence loaded:', intelligence);
+          
+          if (intelligence) {
+            setIntelligence(intelligence);
+            
+            // Get data signals for tab priority calculation
+            let dataSignals = intelligence.dataSignals;
+            if (!dataSignals || Object.keys(dataSignals).length === 0) {
+              console.log('[OrgProfile] No data signals in intelligence, analyzing...');
+              dataSignals = await OrganizationIntelligenceService.analyzeDataSignals(organizationId);
+              console.log('[OrgProfile] Data signals analyzed:', dataSignals);
+            }
+            
+            // Determine tab priority based on intelligence
+            const priorityTabs = OrganizationIntelligenceService.determineTabPriority(intelligence, dataSignals);
+            console.log('[OrgProfile] Tab priority determined:', priorityTabs);
+            setTabs(priorityTabs);
+          } else {
+            console.warn('[OrgProfile] No intelligence returned, using default tabs');
+            // Fallback to default tabs
+            setTabs([
+              { id: 'overview', priority: 100, label: 'Overview' },
+              { id: 'vehicles', priority: 80, label: 'Vehicles' },
+              { id: 'images', priority: 70, label: 'Images' },
+              { id: 'inventory', priority: 60, label: 'Inventory' },
+              { id: 'contributors', priority: 50, label: 'Contributors' },
+              { id: 'marketplace', priority: 40, label: 'Marketplace' },
+              { id: 'notifications', priority: 20, label: 'Notifications' }
+            ]);
+          }
+        } catch (error) {
+          console.error('[OrgProfile] Error loading organization intelligence:', error);
+          // Fallback to default tabs
+          setTabs([
+            { id: 'overview', priority: 100, label: 'Overview' },
+            { id: 'vehicles', priority: 80, label: 'Vehicles' },
+            { id: 'images', priority: 70, label: 'Images' },
+            { id: 'inventory', priority: 60, label: 'Inventory' },
+            { id: 'contributors', priority: 50, label: 'Contributors' },
+            { id: 'marketplace', priority: 40, label: 'Marketplace' },
+            { id: 'notifications', priority: 20, label: 'Notifications' }
+          ]);
+        }
+      })();
       
       // CRITICAL: Set loading to false IMMEDIATELY after org loads so page can render
       setLoading(false);
@@ -1122,32 +1177,42 @@ export default function OrganizationProfile() {
         </section>
       )}
 
-      {/* Tabs */}
-              <div style={{
-        background: 'var(--white)',
-        borderBottom: '2px solid var(--border)',
-        padding: '0 16px'
-      }}>
-        {(['overview', 'vehicles', 'images', 'inventory', 'contributors', 'marketplace', 'notifications'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              background: activeTab === tab ? 'var(--grey-200)' : 'transparent',
-              border: 'none',
-              borderBottom: activeTab === tab ? '2px solid var(--accent)' : 'none',
-              padding: '8px 12px',
-              fontSize: '9pt',
-              cursor: 'pointer',
-              fontFamily: 'Arial, sans-serif',
-              textTransform: 'capitalize',
-              color: activeTab === tab ? 'var(--accent)' : 'var(--text)'
-            }}
-          >
-            {tab}
-          </button>
-        ))}
-              </div>
+      {/* Dynamic Tabs - Respects explicit settings, uses data-driven as fallback */}
+      {tabs.length > 0 ? (
+        <DynamicTabBar
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          source={intelligence?.source}
+        />
+      ) : (
+        // Fallback to default tabs while loading
+        <div style={{
+          background: 'var(--white)',
+          borderBottom: '2px solid var(--border)',
+          padding: '0 16px'
+        }}>
+          {(['overview', 'vehicles', 'images', 'inventory', 'contributors', 'marketplace', 'notifications'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                background: activeTab === tab ? 'var(--grey-200)' : 'transparent',
+                border: 'none',
+                borderBottom: activeTab === tab ? '2px solid var(--accent)' : 'none',
+                padding: '8px 12px',
+                fontSize: '9pt',
+                cursor: 'pointer',
+                fontFamily: 'Arial, sans-serif',
+                textTransform: 'capitalize',
+                color: activeTab === tab ? 'var(--accent)' : 'var(--text)'
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Content */}
       <div style={{ padding: '16px' }}>
@@ -1759,6 +1824,10 @@ export default function OrganizationProfile() {
           </>
         )}
 
+        {activeTab === 'service' && organizationId && (
+          <OrganizationServiceTab organizationId={organizationId} />
+        )}
+
         {activeTab === 'vehicles' && (
             <EnhancedDealerInventory
               organizationId={organizationId!}
@@ -1766,6 +1835,23 @@ export default function OrganizationProfile() {
               canEdit={canEdit}
               isOwner={isOwner}
             />
+        )}
+
+        {activeTab === 'receipts' && organizationId && (
+          <div style={{ padding: '16px' }}>
+            <div className="card">
+              <div className="card-header">Work Orders</div>
+              <div className="card-body">
+                <div style={{ fontSize: '9pt', color: 'var(--grey-600)', textAlign: 'center', padding: '40px' }}>
+                  Receipt/work order browser coming soon
+                  <br />
+                  <span style={{ fontSize: '8pt' }}>
+                    View receipts in vehicle profiles for now
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === 'notifications' && (
