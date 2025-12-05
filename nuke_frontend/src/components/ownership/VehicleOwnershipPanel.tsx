@@ -5,6 +5,7 @@ import { DocumentVerificationService } from '../../services/documentVerification
 import OwnershipService from '../../services/ownershipService';
 import type { OwnershipStatus } from '../../services/ownershipService';
 import RoleManagementInterface from '../rbac/RoleManagementInterface';
+import ModeratorAssignmentWizard from './ModeratorAssignmentWizard';
 import {
   Shield,
   User,
@@ -71,6 +72,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
   const [showAccessRequest, setShowAccessRequest] = useState(false);
   const [showManagement, setShowManagement] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showModeratorWizard, setShowModeratorWizard] = useState(false);
   const [moderatorStatus, setModeratorStatus] = useState<string>('Loading...');
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -226,10 +228,10 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
 
     // Check if user is the uploader/initial submitter
     if (session?.user?.id === (vehicle?.uploaded_by || vehicle?.user_id)) {
-      return 'Uploader (unverified)';
+      return 'Uploader';
     }
 
-    return 'No (unverified)';
+    return 'No';
   };
 
   const getModeratorStatus = async () => {
@@ -293,19 +295,36 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         {/* Collapsible Details */}
         {showDetails && (
           <div className="text-muted" style={{ marginTop: '8px' }}>
-            {session?.user && (
-              <div style={{ marginBottom: '4px' }}>
-                <span className="font-bold">User:</span> {session.user.user_metadata?.full_name || session.user.email}
-              </div>
-            )}
             <div style={{ marginBottom: '4px' }}>
               <span className="font-bold">Legal Owner:</span> {getLegalOwnershipStatus()}
             </div>
             <div style={{ marginBottom: '4px' }}>
-              <span className="font-bold">Listed By:</span> {responsibleName || (session?.user?.id === (vehicle?.uploaded_by || vehicle?.user_id) ? 'You' : 'Another user')}
+              <span className="font-bold">Listed By:</span> {(() => {
+                if (session?.user?.id === (vehicle?.uploaded_by || vehicle?.user_id)) {
+                  // Show current user's name (can be blurred)
+                  const userName = session.user.user_metadata?.full_name || session.user.email || 'You';
+                  return userName;
+                }
+                // Show responsible name (can be blurred/starred)
+                if (responsibleName) {
+                  // Option to blur: return responsibleName.replace(/./g, '*');
+                  return responsibleName;
+                }
+                return 'Unknown';
+              })()}
             </div>
-            <div style={{ marginBottom: '4px' }}>
-              <span className="font-bold">Moderator:</span> {moderatorStatus}
+            <div style={{ marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="font-bold">Moderator:</span> 
+              <span>{moderatorStatus}</span>
+              {moderatorStatus === 'Not assigned' && (isOwner || contributorRole === 'owner' || session?.user?.id === (vehicle?.uploaded_by || vehicle?.user_id)) && (
+                <button
+                  className="button button-small button-tertiary"
+                  onClick={() => setShowModeratorWizard(true)}
+                  style={{ fontSize: '7pt', padding: '2px 6px' }}
+                >
+                  Assign
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -798,6 +817,34 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                   onClose={() => {
                     setShowManagement(false);
                     loadPendingRequestsCount(); // Refresh the counter after management actions
+                  }}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+        {/* Moderator Assignment Wizard */}
+        {showModeratorWizard && ReactDOM.createPortal(
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="modal" style={{ background: 'white', width: '520px', maxWidth: '95vw', maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border)', borderRadius: '4px' }}>
+              <div className="modal-header">
+                <div className="modal-title">Assign Moderator</div>
+                <button
+                  onClick={() => setShowModeratorWizard(false)}
+                  className="button button-small button-tertiary"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="modal-body">
+                <ModeratorAssignmentWizard
+                  vehicleId={vehicle.id}
+                  currentUserId={session?.user?.id}
+                  onClose={() => {
+                    setShowModeratorWizard(false);
+                    loadOwnershipData(); // Refresh moderator status
                   }}
                 />
               </div>
