@@ -8,14 +8,11 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/cors.ts';
 
-interface AnalyzeBundleRequest {
-  vehicleId: string;
-  bundleDate: string; // YYYY-MM-DD
-  deviceFingerprint: string;
-  organizationId: string;
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -25,9 +22,30 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing environment variables' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { vehicleId, bundleDate, deviceFingerprint, organizationId }: AnalyzeBundleRequest = await req.json();
+    let requestBody: any;
+    try {
+      requestBody = await req.json();
+    } catch (jsonError) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid JSON in request body'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { vehicleId, bundleDate, deviceFingerprint, organizationId } = requestBody;
 
     if (!vehicleId || !bundleDate || !deviceFingerprint || !organizationId) {
       return new Response(
@@ -79,81 +97,68 @@ Deno.serve(async (req: Request) => {
     const imageIds = context.bundle.image_ids.slice(0, 10);
 
     // 3. Call generate-work-logs function via HTTP
-    try {
-      const generateWorkLogsUrl = `${supabaseUrl}/functions/v1/generate-work-logs`;
-      console.log(`Calling generate-work-logs with ${imageIds.length} images`);
-      
-      const generateWorkLogsResponse = await fetch(generateWorkLogsUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`,
-          'apikey': supabaseKey
-        },
-        body: JSON.stringify({
-          vehicleId,
-          organizationId,
-          imageIds,
-          eventDate: bundleDate
-        })
-      });
+    const generateWorkLogsUrl = `${supabaseUrl}/functions/v1/generate-work-logs`;
+    console.log(`Calling generate-work-logs with ${imageIds.length} images`);
+    
+    const generateWorkLogsResponse = await fetch(generateWorkLogsUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+        'apikey': supabaseKey
+      },
+      body: JSON.stringify({
+        vehicleId,
+        organizationId,
+        imageIds,
+        eventDate: bundleDate
+      })
+    });
 
-      if (!generateWorkLogsResponse.ok) {
-        const errorText = await generateWorkLogsResponse.text();
-        console.error('generate-work-logs failed:', errorText);
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: 'Failed to analyze bundle',
-            details: errorText,
-            status: generateWorkLogsResponse.status
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const workLogResult = await generateWorkLogsResponse.json();
-      
-      if (!workLogResult || !workLogResult.success) {
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: workLogResult?.error || 'Analysis failed',
-            workLogResult
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // 4. Return success
-      return new Response(
-        JSON.stringify({
-          success: true,
-          eventId: workLogResult.eventId,
-          bundle: {
-            date: bundleDate,
-            imageCount: context.bundle.image_ids.length,
-            imagesAnalyzed: imageIds.length
-          },
-          result: {
-            partsCount: workLogResult.partsCount || 0,
-            laborTasksCount: workLogResult.laborTasksCount || 0
-          }
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } catch (fetchError: any) {
-      console.error('Error calling generate-work-logs:', fetchError);
+    if (!generateWorkLogsResponse.ok) {
+      const errorText = await generateWorkLogsResponse.text();
+      console.error('generate-work-logs failed:', errorText);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Failed to call generate-work-logs',
-          details: fetchError.message
+          error: 'Failed to analyze bundle',
+          details: errorText,
+          status: generateWorkLogsResponse.status
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const workLogResult = await generateWorkLogsResponse.json();
+    
+    if (!workLogResult || !workLogResult.success) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: workLogResult?.error || 'Analysis failed',
+          workLogResult
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 4. Return success
+    return new Response(
+      JSON.stringify({
+        success: true,
+        eventId: workLogResult.eventId,
+        bundle: {
+          date: bundleDate,
+          imageCount: context.bundle.image_ids.length,
+          imagesAnalyzed: imageIds.length
+        },
+        result: {
+          partsCount: workLogResult.partsCount || 0,
+          laborTasksCount: workLogResult.laborTasksCount || 0
+        }
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error: any) {
     console.error('Unexpected error:', error);
@@ -161,11 +166,9 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ 
         success: false, 
         error: 'Unexpected error',
-        details: error.message,
-        stack: error.stack
+        details: error.message
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
-
