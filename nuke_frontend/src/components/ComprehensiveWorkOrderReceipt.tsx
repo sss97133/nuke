@@ -146,6 +146,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
     tools: { items: Tool[], total: number },
     overhead: Overhead
   } | null>(null);
+  const [adjacentEvents, setAdjacentEvents] = useState<{ prev: string | null, next: string | null }>({ prev: null, next: null });
 
   useEffect(() => {
     loadData();
@@ -224,7 +225,24 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         }
       }
 
-      // 4. Get evidence (photos)
+      // 4. Get adjacent events for date navigation
+      if (wo?.vehicle_id && wo?.event_date) {
+        const { data: adjacent } = await supabase
+          .from('timeline_events')
+          .select('id, event_date')
+          .eq('vehicle_id', wo.vehicle_id)
+          .order('event_date', { ascending: false });
+        
+        if (adjacent) {
+          const currentIndex = adjacent.findIndex(e => e.id === eventId);
+          setAdjacentEvents({
+            prev: currentIndex > 0 ? adjacent[currentIndex - 1].id : null,
+            next: currentIndex < adjacent.length - 1 ? adjacent[currentIndex + 1].id : null
+          });
+        }
+      }
+
+      // 5. Get evidence (photos)
       if (wo?.vehicle_id && wo?.event_date) {
         const { data: imgs } = await supabase
           .from('vehicle_images')
@@ -330,6 +348,16 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
     });
   };
 
+  const navigateToEvent = (newEventId: string | null) => {
+    if (newEventId) {
+      window.location.hash = `event=${newEventId}`;
+      // Reload with new event
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('event', newEventId);
+      window.location.href = newUrl.toString();
+    }
+  };
+
   return createPortal(
     <div 
       style={{
@@ -347,114 +375,210 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         overflow: 'auto'
       }}
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+      tabIndex={-1}
     >
       <div 
         style={{
           background: '#fff',
           width: '100%',
-          maxWidth: '900px',
-          maxHeight: '95vh',
+          maxWidth: '800px',
+          maxHeight: '90vh',
           overflow: 'auto',
           border: '2px solid #000',
-          fontFamily: 'Courier New, monospace',
-          fontSize: '9pt'
+          fontFamily: 'Arial, sans-serif'
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER */}
+        {/* DATE NAVIGATION - Wireframe Top */}
         <div style={{
-          padding: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px',
           borderBottom: '2px solid #000',
           backgroundColor: '#f5f5f5'
         }}>
-          <div style={{ 
-            fontSize: '14pt', 
-            fontWeight: 'bold', 
-            marginBottom: '8px',
-            textAlign: 'center' 
-          }}>
-            WORK ORDER RECEIPT
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (adjacentEvents.prev) {
+                navigateToEvent(adjacentEvents.prev);
+              }
+            }}
+            disabled={!adjacentEvents.prev}
+            style={{
+              padding: '4px 12px',
+              fontSize: '7pt',
+              fontWeight: 'bold',
+              border: '2px solid #000',
+              background: adjacentEvents.prev ? '#fff' : '#f0f0f0',
+              cursor: adjacentEvents.prev ? 'pointer' : 'not-allowed',
+              textTransform: 'uppercase',
+              color: adjacentEvents.prev ? '#000' : '#999'
+            }}
+          >
+            ← PREV DAY
+          </button>
+          
+          <div style={{ fontSize: '9pt', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+            {workOrder.event_date ? new Date(workOrder.event_date).toLocaleDateString('en-US', { 
+              month: '2-digit', 
+              day: '2-digit', 
+              year: 'numeric' 
+            }) : 'Date unknown'}
           </div>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between',
-            fontSize: '8pt'
-          }}>
-            <div>
-              <div>Order #{workOrder.id?.substring(0, 12).toUpperCase() || 'N/A'}</div>
-              <div>{workOrder.event_date ? formatDate(workOrder.event_date) : 'Date unknown'}</div>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (adjacentEvents.next) {
+                navigateToEvent(adjacentEvents.next);
+              }
+            }}
+            disabled={!adjacentEvents.next}
+            style={{
+              padding: '4px 12px',
+              fontSize: '7pt',
+              fontWeight: 'bold',
+              border: '2px solid #000',
+              background: adjacentEvents.next ? '#fff' : '#f0f0f0',
+              cursor: adjacentEvents.next ? 'pointer' : 'not-allowed',
+              textTransform: 'uppercase',
+              color: adjacentEvents.next ? '#000' : '#999'
+            }}
+          >
+            NEXT DAY →
+          </button>
+        </div>
+
+        {/* WORK ORDER HEADER - Wireframe */}
+        <div style={{
+          padding: '8px 12px',
+          borderBottom: '3px double #000',
+          background: '#fafafa',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '12px'
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '10pt', fontWeight: 700, letterSpacing: '0.5px', marginBottom: '4px' }}>
+              WORK ORDER #{workOrder.id?.slice(0, 8).toUpperCase() || 'N/A'}
             </div>
-            <div style={{ textAlign: 'right' }}>
-              {workOrder.service_provider_name && (
-                <div style={{ fontWeight: 'bold' }}>{workOrder.service_provider_name}</div>
+            <div style={{ fontSize: '7pt', color: '#666', marginBottom: '6px' }}>
+              {workOrder.event_date ? new Date(workOrder.event_date).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              }) : 'Date unknown'}
+            </div>
+            <div style={{ fontSize: '7pt', color: '#666' }}>
+              {workOrder.service_provider_name || 'Owner/DIY'}
+            </div>
+          </div>
+          
+          {/* IMAGE THUMBNAILS IN HEADER */}
+          {evidence.length > 0 && (
+            <div style={{ 
+              display: 'flex', 
+              gap: '4px',
+              flexShrink: 0
+            }}>
+              {evidence.slice(0, 4).map((img, idx) => (
+                <img
+                  key={img.id}
+                  src={img.image_url}
+                  alt={`Evidence ${idx + 1}`}
+                  onClick={() => window.open(img.image_url, '_blank')}
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    objectFit: 'cover',
+                    border: '1px solid #ccc',
+                    cursor: 'pointer',
+                    borderRadius: '2px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.border = '2px solid #000';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.border = '1px solid #ccc';
+                  }}
+                />
+              ))}
+              {evidence.length > 4 && (
+                <div
+                  onClick={() => {
+                    const imagesSection = document.querySelector('[data-images-section]');
+                    imagesSection?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#f0f0f0',
+                    border: '1px solid #ccc',
+                    borderRadius: '2px',
+                    fontSize: '7pt',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  +{evidence.length - 4}
+                </div>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* ATTRIBUTION SECTION */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
-          <div style={{ 
-            fontSize: '9pt', 
-            fontWeight: 'bold', 
-            marginBottom: '8px',
-            borderBottom: '1px solid #000',
-            paddingBottom: '4px'
-          }}>
-            ATTRIBUTION
-          </div>
-
-          {deviceAttribution.length > 0 && (
-            <div style={{ marginBottom: '8px' }}>
-              <div style={{ fontSize: '7pt', color: '#666' }}>DOCUMENTED BY:</div>
-              {deviceAttribution.map((dev, idx) => (
-                <div key={idx} style={{ fontSize: '8pt', marginLeft: '8px' }}>
-                  Device: {dev.device_fingerprint}
-                  {dev.uploaded_by && ` | Uploaded by User ${dev.uploaded_by.substring(0, 8)}`}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {workOrder.service_provider_name && (
-            <div style={{ marginBottom: '8px' }}>
-              <div style={{ fontSize: '7pt', color: '#666' }}>PERFORMED BY:</div>
-              <div style={{ fontSize: '8pt', marginLeft: '8px', fontWeight: 'bold' }}>
-                {workOrder.service_provider_name}
-              </div>
-            </div>
-          )}
-
-          {participants.length > 0 && (
-            <div style={{ marginBottom: '8px' }}>
-              <div style={{ fontSize: '7pt', color: '#666' }}>PARTICIPANTS:</div>
-              {participants.map(p => (
-                <div key={p.id} style={{ fontSize: '8pt', marginLeft: '8px' }}>
-                  • {p.name || 'Unknown'} ({p.role})
-                  {p.company && ` - ${p.company}`}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {participants.length === 0 && !deviceAttribution.length && (
-            <div style={{ fontSize: '8pt', color: '#999', fontStyle: 'italic' }}>
-              ⚠ Attribution incomplete - no documented participants
-            </div>
           )}
         </div>
 
-        {/* EVIDENCE SET */}
+        {/* EVIDENCE SET - Wireframe */}
         {evidence.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd', backgroundColor: '#fafafa' }}>
+          <div 
+            data-images-section
+            style={{ 
+              padding: '12px', 
+              borderBottom: '2px solid #000',
+              backgroundColor: '#fafafa' 
+            }}
+          >
             <div style={{ 
-              fontSize: '9pt', 
-              fontWeight: 'bold', 
-              marginBottom: '8px',
-              borderBottom: '1px solid #000',
-              paddingBottom: '4px'
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '8px'
             }}>
-              EVIDENCE SET ({evidence.length} photos)
+              <div style={{ 
+                fontSize: '8pt', 
+                fontWeight: 'bold', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                EVIDENCE SET ({evidence.length} photos)
+              </div>
+              <div style={{ 
+                fontSize: '7pt', 
+                color: '#666',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                {workOrder.ai_confidence_score ? (
+                  <>
+                    <span>✓</span>
+                    <span>Analyzed</span>
+                  </>
+                ) : (
+                  <>
+                    <span>⏳</span>
+                    <span>AI pending</span>
+                  </>
+                )}
+              </div>
             </div>
             <div style={{ 
               display: 'grid', 
@@ -464,11 +588,20 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               {evidence.map(img => (
                 <div 
                   key={img.id}
+                  onClick={() => window.open(img.image_url, '_blank')}
                   style={{
                     aspectRatio: '1',
                     border: '1px solid #ccc',
                     overflow: 'hidden',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    borderRadius: '2px',
+                    transition: 'border 0.12s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.border = '2px solid #000';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.border = '1px solid #ccc';
                   }}
                 >
                   <img 
@@ -486,150 +619,150 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           </div>
         )}
 
-        {/* WORK PERFORMED */}
-        <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
+        {/* WORK PERFORMED - Wireframe */}
+        <div style={{ padding: '12px', borderBottom: '2px solid #000' }}>
           <div style={{ 
-            fontSize: '9pt', 
+            fontSize: '8pt', 
             fontWeight: 'bold', 
             marginBottom: '8px',
-            borderBottom: '1px solid #000',
-            paddingBottom: '4px'
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
           }}>
             WORK PERFORMED
           </div>
-          <div style={{ fontSize: '9pt' }}>
-            {workOrder.title || 'Untitled work order'}
+          <div style={{ fontSize: '9pt', lineHeight: '1.5' }}>
+            {workOrder.title || workOrder.description || `${evidence.length} photos from ${workOrder.event_date ? new Date(workOrder.event_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'date unknown'}`}
           </div>
-          {workOrder.description && (
-            <div style={{ fontSize: '8pt', marginTop: '4px', color: '#666' }}>
+          {workOrder.description && workOrder.title && (
+            <div style={{ fontSize: '8pt', marginTop: '4px', color: '#666', lineHeight: '1.5' }}>
               {workOrder.description}
             </div>
           )}
         </div>
 
-        {/* PARTS & MATERIALS */}
-        {costBreakdown?.parts?.items && costBreakdown.parts.items.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
+        {/* COST BREAKDOWN - Wireframe Table Format */}
+        {(costBreakdown?.parts?.items?.length > 0 || costBreakdown?.labor?.tasks?.length > 0 || workOrder.cost_amount) && (
+          <div style={{ padding: '12px', borderBottom: '2px solid #000' }}>
             <div style={{ 
-              fontSize: '9pt', 
+              fontSize: '8pt', 
               fontWeight: 'bold', 
               marginBottom: '8px',
-              borderBottom: '1px solid #000',
-              paddingBottom: '4px'
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
             }}>
-              PARTS & COMPONENTS
+              COST BREAKDOWN
             </div>
-            {costBreakdown.parts.items.map(part => (
-              <div key={part.id} style={{ 
-                marginBottom: '8px',
-                paddingBottom: '8px',
-                borderBottom: '1px dotted #ddd'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  fontSize: '8pt'
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 'bold' }}>{part.name}</div>
-                    {part.brand && (
-                      <div style={{ fontSize: '7pt', color: '#666' }}>
-                        {part.brand}
-                        {part.part_number && ` #${part.part_number}`}
-                      </div>
-                    )}
-                    {part.supplier && (
-                      <div style={{ fontSize: '7pt', color: '#666' }}>
-                        {part.supplier} | Qty: {part.quantity}
-                      </div>
-                    )}
-                    {part.ai_extracted && (
-                      <div style={{ fontSize: '6pt', color: '#999', marginTop: '2px' }}>
-                        ⚙ AI-extracted
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap', marginLeft: '16px' }}>
-                    {formatCurrency(part.total_price)}
-                  </div>
+            
+            {/* Table Header */}
+            <div style={{ 
+              display: 'grid',
+              gridTemplateColumns: '2fr 60px 80px 100px',
+              gap: '8px',
+              paddingBottom: '4px',
+              borderBottom: '1px solid #000',
+              fontSize: '7pt',
+              fontWeight: 'bold',
+              marginBottom: '4px'
+            }}>
+              <div>Item</div>
+              <div style={{ textAlign: 'right' }}>Qty</div>
+              <div style={{ textAlign: 'right' }}>Unit</div>
+              <div style={{ textAlign: 'right' }}>Total</div>
+            </div>
+
+            {/* Parts Items */}
+            {costBreakdown?.parts?.items?.map(part => (
+              <div 
+                key={part.id}
+                style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: '2fr 60px 80px 100px',
+                  gap: '8px',
+                  padding: '4px 0',
+                  fontSize: '8pt',
+                  borderBottom: '1px dotted #ddd'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 'bold' }}>{part.name}</div>
+                  {part.brand && (
+                    <div style={{ fontSize: '6pt', color: '#666' }}>
+                      {part.brand}{part.part_number && ` #${part.part_number}`}
+                    </div>
+                  )}
                 </div>
+                <div style={{ textAlign: 'right' }}>{part.quantity}</div>
+                <div style={{ textAlign: 'right' }}>{formatCurrency(part.unit_price)}</div>
+                <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(part.total_price)}</div>
               </div>
             ))}
+
+            {/* Labor Items */}
+            {costBreakdown?.labor?.tasks?.map(task => (
+              <div 
+                key={task.id}
+                style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: '2fr 60px 80px 100px',
+                  gap: '8px',
+                  padding: '4px 0',
+                  fontSize: '8pt',
+                  borderBottom: '1px dotted #ddd'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 'bold' }}>
+                    {task.task} ({task.hours.toFixed(1)} hrs @ {formatCurrency(task.rate)}/hr)
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>{task.hours.toFixed(1)}</div>
+                <div style={{ textAlign: 'right' }}>{formatCurrency(task.rate)}</div>
+                <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(task.total)}</div>
+              </div>
+            ))}
+
+            {/* Fallback if no detailed breakdown */}
+            {(!costBreakdown?.parts?.items?.length && !costBreakdown?.labor?.tasks?.length) && workOrder.cost_amount && (
+              <div style={{ 
+                display: 'grid',
+                gridTemplateColumns: '2fr 60px 80px 100px',
+                gap: '8px',
+                padding: '4px 0',
+                fontSize: '8pt',
+                borderBottom: '1px dotted #ddd'
+              }}>
+                <div>Work performed</div>
+                <div style={{ textAlign: 'right' }}>-</div>
+                <div style={{ textAlign: 'right' }}>-</div>
+                <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(workOrder.cost_amount)}</div>
+              </div>
+            )}
+
+            {/* Total Row */}
             <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              fontWeight: 'bold',
+              display: 'grid',
+              gridTemplateColumns: '2fr 60px 80px 100px',
+              gap: '8px',
               paddingTop: '8px',
-              borderTop: '1px solid #000',
-              fontSize: '9pt'
+              marginTop: '8px',
+              borderTop: '2px solid #000',
+              fontSize: '9pt',
+              fontWeight: 'bold'
             }}>
-              <div>SUBTOTAL (Parts):</div>
-              <div>{formatCurrency(costBreakdown.parts.total)}</div>
+              <div>TOTAL</div>
+              <div></div>
+              <div></div>
+              <div style={{ textAlign: 'right' }}>
+                {formatCurrency(
+                  costBreakdown?.calculated_total || 
+                  workOrder.cost_amount || 
+                  (costBreakdown?.parts?.total || 0) + (costBreakdown?.labor?.total || 0)
+                )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* LABOR BREAKDOWN */}
-        {costBreakdown?.labor?.tasks && costBreakdown.labor.tasks.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
-            <div style={{ 
-              fontSize: '9pt', 
-              fontWeight: 'bold', 
-              marginBottom: '8px',
-              borderBottom: '1px solid #000',
-              paddingBottom: '4px'
-            }}>
-              LABOR BREAKDOWN
-            </div>
-            {costBreakdown.labor.tasks.map(task => (
-              <div key={task.id} style={{ 
-                marginBottom: '8px',
-                paddingBottom: '8px',
-                borderBottom: '1px dotted #ddd'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  fontSize: '8pt'
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 'bold' }}>{task.task}</div>
-                    <div style={{ fontSize: '7pt', color: '#666' }}>
-                      {task.hours.toFixed(1)} hrs @ {formatCurrency(task.rate)}/hr
-                      {task.category && ` | ${task.category}`}
-                      {task.difficulty && ` | Difficulty: ${task.difficulty}/10`}
-                    </div>
-                    {task.industry_standard && (
-                      <div style={{ fontSize: '7pt', color: task.hours <= task.industry_standard * 1.1 ? '#090' : '#c60' }}>
-                        Industry Standard: {task.industry_standard.toFixed(1)} hrs
-                        {task.hours > task.industry_standard * 1.1 && ' ⚠'}
-                      </div>
-                    )}
-                    {task.ai_estimated && (
-                      <div style={{ fontSize: '6pt', color: '#999', marginTop: '2px' }}>
-                        ⚙ AI-estimated
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap', marginLeft: '16px' }}>
-                    {formatCurrency(task.total)}
-                  </div>
-                </div>
-              </div>
-            ))}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              fontWeight: 'bold',
-              paddingTop: '8px',
-              borderTop: '1px solid #000',
-              fontSize: '9pt'
-            }}>
-              <div>SUBTOTAL (Labor): {costBreakdown.labor.hours.toFixed(1)} hrs</div>
-              <div>{formatCurrency(costBreakdown.labor.total)}</div>
-            </div>
-          </div>
-        )}
 
         {/* MATERIALS */}
         {costBreakdown?.materials?.items && costBreakdown.materials.items.length > 0 && (
@@ -844,25 +977,16 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         )}
 
         {/* FOOTER */}
+        {/* ESC TO CLOSE - Wireframe Footer */}
         <div style={{ 
           padding: '12px', 
-          display: 'flex', 
-          justifyContent: 'flex-end',
-          backgroundColor: '#f5f5f5'
+          textAlign: 'center',
+          borderTop: '2px solid #000',
+          backgroundColor: '#f5f5f5',
+          fontSize: '7pt',
+          color: '#666'
         }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              fontSize: '8pt',
-              fontWeight: 'bold',
-              backgroundColor: '#fff',
-              border: '2px solid #000',
-              cursor: 'pointer'
-            }}
-          >
-            CLOSE
-          </button>
+          [ESC TO CLOSE]
         </div>
       </div>
     </div>,
