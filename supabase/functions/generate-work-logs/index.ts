@@ -507,16 +507,15 @@ Extract detailed parts data with brands, part numbers, and prices for customer s
 
 IMPORTANT: If you see people in the photos, suggest them as participants in participantSuggestions array.`
             },
-            ...images.slice(0, 10).map(img => ({
+            ...images.slice(0, 5).map(img => ({
               type: 'image_url',
               image_url: { url: img.image_url, detail: 'auto' } // Use 'auto' instead of 'high' to reduce processing time
             }))
           ]
         }],
-        max_tokens: 2000, // Reduced to speed up response
+        max_tokens: 1500, // Further reduced to speed up response
         temperature: 0.2,
-        response_format: { type: 'json_object' },
-        timeout: 60000 // 60 second timeout
+        response_format: { type: 'json_object' }
       })
     });
 
@@ -543,13 +542,13 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
                 type: 'text', 
                 text: `Analyze these ${images.length} photos from work on a ${vehicleName} at ${orgName}. Extract detailed parts data with brands, part numbers, and prices for customer shopping. Break down labor by task. Generate professional work log.`
               },
-              ...images.slice(0, 15).map(img => ({
+              ...images.slice(0, 5).map(img => ({
                 type: 'image_url',
-                image_url: { url: img.image_url, detail: 'high' }
+                image_url: { url: img.image_url, detail: 'auto' } // Reduced from 15 to 5, detail from 'high' to 'auto'
               }))
             ]
           }],
-          max_tokens: 2500,
+          max_tokens: 1500, // Reduced to match primary call
           temperature: 0.2,
           response_format: { type: 'json_object' }
         })
