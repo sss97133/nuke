@@ -76,7 +76,7 @@ BEGIN
   INTO v_receipts_total
   FROM receipts
   WHERE scope_type = 'vehicle'
-    AND scope_id = p_vehicle_id
+    AND scope_id::uuid = p_vehicle_id
     AND total IS NOT NULL
     AND total > 0;
   
