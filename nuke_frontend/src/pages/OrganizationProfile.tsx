@@ -16,6 +16,7 @@ import OrganizationEditor from '../components/organization/OrganizationEditor';
 import EnhancedDealerInventory from '../components/organization/EnhancedDealerInventory';
 import BaTBulkImporter from '../components/dealer/BaTBulkImporter';
 import SoldInventoryBrowser from '../components/organization/SoldInventoryBrowser';
+import { ServiceVehicleCardRich } from '../components/organization/ServiceVehicleCardRich';
 import MarketplaceComplianceForm from '../components/organization/MarketplaceComplianceForm';
 import OrganizationNotifications from '../components/organization/OrganizationNotifications';
 import VehicleInquiryModal from '../components/organization/VehicleInquiryModal';
@@ -1463,80 +1464,23 @@ export default function OrganizationProfile() {
                       );
                     }
                     
-                    // Sort by most recent work
-                    const sorted = [...serviceVehicles].sort((a, b) => {
-                      // Could sort by last service date if available
-                      return 0;
-                    });
-                    
                     return (
-                      <div>
-                        {sorted.slice(0, 10).map((vehicle) => (
-                          <div
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
+                        gap: '12px' 
+                      }}>
+                        {serviceVehicles.slice(0, 8).map((vehicle) => (
+                          <ServiceVehicleCardRich
                             key={vehicle.id}
-                            style={{
-                              padding: '12px',
-                              marginBottom: '8px',
-                              border: '1px solid var(--border-light)',
-                              borderRadius: '4px',
-                              background: 'var(--white)',
-                              cursor: 'pointer'
-                            }}
-                            onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6px' }}>
-                              <div style={{ flex: 1 }}>
-                                <a 
-                                  href={`/vehicle/${vehicle.vehicle_id}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  style={{ 
-                                    fontSize: '10pt', 
-                                    fontWeight: 600, 
-                                    color: 'var(--accent)', 
-                                    marginBottom: '2px',
-                                    display: 'block',
-                                    textDecoration: 'none'
-                                  }}
-                                  className="hover:underline"
-                                >
-                                  {vehicle.vehicle_year} {vehicle.vehicle_make} {vehicle.vehicle_model}
-                                </a>
-                                {vehicle.vehicle_vin && (
-                                  <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                                    VIN: {vehicle.vehicle_vin}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                {vehicle.relationship_type && (
-                                  <div style={{
-                                    fontSize: '7pt',
-                                    padding: '2px 6px',
-                                    borderRadius: '2px',
-                                    background: 'var(--accent-dim)',
-                                    color: 'var(--accent)'
-                                  }}>
-                                    In Service
-                                  </div>
-                                )}
-                              </div>
-                              {vehicle.vehicle_image_url && (
-                                <img 
-                                  src={vehicle.vehicle_image_url} 
-                                  alt={`${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`}
-                                  style={{
-                                    width: '60px',
-                                    height: '40px',
-                                    objectFit: 'cover',
-                                    borderRadius: '4px'
-                                  }}
-                                />
-                              )}
-                            </div>
-                          </div>
+                            vehicleId={vehicle.vehicle_id}
+                            vehicleYear={vehicle.vehicle_year}
+                            vehicleMake={vehicle.vehicle_make}
+                            vehicleModel={vehicle.vehicle_model}
+                            vehicleVin={vehicle.vehicle_vin}
+                            organizationId={organizationId!}
+                            laborRate={organization?.labor_rate || 125}
+                          />
                         ))}
                       </div>
                     );
