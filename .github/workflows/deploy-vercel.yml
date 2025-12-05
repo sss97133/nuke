@@ -48,23 +48,42 @@ jobs:
           echo "🚀 Deploying prebuilt artifacts to Vercel production..."
           echo "Using dist/ from npm run build (no vercel pull/build needed)"
           
-          # Deploy prebuilt artifacts directly
-          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
-          DEPLOY_EXIT=$?
-          
-          if [ $DEPLOY_EXIT -ne 0 ]; then
-            echo "❌ Vercel deployment failed!"
-            echo "$DEPLOY_OUTPUT"
+          # Check if dist/ exists
+          if [ ! -d "dist" ]; then
+            echo "❌ dist/ directory not found! Build must have failed."
             exit 1
           fi
           
-          # Extract deployment URL
+          echo "✅ dist/ directory found, deploying..."
+          
+          # Deploy prebuilt artifacts directly with better error handling
+          set +e  # Don't exit on error immediately
+          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          DEPLOY_EXIT=$?
+          set -e  # Re-enable exit on error
+          
+          echo "--- Vercel Deployment Output ---"
+          echo "$DEPLOY_OUTPUT"
+          echo "--- End Output ---"
+          
+          if [ $DEPLOY_EXIT -ne 0 ]; then
+            echo "❌ Vercel deployment failed with exit code: $DEPLOY_EXIT"
+            echo "Full output above ⬆️"
+            exit 1
+          fi
+          
+          # Extract deployment URL (try multiple patterns)
           DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9-]+\.vercel\.app' | head -1 || echo "")
           
           if [ -z "$DEPLOY_URL" ]; then
-            echo "⚠️  Could not extract deployment URL from output:"
-            echo "$DEPLOY_OUTPUT"
-            echo "But deployment may have succeeded - check Vercel dashboard"
+            # Try alternative URL pattern
+            DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[^ ]*\.vercel\.app' | head -1 || echo "")
+          fi
+          
+          if [ -z "$DEPLOY_URL" ]; then
+            echo "⚠️  Could not extract deployment URL from output"
+            echo "Deployment may have succeeded - check Vercel dashboard: https://vercel.com/dashboard"
+            echo "Exit code was: $DEPLOY_EXIT"
           else
             echo "✅ Deployment successful: $DEPLOY_URL"
             echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_ENV
