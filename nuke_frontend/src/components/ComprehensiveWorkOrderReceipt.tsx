@@ -19,6 +19,7 @@ import { supabase } from '../lib/supabase';
 interface ComprehensiveWorkOrderReceiptProps {
   eventId: string;
   onClose: () => void;
+  onNavigate?: (newEventId: string) => void;
 }
 
 interface WorkOrder {
@@ -133,7 +134,7 @@ interface Evidence {
   taken_at?: string;
 }
 
-export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderReceiptProps> = ({ eventId, onClose }) => {
+export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderReceiptProps> = ({ eventId, onClose, onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -350,11 +351,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
 
   const navigateToEvent = (newEventId: string | null) => {
     if (newEventId) {
-      window.location.hash = `event=${newEventId}`;
-      // Reload with new event
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.set('event', newEventId);
-      window.location.href = newUrl.toString();
+      if (onNavigate) {
+        onNavigate(newEventId);
+      } else {
+        // Fallback: use custom event to notify parent
+        window.dispatchEvent(new CustomEvent('receipt-navigate', { detail: { eventId: newEventId } }));
+      }
     }
   };
 
@@ -402,7 +404,9 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           backgroundColor: '#f5f5f5'
         }}>
           <button
+            type="button"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               if (adjacentEvents.prev) {
                 navigateToEvent(adjacentEvents.prev);
@@ -432,7 +436,9 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           </div>
           
           <button
+            type="button"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               if (adjacentEvents.next) {
                 navigateToEvent(adjacentEvents.next);
