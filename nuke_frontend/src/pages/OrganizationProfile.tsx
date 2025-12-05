@@ -1427,13 +1427,121 @@ export default function OrganizationProfile() {
               return null;
             })()}
 
-            {/* Vehicles for Sale */}
+            {/* Vehicles for Sale / Currently in Service */}
             <div className="card" style={{ marginBottom: '16px' }}>
               <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
-                Vehicles for Sale
+                {intelligence?.effectivePrimaryFocus === 'service' ? 'Currently in Service' : 'Vehicles for Sale'}
               </div>
               <div className="card-body">
                 {(() => {
+                  // For service orgs: show service vehicles
+                  // For inventory orgs: show vehicles for sale
+                  const isServiceOrg = intelligence?.effectivePrimaryFocus === 'service';
+                  
+                  if (isServiceOrg) {
+                    // Filter service vehicles (currently in service, not completed)
+                    const serviceVehicles = vehicles.filter(v => {
+                      // Must be active
+                      if (v.status !== 'active') return false;
+                      
+                      // Must be service-related
+                      if (v.relationship_type !== 'service_provider' && 
+                          v.relationship_type !== 'work_location') {
+                        return false;
+                      }
+                      
+                      // Exclude sold/completed service vehicles
+                      const isSold = v.sale_date || v.sale_price || v.vehicle_sale_status === 'sold';
+                      return !isSold;
+                    });
+                    
+                    if (serviceVehicles.length === 0) {
+                      return (
+                        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+                          No vehicles currently in service. Service vehicles will appear here.
+                        </div>
+                      );
+                    }
+                    
+                    // Sort by most recent work
+                    const sorted = [...serviceVehicles].sort((a, b) => {
+                      // Could sort by last service date if available
+                      return 0;
+                    });
+                    
+                    return (
+                      <div>
+                        {sorted.slice(0, 10).map((vehicle) => (
+                          <div
+                            key={vehicle.id}
+                            style={{
+                              padding: '12px',
+                              marginBottom: '8px',
+                              border: '1px solid var(--border-light)',
+                              borderRadius: '4px',
+                              background: 'var(--white)',
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6px' }}>
+                              <div style={{ flex: 1 }}>
+                                <a 
+                                  href={`/vehicle/${vehicle.vehicle_id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{ 
+                                    fontSize: '10pt', 
+                                    fontWeight: 600, 
+                                    color: 'var(--accent)', 
+                                    marginBottom: '2px',
+                                    display: 'block',
+                                    textDecoration: 'none'
+                                  }}
+                                  className="hover:underline"
+                                >
+                                  {vehicle.vehicle_year} {vehicle.vehicle_make} {vehicle.vehicle_model}
+                                </a>
+                                {vehicle.vehicle_vin && (
+                                  <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                    VIN: {vehicle.vehicle_vin}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {vehicle.relationship_type && (
+                                  <div style={{
+                                    fontSize: '7pt',
+                                    padding: '2px 6px',
+                                    borderRadius: '2px',
+                                    background: 'var(--accent-dim)',
+                                    color: 'var(--accent)'
+                                  }}>
+                                    In Service
+                                  </div>
+                                )}
+                              </div>
+                              {vehicle.vehicle_image_url && (
+                                <img 
+                                  src={vehicle.vehicle_image_url} 
+                                  alt={`${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`}
+                                  style={{
+                                    width: '60px',
+                                    height: '40px',
+                                    objectFit: 'cover',
+                                    borderRadius: '4px'
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  
                   // Filter vehicles that are current inventory (not sold, active)
                   // Show vehicles that are:
                   // 1. Not sold - check multiple indicators: sale_date, sale_price, vehicle_sale_status, status
@@ -1653,8 +1761,11 @@ export default function OrganizationProfile() {
               </div>
             </div>
 
-            {/* SOLD INVENTORY BROWSER - Reference for buyers */}
-            <SoldInventoryBrowser organizationId={organizationId!} />
+            {/* SOLD INVENTORY BROWSER / SERVICE ARCHIVE - Reference for buyers or completed service work */}
+            <SoldInventoryBrowser 
+              organizationId={organizationId!} 
+              title={intelligence?.effectivePrimaryFocus === 'service' ? 'Service Archive' : 'Sold Inventory Archive'}
+            />
 
             {/* Basic Info */}
             <div className="card" style={{ marginBottom: '16px' }}>
