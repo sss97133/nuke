@@ -67,20 +67,27 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get vehicle info
-    const { data: vehicle } = await supabase
+    const { data: vehicle, error: vehicleError } = await supabase
       .from('vehicles')
       .select('year, make, model')
       .eq('id', vehicleId)
       .single();
 
+    if (vehicleError || !vehicle) {
+      throw new Error(`Vehicle not found: ${vehicleId}`);
+    }
+
     const vehicleName = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
 
-    // Get organization info
+    // Get organization info (optional - can work without org)
     const { data: org } = await supabase
       .from('businesses')
       .select('business_name, business_type, labor_rate')
       .eq('id', organizationId)
       .single();
+
+    const orgName = org?.business_name || 'Unknown Shop';
+    const laborRate = org?.labor_rate || 125;
 
     // Get image URLs
     const { data: images } = await supabase
@@ -93,13 +100,13 @@ Deno.serve(async (req: Request) => {
       throw new Error('No images found');
     }
 
-    console.log(`Analyzing ${images.length} images for ${vehicleName} at ${org.business_name}`);
+    console.log(`Analyzing ${images.length} images for ${vehicleName} at ${orgName}`);
 
-    const systemPrompt = `You are an expert automotive shop foreman and parts specialist at ${org.business_name}.
+    const systemPrompt = `You are an expert automotive shop foreman and parts specialist at ${orgName}.
 
 Shop Details:
-- Specialization: ${org.business_type || 'Automotive restoration and repair'}
-- Standard labor rate: $${org.labor_rate || 125}/hr
+- Specialization: ${org?.business_type || 'Automotive restoration and repair'}
+- Standard labor rate: $${laborRate}/hr
 - Mitchell Labor Guide certified
 - ASE Master Technician level expertise
 
@@ -244,7 +251,7 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
           content: [
             { 
               type: 'text', 
-              text: `Analyze these ${images.length} photos from work on a ${vehicleName} at ${org.business_name}. Extract detailed parts data with brands, part numbers, and prices for customer shopping. Break down labor by task. Generate professional work log.`
+              text: `Analyze these ${images.length} photos from work on a ${vehicleName} at ${orgName}. Extract detailed parts data with brands, part numbers, and prices for customer shopping. Break down labor by task. Generate professional work log.`
             },
             ...images.slice(0, 15).map(img => ({
               type: 'image_url',
@@ -279,7 +286,7 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
             content: [
               { 
                 type: 'text', 
-                text: `Analyze these ${images.length} photos from work on a ${vehicleName} at ${org.business_name}. Extract detailed parts data with brands, part numbers, and prices for customer shopping. Break down labor by task. Generate professional work log.`
+                text: `Analyze these ${images.length} photos from work on a ${vehicleName} at ${orgName}. Extract detailed parts data with brands, part numbers, and prices for customer shopping. Break down labor by task. Generate professional work log.`
               },
               ...images.slice(0, 15).map(img => ({
                 type: 'image_url',
@@ -317,60 +324,74 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
 
     console.log('Work log generated:', workLog.title);
 
-    // Insert/update timeline event
+    // Insert/update timeline event in VEHICLE timeline (timeline_events table)
+    // This is what the receipt component queries
     const { data: existingEvent } = await supabase
-      .from('business_timeline_events')
+      .from('timeline_events')
       .select('id')
-      .eq('business_id', organizationId)
+      .eq('vehicle_id', vehicleId)
       .eq('event_date', eventDate)
-      .contains('metadata', { vehicle_id: vehicleId })
-      .single();
+      .maybeSingle();
 
     const eventData = {
-      business_id: organizationId,
-      event_type: 'other',
-      event_category: 'service',
+      vehicle_id: vehicleId,
+      user_id: null, // Will be null for AI-generated
+      event_type: 'maintenance' as const,
+      event_category: 'maintenance' as const,
       event_date: eventDate,
       title: workLog.title,
       description: workLog.description,
-      labor_hours: workLog.estimatedLaborHours,
+      duration_hours: workLog.estimatedLaborHours,
       cost_amount: workLog.valueImpact,
-      image_urls: images.map(img => img.image_url),
-      source: 'AI-generated work log from shop images',
-      source_type: 'service_record',
+      service_provider_name: orgName,
+      source_type: 'service_record' as const,
+      confidence_score: Math.round((workLog.confidence || 0.85) * 100),
+      // New comprehensive fields
+      quality_rating: workLog.qualityRating,
+      quality_justification: workLog.qualityJustification,
+      value_impact: workLog.valueImpact,
+      ai_confidence_score: workLog.confidence,
+      concerns: workLog.concerns && workLog.concerns.length > 0 ? workLog.concerns : null,
       metadata: {
-        vehicle_id: vehicleId,
         vehicle_name: vehicleName,
-        work_performed: JSON.stringify(workLog.workPerformed),
-        parts_identified: JSON.stringify(workLog.partsExtracted.map(p => p.name)),
-        qualityRating: workLog.qualityRating,
-        qualityJustification: workLog.qualityJustification,
-        valueImpact: workLog.valueImpact,
-        conditionNotes: workLog.conditionNotes,
+        organization_id: organizationId,
+        work_performed: workLog.workPerformed,
+        parts_identified: workLog.partsExtracted?.map(p => p.name) || [],
+        condition_notes: workLog.conditionNotes,
         tags: workLog.tags,
-        confidence: workLog.confidence,
-        concerns: workLog.concerns.length > 0 ? workLog.concerns.join('; ') : null
-      },
-      created_by: null
+        ai_generated: true
+      }
     };
 
     let timelineEventId: string;
 
     if (existingEvent) {
-      await supabase
-        .from('business_timeline_events')
+      const { error: updateError } = await supabase
+        .from('timeline_events')
         .update(eventData)
         .eq('id', existingEvent.id);
       
+      if (updateError) {
+        console.error('Failed to update timeline event:', updateError);
+        throw new Error(`Failed to update timeline event: ${updateError.message}`);
+      }
+      
       timelineEventId = existingEvent.id;
+      console.log('Updated existing timeline event:', timelineEventId);
     } else {
-      const { data: newEvent } = await supabase
-        .from('business_timeline_events')
+      const { data: newEvent, error: insertError } = await supabase
+        .from('timeline_events')
         .insert(eventData)
         .select('id')
         .single();
       
+      if (insertError || !newEvent) {
+        console.error('Failed to create timeline event:', insertError);
+        throw new Error(`Failed to create timeline event: ${insertError?.message || 'Unknown error'}`);
+      }
+      
       timelineEventId = newEvent.id;
+      console.log('Created new timeline event:', timelineEventId);
     }
 
     // Insert structured parts data into work_order_parts
@@ -442,8 +463,8 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
         task_name: task.task,
         task_category: task.category,
         hours: task.hours,
-        hourly_rate: org.labor_rate || 125,
-        total_cost: task.hours * (org.labor_rate || 125),
+        hourly_rate: laborRate,
+        total_cost: task.hours * (laborRate),
         difficulty_rating: task.difficulty,
         ai_estimated: true,
         added_by: null
@@ -467,7 +488,7 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
       .reduce((sum, p) => sum + p.estimatedPrice, 0) || 0;
     
     const laborTotal = workLog.laborBreakdown
-      ?.reduce((sum, task) => sum + (task.hours * (org.labor_rate || 125)), 0) || 0;
+      ?.reduce((sum, task) => sum + (task.hours * (laborRate)), 0) || 0;
 
     // Insert/update comprehensive financial record
     await supabase
@@ -476,7 +497,7 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
         event_id: timelineEventId,
         labor_cost: laborTotal,
         labor_hours: workLog.estimatedLaborHours,
-        labor_rate: org.labor_rate || 125,
+        labor_rate: laborRate,
         parts_cost: partsTotal,
         supplies_cost: materialsTotal,
         overhead_cost: 0, // TODO: Calculate overhead based on labor hours
