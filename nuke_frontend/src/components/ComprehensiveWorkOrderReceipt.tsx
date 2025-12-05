@@ -26,6 +26,7 @@ interface WorkOrder {
   title: string;
   description?: string;
   event_date: string;
+  vehicle_id?: string;
   duration_hours?: number;
   cost_amount?: number;
   
@@ -153,14 +154,53 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Get work order summary from comprehensive view
-      const { data: wo, error: woError } = await supabase
+      // 1. Try comprehensive view first, fallback to timeline_events
+      let wo: WorkOrder | null = null;
+      
+      const { data: viewData, error: viewError } = await supabase
         .from('work_order_comprehensive_receipt')
         .select('*')
         .eq('event_id', eventId)
         .single();
 
-      if (woError) throw woError;
+      if (viewError || !viewData) {
+        // Fallback to timeline_events table directly
+        console.warn('Comprehensive view failed, falling back to timeline_events:', viewError?.message);
+        const { data: eventData, error: eventError } = await supabase
+          .from('timeline_events')
+          .select('*')
+          .eq('id', eventId)
+          .single();
+        
+        if (eventError || !eventData) {
+          console.error('Failed to load event:', eventError?.message);
+          setLoading(false);
+          return;
+        }
+        
+        // Map timeline_events to WorkOrder shape
+        wo = {
+          id: eventData.id,
+          title: eventData.title,
+          description: eventData.description,
+          event_date: eventData.event_date,
+          duration_hours: eventData.duration_hours,
+          cost_amount: eventData.cost_amount,
+          service_provider_name: eventData.service_provider_name,
+          quality_rating: eventData.quality_rating,
+          value_impact: eventData.value_impact,
+          ai_confidence_score: eventData.ai_confidence_score,
+          concerns: eventData.concerns,
+          vehicle_id: eventData.vehicle_id,
+          // Set defaults for computed fields
+          parts_count: 0,
+          labor_tasks_count: 0,
+          calculated_total: eventData.cost_amount || 0
+        } as WorkOrder;
+      } else {
+        wo = viewData;
+      }
+      
       setWorkOrder(wo);
 
       // 2. Get participants
@@ -233,7 +273,48 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
   }
 
   if (!workOrder) {
-    return null;
+    return createPortal(
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}
+        onClick={onClose}
+      >
+        <div style={{ 
+          background: '#fff', 
+          padding: '24px', 
+          border: '2px solid #000',
+          maxWidth: '400px'
+        }}>
+          <div style={{ fontSize: '10pt', marginBottom: '16px' }}>
+            Could not load work order data. Please try again.
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              fontSize: '8pt',
+              fontWeight: 'bold',
+              backgroundColor: '#fff',
+              border: '2px solid #000',
+              cursor: 'pointer'
+            }}
+          >
+            CLOSE
+          </button>
+        </div>
+      </div>,
+      document.body
+    );
   }
 
   const formatCurrency = (amount?: number | null) => {
@@ -300,8 +381,8 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             fontSize: '8pt'
           }}>
             <div>
-              <div>Order #{workOrder.id.substring(0, 12).toUpperCase()}</div>
-              <div>{formatDate(workOrder.event_date)}</div>
+              <div>Order #{workOrder.id?.substring(0, 12).toUpperCase() || 'N/A'}</div>
+              <div>{workOrder.event_date ? formatDate(workOrder.event_date) : 'Date unknown'}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
               {workOrder.service_provider_name && (
