@@ -1,0 +1,51 @@
+name: Analyze Image Bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      vehicle_id:
+        description: 'Vehicle ID to analyze'
+        required: true
+        type: string
+      bundle_date:
+        description: 'Bundle date (YYYY-MM-DD)'
+        required: true
+        type: string
+      device_fingerprint:
+        description: 'Device fingerprint'
+        required: true
+        type: string
+        default: 'Unknown-Unknown-Unknown-Unknown'
+      organization_id:
+        description: 'Organization ID'
+        required: true
+        type: string
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd scripts
+          npm install @supabase/supabase-js dotenv
+
+      - name: Analyze bundle
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node scripts/analyze-bundle-safe.js \
+            "${{ github.event.inputs.vehicle_id }}" \
+            "${{ github.event.inputs.bundle_date }}" \
+            "${{ github.event.inputs.device_fingerprint }}" \
+            "${{ github.event.inputs.organization_id }}"
+
