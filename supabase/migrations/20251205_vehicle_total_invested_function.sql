@@ -16,6 +16,8 @@ DECLARE
   v_overhead_total DECIMAL(10,2) := 0;
   v_tools_total DECIMAL(10,2) := 0;
   v_financial_records_total DECIMAL(10,2) := 0;
+  v_timeline_costs DECIMAL(10,2) := 0;
+  v_receipts_total DECIMAL(10,2) := 0;
   v_total_invested DECIMAL(10,2) := 0;
   v_result JSONB;
 BEGIN
@@ -61,10 +63,29 @@ BEGIN
   JOIN timeline_events te ON te.id = efr.event_id
   WHERE te.vehicle_id = p_vehicle_id;
 
-  -- Calculate total invested (use the higher of financial_records total or sum of components)
+  -- Also include cost_amount from timeline_events (legacy/modern cost tracking)
+  SELECT COALESCE(SUM(cost_amount), 0)
+  INTO v_timeline_costs
+  FROM timeline_events
+  WHERE vehicle_id = p_vehicle_id
+    AND cost_amount IS NOT NULL
+    AND cost_amount > 0;
+  
+  -- Also check receipts table for build costs
+  SELECT COALESCE(SUM(total), 0)
+  INTO v_receipts_total
+  FROM receipts
+  WHERE scope_type = 'vehicle'
+    AND scope_id = p_vehicle_id
+    AND total IS NOT NULL
+    AND total > 0;
+  
+  -- Calculate total invested (use the highest value from all sources)
   v_total_invested := GREATEST(
     v_financial_records_total,
-    v_parts_total + v_labor_total + v_materials_total + v_overhead_total + v_tools_total
+    v_parts_total + v_labor_total + v_materials_total + v_overhead_total + v_tools_total,
+    v_timeline_costs,
+    v_receipts_total
   );
 
   -- Build result JSON
