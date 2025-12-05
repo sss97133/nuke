@@ -8,6 +8,7 @@ import { extractImageMetadata } from '../utils/imageMetadata';
 import { imageOptimizationService } from './imageOptimizationService';
 import { TimelineEventService } from './timelineEventService';
 import { DocumentTypeDetector } from './documentTypeDetector';
+import { ImageDuplicateLinker } from './imageDuplicateLinker';
 
 export interface ImageUploadResult {
   success: boolean;
@@ -381,12 +382,42 @@ export class ImageUploadService {
       // Images are evidence/documentation that attach to real work events
       // They are displayed in image gallery, not as timeline events
 
-      // 🔗 AUTO-MATCH UNORGANIZED IMAGES TO VEHICLES
-      // If image was uploaded without vehicleId, try to auto-match it
+      // 🔑 IMAGES ARE KEYS - Check for duplicates first to unlock vehicle connections
+      // If image was uploaded without vehicleId, check if it's a duplicate of an existing image
+      // If duplicate found → we know which vehicle this relates to → create service relationship
       if (isImage && dbResult?.id && !vehicleId) {
-        // Trigger auto-matching in background (non-blocking)
-        this.autoMatchImage(dbResult.id, user.id).catch(err => {
-          console.warn('Auto-match failed (non-blocking):', err);
+        // Try duplicate-based linking first (high confidence)
+        ImageDuplicateLinker.checkAndLinkDuplicate(
+          dbResult.id,
+          file.name,
+          metadata?.exif || {},
+          user.id,
+          undefined // Will be set if user has an org
+        ).then(result => {
+          if (result.isDuplicate && result.match) {
+            console.log(`🔑 Duplicate found! Linked to ${result.match.vehicleInfo.year} ${result.match.vehicleInfo.make} ${result.match.vehicleInfo.model}`);
+            // Emit event for UI update
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('image_duplicate_linked', {
+                detail: {
+                  imageId: dbResult.id,
+                  vehicleId: result.match.vehicleId,
+                  vehicleInfo: result.match.vehicleInfo,
+                  confidence: result.match.matchConfidence
+                }
+              }));
+            }
+          } else {
+            // Fall back to GPS/time-based auto-matching
+            this.autoMatchImage(dbResult.id, user.id).catch(err => {
+              console.warn('Auto-match failed (non-blocking):', err);
+            });
+          }
+        }).catch(err => {
+          console.warn('Duplicate check failed, trying auto-match:', err);
+          this.autoMatchImage(dbResult.id, user.id).catch(autoErr => {
+            console.warn('Auto-match also failed:', autoErr);
+          });
         });
       }
 

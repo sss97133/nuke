@@ -244,62 +244,76 @@ export class ForensicReceiptService {
    * Process a single work session through the forensic pipeline
    * 
    * The flow:
-   * 1. GPS → Organization matching (WHERE)
-   * 2. generate-work-logs → AI analysis of images (WHAT, WHO, WHY)
-   *    - This edge function already creates:
-   *      - timeline_events
-   *      - work_order_parts
-   *      - work_order_labor
-   *      - work_order_materials
-   *      - event_financial_records
-   *      - event_participants
-   *      - image_forensic_attribution
-   * 3. Link vehicle to organization if GPS matched
+   * 1. First pass: Get AI analysis to understand WHAT work was done
+   * 2. Use AI context (paint_booth, body_work, etc.) to boost GPS matching confidence
+   * 3. GPS + AI context → Organization matching (WHERE)
+   * 4. Link vehicle to organization if confident match
+   * 
+   * Confidence tiers:
+   * - GPS within 50m = high confidence (auto-link)
+   * - GPS within 500m + AI context match = high confidence (auto-link)
+   * - GPS within 500m alone = low confidence (needs user confirmation)
    */
   private static async processWorkSession(
     session: ForensicWorkSession
   ): Promise<ForensicAnalysisResult> {
     console.log(`🔬 [ForensicReceipt] Analyzing session ${session.sessionId} with ${session.images.length} images`);
     
-    // 1. Try to match organization from GPS (WHERE)
+    // 1. First, do a quick AI analysis to understand WHAT work was done
+    // This helps us boost GPS matching confidence
+    const workLog = await this.generateWorkLog(session, undefined);
+    
+    // 2. Extract AI context from work log for GPS matching boost
+    const aiContext = this.extractAIContext(workLog);
+    console.log(`🔬 [ForensicReceipt] AI detected context: ${aiContext.join(', ') || 'none'}`);
+    
+    // 3. Try to match organization from GPS + AI context (WHERE)
     let matchedOrg: ForensicAnalysisResult['matchedOrganization'] | undefined;
     if (session.gps) {
-      matchedOrg = await this.matchOrganizationFromGPS(session.gps.latitude, session.gps.longitude);
+      matchedOrg = await this.matchOrganizationFromGPS(
+        session.gps.latitude, 
+        session.gps.longitude,
+        aiContext
+      );
+      
       if (matchedOrg) {
-        console.log(`🔬 [ForensicReceipt] GPS matched org: ${matchedOrg.name} (${matchedOrg.matchConfidence * 100}%)`);
+        const confidencePercent = Math.round(matchedOrg.matchConfidence * 100);
+        if ((matchedOrg as any).needsConfirmation) {
+          console.log(`🔬 [ForensicReceipt] Low confidence match: ${matchedOrg.name} (${confidencePercent}%) - NEEDS USER CONFIRMATION`);
+        } else {
+          console.log(`🔬 [ForensicReceipt] GPS+AI matched org: ${matchedOrg.name} (${confidencePercent}%)`);
+        }
       }
     }
     
-    // 2. Call generate-work-logs edge function for comprehensive analysis
-    // This is the main forensic analysis - it creates timeline events, work orders, etc.
-    const workLog = await this.generateWorkLog(session, matchedOrg?.id);
-    
-    // NOTE: generate-work-logs already creates:
-    // - timeline_events with detailed metadata
-    // - work_order_parts (components)
-    // - work_order_materials (consumables)
-    // - work_order_labor (task breakdown)
-    // - event_financial_records
-    // - event_participants (image maker, AI-suggested workers)
-    // - image_forensic_attribution (for no-EXIF images)
-    // - ai_scan_sessions
-    // - ai_scan_field_confidence
-    
-    // So we DON'T need to create duplicate synthetic receipts or timeline events!
-    
-    // 3. Link vehicle to organization if GPS matched
-    if (matchedOrg) {
-      await this.linkVehicleToOrganization(session.vehicleId, matchedOrg.id, session.userId);
+    // 4. If we have a confident match, update the work log with org context
+    if (matchedOrg && matchedOrg.matchConfidence >= 0.5) {
+      // Re-run work log generation with org context for better results
+      const enhancedWorkLog = await this.generateWorkLog(session, matchedOrg.id);
+      if (enhancedWorkLog) {
+        Object.assign(workLog || {}, enhancedWorkLog);
+      }
     }
     
-    // The "synthetic receipt" is effectively the timeline_event + work_order_* records
-    // created by generate-work-logs. Calculate totals for return value.
+    // 5. Link vehicle to organization ONLY if confidence is high enough
+    // Low confidence matches are stored but NOT auto-linked (needs user confirmation)
+    if (matchedOrg && matchedOrg.matchConfidence >= 0.5 && !(matchedOrg as any).needsConfirmation) {
+      await this.linkVehicleToOrganization(
+        session.vehicleId, 
+        matchedOrg.id, 
+        session.userId,
+        matchedOrg.matchConfidence,
+        [matchedOrg.matchReason]
+      );
+    }
+    
+    // Calculate totals for return value
     let syntheticReceipt: ForensicAnalysisResult['syntheticReceipt'] | undefined;
     if (workLog) {
       const laborCost = workLog.laborBreakdown.reduce((sum, t) => sum + (t.hours * 125), 0);
       const partsCost = workLog.partsExtracted.reduce((sum, p) => sum + (p.estimatedPrice * p.quantity), 0);
       syntheticReceipt = {
-        id: session.sessionId, // Timeline event ID is returned from generate-work-logs
+        id: session.sessionId,
         total: laborCost + partsCost,
         laborCost,
         partsCost
@@ -314,48 +328,126 @@ export class ForensicReceiptService {
   }
   
   /**
-   * Match organization from GPS coordinates
+   * Extract AI context keywords from work log for GPS matching boost
+   */
+  private static extractAIContext(workLog: ForensicAnalysisResult['workLog'] | null): string[] {
+    if (!workLog) return [];
+    
+    const context: string[] = [];
+    const tags = workLog.tags || [];
+    const title = workLog.title?.toLowerCase() || '';
+    const description = workLog.description?.toLowerCase() || '';
+    const workPerformed = workLog.workPerformed?.join(' ').toLowerCase() || '';
+    const allText = `${title} ${description} ${workPerformed} ${tags.join(' ')}`;
+    
+    // Paint/body work indicators
+    if (allText.includes('paint') || allText.includes('primer') || allText.includes('clearcoat') || 
+        allText.includes('spray') || allText.includes('booth')) {
+      context.push('paint_booth', 'paint_work');
+    }
+    if (allText.includes('body') || allText.includes('dent') || allText.includes('panel') ||
+        allText.includes('fender') || allText.includes('quarter')) {
+      context.push('body_work');
+    }
+    
+    // Restoration indicators
+    if (allText.includes('restor') || allText.includes('fabricat') || allText.includes('weld') ||
+        allText.includes('metal')) {
+      context.push('restoration', 'fabrication', 'metalwork');
+    }
+    
+    // Mechanical indicators
+    if (allText.includes('engine') || allText.includes('motor') || allText.includes('transmission') ||
+        allText.includes('mechanical') || allText.includes('repair')) {
+      context.push('engine_work', 'mechanical');
+    }
+    
+    // Performance indicators
+    if (allText.includes('performance') || allText.includes('tuning') || allText.includes('racing') ||
+        allText.includes('upgrade')) {
+      context.push('performance', 'tuning');
+    }
+    
+    // Interior indicators
+    if (allText.includes('upholster') || allText.includes('interior') || allText.includes('seat') ||
+        allText.includes('carpet')) {
+      context.push('upholstery', 'interior');
+    }
+    
+    return [...new Set(context)]; // Remove duplicates
+  }
+  
+  /**
+   * Match organization from GPS coordinates + AI context
+   * 
+   * Confidence tiers:
+   * - GPS within 50m = high confidence (0.9)
+   * - GPS within 500m + AI context match = high confidence (0.7-0.95)
+   * - GPS within 500m alone = low confidence (0.3)
+   * 
+   * AI context examples: paint_booth, body_work, restoration, engine_work
    */
   private static async matchOrganizationFromGPS(
     latitude: number,
-    longitude: number
+    longitude: number,
+    aiContext?: string[]
   ): Promise<ForensicAnalysisResult['matchedOrganization'] | undefined> {
     try {
-      // Use PostGIS to find organizations within 100m
+      // Use enhanced function with AI context for better matching
       const { data, error } = await supabase
-        .rpc('find_organizations_near_location', {
+        .rpc('find_organizations_near_location_v2', {
           p_latitude: latitude,
           p_longitude: longitude,
-          p_max_distance_meters: 100
+          p_ai_detected_context: aiContext || null,
+          p_max_distance_meters: 500
         });
       
-      if (error || !data || data.length === 0) {
-        // Try broader search with 500m
-        const { data: broaderData } = await supabase
+      if (error) {
+        console.warn('Enhanced org matching failed, falling back to basic:', error);
+        // Fallback to basic matching
+        const { data: fallbackData } = await supabase
           .rpc('find_organizations_near_location', {
             p_latitude: latitude,
             p_longitude: longitude,
-            p_max_distance_meters: 500
+            p_max_distance_meters: 100
           });
         
-        if (broaderData && broaderData.length > 0) {
-          const org = broaderData[0];
+        if (fallbackData && fallbackData.length > 0) {
+          const org = fallbackData[0];
           return {
             id: org.id,
             name: org.business_name,
-            matchConfidence: Math.max(0.5, 1 - (org.distance_meters / 500)),
+            matchConfidence: Math.max(0.7, 1 - (org.distance_meters / 100)),
             matchReason: `GPS proximity: ${Math.round(org.distance_meters)}m away`
           };
         }
         return undefined;
       }
       
+      if (!data || data.length === 0) {
+        return undefined;
+      }
+      
       const org = data[0];
+      
+      // Only return matches above minimum confidence threshold
+      // Low confidence (0.3) matches need user confirmation
+      if (org.final_confidence < 0.5) {
+        console.log(`🔬 [ForensicReceipt] Low confidence match (${org.final_confidence}) for ${org.business_name} - needs user confirmation`);
+        return {
+          id: org.id,
+          name: org.business_name,
+          matchConfidence: org.final_confidence,
+          matchReason: `Low confidence - ${org.confidence_reasons?.join(', ') || 'GPS only'}`,
+          needsConfirmation: true
+        } as any;
+      }
+      
       return {
         id: org.id,
         name: org.business_name,
-        matchConfidence: Math.max(0.8, 1 - (org.distance_meters / 100)),
-        matchReason: `GPS proximity: ${Math.round(org.distance_meters)}m away`
+        matchConfidence: org.final_confidence,
+        matchReason: org.confidence_reasons?.join(', ') || `GPS: ${Math.round(org.distance_meters)}m`
       };
       
     } catch (err) {
@@ -423,33 +515,64 @@ export class ForensicReceiptService {
   // - image_forensic_attribution
   
   /**
-   * Link vehicle to organization
+   * Link vehicle to organization with confidence tracking
+   * 
+   * User overrides ALWAYS win:
+   * - If user_confirmed = true, don't change
+   * - If user_rejected = true, don't create link
+   * - Store auto_matched_* data for auditing even if user overrides later
    */
   private static async linkVehicleToOrganization(
     vehicleId: string,
     organizationId: string,
-    userId: string
+    userId: string,
+    confidence: number = 0.5,
+    reasons: string[] = []
   ): Promise<void> {
     try {
       // Check if link already exists
       const { data: existing } = await supabase
         .from('organization_vehicles')
-        .select('id')
+        .select('id, user_confirmed, user_rejected')
         .eq('vehicle_id', vehicleId)
         .eq('organization_id', organizationId)
         .maybeSingle();
       
       if (existing) {
-        // Update existing link
+        // USER DATA WINS: If user has confirmed or rejected, don't override
+        if (existing.user_confirmed || existing.user_rejected) {
+          console.log(`🔬 [ForensicReceipt] User override in place, skipping auto-update`);
+          return;
+        }
+        
+        // Update existing link with new confidence data
         await supabase
           .from('organization_vehicles')
           .update({
             updated_at: new Date().toISOString(),
-            receipt_match_count: supabase.rpc('increment_receipt_count')
+            auto_matched_confidence: confidence,
+            auto_matched_reasons: reasons,
+            auto_matched_at: new Date().toISOString()
           })
           .eq('id', existing.id);
+          
+        console.log(`🔬 [ForensicReceipt] Updated existing link (confidence: ${Math.round(confidence * 100)}%)`);
       } else {
-        // Create new link
+        // Check if user has previously REJECTED this specific link
+        const { data: rejected } = await supabase
+          .from('organization_vehicles')
+          .select('id')
+          .eq('vehicle_id', vehicleId)
+          .eq('organization_id', organizationId)
+          .eq('user_rejected', true)
+          .maybeSingle();
+        
+        if (rejected) {
+          console.log(`🔬 [ForensicReceipt] User previously rejected this link, skipping`);
+          return;
+        }
+        
+        // Create new link with confidence data
         await supabase
           .from('organization_vehicles')
           .insert({
@@ -459,11 +582,18 @@ export class ForensicReceiptService {
             status: 'active',
             auto_tagged: true,
             linked_by_user_id: userId,
-            start_date: new Date().toISOString().split('T')[0]
+            start_date: new Date().toISOString().split('T')[0],
+            // Store automation data for auditing
+            auto_matched_confidence: confidence,
+            auto_matched_reasons: reasons,
+            auto_matched_at: new Date().toISOString(),
+            // Not user confirmed yet
+            user_confirmed: false,
+            notes: `Auto-linked via forensic analysis (${Math.round(confidence * 100)}% confidence)`
           });
+          
+        console.log(`🔬 [ForensicReceipt] Created new link (confidence: ${Math.round(confidence * 100)}%)`);
       }
-      
-      console.log(`🔬 [ForensicReceipt] Linked vehicle ${vehicleId} to org ${organizationId}`);
       
     } catch (err) {
       console.warn('Failed to link vehicle to organization:', err);
