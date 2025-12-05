@@ -374,30 +374,65 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
     }
 
     // Insert structured parts data into work_order_parts
+    // Separate materials (consumables) from parts (components)
     if (workLog.partsExtracted && workLog.partsExtracted.length > 0) {
-      const partsToInsert = workLog.partsExtracted.map(part => ({
-        timeline_event_id: timelineEventId,
-        part_name: part.name,
-        part_number: part.partNumber || null,
-        brand: part.brand || null,
-        category: part.category,
-        quantity: part.quantity,
-        unit_price: part.quantity > 0 ? part.estimatedPrice / part.quantity : part.estimatedPrice,
-        total_price: part.estimatedPrice,
-        supplier: part.supplier || null,
-        buy_url: null, // Will be populated by shopping service later
-        notes: part.notes || (part.unit ? `${part.quantity} ${part.unit}` : null),
-        ai_extracted: true,
-        user_verified: false,
-        added_by: null
-      }));
+      const parts = workLog.partsExtracted.filter(p => 
+        p.category !== 'consumable' && p.category !== 'material'
+      );
+      const materials = workLog.partsExtracted.filter(p => 
+        p.category === 'consumable' || p.category === 'material'
+      );
+      
+      // Insert parts
+      if (parts.length > 0) {
+        const partsToInsert = parts.map(part => ({
+          timeline_event_id: timelineEventId,
+          part_name: part.name,
+          part_number: part.partNumber || null,
+          brand: part.brand || null,
+          category: part.category,
+          quantity: part.quantity,
+          unit_price: part.quantity > 0 ? part.estimatedPrice / part.quantity : part.estimatedPrice,
+          total_price: part.estimatedPrice,
+          supplier: part.supplier || null,
+          buy_url: null, // Will be populated by shopping service later
+          notes: part.notes || (part.unit ? `${part.quantity} ${part.unit}` : null),
+          ai_extracted: true,
+          user_verified: false,
+          added_by: null
+        }));
 
-      await supabase
-        .from('work_order_parts')
-        .upsert(partsToInsert, { 
-          onConflict: 'timeline_event_id,part_name',
-          ignoreDuplicates: false 
-        });
+        await supabase
+          .from('work_order_parts')
+          .upsert(partsToInsert, { 
+            onConflict: 'timeline_event_id,part_name',
+            ignoreDuplicates: false 
+          });
+      }
+      
+      // Insert materials (consumables) into work_order_materials
+      if (materials.length > 0) {
+        const materialsToInsert = materials.map(mat => ({
+          timeline_event_id: timelineEventId,
+          material_name: mat.name,
+          material_category: 'other' as const, // Default, AI can improve categorization
+          quantity: mat.quantity,
+          unit: mat.unit || null,
+          unit_cost: mat.quantity > 0 ? mat.estimatedPrice / mat.quantity : mat.estimatedPrice,
+          total_cost: mat.estimatedPrice,
+          supplier: mat.supplier || null,
+          ai_extracted: true,
+          added_by: null,
+          notes: mat.notes || null
+        }));
+
+        await supabase
+          .from('work_order_materials')
+          .upsert(materialsToInsert, {
+            onConflict: 'timeline_event_id,material_name',
+            ignoreDuplicates: false
+          });
+      }
     }
 
     // Insert labor breakdown into work_order_labor
@@ -421,6 +456,49 @@ If you cannot see enough detail in photos to be confident, reduce confidence sco
           ignoreDuplicates: false 
         });
     }
+
+    // Calculate totals for financial record
+    const partsTotal = workLog.partsExtracted
+      ?.filter(p => p.category !== 'consumable' && p.category !== 'material')
+      .reduce((sum, p) => sum + p.estimatedPrice, 0) || 0;
+    
+    const materialsTotal = workLog.partsExtracted
+      ?.filter(p => p.category === 'consumable' || p.category === 'material')
+      .reduce((sum, p) => sum + p.estimatedPrice, 0) || 0;
+    
+    const laborTotal = workLog.laborBreakdown
+      ?.reduce((sum, task) => sum + (task.hours * (org.labor_rate || 125)), 0) || 0;
+
+    // Insert/update comprehensive financial record
+    await supabase
+      .from('event_financial_records')
+      .upsert({
+        event_id: timelineEventId,
+        labor_cost: laborTotal,
+        labor_hours: workLog.estimatedLaborHours,
+        labor_rate: org.labor_rate || 125,
+        parts_cost: partsTotal,
+        supplies_cost: materialsTotal,
+        overhead_cost: 0, // TODO: Calculate overhead based on labor hours
+        tool_depreciation_cost: 0, // TODO: Track tools used
+        customer_price: workLog.valueImpact || null,
+        profit_margin_percent: null
+      }, {
+        onConflict: 'event_id',
+        ignoreDuplicates: false
+      });
+
+    // Update timeline event with quality metrics
+    await supabase
+      .from('timeline_events')
+      .update({
+        quality_rating: workLog.qualityRating,
+        quality_justification: workLog.qualityJustification,
+        value_impact: workLog.valueImpact,
+        ai_confidence_score: workLog.confidence,
+        concerns: workLog.concerns && workLog.concerns.length > 0 ? workLog.concerns : null
+      })
+      .eq('id', timelineEventId);
 
     return new Response(
       JSON.stringify({

@@ -31,6 +31,7 @@ import ExternalListingCard from '../components/vehicle/ExternalListingCard';
 import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 import AddOrganizationRelationship from '../components/vehicle/AddOrganizationRelationship';
 import ValuationCitations from '../components/vehicle/ValuationCitations';
+import { PartsQuoteGenerator } from '../components/PartsQuoteGenerator';
 import LiveAuctionBanner from '../components/auction/LiveAuctionBanner';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
@@ -1268,6 +1269,20 @@ const VehicleProfile: React.FC = () => {
                 initialValuation={latestExpertValuation}
               />
             </React.Suspense>
+
+            {/* AI Parts Quote Generator */}
+            {permissions.isOwner && (
+              <section className="section">
+                <PartsQuoteGenerator 
+                  vehicleId={vehicle.id}
+                  vehicleInfo={{
+                    year: vehicle.year,
+                    make: vehicle.make,
+                    model: vehicle.model
+                  }}
+                />
+              </section>
+            )}
 
         {/* Two column layout: Info on left, Images on right */}
             <section className="section">
