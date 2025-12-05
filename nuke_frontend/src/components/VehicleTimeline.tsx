@@ -636,8 +636,12 @@ const VehicleTimeline: React.FC<{
                                           if (onDateClick) {
                                             onDateClick(date.toISOString().split('T')[0], dayEvents);
                                           } else {
-                                            // If day has photos but no events, load and show the photos
-                                            if (dayEvents.length === 0 && photoCount > 0) {
+                                            // If day has events, open the first event's receipt directly
+                                            if (dayEvents.length > 0) {
+                                              // Open receipt for the first event
+                                              setSelectedEventForDetail(dayEvents[0].id);
+                                            } else if (photoCount > 0) {
+                                              // If day has photos but no events, find or create event for that date
                                               const { data: dayImages } = await supabase
                                                 .from('vehicle_images')
                                                 .select('*')
@@ -645,22 +649,34 @@ const VehicleTimeline: React.FC<{
                                                 .gte('taken_at', dayYmd)
                                                 .lt('taken_at', new Date(new Date(dayYmd).getTime() + 86400000).toISOString());
                                               
-                                              // Create synthetic events to show photos in day popup
-                                              const photoEvent = {
-                                                id: `photos-${dayYmd}`,
-                                                vehicle_id: vehicleId,
-                                                event_type: 'documentation' as any,
-                                                event_date: dayYmd,
-                                                title: `${photoCount} photo${photoCount > 1 ? 's' : ''} taken`,
-                                                description: 'Vehicle documentation',
-                                                image_urls: dayImages?.map(img => img.image_url) || [],
-                                                metadata: { photo_date: true, photo_count: photoCount }
-                                              };
-                                              setSelectedDayEvents([photoEvent as any]);
-                                            } else {
-                                              setSelectedDayEvents(dayEvents);
+                                              // Check if there's an existing event for this date
+                                              const { data: existingEvent } = await supabase
+                                                .from('timeline_events')
+                                                .select('id')
+                                                .eq('vehicle_id', vehicleId)
+                                                .eq('event_date', dayYmd)
+                                                .limit(1)
+                                                .single();
+                                              
+                                              if (existingEvent) {
+                                                // Open existing event receipt
+                                                setSelectedEventForDetail(existingEvent.id);
+                                              } else {
+                                                // Show day popup for photos without events
+                                                const photoEvent = {
+                                                  id: `photos-${dayYmd}`,
+                                                  vehicle_id: vehicleId,
+                                                  event_type: 'documentation' as any,
+                                                  event_date: dayYmd,
+                                                  title: `${photoCount} photo${photoCount > 1 ? 's' : ''} taken`,
+                                                  description: 'Vehicle documentation',
+                                                  image_urls: dayImages?.map(img => img.image_url) || [],
+                                                  metadata: { photo_date: true, photo_count: photoCount }
+                                                };
+                                                setSelectedDayEvents([photoEvent as any]);
+                                                setShowDayPopup(true);
+                                              }
                                             }
-                                            setShowDayPopup(true);
                                           }
                                         }
                                       }}
