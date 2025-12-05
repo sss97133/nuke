@@ -475,15 +475,16 @@ Extract detailed parts data with brands, part numbers, and prices for customer s
 
 IMPORTANT: If you see people in the photos, suggest them as participants in participantSuggestions array.`
             },
-            ...images.slice(0, 15).map(img => ({
+            ...images.slice(0, 10).map(img => ({
               type: 'image_url',
-              image_url: { url: img.image_url, detail: 'high' }
+              image_url: { url: img.image_url, detail: 'auto' } // Use 'auto' instead of 'high' to reduce processing time
             }))
           ]
         }],
-        max_tokens: 2500,
+        max_tokens: 2000, // Reduced to speed up response
         temperature: 0.2,
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' },
+        timeout: 60000 // 60 second timeout
       })
     });
 

@@ -95,10 +95,10 @@ BEGIN
   -- Get bundle images
   SELECT 
     COUNT(*) as image_count,
-    MIN(taken_at) as session_start,
-    MAX(taken_at) as session_end,
-    array_agg(id ORDER BY taken_at) as image_ids,
-    array_agg(image_url ORDER BY taken_at) as image_urls
+    MIN(vi.taken_at) as session_start,
+    MAX(vi.taken_at) as session_end,
+    array_agg(vi.id ORDER BY vi.taken_at) as image_ids,
+    array_agg(vi.image_url ORDER BY vi.taken_at) as image_urls
   INTO v_bundle_images
   FROM vehicle_images vi
   LEFT JOIN device_attributions da ON da.image_id = vi.id
