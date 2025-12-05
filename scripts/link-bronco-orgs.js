@@ -23,12 +23,12 @@ const ORGS = [
   {
     id: 'e796ca48-f3af-41b5-be13-5335bb422b41',
     name: 'Ernies Upholstery',
-    relationship: 'upholstery'
+    relationship: 'service_provider' // 'upholstery' not in allowed list
   },
   {
     id: '66352790-b70e-4de8-bfb1-006b91fa556f',
     name: 'Taylor Customs',
-    relationship: 'painter'
+    relationship: 'service_provider' // 'painter' not in allowed list
   }
 ];
 
