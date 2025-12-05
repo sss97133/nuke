@@ -548,6 +548,51 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
     console.log('Image Maker:', imageMaker.display_name, `(${imageMaker.is_claimed ? 'claimed' : 'ghost'})`);
     console.log('Uploaded by:', uploadedBy.username || uploadedBy.user_id);
 
+    // ============================================
+    // CREATE SCAN SESSION (Never replace - always save)
+    // ============================================
+    const scanStartTime = Date.now();
+    const { data: scanSession, error: scanError } = await supabase
+      .from('ai_scan_sessions')
+      .insert({
+        vehicle_id: vehicleId,
+        image_ids: imageIds,
+        ai_model_version: model,
+        total_images_analyzed: images.length,
+        context_available: {
+          exif_data: exifData.camera_make ? true : false,
+          source_url: null, // TODO: Get from image metadata
+          vehicle_history_count: vehicleHistory.length,
+          organization_data: org ? true : false,
+          participant_attribution: imageMaker.user_id || imageMaker.ghost_user_id ? true : false,
+          catalog_data: false, // TODO: Check if catalog data available
+          oem_manuals: false // TODO: Check if OEM manuals available
+        },
+        overall_confidence: Math.round((workLog.confidence || 0.85) * 100),
+        fields_extracted: [
+          ...(workLog.partsExtracted && workLog.partsExtracted.length > 0 ? ['parts'] : []),
+          ...(workLog.laborBreakdown && workLog.laborBreakdown.length > 0 ? ['labor'] : []),
+          ...(workLog.partsExtracted?.some(p => p.category === 'material' || p.category === 'consumable') ? ['materials'] : []),
+          'quality',
+          'value'
+        ],
+        concerns_flagged: workLog.concerns || []
+      })
+      .select('id')
+      .single();
+
+    if (scanError) {
+      console.error('Failed to create scan session:', scanError);
+    } else {
+      const scanDuration = (Date.now() - scanStartTime) / 1000;
+      await supabase
+        .from('ai_scan_sessions')
+        .update({ scan_duration_seconds: scanDuration })
+        .eq('id', scanSession.id);
+      
+      console.log('Created scan session:', scanSession.id);
+    }
+
     // Insert/update timeline event in VEHICLE timeline (timeline_events table)
     // This is what the receipt component queries
     const { data: existingEvent } = await supabase
@@ -630,6 +675,120 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
       
       timelineEventId = newEvent.id;
       console.log('Created new timeline event:', timelineEventId);
+    }
+
+    // Update scan session with event_id
+    if (scanSession?.id) {
+      await supabase
+        .from('ai_scan_sessions')
+        .update({ event_id: timelineEventId })
+        .eq('id', scanSession.id);
+    }
+
+    // ============================================
+    // SAVE FIELD-LEVEL CONFIDENCE SCORES
+    // ============================================
+    if (scanSession?.id) {
+      const fieldConfidences = [];
+
+      // Parts confidence
+      if (workLog.partsExtracted && workLog.partsExtracted.length > 0) {
+        workLog.partsExtracted.forEach((part, idx) => {
+          fieldConfidences.push({
+            scan_session_id: scanSession.id,
+            field_category: 'parts',
+            field_name: `part_${idx}`,
+            confidence_score: Math.round((workLog.confidence || 0.85) * 100),
+            confidence_factors: {
+              exif_available: exifData.camera_make ? true : false,
+              multiple_images: images.length > 1,
+              ai_model_capability: model.includes('gpt-4o') ? 'high' : 'medium',
+              context_richness: vehicleHistory.length > 0 ? 85 : 60
+            },
+            extracted_value: {
+              name: part.name,
+              brand: part.brand,
+              part_number: part.partNumber,
+              estimated_price: part.estimatedPrice
+            },
+            extraction_reasoning: `Extracted from image analysis. ${part.notes || 'No additional notes'}`
+          });
+        });
+      }
+
+      // Labor confidence
+      if (workLog.laborBreakdown && workLog.laborBreakdown.length > 0) {
+        workLog.laborBreakdown.forEach((task, idx) => {
+          fieldConfidences.push({
+            scan_session_id: scanSession.id,
+            field_category: 'labor',
+            field_name: `task_${idx}`,
+            confidence_score: Math.round((workLog.confidence || 0.85) * 100),
+            confidence_factors: {
+              multiple_images: images.length > 1,
+              historical_data: vehicleHistory.length > 0,
+              organization_data: org ? true : false,
+              context_richness: vehicleHistory.length > 0 ? 85 : 60
+            },
+            extracted_value: {
+              task: task.task,
+              hours: task.hours,
+              category: task.category,
+              difficulty: task.difficulty
+            },
+            extraction_reasoning: `Estimated based on visible work and Mitchell Labor Guide standards`
+          });
+        });
+      }
+
+      // Quality confidence
+      fieldConfidences.push({
+        scan_session_id: scanSession.id,
+        field_category: 'quality',
+        field_name: 'quality_rating',
+        confidence_score: Math.round((workLog.confidence || 0.85) * 100),
+        confidence_factors: {
+          multiple_images: images.length > 1,
+          ai_model_capability: model.includes('gpt-4o') ? 'high' : 'medium',
+          context_richness: vehicleHistory.length > 0 ? 85 : 60
+        },
+        extracted_value: {
+          rating: workLog.qualityRating,
+          justification: workLog.qualityJustification
+        },
+        extraction_reasoning: workLog.qualityJustification || 'Assessed from image analysis'
+      });
+
+      // Value confidence
+      fieldConfidences.push({
+        scan_session_id: scanSession.id,
+        field_category: 'value',
+        field_name: 'value_impact',
+        confidence_score: Math.round((workLog.confidence || 0.85) * 100),
+        confidence_factors: {
+          parts_data: workLog.partsExtracted && workLog.partsExtracted.length > 0,
+          labor_data: workLog.laborBreakdown && workLog.laborBreakdown.length > 0,
+          quality_data: workLog.qualityRating ? true : false,
+          context_richness: vehicleHistory.length > 0 ? 85 : 60
+        },
+        extracted_value: {
+          value_impact: workLog.valueImpact
+        },
+        extraction_reasoning: `Calculated from parts cost + labor cost + quality premium`
+      });
+
+      // Insert all field confidences
+      if (fieldConfidences.length > 0) {
+        const { error: confError } = await supabase
+          .from('ai_scan_field_confidence')
+          .insert(fieldConfidences);
+        
+        if (confError) {
+          console.error('Failed to save field confidence scores:', confError);
+        } else {
+          console.log(`Saved ${fieldConfidences.length} field confidence scores`);
+        }
+      }
     }
 
     // Insert structured parts data into work_order_parts
@@ -839,6 +998,85 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
         }
         
         console.log(`Saved ${suggestedParticipants.length} AI-suggested participants`);
+      }
+    }
+
+    // ============================================
+    // FORENSIC ATTRIBUTION FOR NO-EXIF IMAGES
+    // ============================================
+    // Analyze images without EXIF data using 5W's and source context
+    for (const image of images) {
+      const hasExif = image.exif_data && (
+        image.exif_data.Make || 
+        image.exif_data.Model || 
+        image.exif_data.LensModel
+      );
+
+      if (!hasExif) {
+        // Check uploader history of no-EXIF uploads
+        const { count: noExifHistory } = await supabase
+          .from('vehicle_images')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', image.user_id || uploadedBy.user_id)
+          .is('exif_data', null)
+          .neq('id', image.id);
+
+        // Get source URL from metadata
+        const sourceUrl = image.metadata?.source_url || image.source || null;
+        
+        // Determine ghost user type
+        let ghostUserType = 'unknown_photographer';
+        if (sourceUrl) {
+          if (sourceUrl.includes('bringatrailer.com') || sourceUrl.includes('bat')) {
+            ghostUserType = 'scraped_profile';
+          } else if (sourceUrl.includes('craigslist') || sourceUrl.includes('facebook')) {
+            ghostUserType = 'scraped_profile';
+          }
+        }
+
+        // Calculate attribution confidence
+        let attributionConfidence = 50; // Base confidence for no-EXIF
+        const confidenceFactors: any = {
+          exif_available: false,
+          source_url_available: sourceUrl ? true : false,
+          uploader_history: (noExifHistory || 0) > 0,
+          ai_analysis_consistent: true, // Will be updated based on AI analysis
+          context_richness: vehicleHistory.length > 0 ? 60 : 40
+        };
+
+        if (sourceUrl) attributionConfidence += 20;
+        if ((noExifHistory || 0) > 0) attributionConfidence += 10;
+        if (vehicleHistory.length > 0) attributionConfidence += 10;
+        attributionConfidence = Math.min(attributionConfidence, 100);
+
+        // Save forensic attribution
+        await supabase
+          .from('image_forensic_attribution')
+          .upsert({
+            image_id: image.id,
+            who_uploaded: image.user_id || uploadedBy.user_id,
+            who_has_history_no_exif: (noExifHistory || 0) > 0,
+            what_curating: {
+              work_category: workLog.tags?.[0] || 'general',
+              analysis_indicates: workLog.title || 'Vehicle documentation'
+            },
+            where_source_url: sourceUrl,
+            where_inferred_location: null, // TODO: Infer from image content
+            when_inferred_date: image.taken_at ? new Date(image.taken_at).toISOString().split('T')[0] : null,
+            why_context: {
+              source_type: image.source || 'unknown',
+              source_url: sourceUrl,
+              uploader_pattern: (noExifHistory || 0) > 0 ? 'frequent_no_exif_uploader' : 'occasional',
+              ai_analysis: workLog.title || 'No analysis yet'
+            },
+            attribution_confidence: attributionConfidence,
+            confidence_factors: confidenceFactors,
+            ghost_user_type: ghostUserType,
+            analyzed_by_ai_model: model
+          }, {
+            onConflict: 'image_id',
+            ignoreDuplicates: false
+          });
       }
     }
 
