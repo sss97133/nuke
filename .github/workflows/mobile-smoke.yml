@@ -15,22 +15,32 @@ jobs:
         run: |
           set -euo pipefail
           MOBILE_UA="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
-          for URL in "https://nukefrontend.vercel.app" "https://nuke.vercel.app"; do
-            echo "Testing $URL"
+          # Only test the main production URL (nuke.vercel.app is a redirect/alias)
+          for URL in "https://n-zero.dev"; do
+            echo "🧪 Testing $URL with mobile user agent..."
             # Fetch headers and body
-            STATUS=$(curl -s -A "$MOBILE_UA" -o /dev/null -w "%{http_code}" "$URL")
+            STATUS=$(curl -s -A "$MOBILE_UA" -o /dev/null -w "%{http_code}" "$URL" || echo "000")
             if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 400 ]; then
-              echo "Unexpected status: $STATUS for $URL"
+              echo "❌ Unexpected status: $STATUS for $URL"
+              echo "Response headers:"
+              curl -s -I -A "$MOBILE_UA" "$URL" || true
               exit 1
             fi
             HTML=$(curl -s -A "$MOBILE_UA" "$URL")
             # Basic non-blank checks
-            echo "$HTML" | grep -qi "<title>" || true
-            echo "$HTML" | grep -qi "<div id=\"root\">" || true
+            if ! echo "$HTML" | grep -qi "<title>"; then
+              echo "⚠️  Warning: No <title> tag found"
+            fi
+            if ! echo "$HTML" | grep -qi "<div id=\"root\">"; then
+              echo "⚠️  Warning: No <div id=\"root\"> found"
+            fi
             LEN=$(printf "%s" "$HTML" | wc -c)
             if [ "$LEN" -lt 500 ]; then
-              echo "HTML content too small ($LEN bytes) for $URL"
+              echo "❌ HTML content too small ($LEN bytes) for $URL"
+              echo "First 200 chars of response:"
+              echo "$HTML" | head -c 200
+              echo ""
               exit 1
             fi
-            echo "OK: $URL ($LEN bytes)"
+            echo "✅ OK: $URL ($LEN bytes)"
           done

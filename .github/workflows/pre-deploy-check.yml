@@ -34,7 +34,16 @@ jobs:
 
       - name: Build check
         working-directory: ./nuke_frontend
-        run: npm run build
+        run: |
+          echo "🔨 Building project..."
+          npm run build || {
+            echo "❌ Build failed!"
+            echo "Checking for common issues..."
+            # List files that might be missing
+            ls -la src/components/parts/ || echo "parts directory missing"
+            echo "Build error details above ⬆️"
+            exit 1
+          }
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
@@ -60,6 +69,25 @@ jobs:
             exit 1
           fi
           echo "✅ All required files present"
+          
+      - name: Verify critical files exist
+        run: |
+          echo "🔍 Verifying critical component files..."
+          cd nuke_frontend
+          MISSING=0
+          for file in "src/components/parts/SpatialPartPopup.tsx" "src/components/parts/PartCheckoutModal.tsx" "src/components/parts/PartEnrichmentModal.tsx" "src/components/parts/ClickablePartModal.tsx"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Missing: $file"
+              MISSING=1
+            else
+              echo "✅ Found: $file"
+            fi
+          done
+          if [ $MISSING -eq 1 ]; then
+            echo "❌ Critical files missing - build will fail"
+            exit 1
+          fi
+          echo "✅ All critical files present"
 
       - name: Verify TypeScript config
         run: |
