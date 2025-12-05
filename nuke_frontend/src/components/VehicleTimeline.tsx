@@ -7,7 +7,7 @@ import TimelineEventComments from './TimelineEventComments';
 import TimelineEventEditor from './TimelineEventEditor';
 import { TechnicianWorkTimeline } from './TechnicianWorkTimeline';
 import { TimelineEventService } from '../services/timelineEventService';
-import { UnifiedWorkOrderReceipt } from './UnifiedWorkOrderReceipt';
+import { ComprehensiveWorkOrderReceipt } from './ComprehensiveWorkOrderReceipt';
 
 // Types
 type EventType = 'maintenance' | 'repair' | 'modification' | 'inspection' | 'purchase' | 'sale' | 'accident' | 'registration' | 'insurance' | 'transport' | 'evaluation' | 'general' | 'custom' | 'life';
@@ -1275,7 +1275,7 @@ const VehicleTimeline: React.FC<{
 
         {/* Event Detail Modal - Receipt Style */}
         {selectedEventForDetail && (
-          <UnifiedWorkOrderReceipt
+          <ComprehensiveWorkOrderReceipt
             eventId={selectedEventForDetail}
             onClose={() => setSelectedEventForDetail(null)}
           />
