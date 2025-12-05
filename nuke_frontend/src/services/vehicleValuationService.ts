@@ -578,28 +578,78 @@ export class VehicleValuationService {
         }
       }
 
-      // 4. Include documented labor from work sessions at $75/hr
+      // 4. Include ALL documented work from work orders (parts, labor, materials, overhead)
       try {
-        const { data: workSessions } = await supabase
-          .rpc('get_vehicle_work_sessions', { p_vehicle_id: vehicleId });
-        const hours = (workSessions || []).reduce((sum: number, s: any) => sum + (s.labor_hours || 0), 0);
-        if (hours > 0) {
-          valuation.laborHours = Math.max(valuation.laborHours, hours);
-          valuation.totalInvested += hours * 75;
-          if (!valuation.dataSources.includes('Work Sessions')) valuation.dataSources.push('Work Sessions');
+        const { data: totalInvestedData, error: investedError } = await supabase
+          .rpc('get_vehicle_total_invested', { p_vehicle_id: vehicleId });
+        
+        if (!investedError && totalInvestedData) {
+          const totalInvested = totalInvestedData.total_invested || 0;
+          const breakdown = totalInvestedData.breakdown || {};
+          
+          if (totalInvested > 0) {
+            // Add to total invested
+            valuation.totalInvested = Math.max(valuation.totalInvested, totalInvested);
+            
+            // Update parts investment
+            if (breakdown.parts) {
+              valuation.partsInvestment = Math.max(valuation.partsInvestment, breakdown.parts);
+            }
+            
+            // Update labor hours (calculate from labor cost if available)
+            if (breakdown.labor) {
+              const avgLaborRate = 120; // Default rate
+              const estimatedHours = breakdown.labor / avgLaborRate;
+              valuation.laborHours = Math.max(valuation.laborHours, estimatedHours);
+            }
+            
+            // Add data source
+            if (!valuation.dataSources.includes('Work Orders')) {
+              valuation.dataSources.push('Work Orders');
+            }
+            
+            // Increase confidence based on comprehensive work data
+            if (totalInvestedData.components_count?.events_with_work > 0) {
+              valuation.confidence = Math.min(valuation.confidence + 10, 95);
+            }
+          }
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Error fetching total invested:', err);
+      }
+      
+      // Fallback: Include documented labor from work sessions at $75/hr (if no work order data)
+      if (valuation.totalInvested === 0) {
+        try {
+          const { data: workSessions } = await supabase
+            .rpc('get_vehicle_work_sessions', { p_vehicle_id: vehicleId });
+          const hours = (workSessions || []).reduce((sum: number, s: any) => sum + (s.labor_hours || 0), 0);
+          if (hours > 0) {
+            valuation.laborHours = Math.max(valuation.laborHours, hours);
+            valuation.totalInvested += hours * 75;
+            if (!valuation.dataSources.includes('Work Sessions')) valuation.dataSources.push('Work Sessions');
+          }
+        } catch {}
+      }
 
       // 5. Calculate final values per new model: market + modifications premium + documentation bonus
       const documentationBonus = aiExtractedValue * 0.1;
+      
+      // Modification premium: modifications typically add 40-60% of their cost to market value
+      const modificationPremium = valuation.totalInvested > 0 
+        ? valuation.totalInvested * 0.5  // 50% of investment adds to value
+        : 0;
+      
       if (marketBase > 0) {
+        // Base market value + modification premium + documentation bonus
         const premiumFromParts = Math.max(0, valuation.partsInvestment - marketBase * 0.5);
         valuation.estimatedValue = Math.max(
-          Math.round(marketBase + premiumFromParts + documentationBonus),
+          Math.round(marketBase + premiumFromParts + modificationPremium + documentationBonus),
           valuation.estimatedValue || 0
         );
       } else if (valuation.totalInvested > 0 && !valuation.estimatedValue) {
-        valuation.estimatedValue = valuation.totalInvested + documentationBonus;
+        // If no market base, use total invested + modification premium + documentation bonus
+        valuation.estimatedValue = Math.round(valuation.totalInvested + modificationPremium + documentationBonus);
       } else if (!valuation.estimatedValue && vehicle?.current_value) {
         // FALLBACK: Use database current_value if no other data
         valuation.estimatedValue = vehicle.current_value;
