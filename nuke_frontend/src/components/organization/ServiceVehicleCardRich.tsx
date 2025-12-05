@@ -132,7 +132,7 @@ export function ServiceVehicleCardRich({
         borderRadius: '4px',
         background: 'var(--card-bg)'
       }}>
-        <div style={{ color: 'var(--text-muted)', fontSize: '10pt' }}>Loading...</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Loading...</div>
       </div>
     );
   }
@@ -182,7 +182,7 @@ export function ServiceVehicleCardRich({
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            <span style={{ fontSize: '12pt', opacity: 0.3 }}>+</span>
+            <span style={{ fontSize: '8pt', opacity: 0.3 }}>+</span>
           </div>
         ))}
       </div>
@@ -191,7 +191,7 @@ export function ServiceVehicleCardRich({
       <div style={{ padding: '12px' }}>
         {/* Vehicle Name */}
         <div style={{ 
-          fontSize: '10pt', 
+          fontSize: '8pt', 
           fontWeight: 700, 
           color: 'var(--text-primary)',
           marginBottom: '4px'
@@ -225,7 +225,7 @@ export function ServiceVehicleCardRich({
           marginBottom: '8px'
         }}>
           <div>
-            <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--accent)' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--accent)' }}>
               {stats?.totalSessions || 0}
             </div>
             <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
@@ -233,7 +233,7 @@ export function ServiceVehicleCardRich({
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--text-primary)' }}>
               {stats?.totalHours || 0}h
             </div>
             <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
@@ -241,7 +241,7 @@ export function ServiceVehicleCardRich({
             </div>
           </div>
           <div>
-            <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--success, #22c55e)' }}>
+            <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--success, #22c55e)' }}>
               {formatCurrency(stats?.estimatedCost || 0)}
             </div>
             <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
@@ -252,7 +252,7 @@ export function ServiceVehicleCardRich({
 
         {/* Timeline */}
         <div style={{ 
-          fontSize: '9pt', 
+          fontSize: '8pt', 
           color: 'var(--text-secondary)',
           display: 'flex',
           justifyContent: 'space-between',
