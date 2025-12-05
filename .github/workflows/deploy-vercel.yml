@@ -26,7 +26,15 @@ jobs:
 
       - name: Build project
         working-directory: ./nuke_frontend
-        run: npm run build
+        run: |
+          echo "🔨 Building project..."
+          npm run build || {
+            echo "❌ Build failed!"
+            echo "Checking for common issues..."
+            ls -la src/components/parts/ || echo "parts directory missing"
+            echo "Full build error:"
+            exit 1
+          }
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
@@ -44,11 +52,16 @@ jobs:
 
       - name: Deploy Project Artifacts to Vercel
         working-directory: ./nuke_frontend
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          echo "🚀 Deploying to Vercel production..."
+          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} || {
+            echo "❌ Vercel deployment failed!"
+            exit 1
+          }
 
       - name: Deployment Summary
         run: |
           echo "✅ Deployment completed successfully!"
-          echo "🌐 Check your deployment at: https://nuke.vercel.app"
+          echo "🌐 Production URL: https://n-zero.dev"
           echo "📊 View details: https://vercel.com/dashboard"
 
