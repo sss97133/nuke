@@ -1278,6 +1278,7 @@ const VehicleTimeline: React.FC<{
           <ComprehensiveWorkOrderReceipt
             eventId={selectedEventForDetail}
             onClose={() => setSelectedEventForDetail(null)}
+            onNavigate={(newEventId) => setSelectedEventForDetail(newEventId)}
           />
         )}
       </div>
