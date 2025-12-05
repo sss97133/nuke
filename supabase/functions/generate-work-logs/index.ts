@@ -95,7 +95,35 @@ Deno.serve(async (req: Request) => {
       .single();
 
     const orgName = org?.business_name || 'Unknown Shop';
-    const laborRate = org?.labor_rate || 125;
+    
+    // Resolve labor rate using priority system (contract → user → org → system default)
+    let laborRate = 125; // Default fallback
+    let rateSource = 'system_default';
+    let isUserReported = false;
+    
+    try {
+      const { data: rateInfo } = await supabase
+        .rpc('resolve_labor_rate', {
+          p_organization_id: organizationId,
+          p_vehicle_id: vehicleId,
+          p_user_id: null, // Will be set from participants if available
+          p_client_id: null // Will be set from vehicle owner if available
+        });
+
+      if (rateInfo) {
+        laborRate = rateInfo.rate || org?.labor_rate || 125;
+        rateSource = rateInfo.source || (org?.labor_rate ? 'organization' : 'system_default');
+        isUserReported = rateInfo.is_user_reported || false;
+      } else {
+        // Fallback to org rate or default
+        laborRate = org?.labor_rate || 125;
+        rateSource = org?.labor_rate ? 'organization' : 'system_default';
+      }
+    } catch (error) {
+      console.warn('Failed to resolve labor rate, using fallback:', error);
+      laborRate = org?.labor_rate || 125;
+      rateSource = org?.labor_rate ? 'organization' : 'system_default';
+    }
 
     // Get image URLs and metadata
     const { data: images } = await supabase
@@ -856,16 +884,64 @@ IMPORTANT: If you see people in the photos, suggest them as participants in part
 
     // Insert labor breakdown into work_order_labor
     if (workLog.laborBreakdown && workLog.laborBreakdown.length > 0) {
-      const laborToInsert = workLog.laborBreakdown.map(task => ({
-        timeline_event_id: timelineEventId,
-        task_name: task.task,
-        task_category: task.category,
-        hours: task.hours,
-        hourly_rate: laborRate,
-        total_cost: task.hours * (laborRate),
-        difficulty_rating: task.difficulty,
-        ai_estimated: true,
-        added_by: null
+      const laborToInsert = await Promise.all(workLog.laborBreakdown.map(async (task) => {
+        // Calculate difficulty multiplier (1.0 = normal, 1.5 = complex, 2.0 = expert)
+        const difficultyMultiplier = task.difficulty ? 
+          (task.difficulty <= 3 ? 1.0 : task.difficulty <= 6 ? 1.25 : task.difficulty <= 8 ? 1.5 : 2.0) : 1.0;
+        
+        // Calculate fluid labor cost with multipliers
+        const { data: costCalc } = await supabase
+          .rpc('calculate_labor_cost_fluid', {
+            p_hours: task.hours,
+            p_base_rate: laborRate,
+            p_organization_id: organizationId,
+            p_vehicle_id: vehicleId,
+            p_difficulty_multiplier: difficultyMultiplier,
+            p_location_multiplier: 1.0, // Can be adjusted based on location
+            p_time_multiplier: 1.0, // Can be adjusted for rush/after-hours
+            p_skill_multiplier: 1.0 // Can be adjusted based on technician skill
+          });
+
+        const reportedRate = isUserReported ? laborRate : null;
+        const calculatedRate = costCalc?.calculated_rate || (laborRate * difficultyMultiplier);
+        const finalRate = isUserReported ? reportedRate : calculatedRate;
+
+        // Build calculation metadata
+        const calcMetadata = costCalc ? {
+          rate: laborRate,
+          source: rateSource,
+          reported_rate: reportedRate,
+          calculated_rate: calculatedRate,
+          multipliers: {
+            difficulty: difficultyMultiplier,
+            location: 1.0,
+            time: 1.0,
+            skill: 1.0
+          }
+        } : {
+          rate: laborRate,
+          source: rateSource
+        };
+
+        return {
+          timeline_event_id: timelineEventId,
+          task_name: task.task,
+          task_category: task.category,
+          hours: task.hours,
+          hourly_rate: finalRate, // Use final rate for display
+          reported_rate: reportedRate,
+          calculated_rate: calculatedRate,
+          rate_source: rateSource,
+          difficulty_multiplier: difficultyMultiplier,
+          location_multiplier: 1.0,
+          time_multiplier: 1.0,
+          skill_multiplier: 1.0,
+          total_cost: task.hours * finalRate,
+          difficulty_rating: task.difficulty,
+          calculation_metadata: calcMetadata,
+          ai_estimated: true,
+          added_by: null
+        };
       }));
 
       await supabase

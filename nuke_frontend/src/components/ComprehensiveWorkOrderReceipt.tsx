@@ -88,11 +88,15 @@ interface LaborTask {
   task: string;
   category?: string;
   hours: number;
-  rate: number;
+  rate: number; // Final rate used (reported if available, otherwise calculated)
+  reported_rate?: number | null; // User-reported rate
+  calculated_rate?: number | null; // System-calculated rate with multipliers
+  rate_source?: string; // 'contract', 'user', 'organization', 'system_default'
   total: number;
   difficulty?: number;
   industry_standard?: number;
   ai_estimated?: boolean;
+  calculation_metadata?: any; // Full calculation breakdown
 }
 
 interface Material {
@@ -704,28 +708,45 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             ))}
 
             {/* Labor Items */}
-            {costBreakdown?.labor?.tasks?.map(task => (
-              <div 
-                key={task.id}
-                style={{ 
-                  display: 'grid',
-                  gridTemplateColumns: '2fr 60px 80px 100px',
-                  gap: '8px',
-                  padding: '4px 0',
-                  fontSize: '8pt',
-                  borderBottom: '1px dotted #ddd'
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 'bold' }}>
-                    {task.task} ({task.hours.toFixed(1)} hrs @ {formatCurrency(task.rate)}/hr)
+            {costBreakdown?.labor?.tasks?.map(task => {
+              const hasBothRates = task.reported_rate != null && task.calculated_rate != null && task.reported_rate !== task.calculated_rate;
+              const rateSourceLabel = task.rate_source === 'contract' ? 'Contract' : 
+                                     task.rate_source === 'user' ? 'User Rate' :
+                                     task.rate_source === 'organization' ? 'Org Rate' : 'Estimate';
+              
+              return (
+                <div 
+                  key={task.id}
+                  style={{ 
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 60px 80px 100px',
+                    gap: '8px',
+                    padding: '4px 0',
+                    fontSize: '8pt',
+                    borderBottom: '1px dotted #ddd'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 'bold' }}>
+                      {task.task} ({task.hours.toFixed(1)} hrs @ {formatCurrency(task.rate)}/hr)
+                    </div>
+                    {hasBothRates && (
+                      <div style={{ fontSize: '6pt', color: '#666', marginTop: '2px' }}>
+                        Reported: {formatCurrency(task.reported_rate)}/hr • Calculated: {formatCurrency(task.calculated_rate)}/hr ({rateSourceLabel})
+                      </div>
+                    )}
+                    {!hasBothRates && task.rate_source && (
+                      <div style={{ fontSize: '6pt', color: '#666', marginTop: '2px' }}>
+                        {rateSourceLabel}
+                      </div>
+                    )}
                   </div>
+                  <div style={{ textAlign: 'right' }}>{task.hours.toFixed(1)}</div>
+                  <div style={{ textAlign: 'right' }}>{formatCurrency(task.rate)}</div>
+                  <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(task.total)}</div>
                 </div>
-                <div style={{ textAlign: 'right' }}>{task.hours.toFixed(1)}</div>
-                <div style={{ textAlign: 'right' }}>{formatCurrency(task.rate)}</div>
-                <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(task.total)}</div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Fallback if no detailed breakdown */}
             {(!costBreakdown?.parts?.items?.length && !costBreakdown?.labor?.tasks?.length) && workOrder.cost_amount && (
