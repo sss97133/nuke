@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '../lib/supabase';
-import { loadStripe, Stripe, StripeElements } from '@stripe/stripe-js';
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
 
 // Initialize Stripe (use your publishable key)
 let stripePromise: Promise<Stripe | null> | null = null;

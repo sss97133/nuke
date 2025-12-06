@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { DashboardService, DashboardNotification, PendingWorkApproval, PendingVehicleAssignment, ConnectedProfilesSummary } from '../services/dashboardService';
+import { DashboardService } from '../services/dashboardService';
+import type { DashboardNotification, PendingWorkApproval, PendingVehicleAssignment } from '../services/dashboardService';
 import { MessageCard } from '../components/dashboard/MessageCard';
-import { Sidebar } from '../components/dashboard/Sidebar';
-import { CommandPalette } from '../components/dashboard/CommandPalette';
-import { Terminal } from '../components/dashboard/Terminal';
 import '../design-system.css';
 
 interface PendingCounts {
@@ -19,12 +17,6 @@ interface PendingCounts {
   unread_notifications: number;
 }
 
-interface TerminalLog {
-  id: string;
-  message: string;
-  timestamp: string;
-  type?: 'info' | 'success' | 'error' | 'warning';
-}
 
 export default function Dashboard() {
   const [session, setSession] = useState<any>(null);
@@ -33,11 +25,6 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState<DashboardNotification[]>([]);
   const [pendingWorkApprovals, setPendingWorkApprovals] = useState<PendingWorkApproval[]>([]);
   const [pendingVehicleAssignments, setPendingVehicleAssignments] = useState<PendingVehicleAssignment[]>([]);
-  const [connectedProfiles, setConnectedProfiles] = useState<ConnectedProfilesSummary | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('actions');
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [terminalLogs, setTerminalLogs] = useState<TerminalLog[]>([]);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['actions']));
   const [loadingSections, setLoadingSections] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
@@ -50,16 +37,6 @@ export default function Dashboard() {
       }
     });
 
-    // Keyboard shortcuts
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setShowCommandPalette(true);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -84,7 +61,6 @@ export default function Dashboard() {
               ? { ...prev, unread_notifications: prev.unread_notifications + 1 }
               : null
           );
-          addTerminalLog(`New notification: ${newNotification.title}`, 'info');
         }
       )
       .subscribe();
@@ -94,17 +70,6 @@ export default function Dashboard() {
     };
   }, [session]);
 
-  const addTerminalLog = (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
-    setTerminalLogs((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        message,
-        timestamp: new Date().toISOString(),
-        type
-      }
-    ]);
-  };
 
   // Load critical data first (counts + notifications)
   const loadCriticalData = async (userId: string) => {
@@ -121,23 +86,11 @@ export default function Dashboard() {
       setNotifications(recentNotifs as DashboardNotification[]);
       setLoadingSections(new Set());
       setInitialLoad(false);
-      addTerminalLog('Dashboard ready', 'success');
-
-      // Auto-select category with most items
-      if (counts) {
-        const totalActions = counts.work_approvals + counts.vehicle_assignments;
-        if (totalActions > 0) {
-          setSelectedCategory('actions');
-        } else if (counts.unread_notifications > 0) {
-          setSelectedCategory('notifications');
-        }
-      }
 
       // Load detailed data in background (lazy)
       loadDetailedData(userId);
     } catch (error: any) {
       console.error('Error loading critical data:', error);
-      addTerminalLog(`Error: ${error.message}`, 'error');
       setLoadingSections(new Set());
       setInitialLoad(false);
     }
@@ -148,15 +101,13 @@ export default function Dashboard() {
     try {
       setLoadingSections(new Set(['work', 'assignments', 'profiles']));
       
-      const [workApprovals, vehicleAssignments, profiles] = await Promise.all([
+      const [workApprovals, vehicleAssignments] = await Promise.all([
         DashboardService.getPendingWorkApprovals(userId).catch(() => []),
-        DashboardService.getPendingVehicleAssignments(userId).catch(() => []),
-        DashboardService.getConnectedProfilesSummary(userId).catch(() => null)
+        DashboardService.getPendingVehicleAssignments(userId).catch(() => [])
       ]);
 
       setPendingWorkApprovals(workApprovals);
       setPendingVehicleAssignments(vehicleAssignments);
-      setConnectedProfiles(profiles);
       setLoadingSections(new Set());
     } catch (error: any) {
       console.error('Error loading detailed data:', error);
@@ -182,7 +133,6 @@ export default function Dashboard() {
       );
     } catch (error: any) {
       console.error('Error marking notification as read:', error);
-      addTerminalLog(`Error: ${error.message}`, 'error');
     }
   };
 
@@ -195,17 +145,14 @@ export default function Dashboard() {
       setPendingCounts((prev) =>
         prev ? { ...prev, unread_notifications: 0 } : null
       );
-      addTerminalLog(`Marked ${count} notifications as read`, 'success');
     } catch (error: any) {
       console.error('Error marking all as read:', error);
-      addTerminalLog(`Error: ${error.message}`, 'error');
     }
   };
 
   const handleApproveWork = async (notificationId: string) => {
     try {
       await DashboardService.approveWorkNotification(notificationId);
-      addTerminalLog('Work approved', 'success');
       setPendingWorkApprovals((prev) => prev.filter((w) => w.id !== notificationId));
       setPendingCounts((prev) =>
         prev
@@ -214,14 +161,12 @@ export default function Dashboard() {
       );
     } catch (error: any) {
       console.error('Error approving work:', error);
-      addTerminalLog(`Error: ${error.message}`, 'error');
     }
   };
 
   const handleRejectWork = async (notificationId: string) => {
     try {
       await DashboardService.rejectWorkNotification(notificationId);
-      addTerminalLog('Work rejected', 'info');
       setPendingWorkApprovals((prev) => prev.filter((w) => w.id !== notificationId));
       setPendingCounts((prev) =>
         prev
@@ -230,14 +175,12 @@ export default function Dashboard() {
       );
     } catch (error: any) {
       console.error('Error rejecting work:', error);
-      addTerminalLog(`Error: ${error.message}`, 'error');
     }
   };
 
   const handleApproveAssignment = async (assignmentId: string) => {
     try {
       await DashboardService.approveVehicleAssignment(assignmentId);
-      addTerminalLog('Assignment approved', 'success');
       setPendingVehicleAssignments((prev) => prev.filter((v) => v.id !== assignmentId));
       setPendingCounts((prev) =>
         prev
@@ -249,14 +192,12 @@ export default function Dashboard() {
       );
     } catch (error: any) {
       console.error('Error approving assignment:', error);
-      addTerminalLog(`Error: ${error.message}`, 'error');
     }
   };
 
   const handleRejectAssignment = async (assignmentId: string) => {
     try {
       await DashboardService.rejectVehicleAssignment(assignmentId);
-      addTerminalLog('Assignment rejected', 'info');
       setPendingVehicleAssignments((prev) => prev.filter((v) => v.id !== assignmentId));
       setPendingCounts((prev) =>
         prev
@@ -268,117 +209,9 @@ export default function Dashboard() {
       );
     } catch (error: any) {
       console.error('Error rejecting assignment:', error);
-      addTerminalLog(`Error: ${error.message}`, 'error');
     }
   };
 
-  const getCategories = () => {
-    const counts = pendingCounts || {
-      work_approvals: 0,
-      vehicle_assignments: 0,
-      photo_reviews: 0,
-      document_reviews: 0,
-      user_requests: 0,
-      interaction_requests: 0,
-      ownership_verifications: 0,
-      unread_notifications: 0
-    };
-
-    const totalActions = counts.work_approvals + counts.vehicle_assignments + counts.photo_reviews + counts.document_reviews;
-
-    return [
-      {
-        id: 'actions',
-        label: 'Actions',
-        count: totalActions,
-        icon: '>',
-        expanded: expandedCategories.has('actions'),
-        children: [
-          {
-            id: 'work_approvals',
-            label: 'work',
-            count: counts.work_approvals,
-            icon: 'WRENCH'
-          },
-          {
-            id: 'vehicle_assignments',
-            label: 'assignments',
-            count: counts.vehicle_assignments,
-            icon: 'LINK'
-          },
-          {
-            id: 'photo_reviews',
-            label: 'photos',
-            count: counts.photo_reviews,
-            icon: 'IMAGE'
-          },
-          {
-            id: 'document_reviews',
-            label: 'documents',
-            count: counts.document_reviews,
-            icon: 'DOCUMENT'
-          }
-        ]
-      },
-      {
-        id: 'notifications',
-        label: 'Notifications',
-        count: counts.unread_notifications,
-        icon: 'BELL',
-        expanded: false
-      },
-      {
-        id: 'connected',
-        label: 'Connected',
-        count: connectedProfiles ? connectedProfiles.vehicles + connectedProfiles.organizations : 0,
-        icon: 'LINK',
-        expanded: expandedCategories.has('connected'),
-        children: [
-          {
-            id: 'vehicles',
-            label: 'vehicles',
-            count: connectedProfiles?.vehicles || 0,
-            icon: 'CAR'
-          },
-          {
-            id: 'organizations',
-            label: 'organizations',
-            count: connectedProfiles?.organizations || 0,
-            icon: 'ORG'
-          }
-        ]
-      }
-    ];
-  };
-
-  const getCommands = () => {
-    return [
-      {
-        id: 'mark_all_read',
-        category: 'notification',
-        label: 'Mark All Notifications Read',
-        handler: handleMarkAllRead
-      },
-      {
-        id: 'view_vehicles',
-        category: 'navigate',
-        label: 'View All Vehicles',
-        handler: () => navigate('/vehicles')
-      },
-      {
-        id: 'view_notifications',
-        category: 'navigate',
-        label: 'View All Notifications',
-        handler: () => navigate('/notifications')
-      },
-      {
-        id: 'add_vehicle',
-        category: 'action',
-        label: 'Add Vehicle',
-        handler: () => navigate('/add-vehicle')
-      }
-    ];
-  };
 
   const formatNotificationForCard = (notification: DashboardNotification) => {
     const metadata = notification.metadata || {};
@@ -437,105 +270,6 @@ export default function Dashboard() {
     return actions;
   };
 
-  const getFilteredNotifications = () => {
-    if (selectedCategory === 'notifications') {
-      return notifications.map(formatNotificationForCard);
-    } else if (selectedCategory === 'work_approvals') {
-      if (loadingSections.has('work')) {
-        return [{ id: 'loading', type: 'loading', priority: 3, title: 'Loading...', message: '', is_read: false, created_at: new Date().toISOString() }];
-      }
-      return pendingWorkApprovals.map((wa) => ({
-        id: wa.id,
-        type: 'work_approval_request',
-        priority: 1 as const,
-        title: 'Work Approval Required',
-        message: `${wa.work_type || 'Work'} detected on ${wa.vehicle_name}. Match confidence: ${wa.match_confidence}%`,
-        metadata: {
-          vehicle_id: wa.vehicle_id,
-          vehicle_name: wa.vehicle_name,
-          organization_id: wa.organization_id,
-          organization_name: wa.organization_name,
-          confidence: wa.match_confidence
-        },
-        is_read: false,
-        created_at: wa.created_at,
-        actions: [
-          {
-            id: 'approve',
-            label: 'Approve',
-            type: 'primary' as const,
-            handler: () => handleApproveWork(wa.id)
-          },
-          {
-            id: 'reject',
-            label: 'Reject',
-            type: 'danger' as const,
-            handler: () => handleRejectWork(wa.id)
-          },
-          {
-            id: 'view',
-            label: 'View Details',
-            type: 'link' as const,
-            handler: () => navigate(`/vehicle/${wa.vehicle_id}`)
-          }
-        ]
-      }));
-    } else if (selectedCategory === 'vehicle_assignments') {
-      if (loadingSections.has('assignments')) {
-        return [{ id: 'loading', type: 'loading', priority: 3, title: 'Loading...', message: '', is_read: false, created_at: new Date().toISOString() }];
-      }
-      return pendingVehicleAssignments.map((va) => ({
-        id: va.id,
-        type: 'pending_vehicle_assignment',
-        priority: 2 as const,
-        title: 'Vehicle Assignment Suggested',
-        message: `${va.vehicle_name} suggested for ${va.organization_name}. Confidence: ${va.confidence}%`,
-        metadata: {
-          vehicle_id: va.vehicle_id,
-          vehicle_name: va.vehicle_name,
-          organization_id: va.organization_id,
-          organization_name: va.organization_name,
-          confidence: va.confidence,
-          evidence_sources: va.evidence_sources
-        },
-        is_read: false,
-        created_at: va.created_at,
-        actions: [
-          {
-            id: 'approve',
-            label: 'Approve',
-            type: 'primary' as const,
-            handler: () => handleApproveAssignment(va.id)
-          },
-          {
-            id: 'reject',
-            label: 'Reject',
-            type: 'danger' as const,
-            handler: () => handleRejectAssignment(va.id)
-          },
-          {
-            id: 'view',
-            label: 'View Evidence',
-            type: 'link' as const,
-            handler: () => navigate(`/vehicle/${va.vehicle_id}`)
-          }
-        ]
-      }));
-    }
-    return [];
-  };
-
-  const handleToggleExpand = (categoryId: string) => {
-    setExpandedCategories((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(categoryId)) {
-        newSet.delete(categoryId);
-      } else {
-        newSet.add(categoryId);
-      }
-      return newSet;
-    });
-  };
 
   if (!session?.user) {
     return (
@@ -568,149 +302,107 @@ export default function Dashboard() {
     );
   }
 
-  const filteredNotifications = getFilteredNotifications();
-  const categories = getCategories();
+  // Simplified: Just show all notifications/items in one list
+  const allItems = [
+    ...notifications.map(formatNotificationForCard),
+    ...pendingWorkApprovals.map(wa => ({
+      id: wa.id,
+      type: 'work_approval_request' as const,
+      priority: 1 as const,
+      title: `Work Approval: ${wa.work_type || 'Work'}`,
+      message: `${wa.work_type || 'Work'} detected on ${wa.vehicle_name}`,
+      is_read: false,
+      created_at: wa.created_at,
+      actions: [
+        { id: 'approve', label: 'Approve', type: 'primary' as const, handler: () => handleApproveWork(wa.id) },
+        { id: 'reject', label: 'Reject', type: 'danger' as const, handler: () => handleRejectWork(wa.id) },
+        { id: 'view', label: 'View Vehicle', type: 'link' as const, handler: () => navigate(`/vehicle/${wa.vehicle_id}`) }
+      ]
+    })),
+    ...pendingVehicleAssignments.map(va => ({
+      id: va.id,
+      type: 'pending_vehicle_assignment' as const,
+      priority: 1 as const,
+      title: `Vehicle Assignment: ${va.vehicle_name}`,
+      message: `Assignment request for ${va.vehicle_name}`,
+      is_read: false,
+      created_at: va.created_at,
+      actions: [
+        { id: 'approve', label: 'Approve', type: 'primary' as const, handler: () => handleApproveAssignment(va.id) },
+        { id: 'reject', label: 'Reject', type: 'danger' as const, handler: () => handleRejectAssignment(va.id) },
+        { id: 'view', label: 'View Vehicle', type: 'link' as const, handler: () => navigate(`/vehicle/${va.vehicle_id}`) }
+      ]
+    }))
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
   const isLoading = initialLoad || loadingSections.has('counts') || loadingSections.has('notifications');
+
+  // Simplified Dashboard - just show a simple list, no categories
+  const totalPending = pendingCounts 
+    ? pendingCounts.work_approvals + pendingCounts.vehicle_assignments + pendingCounts.unread_notifications
+    : 0;
 
   return (
     <div
       style={{
-        display: 'flex',
-        height: '100vh',
+        padding: '16px',
         fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
         fontSize: '8pt',
-        background: '#ffffff'
+        background: '#ffffff',
+        maxWidth: '800px',
+        margin: '0 auto'
       }}
     >
-      {/* Sidebar */}
-      <Sidebar
-        categories={categories}
-        selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-        onToggleExpand={handleToggleExpand}
-      />
-
-      {/* Main Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Header */}
-        <div
-          style={{
-            height: '32px',
-            borderBottom: '1px solid #bdbdbd',
-            padding: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: '#ffffff'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: '#000000', fontWeight: '600' }}>Dashboard</span>
-            {pendingCounts && pendingCounts.unread_notifications > 0 && (
-              <span
-                style={{
-                  fontSize: '7pt',
-                  color: '#757575',
-                  background: '#f5f5f5',
-                  padding: '2px 6px',
-                  border: '1px solid #bdbdbd'
-                }}
-              >
-                {pendingCounts.unread_notifications} unread
-              </span>
-            )}
-            {isLoading && (
-              <span style={{ fontSize: '7pt', color: '#757575' }}>Loading...</span>
-            )}
+      {/* Simple Header */}
+      <div
+        style={{
+          marginBottom: '16px',
+          paddingBottom: '8px',
+          borderBottom: '1px solid #bdbdbd'
+        }}
+      >
+        <h1 style={{ fontSize: '10pt', fontWeight: '600', margin: 0 }}>Dashboard</h1>
+        {totalPending > 0 && (
+          <div style={{ fontSize: '7pt', color: '#757575', marginTop: '4px' }}>
+            {totalPending} item{totalPending !== 1 ? 's' : ''} need attention
           </div>
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <button
-              onClick={() => setShowCommandPalette(true)}
-              style={{
-                fontSize: '8pt',
-                fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-                padding: '4px 8px',
-                border: '1px solid #bdbdbd',
-                background: '#ffffff',
-                cursor: 'pointer',
-                color: '#757575'
-              }}
-            >
-              [⌘K]
-            </button>
-            {pendingCounts && pendingCounts.unread_notifications > 0 && (
-              <button
-                onClick={handleMarkAllRead}
-                style={{
-                  fontSize: '8pt',
-                  fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
-                  padding: '4px 8px',
-                  border: '1px solid #bdbdbd',
-                  background: '#ffffff',
-                  cursor: 'pointer',
-                  color: '#000000'
-                }}
-              >
-                [Mark All Read]
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Message List */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '8px',
-            background: '#ffffff'
-          }}
-        >
-          {isLoading ? (
-            <div
-              style={{
-                padding: '32px',
-                textAlign: 'center',
-                color: '#757575',
-                fontSize: '8pt'
-              }}
-            >
-              Loading dashboard...
-            </div>
-          ) : filteredNotifications.length === 0 ? (
-            <div
-              style={{
-                padding: '32px',
-                textAlign: 'center',
-                color: '#757575',
-                fontSize: '8pt'
-              }}
-            >
-              {selectedCategory === 'notifications'
-                ? 'No notifications'
-                : 'No pending items'}
-            </div>
-          ) : (
-            filteredNotifications.map((notification) => (
-              <MessageCard
-                key={notification.id}
-                {...notification}
-                onMarkRead={handleMarkRead}
-              />
-            ))
-          )}
-        </div>
-
-        {/* Terminal */}
-        <Terminal logs={terminalLogs} />
+        )}
       </div>
 
-      {/* Command Palette */}
-      <CommandPalette
-        isOpen={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
-        commands={getCommands()}
-      />
+      {/* Simple List - No Categories */}
+      {isLoading ? (
+        <div
+          style={{
+            padding: '32px',
+            textAlign: 'center',
+            color: '#757575',
+            fontSize: '8pt'
+          }}
+        >
+          Loading...
+        </div>
+      ) : allItems.length === 0 ? (
+        <div
+          style={{
+            padding: '32px',
+            textAlign: 'center',
+            color: '#757575',
+            fontSize: '8pt'
+          }}
+        >
+          All caught up! No pending items.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {allItems.map((item) => (
+            <MessageCard
+              key={item.id}
+              {...item}
+              onMarkRead={handleMarkRead}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
