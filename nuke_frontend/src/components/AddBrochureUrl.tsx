@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../hooks/useToast';
 
@@ -7,6 +8,7 @@ const AddBrochureUrl: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,9 +102,15 @@ const AddBrochureUrl: React.FC = () => {
         const isIndexed = chunks && chunks.length > 0;
         
         showToast(
-          `Document already exists: ${existingDoc.title}${isIndexed ? ' (indexed)' : ''}`,
+          `Document already exists: ${existingDoc.title}${isIndexed ? ' (indexed)' : ''}. Opening library...`,
           'info'
         );
+        
+        // Navigate to library page after a short delay
+        setTimeout(() => {
+          navigate('/library');
+        }, 1000);
+        
         setUrl('');
         setIsOpen(false);
         return;
