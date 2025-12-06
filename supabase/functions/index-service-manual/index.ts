@@ -1,9 +1,10 @@
 /**
- * Service Manual Indexing
+ * Document Indexing (Service Manuals, Material Manuals, TDS Sheets)
  * 
- * Indexes factory service manuals for queryable knowledge base
+ * Indexes technical documents for queryable knowledge base
+ * Supports: service_manual, material_manual, tds (Technical Data Sheets)
  * Uses OpenAI (gpt-4o) or Anthropic (claude-3-5-sonnet) to extract structure and chunk semantically
- * Stores chunks in catalog_text_chunks for AI querying
+ * Stores chunks in document_chunks table for AI querying
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
@@ -36,7 +37,12 @@ serve(async (req) => {
       .single()
 
     if (docError || !doc) throw new Error(`Document not found: ${document_id}`)
-    if (doc.document_type !== 'service_manual') throw new Error('Only service manuals can be indexed')
+    
+    // Supported document types
+    const supportedTypes = ['service_manual', 'material_manual', 'tds']
+    if (!supportedTypes.includes(doc.document_type)) {
+      throw new Error(`Document type '${doc.document_type}' not supported. Supported: ${supportedTypes.join(', ')}`)
+    }
 
     const pdfUrl = doc.file_url
     console.log(`Indexing: ${doc.title} [${mode}]`)
@@ -83,7 +89,10 @@ serve(async (req) => {
 })
 
 async function extractStructure(pdfUrl: string, llmConfig: any, doc: any) {
-  const prompt = `Analyze this factory service manual: "${doc.title}"
+  let prompt = ''
+  
+  if (doc.document_type === 'service_manual') {
+    prompt = `Analyze this factory service manual: "${doc.title}"
 
 Extract the complete structure:
 
@@ -113,23 +122,80 @@ Return JSON:
   ],
   "priority_sections": ["list of section names to index first"]
 }`
+  } else if (doc.document_type === 'tds') {
+    prompt = `Analyze this Technical Data Sheet (TDS): "${doc.title}"
+
+Extract the complete structure:
+
+1. Total page count
+2. Product information (name, code, brand)
+3. Key sections for indexing:
+   - Product Overview
+   - Mixing Ratios & Instructions
+   - Application Method
+   - Coverage & Performance
+   - Safety Data & Warnings
+   - Color Codes (if paint)
+   - Dry/Cure Times
+   - Compatibility
+
+Return JSON:
+{
+  "total_pages": number,
+  "title": "string",
+  "product_name": "string",
+  "product_code": "string",
+  "brand": "string",
+  "sections": [
+    {
+      "name": "Mixing Instructions",
+      "start_page": 1,
+      "end_page": 2,
+      "priority": "high",
+      "content_type": "specification"
+    }
+  ],
+  "priority_sections": ["list of section names to index first"]
+}`
+  } else if (doc.document_type === 'material_manual') {
+    prompt = `Analyze this material manual: "${doc.title}"
+
+Extract the complete structure:
+
+1. Total page count
+2. Product categories
+3. Key sections for indexing:
+   - Product Catalog
+   - Specifications
+   - Application Guides
+   - Compatibility Charts
+   - Safety Information
+   - Mixing/Usage Instructions
+
+Return JSON:
+{
+  "total_pages": number,
+  "title": "string",
+  "categories": ["paint", "primer", "filler", etc.],
+  "sections": [
+    {
+      "name": "Product Catalog",
+      "start_page": 1,
+      "end_page": 50,
+      "priority": "high",
+      "content_type": "specification"
+    }
+  ],
+  "priority_sections": ["list of section names to index first"]
+}`
+  }
 
   const { callLLM } = await import('../_shared/llmProvider.ts')
   
-  // Use LLM with PDF URL - instruct it to analyze the document
-  // For OpenAI/Anthropic, we'll use text extraction or URL-based approach
   const enhancedPrompt = `${prompt}
 
-IMPORTANT: Analyze the service manual PDF at this URL: ${pdfUrl}
-If you cannot access the URL directly, use common knowledge about ${doc.title} structure.
-For Chevrolet service manuals from this era, typical sections include:
-- Body & Frame (usually pages 200-400)
-- Specifications (usually early pages)
-- Paint & Color codes (usually pages 100-200)
-- Engine specifications (usually pages 400-600)
-- Transmission (usually pages 600-800)
-
-Provide your best estimate based on standard service manual structure.`
+IMPORTANT: Analyze the PDF at this URL: ${pdfUrl}
+If you cannot access the URL directly, provide your best estimate based on standard ${doc.document_type} structure.`
 
   const response = await callLLM(llmConfig, [
     {
@@ -197,7 +263,91 @@ async function extractSectionChunks(
   llmConfig: any,
   supabase: any
 ): Promise<number> {
-  const prompt = `Extract content from pages ${startPage} to ${endPage} of "${doc.title}", section: "${sectionName}"
+  let prompt = ''
+  
+  if (doc.document_type === 'tds') {
+    prompt = `Extract content from pages ${startPage} to ${endPage} of "${doc.title}" (Technical Data Sheet), section: "${sectionName}"
+
+CRITICAL: Extract ALL product information for paint/chemical TDS sheets:
+
+For EACH product or section, provide:
+- page_number (exact page)
+- section_heading
+- content (full text)
+- content_type (specification|safety_data|mixing_ratio|application_guide|chart)
+- key_topics (array of topics)
+
+PLUS for paint/chemical products:
+- product_name (e.g., "Basecoat Red", "Clear Coat")
+- product_code (SKU/part number if visible)
+- brand (manufacturer name)
+- color_code (paint color code if applicable)
+- mixing_ratio (JSON object: {"base": 4, "activator": 1, "reducer": 1} or similar)
+- application_method (spray, brush, etc.)
+- dry_time (e.g., "15 min flash, 24 hr cure")
+- coverage (e.g., "300 sq ft per gallon")
+- safety_notes (array of safety warnings)
+
+Return JSON:
+{
+  "chunks": [
+    {
+      "page_number": 1,
+      "section_heading": "Product Overview",
+      "content": "Full text...",
+      "content_type": "specification",
+      "key_topics": ["basecoat", "red", "mixing"],
+      "product_name": "Basecoat Red",
+      "product_code": "BC-RED-001",
+      "brand": "PPG",
+      "color_code": "R123",
+      "mixing_ratio": {"base": 4, "activator": 1, "reducer": 1},
+      "application_method": "Spray",
+      "dry_time": "15 min flash, 24 hr cure",
+      "coverage": "300 sq ft/gal",
+      "safety_notes": ["Flammable", "Use in well-ventilated area"]
+    }
+  ]
+}`
+  } else if (doc.document_type === 'material_manual') {
+    prompt = `Extract content from pages ${startPage} to ${endPage} of "${doc.title}" (Material Manual), section: "${sectionName}"
+
+Extract product information:
+
+For EACH product, provide:
+- page_number
+- section_heading
+- content (full text)
+- content_type (specification|procedure|chart|reference)
+- key_topics (array)
+- product_name
+- product_code (SKU if visible)
+- brand (manufacturer)
+- material_category (paint, primer, filler, adhesive, etc.)
+- compatibility (array of compatible products)
+- usage_instructions (text)
+
+Return JSON:
+{
+  "chunks": [
+    {
+      "page_number": 5,
+      "section_heading": "Body Filler",
+      "content": "Full text...",
+      "content_type": "specification",
+      "key_topics": ["filler", "body work", "repair"],
+      "product_name": "Premium Body Filler",
+      "product_code": "BF-500",
+      "brand": "Evercoat",
+      "material_category": "filler",
+      "compatibility": ["3M Primer", "USC Sealer"],
+      "usage_instructions": "Mix 50:50 with hardener, apply to clean surface"
+    }
+  ]
+}`
+  } else {
+    // Service manual (existing logic)
+    prompt = `Extract content from pages ${startPage} to ${endPage} of "${doc.title}", section: "${sectionName}"
 
 Chunk by semantic units:
 - One procedure = one chunk
@@ -223,6 +373,7 @@ Return JSON array:
     }
   ]
 }`
+  }
 
   const { callLLM } = await import('../_shared/llmProvider.ts')
   
@@ -247,11 +398,12 @@ If you cannot access the PDF directly, provide realistic chunks based on what wo
   if (!jsonMatch) throw new Error('Failed to parse JSON from response')
   const extracted = JSON.parse(jsonMatch[0])
 
-  // Store chunks in service_manual_chunks table
+  // Store chunks in document_chunks table (unified for all document types)
   if (extracted.chunks) {
     for (const chunk of extracted.chunks) {
-      await supabase.from('service_manual_chunks').insert({
+      const chunkData: any = {
         document_id: doc.id,
+        document_type: doc.document_type,
         page_number: chunk.page_number,
         section_name: sectionName,
         section_heading: chunk.section_heading,
@@ -260,10 +412,34 @@ If you cannot access the PDF directly, provide realistic chunks based on what wo
         key_topics: chunk.key_topics || [],
         metadata: {
           document_title: doc.title,
-          document_type: 'service_manual',
           year_range: doc.metadata?.year_range
         }
-      })
+      }
+
+      // TDS-specific fields
+      if (doc.document_type === 'tds' && chunk.product_name) {
+        chunkData.product_name = chunk.product_name
+        chunkData.product_code = chunk.product_code
+        chunkData.brand = chunk.brand
+        chunkData.color_code = chunk.color_code
+        chunkData.mixing_ratio = chunk.mixing_ratio ? JSON.parse(JSON.stringify(chunk.mixing_ratio)) : null
+        chunkData.application_method = chunk.application_method
+        chunkData.dry_time = chunk.dry_time
+        chunkData.coverage = chunk.coverage
+        chunkData.safety_notes = chunk.safety_notes || []
+      }
+
+      // Material manual specific fields
+      if (doc.document_type === 'material_manual' && chunk.product_name) {
+        chunkData.product_name = chunk.product_name
+        chunkData.product_code = chunk.product_code
+        chunkData.brand = chunk.brand
+        chunkData.material_category = chunk.material_category
+        chunkData.compatibility = chunk.compatibility || []
+        chunkData.usage_instructions = chunk.usage_instructions
+      }
+
+      await supabase.from('document_chunks').insert(chunkData)
     }
   }
 
