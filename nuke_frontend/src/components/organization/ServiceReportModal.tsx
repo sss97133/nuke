@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
 
 interface WorkSession {
@@ -106,7 +107,8 @@ export function ServiceReportModal({
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
   };
 
-  return (
+  // Use portal to render at document body level
+  return ReactDOM.createPortal(
     <div 
       style={{
         position: 'fixed',
@@ -328,7 +330,8 @@ export function ServiceReportModal({
           />
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
 
