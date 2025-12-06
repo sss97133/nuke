@@ -1761,10 +1761,13 @@ function scrapeFacebookMarketplace(doc: any, url: string, markdown: string = '',
       
       if (vehicleMatch && vehicleMatch[2] && vehicleMatch[3]) {
         let make = vehicleMatch[2].trim()
-        // Normalize make
-        if (make.toLowerCase() === 'chevy' || make.toLowerCase() === 'chev') make = 'Chevrolet'
-        if (make.toLowerCase() === 'gm' || make.toLowerCase() === 'gmc') make = 'GMC'
-        if (make && make.length > 0) {
+        // Normalize make first
+        if (make.toLowerCase() === 'chevy' || make.toLowerCase() === 'chev') {
+          make = 'Chevrolet'
+        } else if (make.toLowerCase() === 'gm' || make.toLowerCase() === 'gmc') {
+          make = 'GMC'
+        } else if (make && make.length > 0) {
+          // Only apply generic capitalization if not already normalized
           make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase()
         }
         data.make = make
@@ -1925,19 +1928,15 @@ function scrapeFacebookMarketplace(doc: any, url: string, markdown: string = '',
       
       // Engine
       const enginePatterns = [
-        /(\d+\.\d+)\s*L/i,
-        /(\d+)\s*cylinder/i,
-        /V(\d+)/i,
-        /(\d+\.\d+)\s*L\s*V(\d+)/i
+        { pattern: /(\d+\.\d+)\s*L/i, handler: (m: RegExpMatchArray) => m[1] + 'L' },
+        { pattern: /(\d+)\s*cylinder/i, handler: (m: RegExpMatchArray) => m[1] + ' cylinder' },
+        { pattern: /V(\d+)/i, handler: (m: RegExpMatchArray) => 'V' + m[1] },
+        { pattern: /(\d+\.\d+)\s*L\s*V(\d+)/i, handler: (m: RegExpMatchArray) => m[1] + 'L V' + m[2] }
       ]
-      for (const pattern of enginePatterns) {
+      for (const { pattern, handler } of enginePatterns) {
         const match = description.match(pattern)
-        if (match) {
-          if (match[1] && match[1].includes('.')) {
-            data.engine_size = match[1] + 'L'
-          } else if (match[2]) {
-            data.engine_size = match[2] + ' cylinder'
-          }
+        if (match && match[1]) {
+          data.engine_size = handler(match)
           break
         }
       }
