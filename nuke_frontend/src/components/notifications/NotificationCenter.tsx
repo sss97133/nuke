@@ -1,401 +1,298 @@
-import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import '../../design-system.css';
+/**
+ * NOTIFICATION CENTER
+ * 
+ * Simple, fundamental notification system
+ * Shows user-to-user and system-to-user notifications
+ */
+
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
 
 interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  metadata: any;
-  action_url?: string;
-  is_read: boolean;
-  created_at: string;
+  id: string
+  notification_type: string
+  title: string
+  message?: string
+  vehicle_id?: string
+  image_id?: string
+  organization_id?: string
+  from_user_id?: string
+  action_url?: string
+  metadata: any
+  is_read: boolean
+  created_at: string
 }
 
 interface NotificationCenterProps {
-  isOpen?: boolean;
-  onClose?: () => void;
+  isOpen: boolean
+  onClose: () => void
 }
 
-const NotificationCenter = ({ isOpen = true, onClose }: NotificationCenterProps) => {
-  const { user } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const containerRef = useRef<HTMLDivElement>(null);
+export default function NotificationCenter({ isOpen, onClose }: NotificationCenterProps) {
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
-    if (user && isOpen) {
-      loadNotifications();
-    }
-  }, [user, isOpen, filter]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const subscription = supabase
-      .channel(`user_notifications_${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
+    if (isOpen) {
+      loadNotifications()
+      
+      // Real-time subscription
+      const channel = supabase
+        .channel('user_notifications')
+        .on('postgres_changes', {
+          event: '*',
           schema: 'public',
           table: 'user_notifications',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          const n = payload.new as any;
-          setNotifications(prev => ([{ ...n, action_url: n?.metadata?.link_url }, ...prev] as Notification[]));
-          if (n && n.is_read === false) {
-            setUnreadCount(prev => prev + 1);
-          }
-        }
-      )
-      .subscribe();
+          filter: `user_id=eq.${(async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            return user?.id
+          })()}`
+        }, () => {
+          loadNotifications()
+        })
+        .subscribe()
 
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [user]);
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }
+  }, [isOpen])
 
   const loadNotifications = async () => {
-    if (!user) return;
+    try {
+      setLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-    setLoading(true);
+      // Get notifications
+      const { data, error } = await supabase
+        .from('user_notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50)
 
-    let query = supabase
-      .from('user_notifications')
-      .select('id, type, title, message, metadata, is_read, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
+      if (error) throw error
 
-    if (filter === 'unread') {
-      query = query.eq('is_read', false);
+      setNotifications(data || [])
+      setUnreadCount(data?.filter(n => !n.is_read).length || 0)
+    } catch (error: any) {
+      console.error('Error loading notifications:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMarkRead = async (notificationId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      await supabase.rpc('mark_notification_read', {
+        p_notification_id: notificationId,
+        p_user_id: user.id
+      })
+
+      await loadNotifications()
+    } catch (error: any) {
+      console.error('Error marking notification as read:', error)
+    }
+  }
+
+  const handleMarkAllRead = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      await supabase.rpc('mark_all_notifications_read', {
+        p_user_id: user.id
+      })
+
+      await loadNotifications()
+    } catch (error: any) {
+      console.error('Error marking all as read:', error)
+    }
+  }
+
+  const handleClick = (notification: Notification) => {
+    // Mark as read
+    if (!notification.is_read) {
+      handleMarkRead(notification.id)
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error loading notifications:', error);
-    } else {
-      const rows = (data as any[] | null) || [];
-      const mapped = rows.map((n: any) => ({ ...n, action_url: n?.metadata?.link_url })) as Notification[];
-      setNotifications(mapped);
-      setUnreadCount(mapped.filter(n => !n.is_read).length || 0);
-    }
-
-    setLoading(false);
-  };
-
-  const markAsRead = async (notificationId: string) => {
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('user_notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId)
-      .eq('user_id', user.id);
-
-    if (error) {
-      console.error('Error marking notification as read:', error);
-    } else {
-      setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n));
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    }
-  };
-
-  const markAllAsRead = async () => {
-    if (!user) return;
-
-    const { error } = await supabase
-      .from('user_notifications')
-      .update({ is_read: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false);
-
-    if (error) {
-      console.error('Error marking all notifications as read:', error);
-    } else {
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadCount(0);
-    }
-  };
-
-  const deleteNotification = async (notificationId: string) => {
-    // Deletion not supported by current RLS; mark as read instead
-    await markAsRead(notificationId);
-  };
-
-  const handleNotificationClick = (notification: Notification) => {
-    if (!notification.read) {
-      markAsRead(notification.id);
-    }
-
+    // Navigate to action
     if (notification.action_url) {
-      window.location.href = notification.action_url;
+      navigate(notification.action_url)
+      onClose()
+    } else if (notification.vehicle_id) {
+      navigate(`/vehicle/${notification.vehicle_id}`)
+      onClose()
+    } else if (notification.organization_id) {
+      navigate(`/organization/${notification.organization_id}`)
+      onClose()
     }
-  };
-
-  const formatTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const notificationTime = new Date(timestamp);
-    const diffInMinutes = Math.floor((now.getTime() - notificationTime.getTime()) / 60000);
-
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-
-    const diffInDays = Math.floor(diffInHours / 24);
-    if (diffInDays < 7) return `${diffInDays}d ago`;
-
-    return notificationTime.toLocaleDateString();
-  };
+  }
 
   const getNotificationIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      like: '❤️',
-      comment: '💬',
-      follow: '👤',
-      mention: '📢',
-      auction_outbid: '🔨',
-      auction_won: '🏆',
-      auction_ending: '⏰',
-      stream_live: '📺',
-      build_milestone: '🎯',
-      system: '🔔'
-    };
-    return icons[type] || '📋';
-  };
+    switch (type) {
+      case 'comment_on_vehicle': return '💬'
+      case 'vehicle_access_request': return '🔓'
+      case 'vehicle_contribution': return '➕'
+      case 'vehicle_liked': return '❤️'
+      case 'upload_completed': return '✅'
+      case 'analysis_completed': return '🤖'
+      case 'price_updated': return '💰'
+      case 'work_order_assigned': return '🔧'
+      default: return '🔔'
+    }
+  }
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
     <div
-      ref={containerRef}
       style={{
-        background: '#f5f5f5',
-        border: '1px solid #bdbdbd',
-        padding: '0px',
-        margin: '16px',
-        fontFamily: 'Arial, sans-serif',
+        position: 'fixed',
+        top: '60px',
+        right: '16px',
+        width: '400px',
         maxHeight: '600px',
+        background: '#ffffff',
+        border: '2px solid #bdbdbd',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        zIndex: 1000,
         display: 'flex',
         flexDirection: 'column'
       }}
     >
       {/* Header */}
-      <div style={{
-        background: '#e0e0e0',
-        padding: '8px 12px',
-        borderBottom: '1px solid #bdbdbd',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
+      <div
+        style={{
+          padding: '12px',
+          borderBottom: '1px solid #bdbdbd',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: '#f5f5f5'
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <h3 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0' }}>
-            🔔 Notifications
-          </h3>
+          <span style={{ fontSize: '10pt', fontWeight: '600' }}>Notifications</span>
           {unreadCount > 0 && (
-            <div style={{
-              background: '#dc2626',
-              color: 'white',
-              borderRadius: '50%',
-              width: '16px',
-              height: '16px',
-              fontSize: '7pt',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 'bold'
-            }}>
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </div>
+            <span
+              style={{
+                fontSize: '7pt',
+                padding: '2px 6px',
+                background: '#dc2626',
+                color: 'white',
+                borderRadius: '10px'
+              }}
+            >
+              {unreadCount}
+            </span>
           )}
         </div>
-
         <div style={{ display: 'flex', gap: '4px' }}>
           {unreadCount > 0 && (
             <button
-              onClick={markAllAsRead}
+              onClick={handleMarkAllRead}
               style={{
-                padding: '2px 6px',
-                fontSize: '7pt',
+                padding: '4px 8px',
                 border: '1px solid #bdbdbd',
-                background: '#424242',
-                color: 'white',
-                borderRadius: '0px',
-                cursor: 'pointer'
+                background: '#ffffff',
+                cursor: 'pointer',
+                fontSize: '7pt'
               }}
             >
               Mark All Read
             </button>
           )}
-          {onClose && (
-            <button
-              onClick={onClose}
-              style={{
-                padding: '2px 6px',
-                fontSize: '7pt',
-                border: '1px solid #bdbdbd',
-                background: '#e0e0e0',
-                color: '#424242',
-                borderRadius: '0px',
-                cursor: 'pointer'
-              }}
-            >
-              ✕
-            </button>
-          )}
+          <button
+            onClick={onClose}
+            style={{
+              padding: '4px 8px',
+              border: '1px solid #bdbdbd',
+              background: '#ffffff',
+              cursor: 'pointer',
+              fontSize: '7pt'
+            }}
+          >
+            ✕
+          </button>
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div style={{
-        background: 'white',
-        padding: '8px',
-        borderBottom: '1px solid #bdbdbd',
-        display: 'flex',
-        gap: '4px'
-      }}>
-        <button
-          onClick={() => setFilter('all')}
-          style={{
-            padding: '4px 8px',
-            fontSize: '8pt',
-            border: '1px solid #bdbdbd',
-            background: filter === 'all' ? '#424242' : '#f5f5f5',
-            color: filter === 'all' ? 'white' : '#424242',
-            borderRadius: '0px',
-            cursor: 'pointer'
-          }}
-        >
-          All ({notifications.length})
-        </button>
-        <button
-          onClick={() => setFilter('unread')}
-          style={{
-            padding: '4px 8px',
-            fontSize: '8pt',
-            border: '1px solid #bdbdbd',
-            background: filter === 'unread' ? '#424242' : '#f5f5f5',
-            color: filter === 'unread' ? 'white' : '#424242',
-            borderRadius: '0px',
-            cursor: 'pointer'
-          }}
-        >
-          Unread ({unreadCount})
-        </button>
-      </div>
-
       {/* Notifications List */}
-      <div style={{
-        flex: '1',
-        overflowY: 'auto',
-        background: 'white'
-      }}>
+      <div
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '8px'
+        }}
+      >
         {loading ? (
-          <div style={{
-            padding: '16px',
-            textAlign: 'center',
-            fontSize: '8pt',
-            color: '#757575'
-          }}>
-            Loading notifications...
+          <div style={{ padding: '32px', textAlign: 'center', color: '#757575', fontSize: '8pt' }}>
+            Loading...
           </div>
         ) : notifications.length === 0 ? (
-          <div style={{
-            padding: '24px',
-            textAlign: 'center',
-            fontSize: '8pt',
-            color: '#757575'
-          }}>
-            {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+          <div style={{ padding: '32px', textAlign: 'center', color: '#757575', fontSize: '8pt' }}>
+            No notifications
           </div>
         ) : (
-          notifications.map(notification => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {notifications.map(notification => (
               <div
-              key={notification.id}
-              onClick={() => handleNotificationClick(notification)}
-              style={{
-                padding: '12px',
-                borderBottom: '1px solid #f0f0f0',
-                  background: notification.is_read ? 'white' : '#f8fafc',
-                cursor: notification.action_url ? 'pointer' : 'default',
-                position: 'relative'
-              }}
-            >
-              {/* Unread indicator */}
-              {!notification.is_read && (
-                <div style={{
-                  position: 'absolute',
-                  left: '4px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '4px',
-                  height: '4px',
-                  background: '#3b82f6',
-                  borderRadius: '50%'
-                }} />
-              )}
-
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', paddingLeft: '8px' }}>
-                {/* Notification Icon */}
-                <div style={{ fontSize: '12pt', minWidth: '16px' }}>
-                  {getNotificationIcon(notification.type)}
-                </div>
-
-                {/* Notification Content */}
-                <div style={{ flex: '1' }}>
-                  <div style={{ fontSize: '8pt', fontWeight: 'bold', marginBottom: '2px' }}>
-                    {notification.title}
-                  </div>
-                  {notification.message && (
-                    <div style={{ fontSize: '8pt', color: '#6b7280', marginBottom: '4px' }}>
-                      {notification.message}
+                key={notification.id}
+                onClick={() => handleClick(notification)}
+                style={{
+                  padding: '12px',
+                  border: '1px solid #bdbdbd',
+                  background: notification.is_read ? '#ffffff' : '#f0f9ff',
+                  cursor: 'pointer',
+                  transition: '0.12s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = notification.is_read ? '#ffffff' : '#f0f9ff'
+                }}
+              >
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'start' }}>
+                  <span style={{ fontSize: '14pt' }}>{getNotificationIcon(notification.notification_type)}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '9pt', fontWeight: notification.is_read ? '400' : '600', marginBottom: '4px' }}>
+                      {notification.title}
                     </div>
-                  )}
-                  <div style={{ fontSize: '7pt', color: '#9ca3af' }}>
-                    {formatTimeAgo(notification.created_at)}
+                    {notification.message && (
+                      <div style={{ fontSize: '8pt', color: '#757575', marginBottom: '4px' }}>
+                        {notification.message}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '7pt', color: '#9e9e9e' }}>
+                      {new Date(notification.created_at).toLocaleString()}
+                    </div>
                   </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '2px' }}>
                   {!notification.is_read && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        markAsRead(notification.id);
-                      }}
+                    <div
                       style={{
-                        padding: '2px 4px',
-                        fontSize: '7pt',
-                        border: '1px solid #bdbdbd',
-                        background: '#f5f5f5',
-                        color: '#424242',
-                        borderRadius: '0px',
-                        cursor: 'pointer'
+                        width: '8px',
+                        height: '8px',
+                        background: '#0ea5e9',
+                        borderRadius: '50%',
+                        marginTop: '4px'
                       }}
-                    >
-                      ✓
-                    </button>
+                    />
                   )}
-                  {/* Delete hidden due to RLS constraints */}
                 </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
-  );
-};
-
-export default NotificationCenter;
+  )
+}

@@ -32,6 +32,7 @@ import { type LinkedOrg } from '../components/vehicle/LinkedOrganizations';
 import AddOrganizationRelationship from '../components/vehicle/AddOrganizationRelationship';
 import ValuationCitations from '../components/vehicle/ValuationCitations';
 import { PartsQuoteGenerator } from '../components/PartsQuoteGenerator';
+import WiringQueryContextBar from '../components/wiring/WiringQueryContextBar';
 import LiveAuctionBanner from '../components/auction/LiveAuctionBanner';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
@@ -1288,9 +1289,33 @@ const VehicleProfile: React.FC = () => {
               />
             </React.Suspense>
 
-            {/* AI Parts Quote Generator */}
+            {/* Wiring Query Context Bar & AI Parts Quote Generator */}
             {permissions.isOwner && (
               <section className="section">
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ 
+                    fontSize: '10pt', 
+                    fontWeight: 'bold', 
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    ⚡ WIRING QUERY
+                  </div>
+                  <WiringQueryContextBar
+                    vehicleId={vehicle.id}
+                    vehicleInfo={{
+                      year: vehicle.year,
+                      make: vehicle.make,
+                      model: vehicle.model
+                    }}
+                    onQuoteGenerated={(quote) => {
+                      // Quote will be displayed in PartsQuoteGenerator
+                      console.log('Quote generated:', quote)
+                    }}
+                  />
+                </div>
                 <PartsQuoteGenerator 
                   vehicleId={vehicle.id}
                   vehicleInfo={{
