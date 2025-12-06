@@ -5,6 +5,7 @@ import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import { ProfileBalancePill } from './ProfileBalancePill';
 import { UploadStatusBar } from './UploadStatusBar';
 import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
+import AddBrochureUrl from '../AddBrochureUrl';
 import { AppLayoutProvider, usePreventDoubleLayout } from './AppLayoutContext';
 import '../../design-system.css';
 
@@ -157,6 +158,11 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
           </div>
 
           <div className="header-right">
+            {/* Add Brochure URL - Quick paste */}
+            <div style={{ flex: '0 0 auto', marginRight: '8px' }}>
+              <AddBrochureUrl />
+            </div>
+
             {/* Global Search - AI Data Ingestion */}
             <div style={{ flex: '0 0 auto', minWidth: 0, maxWidth: '200px', marginRight: '8px' }}>
               <AIDataIngestionSearch />
