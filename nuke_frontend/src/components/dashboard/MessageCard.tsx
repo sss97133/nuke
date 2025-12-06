@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 
 interface MessageCardProps {
   id: string;
@@ -101,6 +102,48 @@ export const MessageCard: React.FC<MessageCardProps> = ({
   onClick
 }) => {
   const navigate = useNavigate();
+  const [vehicleImageUrl, setVehicleImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (metadata?.vehicle_id) {
+      loadVehicleImage(metadata.vehicle_id);
+    }
+  }, [metadata?.vehicle_id]);
+
+  const loadVehicleImage = async (vehicleId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_images')
+        .select('image_url, thumbnail_url, large_url, variants, is_primary')
+        .eq('vehicle_id', vehicleId)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(1);
+
+      if (error) throw error;
+
+      const image = data?.[0];
+      if (image) {
+        setVehicleImageUrl(image.thumbnail_url || image.variants?.medium || image.variants?.large || image.image_url || null);
+      }
+    } catch (error) {
+      console.error('Error loading vehicle image:', error);
+    }
+  };
+
+  // Determine if this needs yes/no confirmation
+  const needsConfirmation = actions?.some(a => 
+    a.id === 'approve' || a.id === 'reject' || 
+    a.label.toLowerCase() === 'approve' || a.label.toLowerCase() === 'reject'
+  );
+
+  // Get yes/no actions
+  const yesAction = actions?.find(a => 
+    a.id === 'approve' || a.label.toLowerCase() === 'approve' || a.type === 'primary'
+  );
+  const noAction = actions?.find(a => 
+    a.id === 'reject' || a.label.toLowerCase() === 'reject' || a.type === 'danger'
+  );
   
   // Handle loading state
   if (type === 'loading') {
@@ -146,10 +189,10 @@ export const MessageCard: React.FC<MessageCardProps> = ({
         borderBottom: '1px solid #bdbdbd',
         padding: '8px 8px 8px 4px',
         marginBottom: '4px',
-        cursor: onClick || metadata?.vehicle_id || metadata?.action_url ? 'pointer' : 'default',
+        cursor: (onClick || metadata?.vehicle_id || metadata?.action_url) && !needsConfirmation ? 'pointer' : 'default',
         position: 'relative'
       }}
-      onClick={handleClick}
+      onClick={needsConfirmation ? undefined : handleClick}
     >
       {/* Unread indicator */}
       {!is_read && (
@@ -168,27 +211,46 @@ export const MessageCard: React.FC<MessageCardProps> = ({
       )}
 
       {/* Message content */}
-      <div style={{ paddingLeft: is_read ? '0' : '12px' }}>
-        {/* Type header */}
-        <div style={{ color: '#757575', marginBottom: '4px' }}>
-          {'>'} {getMessageIcon(type)} {type}
-        </div>
+      <div style={{ paddingLeft: is_read ? '0' : '12px', display: 'flex', gap: '12px' }}>
+        {/* Vehicle Image */}
+        {vehicleImageUrl && (
+          <div style={{ flex: '0 0 60px', height: '60px', background: '#f0f0f0', border: '1px solid #bdbdbd', overflow: 'hidden' }}>
+            <img
+              src={vehicleImageUrl}
+              alt="Vehicle"
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover'
+              }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none'
+              }}
+            />
+          </div>
+        )}
 
-        {/* Title */}
-        <div
-          style={{
-            color: is_read ? '#424242' : '#000000',
-            fontWeight: is_read ? 'normal' : '600',
-            marginBottom: '4px'
-          }}
-        >
-          {title}
-        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Type header */}
+          <div style={{ color: '#757575', marginBottom: '4px' }}>
+            {'>'} {getMessageIcon(type)} {type}
+          </div>
 
-        {/* Message body */}
-        <div style={{ color: '#424242', marginBottom: '4px', whiteSpace: 'pre-wrap' }}>
-          {message}
-        </div>
+          {/* Title */}
+          <div
+            style={{
+              color: is_read ? '#424242' : '#000000',
+              fontWeight: is_read ? 'normal' : '600',
+              marginBottom: '4px'
+            }}
+          >
+            {title}
+          </div>
+
+          {/* Message body / Data Point */}
+          <div style={{ color: '#424242', marginBottom: '4px', whiteSpace: 'pre-wrap', fontWeight: needsConfirmation ? '500' : 'normal' }}>
+            {message}
+          </div>
 
         {/* Metadata */}
         {metadata && (
@@ -213,8 +275,69 @@ export const MessageCard: React.FC<MessageCardProps> = ({
           created: {formatTimeAgo(created_at)}
         </div>
 
-        {/* Actions */}
-        {actions && actions.length > 0 && (
+        {/* Yes/No Actions */}
+        {needsConfirmation && (yesAction || noAction) ? (
+          <div
+            style={{
+              marginTop: '8px',
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {yesAction && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  yesAction.handler();
+                }}
+                style={{
+                  fontSize: '9pt',
+                  fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                  padding: '6px 16px',
+                  border: '1px solid #059669',
+                  background: '#059669',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                YES
+              </button>
+            )}
+            {noAction && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // If handler accepts a callback for notes, trigger it
+                  // Otherwise call directly
+                  if (noAction.handler.length > 0) {
+                    // Handler expects a callback that provides notes
+                    const notes = prompt('Why are you rejecting this? (Optional)');
+                    if (notes !== null) {
+                      noAction.handler(notes || undefined);
+                    }
+                  } else {
+                    noAction.handler();
+                  }
+                }}
+                style={{
+                  fontSize: '9pt',
+                  fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                  padding: '6px 16px',
+                  border: '1px solid #dc2626',
+                  background: '#ffffff',
+                  color: '#dc2626',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                NO
+              </button>
+            )}
+          </div>
+        ) : actions && actions.length > 0 ? (
           <div
             style={{
               marginTop: '8px',
@@ -251,7 +374,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
               </button>
             ))}
           </div>
-        )}
+        ) : null}
 
         {/* Mark read button */}
         {!is_read && onMarkRead && (

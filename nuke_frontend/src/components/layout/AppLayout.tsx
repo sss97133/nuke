@@ -35,8 +35,24 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [orgNavPath, setOrgNavPath] = useState<string>('/organizations');
+  const [nZeroMenuOpen, setNZeroMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Close menu when clicking outside
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-n-zero-menu]')) {
+        setNZeroMenuOpen(false);
+      }
+    };
+
+    if (nZeroMenuOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [nZeroMenuOpen]);
 
   useEffect(() => {
     // Get initial session
@@ -114,47 +130,104 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       <div className="header-wrapper">
         <div className="header-content">
           <div className="header-left">
-            {/* Desktop Navigation - n-zero as fifth button */}
-            <nav className="main-nav desktop-nav">
-              <Link 
-                to="/dash" 
-                className={`nav-link ${isActivePage('/dash') ? 'active' : ''}`}
+            {/* n-zero Expandable Menu */}
+            <div style={{ position: 'relative' }} data-n-zero-menu>
+              <button
+                onClick={() => setNZeroMenuOpen(!nZeroMenuOpen)}
+                className={`nav-link ${nZeroMenuOpen ? 'active' : ''}`}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  padding: '8px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
               >
-                Home
-              </Link>
-              <Link 
-                to="/vehicles" 
-                className={`nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
-              >
-                Vehicles
-              </Link>
-              <Link 
-                to="/auctions" 
-                className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
-              >
-                Auctions
-              </Link>
-              <Link 
-                to={orgNavPath}
-                className={`nav-link ${isActivePage('/shops') ? 'active' : ''}`}
-              >
-                Organizations
-              </Link>
-              <Link 
-                to="/system-health"
-                className={`nav-link ${isActivePage('/system-health') ? 'active' : ''}`}
-              >
-                System Health
-              </Link>
-              <Link 
-                to="https://n-zero.dev/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`nav-link ${isActivePage('/') ? 'active' : ''}`}
-              >
-                n-zero
-              </Link>
-            </nav>
+                <span>n-zero</span>
+                <span style={{ fontSize: '7pt' }}>{nZeroMenuOpen ? '▼' : '▶'}</span>
+              </button>
+              
+              {nZeroMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    background: '#ffffff',
+                    border: '2px solid #bdbdbd',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '160px',
+                    marginTop: '2px'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Link
+                    to="/vehicles"
+                    className={`nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
+                    style={{
+                      display: 'block',
+                      padding: '8px 12px',
+                      textDecoration: 'none',
+                      borderBottom: '1px solid #f0f0f0'
+                    }}
+                    onClick={() => setNZeroMenuOpen(false)}
+                  >
+                    Vehicles
+                  </Link>
+                  <Link
+                    to="/auctions"
+                    className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
+                    style={{
+                      display: 'block',
+                      padding: '8px 12px',
+                      textDecoration: 'none',
+                      borderBottom: '1px solid #f0f0f0'
+                    }}
+                    onClick={() => setNZeroMenuOpen(false)}
+                  >
+                    Auctions
+                  </Link>
+                  <Link
+                    to={orgNavPath}
+                    className={`nav-link ${isActivePage('/shops') ? 'active' : ''}`}
+                    style={{
+                      display: 'block',
+                      padding: '8px 12px',
+                      textDecoration: 'none',
+                      borderBottom: '1px solid #f0f0f0'
+                    }}
+                    onClick={() => setNZeroMenuOpen(false)}
+                  >
+                    Organizations
+                  </Link>
+                  <a
+                    href="https://n-zero.dev/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="nav-link"
+                    style={{
+                      display: 'block',
+                      padding: '8px 12px',
+                      textDecoration: 'none'
+                    }}
+                    onClick={() => setNZeroMenuOpen(false)}
+                  >
+                    n-zero
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* Home link - separate from menu */}
+            <Link 
+              to="/dash" 
+              className={`nav-link ${isActivePage('/dash') ? 'active' : ''}`}
+            >
+              Home
+            </Link>
           </div>
 
           <div className="header-right">

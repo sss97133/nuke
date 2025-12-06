@@ -160,14 +160,14 @@ export default function SystemHealth() {
 
   const getIssueTypeIcon = (type: string) => {
     switch (type) {
-      case 'rls_violation': return '🔒'
-      case 'ai_confusion': return '🤖'
-      case 'duplicate_vehicle': return '📋'
-      case 'duplicate_image': return '🖼️'
-      case 'image_vehicle_mismatch': return '⚠️'
-      case 'org_vehicle_mismatch': return '🏢'
-      case 'data_quality': return '📊'
-      default: return '❌'
+      case 'rls_violation': return '[RLS]'
+      case 'ai_confusion': return '[AI]'
+      case 'duplicate_vehicle': return '[DUP]'
+      case 'duplicate_image': return '[IMG]'
+      case 'image_vehicle_mismatch': return '[MATCH]'
+      case 'org_vehicle_mismatch': return '[ORG]'
+      case 'data_quality': return '[DATA]'
+      default: return '[ERR]'
     }
   }
 
@@ -221,7 +221,7 @@ export default function SystemHealth() {
         <div style={{ padding: '32px', textAlign: 'center', color: '#757575' }}>Loading...</div>
       ) : issues.length === 0 ? (
         <div style={{ padding: '32px', textAlign: 'center', color: '#757575' }}>
-          No issues found. System is healthy! ✅
+          No issues found. System is healthy.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -260,7 +260,7 @@ export default function SystemHealth() {
                   )}
                   {issue.suggested_fix && (
                     <div style={{ fontSize: '7pt', color: '#059669', marginTop: '4px', fontStyle: 'italic' }}>
-                      💡 {issue.suggested_fix}
+                      FIX: {issue.suggested_fix}
                     </div>
                   )}
                   <div style={{ fontSize: '7pt', color: '#9e9e9e', marginTop: '4px' }}>

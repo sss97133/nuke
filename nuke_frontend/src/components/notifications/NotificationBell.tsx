@@ -65,7 +65,7 @@ export default function NotificationBell() {
         }}
         title="Notifications"
       >
-        <span style={{ fontSize: '16pt' }}>🔔</span>
+        <span style={{ fontSize: '9pt', fontWeight: '600' }}>NOTIFICATIONS</span>
         {unreadCount > 0 && (
           <span
             style={{
