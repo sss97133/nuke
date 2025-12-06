@@ -34,6 +34,7 @@ serve(async (req) => {
     console.log(`Tier 1 analysis: ${image_id}`)
 
     let analysis = null
+    let vehicleDetection = null
     let provider = 'none'
     let usageStats = null
     
@@ -75,9 +76,11 @@ serve(async (req) => {
     }
 
     // 3. Try OpenAI if others failed
+    let openaiKeyForVehicle: string | null = null
     if (!analysis) {
       const openaiKeyResult = await getUserApiKey(supabase, user_id || null, 'openai', 'OPENAI_API_KEY')
       if (openaiKeyResult.apiKey) {
+        openaiKeyForVehicle = openaiKeyResult.apiKey
         try {
           console.log(`Using OpenAI (${openaiKeyResult.source})`)
           const result = await runTier1AnalysisOpenAI(image_url, estimated_resolution || 'medium', openaiKeyResult.apiKey)
@@ -88,6 +91,35 @@ serve(async (req) => {
           console.error('OpenAI analysis failed:', e)
           errors.push(`OpenAI: ${e.message}`)
         }
+      }
+    }
+
+    // ✅ Fallback lightweight vehicle detection to populate ai_detected_vehicle / angle
+    if (!openaiKeyForVehicle) {
+      const openaiKeyResult = await getUserApiKey(supabase, user_id || null, 'openai', 'OPENAI_API_KEY')
+      if (openaiKeyResult.apiKey) {
+        openaiKeyForVehicle = openaiKeyResult.apiKey
+      }
+    }
+    if (openaiKeyForVehicle) {
+      try {
+        vehicleDetection = await runLightweightVehicleDetection(image_url, openaiKeyForVehicle)
+        console.log('🚗 Lightweight vehicle detection:', vehicleDetection)
+      } catch (e) {
+        console.warn('Lightweight vehicle detection failed (non-blocking):', e.message || e)
+      }
+    }
+
+    // 🔎 VIN / sticker text extraction (non-blocking, best-effort)
+    let vinExtraction = null
+    if (openaiKeyForVehicle) {
+      try {
+        vinExtraction = await runVinStickerExtraction(image_url, openaiKeyForVehicle)
+        if (vinExtraction?.vin) {
+          console.log('🔍 VIN detected in Tier1:', vinExtraction.vin)
+        }
+      } catch (e) {
+        console.warn('VIN extraction failed (non-blocking):', e.message || e)
       }
     }
 
@@ -200,8 +232,48 @@ serve(async (req) => {
         },
         image_category: analysis.category || 'exterior',
         category: analysis.category || 'general',
-        ai_processing_status: 'completed',
+        ai_processing_status: 'complete',
         ai_processing_completed_at: new Date().toISOString()
+      }
+      
+      // Map lightweight detection into image columns if present
+      if (vehicleDetection?.is_vehicle && vehicleDetection.vehicle) {
+        updateData.ai_detected_vehicle = {
+          year: vehicleDetection.vehicle.year ?? null,
+          make: vehicleDetection.vehicle.make ?? null,
+          model: vehicleDetection.vehicle.model ?? null,
+          confidence: vehicleDetection.vehicle.confidence ?? null,
+          ...(vinExtraction?.vin ? { vin: vinExtraction.vin } : {})
+        }
+      }
+      if (vehicleDetection?.angle) {
+        updateData.ai_detected_angle = vehicleDetection.angle
+        updateData.ai_detected_angle_confidence = vehicleDetection.angle_confidence ?? null
+      }
+      // If VIN only (no vehicle detection), still store in metadata
+      if (!updateData.ai_detected_vehicle && vinExtraction?.vin) {
+        updateData.ai_detected_vehicle = {
+          vin: vinExtraction.vin,
+          confidence: vinExtraction.vin_confidence ?? null,
+          make: null,
+          model: null,
+          year: null
+        }
+      }
+      // Store detection payload for downstream grouping/QA
+      if (vehicleDetection) {
+        const metadata = currentImage?.ai_scan_metadata || {}
+        updateData.ai_scan_metadata = {
+          ...metadata,
+          tier_1_analysis: analysis,
+          processing_tier_reached: 1,
+          scanned_at: new Date().toISOString(),
+          provider: provider,
+          usage: usageStats,
+          vehicle_detection: vehicleDetection,
+          ...(vinExtraction ? { vin_extraction: vinExtraction } : {}),
+          ...(spidData ? { spid: spidData } : {})
+        }
       }
       
       if (estimated_resolution) {
@@ -487,4 +559,98 @@ function processAnalysisResult(jsonString: string, estimatedResolution: string) 
   )
   
   return result
+}
+
+// Minimal, cheap vehicle/angle detection to populate ai_detected_vehicle and ai_detected_angle
+async function runLightweightVehicleDetection(imageUrl: string, apiKey: string) {
+  const prompt = `Analyze this image quickly and return ONLY a JSON object (no markdown, no explanation):
+{
+  "is_vehicle": boolean,
+  "vehicle": {
+    "year": number or null,
+    "make": string or null,
+    "model": string or null,
+    "confidence": 0.0-1.0
+  },
+  "angle": "front" | "front_three_quarter" | "rear" | "rear_three_quarter" | "side" | "interior" | "engine_bay" | "undercarriage" | "detail" | "unknown",
+  "angle_confidence": 0.0-1.0,
+  "vin_visible": boolean,
+  "vin": string or null
+}`
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 300,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: imageUrl } }
+          ]
+        }
+      ]
+    })
+  })
+
+  if (!response.ok) {
+    const txt = await response.text()
+    throw new Error(`OpenAI vehicle detection error: ${response.status} - ${txt}`)
+  }
+
+  const data = await response.json()
+  const content = data.choices?.[0]?.message?.content
+  if (!content) throw new Error('No content returned from vehicle detection')
+  return JSON.parse(content)
+}
+
+// Extract VIN / sticker fields quickly (best-effort, cheap)
+async function runVinStickerExtraction(imageUrl: string, apiKey: string) {
+  const prompt = `You are extracting VIN and label data from vehicle stickers. Return ONLY strict JSON (no markdown):
+{
+  "vin": string or null,
+  "vin_confidence": 0.0-1.0 or null,
+  "fields": [
+    { "key": "label", "value": string, "confidence": 0.0-1.0 }
+  ]
+}
+- If no VIN is visible, set vin=null.
+- Keep field values short (<=120 chars).`
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 220,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: imageUrl } }
+          ]
+        }
+      ]
+    })
+  })
+
+  if (!response.ok) {
+    const txt = await response.text()
+    throw new Error(`OpenAI VIN extraction error: ${response.status} - ${txt}`)
+  }
+
+  const data = await response.json()
+  const content = data.choices?.[0]?.message?.content
+  if (!content) throw new Error('No content returned from VIN extraction')
+  return JSON.parse(content)
 }
