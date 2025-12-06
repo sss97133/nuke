@@ -5,7 +5,7 @@ import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import { ProfileBalancePill } from './ProfileBalancePill';
 import { UploadStatusBar } from './UploadStatusBar';
 import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
-import NotificationBell from '../notifications/NotificationBell';
+import NotificationCenter from '../notifications/NotificationCenter';
 import { AppLayoutProvider, usePreventDoubleLayout } from './AppLayoutContext';
 import '../../design-system.css';
 
@@ -36,6 +36,8 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   const [userProfile, setUserProfile] = useState<any>(null);
   const [orgNavPath, setOrgNavPath] = useState<string>('/organizations');
   const [nZeroMenuOpen, setNZeroMenuOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -61,6 +63,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       setLoading(false);
       if (session?.user) {
         fetchUserProfile(session.user.id);
+        loadUnreadCount(session.user.id);
       }
     });
 
@@ -71,8 +74,10 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         setLoading(false);
         if (session?.user) {
           fetchUserProfile(session.user.id);
+          loadUnreadCount(session.user.id);
         } else {
           setUserProfile(null);
+          setUnreadNotifications(0);
         }
       }
     );
@@ -84,6 +89,22 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   useEffect(() => {
     setOrgNavPath('/organizations');
   }, [session]);
+
+  useEffect(() => {
+    // Subscribe to notification changes for badge updates
+    if (!session?.user?.id) return;
+    const channel = supabase
+      .channel('notification_badge')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_notifications', filter: `user_id=eq.${session.user.id}` },
+        () => loadUnreadCount(session.user.id)
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -98,6 +119,19 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
+    }
+  };
+
+  const loadUnreadCount = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('get_unread_notification_count', {
+        p_user_id: userId
+      });
+      if (error) throw error;
+      setUnreadNotifications(data || 0);
+    } catch (error) {
+      console.error('Error loading unread notifications:', error);
+      setUnreadNotifications(0);
     }
   };
 
@@ -241,17 +275,15 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
               <GlobalUploadIndicator />
             </div>
 
-            {/* Notifications */}
-            {session && (
-              <div style={{ flex: '0 0 auto', marginRight: '8px' }}>
-                <NotificationBell />
-              </div>
-            )}
-
             {/* Profile Balance Capsule - Combined balance + profile + navigation */}
             <div style={{ flex: '0 0 auto' }}>
               {session ? (
-                <ProfileBalancePill session={session} userProfile={userProfile} />
+                <ProfileBalancePill
+                  session={session}
+                  userProfile={userProfile}
+                  unreadCount={unreadNotifications}
+                  onOpenNotifications={() => setShowNotifications(true)}
+                />
               ) : (
                 <Link to="/login" className="button button-primary" style={{ border: '2px solid #0ea5e9', transition: 'all 0.12s ease' }}>
                   Login
@@ -316,6 +348,9 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
           {children}
         </div>
       </main>
+
+      {/* Notifications Flyout */}
+      <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
 
       {/* Footer */}
       <footer className="app-footer">

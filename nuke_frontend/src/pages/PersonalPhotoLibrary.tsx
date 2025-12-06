@@ -500,6 +500,10 @@ export const PersonalPhotoLibrary: React.FC = () => {
     }
   };
 
+  const [vehicleSectionCollapsed, setVehicleSectionCollapsed] = useState(false);
+  const [anglesSectionCollapsed, setAnglesSectionCollapsed] = useState(false);
+  const [vehicleProfilesCollapsed, setVehicleProfilesCollapsed] = useState(false);
+
   const handleAiStatusClick = () => {
     const total =
       counts.aiComplete +
@@ -743,130 +747,163 @@ export const PersonalPhotoLibrary: React.FC = () => {
         <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
           <div
             className="text text-small text-muted"
-            style={{ marginBottom: '8px', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={handleVehicleStatusClick}
+            style={{ marginBottom: '8px', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => setVehicleSectionCollapsed(!vehicleSectionCollapsed)}
           >
-            VEHICLE
+            <span>VEHICLE</span>
+            <span style={{ fontSize: '9pt' }}>{vehicleSectionCollapsed ? '▼' : '▲'}</span>
           </div>
-          {[
-            { key: 'vehicle_found', label: 'Detected', count: counts.vehicleFound },
-            { key: 'no_vehicle', label: 'Not Found', count: counts.noVehicle }
-          ].map(item => (
-            <div
-              key={item.key}
-              onClick={() => setActiveFilter(activeFilter === item.key ? null : item.key)}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '4px 6px',
-                marginBottom: '2px',
-                cursor: 'pointer',
-                background: activeFilter === item.key ? 'var(--grey-200)' : 'transparent',
-                border: activeFilter === item.key ? '1px solid var(--border-medium)' : '1px solid transparent'
-              }}
-            >
-              <span className="text text-small">{item.label}</span>
-              <span className="text text-small font-bold">{item.count.toLocaleString()}</span>
-            </div>
-          ))}
+          {!vehicleSectionCollapsed && (
+            <>
+              <div
+                className="text text-small text-muted"
+                style={{ marginBottom: '4px', cursor: 'pointer' }}
+                onClick={handleVehicleStatusClick}
+              >
+                Tap to see detection summary
+              </div>
+              {[
+                { key: 'vehicle_found', label: 'Detected', count: counts.vehicleFound },
+                { key: 'no_vehicle', label: 'Not Found', count: counts.noVehicle }
+              ].map(item => (
+                <div
+                  key={item.key}
+                  onClick={() => setActiveFilter(activeFilter === item.key ? null : item.key)}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    padding: '4px 6px',
+                    marginBottom: '2px',
+                    cursor: 'pointer',
+                    background: activeFilter === item.key ? 'var(--grey-200)' : 'transparent',
+                    border: activeFilter === item.key ? '1px solid var(--border-medium)' : '1px solid transparent'
+                  }}
+                >
+                  <span className="text text-small">{item.label}</span>
+                  <span className="text text-small font-bold">{item.count.toLocaleString()}</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Angles */}
         <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
           <div
             className="text text-small text-muted"
-            style={{ marginBottom: '8px', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline' }}
-            onClick={handleAngleStatusClick}
+            style={{ marginBottom: '8px', letterSpacing: '0.5px', cursor: 'pointer', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => setAnglesSectionCollapsed(!anglesSectionCollapsed)}
           >
-            ANGLE
+            <span>ANGLE</span>
+            <span style={{ fontSize: '9pt' }}>{anglesSectionCollapsed ? '▼' : '▲'}</span>
           </div>
-          {[
-            { key: 'angle_front', label: 'Front', count: counts.anglesFront },
-            { key: 'angle_rear', label: 'Rear', count: counts.anglesRear },
-            { key: 'angle_side', label: 'Side', count: counts.anglesSide },
-            { key: 'angle_interior', label: 'Interior', count: counts.anglesInterior },
-            { key: 'angle_engine', label: 'Engine Bay', count: counts.anglesEngineBay },
-            { key: 'angle_detail', label: 'Detail', count: counts.anglesDetail }
-          ].map(item => (
-            <div
-              key={item.key}
-              onClick={() => setActiveFilter(activeFilter === item.key ? null : item.key)}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '4px 6px',
-                marginBottom: '2px',
-                cursor: item.count > 0 ? 'pointer' : 'default',
-                opacity: item.count === 0 ? 0.4 : 1,
-                background: activeFilter === item.key ? 'var(--grey-200)' : 'transparent',
-                border: activeFilter === item.key ? '1px solid var(--border-medium)' : '1px solid transparent'
-              }}
-            >
-              <span className="text text-small">{item.label}</span>
-              <span className="text text-small font-bold">{item.count.toLocaleString()}</span>
-            </div>
-          ))}
+          {!anglesSectionCollapsed && (
+            <>
+              <div
+                className="text text-small text-muted"
+                style={{ marginBottom: '4px', cursor: 'pointer' }}
+                onClick={handleAngleStatusClick}
+              >
+                Tap to see angle coverage summary
+              </div>
+              {[
+                { key: 'angle_front', label: 'Front', count: counts.anglesFront },
+                { key: 'angle_rear', label: 'Rear', count: counts.anglesRear },
+                { key: 'angle_side', label: 'Side', count: counts.anglesSide },
+                { key: 'angle_interior', label: 'Interior', count: counts.anglesInterior },
+                { key: 'angle_engine', label: 'Engine Bay', count: counts.anglesEngineBay },
+                { key: 'angle_detail', label: 'Detail', count: counts.anglesDetail }
+              ].map(item => (
+                <div
+                  key={item.key}
+                  onClick={() => setActiveFilter(activeFilter === item.key ? null : item.key)}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    padding: '4px 6px',
+                    marginBottom: '2px',
+                    cursor: item.count > 0 ? 'pointer' : 'default',
+                    opacity: item.count === 0 ? 0.4 : 1,
+                    background: activeFilter === item.key ? 'var(--grey-200)' : 'transparent',
+                    border: activeFilter === item.key ? '1px solid var(--border-medium)' : '1px solid transparent'
+                  }}
+                >
+                  <span className="text text-small">{item.label}</span>
+                  <span className="text text-small font-bold">{item.count.toLocaleString()}</span>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Vehicle Profiles - Work Table */}
         <div style={{ padding: '12px', borderBottom: '1px solid var(--border-light)' }}>
-          <div className="text text-small text-muted" style={{ marginBottom: '6px', letterSpacing: '0.5px' }}>
-            VEHICLE PROFILES
+          <div
+            className="text text-small text-muted"
+            style={{ marginBottom: '6px', letterSpacing: '0.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            onClick={() => setVehicleProfilesCollapsed(!vehicleProfilesCollapsed)}
+          >
+            <span>VEHICLE PROFILES</span>
+            <span style={{ fontSize: '9pt' }}>{vehicleProfilesCollapsed ? '▼' : '▲'}</span>
           </div>
-          <input
-            type="text"
-            placeholder="Filter..."
-            value={vehicleSearch}
-            onChange={(e) => setVehicleSearch(e.target.value)}
-            className="form-input"
-            style={{ width: '100%', fontSize: '8pt', marginBottom: '6px', padding: '4px 6px' }}
-          />
-          <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
-            {filteredVehicles.length === 0 ? (
-              <div className="text text-small text-muted">
-                No matching vehicles
-              </div>
-            ) : (
-              filteredVehicles.map(v => {
-                const label = `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Untitled';
-                const isActive = activeVehicleId === v.id;
-                return (
-                  <div
-                    key={v.id}
-                    onClick={() => {
-                      if (selectedPhotos.size > 0) {
-                        setSubmitVehicleId(v.id);
-                        setShowSubmitWizard(true);
-                      } else {
-                        setActiveVehicleId(isActive ? null : v.id);
-                      }
-                    }}
-                    style={{
-                      padding: '4px 6px',
-                      marginBottom: '2px',
-                      cursor: 'pointer',
-                      background: isActive ? 'var(--grey-200)' : 'transparent',
-                      border: isActive ? '1px solid var(--border-medium)' : '1px solid transparent',
-                      fontSize: '8pt'
-                    }}
-                  >
-                    {label}
+          {!vehicleProfilesCollapsed && (
+            <>
+              <input
+                type="text"
+                placeholder="Filter..."
+                value={vehicleSearch}
+                onChange={(e) => setVehicleSearch(e.target.value)}
+                className="form-input"
+                style={{ width: '100%', fontSize: '8pt', marginBottom: '6px', padding: '4px 6px' }}
+              />
+              <div style={{ maxHeight: '160px', overflowY: 'auto' }}>
+                {filteredVehicles.length === 0 ? (
+                  <div className="text text-small text-muted">
+                    No matching vehicles
                   </div>
-                );
-              })
-            )}
-          </div>
-          {activeVehicleId && selectedPhotos.size > 0 && (
-            <button
-              onClick={() => {
-                setSubmitVehicleId(activeVehicleId);
-                setShowSubmitWizard(true);
-              }}
-              className="button button-primary"
-              style={{ width: '100%', marginTop: '6px', fontSize: '8pt', padding: '4px 6px' }}
-            >
-              SUBMIT TO PROFILE
-            </button>
+                ) : (
+                  filteredVehicles.map(v => {
+                    const label = `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Untitled';
+                    const isActive = activeVehicleId === v.id;
+                    return (
+                      <div
+                        key={v.id}
+                        onClick={() => {
+                          if (selectedPhotos.size > 0) {
+                            setSubmitVehicleId(v.id);
+                            setShowSubmitWizard(true);
+                          } else {
+                            setActiveVehicleId(isActive ? null : v.id);
+                          }
+                        }}
+                        style={{
+                          padding: '4px 6px',
+                          marginBottom: '2px',
+                          cursor: 'pointer',
+                          background: isActive ? 'var(--grey-200)' : 'transparent',
+                          border: isActive ? '1px solid var(--border-medium)' : '1px solid transparent',
+                          fontSize: '8pt'
+                        }}
+                      >
+                        {label}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {activeVehicleId && selectedPhotos.size > 0 && (
+                <button
+                  onClick={() => {
+                    setSubmitVehicleId(activeVehicleId);
+                    setShowSubmitWizard(true);
+                  }}
+                  className="button button-primary"
+                  style={{ width: '100%', marginTop: '6px', fontSize: '8pt', padding: '4px 6px' }}
+                >
+                  SUBMIT TO PROFILE
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -1056,29 +1093,44 @@ export const PersonalPhotoLibrary: React.FC = () => {
         </div>
 
         {/* Photo Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', background: 'var(--grey-100)' }}>
-          {uploading ? (
-            <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-              <div className="text font-bold" style={{ fontSize: '12pt', marginBottom: '16px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', background: 'var(--grey-100)', position: 'relative' }}>
+          {uploading && (
+            <div
+              style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 5,
+                padding: '8px 12px',
+                background: 'var(--white)',
+                borderBottom: '1px solid var(--border-light)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}
+            >
+              <div className="text font-bold" style={{ fontSize: '11pt' }}>
                 Uploading {uploadProgress.current} / {uploadProgress.total}
               </div>
-              <div style={{
-                width: '100%',
-                maxWidth: '500px',
-                margin: '0 auto',
-                height: '24px',
-                background: 'var(--grey-200)',
-                border: '2px inset var(--border-medium)'
-              }}>
-                <div style={{
-                  width: `${(uploadProgress.current / uploadProgress.total) * 100}%`,
-                  height: '100%',
-                  background: 'var(--primary)',
-                  transition: 'width 0.2s'
-                }} />
+              <div
+                style={{
+                  width: '100%',
+                  height: '14px',
+                  background: 'var(--grey-200)',
+                  border: '1px solid var(--border-medium)'
+                }}
+              >
+                <div
+                  style={{
+                    width: `${uploadProgress.total ? (uploadProgress.current / uploadProgress.total) * 100 : 0}%`,
+                    height: '100%',
+                    background: 'var(--primary)',
+                    transition: 'width 0.2s'
+                  }}
+                />
               </div>
             </div>
-          ) : displayPhotos.length === 0 ? (
+          )}
+          {displayPhotos.length === 0 ? (
             <div style={{ 
               padding: '80px 20px', 
               textAlign: 'center',

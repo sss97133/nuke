@@ -16,6 +16,8 @@ import { supabase } from '../../lib/supabase';
 interface Props {
   session: any;
   userProfile: any;
+  unreadCount?: number;
+  onOpenNotifications?: () => void;
 }
 
 interface CashBalance {
@@ -23,7 +25,7 @@ interface CashBalance {
   pending_cents: number;
 }
 
-export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) => {
+export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unreadCount = 0, onOpenNotifications }) => {
   const [balance, setBalance] = useState<CashBalance | null>(null);
   const [expanded, setExpanded] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
@@ -166,6 +168,21 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
         }}
         onClick={() => setExpanded(!expanded)}
       >
+        {/* Notification badge on capsule */}
+        {unreadCount > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '-4px',
+              right: '-4px',
+              width: '10px',
+              height: '10px',
+              borderRadius: '999px',
+              background: '#dc2626',
+              boxShadow: '0 0 0 2px #1a1a1a'
+            }}
+          />
+        )}
         {/* Balance (left side) - Always show when expanded */}
         {expanded && (
           <div
@@ -249,25 +266,53 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile }) =>
               right: `${dropdownPosition.right}px`
             }}
           >
-          {[
-            { label: 'Capsule', action: '/capsule' },
-            { label: 'Profile', action: `/profile/${session?.user?.id || ''}` },
-            { label: 'Vehicles', action: '/vehicles' },
-            { label: 'Auctions', action: '/auctions' },
-            { label: 'Organizations', action: '/organizations' },
-            { label: 'Photos', action: '/capsule?tab=photos' },
-            ...(isAdmin ? [{ label: 'Admin', action: '/admin' }] : [])
-          ].map((item, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                navigate(item.action);
-                setShowMenu(false);
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+              <button
+                onClick={() => {
+                  if (onOpenNotifications) {
+                    onOpenNotifications();
+                  } else {
+                    navigate('/notifications');
+                  }
+                  setShowMenu(false);
+                }}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}
+              >
+                <span>Notifications</span>
+                {unreadCount > 0 && (
+                  <span
+                    style={{
+                      background: '#dc2626',
+                      color: '#ffffff',
+                      borderRadius: '12px',
+                      padding: '2px 8px',
+                      fontSize: '10px',
+                      minWidth: '24px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              {[
+                { label: 'Capsule', action: '/capsule' },
+                { label: 'Profile', action: `/profile/${session?.user?.id || ''}` },
+                { label: 'Vehicles', action: '/vehicles' },
+                { label: 'Auctions', action: '/auctions' },
+                { label: 'Organizations', action: '/organizations' },
+                { label: 'Photos', action: '/capsule?tab=photos' },
+                ...(isAdmin ? [{ label: 'Admin', action: '/admin' }] : [])
+              ].map((item, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    navigate(item.action);
+                    setShowMenu(false);
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
           </div>
         </>
       )}
