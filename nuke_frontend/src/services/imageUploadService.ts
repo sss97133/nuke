@@ -14,6 +14,9 @@ export interface ImageUploadResult {
   success: boolean;
   imageId?: string;
   imageUrl?: string;
+  duplicateOf?: string;
+  duplicateType?: 'exact' | 'perceptual';
+  message?: string;
   error?: string;
 }
 
@@ -74,6 +77,113 @@ export class ImageUploadService {
   }
 
   /**
+   * Compute a SHA-256 content hash for exact duplicate detection
+   */
+  private static async computeFileHash(file: File): Promise<string> {
+    const arrayBuffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  /**
+   * Load an image element from a File (for perceptual hashing)
+   */
+  private static loadImageElement(file: File): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(img);
+      };
+      img.onerror = (err) => {
+        URL.revokeObjectURL(objectUrl);
+        reject(err);
+      };
+      img.src = objectUrl;
+    });
+  }
+
+  /**
+   * Convert an image to grayscale pixel matrix at a target size
+   */
+  private static getGrayscaleMatrix(
+    img: HTMLImageElement,
+    width: number,
+    height: number
+  ): number[] {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return [];
+    ctx.drawImage(img, 0, 0, width, height);
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    const grayscale: number[] = [];
+    for (let i = 0; i < data.length; i += 4) {
+      // luminance
+      const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      grayscale.push(gray);
+    }
+    return grayscale;
+  }
+
+  /**
+   * Convert bitstring to hex
+   */
+  private static bitsToHex(bits: string): string {
+    let hex = '';
+    for (let i = 0; i < bits.length; i += 4) {
+      const chunk = bits.slice(i, i + 4);
+      hex += parseInt(chunk, 2).toString(16);
+    }
+    return hex;
+  }
+
+  /**
+   * Perceptual hash (aHash) 8x8 for near-duplicate detection
+   */
+  private static computeAverageHash(img: HTMLImageElement): string {
+    const size = 8;
+    const pixels = this.getGrayscaleMatrix(img, size, size);
+    if (pixels.length === 0) return '';
+    const avg = pixels.reduce((sum, val) => sum + val, 0) / pixels.length;
+    const bits = pixels.map((p) => (p >= avg ? '1' : '0')).join('');
+    return this.bitsToHex(bits);
+  }
+
+  /**
+   * Difference hash (dHash) 8x8 for fast perceptual matching
+   */
+  private static computeDifferenceHash(img: HTMLImageElement): string {
+    const width = 9;
+    const height = 8;
+    const pixels = this.getGrayscaleMatrix(img, width, height);
+    if (pixels.length === 0) return '';
+    const bits: string[] = [];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width - 1; x++) {
+        const left = pixels[y * width + x];
+        const right = pixels[y * width + x + 1];
+        bits.push(left > right ? '1' : '0');
+      }
+    }
+    return this.bitsToHex(bits.join(''));
+  }
+
+  /**
+   * Compute perceptual hashes (aHash + dHash)
+   */
+  private static async computePerceptualHashes(file: File) {
+    const img = await this.loadImageElement(file);
+    const phash = this.computeAverageHash(img);
+    const dhash = this.computeDifferenceHash(img);
+    return { phash, dhash };
+  }
+
+  /**
    * Upload a single image to vehicle OR personal library
    * @param vehicleId - Vehicle ID (optional - if not provided, goes to personal library)
    * @param file - Image file to upload
@@ -118,6 +228,88 @@ export class ImageUploadService {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
         return { success: false, error: 'Please login to upload images' };
+      }
+
+      // Compute hashes up front for dedupe (use original file for stability)
+      let fileHash: string | null = null;
+      let perceptualHash: string | null = null;
+      let differenceHash: string | null = null;
+
+      try {
+        fileHash = await this.computeFileHash(file);
+      } catch (err) {
+        console.warn('Failed to compute file hash (non-blocking):', err);
+      }
+
+      if (isImage) {
+        try {
+          const hashes = await this.computePerceptualHashes(file);
+          perceptualHash = hashes.phash || null;
+          differenceHash = hashes.dhash || null;
+        } catch (err) {
+          console.warn('Failed to compute perceptual hash (non-blocking):', err);
+        }
+      }
+
+      // Lightweight duplicate check before storage (avoid double uploads)
+      let duplicateOf: string | null = null;
+      let duplicateType: 'exact' | 'perceptual' | null = null;
+
+      // Exact duplicates per vehicle (or personal library)
+      if (fileHash) {
+        try {
+          const exactQuery = supabase
+            .from('vehicle_images')
+            .select('id, image_url, vehicle_id')
+            .eq('file_hash', fileHash)
+            .limit(1);
+
+          if (vehicleId) {
+            exactQuery.eq('vehicle_id', vehicleId);
+          } else {
+            exactQuery.is('vehicle_id', null).eq('user_id', user.id);
+          }
+
+          const { data: exactDup, error: exactErr } = await exactQuery.maybeSingle();
+          if (exactErr && exactErr.code !== 'PGRST116') {
+            console.warn('Exact duplicate check failed (non-blocking):', exactErr);
+          } else if (exactDup) {
+            duplicateOf = exactDup.id;
+            duplicateType = 'exact';
+            return {
+              success: true,
+              imageId: exactDup.id,
+              imageUrl: exactDup.image_url,
+              duplicateOf: exactDup.id,
+              duplicateType: 'exact',
+              message: 'Exact duplicate detected; reusing existing image'
+            };
+          }
+        } catch (err) {
+          console.warn('Exact duplicate check failed (non-blocking):', err);
+        }
+      }
+
+      // Perceptual duplicates (same vehicle only)
+      if (!duplicateOf && isImage && perceptualHash && vehicleId) {
+        try {
+          const { data: perceptualDup, error: phErr } = await supabase
+            .from('vehicle_images')
+            .select('id')
+            .eq('vehicle_id', vehicleId)
+            .eq('perceptual_hash', perceptualHash)
+            .limit(1)
+            .maybeSingle();
+
+          if (phErr && phErr.code !== 'PGRST116') {
+            console.warn('Perceptual duplicate check failed (non-blocking):', phErr);
+          } else if (perceptualDup) {
+            duplicateOf = perceptualDup.id;
+            duplicateType = 'perceptual';
+          }
+        } catch (err) {
+          console.warn('Perceptual duplicate check failed (non-blocking):', err);
+        }
       }
 
       // Extract EXIF metadata for images only (use original file for EXIF, not compressed)
@@ -336,6 +528,11 @@ export class ImageUploadService {
           category: category,
           file_size: fileToUpload.size, // Use compressed file size
           mime_type: fileToUpload.type,
+          file_hash: fileHash,
+          perceptual_hash: perceptualHash,
+          dhash: differenceHash,
+          duplicate_of: duplicateOf,
+          is_duplicate: Boolean(duplicateOf),
           is_primary: count === 0 && !isDocument, // First image becomes primary (not documents)
           is_sensitive: false, // Required field
           taken_at: photoDate.toISOString(), // Use actual photo date for timeline
@@ -351,7 +548,7 @@ export class ImageUploadService {
             reasoning: docDetection.reasoning,
             detected_at: new Date().toISOString()
           }) : null,
-          ai_processing_status: 'pending', // Queue for AI analysis
+          ai_processing_status: duplicateOf ? 'duplicate_skipped' : 'pending', // Queue for AI analysis unless duplicate
           organization_status: vehicleId ? 'organized' : 'unorganized' // Auto-organized if linked to vehicle
         })
         .select('id')
@@ -423,7 +620,7 @@ export class ImageUploadService {
 
       // 🤖 TRIGGER AI ANALYSIS AUTOMATICALLY ON UPLOAD
       // This MUST trigger for every image upload - no exceptions
-      if (isImage && dbResult?.id) {
+      if (isImage && dbResult?.id && !duplicateOf) {
         console.log('🚀 Triggering AI analysis for uploaded image:', dbResult.id);
         
         // Emit event for UI to track
@@ -535,6 +732,8 @@ export class ImageUploadService {
         }).catch(err => {
           console.error('❌ Fallback analysis failed:', err);
         });
+      } else if (isImage && dbResult?.id && duplicateOf) {
+        console.log('⏩ Skipping AI analysis for duplicate image; linked to existing asset', { imageId: dbResult.id, duplicateOf });
       }
 
       return {
