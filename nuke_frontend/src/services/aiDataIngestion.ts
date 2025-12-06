@@ -125,6 +125,16 @@ class AIDataIngestionService {
     
     // Check for URL
     if (trimmed.match(/^https?:\/\//i) || trimmed.match(/^www\./i)) {
+      // Skip PDF/document URLs - these should be handled by AddBrochureUrl component
+      if (trimmed.includes('.pdf') || 
+          trimmed.includes('/pdf') || 
+          trimmed.includes('catalog') || 
+          trimmed.includes('manual') || 
+          trimmed.includes('tds') ||
+          trimmed.includes('document') ||
+          trimmed.includes('brochure')) {
+        return 'search'; // Treat as search to avoid scraping
+      }
       return 'url';
     }
     
