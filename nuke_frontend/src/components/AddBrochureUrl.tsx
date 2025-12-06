@@ -10,7 +10,15 @@ const AddBrochureUrl: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent AI ingestion from intercepting
     if (!url.trim()) return;
+
+    // Validate it's a PDF URL
+    const urlLower = url.toLowerCase();
+    if (!urlLower.includes('.pdf') && !urlLower.includes('pdf') && !urlLower.includes('document')) {
+      showToast('Please paste a PDF document URL', 'error');
+      return;
+    }
 
     setUploading(true);
     try {
@@ -137,15 +145,7 @@ const AddBrochureUrl: React.FC = () => {
           e.currentTarget.style.borderColor = 'var(--border)';
         }}
       >
-        <img
-          src="/icon-document.svg"
-          alt="Add"
-          style={{ width: '16px', height: '16px' }}
-          onError={(e) => {
-            // Fallback if icon doesn't exist
-            e.currentTarget.style.display = 'none';
-          }}
-        />
+        <span style={{ fontSize: '10pt' }}>📄</span>
         <span style={{ fontSize: '8pt', whiteSpace: 'nowrap' }}>Add Docs</span>
       </div>
     );
@@ -154,6 +154,7 @@ const AddBrochureUrl: React.FC = () => {
   return (
     <form
       onSubmit={handleSubmit}
+      onClick={(e) => e.stopPropagation()}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -162,7 +163,9 @@ const AddBrochureUrl: React.FC = () => {
         border: '2px solid var(--border)',
         padding: '4px 6px',
         height: '28px',
-        transition: '0.12s'
+        transition: '0.12s',
+        position: 'relative',
+        zIndex: 1000
       }}
       onBlur={(e) => {
         // Close if clicking outside
@@ -175,7 +178,12 @@ const AddBrochureUrl: React.FC = () => {
         type="url"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder="Paste URL..."
+        onPaste={(e) => {
+          // Stop propagation to prevent AI ingestion from intercepting
+          e.stopPropagation();
+        }}
+        onClick={(e) => e.stopPropagation()}
+        placeholder="Paste PDF URL..."
         autoFocus
         disabled={uploading}
         style={{
