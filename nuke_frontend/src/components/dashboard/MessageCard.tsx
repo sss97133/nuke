@@ -404,6 +404,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
         )}
       </div>
     </div>
+    </div>
   );
 };
 
