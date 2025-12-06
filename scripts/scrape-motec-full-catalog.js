@@ -1,0 +1,220 @@
+/**
+ * FULL MOTEC CATALOG INDEXER
+ * 
+ * Uses edge function (which has Firecrawl API key) to scrape
+ * comprehensive list of all Motec wiring products
+ */
+
+import { createClient } from '@supabase/supabase-js';
+import { config } from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+config({ path: path.resolve(__dirname, '../.env') });
+
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Comprehensive list of Motec categories to scrape
+// We'll start with common patterns and homepage
+const ALL_CATEGORIES = [
+  // Main pages
+  { name: 'Homepage', url: 'https://www.motec.com/' },
+  { name: 'Products', url: 'https://www.motec.com/products' },
+  { name: 'Catalog', url: 'https://www.motec.com/catalog' },
+  
+  // Common category patterns
+  { name: 'Connectors', url: 'https://www.motec.com/connectors' },
+  { name: 'Terminals', url: 'https://www.motec.com/terminals' },
+  { name: 'Wire & Cable', url: 'https://www.motec.com/wire' },
+  { name: 'Wire & Cable Alt', url: 'https://www.motec.com/cable' },
+  { name: 'Heat Shrink', url: 'https://www.motec.com/heat-shrink' },
+  { name: 'Tools', url: 'https://www.motec.com/tools' },
+  { name: 'Fuses', url: 'https://www.motec.com/fuses' },
+  { name: 'Relays', url: 'https://www.motec.com/relays' },
+  { name: 'Switches', url: 'https://www.motec.com/switches' },
+  { name: 'Grommets', url: 'https://www.motec.com/grommets' },
+  { name: 'Sleeving', url: 'https://www.motec.com/sleeving' },
+  { name: 'Crimp Tools', url: 'https://www.motec.com/crimp-tools' },
+  { name: 'Wire Harness', url: 'https://www.motec.com/wire-harness' },
+  { name: 'Cable Ties', url: 'https://www.motec.com/cable-ties' },
+  { name: 'Fuse Blocks', url: 'https://www.motec.com/fuse-blocks' },
+  { name: 'Relay Sockets', url: 'https://www.motec.com/relay-sockets' },
+  { name: 'Terminal Blocks', url: 'https://www.motec.com/terminal-blocks' },
+  { name: 'Wire Loom', url: 'https://www.motec.com/wire-loom' },
+  { name: 'Strain Relief', url: 'https://www.motec.com/strain-relief' },
+  { name: 'Pins & Sockets', url: 'https://www.motec.com/pins-sockets' },
+  { name: 'Splices', url: 'https://www.motec.com/splices' },
+  { name: 'Cable Clamps', url: 'https://www.motec.com/cable-clamps' },
+  
+  // Automotive specific
+  { name: 'Automotive', url: 'https://www.motec.com/automotive' },
+  { name: 'Marine', url: 'https://www.motec.com/marine' },
+  { name: 'RV', url: 'https://www.motec.com/rv' },
+  
+  // Search/listing pages
+  { name: 'All Products', url: 'https://www.motec.com/products/all' },
+  { name: 'Category Listing', url: 'https://www.motec.com/category' },
+];
+
+async function scrapeCategory(url, categoryName) {
+  try {
+    const { data, error } = await supabase.functions.invoke('scrape-motec-catalog', {
+      body: {
+        url,
+        category_name: categoryName
+      }
+    });
+    
+    if (error) {
+      return { success: false, error: error.message, products: 0, stored: 0, updated: 0 };
+    }
+    
+    if (data.error) {
+      return { success: false, error: data.error, products: 0, stored: 0, updated: 0 };
+    }
+    
+    return {
+      success: true,
+      products: data.products_found || 0,
+      stored: data.stored || 0,
+      updated: data.updated || 0
+    };
+  } catch (error) {
+    return { success: false, error: error.message, products: 0, stored: 0, updated: 0 };
+  }
+}
+
+async function main() {
+  console.log('🚀 FULL MOTEC CATALOG INDEXER');
+  console.log('='.repeat(70));
+  console.log('');
+  console.log('Using edge function: scrape-motec-catalog');
+  console.log('(Edge function has access to FIRECRAWL_API_KEY from Supabase secrets)');
+  console.log('');
+  console.log(`📋 Scraping ${ALL_CATEGORIES.length} categories...`);
+  console.log('');
+  
+  let totalProducts = 0;
+  let totalStored = 0;
+  let totalUpdated = 0;
+  let totalFailed = 0;
+  const results = [];
+  
+  for (let i = 0; i < ALL_CATEGORIES.length; i++) {
+    const category = ALL_CATEGORIES[i];
+    console.log(`[${i + 1}/${ALL_CATEGORIES.length}] ${category.name}`);
+    console.log(`   URL: ${category.url}`);
+    
+    const result = await scrapeCategory(category.url, category.name);
+    
+    if (result.success) {
+      if (result.products > 0) {
+        console.log(`   ✅ Found ${result.products} products`);
+        console.log(`      Stored: ${result.stored}, Updated: ${result.updated}`);
+        
+        totalProducts += result.products;
+        totalStored += result.stored;
+        totalUpdated += result.updated;
+        
+        results.push({
+          category: category.name,
+          success: true,
+          products: result.products,
+          stored: result.stored
+        });
+      } else {
+        console.log(`   ⚠️  No products found (page may not exist or have different structure)`);
+      }
+    } else {
+      // Don't count 404s as failures - category might not exist
+      const is404 = result.error?.includes('404') || result.error?.includes('Not Found');
+      if (!is404) {
+        console.log(`   ❌ Failed: ${result.error}`);
+        totalFailed++;
+      } else {
+        console.log(`   ⚠️  Category not found (404)`);
+      }
+      
+      results.push({
+        category: category.name,
+        success: false,
+        error: result.error
+      });
+    }
+    
+    // Delay between requests
+    if (i < ALL_CATEGORIES.length - 1) {
+      console.log(`   ⏳ Waiting 3 seconds...`);
+      await new Promise(r => setTimeout(r, 3000));
+    }
+    console.log('');
+  }
+  
+  // Final summary
+  console.log('='.repeat(70));
+  console.log('📊 FINAL SUMMARY');
+  console.log('='.repeat(70));
+  console.log(`Categories processed: ${ALL_CATEGORIES.length}`);
+  console.log(`✅ Successful: ${ALL_CATEGORIES.length - totalFailed}`);
+  console.log(`❌ Failed: ${totalFailed}`);
+  console.log(`📦 Total products found: ${totalProducts}`);
+  console.log(`💾 Stored: ${totalStored}`);
+  console.log(`🔄 Updated: ${totalUpdated}`);
+  console.log('');
+  
+  // Database stats
+  const { data: source } = await supabase
+    .from('catalog_sources')
+    .select('id')
+    .eq('provider', 'Motec')
+    .single();
+  
+  if (source) {
+    const { data: dbStats, error: dbError } = await supabase
+      .from('catalog_parts')
+      .select('id, part_number, name, price_current, category')
+      .eq('catalog_id', source.id)
+      .limit(1000);
+    
+    if (!dbError && dbStats) {
+      const withPrice = dbStats.filter(p => p.price_current).length;
+      const categories = [...new Set(dbStats.map(p => p.category))];
+      
+      console.log('📊 DATABASE STATISTICS:');
+      console.log(`   Total products in database: ${dbStats.length}`);
+      console.log(`   Products with prices: ${withPrice}`);
+      if (categories.length > 0) {
+        console.log(`   Categories: ${categories.join(', ')}`);
+      }
+      console.log('');
+      
+      // Show sample products
+      if (dbStats.length > 0) {
+        console.log('📦 Sample products:');
+        dbStats.slice(0, 10).forEach((p, i) => {
+          console.log(`   ${i + 1}. ${p.part_number} - ${p.name}`);
+          if (p.price_current) console.log(`      Price: $${p.price_current}`);
+        });
+      }
+    }
+  }
+  
+  console.log('');
+  console.log('✅ Full Motec catalog indexing complete!');
+  console.log('');
+  console.log('All products are now available in catalog_parts table');
+  console.log('Use for instant wiring quotes and job estimates');
+}
+
+main().catch(console.error);
+

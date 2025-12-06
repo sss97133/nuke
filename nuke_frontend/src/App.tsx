@@ -24,6 +24,7 @@ const ImportClassicCars = React.lazy(() => import('./pages/ImportClassicCars'));
 // import VehicleEditForm from './pages/VehicleEditForm';
 // import VehicleDateImages from './pages/VehicleDateImages';
 import Dashboard from './pages/Dashboard';
+import SystemHealth from './pages/SystemHealth';
 import ImageProcessingDashboard from './pages/ImageProcessingDashboard';
 import LiveImageAnalysisMonitor from './components/admin/LiveImageAnalysisMonitor';
 import ScriptControlCenter from './pages/ScriptControlCenter';
@@ -273,7 +274,8 @@ function App() {
 
             {/* Main routes */}
             <Route path="/discover" element={<Discovery />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dash" element={<Dashboard />} />
+            <Route path="/system-health" element={<SystemHealth />} />
             <Route path="/search" element={<Search />} />
             <Route path="/market/squarebodies" element={<SquarebodyMarketDashboard />} />
             <Route path="/market/squarebodies/live" element={<SquarebodyLiveFeed />} />

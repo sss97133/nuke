@@ -5,7 +5,7 @@ import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import { ProfileBalancePill } from './ProfileBalancePill';
 import { UploadStatusBar } from './UploadStatusBar';
 import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
-import AddBrochureUrl from '../AddBrochureUrl';
+import NotificationBell from '../notifications/NotificationBell';
 import { AppLayoutProvider, usePreventDoubleLayout } from './AppLayoutContext';
 import '../../design-system.css';
 
@@ -114,25 +114,11 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       <div className="header-wrapper">
         <div className="header-content">
           <div className="header-left">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="logo"
-              style={{
-                border: 'none',
-                padding: 0,
-                background: 'transparent',
-                cursor: 'pointer'
-              }}
-            >
-              <span className="logo-text">n-zero</span>
-            </button>
-            
-            {/* Desktop Navigation */}
+            {/* Desktop Navigation - n-zero as fifth button */}
             <nav className="main-nav desktop-nav">
               <Link 
-                to="/dashboard" 
-                className={`nav-link ${isActivePage('/dashboard') ? 'active' : ''}`}
+                to="/dash" 
+                className={`nav-link ${isActivePage('/dash') ? 'active' : ''}`}
               >
                 Home
               </Link>
@@ -154,17 +140,26 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
               >
                 Organizations
               </Link>
+              <Link 
+                to="/system-health"
+                className={`nav-link ${isActivePage('/system-health') ? 'active' : ''}`}
+              >
+                System Health
+              </Link>
+              <Link 
+                to="https://n-zero.dev/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`nav-link ${isActivePage('/') ? 'active' : ''}`}
+              >
+                n-zero
+              </Link>
             </nav>
           </div>
 
           <div className="header-right">
-            {/* Add Brochure URL - Quick paste */}
-            <div style={{ flex: '0 0 auto', marginRight: '8px' }}>
-              <AddBrochureUrl />
-            </div>
-
             {/* Global Search - AI Data Ingestion */}
-            <div style={{ flex: '0 0 auto', minWidth: 0, maxWidth: '200px', marginRight: '8px' }}>
+            <div style={{ flex: '0 0 auto', minWidth: 0, maxWidth: '400px', marginRight: '8px' }}>
               <AIDataIngestionSearch />
             </div>
 
@@ -172,6 +167,13 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
             <div style={{ flex: '0 0 auto', marginRight: '8px' }}>
               <GlobalUploadIndicator />
             </div>
+
+            {/* Notifications */}
+            {session && (
+              <div style={{ flex: '0 0 auto', marginRight: '8px' }}>
+                <NotificationBell />
+              </div>
+            )}
 
             {/* Profile Balance Capsule - Combined balance + profile + navigation */}
             <div style={{ flex: '0 0 auto' }}>
