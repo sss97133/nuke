@@ -87,16 +87,15 @@ serve(async (req) => {
           console.log('🔥 Using aggressive settings for KSL')
         } else if (isFacebookMarketplace) {
           // Facebook Marketplace: aggressive settings for bot protection
-          firecrawlOptions.waitFor = 10000 // Wait 10 seconds for content to load
+          // Reduced wait times to avoid timeout (edge functions have ~60s limit)
+          firecrawlOptions.waitFor = 5000 // Wait 5 seconds for content to load
           firecrawlOptions.mobile = true // Use mobile user agent (often less protected)
           firecrawlOptions.actions = [
-            { type: 'wait', milliseconds: 5000 },
-            { type: 'scroll', direction: 'down' },
             { type: 'wait', milliseconds: 3000 },
             { type: 'scroll', direction: 'down' },
             { type: 'wait', milliseconds: 2000 }
           ]
-          console.log('🔥 Using aggressive settings for Facebook Marketplace')
+          console.log('🔥 Using aggressive settings for Facebook Marketplace (reduced wait to avoid timeout)')
         } else {
           firecrawlOptions.waitFor = 2000
         }
@@ -1691,392 +1690,424 @@ function scrapeGoxee(doc: any, url: string): any {
 }
 
 function scrapeFacebookMarketplace(doc: any, url: string, markdown: string = '', html: string = ''): any {
-  const data: any = {
-    source: 'Facebook Marketplace',
-    listing_url: url,
-    discovery_url: url
-  }
+  try {
+    const data: any = {
+      source: 'Facebook Marketplace',
+      listing_url: url,
+      discovery_url: url
+    }
 
-  // Get full content for extraction
-  const bodyText = doc.body?.textContent || ''
-  const fullContent = markdown || bodyText
-  const fullHtml = html || doc.documentElement?.outerHTML || ''
+    // Get full content for extraction with null checks
+    const bodyText = (doc && doc.body && doc.body.textContent) ? doc.body.textContent : ''
+    const fullContent = markdown || bodyText
+    const fullHtml = html || (doc && doc.documentElement && doc.documentElement.outerHTML) ? doc.documentElement.outerHTML : ''
 
-  // ========================================
-  // 1. EXTRACT TITLE AND BASIC INFO
-  // ========================================
+    // ========================================
+    // 1. EXTRACT TITLE AND BASIC INFO
+    // ========================================
   
-  // Try multiple title selectors for Facebook Marketplace
-  const titleSelectors = [
-    'h1[data-testid="marketplace-pdp-title"]',
-    'h1',
-    '[data-testid="marketplace-listing-title"]',
-    '.x1heor9g h1',
-    'span[dir="auto"]'
-  ]
-  
-  let titleText = ''
-  for (const selector of titleSelectors) {
-    const titleEl = doc.querySelector(selector)
-    if (titleEl) {
-      titleText = titleEl.textContent?.trim() || ''
-      if (titleText && titleText.length > 5) break
-    }
-  }
-  
-  // Fallback: extract from markdown first line
-  if (!titleText && markdown) {
-    const firstLine = markdown.split('\n')[0].trim()
-    if (firstLine && firstLine.length > 5) {
-      titleText = firstLine
-    }
-  }
-  
-  if (titleText) {
-    data.title = titleText
+    // Get full content for extraction with null checks
+    const bodyText = (doc && doc.body && doc.body.textContent) ? doc.body.textContent : ''
+    const fullContent = markdown || bodyText
+    const fullHtml = html || (doc && doc.documentElement && doc.documentElement.outerHTML) ? doc.documentElement.outerHTML : ''
+
+    // ========================================
+    // 1. EXTRACT TITLE AND BASIC INFO
+    // ========================================
     
-    // Parse year/make/model from title (e.g., "1968 Dodge Coronet")
-    const yearMatch = titleText.match(/\b(19|20)\d{2}\b/)
-    if (yearMatch) {
-      data.year = parseInt(yearMatch[0])
-    }
+    // Try multiple title selectors for Facebook Marketplace
+    const titleSelectors = [
+      'h1[data-testid="marketplace-pdp-title"]',
+      'h1',
+      '[data-testid="marketplace-listing-title"]',
+      '.x1heor9g h1',
+      'span[dir="auto"]'
+    ]
     
-    // Extract make/model - try multiple patterns
-    let vehicleMatch = titleText.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+(.+?)(?:\s*-\s*\$|\s*\$|\s*\(|$)/i)
-    if (!vehicleMatch) {
-      vehicleMatch = titleText.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+(.+?)$/i)
-    }
-    if (!vehicleMatch) {
-      vehicleMatch = titleText.match(/\b(19|20)\d{2}\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)\s+(.+?)(?:\s|$)/i)
-    }
-    
-    if (vehicleMatch && vehicleMatch[2] && vehicleMatch[3]) {
-      let make = vehicleMatch[2].trim()
-      // Normalize make
-      if (make.toLowerCase() === 'chevy' || make.toLowerCase() === 'chev') make = 'Chevrolet'
-      if (make.toLowerCase() === 'gm' || make.toLowerCase() === 'gmc') make = 'GMC'
-      if (make && make.length > 0) {
-        make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase()
+    let titleText = ''
+    for (const selector of titleSelectors) {
+      const titleEl = doc.querySelector(selector)
+      if (titleEl) {
+        titleText = titleEl.textContent?.trim() || ''
+        if (titleText && titleText.length > 5) break
       }
-      data.make = make
+    }
+    
+    // Fallback: extract from markdown first line
+    if (!titleText && markdown) {
+      const firstLine = markdown.split('\n')[0].trim()
+      if (firstLine && firstLine.length > 5) {
+        titleText = firstLine
+      }
+    }
+    
+    if (titleText) {
+      data.title = titleText
       
-      let model = vehicleMatch[3].trim()
-      // Clean up model - remove price, location, etc.
-      model = model.replace(/\s*-\s*\$.*$/, '').replace(/\s*\(.*$/, '').trim()
-      if (model) {
-        data.model = model
+      // Parse year/make/model from title (e.g., "1968 Dodge Coronet")
+      const yearMatch = titleText.match(/\b(19|20)\d{2}\b/)
+      if (yearMatch) {
+        data.year = parseInt(yearMatch[0])
+      }
+      
+      // Extract make/model - try multiple patterns
+      let vehicleMatch = titleText.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+(.+?)(?:\s*-\s*\$|\s*\$|\s*\(|$)/i)
+      if (!vehicleMatch) {
+        vehicleMatch = titleText.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+(.+?)$/i)
+      }
+      if (!vehicleMatch) {
+        vehicleMatch = titleText.match(/\b(19|20)\d{2}\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)\s+(.+?)(?:\s|$)/i)
+      }
+      
+      if (vehicleMatch && vehicleMatch[2] && vehicleMatch[3]) {
+        let make = vehicleMatch[2].trim()
+        // Normalize make
+        if (make.toLowerCase() === 'chevy' || make.toLowerCase() === 'chev') make = 'Chevrolet'
+        if (make.toLowerCase() === 'gm' || make.toLowerCase() === 'gmc') make = 'GMC'
+        if (make && make.length > 0) {
+          make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase()
+        }
+        data.make = make
+        
+        let model = vehicleMatch[3].trim()
+        // Clean up model - remove price, location, etc.
+        model = model.replace(/\s*-\s*\$.*$/, '').replace(/\s*\(.*$/, '').trim()
+        if (model) {
+          data.model = model
+        }
       }
     }
-  }
 
-  // ========================================
-  // 2. EXTRACT PRICE
-  // ========================================
-  
-  // Try multiple price selectors
-  const priceSelectors = [
-    '[data-testid="marketplace-price"]',
-    '[class*="price"]',
-    'span[dir="auto"]:contains("$")'
-  ]
-  
-  let priceText = ''
-  for (const selector of priceSelectors) {
-    const priceEl = doc.querySelector(selector)
-    if (priceEl) {
-      priceText = priceEl.textContent?.trim() || ''
-      if (priceText.includes('$')) break
-    }
-  }
-  
-  // Fallback: regex from full content
-  if (!priceText) {
-    const priceMatch = fullContent.match(/\$[\s]*([\d,]+)/)
-    if (priceMatch) {
-      priceText = priceMatch[0]
-    }
-  }
-  
-  if (priceText) {
-    const priceMatch = priceText.match(/\$[\s]*([\d,]+)/)
-    if (priceMatch) {
-      data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
-    }
-  }
-  
-  // Also check title for price
-  if (!data.asking_price && titleText) {
-    const titlePriceMatch = titleText.match(/\$\s*([\d,]+)/)
-    if (titlePriceMatch) {
-      data.asking_price = parseInt(titlePriceMatch[1].replace(/,/g, ''))
-    }
-  }
-
-  // ========================================
-  // 3. EXTRACT LOCATION
-  // ========================================
-  
-  // Facebook Marketplace location patterns
-  const locationPatterns = [
-    /([A-Za-z\s]+,\s*[A-Z]{2})/g,  // "Anaheim, CA"
-    /([A-Za-z\s]+,\s*California)/gi,  // "Anaheim, California"
-    /Location:\s*([A-Za-z\s,]+)/i,
-    /([A-Za-z\s]+)\s*-\s*Cars\s*&\s*Trucks/i  // "Anaheim, California - Cars & Trucks"
-  ]
-  
-  for (const pattern of locationPatterns) {
-    const match = fullContent.match(pattern)
-    if (match) {
-      data.location = match[1].trim()
-      break
-    }
-  }
-
-  // ========================================
-  // 4. EXTRACT DESCRIPTION
-  // ========================================
-  
-  const descSelectors = [
-    '[data-testid="marketplace-pdp-description"]',
-    '[class*="description"]',
-    '[data-ad-preview="message"]'
-  ]
-  
-  let description = ''
-  for (const selector of descSelectors) {
-    const descEl = doc.querySelector(selector)
-    if (descEl) {
-      description = descEl.textContent?.trim() || ''
-      if (description && description.length > 20) break
-    }
-  }
-  
-  // Fallback: extract from markdown (often cleaner)
-  if (!description && markdown) {
-    const lines = markdown.split('\n')
-    let descStart = false
-    const descLines: string[] = []
-    for (const line of lines) {
-      if (descStart && line.trim()) {
-        // Stop at image markers or price patterns
-        if (line.match(/^!\[/)) break
-        if (line.match(/^\$\d/)) break
-        descLines.push(line.trim())
-      }
-      if (line.trim() && !line.match(/^\d{4}\s+[A-Za-z]/) && !line.match(/^\$/)) {
-        descStart = true
-      }
-    }
-    description = descLines.join(' ').trim()
-  }
-  
-  if (description && description.length > 10) {
-    data.description = description.substring(0, 5000) // Limit length
-  }
-
-  // ========================================
-  // 5. EXTRACT VEHICLE DETAILS FROM DESCRIPTION
-  // ========================================
-  
-  if (description) {
-    const descUpper = description.toUpperCase()
+    // ========================================
+    // 2. EXTRACT PRICE
+    // ========================================
     
-    // Mileage/Odometer
-    const mileagePatterns = [
-      /(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi|mileage)/i,
-      /mileage[:\s]+(\d{1,3}(?:,\d{3})*)/i,
-      /odometer[:\s]+(\d{1,3}(?:,\d{3})*)/i,
-      /(\d{1,3}(?:,\d{3})*)\s*k\s*miles/i
+    // Try multiple price selectors
+    const priceSelectors = [
+      '[data-testid="marketplace-price"]',
+      '[class*="price"]'
     ]
-    for (const pattern of mileagePatterns) {
-      const match = description.match(pattern)
+    
+    let priceText = ''
+    for (const selector of priceSelectors) {
+      const priceEl = doc.querySelector(selector)
+      if (priceEl) {
+        priceText = priceEl.textContent?.trim() || ''
+        if (priceText.includes('$')) break
+      }
+    }
+    
+    // Fallback: search for spans with dir="auto" that contain $
+    if (!priceText) {
+      const autoSpans = doc.querySelectorAll('span[dir="auto"]')
+      for (const span of Array.from(autoSpans)) {
+        const text = (span as any).textContent?.trim() || ''
+        if (text.includes('$')) {
+          priceText = text
+          break
+        }
+      }
+    }
+    
+    // Fallback: regex from full content
+    if (!priceText) {
+      const priceMatch = fullContent.match(/\$[\s]*([\d,]+)/)
+      if (priceMatch) {
+        priceText = priceMatch[0]
+      }
+    }
+    
+    if (priceText) {
+      const priceMatch = priceText.match(/\$[\s]*([\d,]+)/)
+      if (priceMatch) {
+        data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
+      }
+    }
+    
+    // Also check title for price
+    if (!data.asking_price && titleText) {
+      const titlePriceMatch = titleText.match(/\$\s*([\d,]+)/)
+      if (titlePriceMatch) {
+        data.asking_price = parseInt(titlePriceMatch[1].replace(/,/g, ''))
+      }
+    }
+
+    // ========================================
+    // 3. EXTRACT LOCATION
+    // ========================================
+    
+    // Facebook Marketplace location patterns
+    const locationPatterns = [
+      /([A-Za-z\s]+,\s*[A-Z]{2})/g,  // "Anaheim, CA"
+      /([A-Za-z\s]+,\s*California)/gi,  // "Anaheim, California"
+      /Location:\s*([A-Za-z\s,]+)/i,
+      /([A-Za-z\s]+)\s*-\s*Cars\s*&\s*Trucks/i  // "Anaheim, California - Cars & Trucks"
+    ]
+    
+    for (const pattern of locationPatterns) {
+      const match = fullContent.match(pattern)
       if (match) {
-        data.mileage = parseInt(match[1].replace(/,/g, ''))
+        data.location = match[1].trim()
         break
       }
     }
+
+    // ========================================
+    // 4. EXTRACT DESCRIPTION
+    // ========================================
     
-    // VIN
-    const vinPattern = /\b([A-HJ-NPR-Z0-9]{17})\b/
-    const vinMatch = description.match(vinPattern) || fullHtml.match(vinPattern)
-    if (vinMatch && !/[IOQ]/.test(vinMatch[1])) {
-      data.vin = vinMatch[1].toUpperCase()
+    const descSelectors = [
+      '[data-testid="marketplace-pdp-description"]',
+      '[class*="description"]',
+      '[data-ad-preview="message"]'
+    ]
+    
+    let description = ''
+    for (const selector of descSelectors) {
+      const descEl = doc.querySelector(selector)
+      if (descEl) {
+        description = descEl.textContent?.trim() || ''
+        if (description && description.length > 20) break
+      }
     }
     
-    // Engine
-    const enginePatterns = [
-      /(\d+\.\d+)\s*L/i,
-      /(\d+)\s*cylinder/i,
-      /V(\d+)/i,
-      /(\d+\.\d+)\s*L\s*V(\d+)/i
+    // Fallback: extract from markdown (often cleaner)
+    if (!description && markdown) {
+      const lines = markdown.split('\n')
+      let descStart = false
+      const descLines: string[] = []
+      for (const line of lines) {
+        if (descStart && line.trim()) {
+          // Stop at image markers or price patterns
+          if (line.match(/^!\[/)) break
+          if (line.match(/^\$\d/)) break
+          descLines.push(line.trim())
+        }
+        if (line.trim() && !line.match(/^\d{4}\s+[A-Za-z]/) && !line.match(/^\$/)) {
+          descStart = true
+        }
+      }
+      description = descLines.join(' ').trim()
+    }
+    
+    if (description && description.length > 10) {
+      data.description = description.substring(0, 5000) // Limit length
+    }
+
+    // ========================================
+    // 5. EXTRACT VEHICLE DETAILS FROM DESCRIPTION
+    // ========================================
+    
+    if (description) {
+      const descUpper = description.toUpperCase()
+      
+      // Mileage/Odometer
+      const mileagePatterns = [
+        /(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi|mileage)/i,
+        /mileage[:\s]+(\d{1,3}(?:,\d{3})*)/i,
+        /odometer[:\s]+(\d{1,3}(?:,\d{3})*)/i,
+        /(\d{1,3}(?:,\d{3})*)\s*k\s*miles/i
+      ]
+      for (const pattern of mileagePatterns) {
+        const match = description.match(pattern)
+        if (match) {
+          data.mileage = parseInt(match[1].replace(/,/g, ''))
+          break
+        }
+      }
+      
+      // VIN
+      const vinPattern = /\b([A-HJ-NPR-Z0-9]{17})\b/
+      const vinMatch = description.match(vinPattern) || fullHtml.match(vinPattern)
+      if (vinMatch && !/[IOQ]/.test(vinMatch[1])) {
+        data.vin = vinMatch[1].toUpperCase()
+      }
+      
+      // Engine
+      const enginePatterns = [
+        /(\d+\.\d+)\s*L/i,
+        /(\d+)\s*cylinder/i,
+        /V(\d+)/i,
+        /(\d+\.\d+)\s*L\s*V(\d+)/i
+      ]
+      for (const pattern of enginePatterns) {
+        const match = description.match(pattern)
+        if (match) {
+          if (match[1] && match[1].includes('.')) {
+            data.engine_size = match[1] + 'L'
+          } else if (match[2]) {
+            data.engine_size = match[2] + ' cylinder'
+          }
+          break
+        }
+      }
+      
+      // Transmission
+      const transPatterns = [
+        /(automatic|manual|auto|stick|5-speed|6-speed|4-speed)/i
+      ]
+      for (const pattern of transPatterns) {
+        const match = description.match(pattern)
+        if (match) {
+          data.transmission = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()
+          break
+        }
+      }
+      
+      // Color
+      const colorPatterns = [
+        /color[:\s]+(\w+)/i,
+        /(\w+)\s+exterior/i,
+        /paint[ed]?\s+(\w+)/i
+      ]
+      for (const pattern of colorPatterns) {
+        const match = description.match(pattern)
+        if (match && !['the', 'a', 'an'].includes(match[1].toLowerCase())) {
+          data.color = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()
+          break
+        }
+      }
+      
+      // Condition
+      if (descUpper.includes('EXCELLENT') || descUpper.includes('MINT')) {
+        data.condition = 'Excellent'
+      } else if (descUpper.includes('GOOD') || descUpper.includes('GREAT')) {
+        data.condition = 'Good'
+      } else if (descUpper.includes('FAIR') || descUpper.includes('DECENT')) {
+        data.condition = 'Fair'
+      } else if (descUpper.includes('POOR') || descUpper.includes('PROJECT')) {
+        data.condition = 'Poor'
+      }
+      
+      // Title status
+      if (descUpper.match(/CLEAN\s+TITLE/i)) {
+        data.title_status = 'Clean'
+      } else if (descUpper.match(/SALVAGE/i)) {
+        data.title_status = 'Salvage'
+      } else if (descUpper.match(/REBUILT/i)) {
+        data.title_status = 'Rebuilt'
+      }
+    }
+
+    // ========================================
+    // 6. EXTRACT ALL IMAGES (DEEP SEARCH)
+    // ========================================
+    
+    const images: string[] = []
+    
+    // Method 1: Extract from HTML img tags
+    const imgElements = doc.querySelectorAll('img[src], img[data-src]')
+    imgElements.forEach((img: any) => {
+      const src = img.getAttribute('src') || img.getAttribute('data-src') || ''
+      if (src && src.startsWith('http') && !src.includes('logo') && !src.includes('icon') && !src.includes('avatar')) {
+        // Facebook image URLs - extract full resolution
+        if (src.includes('scontent') || src.includes('fbcdn')) {
+          // Facebook CDN images - try to get full res
+          const fullResUrl = src.replace(/\/s\d+x\d+\//, '/s2048x2048/').replace(/\/[a-z]\d+\./, '/s2048x2048.')
+          if (!images.includes(fullResUrl)) {
+            images.push(fullResUrl)
+          }
+        } else if (!images.includes(src)) {
+          images.push(src)
+        }
+      }
+    })
+    
+    // Method 2: Extract from markdown image syntax
+    if (markdown) {
+      const markdownImages = markdown.matchAll(/!\[.*?\]\((.*?)\)/g)
+      for (const match of markdownImages) {
+        const imgUrl = match[1]
+        if (imgUrl && imgUrl.startsWith('http') && !images.includes(imgUrl)) {
+          images.push(imgUrl)
+        }
+      }
+    }
+    
+    // Method 3: Regex extract from HTML (deep search)
+    const htmlImagePattern = /https?:\/\/[^"'\s]+(?:scontent|fbcdn)[^"'\s]+\.(?:jpg|jpeg|png|webp)/gi
+    let htmlMatch
+    while ((htmlMatch = htmlImagePattern.exec(fullHtml)) !== null) {
+      const imgUrl = htmlMatch[0]
+      // Upgrade to full resolution
+      const fullResUrl = imgUrl.replace(/\/s\d+x\d+\//, '/s2048x2048/').replace(/\/[a-z]\d+\./, '/s2048x2048.')
+      if (!images.includes(fullResUrl)) {
+        images.push(fullResUrl)
+      }
+    }
+    
+    // Remove duplicates and filter out non-vehicle images
+    data.images = [...new Set(images)].filter(url => {
+      const urlLower = url.toLowerCase()
+      return !urlLower.includes('logo') && 
+             !urlLower.includes('icon') && 
+             !urlLower.includes('avatar') &&
+             !urlLower.includes('profile')
+    })
+
+    // ========================================
+    // 7. EXTRACT LISTING METADATA
+    // ========================================
+    
+    // Posted date
+    const datePatterns = [
+      /(\d+)\s+(days?|hours?|minutes?)\s+ago/i,
+      /listed\s+(\d+)\s+(days?|hours?)/i
     ]
-    for (const pattern of enginePatterns) {
-      const match = description.match(pattern)
+    for (const pattern of datePatterns) {
+      const match = fullContent.match(pattern)
       if (match) {
-        if (match[1] && match[1].includes('.')) {
-          data.engine_size = match[1] + 'L'
-        } else if (match[2]) {
-          data.engine_size = match[2] + ' cylinder'
+        const value = parseInt(match[1])
+        const unit = match[2].toLowerCase()
+        const now = new Date()
+        if (unit.startsWith('minute')) {
+          data.listed_date = new Date(now.getTime() - value * 60 * 1000).toISOString()
+        } else if (unit.startsWith('hour')) {
+          data.listed_date = new Date(now.getTime() - value * 60 * 60 * 1000).toISOString()
+        } else if (unit.startsWith('day')) {
+          data.listed_date = new Date(now.getTime() - value * 24 * 60 * 60 * 1000).toISOString()
         }
         break
       }
     }
+
+    // ========================================
+    // 8. SET ORIGIN METADATA
+    // ========================================
     
-    // Transmission
-    const transPatterns = [
-      /(automatic|manual|auto|stick|5-speed|6-speed|4-speed)/i
-    ]
-    for (const pattern of transPatterns) {
-      const match = description.match(pattern)
-      if (match) {
-        data.transmission = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()
-        break
-      }
-    }
-    
-    // Color
-    const colorPatterns = [
-      /color[:\s]+(\w+)/i,
-      /(\w+)\s+exterior/i,
-      /paint[ed]?\s+(\w+)/i
-    ]
-    for (const pattern of colorPatterns) {
-      const match = description.match(pattern)
-      if (match && !['the', 'a', 'an'].includes(match[1].toLowerCase())) {
-        data.color = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()
-        break
-      }
+    data.origin_metadata = {
+      facebook_marketplace_listing_id: url.match(/\/item\/(\d+)/)?.[1] || null,
+      facebook_marketplace_url: url,
+      scraped_at: new Date().toISOString(),
+      source: 'facebook_marketplace'
     }
     
-    // Condition
-    if (descUpper.includes('EXCELLENT') || descUpper.includes('MINT')) {
-      data.condition = 'Excellent'
-    } else if (descUpper.includes('GOOD') || descUpper.includes('GREAT')) {
-      data.condition = 'Good'
-    } else if (descUpper.includes('FAIR') || descUpper.includes('DECENT')) {
-      data.condition = 'Fair'
-    } else if (descUpper.includes('POOR') || descUpper.includes('PROJECT')) {
-      data.condition = 'Poor'
-    }
-    
-    // Title status
-    if (descUpper.match(/CLEAN\s+TITLE/i)) {
-      data.title_status = 'Clean'
-    } else if (descUpper.match(/SALVAGE/i)) {
-      data.title_status = 'Salvage'
-    } else if (descUpper.match(/REBUILT/i)) {
-      data.title_status = 'Rebuilt'
+    data.profile_origin = 'facebook_marketplace_import'
+    data.discovery_source = 'facebook_marketplace'
+
+    console.log('Facebook Marketplace extraction complete:', JSON.stringify({
+      year: data.year,
+      make: data.make,
+      model: data.model,
+      price: data.asking_price,
+      mileage: data.mileage,
+      location: data.location,
+      images: data.images?.length || 0,
+      has_description: !!data.description
+    }))
+
+    return data
+  } catch (error: any) {
+    console.error('Error in scrapeFacebookMarketplace:', error)
+    console.error('Stack:', error.stack)
+    // Return basic data structure even if parsing fails
+    return {
+      source: 'Facebook Marketplace',
+      listing_url: url,
+      discovery_url: url,
+      error: error.message || String(error)
     }
   }
-
-  // ========================================
-  // 6. EXTRACT ALL IMAGES (DEEP SEARCH)
-  // ========================================
-  
-  const images: string[] = []
-  
-  // Method 1: Extract from HTML img tags
-  const imgElements = doc.querySelectorAll('img[src], img[data-src]')
-  imgElements.forEach((img: any) => {
-    const src = img.getAttribute('src') || img.getAttribute('data-src') || ''
-    if (src && src.startsWith('http') && !src.includes('logo') && !src.includes('icon') && !src.includes('avatar')) {
-      // Facebook image URLs - extract full resolution
-      if (src.includes('scontent') || src.includes('fbcdn')) {
-        // Facebook CDN images - try to get full res
-        const fullResUrl = src.replace(/\/s\d+x\d+\//, '/s2048x2048/').replace(/\/[a-z]\d+\./, '/s2048x2048.')
-        if (!images.includes(fullResUrl)) {
-          images.push(fullResUrl)
-        }
-      } else if (!images.includes(src)) {
-        images.push(src)
-      }
-    }
-  })
-  
-  // Method 2: Extract from markdown image syntax
-  if (markdown) {
-    const markdownImages = markdown.matchAll(/!\[.*?\]\((.*?)\)/g)
-    for (const match of markdownImages) {
-      const imgUrl = match[1]
-      if (imgUrl && imgUrl.startsWith('http') && !images.includes(imgUrl)) {
-        images.push(imgUrl)
-      }
-    }
-  }
-  
-  // Method 3: Regex extract from HTML (deep search)
-  const htmlImagePattern = /https?:\/\/[^"'\s]+(?:scontent|fbcdn)[^"'\s]+\.(?:jpg|jpeg|png|webp)/gi
-  let htmlMatch
-  while ((htmlMatch = htmlImagePattern.exec(fullHtml)) !== null) {
-    const imgUrl = htmlMatch[0]
-    // Upgrade to full resolution
-    const fullResUrl = imgUrl.replace(/\/s\d+x\d+\//, '/s2048x2048/').replace(/\/[a-z]\d+\./, '/s2048x2048.')
-    if (!images.includes(fullResUrl)) {
-      images.push(fullResUrl)
-    }
-  }
-  
-  // Remove duplicates and filter out non-vehicle images
-  data.images = [...new Set(images)].filter(url => {
-    const urlLower = url.toLowerCase()
-    return !urlLower.includes('logo') && 
-           !urlLower.includes('icon') && 
-           !urlLower.includes('avatar') &&
-           !urlLower.includes('profile')
-  })
-
-  // ========================================
-  // 7. EXTRACT LISTING METADATA
-  // ========================================
-  
-  // Posted date
-  const datePatterns = [
-    /(\d+)\s+(days?|hours?|minutes?)\s+ago/i,
-    /listed\s+(\d+)\s+(days?|hours?)/i
-  ]
-  for (const pattern of datePatterns) {
-    const match = fullContent.match(pattern)
-    if (match) {
-      const value = parseInt(match[1])
-      const unit = match[2].toLowerCase()
-      const now = new Date()
-      if (unit.startsWith('minute')) {
-        data.listed_date = new Date(now.getTime() - value * 60 * 1000).toISOString()
-      } else if (unit.startsWith('hour')) {
-        data.listed_date = new Date(now.getTime() - value * 60 * 60 * 1000).toISOString()
-      } else if (unit.startsWith('day')) {
-        data.listed_date = new Date(now.getTime() - value * 24 * 60 * 60 * 1000).toISOString()
-      }
-      break
-    }
-  }
-
-  // ========================================
-  // 8. SET ORIGIN METADATA
-  // ========================================
-  
-  data.origin_metadata = {
-    facebook_marketplace_listing_id: url.match(/\/item\/(\d+)/)?.[1] || null,
-    facebook_marketplace_url: url,
-    scraped_at: new Date().toISOString(),
-    source: 'facebook_marketplace'
-  }
-  
-  data.profile_origin = 'facebook_marketplace_import'
-  data.discovery_source = 'facebook_marketplace'
-
-  console.log('Facebook Marketplace extraction complete:', JSON.stringify({
-    year: data.year,
-    make: data.make,
-    model: data.model,
-    price: data.asking_price,
-    mileage: data.mileage,
-    location: data.location,
-    images: data.images?.length || 0,
-    has_description: !!data.description
-  }))
-
-  return data
 }
 
 function scrapeKSL(doc: any, url: string, markdown: string = ''): any {
