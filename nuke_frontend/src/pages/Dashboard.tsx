@@ -180,14 +180,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleRejectClick = (id: string, title: string) => {
-    setRejectionModal({
-      open: true,
-      assignmentId: id,
-      title
-    });
-  };
-
   const handleApproveAssignment = async (assignmentId: string) => {
     try {
       await DashboardService.approveVehicleAssignment(assignmentId);

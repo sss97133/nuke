@@ -251,7 +251,6 @@ export const MessageCard: React.FC<MessageCardProps> = ({
           <div style={{ color: '#424242', marginBottom: '4px', whiteSpace: 'pre-wrap', fontWeight: needsConfirmation ? '500' : 'normal' }}>
             {message}
           </div>
-
         {/* Metadata */}
         {metadata && (
           <div style={{ color: '#757575', marginTop: '4px', marginBottom: '4px' }}>
