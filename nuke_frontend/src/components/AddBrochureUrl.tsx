@@ -82,6 +82,32 @@ const AddBrochureUrl: React.FC = () => {
       else if (lowerUrl.includes('snap-on') || lowerUrl.includes('snapon')) brand = 'Snap-on';
       else if (lowerUrl.includes('car-o-liner') || lowerUrl.includes('caroliner')) brand = 'Car-O-Liner';
 
+      // Check if document already exists (duplicate detection)
+      const { data: existingDoc } = await supabase
+        .from('library_documents')
+        .select('id, title, document_type')
+        .eq('file_url', url)
+        .single();
+
+      if (existingDoc) {
+        // Check if it's already indexed
+        const { data: chunks } = await supabase
+          .from('document_chunks')
+          .select('id')
+          .eq('document_id', existingDoc.id)
+          .limit(1);
+
+        const isIndexed = chunks && chunks.length > 0;
+        
+        showToast(
+          `Document already exists: ${existingDoc.title}${isIndexed ? ' (indexed)' : ''}`,
+          'info'
+        );
+        setUrl('');
+        setIsOpen(false);
+        return;
+      }
+
       // Insert document
       const { data: doc, error } = await supabase
         .from('library_documents')
@@ -110,10 +136,21 @@ const AddBrochureUrl: React.FC = () => {
 
       // Auto-index if it's a material_manual or tds
       if (documentType === 'material_manual' || documentType === 'tds') {
-        // Trigger indexing in background
-        supabase.functions.invoke('index-service-manual', {
-          body: { document_id: doc.id, mode: 'full' }
-        }).catch(err => console.error('Indexing error:', err));
+        // Check if chunks already exist (shouldn't happen for new doc, but safety check)
+        const { data: existingChunks } = await supabase
+          .from('document_chunks')
+          .select('id')
+          .eq('document_id', doc.id)
+          .limit(1);
+
+        if (!existingChunks || existingChunks.length === 0) {
+          // Trigger indexing in background
+          supabase.functions.invoke('index-service-manual', {
+            body: { document_id: doc.id, mode: 'full' }
+          }).catch(err => console.error('Indexing error:', err));
+        } else {
+          console.log('Document already indexed, skipping');
+        }
       }
     } catch (error: any) {
       console.error('Error adding brochure:', error);

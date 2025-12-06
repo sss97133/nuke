@@ -24,6 +24,14 @@ interface Notification {
   created_at: string
 }
 
+interface VehicleImage {
+  image_url: string
+  thumbnail_url?: string
+  large_url?: string
+  variants?: any
+  is_primary?: boolean
+}
+
 interface NotificationCenterProps {
   isOpen: boolean
   onClose: () => void
@@ -33,6 +41,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [vehicleImages, setVehicleImages] = useState<Record<string, VehicleImage | null>>({})
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -67,22 +76,144 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Get notifications
-      const { data, error } = await supabase
-        .from('user_notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50)
+      // Load ALL notification sources in parallel
+      const [userNotifs, workApprovals, vehicleAssignments] = await Promise.all([
+        // Standard user notifications
+        supabase
+          .from('user_notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        
+        // Work approval notifications
+        supabase.rpc('get_pending_work_approvals', { p_user_id: user.id }),
+        
+        // Vehicle assignment notifications  
+        supabase.rpc('get_pending_vehicle_assignments', { p_user_id: user.id })
+      ])
 
-      if (error) throw error
+      // Combine all notifications into unified format
+      const unifiedNotifications: Notification[] = []
 
-      setNotifications(data || [])
-      setUnreadCount(data?.filter(n => !n.is_read).length || 0)
+      // Add user notifications
+      if (userNotifs.data) {
+        userNotifs.data.forEach(n => {
+          unifiedNotifications.push({
+            id: n.id,
+            notification_type: n.notification_type || n.type || 'unknown',
+            title: n.title,
+            message: n.message,
+            vehicle_id: n.vehicle_id,
+            image_id: n.image_id,
+            organization_id: n.organization_id,
+            from_user_id: n.from_user_id,
+            action_url: n.action_url,
+            metadata: n.metadata || {},
+            is_read: n.is_read || false,
+            created_at: n.created_at
+          })
+        })
+      }
+
+      // Add work approvals
+      if (workApprovals.data) {
+        workApprovals.data.forEach((wa: any) => {
+          unifiedNotifications.push({
+            id: `work_${wa.id}`,
+            notification_type: 'work_approval_request',
+            title: `Work Approval: ${wa.work_type || 'Work'}`,
+            message: `${wa.work_type || 'Work'} detected on ${wa.vehicle_name}`,
+            vehicle_id: wa.vehicle_id,
+            organization_id: wa.organization_id,
+            metadata: {
+              requires_confirmation: true,
+              action: 'approve_work',
+              work_id: wa.id,
+              work_type: wa.work_type,
+              data_point: `${wa.work_type || 'Work'} on ${wa.vehicle_name} - Approve this work?`
+            },
+            is_read: false,
+            created_at: wa.created_at
+          })
+        })
+      }
+
+      // Add vehicle assignments
+      if (vehicleAssignments.data) {
+        vehicleAssignments.data.forEach((va: any) => {
+          const relationshipDisplay = va.relationship_type
+            .split('_')
+            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ')
+          
+          unifiedNotifications.push({
+            id: `assignment_${va.id}`,
+            notification_type: 'pending_vehicle_assignment',
+            title: `Link ${va.vehicle_name} to ${va.organization_name}`,
+            message: `Suggested as ${relationshipDisplay} (${Math.round(va.confidence)}% confidence)`,
+            vehicle_id: va.vehicle_id,
+            organization_id: va.organization_id,
+            metadata: {
+              requires_confirmation: true,
+              action: 'approve_assignment',
+              assignment_id: va.id,
+              relationship_type: va.relationship_type,
+              confidence: va.confidence,
+              evidence_sources: va.evidence_sources,
+              data_point: `Link ${va.vehicle_name} to ${va.organization_name} as ${relationshipDisplay}?`
+            },
+            is_read: false,
+            created_at: va.created_at
+          })
+        })
+      }
+
+      // Sort by created_at descending
+      unifiedNotifications.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+
+      setNotifications(unifiedNotifications.slice(0, 50))
+      setUnreadCount(unifiedNotifications.filter(n => !n.is_read).length)
+
+      // Load vehicle images
+      const vehicleIds = [...new Set(unifiedNotifications
+        .filter(n => n.vehicle_id)
+        .map(n => n.vehicle_id)
+      )] as string[]
+
+      if (vehicleIds.length > 0) {
+        loadVehicleImages(vehicleIds)
+      }
     } catch (error: any) {
       console.error('Error loading notifications:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadVehicleImages = async (vehicleIds: string[]) => {
+    try {
+      const { data, error } = await supabase
+        .from('vehicle_images')
+        .select('vehicle_id, image_url, thumbnail_url, large_url, variants, is_primary')
+        .in('vehicle_id', vehicleIds)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+
+      const imagesMap: Record<string, VehicleImage | null> = {}
+      vehicleIds.forEach(id => {
+        const vehicleImages = data?.filter(img => img.vehicle_id === id) || []
+        const primaryImage = vehicleImages.find(img => img.is_primary) || vehicleImages[0] || null
+        imagesMap[id] = primaryImage
+      })
+
+      setVehicleImages(imagesMap)
+    } catch (error: any) {
+      console.error('Error loading vehicle images:', error)
     }
   }
 
@@ -117,7 +248,110 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
     }
   }
 
+  const handleYes = async (notification: Notification) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      // Handle approval/yes action
+      if (notification.metadata?.action === 'approve_assignment') {
+        const { error } = await supabase.rpc('approve_pending_assignment', {
+          p_assignment_id: notification.metadata.assignment_id,
+          p_user_id: user.id,
+          p_notes: null
+        })
+        if (error) throw error
+      } else if (notification.metadata?.action === 'approve_work') {
+        // Use the work approval RPC
+        const { error } = await supabase.rpc('respond_to_work_approval', {
+          p_notification_id: notification.metadata.work_id,
+          p_user_id: user.id,
+          p_response_action: 'approve',
+          p_response_notes: null
+        })
+        if (error) throw error
+      } else if (notification.id.startsWith('work_')) {
+        // Work approval from ID
+        const workId = notification.id.replace('work_', '')
+        const { error } = await supabase.rpc('respond_to_work_approval', {
+          p_notification_id: workId,
+          p_user_id: user.id,
+          p_response_action: 'approve',
+          p_response_notes: null
+        })
+        if (error) throw error
+      } else if (notification.id.startsWith('assignment_')) {
+        // Assignment from ID
+        const assignmentId = notification.id.replace('assignment_', '')
+        const { error } = await supabase.rpc('approve_pending_assignment', {
+          p_assignment_id: assignmentId,
+          p_user_id: user.id,
+          p_notes: null
+        })
+        if (error) throw error
+      } else {
+        // Standard user notification - just mark as read
+        await handleMarkRead(notification.id)
+      }
+
+      await loadNotifications()
+    } catch (error: any) {
+      console.error('Error handling yes action:', error)
+      alert(`Error: ${error.message}`)
+    }
+  }
+
+  const [rejectionModal, setRejectionModal] = useState<{
+    open: boolean;
+    notification: Notification | null;
+  } | null>(null)
+
+  const handleNo = async (notification: Notification, notes?: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+
+      // Handle rejection/no action
+      if (notification.metadata?.action === 'approve_assignment' || notification.id.startsWith('assignment_')) {
+        const assignmentId = notification.metadata?.assignment_id || notification.id.replace('assignment_', '')
+        const { error } = await supabase.rpc('reject_pending_assignment', {
+          p_assignment_id: assignmentId,
+          p_user_id: user.id,
+          p_notes: notes || null
+        })
+        if (error) throw error
+      } else if (notification.metadata?.action === 'approve_work' || notification.id.startsWith('work_')) {
+        const workId = notification.metadata?.work_id || notification.id.replace('work_', '')
+        const { error } = await supabase.rpc('respond_to_work_approval', {
+          p_notification_id: workId,
+          p_user_id: user.id,
+          p_response_action: 'reject',
+          p_response_notes: notes || null
+        })
+        if (error) throw error
+      } else {
+        // Standard notification - just mark as read
+        await handleMarkRead(notification.id)
+      }
+
+      await loadNotifications()
+      setRejectionModal(null)
+    } catch (error: any) {
+      console.error('Error handling no action:', error)
+      alert(`Error: ${error.message}`)
+    }
+  }
+
+  const handleNoClick = (notification: Notification) => {
+    setRejectionModal({ open: true, notification })
+  }
+
   const handleClick = (notification: Notification) => {
+    // Don't navigate on click if there are yes/no actions
+    if (notification.metadata?.requires_confirmation) {
+      return
+    }
+
     // Mark as read
     if (!notification.is_read) {
       handleMarkRead(notification.id)
@@ -136,17 +370,39 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
     }
   }
 
+  const getVehicleImageUrl = (vehicleId?: string): string | null => {
+    if (!vehicleId) return null
+    const image = vehicleImages[vehicleId]
+    if (!image) return null
+    
+    return image.thumbnail_url || image.variants?.medium || image.variants?.large || image.image_url || null
+  }
+
+  const getDataPoint = (notification: Notification): string => {
+    // Extract the specific data point from metadata
+    if (notification.metadata?.data_point) {
+      return notification.metadata.data_point
+    }
+    if (notification.metadata?.question) {
+      return notification.metadata.question
+    }
+    if (notification.metadata?.field_name) {
+      return `${notification.metadata.field_name}: ${notification.metadata.field_value || 'needs confirmation'}`
+    }
+    return notification.message || notification.title
+  }
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
-      case 'comment_on_vehicle': return '💬'
-      case 'vehicle_access_request': return '🔓'
-      case 'vehicle_contribution': return '➕'
-      case 'vehicle_liked': return '❤️'
-      case 'upload_completed': return '✅'
-      case 'analysis_completed': return '🤖'
-      case 'price_updated': return '💰'
-      case 'work_order_assigned': return '🔧'
-      default: return '🔔'
+      case 'comment_on_vehicle': return '[CMT]'
+      case 'vehicle_access_request': return '[ACC]'
+      case 'vehicle_contribution': return '[ADD]'
+      case 'vehicle_liked': return '[LKE]'
+      case 'upload_completed': return '[UPL]'
+      case 'analysis_completed': return '[AI]'
+      case 'price_updated': return '[PRC]'
+      case 'work_order_assigned': return '[WRK]'
+      default: return '[NOT]'
     }
   }
 
@@ -220,7 +476,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
               fontSize: '7pt'
             }}
           >
-            ✕
+            CLOSE
           </button>
         </div>
       </div>
@@ -242,54 +498,127 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
             No notifications
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {notifications.map(notification => (
-              <div
-                key={notification.id}
-                onClick={() => handleClick(notification)}
-                style={{
-                  padding: '12px',
-                  border: '1px solid #bdbdbd',
-                  background: notification.is_read ? '#ffffff' : '#f0f9ff',
-                  cursor: 'pointer',
-                  transition: '0.12s'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f5f5f5'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = notification.is_read ? '#ffffff' : '#f0f9ff'
-                }}
-              >
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'start' }}>
-                  <span style={{ fontSize: '14pt' }}>{getNotificationIcon(notification.notification_type)}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '9pt', fontWeight: notification.is_read ? '400' : '600', marginBottom: '4px' }}>
-                      {notification.title}
-                    </div>
-                    {notification.message && (
-                      <div style={{ fontSize: '8pt', color: '#757575', marginBottom: '4px' }}>
-                        {notification.message}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {notifications.map(notification => {
+              const vehicleImageUrl = getVehicleImageUrl(notification.vehicle_id || undefined)
+              const dataPoint = getDataPoint(notification)
+              const requiresConfirmation = notification.metadata?.requires_confirmation || notification.metadata?.action
+
+              return (
+                <div
+                  key={notification.id}
+                  onClick={() => handleClick(notification)}
+                  style={{
+                    padding: '12px',
+                    border: '1px solid #bdbdbd',
+                    background: notification.is_read ? '#ffffff' : '#f0f9ff',
+                    cursor: requiresConfirmation ? 'default' : 'pointer',
+                    transition: '0.12s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!requiresConfirmation) {
+                      e.currentTarget.style.background = '#f5f5f5'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = notification.is_read ? '#ffffff' : '#f0f9ff'
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
+                    {/* Vehicle Image */}
+                    {vehicleImageUrl && (
+                      <div style={{ flex: '0 0 60px', height: '60px', background: '#f0f0f0', border: '1px solid #bdbdbd', overflow: 'hidden' }}>
+                        <img
+                          src={vehicleImageUrl}
+                          alt="Vehicle"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none'
+                          }}
+                        />
                       </div>
                     )}
-                    <div style={{ fontSize: '7pt', color: '#9e9e9e' }}>
-                      {new Date(notification.created_at).toLocaleString()}
+
+                    {/* Content */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '9pt', fontWeight: notification.is_read ? '400' : '600', marginBottom: '6px' }}>
+                        {notification.title}
+                      </div>
+                      
+                      {/* Data Point */}
+                      <div style={{ 
+                        fontSize: '8pt', 
+                        color: '#424242', 
+                        marginBottom: requiresConfirmation ? '8px' : '4px',
+                        fontWeight: '500'
+                      }}>
+                        {dataPoint}
+                      </div>
+
+                      {requiresConfirmation && (
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleYes(notification)
+                            }}
+                            style={{
+                              padding: '6px 16px',
+                              border: '1px solid #059669',
+                              background: '#059669',
+                              color: 'white',
+                              cursor: 'pointer',
+                              fontSize: '8pt',
+                              fontWeight: '600'
+                            }}
+                          >
+                            YES
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleNo(notification)
+                            }}
+                            style={{
+                              padding: '6px 16px',
+                              border: '1px solid #dc2626',
+                              background: '#ffffff',
+                              color: '#dc2626',
+                              cursor: 'pointer',
+                              fontSize: '8pt',
+                              fontWeight: '600'
+                            }}
+                          >
+                            NO
+                          </button>
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: '7pt', color: '#9e9e9e', marginTop: '4px' }}>
+                        {new Date(notification.created_at).toLocaleString()}
+                      </div>
                     </div>
+
+                    {!notification.is_read && !requiresConfirmation && (
+                      <div
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          background: '#0ea5e9',
+                          borderRadius: '50%',
+                          marginTop: '4px',
+                          flexShrink: 0
+                        }}
+                      />
+                    )}
                   </div>
-                  {!notification.is_read && (
-                    <div
-                      style={{
-                        width: '8px',
-                        height: '8px',
-                        background: '#0ea5e9',
-                        borderRadius: '50%',
-                        marginTop: '4px'
-                      }}
-                    />
-                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

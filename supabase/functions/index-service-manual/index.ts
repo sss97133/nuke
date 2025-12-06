@@ -62,8 +62,51 @@ serve(async (req) => {
         .update({ metadata: result })
         .eq('id', document_id)
     } else if (mode === 'chunk') {
+      // Check if already indexed
+      const { data: existingChunks } = await supabase
+        .from('document_chunks')
+        .select('id')
+        .eq('document_id', document_id)
+        .limit(1)
+      
+      if (existingChunks && existingChunks.length > 0) {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            document_id, 
+            mode, 
+            skipped: true,
+            message: 'Document already indexed',
+            existing_chunks: existingChunks.length
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
       result = await chunkAndIndex(pdfUrl, llmConfig, doc, supabase)
     } else if (mode === 'full') {
+      // Check if already indexed
+      const { data: existingChunks } = await supabase
+        .from('document_chunks')
+        .select('id')
+        .eq('document_id', document_id)
+        .limit(1)
+      
+      if (existingChunks && existingChunks.length > 0) {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            document_id, 
+            mode, 
+            skipped: true,
+            message: 'Document already indexed',
+            existing_chunks: existingChunks.length,
+            structure: doc.metadata?.sections || []
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
       // Do both
       const structure = await extractStructure(pdfUrl, llmConfig, doc)
       await supabase

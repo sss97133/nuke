@@ -164,18 +164,28 @@ export default function Dashboard() {
     }
   };
 
-  const handleRejectWork = async (notificationId: string) => {
+  const handleRejectWork = async (notificationId: string, notes?: string) => {
     try {
-      await DashboardService.rejectWorkNotification(notificationId);
+      await DashboardService.rejectWorkNotification(notificationId, notes);
       setPendingWorkApprovals((prev) => prev.filter((w) => w.id !== notificationId));
       setPendingCounts((prev) =>
         prev
           ? { ...prev, work_approvals: Math.max(0, prev.work_approvals - 1) }
           : null
       );
+      setRejectionModal(null);
     } catch (error: any) {
       console.error('Error rejecting work:', error);
+      alert(`Error: ${error.message}`);
     }
+  };
+
+  const handleRejectClick = (id: string, title: string) => {
+    setRejectionModal({
+      open: true,
+      assignmentId: id,
+      title
+    });
   };
 
   const handleApproveAssignment = async (assignmentId: string) => {
@@ -195,9 +205,16 @@ export default function Dashboard() {
     }
   };
 
-  const handleRejectAssignment = async (assignmentId: string) => {
+  const [rejectionModal, setRejectionModal] = useState<{
+    open: boolean;
+    id: string | null;
+    title: string;
+    type: 'assignment' | 'work' | null;
+  } | null>(null);
+
+  const handleRejectAssignment = async (assignmentId: string, notes?: string) => {
     try {
-      await DashboardService.rejectVehicleAssignment(assignmentId);
+      await DashboardService.rejectVehicleAssignment(assignmentId, notes);
       setPendingVehicleAssignments((prev) => prev.filter((v) => v.id !== assignmentId));
       setPendingCounts((prev) =>
         prev
@@ -207,9 +224,20 @@ export default function Dashboard() {
             }
           : null
       );
+      setRejectionModal(null);
     } catch (error: any) {
       console.error('Error rejecting assignment:', error);
+      alert(`Error: ${error.message}`);
     }
+  };
+
+  const handleRejectClick = (id: string, title: string, type: 'assignment' | 'work' = 'assignment') => {
+    setRejectionModal({
+      open: true,
+      id,
+      title,
+      type
+    });
   };
 
 
@@ -315,8 +343,8 @@ export default function Dashboard() {
       created_at: wa.created_at,
       actions: [
         { id: 'approve', label: 'Approve', type: 'primary' as const, handler: () => handleApproveWork(wa.id) },
-        { id: 'reject', label: 'Reject', type: 'danger' as const, handler: () => handleRejectWork(wa.id) },
-        { id: 'view', label: 'View Vehicle', type: 'link' as const, handler: () => navigate(`/vehicle/${wa.vehicle_id}`) }
+        { id: 'reject', label: 'Reject', type: 'danger' as const, handler: () => handleRejectClick(wa.id, `Work Approval: ${wa.work_type || 'Work'} on ${wa.vehicle_name}`, 'work') },
+        { id: 'view', label: 'View Vehicle', type: 'link' as const, handler: () => window.open(`/vehicle/${wa.vehicle_id}`, '_blank', 'noopener,noreferrer') }
       ]
     })),
     ...pendingVehicleAssignments.map(va => {
@@ -339,10 +367,15 @@ export default function Dashboard() {
         message: `Suggested as ${relationshipDisplay} (${Math.round(va.confidence)}% confidence)${evidenceDisplay ? `. ${evidenceDisplay}` : ''}`,
         is_read: false,
         created_at: va.created_at,
+        metadata: {
+          vehicle_id: va.vehicle_id,
+          vehicle_name: va.vehicle_name,
+          organization_name: va.organization_name
+        },
         actions: [
           { id: 'approve', label: 'Approve', type: 'primary' as const, handler: () => handleApproveAssignment(va.id) },
-          { id: 'reject', label: 'Reject', type: 'danger' as const, handler: () => handleRejectAssignment(va.id) },
-          { id: 'view', label: 'View Vehicle', type: 'link' as const, handler: () => navigate(`/vehicle/${va.vehicle_id}`) }
+          { id: 'reject', label: 'Reject', type: 'danger' as const, handler: () => handleRejectClick(va.id, `Link ${va.vehicle_name} to ${va.organization_name}`, 'assignment') },
+          { id: 'view', label: 'View Vehicle', type: 'link' as const, handler: () => window.open(`/vehicle/${va.vehicle_id}`, '_blank') }
         ]
       };
     })
@@ -414,6 +447,100 @@ export default function Dashboard() {
               onMarkRead={handleMarkRead}
             />
           ))}
+        </div>
+      )}
+
+      {/* Rejection Feedback Modal */}
+      {rejectionModal && rejectionModal.open && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }}
+          onClick={() => setRejectionModal(null)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              padding: '20px',
+              border: '2px solid #bdbdbd',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '4px' }}>
+                Rejection Reason
+              </div>
+              <div style={{ fontSize: '8pt', color: '#757575', marginBottom: '12px' }}>
+                {rejectionModal.title}
+              </div>
+              <div style={{ fontSize: '8pt', color: '#757575', marginBottom: '8px' }}>
+                Why are you rejecting this? (Optional)
+              </div>
+              <textarea
+                id="rejection-notes"
+                placeholder="e.g., Vehicle is in storage, not actively serviced"
+                style={{
+                  width: '100%',
+                  minHeight: '80px',
+                  padding: '8px',
+                  border: '1px solid #bdbdbd',
+                  fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
+                  fontSize: '8pt',
+                  resize: 'vertical'
+                }}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setRejectionModal(null)}
+                style={{
+                  padding: '6px 16px',
+                  border: '1px solid #bdbdbd',
+                  background: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '8pt'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const notes = (document.getElementById('rejection-notes') as HTMLTextAreaElement)?.value || undefined;
+                  if (rejectionModal.id) {
+                    if (rejectionModal.type === 'work') {
+                      handleRejectWork(rejectionModal.id, notes);
+                    } else {
+                      handleRejectAssignment(rejectionModal.id, notes);
+                    }
+                  }
+                }}
+                style={{
+                  padding: '6px 16px',
+                  border: '1px solid #dc2626',
+                  background: '#dc2626',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '8pt',
+                  fontWeight: '600'
+                }}
+              >
+                Reject
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

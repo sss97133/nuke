@@ -185,15 +185,12 @@ export class DashboardService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    const { error } = await supabase
-      .from('pending_vehicle_assignments')
-      .update({
-        status: 'approved',
-        reviewed_by_user_id: user.id,
-        reviewed_at: new Date().toISOString(),
-        review_notes: notes || null
-      })
-      .eq('id', assignmentId);
+    // Use RPC function instead of direct update (handles RLS properly)
+    const { error } = await supabase.rpc('approve_pending_assignment', {
+      p_assignment_id: assignmentId,
+      p_user_id: user.id,
+      p_notes: notes || null
+    });
 
     if (error) throw error;
   }
@@ -205,15 +202,12 @@ export class DashboardService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    const { error } = await supabase
-      .from('pending_vehicle_assignments')
-      .update({
-        status: 'rejected',
-        reviewed_by_user_id: user.id,
-        reviewed_at: new Date().toISOString(),
-        review_notes: notes || null
-      })
-      .eq('id', assignmentId);
+    // Use RPC function instead of direct update (handles RLS properly)
+    const { error } = await supabase.rpc('reject_pending_assignment', {
+      p_assignment_id: assignmentId,
+      p_user_id: user.id,
+      p_notes: notes || null
+    });
 
     if (error) throw error;
   }
