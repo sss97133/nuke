@@ -247,20 +247,21 @@ If you cannot access the PDF directly, provide realistic chunks based on what wo
   if (!jsonMatch) throw new Error('Failed to parse JSON from response')
   const extracted = JSON.parse(jsonMatch[0])
 
-  // Store chunks in catalog_text_chunks (reuse existing table)
+  // Store chunks in service_manual_chunks table
   if (extracted.chunks) {
     for (const chunk of extracted.chunks) {
-      await supabase.from('catalog_text_chunks').insert({
-        catalog_id: doc.id,
+      await supabase.from('service_manual_chunks').insert({
+        document_id: doc.id,
         page_number: chunk.page_number,
-        section: sectionName,
-        heading: chunk.section_heading,
+        section_name: sectionName,
+        section_heading: chunk.section_heading,
         content: chunk.content,
         content_type: chunk.content_type,
+        key_topics: chunk.key_topics || [],
         metadata: {
-          key_topics: chunk.key_topics,
           document_title: doc.title,
-          document_type: 'service_manual'
+          document_type: 'service_manual',
+          year_range: doc.metadata?.year_range
         }
       })
     }
