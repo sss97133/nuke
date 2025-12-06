@@ -319,20 +319,33 @@ export default function Dashboard() {
         { id: 'view', label: 'View Vehicle', type: 'link' as const, handler: () => navigate(`/vehicle/${wa.vehicle_id}`) }
       ]
     })),
-    ...pendingVehicleAssignments.map(va => ({
-      id: va.id,
-      type: 'pending_vehicle_assignment' as const,
-      priority: 1 as const,
-      title: `Vehicle Assignment: ${va.vehicle_name}`,
-      message: `Assignment request for ${va.vehicle_name}`,
-      is_read: false,
-      created_at: va.created_at,
-      actions: [
-        { id: 'approve', label: 'Approve', type: 'primary' as const, handler: () => handleApproveAssignment(va.id) },
-        { id: 'reject', label: 'Reject', type: 'danger' as const, handler: () => handleRejectAssignment(va.id) },
-        { id: 'view', label: 'View Vehicle', type: 'link' as const, handler: () => navigate(`/vehicle/${va.vehicle_id}`) }
-      ]
-    }))
+    ...pendingVehicleAssignments.map(va => {
+      // Format relationship type for display (e.g., 'service_provider' -> 'Service Provider')
+      const relationshipDisplay = va.relationship_type
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      // Format evidence sources for display
+      const evidenceDisplay = va.evidence_sources && va.evidence_sources.length > 0
+        ? `Based on: ${va.evidence_sources.join(', ')}`
+        : '';
+      
+      return {
+        id: va.id,
+        type: 'pending_vehicle_assignment' as const,
+        priority: 1 as const,
+        title: `Link ${va.vehicle_name} to ${va.organization_name}`,
+        message: `Suggested as ${relationshipDisplay} (${Math.round(va.confidence)}% confidence)${evidenceDisplay ? `. ${evidenceDisplay}` : ''}`,
+        is_read: false,
+        created_at: va.created_at,
+        actions: [
+          { id: 'approve', label: 'Approve', type: 'primary' as const, handler: () => handleApproveAssignment(va.id) },
+          { id: 'reject', label: 'Reject', type: 'danger' as const, handler: () => handleRejectAssignment(va.id) },
+          { id: 'view', label: 'View Vehicle', type: 'link' as const, handler: () => navigate(`/vehicle/${va.vehicle_id}`) }
+        ]
+      };
+    })
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const isLoading = initialLoad || loadingSections.has('counts') || loadingSections.has('notifications');
