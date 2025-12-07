@@ -1,0 +1,28 @@
+name: Tier1 Batch Runner
+
+on:
+  schedule:
+    - cron: "*/2 * * * *" # every 2 minutes
+  workflow_dispatch:
+
+jobs:
+  invoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call tier1-batch-runner
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+        run: |
+          if [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_PROJECT_URL" ]; then
+            echo "Missing SUPABASE_ANON_KEY or SUPABASE_PROJECT_URL secrets" >&2
+            exit 1
+          fi
+          curl -sS -X POST \
+            "$SUPABASE_PROJECT_URL/functions/v1/tier1-batch-runner" \
+            -H "Content-Type: application/json" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -d '{}' \
+            --max-time 60
+
