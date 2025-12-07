@@ -8,8 +8,8 @@
 import { serve } from "https://deno.land/std@0.223.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const BATCH_SIZE = 1; // small to avoid worker limits
-const PACE_MS = 600; // delay between calls to avoid worker limits
+const BATCH_SIZE = 5; // higher batch for faster drain
+const PACE_MS = 250; // tighter pacing; relies on single retry
 const LOOKBACK_DAYS = 30;
 
 const corsHeaders = {
