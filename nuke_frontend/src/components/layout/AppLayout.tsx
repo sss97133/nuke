@@ -192,7 +192,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                     background: '#ffffff',
                     border: '2px solid #bdbdbd',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    zIndex: 1000,
+                    zIndex: 2000,
                     minWidth: '160px',
                     marginTop: '2px'
                   }}
