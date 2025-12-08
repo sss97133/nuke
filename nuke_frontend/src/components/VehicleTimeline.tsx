@@ -290,6 +290,25 @@ const VehicleTimeline: React.FC<{
         .order('event_date', { ascending: false })
         .limit(200);
 
+      // Load auction activity dates (comments and events)
+      const { data: auctionData } = await supabase
+        .from('auction_comments')
+        .select(`
+          posted_at,
+          comment_text,
+          comment_type,
+          bid_amount,
+          is_leading_bid,
+          auction_events (
+            source_url,
+            auction_start_date,
+            auction_end_date,
+            winning_bid,
+            outcome
+          )
+        `)
+        .eq('vehicle_id', vehicleId);
+
       // Load photo dates for calendar heatmap (photos ARE activity even if not events)
       const { data: imageData } = await supabase
         .from('vehicle_images')
@@ -297,18 +316,31 @@ const VehicleTimeline: React.FC<{
         .eq('vehicle_id', vehicleId)
         .not('taken_at', 'is', null);
 
-      // Build photo date map for calendar
-      const photoDateMap = new Map<string, number>();
+      // Build activity date map for calendar (photos + auction activity)
+      const activityDateMap = new Map<string, number>();
+
+      // Add photo dates
       if (imageData) {
         for (const img of imageData) {
           if (img.taken_at) {
             const dateKey = new Date(img.taken_at).toISOString().split('T')[0];
-            photoDateMap.set(dateKey, (photoDateMap.get(dateKey) || 0) + 1);
+            activityDateMap.set(dateKey, (activityDateMap.get(dateKey) || 0) + 1);
           }
         }
       }
-      setPhotoDates(photoDateMap);
-      console.log(`Loaded ${photoDateMap.size} days with photos`);
+
+      // Add auction activity dates
+      if (auctionData) {
+        for (const comment of auctionData) {
+          if (comment.posted_at) {
+            const dateKey = new Date(comment.posted_at).toISOString().split('T')[0];
+            activityDateMap.set(dateKey, (activityDateMap.get(dateKey) || 0) + 1);
+          }
+        }
+      }
+
+      setPhotoDates(activityDateMap);
+      console.log(`Loaded ${activityDateMap.size} days with activity (photos + auction)`);
 
       if (timelineError) {
         console.error('Error loading timeline events:', timelineError);
@@ -332,8 +364,8 @@ const VehicleTimeline: React.FC<{
           yearCounts[year] = (yearCounts[year] || 0) + 1;
         });
         
-        // Add photo counts by year
-        photoDateMap.forEach((count, dateStr) => {
+        // Add activity counts by year (photos + auction)
+        activityDateMap.forEach((count, dateStr) => {
           const year = new Date(dateStr).getFullYear();
           yearCounts[year] = (yearCounts[year] || 0) + count;
         });
@@ -347,9 +379,9 @@ const VehicleTimeline: React.FC<{
             })
             .map(([year]) => Number(year));
           
-          // Always set to the year with the most activity (events + photos)
+          // Always set to the year with the most activity (events + photos + auction)
           setSelectedYear(sortedYears[0]);
-          console.log(`Setting timeline to year ${sortedYears[0]} with ${yearCounts[sortedYears[0]]} items (events + photos)`);
+          console.log(`Setting timeline to year ${sortedYears[0]} with ${yearCounts[sortedYears[0]]} items (events + photos + auction)`);
         }
       }
     } catch (error) {
@@ -623,14 +655,14 @@ const VehicleTimeline: React.FC<{
                                       })
                                     : [];
                                   
-                                  // Include photo activity for this day (photos taken on this date)
-                                  const photoCount = photoDates.get(dayYmd) || 0;
-                                  const hours = hoursForDay(dayEvents) + (photoCount > 0 ? Math.min(2, photoCount / 10) : 0);
-                                  const clickable = dayEvents.length > 0 || photoCount > 0;
+                                  // Include activity for this day (photos + auction activity)
+                                  const activityCount = photoDates.get(dayYmd) || 0;
+                                  const hours = hoursForDay(dayEvents) + (activityCount > 0 ? Math.min(2, activityCount / 10) : 0);
+                                  const clickable = dayEvents.length > 0 || activityCount > 0;
                                   return (
                                     <div
                                       key={idx}
-                                      title={`${date.toLocaleDateString()}: ${clickable ? `${dayEvents.length} events${photoCount > 0 ? ` • ${photoCount} photos` : ''} • ~${hours.toFixed(1)} hrs` : 'No activity'}`}
+                                      title={`${date.toLocaleDateString()}: ${clickable ? `${dayEvents.length} events${activityCount > 0 ? ` • ${activityCount} activity` : ''} • ~${hours.toFixed(1)} hrs` : 'No activity'}`}
                                       onClick={async () => {
                                         if (clickable) {
                                           if (onDateClick) {
@@ -640,14 +672,31 @@ const VehicleTimeline: React.FC<{
                                             if (dayEvents.length > 0) {
                                               // Open receipt for the first event
                                               setSelectedEventForDetail(dayEvents[0].id);
-                                            } else if (photoCount > 0) {
-                                              // If day has photos but no events, find or create event for that date
+                                            } else if (activityCount > 0) {
+                                              // If day has activity but no events, get photos and auction activity for that date
                                               const { data: dayImages } = await supabase
                                                 .from('vehicle_images')
                                                 .select('*')
                                                 .eq('vehicle_id', vehicleId)
                                                 .gte('taken_at', dayYmd)
                                                 .lt('taken_at', new Date(new Date(dayYmd).getTime() + 86400000).toISOString());
+
+                                              const { data: dayAuction } = await supabase
+                                                .from('auction_comments')
+                                                .select(`
+                                                  comment_text,
+                                                  comment_type,
+                                                  bid_amount,
+                                                  is_leading_bid,
+                                                  posted_at,
+                                                  auction_events (
+                                                    source_url,
+                                                    outcome
+                                                  )
+                                                `)
+                                                .eq('vehicle_id', vehicleId)
+                                                .gte('posted_at', dayYmd)
+                                                .lt('posted_at', new Date(new Date(dayYmd).getTime() + 86400000).toISOString());
                                               
                                               // Check if there's an existing event for this date
                                               const { data: existingEvent, error: eventError } = await supabase
@@ -668,18 +717,41 @@ const VehicleTimeline: React.FC<{
                                                 // Open existing event receipt
                                                 setSelectedEventForDetail(existingEvent.id);
                                               } else {
-                                                // Show day popup for photos without events
-                                                const photoEvent = {
-                                                  id: `photos-${dayYmd}`,
+                                                // Show day popup for activity without events
+                                                const photoCount = dayImages?.length || 0;
+                                                const auctionCount = dayAuction?.length || 0;
+
+                                                let title = '';
+                                                let description = '';
+
+                                                if (photoCount > 0 && auctionCount > 0) {
+                                                  title = `${photoCount} photo${photoCount > 1 ? 's' : ''} • ${auctionCount} auction comment${auctionCount > 1 ? 's' : ''}`;
+                                                  description = 'Photos taken and auction activity';
+                                                } else if (photoCount > 0) {
+                                                  title = `${photoCount} photo${photoCount > 1 ? 's' : ''} taken`;
+                                                  description = 'Vehicle documentation';
+                                                } else if (auctionCount > 0) {
+                                                  title = `${auctionCount} auction comment${auctionCount > 1 ? 's' : ''}`;
+                                                  description = 'Bring a Trailer auction activity';
+                                                }
+
+                                                const activityEvent = {
+                                                  id: `activity-${dayYmd}`,
                                                   vehicle_id: vehicleId,
                                                   event_type: 'documentation' as any,
                                                   event_date: dayYmd,
-                                                  title: `${photoCount} photo${photoCount > 1 ? 's' : ''} taken`,
-                                                  description: 'Vehicle documentation',
+                                                  title,
+                                                  description,
                                                   image_urls: dayImages?.map(img => img.image_url) || [],
-                                                  metadata: { photo_date: true, photo_count: photoCount }
+                                                  metadata: {
+                                                    photo_date: photoCount > 0,
+                                                    photo_count: photoCount,
+                                                    auction_activity: auctionCount > 0,
+                                                    auction_count: auctionCount,
+                                                    auction_data: dayAuction
+                                                  }
                                                 };
-                                                setSelectedDayEvents([photoEvent as any]);
+                                                setSelectedDayEvents([activityEvent as any]);
                                                 setShowDayPopup(true);
                                               }
                                             }
