@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import VehicleThumbnail from '../VehicleThumbnail';
 import DataContextModal from './DataContextModal';
+import { UnifiedPricingService } from '../../services/unifiedPricingService';
 import '../../design-system.css';
 
 interface VehicleData {
@@ -27,10 +28,10 @@ interface EnhancedVehicleCardProps {
   onDataClick?: (contextType: string, contextValue: any) => void;
 }
 
-const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({ 
-  vehicle, 
-  viewMode, 
-  denseMode = false 
+const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
+  vehicle,
+  viewMode,
+  denseMode = false
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalContext, setModalContext] = useState<{
@@ -38,6 +39,24 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
     value: string | number | null;
   }>({ type: null, value: null });
   const [sortPreference, setSortPreference] = useState<'coolest' | 'nearest' | 'best_opportunity'>('coolest');
+  const [unifiedPrice, setUnifiedPrice] = useState<number>(0);
+  const [priceLabel, setPriceLabel] = useState<string>('');
+
+  // Load unified price on component mount
+  useEffect(() => {
+    const loadPrice = async () => {
+      try {
+        const price = await UnifiedPricingService.getDisplayPrice(vehicle.id);
+        setUnifiedPrice(price.displayValue);
+        setPriceLabel(price.displayLabel);
+      } catch (error) {
+        // Fallback to legacy pricing logic
+        setUnifiedPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value || vehicle.purchase_price || vehicle.msrp || 0);
+        setPriceLabel('Estimated at');
+      }
+    };
+    loadPrice();
+  }, [vehicle.id, vehicle.sale_price, vehicle.asking_price, vehicle.current_value, vehicle.purchase_price, vehicle.msrp]);
 
   const getUserDisplay = () => {
     if (vehicle.profiles?.full_name) return vehicle.profiles.full_name;
@@ -46,7 +65,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
   };
 
   const calculateEstimate = () => {
-    return vehicle.sale_price || vehicle.asking_price || vehicle.current_value || vehicle.purchase_price || vehicle.msrp || 0;
+    return unifiedPrice;
   };
 
   const calculateChange = () => {

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { UnifiedPricingService } from '../../services/unifiedPricingService';
 
 interface VehicleCardDenseProps {
   vehicle: {
@@ -45,14 +46,32 @@ interface VehicleCardDenseProps {
   showDetailOverlay?: boolean;
 }
 
-const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({ 
-  vehicle, 
-  viewMode = 'list', 
-  showSocial = false, 
+const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
+  vehicle,
+  viewMode = 'list',
+  showSocial = false,
   showPriceChange = false,
   showPriceOverlay = true,
   showDetailOverlay = true
 }) => {
+  const [displayPrice, setDisplayPrice] = useState<string>('—');
+  const [priceLabel, setPriceLabel] = useState<string>('');
+
+  // Load unified price on component mount
+  useEffect(() => {
+    const loadPrice = async () => {
+      try {
+        const price = await UnifiedPricingService.getDisplayPrice(vehicle.id);
+        setDisplayPrice(UnifiedPricingService.formatPrice(price.displayValue));
+        setPriceLabel(price.displayLabel);
+      } catch (error) {
+        setDisplayPrice('—');
+        setPriceLabel('');
+      }
+    };
+    loadPrice();
+  }, [vehicle.id]);
+
   const formatPrice = (price?: number) => {
     if (!price) return '—';
     return new Intl.NumberFormat('en-US', {
@@ -94,8 +113,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   };
 
   const imageUrl = getImageUrl();
-  // Price priority: sale_price (sold) > asking_price (listed) > current_value (estimated)
-  const displayPrice = vehicle.sale_price || vehicle.asking_price || vehicle.current_value;
   const timeAgo = formatTimeAgo(vehicle.updated_at || vehicle.created_at);
 
   // LIST VIEW: Cursor-style - compact, dense, single row
@@ -167,7 +184,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         
         {/* Value */}
         <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '9pt' }}>
-          {formatPrice(vehicle.current_value)}
+          {displayPrice}
         </div>
         
         {/* Profit (if valid) */}
@@ -236,7 +253,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           )}
 
           {/* Price - top right (toggleable) */}
-          {showPriceOverlay && vehicle.current_value && (
+          {showPriceOverlay && displayPrice !== '—' && (
             <div
               style={{
                 position: 'absolute',
@@ -251,7 +268,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 fontWeight: 700,
               }}
             >
-              {formatPrice(vehicle.current_value)}
+              {displayPrice}
             </div>
           )}
 
@@ -435,7 +452,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         onTouchEnd={handleTouchEnd}
       >
         {/* Price overlay - top right */}
-        {showPriceOverlay && vehicle.current_value && (
+        {showPriceOverlay && displayPrice !== '—' && (
           <div style={{
             position: 'absolute',
             top: '6px',
@@ -448,7 +465,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             fontSize: '8pt',
             fontWeight: 700,
           }}>
-            {formatPrice(vehicle.current_value)}
+            {displayPrice}
           </div>
         )}
         
