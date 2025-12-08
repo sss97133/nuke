@@ -221,8 +221,24 @@
 
 /* 10001 - Profile dropdown menu */
 /* 10000 - Profile dropdown backdrop */
+/* 2000 - Navigation dropdown menu */
 /* 1000 - Sticky header */
 /* 200 - Upload status bar */
 /* 100 - Page content */
 /* 1 - Base content */
+
+/* ============================================================================
+   NAVIGATION DROPDOWN FIXES
+   ============================================================================ */
+
+/* Ensure navigation dropdown links are clickable and have proper hover states */
+[data-n-zero-menu] .nav-link {
+  cursor: pointer !important;
+  transition: background-color 0.1s ease !important;
+}
+
+[data-n-zero-menu] .nav-link:hover {
+  background: #f0f0f0 !important;
+  border-color: transparent !important;
+}
 
