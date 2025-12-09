@@ -721,16 +721,6 @@ body {
 /* REMOVED - now in header-fix.css */
 /* .header-wrapper, .header-content, .header-left moved to header-fix.css for clean separation */
 
-.header-left {
-  /* Keeping this for backwards compatibility but header-fix.css takes precedence */
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  padding-left: 5px;
-  flex: 0 0 auto;
-  min-width: 0;
-}
-
 .logo {
   text-decoration: none;
   color: var(--text);
@@ -3108,13 +3098,6 @@ body {
     display: flex !important;
   }
 
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: var(--space-6);
-    padding-left: 5px;
-  }
-  
   .header-right {
     display: flex;
     align-items: center;
@@ -3154,23 +3137,6 @@ body {
   }
 
   /* REMOVED - header rules now in header-fix.css for clean responsive design */
-
-  .header-left {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: var(--space-6);
-    min-width: 0;
-  }
-
-  .header-right {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    min-width: 0;
-  }
-
   .desktop-nav {
     display: flex !important;
   }
