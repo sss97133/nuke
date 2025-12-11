@@ -149,6 +149,62 @@ interface ProcessRequest {
   source_id?: string;
 }
 
+/**
+ * Trigger dealer website inventory sync
+ * This queues a scrape of the dealer's full website inventory
+ */
+async function triggerDealerInventorySync(orgId: string, website: string, supabase: any) {
+  try {
+    // Check if sync was already triggered recently (within 24 hours)
+    const { data: recentSync } = await supabase
+      .from('organizations')
+      .select('last_inventory_sync')
+      .eq('id', orgId)
+      .single();
+    
+    if (recentSync?.last_inventory_sync) {
+      const lastSync = new Date(recentSync.last_inventory_sync);
+      const hoursSinceSync = (Date.now() - lastSync.getTime()) / (1000 * 60 * 60);
+      if (hoursSinceSync < 24) {
+        console.log(`⏭️  Inventory sync skipped (synced ${hoursSinceSync.toFixed(1)}h ago)`);
+        return;
+      }
+    }
+    
+    // Trigger scrape-multi-source function to scrape dealer website
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`
+      },
+      body: JSON.stringify({
+        source_url: website,
+        source_type: 'dealer_website',
+        organization_id: orgId,
+        max_results: 100 // Scrape up to 100 vehicles
+      })
+    });
+    
+    if (response.ok) {
+      console.log(`✅ Triggered inventory sync for ${website}`);
+      // Update last_inventory_sync timestamp
+      await supabase
+        .from('organizations')
+        .update({ last_inventory_sync: new Date().toISOString() })
+        .eq('id', orgId);
+    } else {
+      throw new Error(`Sync trigger failed: ${response.status}`);
+    }
+  } catch (error: any) {
+    console.error(`❌ Failed to trigger inventory sync: ${error.message}`);
+    throw error;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -818,78 +874,161 @@ serve(async (req) => {
         let dealerPhone: string | null = null;
         let dealerLocation: string | null = null;
         
-        // Extract dealer info from Craigslist listing
+        // Extract dealer info from Craigslist listing (enhanced with website detection)
         if (item.listing_url.includes('craigslist.org')) {
-          // Look for dealer name in title or description
-          const titleText = scrapeData.data.title || '';
-          const descText = scrapeData.data.description || '';
-          const combinedText = `${titleText} ${descText}`;
-          
-          // Pattern: "Desert Private Collection (760) 313-6607"
-          const dealerMatch = combinedText.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*\(?\s*(\d{3})\s*\)?\s*(\d{3})[-\s]?(\d{4})/);
-          if (dealerMatch) {
-            dealerName = dealerMatch[1].trim();
-            dealerPhone = `(${dealerMatch[2]}) ${dealerMatch[3]}-${dealerMatch[4]}`;
+          // Use dealer info from scrape-vehicle if available (includes website extraction)
+          if (scrapeData.data.dealer_name) {
+            dealerName = scrapeData.data.dealer_name;
+          }
+          if (scrapeData.data.dealer_website) {
+            // Store website for organization creation
+            const dealerWebsite = scrapeData.data.dealer_website;
+          }
+          if (scrapeData.data.dealer_phone) {
+            dealerPhone = scrapeData.data.dealer_phone;
           }
           
-          // Pattern: "EZCustom4x4", "Hayes Classics", etc.
+          // Fallback to pattern matching if scraper didn't find dealer info
           if (!dealerName) {
-            const namePatterns = [
-              /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Classics?/i,
-              /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Auto/i,
-              /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Motors?/i,
-              /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Collection/i
-            ];
-            for (const pattern of namePatterns) {
-              const match = combinedText.match(pattern);
-              if (match && match[1].length > 3) {
-                dealerName = match[1].trim();
-                break;
+            const titleText = scrapeData.data.title || '';
+            const descText = scrapeData.data.description || '';
+            const combinedText = `${titleText} ${descText}`;
+            
+            // Pattern: "Desert Private Collection (760) 313-6607"
+            const dealerMatch = combinedText.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*\(?\s*(\d{3})\s*\)?\s*(\d{3})[-\s]?(\d{4})/);
+            if (dealerMatch) {
+              dealerName = dealerMatch[1].trim();
+              dealerPhone = `(${dealerMatch[2]}) ${dealerMatch[3]}-${dealerMatch[4]}`;
+            }
+            
+            // Pattern: "EZCustom4x4", "Hayes Classics", etc.
+            if (!dealerName) {
+              const namePatterns = [
+                /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Classics?/i,
+                /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Auto/i,
+                /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Motors?/i,
+                /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Collection/i
+              ];
+              for (const pattern of namePatterns) {
+                const match = combinedText.match(pattern);
+                if (match && match[1].length > 3) {
+                  dealerName = match[1].trim();
+                  break;
+                }
+              }
+            }
+            
+            // Extract location from title/description
+            const locationMatch = combinedText.match(/\(([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\)/);
+            if (locationMatch) {
+              dealerLocation = locationMatch[1];
+            }
+          }
+        }
+        
+        // Enhanced organization detection: check for VIN + dealer combo
+        // This enables intelligent cross-city dealer detection
+        const dealerWebsite = scrapeData.data.dealer_website || null;
+        const listingVIN = scrapeData.data.vin || null;
+        
+        // Get or create organization (intelligent dealer detection)
+        if ((dealerName && dealerName.length > 2) || dealerWebsite) {
+          const orgSlug = dealerName 
+            ? dealerName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+            : null;
+          
+          // Check if organization exists by website (strongest match), slug, or name
+          let existingOrg = null;
+          if (dealerWebsite) {
+            const { data: orgByWebsite } = await supabase
+              .from('organizations')
+              .select('id, name, website')
+              .eq('website', dealerWebsite)
+              .limit(1)
+              .maybeSingle();
+            
+            if (orgByWebsite) {
+              existingOrg = orgByWebsite;
+              console.log(`✅ Found existing organization by website: ${dealerWebsite} -> ${orgByWebsite.name}`);
+            }
+          }
+          
+          // Fallback: check by slug or name
+          if (!existingOrg && orgSlug) {
+            const { data: orgByName } = await supabase
+              .from('organizations')
+              .select('id, name, website')
+              .or(`slug.eq.${orgSlug},name.ilike.%${dealerName}%`)
+              .limit(1)
+              .maybeSingle();
+            
+            if (orgByName) {
+              existingOrg = orgByName;
+              // Update website if we found org by name but it's missing website
+              if (dealerWebsite && !orgByName.website) {
+                await supabase
+                  .from('organizations')
+                  .update({ website: dealerWebsite })
+                  .eq('id', orgByName.id);
+                console.log(`✅ Updated organization website: ${orgByName.name}`);
               }
             }
           }
           
-          // Extract location from title/description
-          const locationMatch = combinedText.match(/\(([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\)/);
-          if (locationMatch) {
-            dealerLocation = locationMatch[1];
-          }
-        }
-        
-        // Get or create organization
-        if (dealerName && dealerName.length > 2) {
-          const orgSlug = dealerName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-          
-          // Check if organization exists
-          const { data: existingOrg } = await supabase
-            .from('organizations')
-            .select('id')
-            .or(`slug.eq.${orgSlug},name.ilike.%${dealerName}%`)
-            .limit(1)
-            .single();
-          
           if (existingOrg) {
             organizationId = existingOrg.id;
-            console.log(`✅ Found existing organization: ${dealerName} (${organizationId})`);
+            console.log(`✅ Found existing organization: ${existingOrg.name} (${organizationId})`);
+            
+            // Trigger inventory sync if website available (async, don't wait)
+            if (dealerWebsite) {
+              // Queue website inventory scrape for this dealer
+              triggerDealerInventorySync(existingOrg.id, dealerWebsite, supabase).catch(err => {
+                console.warn(`⚠️ Failed to trigger inventory sync: ${err.message}`);
+              });
+            }
           } else {
             // Create new organization
+            const orgData: any = {
+              type: 'dealer',
+              discovered_via: 'import_queue',
+              source_url: item.listing_url
+            };
+            
+            if (dealerName) {
+              orgData.name = dealerName;
+              orgData.slug = orgSlug;
+            } else if (dealerWebsite) {
+              // Extract name from domain if no name found
+              const domainMatch = dealerWebsite.match(/https?:\/\/(?:www\.)?([^.]+)/);
+              if (domainMatch) {
+                const domainName = domainMatch[1].replace(/-/g, ' ');
+                orgData.name = domainName.split(/(?=[A-Z])/).map((w: string) => 
+                  w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+                ).join(' ');
+                orgData.slug = domainName.replace(/[^a-z0-9]+/g, '-');
+              }
+            }
+            
+            if (dealerPhone) orgData.phone = dealerPhone;
+            if (dealerLocation) orgData.location = dealerLocation;
+            if (dealerWebsite) orgData.website = dealerWebsite;
+            
             const { data: newOrg, error: orgError } = await supabase
               .from('organizations')
-              .insert({
-                name: dealerName,
-                slug: orgSlug,
-                type: 'dealer',
-                phone: dealerPhone,
-                location: dealerLocation,
-                discovered_via: 'import_queue',
-                source_url: item.listing_url
-              })
+              .insert(orgData)
               .select('id')
               .single();
             
             if (newOrg && !orgError) {
               organizationId = newOrg.id;
-              console.log(`✅ Created new organization: ${dealerName} (${organizationId})`);
+              console.log(`✅ Created new organization: ${orgData.name || dealerWebsite} (${organizationId})`);
+              
+              // Trigger inventory sync for new dealer
+              if (dealerWebsite) {
+                triggerDealerInventorySync(newOrg.id, dealerWebsite, supabase).catch(err => {
+                  console.warn(`⚠️ Failed to trigger inventory sync: ${err.message}`);
+                });
+              }
             } else {
               console.warn(`⚠️ Failed to create organization: ${orgError?.message || 'Unknown error'}`);
             }
@@ -950,6 +1089,77 @@ serve(async (req) => {
         
         if (!year || year < 1885 || year > new Date().getFullYear() + 1) {
           throw new Error(`Invalid year: ${year} - cannot create vehicle`);
+        }
+        
+        // VIN-based duplicate detection (handles cross-city dealer listings)
+        // If same VIN exists, update existing vehicle instead of creating duplicate
+        let existingVehicleId: string | null = null;
+        const listingVIN = scrapeData.data.vin;
+        
+        if (listingVIN && listingVIN.length === 17 && !listingVIN.startsWith('VIVA-')) {
+          const { data: existingVehicle } = await supabase
+            .from('vehicles')
+            .select('id, discovery_url, origin_organization_id')
+            .eq('vin', listingVIN)
+            .limit(1)
+            .maybeSingle();
+          
+          if (existingVehicle) {
+            existingVehicleId = existingVehicle.id;
+            console.log(`✅ Found existing vehicle with VIN ${listingVIN}, updating instead of creating duplicate`);
+            
+            // Update discovery URL if this listing is different (cross-city detection)
+            if (existingVehicle.discovery_url !== item.listing_url) {
+              await supabase
+                .from('vehicles')
+                .update({ 
+                  discovery_url: item.listing_url, // Update to latest listing
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingVehicle.id);
+              console.log(`📍 Updated discovery URL for cross-city listing: ${item.listing_url}`);
+            }
+            
+            // Link to organization if not already linked
+            if (organizationId && (!existingVehicle.origin_organization_id || existingVehicle.origin_organization_id !== organizationId)) {
+              await supabase
+                .from('vehicles')
+                .update({ 
+                  origin_organization_id: organizationId,
+                  selling_organization_id: organizationId,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingVehicle.id);
+              console.log(`🔗 Linked existing vehicle to organization ${organizationId}`);
+              
+              // Also ensure organization_vehicles link exists
+              await supabase
+                .from('organization_vehicles')
+                .upsert({
+                  organization_id: organizationId,
+                  vehicle_id: existingVehicle.id,
+                  relationship_type: 'inventory',
+                  status: 'active',
+                  auto_tagged: true
+                }, {
+                  onConflict: 'organization_id,vehicle_id'
+                });
+            }
+            
+            // Mark queue item as processed (merged with existing)
+            await supabase
+              .from('import_queue')
+              .update({
+                status: 'completed',
+                processed_at: new Date().toISOString(),
+                vehicle_id: existingVehicle.id
+              })
+              .eq('id', item.id);
+            
+            console.log(`✅ Merged listing with existing vehicle ${existingVehicle.id}`);
+            processedCount++;
+            continue; // Skip to next item
+          }
         }
         
         // Create vehicle - START AS PENDING until validated
@@ -1218,6 +1428,16 @@ serve(async (req) => {
             // Extract current bid from asking_price
             const currentBid = scrapeData.data.asking_price || null;
             
+            // Calculate start_date: Use auction_start_date if available, otherwise calculate from end_date (end - 7 days)
+            let startDate = scrapeData.data.auction_start_date;
+            if (!startDate && scrapeData.data.auction_end_date) {
+              const endDate = new Date(scrapeData.data.auction_end_date);
+              const calculatedStart = new Date(endDate);
+              calculatedStart.setDate(calculatedStart.getDate() - 7); // BAT auctions run for 7 days
+              startDate = calculatedStart.toISOString();
+              console.log(`📅 Calculated start_date from end_date: ${startDate} (end: ${scrapeData.data.auction_end_date})`);
+            }
+            
             // Use the same organization_id as the vehicle
             const orgId = organizationId || null;
             
@@ -1230,7 +1450,7 @@ serve(async (req) => {
                 listing_url: item.listing_url,
                 listing_id: lotNumber || item.listing_url.split('/').pop() || null,
                 listing_status: 'active',
-                start_date: new Date().toISOString(), // Approximate start
+                start_date: startDate || new Date().toISOString(), // Use calculated start_date, fallback to now
                 end_date: scrapeData.data.auction_end_date,
                 current_bid: currentBid,
                 bid_count: 0, // Will be updated on sync

@@ -1,0 +1,621 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface DealerProfileData {
+  name: string | null;
+  logo_url: string | null;
+  website: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  phone: string | null;
+  email: string | null;
+  dealer_license: string | null;
+  license_type: 'dealer_license' | 'auction_license' | null;
+  business_type: 'dealer' | 'auction_house';
+  description: string | null;
+  specialties: string[];
+  inventory_url: string | null;
+  auctions_url: string | null;
+}
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const { profile_url } = await req.json();
+
+    if (!profile_url) {
+      return new Response(
+        JSON.stringify({ error: 'profile_url is required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    );
+
+    const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+
+    console.log(`🔥 Indexing Classic.com dealer profile: ${profile_url}`);
+
+    // Step 1: Scrape Classic.com profile with Firecrawl STRUCTURED EXTRACTION
+    let dealerData: DealerProfileData | null = null;
+
+    if (firecrawlApiKey) {
+      console.log('🔥 Using Firecrawl structured extraction...');
+      const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${firecrawlApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          url: profile_url,
+          formats: ['html', 'markdown', 'extract'],
+          extract: {
+            schema: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                logo_url: { type: 'string' },
+                website: { type: 'string' },
+                address: { type: 'string' },
+                city: { type: 'string' },
+                state: { type: 'string' },
+                zip: { type: 'string' },
+                phone: { type: 'string' },
+                email: { type: 'string' },
+                dealer_license: { type: 'string' },
+                description: { type: 'string' },
+                specialties: {
+                  type: 'array',
+                  items: { type: 'string' }
+                },
+                inventory_url: { type: 'string' },
+                auctions_url: { type: 'string' },
+                business_type: { type: 'string', enum: ['dealer', 'auction_house'] }
+              }
+            }
+          },
+          waitFor: 3000
+        })
+      });
+
+      if (firecrawlResponse.ok) {
+        const firecrawlData = await firecrawlResponse.json();
+        
+        if (firecrawlData.success && firecrawlData.data?.extract) {
+          const extracted = firecrawlData.data.extract;
+          dealerData = {
+            name: extracted.name || null,
+            logo_url: extracted.logo_url || null,
+            website: extracted.website || null,
+            address: extracted.address || null,
+            city: extracted.city || null,
+            state: extracted.state || null,
+            zip: extracted.zip || null,
+            phone: extracted.phone || null,
+            email: extracted.email || null,
+            dealer_license: extracted.dealer_license || null,
+            license_type: extracted.dealer_license ? 'dealer_license' : null,
+            business_type: (extracted.business_type === 'auction_house' ? 'auction_house' : 'dealer'),
+            description: extracted.description || null,
+            specialties: extracted.specialties || [],
+            inventory_url: extracted.inventory_url || null,
+            auctions_url: extracted.auctions_url || null
+          };
+          console.log('✅ Firecrawl structured extraction successful');
+        } else {
+          console.warn('⚠️ Firecrawl extract empty, falling back to HTML parsing');
+          // Fallback to HTML parsing
+          const html = firecrawlData.data?.html || '';
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          dealerData = extractDealerProfileData(doc, html);
+        }
+      } else {
+        throw new Error(`Firecrawl failed: ${firecrawlResponse.status}`);
+      }
+    } else {
+      throw new Error('FIRECRAWL_API_KEY is required');
+    }
+
+    if (!dealerData) {
+      throw new Error('Failed to extract dealer data');
+    }
+
+    // Step 3: Check greenlight signals
+    if (!shouldCreateOrganization(dealerData)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing required greenlight signals (name, logo, license)' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    // Step 4: Download and store logo as favicon
+    let logoUrl: string | null = null;
+    if (dealerData.logo_url) {
+      logoUrl = await downloadAndStoreLogo(dealerData.logo_url, dealerData.website || '', supabase);
+    }
+
+    // Step 5: Find or create organization using geographic logic
+    const organization = await findOrCreateOrganizationWithGeographicLogic(
+      dealerData,
+      logoUrl,
+      profile_url,
+      supabase
+    );
+
+    // Step 6: Queue inventory extraction if website available
+    if (organization && dealerData.website) {
+      await queueInventoryExtraction({
+        organization_id: organization.id,
+        business_type: dealerData.business_type,
+        website: dealerData.website,
+        inventory_url: dealerData.inventory_url,
+        auctions_url: dealerData.auctions_url
+      }, supabase);
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        organization_id: organization?.id,
+        organization_name: organization?.name,
+        logo_url: logoUrl,
+        dealer_data: dealerData,
+        action: organization?.id ? 'created' : 'found_existing'
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error: any) {
+    console.error('Error indexing Classic.com dealer:', error);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    );
+  }
+});
+
+/**
+ * Extract dealer profile data from Classic.com HTML
+ */
+function extractDealerProfileData(doc: any, html: string): DealerProfileData {
+  const data: DealerProfileData = {
+    name: null,
+    logo_url: null,
+    website: null,
+    address: null,
+    city: null,
+    state: null,
+    zip: null,
+    phone: null,
+    email: null,
+    dealer_license: null,
+    license_type: null,
+    business_type: 'dealer',
+    description: null,
+    specialties: [],
+    inventory_url: null,
+    auctions_url: null
+  };
+
+  // Extract dealer name (usually in h1 or title)
+  const nameEl = doc.querySelector('h1, .dealer-name, .dealer-title, title');
+  if (nameEl) {
+    data.name = nameEl.textContent?.trim() || null;
+    // Clean up Classic.com suffix if present
+    if (data.name) {
+      data.name = data.name.replace(/\s*-\s*Classic.com.*$/i, '').trim();
+    }
+  }
+
+  // Extract logo (Classic.com stores in images.classic.com/uploads/dealer/)
+  // Pattern matches: <img src="https://images.classic.com/uploads/dealer/One_Eleven_Motorcars.png" class="object-fit" alt="111 Motorcars">
+  const logoPatterns = [
+    // Exact Classic.com pattern with class="object-fit"
+    /<img[^>]+src="(https?:\/\/images\.classic\.com\/uploads\/dealer\/[^"]+\.(?:png|jpg|jpeg|svg))"[^>]*class="[^"]*object-fit[^"]*"[^>]*alt="[^"]*"/i,
+    // Generic Classic.com dealer logo pattern
+    /<img[^>]+src="(https?:\/\/images\.classic\.com\/uploads\/dealer\/[^"]+\.(?:png|jpg|jpeg|svg))"/i,
+    // Fallback: any dealer logo mention
+    /dealer.*logo.*src="([^"]+\.(?:png|jpg|jpeg|svg))"/i
+  ];
+
+  for (const pattern of logoPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      data.logo_url = match[1].startsWith('http') ? match[1] : `https://www.classic.com${match[1]}`;
+      break;
+    }
+  }
+
+  // Extract website URL
+  const websiteEl = doc.querySelector('a[href*="http"], .website, .dealer-website');
+  if (websiteEl) {
+    const href = websiteEl.getAttribute('href');
+    if (href && href.startsWith('http')) {
+      data.website = href;
+    }
+  }
+
+  // Extract address, city, state, zip
+  const addressPatterns = [
+    /(\d+\s+[A-Za-z0-9\s,]+(?:Ave|Avenue|St|Street|Rd|Road|Dr|Drive|Blvd|Boulevard|Ln|Lane)[^,]*),\s*([A-Za-z\s]+),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/i,
+    /([A-Za-z\s]+),\s*([A-Z]{2})\s*(\d{5})/i
+  ];
+
+  const bodyText = doc.body?.textContent || '';
+  for (const pattern of addressPatterns) {
+    const match = bodyText.match(pattern);
+    if (match) {
+      if (match.length === 5) {
+        data.address = match[1].trim();
+        data.city = match[2].trim();
+        data.state = match[3].trim();
+        data.zip = match[4].trim();
+      } else if (match.length === 4) {
+        data.city = match[1].trim();
+        data.state = match[2].trim();
+        data.zip = match[3].trim();
+      }
+      break;
+    }
+  }
+
+  // Extract phone
+  const phonePattern = /\(?\s*(\d{3})\s*\)?\s*[-.\s]?\s*(\d{3})\s*[-.\s]?\s*(\d{4})/;
+  const phoneMatch = bodyText.match(phonePattern);
+  if (phoneMatch) {
+    data.phone = `(${phoneMatch[1]}) ${phoneMatch[2]}-${phoneMatch[3]}`;
+  }
+
+  // Extract email
+  const emailPattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/;
+  const emailMatch = bodyText.match(emailPattern);
+  if (emailMatch) {
+    data.email = emailMatch[1];
+  }
+
+  // Extract dealer license (look for license numbers)
+  const licensePatterns = [
+    /dealer[^\w]*license[^\w]*#?:?\s*([A-Z0-9-]+)/i,
+    /license[^\w]*number[^\w]*:?\s*([A-Z0-9-]+)/i,
+    /DL[^\w]*#?:?\s*([A-Z0-9-]+)/i
+  ];
+
+  for (const pattern of licensePatterns) {
+    const match = bodyText.match(pattern);
+    if (match && match[1]) {
+      data.dealer_license = match[1].trim();
+      data.license_type = 'dealer_license'; // Default, could be auction_license
+      break;
+    }
+  }
+
+  // Detect business type (dealer vs auction house)
+  const auctionKeywords = /auction|bid|lot|catalog|event/i;
+  if (auctionKeywords.test(data.name || '') || auctionKeywords.test(bodyText)) {
+    data.business_type = 'auction_house';
+    if (data.dealer_license) {
+      data.license_type = 'auction_license';
+    }
+  }
+
+  // Extract description
+  const descEl = doc.querySelector('.description, .dealer-description, .about, p');
+  if (descEl) {
+    data.description = descEl.textContent?.trim() || null;
+  }
+
+  // Extract specialties (if listed)
+  const specialtiesEls = doc.querySelectorAll('.specialty, .specialties li, [class*="specialty"]');
+  if (specialtiesEls.length > 0) {
+    data.specialties = Array.from(specialtiesEls)
+      .map(el => el.textContent?.trim())
+      .filter(Boolean) as string[];
+  }
+
+  // Determine inventory/auctions URLs from website
+  if (data.website) {
+    try {
+      const url = new URL(data.website);
+      if (data.business_type === 'auction_house') {
+        data.auctions_url = `${url.origin}/auctions`;
+      } else {
+        data.inventory_url = `${url.origin}/inventory`;
+      }
+    } catch {
+      // Invalid URL
+    }
+  }
+
+  return data;
+}
+
+/**
+ * Check if we should create organization (greenlight signals)
+ */
+function shouldCreateOrganization(data: DealerProfileData): boolean {
+  return !!(
+    data.name && 
+    data.name.length > 2 &&
+    data.logo_url &&
+    data.dealer_license &&
+    data.dealer_license.length > 3
+  );
+}
+
+/**
+ * Download logo and store as organization favicon/logo
+ */
+async function downloadAndStoreLogo(
+  logoUrl: string,
+  website: string,
+  supabase: any
+): Promise<string | null> {
+  try {
+    // Download logo image
+    const response = await fetch(logoUrl);
+    if (!response.ok) {
+      console.warn(`Failed to download logo: ${response.status}`);
+      return null;
+    }
+
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    // Extract domain for storage path
+    let domain = 'unknown';
+    if (website) {
+      try {
+        domain = new URL(website).hostname.replace(/^www\./, '');
+      } catch {
+        // Invalid URL
+      }
+    }
+
+    // Upload to Supabase Storage
+    // Use domain from website or extract from logo URL
+    const logoFileName = logoUrl.split('/').pop()?.split('?')[0] || 'logo.png';
+    const fileExtension = logoFileName.split('.').pop() || 'png';
+    
+    // Generate clean filename: domain-logo.ext or dealer-name-logo.ext
+    let fileName = logoFileName;
+    if (domain && domain !== 'unknown') {
+      fileName = `${domain.replace(/[^a-z0-9]/gi, '-')}-logo.${fileExtension}`;
+    } else {
+      // Extract from logo URL if domain unknown
+      const logoPathMatch = logoUrl.match(/\/([^\/]+\.(?:png|jpg|jpeg|svg))/i);
+      if (logoPathMatch) {
+        fileName = logoPathMatch[1].replace(/[^a-z0-9.]/gi, '-');
+      }
+    }
+    
+    const filePath = `organization-logos/${fileName}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('public')
+      .upload(filePath, uint8Array, {
+        contentType: blob.type || `image/${fileExtension}`,
+        upsert: true,
+        cacheControl: '3600' // Cache for 1 hour
+      });
+
+    if (uploadError) {
+      console.error('Logo upload error:', uploadError);
+      // Try alternative bucket or return original URL
+      return logoUrl; // Return original URL as fallback
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('public')
+      .getPublicUrl(filePath);
+
+    // Also cache in source_favicons table
+    if (website) {
+      try {
+        const domain = new URL(website).hostname;
+        await supabase.rpc('upsert_source_favicon', {
+          p_domain: domain,
+          p_favicon_url: publicUrl,
+          p_source_type: 'dealer',
+          p_source_name: domain.split('.')[0]
+        });
+      } catch (err) {
+        console.warn('Failed to cache favicon:', err);
+      }
+    }
+
+    return publicUrl;
+
+  } catch (error: any) {
+    console.error('Error downloading logo:', error);
+    return null;
+  }
+}
+
+/**
+ * Find or create organization using geographic logic
+ */
+async function findOrCreateOrganizationWithGeographicLogic(
+  dealerData: DealerProfileData,
+  logoUrl: string | null,
+  sourceUrl: string,
+  supabase: any
+): Promise<any> {
+  // Priority 1: Match by dealer license (strongest - unique identifier)
+  if (dealerData.dealer_license) {
+    const { data: existingByLicense } = await supabase
+      .from('businesses')
+      .select('id, business_name, city, state, dealer_license, logo_url')
+      .eq('dealer_license', dealerData.dealer_license)
+      .maybeSingle();
+
+    if (existingByLicense) {
+      // Update logo if missing
+      if (logoUrl && !existingByLicense.logo_url) {
+        await supabase
+          .from('businesses')
+          .update({ logo_url: logoUrl })
+          .eq('id', existingByLicense.id);
+      }
+      return { id: existingByLicense.id, name: existingByLicense.business_name };
+    }
+  }
+
+  // Priority 2: Match by website
+  if (dealerData.website) {
+    const { data: existingByWebsite } = await supabase
+      .from('businesses')
+      .select('id, business_name, city, state, dealer_license, logo_url')
+      .eq('website', dealerData.website)
+      .maybeSingle();
+
+    if (existingByWebsite) {
+      // Update license if missing
+      if (dealerData.dealer_license && !existingByWebsite.dealer_license) {
+        await supabase
+          .from('businesses')
+          .update({ 
+            dealer_license: dealerData.dealer_license,
+            logo_url: logoUrl || existingByWebsite.logo_url
+          })
+          .eq('id', existingByWebsite.id);
+      }
+      return { id: existingByWebsite.id, name: existingByWebsite.business_name };
+    }
+  }
+
+  // Priority 3: Match by name + city + state (geographic matching)
+  if (dealerData.name && dealerData.city && dealerData.state) {
+    const { data: existingByLocation } = await supabase
+      .from('businesses')
+      .select('id, business_name, city, state, dealer_license, logo_url, website')
+      .ilike('business_name', `%${dealerData.name}%`)
+      .ilike('city', `%${dealerData.city}%`)
+      .eq('state', dealerData.state.toUpperCase())
+      .maybeSingle();
+
+    if (existingByLocation) {
+      // Update missing fields
+      const updates: any = {};
+      if (logoUrl) updates.logo_url = logoUrl;
+      if (dealerData.dealer_license) updates.dealer_license = dealerData.dealer_license;
+      if (dealerData.website) updates.website = dealerData.website;
+
+      if (Object.keys(updates).length > 0) {
+        await supabase
+          .from('businesses')
+          .update(updates)
+          .eq('id', existingByLocation.id);
+      }
+      return { id: existingByLocation.id, name: existingByLocation.business_name };
+    }
+  }
+
+  // No match found - create new organization
+  const slug = dealerData.name
+    ?.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'unknown';
+
+  const geographicKey = dealerData.city && dealerData.state
+    ? `${dealerData.name?.toLowerCase()}-${dealerData.city.toLowerCase()}-${dealerData.state.toLowerCase()}`
+    : null;
+
+  const { data: newOrg, error } = await supabase
+    .from('businesses')
+    .insert({
+      business_name: dealerData.name,
+      business_type: dealerData.business_type === 'auction_house' ? 'other' : 'dealership',
+      type: dealerData.business_type, // Store in type field if it exists
+      website: dealerData.website,
+      phone: dealerData.phone,
+      email: dealerData.email,
+      address: dealerData.address,
+      city: dealerData.city,
+      state: dealerData.state,
+      zip_code: dealerData.zip,
+      dealer_license: dealerData.dealer_license,
+      logo_url: logoUrl,
+      description: dealerData.description,
+      specialties: dealerData.specialties.length > 0 ? dealerData.specialties : null,
+      geographic_key: geographicKey,
+      discovered_via: 'classic_com_indexing',
+      source_url: sourceUrl,
+      metadata: {
+        classic_com_profile: sourceUrl,
+        inventory_url: dealerData.inventory_url,
+        auctions_url: dealerData.auctions_url,
+        slug: slug
+      }
+    })
+    .select('id, business_name')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create organization: ${error.message}`);
+  }
+
+  return { id: newOrg.id, name: newOrg.business_name };
+}
+
+/**
+ * Queue inventory extraction job
+ */
+async function queueInventoryExtraction(
+  params: {
+    organization_id: string;
+    business_type: 'dealer' | 'auction_house';
+    website: string;
+    inventory_url?: string | null;
+    auctions_url?: string | null;
+  },
+  supabase: any
+): Promise<void> {
+  // Create job in inventory extraction queue (or call scrape-multi-source)
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+  const targetUrl = params.business_type === 'auction_house' 
+    ? (params.auctions_url || `${params.website}/auctions`)
+    : (params.inventory_url || `${params.website}/inventory`);
+
+  // Trigger scrape-multi-source to extract inventory
+  await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseServiceKey}`
+    },
+    body: JSON.stringify({
+      source_url: targetUrl,
+      source_type: params.business_type === 'auction_house' ? 'auction_house' : 'dealer_website',
+      organization_id: params.organization_id,
+      max_results: 200,
+      use_llm_extraction: true
+    })
+  }).catch(err => {
+    console.warn('Failed to queue inventory extraction:', err);
+    // Don't fail the whole operation if inventory queue fails
+  });
+}
+
