@@ -349,9 +349,15 @@ const CursorHomepage: React.FC = () => {
         return;
       }
 
-      // Query vehicles first (without embedded images to avoid relationship ambiguity)
-      // Use RPC function to get accurate counts and tier
-      const { data: vehicles, error } = await supabase.rpc('get_vehicle_feed_data');
+      // Query vehicles directly with is_public filter
+      // Get vehicles with basic info - we'll fetch images separately for better performance
+      const { data: vehicles, error } = await supabase
+        .from('vehicles')
+        .select('id, year, make, model, vin, created_at, updated_at, sale_price, current_value, purchase_price, asking_price, is_for_sale, mileage, condition_rating, status, is_public')
+        .eq('is_public', true)
+        .neq('status', 'pending')
+        .order('updated_at', { ascending: false })
+        .limit(1000);
       
       // If showPending filter is enabled, also fetch pending vehicles
       let pendingVehicles: any[] = [];
@@ -423,15 +429,22 @@ const CursorHomepage: React.FC = () => {
       const vehicleIds = vehiclesToProcess.map((v: any) => v.id);
       
       // Get all images for these vehicles in one query
+      // Include all possible URL fields and variants
       const { data: allImages, error: imagesError } = await supabase
         .from('vehicle_images')
-        .select('id, vehicle_id, thumbnail_url, medium_url, image_url, is_primary, created_at')
+        .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, created_at')
         .in('vehicle_id', vehicleIds)
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (imagesError) {
-        console.warn('Error loading images:', imagesError);
+        console.error('❌ Error loading images:', imagesError);
+      } else {
+        console.log(`✅ Loaded ${allImages?.length || 0} images for ${vehicleIds.length} vehicles`);
+        if (allImages && allImages.length > 0) {
+          // Log sample image to see structure
+          console.log('Sample image:', allImages[0]);
+        }
       }
 
       // Group images by vehicle_id
@@ -464,14 +477,30 @@ const CursorHomepage: React.FC = () => {
         const images = imagesByVehicle.get(v.id) || [];
         
         // Map images with proper URL extraction - prioritize primary images
+        // Try all possible URL field names including variants
         const all_images = images
-          .map((img: any) => ({
-            id: img.id,
-            url: img.thumbnail_url || img.medium_url || img.image_url || null,
-            is_primary: img.is_primary || false,
-            created_at: img.created_at
-          }))
-          .filter((img: any) => img.url !== null) // Only include images with valid URLs
+          .map((img: any) => {
+            // Extract URL from variants if available (prefer medium, then large, then full)
+            let url = null;
+            if (img.variants && typeof img.variants === 'object') {
+              url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
+            }
+            // Fallback to direct URL fields in order of preference
+            if (!url) {
+              url = img.medium_url || img.large_url || img.image_url || img.thumbnail_url || null;
+            }
+            
+            return {
+              id: img.id,
+              url: url,
+              is_primary: img.is_primary || false,
+              created_at: img.created_at
+            };
+          })
+          .filter((img: any) => {
+            // Only include images with valid, non-empty URLs
+            return img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '';
+          })
           .sort((a: any, b: any) => {
             // Primary images first
             if (a.is_primary && !b.is_primary) return -1;
@@ -529,14 +558,21 @@ const CursorHomepage: React.FC = () => {
           }
 
           // Primary image is already sorted first - ensure we have a valid URL
-          // Also check if RPC function returned a primary_image_url
-          const primaryImageUrl = all_images[0]?.url || v.primary_image_url || null;
+          const primaryImageUrl = all_images[0]?.url || null;
+          
+          // Debug logging for vehicles without images
+          if (!primaryImageUrl && totalImages === 0) {
+            console.warn(`⚠️ Vehicle ${v.id} (${v.year} ${v.make} ${v.model}) has no images`);
+          } else if (!primaryImageUrl && totalImages > 0) {
+            console.warn(`⚠️ Vehicle ${v.id} has ${totalImages} images but no valid URL in all_images array`);
+            console.warn('Images data:', images.slice(0, 2));
+          }
 
             return {
             ...v,
             display_price: displayPrice, // Add smart price for display
-            image_count: v.image_count || totalImages, // Use accurate count from RPC if available
-            view_count: v.view_count || 0, // Use accurate count from RPC
+            image_count: totalImages, // Use actual count from images query
+            view_count: 0, // TODO: Add view_count query if needed
             event_count: activity7d,
             activity_7d: activity7d,
             hype_score: hypeScore,
@@ -544,8 +580,8 @@ const CursorHomepage: React.FC = () => {
             primary_image_url: primaryImageUrl,
             image_url: primaryImageUrl,
             all_images: all_images,
-            tier: v.tier, // From RPC function
-            tier_label: v.tier_label // From RPC function
+            tier: 'C', // Default tier - can be calculated later if needed
+            tier_label: 'Tier C' // Default tier label
           };
         });
       
