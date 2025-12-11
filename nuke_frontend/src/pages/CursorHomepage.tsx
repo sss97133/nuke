@@ -849,7 +849,15 @@ const CursorHomepage: React.FC = () => {
           // VehicleProfile line 1131: find((r: any) => r.is_primary === true) || imageRecords[0]
           const primaryImage = images.find((img: any) => img.is_primary === true) || images[0];
           // VehicleProfile line 1136: large_url || image_url
-          const primaryImageUrl = primaryImage ? (primaryImage.large_url || primaryImage.image_url) : null;
+          // CRITICAL FIX: Ensure we always get a URL if images exist
+          let primaryImageUrl = null;
+          if (primaryImage) {
+            primaryImageUrl = primaryImage.large_url || primaryImage.image_url || primaryImage.medium_url || primaryImage.thumbnail_url || null;
+          }
+          // FALLBACK: If primaryImageUrl is still null but we have all_images, use first image from all_images
+          if (!primaryImageUrl && all_images.length > 0 && all_images[0]?.url) {
+            primaryImageUrl = all_images[0].url;
+          }
           
           // #region agent log
           if (vehiclesToProcess.indexOf(v) < 5) {
