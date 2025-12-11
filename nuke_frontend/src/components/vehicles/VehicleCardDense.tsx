@@ -598,8 +598,22 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     vehicleImages.push(vehicle.image_url);
   }
   
-  // Get current image URL
-  const currentImageUrl = vehicleImages[currentImageIndex] || vehicleImages[0] || null;
+  // Get current image URL - try multiple fallbacks
+  let currentImageUrl = vehicleImages[currentImageIndex] || vehicleImages[0] || null;
+  
+  // Aggressive fallback - if we still don't have an image, try ANY image field on the vehicle
+  if (!currentImageUrl) {
+    // Try in order: primary_image_url, image_url, then check all_images one more time
+    currentImageUrl = vehicle.primary_image_url || vehicle.image_url || null;
+    
+    // If still no URL, try extracting from all_images manually
+    if (!currentImageUrl && vehicle.all_images && vehicle.all_images.length > 0) {
+      const firstValidImage = vehicle.all_images.find(img => img.url && img.url.trim() !== '');
+      if (firstValidImage) {
+        currentImageUrl = firstValidImage.url;
+      }
+    }
+  }
   
   // Debug logging for grid view (first few vehicles only)
   if (viewMode === 'grid' && vehicle.id) {
@@ -608,13 +622,16 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       console.log(`🔍 Grid view - Vehicle ${vehicle.id}:`, {
         vehicleId: vehicle.id,
         all_images: vehicle.all_images,
+        all_images_length: vehicle.all_images?.length,
         primary_image_url: vehicle.primary_image_url,
         image_url: vehicle.image_url,
         image_variants: vehicle.image_variants,
         imageUrl,
         vehicleImages,
+        vehicleImages_length: vehicleImages.length,
         currentImageIndex,
-        currentImageUrl
+        currentImageUrl,
+        FINAL_URL: currentImageUrl
       });
     }
   }
