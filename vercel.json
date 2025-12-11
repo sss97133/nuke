@@ -9,7 +9,7 @@
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!_next|.*\\..*).*)",
       "destination": "/index.html"
     }
   ],
