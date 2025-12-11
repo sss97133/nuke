@@ -1,14 +1,7 @@
 import { useState, useEffect } from 'react';
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useRotatingVerb.ts:1',message:'useRotatingVerb module start',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-// #endregion
-
 // Rotating action verbs hook (inspired by Claude's thinking animation)
 export const useRotatingVerb = () => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useRotatingVerb.ts:5',message:'useRotatingVerb function start',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  // Massive randomized list of automotive verbs - 700+ terms covering fabrication, engineering, racing, and physical activities
+// Massive randomized list of automotive verbs - 700+ terms covering fabrication, engineering, racing, and physical activities
   const verbs = [
     'Balancing', 'Troubleshooting', 'Cerakoting', 'Installing', 'Checking', 'Fabricating', 'Bending', 'Blocking',
     'Pressure', 'Relocating', 'Dynoing', 'Fitting', 'Threading', 'Building', 'Vacuum', 'Fusing', 'Toeing', 'Scuffing',
@@ -68,16 +61,8 @@ export const useRotatingVerb = () => {
     'PLCs', 'Programmable', 'Logic', 'Controllers', 'Programming', 'SCADA', 'Systems', 'Supervisory', 'Control', 'And',
     'Data', 'Acquisition', 'Configuring', 'HMI', 'Human', 'Machine', 'Interfaces', 'Designing'
   ];
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useRotatingVerb.ts:66',message:'Before useState call',data:{verbsLength:verbs.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  
-  const [currentVerb, setCurrentVerb] = useState(verbs[0]);
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useRotatingVerb.ts:68',message:'After useState call',data:{currentVerb},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  
-  useEffect(() => {
+const [currentVerb, setCurrentVerb] = useState(verbs[0]);
+useEffect(() => {
     const getRandomInterval = () => {
       // Variable speeds: 50% chance fast (500-1000ms), 30% medium (1000-2000ms), 20% slow (2000-4000ms)
       const rand = Math.random();
