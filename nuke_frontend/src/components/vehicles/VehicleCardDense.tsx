@@ -560,12 +560,64 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [touchStart, setTouchStart] = React.useState(0);
   
-  // Use all_images array from homepage query (up to 5 images)
-  // Ensure we have at least primary_image_url as fallback
-  const vehicleImages = vehicle.all_images?.map(img => img.url).filter(Boolean) || 
-                        (vehicle.primary_image_url ? [vehicle.primary_image_url] : []) ||
-                        (imageUrl ? [imageUrl] : []);
-  const currentImageUrl = vehicleImages[currentImageIndex] || vehicle.primary_image_url || imageUrl;
+  // Build image array with proper fallback chain
+  // Priority: all_images[0] > primary_image_url > imageUrl > image_variants > image_url
+  const vehicleImages: string[] = [];
+  
+  // First, try all_images array
+  if (vehicle.all_images && vehicle.all_images.length > 0) {
+    const urls = vehicle.all_images.map(img => img.url).filter(Boolean);
+    if (urls.length > 0) {
+      vehicleImages.push(...urls);
+    }
+  }
+  
+  // Then try primary_image_url (if not already in array)
+  if (vehicle.primary_image_url && !vehicleImages.includes(vehicle.primary_image_url)) {
+    vehicleImages.push(vehicle.primary_image_url);
+  }
+  
+  // Then try imageUrl from getImageUrl() (if not already in array)
+  if (imageUrl && !vehicleImages.includes(imageUrl)) {
+    vehicleImages.push(imageUrl);
+  }
+  
+  // Then try image_variants
+  if (vehicle.image_variants) {
+    const variants = vehicle.image_variants;
+    const variantUrls = [variants.medium, variants.large, variants.thumbnail].filter(Boolean);
+    variantUrls.forEach(url => {
+      if (url && !vehicleImages.includes(url)) {
+        vehicleImages.push(url);
+      }
+    });
+  }
+  
+  // Finally try image_url
+  if (vehicle.image_url && !vehicleImages.includes(vehicle.image_url)) {
+    vehicleImages.push(vehicle.image_url);
+  }
+  
+  // Get current image URL
+  const currentImageUrl = vehicleImages[currentImageIndex] || vehicleImages[0] || null;
+  
+  // Debug logging for grid view (first few vehicles only)
+  if (viewMode === 'grid' && vehicle.id) {
+    const vehicleIndex = (window as any).__debugVehicleIndex = ((window as any).__debugVehicleIndex || 0) + 1;
+    if (vehicleIndex <= 5) {
+      console.log(`🔍 Grid view - Vehicle ${vehicle.id}:`, {
+        vehicleId: vehicle.id,
+        all_images: vehicle.all_images,
+        primary_image_url: vehicle.primary_image_url,
+        image_url: vehicle.image_url,
+        image_variants: vehicle.image_variants,
+        imageUrl,
+        vehicleImages,
+        currentImageIndex,
+        currentImageUrl
+      });
+    }
+  }
   
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX);
