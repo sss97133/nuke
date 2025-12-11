@@ -725,17 +725,32 @@ const CursorHomepage: React.FC = () => {
             
             // Fallback to direct URL fields in order of preference
             if (!url || url === '' || url.trim() === '') {
-              url = img.medium_url || img.large_url || img.image_url || img.thumbnail_url || null;
+              // Try all URL fields - image_url is often the most reliable
+              url = img.image_url || img.medium_url || img.large_url || img.thumbnail_url || null;
             }
             
             // Final validation - ensure URL is a string and not empty
             if (url && typeof url === 'string' && url.trim() !== '') {
-              return {
-                id: img.id,
-                url: url.trim(),
-                is_primary: img.is_primary || false,
-                created_at: img.created_at
-              };
+              const cleanUrl = url.trim();
+              // Ensure URL is valid (starts with http or /)
+              if (cleanUrl.startsWith('http') || cleanUrl.startsWith('/') || cleanUrl.startsWith('data:')) {
+                return {
+                  id: img.id,
+                  url: cleanUrl,
+                  is_primary: img.is_primary || false,
+                  created_at: img.created_at
+                };
+              }
+            }
+            
+            // Log if we have an image but couldn't extract a URL
+            if (img.id && !url) {
+              console.warn(`⚠️ Image ${img.id} has no extractable URL:`, {
+                variants: img.variants,
+                image_url: img.image_url,
+                medium_url: img.medium_url,
+                thumbnail_url: img.thumbnail_url
+              });
             }
             
             return null;
@@ -1923,23 +1938,38 @@ const CursorHomepage: React.FC = () => {
             gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
             gap: '0'
         }}>
-            {filteredVehicles.map((vehicle) => (
-            <LazyLoadVehicleImages
-              key={vehicle.id}
-              vehicleId={vehicle.id}
-              onVisible={handleVehicleVisible}
-            >
-              <VehicleCardDense
-                vehicle={{
-                  ...vehicle,
-                    primary_image_url: vehicle.primary_image_url
-                }}
-                viewMode="grid"
-                showPriceOverlay={filters.showPrices}
-                showDetailOverlay={filters.showDetailOverlay}
-              />
-            </LazyLoadVehicleImages>
-          ))}
+            {filteredVehicles.map((vehicle, index) => {
+              // Debug first 3 vehicles
+              if (index < 3) {
+                console.log(`🔍 Grid vehicle ${index} (${vehicle.id}):`, {
+                  primary_image_url: vehicle.primary_image_url,
+                  all_images: vehicle.all_images,
+                  all_images_length: vehicle.all_images?.length,
+                  image_url: vehicle.image_url,
+                  image_count: vehicle.image_count
+                });
+              }
+              
+              return (
+                <LazyLoadVehicleImages
+                  key={vehicle.id}
+                  vehicleId={vehicle.id}
+                  onVisible={handleVehicleVisible}
+                >
+                  <VehicleCardDense
+                    vehicle={{
+                      ...vehicle,
+                      primary_image_url: vehicle.primary_image_url,
+                      all_images: vehicle.all_images || [],
+                      image_url: vehicle.image_url || vehicle.primary_image_url
+                    }}
+                    viewMode="grid"
+                    showPriceOverlay={filters.showPrices}
+                    showDetailOverlay={filters.showDetailOverlay}
+                  />
+                </LazyLoadVehicleImages>
+              );
+            })}
         </div>
         )}
 
