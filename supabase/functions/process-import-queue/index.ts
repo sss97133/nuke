@@ -332,6 +332,11 @@ serve(async (req) => {
         // Remove "Pending Organization Assignments" HTML blocks before parsing
         html = html.replace(/<div[^>]*style="[^"]*padding:\s*12px[^"]*background:\s*rgb\(254,\s*243,\s*199\)[^"]*"[^>]*>[\s\S]*?REJECT<\/div>/gi, '');
         
+        // Remove QR code links and junk text
+        html = html.replace(/QR\s+Code\s+Link\s+to\s+This\s+Post/gi, '');
+        html = html.replace(/<div[^>]*style="[^"]*font-size:\s*9pt[^"]*"[^>]*>[\s\S]*?QR\s+Code[\s\S]*?<\/div>/gi, '');
+        html = html.replace(/QR\s+Code[\s\S]{0,200}/gi, '');
+        
         const doc = new DOMParser().parseFromString(html, 'text/html');
 
         // Basic data extraction
@@ -633,12 +638,21 @@ serve(async (req) => {
               const title = titleElement.textContent?.trim() || '';
               scrapeData.data.title = title;
               
-              // Parse from title: "9k-Mile 1992 Chevrolet 454 SS" or "10k-mile 2009 Porsche 911..."
-              // Remove mileage/ownership descriptors first
+              // Parse from title: "9k-Mile 1992 Chevrolet 454 SS" or "10k-mile 2009 Porsche 911..." or "This 1961 Lincoln..."
+              // Remove mileage/ownership descriptors and other prefixes first
               let cleanTitle = title
-                .replace(/\d+k-?mile/gi, '')
-                .replace(/\d+-years?-owned/gi, '')
-                .replace(/\d+,\d+-mile/gi, '')
+                .replace(/^\d+k-?mile\s*/gi, '')
+                .replace(/^\d+-years?-owned\s*/gi, '')
+                .replace(/^\d+,\d+-mile\s*/gi, '')
+                .replace(/^single-family-owned\s*/gi, '')
+                .replace(/^original-owner\s*/gi, '')
+                .replace(/^this\s+/gi, '') // Remove "This" prefix
+                .replace(/^el\s+/gi, '') // Remove "El" prefix (El Camino)
+                .replace(/^red\s+/gi, '') // Remove color prefixes
+                .replace(/^beautiful\s+/gi, '')
+                .replace(/^supercharged\s+/gi, '')
+                .replace(/^all\s+/gi, '')
+                .replace(/^502-powered\s*/gi, '')
                 .replace(/\s+/g, ' ')
                 .trim();
               
@@ -651,21 +665,12 @@ serve(async (req) => {
                 
                 // Extract make/model after year
                 const afterYear = cleanTitle.substring(cleanTitle.indexOf(yearMatch[0]) + 4).trim();
-                const knownMakes = ['chevrolet', 'chevy', 'ford', 'gmc', 'dodge', 'ram', 'toyota', 'honda', 'nissan', 'bmw', 'mercedes', 'benz', 'audi', 'volkswagen', 'vw', 'porsche', 'jaguar', 'cadillac', 'buick', 'pontiac', 'lincoln', 'chrysler', 'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi', 'hyundai', 'kia', 'volvo', 'tesla', 'genesis', 'alfa', 'romeo', 'fiat', 'mini', 'ferrari', 'lamborghini', 'mclaren', 'aston', 'martin', 'bentley', 'rolls', 'royce', 'datsun', 'mercury'];
+                const knownMakes = ['chevrolet', 'chevy', 'ford', 'gmc', 'dodge', 'ram', 'toyota', 'honda', 'nissan', 'bmw', 'mercedes', 'benz', 'mercedes-benz', 'audi', 'volkswagen', 'vw', 'porsche', 'jaguar', 'cadillac', 'buick', 'pontiac', 'lincoln', 'chrysler', 'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi', 'hyundai', 'kia', 'volvo', 'tesla', 'genesis', 'alfa', 'romeo', 'alfa romeo', 'fiat', 'mini', 'ferrari', 'lamborghini', 'mclaren', 'aston', 'martin', 'aston martin', 'bentley', 'rolls', 'royce', 'rolls-royce', 'datsun', 'mercury', 'jeep', 'suzuki'];
                 const afterYearLower = afterYear.toLowerCase();
                 
                 for (const makeName of knownMakes) {
                   if (afterYearLower.startsWith(makeName + ' ') || afterYearLower.startsWith(makeName + '-')) {
-                    let make = makeName === 'chevy' ? 'Chevrolet' : makeName === 'vw' ? 'Volkswagen' : makeName === 'benz' ? 'Mercedes' : makeName.charAt(0).toUpperCase() + makeName.slice(1);
-                    
-                    // Handle two-word makes
-                    if (makeName === 'alfa' && afterYearLower.includes('romeo')) {
-                      make = 'Alfa Romeo';
-                    } else if (makeName === 'aston' && afterYearLower.includes('martin')) {
-                      make = 'Aston Martin';
-                    } else if (makeName === 'rolls' && afterYearLower.includes('royce')) {
-                      make = 'Rolls-Royce';
-                    }
+                    let make = makeName === 'chevy' ? 'Chevrolet' : makeName === 'vw' ? 'Volkswagen' : makeName === 'benz' ? 'Mercedes' : makeName === 'mercedes-benz' ? 'Mercedes-Benz' : makeName === 'alfa romeo' || makeName === 'alfa-romeo' ? 'Alfa Romeo' : makeName === 'aston martin' || makeName === 'aston-martin' ? 'Aston Martin' : makeName === 'rolls-royce' || (makeName === 'rolls' && afterYearLower.includes('royce')) ? 'Rolls-Royce' : makeName.charAt(0).toUpperCase() + makeName.slice(1);
                     
                     if (isValidMake(make)) {
                       scrapeData.data.make = make;
@@ -719,7 +724,25 @@ serve(async (req) => {
           }
           const bodyElement = doc.querySelector('#postingbody');
           if (bodyElement) {
-            scrapeData.data.description = bodyElement.textContent?.trim() || '';
+            let description = bodyElement.textContent?.trim() || '';
+            
+            // Clean description - remove QR codes, junk text, dealer info lines
+            description = description.replace(/QR\s+Code\s+Link\s+to\s+This\s+Post/gi, '');
+            description = description.replace(/QR\s+Code[\s\S]{0,200}/gi, '');
+            // Remove lines like "70,094 mi. - Automatic - 2D Coupe - 8 Cyl - RWD: Rear Wheel Drive - VIN# 1X27F3L112036"
+            description = description.replace(/^\s*\d+[,\d]*\s*mi\.\s*-\s*[^-]+-\s*[^-]+-\s*[^-]+-\s*[^-]+-\s*RWD:?\s*[^-]+-\s*VIN#?\s*[A-HJ-NPR-Z0-9]{17}\s*$/gmi, '');
+            // Extract VIN from description if present
+            const vinMatch = description.match(/VIN#?\s*([A-HJ-NPR-Z0-9]{17})/i);
+            if (vinMatch && !scrapeData.data.vin) {
+              scrapeData.data.vin = vinMatch[1].toUpperCase();
+            }
+            // Extract mileage from description
+            const mileageMatch = description.match(/(\d+(?:,\d+)?)\s*mi\./i);
+            if (mileageMatch && !scrapeData.data.mileage) {
+              scrapeData.data.mileage = parseInt(mileageMatch[1].replace(/,/g, ''));
+            }
+            
+            scrapeData.data.description = description.trim();
           }
           if (scrapeData.data.title) {
             const yearMatch = scrapeData.data.title.match(/\b(19|20)\d{2}\b/);
@@ -741,18 +764,32 @@ serve(async (req) => {
               }
               
               // Extract make (validate against known makes)
-              if (parts[startIndex]) {
-                let make = parts[startIndex];
+              // Skip invalid prefixes
+              const invalidPrefixes = ['this', 'el', 'red', 'beautiful', 'supercharged', 'all', '6k-mile', '10k-mile', '18k-mile', '47k-mile', 'original-owner', 'single-family-owned', '20-years-owned'];
+              
+              let makeIndex = startIndex;
+              while (makeIndex < parts.length && invalidPrefixes.includes(parts[makeIndex].toLowerCase())) {
+                makeIndex++;
+              }
+              
+              if (makeIndex < parts.length) {
+                let make = parts[makeIndex];
                 if (make.toLowerCase() === 'chevy') make = 'Chevrolet';
                 if (make.toLowerCase() === 'vw') make = 'Volkswagen';
+                
+                // Special case: "El Camino" - make is Chevrolet, not "El"
+                if (make.toLowerCase() === 'el' && parts.length > makeIndex + 1 && parts[makeIndex + 1].toLowerCase() === 'camino') {
+                  make = 'Chevrolet';
+                  makeIndex++; // Skip "El"
+                }
                 
                 // Only use if valid make
                 if (isValidMake(make)) {
                   scrapeData.data.make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase();
                   
                   // Extract model (rest of title)
-                  if (parts.length > startIndex + 1) {
-                    const modelParts = parts.slice(startIndex + 1);
+                  if (parts.length > makeIndex + 1) {
+                    const modelParts = parts.slice(makeIndex + 1);
                     // Filter out common non-model words
                     const filteredModel = modelParts.filter(p => 
                       !['for', 'sale', 'wanted', 'needs', 'runs', 'great', 'condition'].includes(p.toLowerCase())
@@ -775,9 +812,92 @@ serve(async (req) => {
           }
         }
 
-        // Get source info for organization linking
+        // Extract dealer/organization info from listing
         let organizationId = null;
-        if (item.source_id) {
+        let dealerName: string | null = null;
+        let dealerPhone: string | null = null;
+        let dealerLocation: string | null = null;
+        
+        // Extract dealer info from Craigslist listing
+        if (item.listing_url.includes('craigslist.org')) {
+          // Look for dealer name in title or description
+          const titleText = scrapeData.data.title || '';
+          const descText = scrapeData.data.description || '';
+          const combinedText = `${titleText} ${descText}`;
+          
+          // Pattern: "Desert Private Collection (760) 313-6607"
+          const dealerMatch = combinedText.match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*\(?\s*(\d{3})\s*\)?\s*(\d{3})[-\s]?(\d{4})/);
+          if (dealerMatch) {
+            dealerName = dealerMatch[1].trim();
+            dealerPhone = `(${dealerMatch[2]}) ${dealerMatch[3]}-${dealerMatch[4]}`;
+          }
+          
+          // Pattern: "EZCustom4x4", "Hayes Classics", etc.
+          if (!dealerName) {
+            const namePatterns = [
+              /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Classics?/i,
+              /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Auto/i,
+              /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Motors?/i,
+              /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*Collection/i
+            ];
+            for (const pattern of namePatterns) {
+              const match = combinedText.match(pattern);
+              if (match && match[1].length > 3) {
+                dealerName = match[1].trim();
+                break;
+              }
+            }
+          }
+          
+          // Extract location from title/description
+          const locationMatch = combinedText.match(/\(([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\)/);
+          if (locationMatch) {
+            dealerLocation = locationMatch[1];
+          }
+        }
+        
+        // Get or create organization
+        if (dealerName && dealerName.length > 2) {
+          const orgSlug = dealerName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+          
+          // Check if organization exists
+          const { data: existingOrg } = await supabase
+            .from('organizations')
+            .select('id')
+            .or(`slug.eq.${orgSlug},name.ilike.%${dealerName}%`)
+            .limit(1)
+            .single();
+          
+          if (existingOrg) {
+            organizationId = existingOrg.id;
+            console.log(`✅ Found existing organization: ${dealerName} (${organizationId})`);
+          } else {
+            // Create new organization
+            const { data: newOrg, error: orgError } = await supabase
+              .from('organizations')
+              .insert({
+                name: dealerName,
+                slug: orgSlug,
+                type: 'dealer',
+                phone: dealerPhone,
+                location: dealerLocation,
+                discovered_via: 'import_queue',
+                source_url: item.listing_url
+              })
+              .select('id')
+              .single();
+            
+            if (newOrg && !orgError) {
+              organizationId = newOrg.id;
+              console.log(`✅ Created new organization: ${dealerName} (${organizationId})`);
+            } else {
+              console.warn(`⚠️ Failed to create organization: ${orgError?.message || 'Unknown error'}`);
+            }
+          }
+        }
+        
+        // Fallback: Use source organization if no dealer found
+        if (!organizationId && item.source_id) {
           const { data: source } = await supabase
             .from('scrape_sources')
             .select('id')
@@ -901,15 +1021,41 @@ serve(async (req) => {
             .eq('id', newVehicle.id);
         }
 
+        // CRITICAL: Filter images with AI to remove other vehicles, then backfill
+        let filteredImages = scrapeData.data.images || [];
+        if (filteredImages.length > 0 && make && model && year) {
+          console.log(`🔍 Filtering ${filteredImages.length} images with AI to match ${year} ${make} ${model}...`);
+          try {
+            const { data: filterResult, error: filterError } = await supabase.functions.invoke('filter-vehicle-images-ai', {
+              body: {
+                vehicle_id: newVehicle.id,
+                image_urls: filteredImages,
+                year: year,
+                make: make,
+                model: model
+              }
+            });
+
+            if (!filterError && filterResult?.filtered_images) {
+              filteredImages = filterResult.filtered_images;
+              console.log(`✅ AI filtered: ${filterResult.matched} matched, ${filterResult.rejected} rejected`);
+            } else {
+              console.warn(`⚠️ AI filtering failed: ${filterError?.message || 'Unknown error'} - using all images`);
+            }
+          } catch (err: any) {
+            console.warn(`⚠️ AI filtering error: ${err.message} - using all images`);
+          }
+        }
+        
         // CRITICAL: Backfill images IMMEDIATELY (before validation) - required for activation
         let imagesBackfilled = false;
-        if (scrapeData.data.images && scrapeData.data.images.length > 0) {
-          console.log(`🖼️  Backfilling ${scrapeData.data.images.length} images BEFORE validation...`);
+        if (filteredImages.length > 0) {
+          console.log(`🖼️  Backfilling ${filteredImages.length} filtered images BEFORE validation...`);
           try {
             const { data: backfillResult, error: backfillError } = await supabase.functions.invoke('backfill-images', {
               body: {
                 vehicle_id: newVehicle.id,
-                image_urls: scrapeData.data.images,
+                image_urls: filteredImages,
                 source: 'import_queue',
                 run_analysis: false
               }
@@ -920,6 +1066,9 @@ serve(async (req) => {
               imagesBackfilled = true;
             } else {
               console.warn(`⚠️ Image backfill failed: ${backfillError?.message || 'Unknown error'}`);
+              if (backfillResult?.error_summary) {
+                console.warn(`   Errors: ${backfillResult.error_summary.slice(0, 3).join('; ')}`);
+              }
             }
           } catch (err: any) {
             console.error(`❌ Image backfill failed:`, err.message);

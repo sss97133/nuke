@@ -40,122 +40,74 @@ type SortDirection = 'asc' | 'desc';
 // Rotating action verbs hook (inspired by Claude's thinking animation)
 const useRotatingVerb = () => {
   const verbs = [
-    'Wrenching',
-    'Building',
-    'Restoring',
-    'Cruising',
-    'Fabricating',
-    'Tuning',
-    'Spinning',
-    'Racing',
-    'Grinding',
-    'Welding',
-    'Painting',
-    'Polishing',
-    'Upgrading',
-    'Modding',
-    'Boosting',
-    'Drifting',
-    'Revving',
-    'Detailing',
-    'Collecting',
-    'Showing',
-    'Flipping',
-    'Trading',
-    'Swapping',
-    'Hunting',
-    'Sourcing',
-    'Inspecting',
-    'Diagnosing',
-    'Tweaking',
-    'Dialing',
-    'Hooning',
-    'Launching',
-    'Burnouts',
-    'Drag',
-    'Tracking',
-    'AutoXing',
-    'Drifting',
-    'Rolling',
-    'Slamming',
-    'Bagging',
-    'Coiling',
-    'Cutting',
-    'Pounding',
-    'Stretching',
-    'Tucking',
-    'Dropping',
-    'Raising',
-    'Camber',
-    'Slapping',
-    'Bolting',
-    'Torquing',
-    'Bleeding',
-    'Flushing',
-    'Changing',
-    'Swapping',
-    'Rebuilding',
-    'Boring',
-    'Stroking',
-    'Porting',
-    'Machining',
-    'Balancing',
-    'Blueprinting',
-    'Dynoing',
-    'Mapping',
-    'Flashing',
-    'Coding',
-    'Logging',
-    'Scanning',
-    'Wiring',
-    'Soldering',
-    'Crimping',
-    'Routing',
-    'Tucking',
-    'Wrapping',
-    'Taping',
-    'Shrinking',
-    'Stripping',
-    'Chroming',
-    'Plating',
-    'Anodizing',
-    'Powder',
-    'Cerakoting',
-    'Wrapping',
-    'Dipping',
-    'Spraying',
-    'Rolling',
-    'Buffing',
-    'Claying',
-    'Correcting',
-    'Ceramic',
-    'Waxing',
-    'Sealing',
-    'Debadging',
-    'Shaving',
-    'Molding',
-    'Frenching',
-    'Smoothing',
-    'Louvering',
-    'Venting',
-    'Flaring',
-    'Widening',
-    'Chopping',
-    'Sectioning',
-    'Channeling',
-    'Z-ing',
-    'C-notching',
-    'Triangulating',
-    'Linking',
-    'Tabbing',
-    'Bracing',
-    'Caging',
-    'Gutting',
-    'Deleting',
-    'Relocating',
-    'Hiding'
+    // Core Activities
+    'Wrenching', 'Building', 'Restoring', 'Cruising', 'Fabricating', 'Tuning', 'Spinning', 'Racing',
+    'Modding', 'Upgrading', 'Boosting', 'Drifting', 'Revving', 'Detailing', 'Collecting', 'Showing',
+    'Flipping', 'Trading', 'Swapping', 'Hunting', 'Sourcing', 'Inspecting', 'Diagnosing', 'Tweaking',
+    'Dialing', 'Hooning', 'Launching', 'Burnouts', 'Drag', 'Tracking', 'AutoXing', 'Rallying',
+    'Attacking', 'Ripping', 'Shredding', 'Lapping', 'Gridding', 'Pitting', 'Qualifying',
+    
+    // Fabrication & Metalwork
+    'Welding', 'Grinding', 'Cutting', 'Machining', 'Milling', 'Turning', 'Drilling', 'Tapping',
+    'Threading', 'Boring', 'Honing', 'Reaming', 'Countersinking', 'Chamfering', 'Facing', 'Parting',
+    'Grooving', 'Knurling', 'Forming', 'Bending', 'Folding', 'Crimping', 'Flaring', 'Beading',
+    'Swaging', 'Stamping', 'Punching', 'Shearing', 'Sawing', 'Plasma', 'TIG', 'MIG', 'Stick',
+    'Brazing', 'Soldering', 'Forging', 'Casting', 'Pouring', 'Molding', 'Extruding', 'Drawing',
+    'Hammering', 'Planishing', 'Shrinking', 'Stretching', 'Fitting', 'Tacking',
+    
+    // Bodywork & Paint
+    'Painting', 'Polishing', 'Spraying', 'Buffing', 'Claying', 'Correcting', 'Waxing', 'Sealing',
+    'Debadging', 'Shaving', 'Frenching', 'Smoothing', 'Louvering', 'Venting', 'Widening',
+    'Chopping', 'Sectioning', 'Channeling', 'Triangulating', 'Linking', 'Tabbing', 'Bracing',
+    'Caging', 'Gutting', 'Deleting', 'Relocating', 'Blocking', 'Sanding', 'Scuffing', 'Priming',
+    'Basecoating', 'Clearing', 'Masking', 'Taping', 'Stripping', 'Feathering', 'Blending',
+    'Blasting', 'Etching', 'Prepping', 'Filling', 'Skimming', 'Pulling', 'Straightening',
+    'Aligning', 'Gapping',
+    
+    // Finishing & Surface Treatment
+    'Chroming', 'Plating', 'Anodizing', 'Powder', 'Cerakoting', 'Wrapping', 'Dipping',
+    'Coating', 'Electroplating', 'Brushing', 'Finishing', 'Vapor', 'Blasting', 'Shot', 'Peening',
+    'Pickling', 'Passivating', 'Oxidizing', 'Galvanizing',
+    
+    // Suspension & Chassis
+    'Slamming', 'Bagging', 'Coiling', 'Dropping', 'Raising', 'Camber', 'Tucking', 'Stretching',
+    'Stance', 'Squatting', 'Raking', 'Leveling', 'Lifting', 'Lowering', 'Shimming', 'Preloading',
+    'Weighting', 'Balancing', 'Aligning', 'Toeing', 'Castering', 'Adjusting', 'Torquing',
+    'Compressing', 'Extending', 'Rebuilding', 'Revalving', 'Upgrading', 'Replacing',
+    
+    // Engine Work
+    'Rebuilding', 'Boring', 'Stroking', 'Porting', 'Machining', 'Balancing', 'Blueprinting',
+    'Dynoing', 'Mapping', 'Flashing', 'Coding', 'Logging', 'Scanning', 'Tuning', 'Calibrating',
+    'Timing', 'Advancing', 'Retarding', 'Lapping', 'Seating', 'Cutting', 'Reconditioning',
+    'Resurfacing', 'Decking', 'Cleaning', 'Tanking', 'Magnafluxing', 'Testing', 'Benching',
+    'Milling', 'Prepping', 'Installing', 'Sleeving', 'Torquing', 'Sequencing', 'Degreeing',
+    'Fitting', 'Gapping', 'Grinding', 'Polishing', 'Priming',
+    
+    // Electrical & Electronics
+    'Wiring', 'Soldering', 'Crimping', 'Routing', 'Tucking', 'Wrapping', 'Taping', 'Shrinking',
+    'Stripping', 'Splicing', 'Terminating', 'Connecting', 'Testing', 'Troubleshooting', 'Diagnosing',
+    'Scanning', 'Reading', 'Clearing', 'Flashing', 'Programming', 'Mapping', 'Tuning', 'Calibrating',
+    'Installing', 'Mounting', 'Configuring', 'Monitoring',
+    
+    // Transmission & Drivetrain
+    'Rebuilding', 'Clutching', 'Replacing', 'Resurfacing', 'Installing', 'Changing', 'Adjusting',
+    'Rebuilding', 'Setting', 'Balancing', 'Flashing', 'Updating', 'Calibrating',
+    
+    // Brakes & Wheels
+    'Bleeding', 'Flushing', 'Changing', 'Replacing', 'Turning', 'Resurfacing', 'Rebuilding',
+    'Flaring', 'Fitting', 'Testing', 'Diagnosing', 'Balancing', 'Mounting', 'Torquing',
+    'Rotating', 'Programming', 'Repairing', 'Straightening',
+    
+    // Computer & Software (automotive focused)
+    'Coding', 'Programming', 'Scripting', 'Debugging', 'Flashing', 'Mapping', 'Tuning',
+    'Logging', 'Analyzing', 'Processing', 'Monitoring', 'Calibrating', 'Configuring',
+    
+    // Racing & Performance
+    'Dynoing', 'Launching', 'Testing', 'Optimizing', 'Analyzing', 'Data', 'Logging', 'Tuning',
+    
+    // Physical Activities
+    'Lifting', 'Dropping', 'Pushing', 'Pulling', 'Rotating', 'Spinning', 'Rolling', 'Tucking'
   ];
-  
   const [currentVerb, setCurrentVerb] = useState(verbs[0]);
   
   useEffect(() => {
@@ -511,16 +463,20 @@ const CursorHomepage: React.FC = () => {
         // Get images for this vehicle
         const images = imagesByVehicle.get(v.id) || [];
         
+        // Map images with proper URL extraction - prioritize primary images
         const all_images = images
           .map((img: any) => ({
             id: img.id,
-            url: img.thumbnail_url || img.medium_url || img.image_url,
-            is_primary: img.is_primary,
+            url: img.thumbnail_url || img.medium_url || img.image_url || null,
+            is_primary: img.is_primary || false,
             created_at: img.created_at
           }))
+          .filter((img: any) => img.url !== null) // Only include images with valid URLs
           .sort((a: any, b: any) => {
-            if (a.is_primary) return -1;
-            if (b.is_primary) return 1;
+            // Primary images first
+            if (a.is_primary && !b.is_primary) return -1;
+            if (!a.is_primary && b.is_primary) return 1;
+            // Then by creation date (newest first)
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           })
           .slice(0, 5); // Limit to 5 for performance
@@ -572,8 +528,9 @@ const CursorHomepage: React.FC = () => {
             hypeReason = hypeReason || 'TRENDING';
           }
 
-          // Primary image is already sorted first
-          const primaryImageUrl = all_images[0]?.url || null;
+          // Primary image is already sorted first - ensure we have a valid URL
+          // Also check if RPC function returned a primary_image_url
+          const primaryImageUrl = all_images[0]?.url || v.primary_image_url || null;
 
             return {
             ...v,
