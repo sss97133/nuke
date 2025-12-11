@@ -600,6 +600,16 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     currentImageUrl = imageUrl || null;
   }
   
+  // #region agent log
+  if (viewMode === 'grid' && (window as any).__debugVehicleCardIndex === undefined) {
+    (window as any).__debugVehicleCardIndex = 0;
+  }
+  if (viewMode === 'grid' && (window as any).__debugVehicleCardIndex < 5) {
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:596',message:'VehicleCardDense URL extraction',data:{vehicleId:vehicle.id,all_images:vehicle.all_images,all_imagesLength:vehicle.all_images?.length,primary_image_url:vehicle.primary_image_url,image_url:vehicle.image_url,vehicleImages,vehicleImagesLength:vehicleImages.length,currentImageIndex,currentImageUrl,imageUrl_from_getImageUrl:imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    (window as any).__debugVehicleCardIndex++;
+  }
+  // #endregion
+  
   // EMERGENCY FIX: Log and use ANY available image field
   if (!currentImageUrl && viewMode === 'grid') {
     // Try every possible field
@@ -616,6 +626,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     if (possibleUrls.length > 0) {
       currentImageUrl = possibleUrls[0];
       console.warn(`⚠️ Vehicle ${vehicle.id} - Using emergency fallback URL:`, currentImageUrl);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:620',message:'Emergency fallback used',data:{vehicleId:vehicle.id,fallbackUrl:currentImageUrl,possibleUrls},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
     } else {
       console.error(`❌ Vehicle ${vehicle.id} has NO image URLs at all!`, {
         all_images: vehicle.all_images,
@@ -624,6 +637,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         image_variants: vehicle.image_variants,
         imageUrl
       });
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:630',message:'NO image URLs found',data:{vehicleId:vehicle.id,all_images:vehicle.all_images,primary_image_url:vehicle.primary_image_url,image_url:vehicle.image_url,image_variants:vehicle.image_variants,imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
     }
   }
   
@@ -701,6 +717,20 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           backgroundSize: currentImageUrl ? 'cover' : 'contain',
           backgroundColor: '#f5f5f5',
           position: 'relative',
+        }}
+        onLoad={() => {
+          // #region agent log
+          if ((window as any).__debugVehicleCardIndex < 5) {
+            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:655',message:'Image element loaded',data:{vehicleId:vehicle.id,currentImageUrl,loaded:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          }
+          // #endregion
+        }}
+        onError={() => {
+          // #region agent log
+          if ((window as any).__debugVehicleCardIndex < 5) {
+            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:662',message:'Image element failed to load',data:{vehicleId:vehicle.id,currentImageUrl,error:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+          }
+          // #endregion
         }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}

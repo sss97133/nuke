@@ -60,42 +60,105 @@ async function indexDealerProfile(profileUrl) {
 async function scrapeDealerDirectory() {
   console.log('\n📋 Scraping Classic.com dealer directory...');
   
-  // Classic.com dealer directory URL
-  const directoryUrl = 'https://www.classic.com/dealers';
+  // Classic.com dealer directory URLs (try both /dealers and /data)
+  const directoryUrls = [
+    'https://www.classic.com/dealers',
+    'https://www.classic.com/data'
+  ];
   
-  try {
-    // Use scrape-multi-source to extract dealer profile URLs
-    const { data, error } = await supabase.functions.invoke('scrape-multi-source', {
-      body: {
-        source_url: directoryUrl,
-        source_type: 'marketplace',
-        extract_listings: false,
-        extract_dealer_info: false,
-        use_llm_extraction: true,
-        max_listings: 1000
+  const allProfileUrls = new Set();
+  
+  for (const directoryUrl of directoryUrls) {
+    try {
+      console.log(`   🔍 Scraping ${directoryUrl}...`);
+      
+      // Use scrape-multi-source with LLM extraction to find dealer profile URLs
+      const { data, error } = await supabase.functions.invoke('scrape-multi-source', {
+        body: {
+          source_url: directoryUrl,
+          source_type: 'marketplace',
+          extract_listings: false,
+          extract_dealer_info: false,
+          use_llm_extraction: true,
+          max_listings: 5000 // High limit to catch all dealers
+        }
+      });
+
+      if (error) {
+        console.warn(`   ⚠️  Error scraping ${directoryUrl}: ${error.message}`);
+        continue;
       }
-    });
 
-    if (error) {
-      throw error;
+      // Extract dealer profile URLs from the scraped data
+      // Profile URLs pattern: https://www.classic.com/s/dealer-name-ID/
+      const html = data?.html || data?.markdown || '';
+      const markdown = data?.markdown || '';
+      
+      // Pattern 1: Extract from HTML href attributes
+      const hrefPattern = /href=["'](https?:\/\/www\.classic\.com\/s\/[^"']+)/gi;
+      let match;
+      while ((match = hrefPattern.exec(html)) !== null) {
+        const url = match[1].replace(/\/$/, '') + '/'; // Ensure trailing slash
+        allProfileUrls.add(url);
+      }
+      
+      // Pattern 2: Extract from markdown links
+      const markdownPattern = /\[([^\]]+)\]\((https?:\/\/www\.classic\.com\/s\/[^)]+)\)/gi;
+      while ((match = markdownPattern.exec(markdown)) !== null) {
+        const url = match[2].replace(/\/$/, '') + '/';
+        allProfileUrls.add(url);
+      }
+      
+      // Pattern 3: Extract raw URLs from text
+      const urlPattern = /https?:\/\/www\.classic\.com\/s\/[^\s\)"']+/gi;
+      while ((match = urlPattern.exec(html + markdown)) !== null) {
+        const url = match[0].replace(/\/$/, '') + '/';
+        if (url.includes('/s/')) {
+          allProfileUrls.add(url);
+        }
+      }
+      
+      // Pattern 4: Extract relative URLs
+      const relativePattern = /["']\/s\/([^"']+)/gi;
+      while ((match = relativePattern.exec(html)) !== null) {
+        const url = `https://www.classic.com/s/${match[1].replace(/\/$/, '')}/`;
+        allProfileUrls.add(url);
+      }
+      
+      console.log(`   ✅ Found ${allProfileUrls.size} unique dealer profiles so far`);
+      
+      // Also check if scrape-multi-source extracted listings that are actually dealer profiles
+      if (data?.listings && Array.isArray(data.listings)) {
+        for (const listing of data.listings) {
+          if (listing.url && listing.url.includes('classic.com/s/')) {
+            const url = listing.url.replace(/\/$/, '') + '/';
+            allProfileUrls.add(url);
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.warn(`   ⚠️  Error scraping ${directoryUrl}: ${error.message}`);
     }
-
-    // Extract dealer profile URLs from Classic.com
-    // Profile URLs look like: /s/111-motorcars-ZnQygen/
-    const profileUrls = [];
     
-    // This would need to be implemented based on actual Classic.com structure
-    // For now, we'll use a known example
-    console.log('   ⚠️  Directory scraping not yet implemented - using example URL');
-    
-    return [
-      'https://www.classic.com/s/111-motorcars-ZnQygen/'
-      // Add more profile URLs here as we discover them
-    ];
-  } catch (error) {
-    console.error(`   ❌ Error scraping directory: ${error.message}`);
-    return [];
+    // Rate limit between directory URLs
+    if (directoryUrls.indexOf(directoryUrl) < directoryUrls.length - 1) {
+      await new Promise(r => setTimeout(r, 2000));
+    }
   }
+  
+  const profileUrls = Array.from(allProfileUrls).filter(url => 
+    url.includes('classic.com/s/') && url.length > 25 // Filter out invalid URLs
+  );
+  
+  console.log(`   ✅ Total unique dealer profiles found: ${profileUrls.length}`);
+  
+  if (profileUrls.length === 0) {
+    console.log('   ⚠️  No profiles found, using example URL for testing');
+    return ['https://www.classic.com/s/111-motorcars-ZnQygen/'];
+  }
+  
+  return profileUrls;
 }
 
 /**

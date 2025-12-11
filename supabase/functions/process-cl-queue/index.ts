@@ -391,6 +391,10 @@ serve(async (req) => {
             })
 
             // Create timeline event
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:394',message:'Before timeline event creation',data:{hasPostedDate:!!data.posted_date,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            
             if (data.posted_date) {
               try {
                 let eventDate = new Date().toISOString().split('T')[0]
@@ -398,6 +402,10 @@ serve(async (req) => {
                 if (dateMatch) {
                   eventDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
                 }
+                
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:402',message:'Timeline event date calculated',data:{originalPostedDate:data.posted_date,eventDate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
 
                 await supabase
                   .from('timeline_events')
@@ -416,9 +424,20 @@ serve(async (req) => {
                       posted_date: data.posted_date
                     }
                   })
+                  
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:422',message:'Timeline event created',data:{eventDate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
               } catch (timelineErr) {
                 console.warn(`  ⚠️ Timeline event creation error:`, timelineErr)
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:425',message:'Timeline event creation error',data:{error:timelineErr?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
               }
+            } else {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:430',message:'No posted_date - timeline event skipped',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
             }
 
             // Download and upload images
@@ -609,6 +628,10 @@ serve(async (req) => {
 
 // Inline Craigslist scraping function (same as scrape-all-craigslist-squarebodies)
 function scrapeCraigslistInline(doc: any, url: string): any {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:611',message:'scrapeCraigslistInline entry',data:{url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
   const data: any = {
     source: 'Craigslist',
     listing_url: url
@@ -618,10 +641,19 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   if (titleElement) {
     data.title = titleElement.textContent.trim()
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:620',message:'Title extracted',data:{title:data.title},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
     const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
     if (yearMatch) data.year = yearMatch[0]
     
     const vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+(.+?)(?:\s*-\s*\$|\s*\$|\(|$)/i)
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:625',message:'Vehicle regex match result',data:{matched:!!vehicleMatch,make:vehicleMatch?.[2],model:vehicleMatch?.[3]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
     if (vehicleMatch && vehicleMatch[3]) {
       data.make = vehicleMatch[2]
       let modelText = vehicleMatch[3].trim()
@@ -648,6 +680,69 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   }
 
   const fullText = doc.body?.textContent || ''
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:652',message:'Before posted_date extraction',data:{hasPostedDate:!!data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
+  // Extract posted date from HTML
+  // Try multiple selectors for posted date
+  const postedDateSelectors = [
+    'time.date',
+    '.postinginfos time',
+    'time[datetime]',
+    '.postinginfo time',
+    'span[class*="date"]',
+    '.postingtitletext time'
+  ]
+  
+  let postedDateFound = false
+  for (const selector of postedDateSelectors) {
+    const dateElement = doc.querySelector(selector)
+    if (dateElement) {
+      const datetime = dateElement.getAttribute('datetime') || dateElement.textContent?.trim()
+      if (datetime) {
+        try {
+          const parsedDate = new Date(datetime)
+          if (!isNaN(parsedDate.getTime())) {
+            data.posted_date = parsedDate.toISOString()
+            postedDateFound = true
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:675',message:'Posted date extracted from selector',data:{selector,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            break
+          }
+        } catch (e) {
+          // Continue to next selector
+        }
+      }
+    }
+  }
+  
+  // Fallback: try to extract from text content (e.g., "Posted 2025-11-27 15:00")
+  if (!postedDateFound) {
+    const postedTextMatch = fullText.match(/Posted\s+(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i)
+    if (postedTextMatch) {
+      const [, year, month, day, hour, minute] = postedTextMatch
+      const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00`
+      try {
+        const parsedDate = new Date(dateStr)
+        if (!isNaN(parsedDate.getTime())) {
+          data.posted_date = parsedDate.toISOString()
+          postedDateFound = true
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:695',message:'Posted date extracted from text pattern',data:{posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+  }
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:702',message:'After posted_date extraction',data:{hasPostedDate:!!data.posted_date,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   
   const attrGroups = doc.querySelectorAll('.attrgroup')
   attrGroups.forEach((group: any) => {
@@ -677,17 +772,64 @@ function scrapeCraigslistInline(doc: any, url: string): any {
     data.description = descElement.textContent.trim().substring(0, 5000)
   }
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:730',message:'Before image extraction',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  
   const images: string[] = []
   const thumbLinks = doc.querySelectorAll('a.thumb')
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:735',message:'Thumb links found',data:{thumbCount:thumbLinks.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  
   thumbLinks.forEach((link: any) => {
     const href = link.getAttribute('href')
     if (href && href.startsWith('http')) {
       images.push(href.replace(/\/\d+x\d+\//, '/1200x900/'))
     }
   })
+  
+  // Also try extracting from img tags with images.craigslist.org URLs
+  const imgTags = doc.querySelectorAll('img[src*="images.craigslist.org"]')
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:747',message:'Img tags found',data:{imgTagCount:imgTags.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  
+  imgTags.forEach((img: any) => {
+    const src = img.getAttribute('src')
+    if (src && src.includes('images.craigslist.org') && !images.includes(src)) {
+      // Upgrade to high-res version
+      const highResUrl = src.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!images.includes(highResUrl)) {
+        images.push(highResUrl)
+      }
+    }
+  })
+  
+  // Also try data-src attributes (lazy loading)
+  const lazyImages = doc.querySelectorAll('img[data-src*="images.craigslist.org"]')
+  lazyImages.forEach((img: any) => {
+    const dataSrc = img.getAttribute('data-src')
+    if (dataSrc && dataSrc.includes('images.craigslist.org')) {
+      const highResUrl = dataSrc.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!images.includes(highResUrl)) {
+        images.push(highResUrl)
+      }
+    }
+  })
+  
   if (images.length > 0) {
     data.images = Array.from(new Set(images)).slice(0, 50)
   }
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:770',message:'After image extraction',data:{imageCount:data.images?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:774',message:'scrapeCraigslistInline exit',data:{title:data.title,year:data.year,make:data.make,model:data.model,posted_date:data.posted_date,imageCount:data.images?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'ALL'})}).catch(()=>{});
+  // #endregion
 
   return data
 }

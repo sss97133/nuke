@@ -8,12 +8,14 @@ const corsHeaders = {
 
 interface ScrapeRequest {
   source_url: string;
-  source_type: 'dealer' | 'auction' | 'marketplace' | 'classifieds';
+  source_type: 'dealer' | 'auction' | 'auction_house' | 'dealer_website' | 'marketplace' | 'classifieds';
   search_query?: string;
   extract_listings?: boolean;
   extract_dealer_info?: boolean;
   use_llm_extraction?: boolean;
   max_listings?: number;
+  max_results?: number; // Alias for max_listings
+  organization_id?: string; // Optional: link inventory directly to existing organization
 }
 
 serve(async (req) => {
@@ -42,8 +44,12 @@ serve(async (req) => {
       extract_listings = true,
       extract_dealer_info = true,
       use_llm_extraction = true,
-      max_listings = 100
+      max_listings = 100,
+      max_results,
+      organization_id
     } = body;
+    
+    const maxListingsToProcess = max_results || max_listings || 100;
 
     console.log(`Scraping ${source_url} (${source_type})`);
 
@@ -356,13 +362,31 @@ Return ONLY valid JSON in this format:
       }
     }
 
-    // Step 5: Create/update business if dealer info found
-    let organizationId: string | null = null;
+    // Step 5: Create/update business if dealer info found or use provided organization_id
+    let organizationId: string | null = organization_id || null;
     
-    if (dealerInfo && dealerInfo.name) {
-      const businessType = (source_type === 'auction' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
+    // If organization_id provided, verify it exists and get business type
+    let businessType: 'dealer' | 'auction_house' = 'dealer';
+    if (organizationId) {
+      const { data: existingOrg } = await supabase
+        .from('businesses')
+        .select('id, type, business_name')
+        .eq('id', organizationId)
+        .maybeSingle();
       
-      // Try to find existing business by website (strongest signal)
+      if (!existingOrg) {
+        console.warn(`⚠️  Provided organization_id ${organizationId} not found, will create new organization`);
+        organizationId = null;
+      } else {
+        businessType = (existingOrg.type === 'auction_house' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
+        console.log(`✅ Using provided organization: ${existingOrg.business_name} (${businessType})`);
+      }
+    }
+    
+    if (!organizationId && dealerInfo && dealerInfo.name) {
+        businessType = (source_type === 'auction' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
+        
+        // Try to find existing business by website (strongest signal)
       let existingOrg = null;
       if (dealerInfo.website) {
         const { data } = await supabase
@@ -387,6 +411,7 @@ Return ONLY valid JSON in this format:
 
       if (existingOrg) {
         organizationId = existingOrg.id;
+        businessType = (existingOrg.type === 'auction_house' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
         console.log(`✅ Found existing business: ${existingOrg.business_name} (${organizationId})`);
         
         // Update inventory counts if we have them
@@ -450,40 +475,127 @@ Return ONLY valid JSON in this format:
       }
     }
 
-    // Step 6: Queue listings for import
+    // Step 6: Process listings - queue for import OR directly create dealer_inventory/auction records
     let queuedCount = 0;
     let duplicateCount = 0;
+    let inventoryCreatedCount = 0;
 
-    for (const listing of listings.slice(0, max_listings)) {
-      if (!listing.url) continue;
+    // If we have an organization_id and this is dealer inventory, we can create dealer_inventory records
+    // For auction houses, we'll still queue since they need auction_events/auction_lots structure
+    const shouldCreateInventoryDirectly = organizationId && businessType === 'dealer' && listings.length > 0;
+    
+    if (shouldCreateInventoryDirectly) {
+      console.log(`📦 Creating dealer_inventory records directly for organization ${organizationId}...`);
+      
+      // First, queue listings to create vehicles
+      // Then we'll link them to dealer_inventory
+      for (const listing of listings.slice(0, maxListingsToProcess)) {
+        if (!listing.url) continue;
 
-      const { error: queueError } = await supabase
-        .from('import_queue')
-        .insert({
-          source_id: sourceId,
-          listing_url: listing.url,
-          listing_title: listing.title,
-          listing_price: listing.price,
-          listing_year: listing.year,
-          listing_make: listing.make,
-          listing_model: listing.model,
-          thumbnail_url: listing.thumbnail_url,
-          raw_data: listing,
-          priority: listing.is_squarebody ? 10 : 0
-        });
+        const { data: queuedItem, error: queueError } = await supabase
+          .from('import_queue')
+          .insert({
+            source_id: sourceId,
+            listing_url: listing.url,
+            listing_title: listing.title,
+            listing_price: listing.price,
+            listing_year: listing.year,
+            listing_make: listing.make,
+            listing_model: listing.model,
+            thumbnail_url: listing.thumbnail_url,
+            raw_data: {
+              ...listing,
+              organization_id: organizationId, // Tag with org ID for processing
+              inventory_extraction: true
+            },
+            priority: listing.is_squarebody ? 10 : 0
+          })
+          .select('id')
+          .single();
 
-      if (queueError) {
-        if (queueError.code === '23505') { // Unique violation
-          duplicateCount++;
+        if (queueError) {
+          if (queueError.code === '23505') { // Unique violation
+            duplicateCount++;
+          } else {
+            console.error('Queue error:', queueError);
+          }
         } else {
-          console.error('Queue error:', queueError);
+          queuedCount++;
         }
-      } else {
-        queuedCount++;
       }
-    }
+      
+      console.log(`✅ Queued ${queuedCount} listings for vehicle creation (will auto-link to dealer_inventory via process-import-queue)`);
+    } else if (organizationId && businessType === 'auction_house') {
+      // For auction houses, we need to structure as auction events/lots
+      // This will be handled separately since auction structure is more complex
+      console.log(`🏛️  Auction house detected - listings will be processed as auction events/lots`);
+      
+      for (const listing of listings.slice(0, maxListingsToProcess)) {
+        if (!listing.url) continue;
 
-    console.log(`Queued ${queuedCount} new listings, ${duplicateCount} duplicates skipped`);
+        const { error: queueError } = await supabase
+          .from('import_queue')
+          .insert({
+            source_id: sourceId,
+            listing_url: listing.url,
+            listing_title: listing.title,
+            listing_price: listing.price,
+            listing_year: listing.year,
+            listing_make: listing.make,
+            listing_model: listing.model,
+            thumbnail_url: listing.thumbnail_url,
+            raw_data: {
+              ...listing,
+              organization_id: organizationId,
+              business_type: 'auction_house',
+              auction_extraction: true
+            },
+            priority: listing.is_squarebody ? 10 : 0
+          });
+
+        if (queueError) {
+          if (queueError.code === '23505') {
+            duplicateCount++;
+          } else {
+            console.error('Queue error:', queueError);
+          }
+        } else {
+          queuedCount++;
+        }
+      }
+    } else {
+      // Standard queue process (when no org_id provided)
+      for (const listing of listings.slice(0, maxListingsToProcess)) {
+        if (!listing.url) continue;
+
+        const { error: queueError } = await supabase
+          .from('import_queue')
+          .insert({
+            source_id: sourceId,
+            listing_url: listing.url,
+            listing_title: listing.title,
+            listing_price: listing.price,
+            listing_year: listing.year,
+            listing_make: listing.make,
+            listing_model: listing.model,
+            thumbnail_url: listing.thumbnail_url,
+            raw_data: listing,
+            priority: listing.is_squarebody ? 10 : 0
+          });
+
+        if (queueError) {
+          if (queueError.code === '23505') { // Unique violation
+            duplicateCount++;
+          } else {
+            console.error('Queue error:', queueError);
+          }
+        } else {
+          queuedCount++;
+        }
+      }
+
+      console.log(`Queued ${queuedCount} new listings, ${duplicateCount} duplicates skipped`);
+    }
 
     return new Response(JSON.stringify({
       success: true,
