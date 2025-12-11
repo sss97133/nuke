@@ -38,6 +38,8 @@ interface VehicleCardDenseProps {
     all_images?: Array<{ id: string; url: string; is_primary: boolean }>;
     tier?: string;
     tier_label?: string;
+    profile_origin?: string; // 'bat_import', 'url_scraper', 'user_upload', etc.
+    activity_7d?: number; // Recent activity (timeline events in last 7 days)
   };
   viewMode?: 'list' | 'gallery' | 'grid';
   showSocial?: boolean;
@@ -100,6 +102,88 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return `${Math.floor(diffInHours / 168)}w ago`;
   };
 
+  // Calculate alphabet-based tier (F, E, D, C, B, A, S, SSS)
+  // Key principle: BAT listings = C tier (data but no engagement)
+  // Higher tiers require actual user engagement and active use
+  const calculateVehicleTier = (vehicle: VehicleCardDenseProps['vehicle']): string => {
+    const hasVIN = vehicle.vin && vehicle.vin.length === 17;
+    const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
+    const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
+    const isBATImport = vehicle.profile_origin === 'bat_import';
+    const isScraped = vehicle.profile_origin === 'url_scraper' || vehicle.profile_origin === 'craigslist_scrape' || vehicle.profile_origin === 'ksl_import';
+    
+    // Engagement metrics (what makes higher tiers)
+    const eventCount = vehicle.event_count || 0;
+    const recentActivity = vehicle.activity_7d || 0; // Timeline events in last 7 days
+    const viewCount = vehicle.view_count || 0;
+    const hasUserEngagement = eventCount > 0 || recentActivity > 0 || viewCount > 10;
+    
+    // F tier: No images, description only, likely pending
+    if (imageCount === 0) return 'F';
+    
+    // E tier: Images but like 1 pixelated one (very low quality or just 1 image)
+    if (imageCount === 1) return 'E';
+    
+    // D tier: 2-4 images, minimal data
+    if (imageCount >= 2 && imageCount < 5) {
+      // Even with engagement, very few images caps at D
+      if (hasUserEngagement && hasVIN && hasPrice) return 'D';
+      return 'D';
+    }
+    
+    // C tier: BAT listings or scraped listings (have data but no engagement)
+    // This is the baseline - converted listings with images, VIN, price
+    if (isBATImport || isScraped) {
+      // BAT/scraped listings with good data = C tier
+      if (imageCount >= 5 && hasVIN && hasPrice) return 'C';
+      if (imageCount >= 5 && (hasVIN || hasPrice)) return 'C';
+      return 'D';
+    }
+    
+    // For user-uploaded vehicles, engagement determines tier
+    // C tier: 5-9 images, some data, minimal engagement
+    if (imageCount >= 5 && imageCount < 10) {
+      if (hasUserEngagement && hasVIN && hasPrice) return 'C';
+      if (hasVIN || hasPrice) return 'C';
+      return 'D';
+    }
+    
+    // B tier: 10-19 images + user engagement (events, views, activity)
+    if (imageCount >= 10 && imageCount < 20) {
+      if (hasUserEngagement && hasVIN && hasPrice) {
+        // Active engagement (recent activity or multiple events)
+        if (recentActivity >= 3 || eventCount >= 5 || viewCount >= 50) return 'B';
+        return 'C';
+      }
+      if (hasUserEngagement && (hasVIN || hasPrice)) return 'C';
+      if (hasVIN && hasPrice) return 'C'; // Data but no engagement = C
+      return 'D';
+    }
+    
+    // A tier: 20+ images + strong user engagement
+    if (imageCount >= 20) {
+      if (hasUserEngagement && hasVIN && hasPrice) {
+        // Strong engagement (active use, multiple events, good views)
+        if (recentActivity >= 5 || eventCount >= 10 || viewCount >= 100) {
+          // S tier: 50+ images + exceptional engagement
+          if (imageCount >= 50 && (recentActivity >= 10 || eventCount >= 20 || viewCount >= 200)) {
+            // SSS tier: 100+ images + exceptional engagement
+            if (imageCount >= 100 && (recentActivity >= 15 || eventCount >= 30 || viewCount >= 500)) return 'SSS';
+            return 'S';
+          }
+          return 'A';
+        }
+        return 'B';
+      }
+      // Has images but no engagement = C (like BAT listings)
+      if (hasVIN && hasPrice) return 'C';
+      return 'C';
+    }
+    
+    // Default fallback
+    return 'F';
+  };
+
   // Get optimal image for this view mode
   const getImageUrl = () => {
     const variants = vehicle.image_variants || {};
@@ -119,7 +203,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   };
 
   const imageUrl = getImageUrl();
-  const timeAgo = formatTimeAgo(vehicle.updated_at || vehicle.created_at);
+  // Use created_at (upload time) for time display
+  const timeAgo = formatTimeAgo(vehicle.created_at);
 
   // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {
@@ -341,26 +426,25 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   return null;
                 })()}
 
-                {/* Vehicle Tier - use from RPC or calculate */}
+                {/* Vehicle Tier - alphabet-based (F, E, D, C, B, A, S, SSS) */}
                 {(() => {
-                  const tierLabel = vehicle.tier_label || (() => {
-                    // Fallback calculation if not from RPC
-                    const hasVIN = vehicle.vin && vehicle.vin.length === 17;
-                    const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
-                    const hasEvents = (vehicle.event_count || 0) > 0;
-                    const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
-                    
-                    if (imageCount >= 20 && hasVIN && hasPrice && hasEvents) return 'Tier 5';
-                    if (imageCount >= 10 && hasVIN && hasPrice) return 'Tier 4';
-                    if (imageCount >= 5 && (hasVIN || hasEvents)) return 'Tier 3';
-                    if (imageCount >= 1) return 'Tier 2';
-                    return 'Tier 1';
-                  })();
+                  const tierLabel = vehicle.tier_label || calculateVehicleTier(vehicle);
                   
-                  const tier = vehicle.tier || (tierLabel === 'Tier 5' ? 'complete' :
-                    tierLabel === 'Tier 4' ? 'excellent' :
-                    tierLabel === 'Tier 3' ? 'good' :
-                    tierLabel === 'Tier 2' ? 'fair' : 'minimal');
+                  // Color mapping for alphabet tiers
+                  const getTierColor = (tier: string) => {
+                    switch (tier) {
+                      case 'SSS': return '#9333ea'; // Purple - highest
+                      case 'SS': return '#7c3aed';
+                      case 'S': return '#8b5cf6';
+                      case 'A': return '#10b981'; // Green - excellent
+                      case 'B': return '#3b82f6'; // Blue - good
+                      case 'C': return '#f59e0b'; // Orange - fair
+                      case 'D': return '#f97316'; // Dark orange - minimal
+                      case 'E': return '#ef4444'; // Red - poor
+                      case 'F': return '#6b7280'; // Gray - pending/no data
+                      default: return '#6b7280';
+                    }
+                  };
                   
                   if (tierLabel) {
                     return (
@@ -368,13 +452,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         <span
                           style={{
                             fontWeight: 600,
-                            color: tier === 'complete' || tier === 'excellent' 
-                              ? '#10b981' 
-                              : tier === 'good' 
-                              ? '#3b82f6' 
-                              : tier === 'fair'
-                              ? '#f59e0b'
-                              : '#6b7280'
+                            color: getTierColor(tierLabel)
                           }}
                         >
                           {tierLabel}
@@ -623,25 +701,25 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               return null;
             })()}
 
-            {/* Vehicle Tier */}
+            {/* Vehicle Tier - alphabet-based (F, E, D, C, B, A, S, SSS) */}
             {(() => {
-              const tierLabel = vehicle.tier_label || (() => {
-                const hasVIN = vehicle.vin && vehicle.vin.length === 17;
-                const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
-                const hasEvents = (vehicle.event_count || 0) > 0;
-                const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
-                
-                if (imageCount >= 20 && hasVIN && hasPrice && hasEvents) return 'Tier 5';
-                if (imageCount >= 10 && hasVIN && hasPrice) return 'Tier 4';
-                if (imageCount >= 5 && (hasVIN || hasEvents)) return 'Tier 3';
-                if (imageCount >= 1) return 'Tier 2';
-                return 'Tier 1';
-              })();
+              const tierLabel = vehicle.tier_label || calculateVehicleTier(vehicle);
               
-              const tier = vehicle.tier || (tierLabel === 'Tier 5' ? 'complete' :
-                tierLabel === 'Tier 4' ? 'excellent' :
-                tierLabel === 'Tier 3' ? 'good' :
-                tierLabel === 'Tier 2' ? 'fair' : 'minimal');
+              // Color mapping for alphabet tiers
+              const getTierColor = (tier: string) => {
+                switch (tier) {
+                  case 'SSS': return '#9333ea'; // Purple - highest
+                  case 'SS': return '#7c3aed';
+                  case 'S': return '#8b5cf6';
+                  case 'A': return '#10b981'; // Green - excellent
+                  case 'B': return '#3b82f6'; // Blue - good
+                  case 'C': return '#f59e0b'; // Orange - fair
+                  case 'D': return '#f97316'; // Dark orange - minimal
+                  case 'E': return '#ef4444'; // Red - poor
+                  case 'F': return '#6b7280'; // Gray - pending/no data
+                  default: return '#6b7280';
+                }
+              };
               
               if (tierLabel) {
                 return (
@@ -649,13 +727,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     <span
                       style={{
                         fontWeight: 600,
-                        color: tier === 'complete' || tier === 'excellent' 
-                          ? '#10b981' 
-                          : tier === 'good' 
-                          ? '#3b82f6' 
-                          : tier === 'fair'
-                          ? '#f59e0b'
-                          : '#6b7280'
+                        color: getTierColor(tierLabel)
                       }}
                     >
                       {tierLabel}

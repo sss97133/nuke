@@ -57,42 +57,146 @@ serve(async (req) => {
       uploaded: 0,
       failed: 0,
       skipped: 0,
-      analyzed: 0
+      analyzed: 0,
+      errors: [] as string[]
     };
 
     for (let i = 0; i < image_urls.length; i++) {
-      const imageUrl = image_urls[i];
+      let imageUrl = image_urls[i];
+      
+      // Clean HTML entities from URL
+      imageUrl = imageUrl
+        .replace(/&#038;/g, '&')
+        .replace(/&#039;/g, "'")
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"');
+      
+      // Remove resize parameters for BaT
+      if (imageUrl.includes('bringatrailer.com')) {
+        imageUrl = imageUrl
+          .replace(/[?&]w=\d+/g, '')
+          .replace(/[?&]resize=[^&]*/g, '')
+          .replace(/[?&]fit=[^&]*/g, '')
+          .replace(/[?&]$/, '');
+        if (imageUrl.includes('-scaled.')) {
+          imageUrl = imageUrl.replace('-scaled.', '.');
+        }
+      }
       
       try {
-        // Download image
-        const imageResponse = await fetch(imageUrl);
+        // Download image with proper headers (especially for Craigslist and BaT)
+        const headers: HeadersInit = {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9'
+        };
+        
+        // Add Referer for specific sites
+        if (imageUrl.includes('craigslist')) {
+          headers['Referer'] = 'https://craigslist.org/';
+        } else if (imageUrl.includes('bringatrailer')) {
+          headers['Referer'] = 'https://bringatrailer.com/';
+        }
+        
+        console.log(`Downloading image ${i + 1}/${image_urls.length}: ${imageUrl.substring(0, 80)}...`);
+        let imageResponse: Response;
+        try {
+          // Add timeout (30 seconds)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          
+          imageResponse = await fetch(imageUrl, { 
+            headers,
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+        } catch (fetchError: any) {
+          if (fetchError.name === 'AbortError') {
+            console.log(`Timeout fetching ${imageUrl}`);
+          } else {
+            console.log(`Fetch error for ${imageUrl}: ${fetchError.message || fetchError}`);
+          }
+          results.failed++;
+          continue;
+        }
+        
         if (!imageResponse.ok) {
-          console.log(`Failed to download ${imageUrl}: ${imageResponse.status}`);
+          console.log(`Failed to download ${imageUrl}: ${imageResponse.status} ${imageResponse.statusText}`);
+          try {
+            const errorText = await imageResponse.text();
+            if (errorText && errorText.length < 500) {
+              console.log(`Error response: ${errorText}`);
+            }
+          } catch (e) {
+            // Ignore error reading response
+          }
           results.failed++;
           continue;
         }
 
-        const imageBlob = await imageResponse.blob();
         const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        if (!contentType.startsWith('image/')) {
+          console.log(`Not an image: ${contentType} for ${imageUrl}`);
+          results.failed++;
+          continue;
+        }
+        
+        // Convert response to Uint8Array (same approach as backfill-craigslist-images)
+        let imageBytes: Uint8Array;
+        try {
+          // Use blob first, then arrayBuffer (same as backfill-craigslist-images)
+          const imageBlob = await imageResponse.blob();
+          const arrayBuffer = await imageBlob.arrayBuffer();
+          imageBytes = new Uint8Array(arrayBuffer);
+        } catch (conversionError: any) {
+          console.log(`Conversion error for ${imageUrl}: ${conversionError.message || conversionError}`);
+          results.failed++;
+          continue;
+        }
+        
+        // Verify it's actually an image
+        if (imageBytes.length === 0) {
+          console.log(`Empty bytes for ${imageUrl}`);
+          results.failed++;
+          continue;
+        }
+        
+        // Check size (should be > 0 and < 50MB)
+        if (imageBytes.length > 52428800) {
+          console.log(`Image too large: ${(imageBytes.length / 1024 / 1024).toFixed(1)}MB for ${imageUrl}`);
+          results.failed++;
+          continue;
+        }
+        
+        console.log(`Image size: ${(imageBytes.length / 1024).toFixed(1)}KB, type: ${contentType}`);
+        
         const extension = contentType.includes('png') ? 'png' : 'jpg';
         
         // Generate unique filename
         const filename = `${source}_${Date.now()}_${i}.${extension}`;
         const storagePath = `${vehicle_id}/${filename}`;
-
-        // Upload to storage
-        const { error: uploadError } = await supabase.storage
+        
+        console.log(`Uploading to storage: ${storagePath}`);
+        
+        // Upload to storage using Uint8Array (same as backfill-craigslist-images)
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from('vehicle-images')
-          .upload(storagePath, imageBlob, {
-            contentType,
+          .upload(storagePath, imageBytes, {
+            contentType: `image/${extension}`,
+            cacheControl: '3600',
             upsert: false
           });
 
         if (uploadError) {
-          console.log(`Upload failed for ${filename}: ${uploadError.message}`);
+          const errorMsg = `Upload failed for ${filename}: ${uploadError.message || JSON.stringify(uploadError)}`;
+          console.log(`❌ ${errorMsg}`);
+          results.errors.push(errorMsg);
           results.failed++;
           continue;
         }
+        
+        console.log(`✅ Uploaded ${filename} (${(imageBytes.length / 1024).toFixed(1)}KB)`);
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage

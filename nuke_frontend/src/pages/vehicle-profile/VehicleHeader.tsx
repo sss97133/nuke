@@ -1678,10 +1678,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </div>
       )}
 
-      {showProvenancePopup && vehicle && primaryAmount !== null && (
+      {showProvenancePopup && vehicle && (
         <ValueProvenancePopup
           vehicleId={vehicle.id}
           field={(() => {
+            // If no price exists, default to asking_price for "Set a price"
+            if (primaryAmount === null) {
+              return 'asking_price';
+            }
             // Determine which field is actually being displayed based on primaryPrice
             const displayModeValue = displayMode || 'auto';
             if (displayModeValue === 'sale' || primaryPrice.label?.includes('SOLD') || primaryPrice.label?.includes('Sold')) {
@@ -1699,7 +1703,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             }
             return 'current_value';
           })()}
-          value={primaryAmount}
+          value={primaryAmount || 0}
           onClose={() => setShowProvenancePopup(false)}
           onUpdate={(newValue) => {
             // Optionally refresh the vehicle data or update local state

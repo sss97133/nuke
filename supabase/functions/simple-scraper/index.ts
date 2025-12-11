@@ -53,9 +53,44 @@ serve(async (req) => {
       const priceString = priceMatch ? priceMatch[0] : ''
       const price = priceString ? parseFloat(priceString.replace(/[\$,]/g, '')) : null
 
-      // Extract images - ensure we always return an array
-      const imageMatches = html.match(/https:\/\/images\.craigslist\.org\/[^"'\s>]+/g)
-      const images = imageMatches ? [...new Set(imageMatches)].filter((url: string) => url && typeof url === 'string' && url.trim().length > 0) : []
+      // Extract images - BaT and Craigslist
+      let images: string[] = []
+      
+      // BaT images: wp-content/uploads URLs
+      if (url.includes('bringatrailer.com')) {
+        const batImageMatches = html.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)/gi)
+        if (batImageMatches) {
+          images = batImageMatches
+            .map(img => {
+              // Clean HTML entities and resize parameters
+              return img
+                .replace(/&#038;/g, '&')
+                .replace(/&amp;/g, '&')
+                .replace(/[?&]w=\d+/g, '')
+                .replace(/[?&]resize=[^&]*/g, '')
+                .replace(/[?&]fit=[^&]*/g, '')
+                .replace(/[?&]$/, '')
+                .replace(/-scaled\./g, '.')
+            })
+            .filter((url: string) => {
+              const lower = url.toLowerCase()
+              return !lower.includes('themes/') && 
+                     !lower.includes('assets/') && 
+                     !lower.includes('.svg')
+            })
+        }
+      }
+      
+      // Craigslist images
+      if (url.includes('craigslist.org') || images.length === 0) {
+        const craigslistMatches = html.match(/https:\/\/images\.craigslist\.org\/[^"'\s>]+/g)
+        if (craigslistMatches) {
+          images = [...images, ...craigslistMatches]
+        }
+      }
+      
+      // Remove duplicates and filter
+      images = [...new Set(images)].filter((url: string) => url && typeof url === 'string' && url.trim().length > 0)
 
       // Extract basic vehicle info from title
       let year, make, model
@@ -131,8 +166,12 @@ serve(async (req) => {
         make,
         model: model || 'Unknown',  // Database requires non-empty string
         images,
-        source: 'Craigslist',
+        source: url.includes('bringatrailer.com') ? 'Bring a Trailer' : 
+                url.includes('craigslist.org') ? 'Craigslist' : 
+                'Unknown',
         listing_url: url,
+        html: html.substring(0, 50000), // Store first 50k chars for further processing
+        text: html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 10000), // Plain text for AI extraction
         raw_html_length: html.length
       }
     }
