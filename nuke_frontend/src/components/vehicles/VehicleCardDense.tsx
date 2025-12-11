@@ -40,6 +40,8 @@ interface VehicleCardDenseProps {
     tier_label?: string;
     profile_origin?: string; // 'bat_import', 'url_scraper', 'user_upload', etc.
     activity_7d?: number; // Recent activity (timeline events in last 7 days)
+    receipt_count?: number; // Number of receipts (build documentation)
+    ownership_verified?: boolean; // Has verified ownership records
   };
   viewMode?: 'list' | 'gallery' | 'grid';
   showSocial?: boolean;
@@ -103,80 +105,78 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   };
 
   // Calculate alphabet-based tier (F, E, D, C, B, A, S, SSS)
-  // Key principle: BAT listings = C tier (data but no engagement)
-  // Higher tiers require actual user engagement and active use
+  // Tier Philosophy:
+  // - F, E, D, C: Vast majority - dealers, flippers, basic listings
+  // - B: "Cool" BAT cars OR people making an effort
+  // - A: Strong engagement and documentation
+  // - S, SSS: ONLY manually assigned (never auto-calculated)
   const calculateVehicleTier = (vehicle: VehicleCardDenseProps['vehicle']): string => {
+    // If tier is manually set to S or SSS, use it (never override manual assignments)
+    if (vehicle.tier_label === 'S' || vehicle.tier_label === 'SSS') {
+      return vehicle.tier_label;
+    }
+    if (vehicle.tier === 'S' || vehicle.tier === 'SSS') {
+      return vehicle.tier;
+    }
+    
     const hasVIN = vehicle.vin && vehicle.vin.length === 17;
     const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
     const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
     const isBATImport = vehicle.profile_origin === 'bat_import';
     const isScraped = vehicle.profile_origin === 'url_scraper' || vehicle.profile_origin === 'craigslist_scrape' || vehicle.profile_origin === 'ksl_import';
     
-    // Engagement metrics (what makes higher tiers)
+    // Engagement metrics
     const eventCount = vehicle.event_count || 0;
-    const recentActivity = vehicle.activity_7d || 0; // Timeline events in last 7 days
+    const recentActivity = vehicle.activity_7d || 0;
     const viewCount = vehicle.view_count || 0;
-    const hasUserEngagement = eventCount > 0 || recentActivity > 0 || viewCount > 10;
     
-    // F tier: No images, description only, likely pending
+    // F tier: No images, description only, likely pending (dealers, flippers, shit heads)
     if (imageCount === 0) return 'F';
     
-    // E tier: Images but like 1 pixelated one (very low quality or just 1 image)
+    // E tier: Images but like 1 pixelated one (dealers, flippers, shit heads)
     if (imageCount === 1) return 'E';
     
-    // D tier: 2-4 images, minimal data
-    if (imageCount >= 2 && imageCount < 5) {
-      // Even with engagement, very few images caps at D
-      if (hasUserEngagement && hasVIN && hasPrice) return 'D';
-      return 'D';
-    }
+    // D tier: 2-4 images, minimal data (dealers, flippers, shit heads)
+    if (imageCount >= 2 && imageCount < 5) return 'D';
     
-    // C tier: BAT listings or scraped listings (have data but no engagement)
-    // This is the baseline - converted listings with images, VIN, price
-    if (isBATImport || isScraped) {
-      // BAT/scraped listings with good data = C tier
-      if (imageCount >= 5 && hasVIN && hasPrice) return 'C';
-      if (imageCount >= 5 && (hasVIN || hasPrice)) return 'C';
-      return 'D';
-    }
-    
-    // For user-uploaded vehicles, engagement determines tier
-    // C tier: 5-9 images, some data, minimal engagement
+    // C tier: Vast majority - BAT listings, scraped listings, basic user uploads
+    // This is the baseline for converted listings with images, VIN, price
     if (imageCount >= 5 && imageCount < 10) {
-      if (hasUserEngagement && hasVIN && hasPrice) return 'C';
+      // BAT/scraped listings = C tier
+      if (isBATImport || isScraped) return 'C';
+      // User uploads with minimal data = C tier
       if (hasVIN || hasPrice) return 'C';
       return 'D';
     }
     
-    // B tier: 10-19 images + user engagement (events, views, activity)
+    // C tier: 10-19 images - still vast majority
     if (imageCount >= 10 && imageCount < 20) {
-      if (hasUserEngagement && hasVIN && hasPrice) {
-        // Active engagement (recent activity or multiple events)
-        if (recentActivity >= 3 || eventCount >= 5 || viewCount >= 50) return 'B';
+      // BAT listings with good data = C tier (unless "cool" BAT car)
+      if (isBATImport || isScraped) {
+        // "Cool" BAT cars = B tier (exceptional BAT listings with high views/engagement)
+        if (viewCount >= 100 || eventCount >= 5) return 'B';
         return 'C';
       }
-      if (hasUserEngagement && (hasVIN || hasPrice)) return 'C';
-      if (hasVIN && hasPrice) return 'C'; // Data but no engagement = C
-      return 'D';
+      // User uploads = C tier unless making an effort
+      if (eventCount >= 3 || recentActivity >= 2) return 'B'; // Making an effort
+      if (hasVIN && hasPrice) return 'C';
+      return 'C';
     }
     
-    // A tier: 20+ images + strong user engagement
-    if (imageCount >= 20) {
-      if (hasUserEngagement && hasVIN && hasPrice) {
-        // Strong engagement (active use, multiple events, good views)
-        if (recentActivity >= 5 || eventCount >= 10 || viewCount >= 100) {
-          // S tier: 50+ images + exceptional engagement
-          if (imageCount >= 50 && (recentActivity >= 10 || eventCount >= 20 || viewCount >= 200)) {
-            // SSS tier: 100+ images + exceptional engagement
-            if (imageCount >= 100 && (recentActivity >= 15 || eventCount >= 30 || viewCount >= 500)) return 'SSS';
-            return 'S';
-          }
-          return 'A';
-        }
-        return 'B';
-      }
-      // Has images but no engagement = C (like BAT listings)
-      if (hasVIN && hasPrice) return 'C';
+    // B tier: 20+ images + "cool" BAT cars OR people making an effort
+    if (imageCount >= 20 && imageCount < 50) {
+      // "Cool" BAT cars (high engagement BAT listings)
+      if (isBATImport && (viewCount >= 200 || eventCount >= 10)) return 'B';
+      // People making an effort (user engagement)
+      if (eventCount >= 5 || recentActivity >= 3 || viewCount >= 50) return 'B';
+      // Otherwise = C tier (vast majority)
+      return 'C';
+    }
+    
+    // A tier: 50+ images + strong engagement
+    if (imageCount >= 50) {
+      if (eventCount >= 10 || recentActivity >= 5 || viewCount >= 100) return 'A';
+      if (eventCount >= 5 || viewCount >= 50) return 'B';
       return 'C';
     }
     

@@ -800,10 +800,65 @@ const CursorHomepage: React.FC = () => {
               }}>
                 {rotatingVerb}
               </span>
+              {' '}
+              <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 'normal' }}>
+                {filteredVehicles.length} vehicles
+              </span>
             </h2>
             
-            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginLeft: 'auto' }}>
-              {filteredVehicles.length} vehicles
+            {/* Metrics Row */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '16px',
+              flexWrap: 'wrap',
+              fontSize: '8pt',
+              color: 'var(--text-muted)',
+              marginLeft: 'auto'
+            }}>
+              {(() => {
+                const totalValue = filteredVehicles.reduce((sum, v) => sum + (v.display_price || 0), 0);
+                const avgValue = filteredVehicles.length > 0 ? totalValue / filteredVehicles.length : 0;
+                const forSaleCount = filteredVehicles.filter(v => v.is_for_sale).length;
+                const totalImages = filteredVehicles.reduce((sum, v) => sum + (v.image_count || 0), 0);
+                const totalEvents = filteredVehicles.reduce((sum, v) => sum + (v.event_count || 0), 0);
+                const totalViews = filteredVehicles.reduce((sum, v) => sum + (v.view_count || 0), 0);
+                
+                return (
+                  <>
+                    {totalValue > 0 && (
+                      <span>
+                        <strong style={{ color: 'var(--text)' }}>{formatCurrency(totalValue)}</strong> total value
+                      </span>
+                    )}
+                    {avgValue > 0 && filteredVehicles.length > 1 && (
+                      <span>
+                        <strong style={{ color: 'var(--text)' }}>{formatCurrency(avgValue)}</strong> avg
+                      </span>
+                    )}
+                    {forSaleCount > 0 && (
+                      <span>
+                        <strong style={{ color: 'var(--text)' }}>{forSaleCount}</strong> for sale
+                      </span>
+                    )}
+                    {totalImages > 0 && (
+                      <span>
+                        <strong style={{ color: 'var(--text)' }}>{totalImages.toLocaleString()}</strong> images
+                      </span>
+                    )}
+                    {totalEvents > 0 && (
+                      <span>
+                        <strong style={{ color: 'var(--text)' }}>{totalEvents.toLocaleString()}</strong> events
+                      </span>
+                    )}
+                    {totalViews > 0 && (
+                      <span>
+                        <strong style={{ color: 'var(--text)' }}>{totalViews.toLocaleString()}</strong> views
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
             
