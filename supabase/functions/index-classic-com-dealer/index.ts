@@ -147,16 +147,39 @@ serve(async (req) => {
       );
     }
 
-    // Step 4: Download and store logo as favicon
+    // Step 4: Download and store logo as favicon + extract website favicon
     let logoUrl: string | null = null;
+    let faviconUrl: string | null = null;
+    let primaryImageUrl: string | null = null;
+    
     if (dealerData.logo_url) {
       logoUrl = await downloadAndStoreLogo(dealerData.logo_url, dealerData.website || '', supabase);
+    }
+    
+    // Also try to extract favicon from website (for small UI areas)
+    if (dealerData.website) {
+      try {
+        faviconUrl = await extractWebsiteFavicon(dealerData.website, supabase);
+      } catch (err) {
+        console.warn('Failed to extract website favicon:', err);
+      }
+    }
+    
+    // Extract primary image (property front - keeping expectations low for now)
+    if (dealerData.website) {
+      try {
+        primaryImageUrl = await extractPrimaryImage(dealerData.website, supabase);
+      } catch (err) {
+        console.warn('Failed to extract primary image:', err);
+      }
     }
 
     // Step 5: Find or create organization using geographic logic
     const organization = await findOrCreateOrganizationWithGeographicLogic(
       dealerData,
       logoUrl,
+      faviconUrl,
+      primaryImageUrl,
       profile_url,
       supabase
     );
@@ -172,13 +195,51 @@ serve(async (req) => {
       }, supabase);
     }
 
+    // Step 7: Extract and store team/employee data from dealer website (private, for future email outreach)
+    let teamDataStored = 0;
+    if (organization?.id && dealerData.website) {
+      try {
+        const { storeTeamData } = await import('../_shared/storeTeamData.ts');
+        
+        // Use extract-using-catalog to get team data from website
+        const { data: extractResult } = await supabase.functions.invoke('extract-using-catalog', {
+          body: {
+            url: dealerData.website,
+            use_catalog: true,
+            fallback_to_ai: true
+          }
+        });
+
+        if (extractResult?.success && extractResult.data?.team_members) {
+          const teamMembers = extractResult.data.team_members;
+          if (Array.isArray(teamMembers) && teamMembers.length > 0) {
+            const result = await storeTeamData(
+              supabase,
+              organization.id,
+              teamMembers,
+              dealerData.website,
+              0.8 // Confidence score
+            );
+            teamDataStored = result.stored;
+            console.log(`✅ Stored ${teamDataStored} team members for ${organization.name}`);
+          }
+        }
+      } catch (err: any) {
+        console.warn('⚠️  Failed to extract/store team data:', err.message);
+        // Don't fail the whole operation if team extraction fails
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         organization_id: organization?.id,
         organization_name: organization?.name,
         logo_url: logoUrl,
+        favicon_url: faviconUrl, // Cached in source_favicons table
+        banner_url: primaryImageUrl, // Property front image (using banner_url column)
         dealer_data: dealerData,
+        team_members_stored: teamDataStored,
         action: organization?.id ? 'created' : 'found_existing'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -350,14 +411,15 @@ function extractDealerProfileData(doc: any, html: string): DealerProfileData {
 
 /**
  * Check if we should create organization (greenlight signals)
+ * Greenlight: name + logo (license is nice-to-have, can be looked up from business records)
  */
 function shouldCreateOrganization(data: DealerProfileData): boolean {
+  // Required: name and logo (images are a strong signal)
+  // License is optional since it often requires business records lookup
   return !!(
     data.name && 
     data.name.length > 2 &&
-    data.logo_url &&
-    data.dealer_license &&
-    data.dealer_license.length > 3
+    data.logo_url
   );
 }
 
@@ -453,11 +515,150 @@ async function downloadAndStoreLogo(
 }
 
 /**
+ * Extract website favicon (for small UI areas - SVG, PNG, ICO)
+ * Uses shared extractFavicon utility which caches in source_favicons table
+ */
+async function extractWebsiteFavicon(website: string, supabase: any): Promise<string | null> {
+  try {
+    // Import shared favicon extractor
+    const extractFaviconPath = '../_shared/extractFavicon.ts';
+    const { extractAndCacheFavicon } = await import(extractFaviconPath);
+    
+    // Extract and cache favicon (returns Google favicon service URL or cached URL)
+    const faviconUrl = await extractAndCacheFavicon(supabase, website, 'dealer', null);
+    
+    // Also try to get actual favicon from website (better quality for SVG/PNG)
+    try {
+      const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+      if (firecrawlApiKey) {
+        const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${firecrawlApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: website,
+            formats: ['html'],
+            pageOptions: { waitFor: 1000 }
+          }),
+          signal: AbortSignal.timeout(8000)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.html) {
+            const html = data.data.html;
+            
+            // Try to find favicon in HTML
+            const faviconPatterns = [
+              /<link[^>]+rel=["'](?:icon|shortcut icon|apple-touch-icon)["'][^>]+href=["']([^"']+)["']/i,
+              /<link[^>]+href=["']([^"']+favicon[^"']+)["'][^>]+rel=["'](?:icon|shortcut icon)["']/i,
+            ];
+
+            for (const pattern of faviconPatterns) {
+              const match = html.match(pattern);
+              if (match && match[1]) {
+                let faviconUrl = match[1];
+                if (!faviconUrl.startsWith('http')) {
+                  try {
+                    const baseUrl = new URL(website);
+                    faviconUrl = new URL(faviconUrl, baseUrl.origin).href;
+                  } catch {
+                    continue;
+                  }
+                }
+                // Prefer actual favicon over Google service
+                return faviconUrl;
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      // Fall back to cached favicon
+    }
+    
+    return faviconUrl;
+  } catch (err) {
+    console.warn('Favicon extraction failed:', err);
+    return null;
+  }
+}
+
+/**
+ * Extract primary image (property front - keeping expectations low for now)
+ * Tries to find a property/building image from the website
+ */
+async function extractPrimaryImage(website: string, supabase: any): Promise<string | null> {
+  try {
+    const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+    if (!firecrawlApiKey) return null;
+
+    // Try to scrape homepage for property images
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${firecrawlApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: website,
+        formats: ['html'],
+        pageOptions: { waitFor: 2000 }
+      }),
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (!data.success || !data.data?.html) return null;
+
+    const html = data.data.html;
+    
+    // Look for property/building images (hero images, about page images, etc.)
+    // Patterns: hero, about, property, building, facility, location
+    const imagePatterns = [
+      /<img[^>]+src="([^"]*hero[^"]*\.(?:jpg|jpeg|png|webp))"[^>]*/i,
+      /<img[^>]+src="([^"]*about[^"]*\.(?:jpg|jpeg|png|webp))"[^>]*/i,
+      /<img[^>]+src="([^"]*property[^"]*\.(?:jpg|jpeg|png|webp))"[^>]*/i,
+      /<img[^>]+src="([^"]*building[^"]*\.(?:jpg|jpeg|png|webp))"[^>]*/i,
+      /<img[^>]+src="([^"]*facility[^"]*\.(?:jpg|jpeg|png|webp))"[^>]*/i,
+      /<img[^>]+src="([^"]*location[^"]*\.(?:jpg|jpeg|png|webp))"[^>]*/i,
+    ];
+
+    for (const pattern of imagePatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        let imageUrl = match[1];
+        if (!imageUrl.startsWith('http')) {
+          try {
+            const baseUrl = new URL(website);
+            imageUrl = new URL(imageUrl, baseUrl.origin).href;
+          } catch {
+            continue;
+          }
+        }
+        return imageUrl;
+      }
+    }
+
+    return null;
+  } catch (err) {
+    console.warn('Primary image extraction failed:', err);
+    return null;
+  }
+}
+
+/**
  * Find or create organization using geographic logic
  */
 async function findOrCreateOrganizationWithGeographicLogic(
   dealerData: DealerProfileData,
   logoUrl: string | null,
+  faviconUrl: string | null,
+  primaryImageUrl: string | null,
   sourceUrl: string,
   supabase: any
 ): Promise<any> {
@@ -518,6 +719,7 @@ async function findOrCreateOrganizationWithGeographicLogic(
       // Update missing fields
       const updates: any = {};
       if (logoUrl) updates.logo_url = logoUrl;
+      if (primaryImageUrl) updates.banner_url = primaryImageUrl;
       if (dealerData.dealer_license) updates.dealer_license = dealerData.dealer_license;
       if (dealerData.website) updates.website = dealerData.website;
 
@@ -556,8 +758,9 @@ async function findOrCreateOrganizationWithGeographicLogic(
       zip_code: dealerData.zip,
       dealer_license: dealerData.dealer_license,
       logo_url: logoUrl,
+      banner_url: primaryImageUrl, // Use banner_url for property front image
       description: dealerData.description,
-      specialties: dealerData.specialties.length > 0 ? dealerData.specialties : null,
+      specializations: dealerData.specialties && dealerData.specialties.length > 0 ? dealerData.specialties : null,
       geographic_key: geographicKey,
       discovered_via: 'classic_com_indexing',
       source_url: sourceUrl,
@@ -565,7 +768,10 @@ async function findOrCreateOrganizationWithGeographicLogic(
         classic_com_profile: sourceUrl,
         inventory_url: dealerData.inventory_url,
         auctions_url: dealerData.auctions_url,
-        slug: slug
+        slug: slug,
+        logo_source: logoUrl ? 'classic_com' : null,
+        favicon_source: faviconUrl ? 'website' : null,
+        primary_image_source: primaryImageUrl ? 'website' : null
       }
     })
     .select('id, business_name')

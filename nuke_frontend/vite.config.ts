@@ -14,14 +14,15 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          supabase: ['@supabase/supabase-js'],
-          ui: ['@headlessui/react', '@heroicons/react', 'lucide-react'],
-          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
-          pdf: ['pdfjs-dist'],
-          exif: ['exifr', 'piexifjs', 'exif-js', 'exifreader'],
-        }
+        // Temporarily disable manualChunks to test if it causes TDZ
+        // manualChunks: {
+        //   vendor: ['react', 'react-dom'],
+        //   supabase: ['@supabase/supabase-js'],
+        //   ui: ['@headlessui/react', '@heroicons/react', 'lucide-react'],
+        //   forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
+        //   pdf: ['pdfjs-dist'],
+        //   exif: ['exifr', 'piexifjs', 'exif-js', 'exifreader'],
+        // }
       }
     },
     // Ensure production builds don't use eval

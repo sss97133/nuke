@@ -11,24 +11,87 @@
     <meta name="format-detection" content="telephone=no" />
     <title>n-zero</title>
     <!-- DEPLOYMENT FORCE: bump to invalidate cached preview/prod -->
-    <meta name="deployment-force" content="fix-module-load-error-dec11-2025">
+    <meta name="deployment-force" content="tdz-debug-new-entry-point-2025">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
+      // Unregister any service workers and clear caches
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+            console.log('[index.html] Service worker unregistered');
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          for (let name of names) {
+            caches.delete(name);
+            console.log('[index.html] Cache deleted:', name);
+          }
+        });
+      }
+      
       // Diagnostics: confirm index.html executes and capture runtime errors
       console.log('[index.html] loaded');
       window.addEventListener('error', function(e) {
-        console.error('[window.onerror]', e.message || e);
+        const errorData = {
+          message: e.message,
+          filename: e.filename,
+          lineno: e.lineno,
+          colno: e.colno,
+          error: e.error ? {
+            name: e.error.name,
+            message: e.error.message,
+            stack: e.error.stack
+          } : null
+        };
+        console.error('[window.onerror]', errorData);
+        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'index.html:error-handler',
+            message: 'Window error captured',
+            data: errorData,
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run15',
+            hypothesisId: 'S'
+          })
+        }).catch(() => {});
       });
       window.addEventListener('unhandledrejection', function(e) {
-        console.error('[unhandledrejection]', e.reason);
+        const errorData = {
+          reason: e.reason,
+          reasonString: String(e.reason),
+          reasonStack: e.reason && e.reason.stack ? e.reason.stack : null
+        };
+        console.error('[unhandledrejection]', errorData);
+        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            location: 'index.html:unhandledrejection',
+            message: 'Unhandled rejection captured',
+            data: errorData,
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            runId: 'run15',
+            hypothesisId: 'S'
+          })
+        }).catch(() => {});
       });
     </script>
-    <script type="text/javascript" src="https://www.dropbox.com/static/api/2/dropins.js" id="dropboxjs" data-app-key="howu7w7zml4m6mq"></script>
+    <!-- Temporarily removed Dropbox script to test if it causes TDZ -->
+    <!-- <script type="text/javascript" src="https://www.dropbox.com/static/api/2/dropins.js" id="dropboxjs" data-app-key="howu7w7zml4m6mq"></script> -->
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- Temporarily use new entry point to test -->
+    <script type="module" src="/src/main-new.tsx"></script>
+    <!-- <script type="module" src="/src/main.tsx"></script> -->
   </body>
 </html>

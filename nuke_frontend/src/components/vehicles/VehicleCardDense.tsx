@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:1',message:'VehicleCardDense module start',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+// #endregion
 import { Link } from 'react-router-dom';
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:3',message:'Before UnifiedPricingService import',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+// #endregion
 import { UnifiedPricingService } from '../../services/unifiedPricingService';
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:5',message:'After UnifiedPricingService import',data:{hasService:!!UnifiedPricingService},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+// #endregion
 
 interface VehicleCardDenseProps {
   vehicle: {
@@ -61,8 +70,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showPriceOverlay = true,
   showDetailOverlay = true
 }) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:56',message:'VehicleCardDense component start',data:{vehicleId:vehicle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   const [displayPrice, setDisplayPrice] = useState<string>('—');
   const [priceLabel, setPriceLabel] = useState<string>('');
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:64',message:'After useState calls',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
 
   // Load unified price on component mount
   useEffect(() => {

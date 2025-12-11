@@ -1163,7 +1163,6 @@ serve(async (req) => {
         }
         
         // Create vehicle - START AS PENDING until validated
-        // Store extracted image URLs in metadata for later backfill
         const { data: newVehicle, error: vehicleError} = await supabase
           .from('vehicles')
           .insert({
@@ -1177,7 +1176,7 @@ serve(async (req) => {
               source_id: item.source_id,
               queue_id: item.id,
               imported_at: new Date().toISOString(),
-              image_urls: scrapeData.data.images || [], // Store for backfill
+              image_urls: scrapeData.data.images || [], // Store for reference
               image_count: scrapeData.data.images?.length || 0
             },
             selling_organization_id: organizationId,
@@ -1188,6 +1187,111 @@ serve(async (req) => {
 
         if (vehicleError) {
           throw new Error(`Vehicle insert failed: ${vehicleError.message}`);
+        }
+
+        // CRITICAL FIX: Immediately download and upload images (don't wait for backfill)
+        const imageUrls = scrapeData.data.images || [];
+        if (imageUrls.length > 0) {
+          console.log(`  📸 Processing ${imageUrls.length} images immediately...`);
+          let imagesUploaded = 0;
+          
+          // Get import user ID (use organization owner or system user)
+          let importUserId = null;
+          if (organizationId) {
+            const { data: org } = await supabase
+              .from('organizations')
+              .select('owner_id')
+              .eq('id', organizationId)
+              .single();
+            importUserId = org?.owner_id || null;
+          }
+          
+          // If no org owner, try to get from auth context or use system user
+          if (!importUserId) {
+            const { data: { user } } = await supabase.auth.getUser();
+            importUserId = user?.id || null;
+          }
+          
+          for (let i = 0; i < imageUrls.length && i < 20; i++) { // Limit to 20 images
+            const imageUrl = imageUrls[i];
+            try {
+              // Download image
+              const imageResponse = await fetch(imageUrl, {
+                signal: AbortSignal.timeout(10000)
+              });
+              
+              if (!imageResponse.ok) {
+                console.warn(`    ⚠️ Failed to download image ${i + 1}: HTTP ${imageResponse.status}`);
+                continue;
+              }
+              
+              const imageBlob = await imageResponse.blob();
+              const arrayBuffer = await imageBlob.arrayBuffer();
+              const uint8Array = new Uint8Array(arrayBuffer);
+              
+              // Generate filename
+              const ext = imageUrl.match(/\.(jpg|jpeg|png|webp)$/i)?.[1] || 'jpg';
+              const fileName = `import_queue_${Date.now()}_${i}.${ext}`;
+              const storagePath = `${newVehicle.id}/${fileName}`;
+              
+              // Upload to Supabase Storage
+              const { error: uploadError } = await supabase.storage
+                .from('vehicle-images')
+                .upload(storagePath, uint8Array, {
+                  contentType: `image/${ext}`,
+                  cacheControl: '3600',
+                  upsert: false
+                });
+              
+              if (uploadError) {
+                console.warn(`    ⚠️ Upload error for image ${i + 1}: ${uploadError.message}`);
+                continue;
+              }
+              
+              // Get public URL
+              const { data: { publicUrl } } = supabase.storage
+                .from('vehicle-images')
+                .getPublicUrl(storagePath);
+              
+              // Create vehicle_images record immediately
+              const { data: imageData, error: imageInsertError } = await supabase
+                .from('vehicle_images')
+                .insert({
+                  vehicle_id: newVehicle.id,
+                  image_url: publicUrl, // CRITICAL: Set image_url field
+                  user_id: importUserId,
+                  is_primary: i === 0, // First image is primary
+                  source: 'import_queue',
+                  taken_at: new Date().toISOString(),
+                  exif_data: {
+                    source_url: imageUrl,
+                    discovery_url: item.listing_url,
+                    imported_by_user_id: importUserId,
+                    imported_at: new Date().toISOString(),
+                    queue_id: item.id
+                  }
+                })
+                .select('id')
+                .single();
+              
+              if (imageInsertError) {
+                console.warn(`    ⚠️ Failed to create image record ${i + 1}: ${imageInsertError.message}`);
+                continue;
+              }
+              
+              imagesUploaded++;
+              console.log(`    ✅ Uploaded image ${i + 1}/${imageUrls.length}`);
+              
+              // Small delay to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 200));
+              
+            } catch (imgError: any) {
+              console.warn(`    ⚠️ Error processing image ${i + 1}: ${imgError.message}`);
+              continue;
+            }
+          }
+          
+          console.log(`  ✅ Successfully uploaded ${imagesUploaded}/${imageUrls.length} images`);
         }
 
         // Create dealer_inventory record if this is inventory extraction from a dealer

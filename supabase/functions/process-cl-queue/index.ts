@@ -130,6 +130,7 @@ serve(async (req) => {
         // Scrape listing
         let scrapeData: any
         try {
+          console.log(`[DEBUG] Fetching listing: ${queueItem.listing_url}`)
           const response = await fetch(queueItem.listing_url, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -147,10 +148,30 @@ serve(async (req) => {
             throw new Error('Failed to parse HTML')
           }
           
+          // Log HTML structure for debugging
+          const timeElements = doc.querySelectorAll('time')
+          console.log(`[DEBUG] Found ${timeElements.length} time elements in HTML`)
+          timeElements.forEach((time, i) => {
+            console.log(`[DEBUG] Time element ${i}:`, {
+              datetime: time.getAttribute('datetime'),
+              text: time.textContent?.trim(),
+              className: time.className
+            })
+          })
+          
           scrapeData = {
             success: true,
             data: scrapeCraigslistInline(doc, queueItem.listing_url)
           }
+          
+          console.log(`[DEBUG] Scrape result:`, {
+            title: scrapeData.data?.title,
+            year: scrapeData.data?.year,
+            make: scrapeData.data?.make,
+            model: scrapeData.data?.model,
+            posted_date: scrapeData.data?.posted_date,
+            imageCount: scrapeData.data?.images?.length || 0
+          })
           
         } catch (scrapeError: any) {
           // Mark as failed and increment retry count
@@ -188,9 +209,13 @@ serve(async (req) => {
 
         // Extract and validate vehicle data
         const data = scrapeData.data
+        console.log(`[DEBUG] Raw extracted data:`, JSON.stringify(data, null, 2))
+        
         let make = (data.make || '').toLowerCase()
         let model = (data.model || '').toLowerCase() || ''
         const yearNum = typeof data.year === 'string' ? parseInt(data.year) : data.year
+        
+        console.log(`[DEBUG] After normalization:`, { make, model, year: yearNum, posted_date: data.posted_date })
 
         // Extract from title if missing
         if (!make || !model) {
@@ -360,6 +385,7 @@ serve(async (req) => {
             stats.created++
 
             // FORENSIC ENRICHMENT (replaces manual field assignment)
+            console.log(`[DEBUG] Before forensic enrichment, vehicle data:`, { vehicleId, make: data.make, model: data.model, posted_date: data.posted_date })
             await supabase.rpc('process_scraped_data_forensically', {
               p_vehicle_id: vehicleId,
               p_scraped_data: data,
@@ -367,6 +393,7 @@ serve(async (req) => {
               p_scraper_name: 'craigslist-queue',
               p_context: { description: data.description }
             })
+            console.log(`[DEBUG] After forensic enrichment`)
 
             // Build consensus for all fields
             const fields = ['vin', 'color', 'mileage', 'transmission', 'drivetrain', 'engine_size', 'trim', 'series']
@@ -392,18 +419,42 @@ serve(async (req) => {
 
             // Create timeline event
             // #region agent log
+            console.log('[DEBUG] Before timeline event creation', { hasPostedDate: !!data.posted_date, posted_date: data.posted_date })
             fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:394',message:'Before timeline event creation',data:{hasPostedDate:!!data.posted_date,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
             // #endregion
             
             if (data.posted_date) {
               try {
-                let eventDate = new Date().toISOString().split('T')[0]
-                const dateMatch = data.posted_date.match(/(\d{4})-(\d{2})-(\d{2})/)
-                if (dateMatch) {
-                  eventDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
+                let eventDate = new Date().toISOString().split('T')[0] // Default to today
+                
+                // Parse posted_date - it should be an ISO string like "2025-11-27T15:00:37.000Z"
+                try {
+                  const parsedDate = new Date(data.posted_date)
+                  if (!isNaN(parsedDate.getTime())) {
+                    // Extract just the date part (YYYY-MM-DD)
+                    eventDate = parsedDate.toISOString().split('T')[0]
+                  } else {
+                    // Fallback: try regex extraction
+                    const dateMatch = data.posted_date.match(/(\d{4})-(\d{2})-(\d{2})/)
+                    if (dateMatch) {
+                      eventDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
+                    }
+                  }
+                } catch (parseErr) {
+                  // Fallback: try regex extraction
+                  const dateMatch = data.posted_date.match(/(\d{4})-(\d{2})-(\d{2})/)
+                  if (dateMatch) {
+                    eventDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
+                  }
                 }
                 
                 // #region agent log
+                console.log('[DEBUG] Timeline event date calculated', { 
+                  originalPostedDate: data.posted_date, 
+                  eventDate,
+                  parsedDate: new Date(data.posted_date).toISOString(),
+                  dateOnly: new Date(data.posted_date).toISOString().split('T')[0]
+                })
                 fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:402',message:'Timeline event date calculated',data:{originalPostedDate:data.posted_date,eventDate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                 // #endregion
 
@@ -426,16 +477,19 @@ serve(async (req) => {
                   })
                   
                 // #region agent log
+                console.log('[DEBUG] Timeline event created', { eventDate })
                 fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:422',message:'Timeline event created',data:{eventDate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                 // #endregion
               } catch (timelineErr) {
                 console.warn(`  ⚠️ Timeline event creation error:`, timelineErr)
                 // #region agent log
+                console.log('[DEBUG] Timeline event creation error', { error: timelineErr?.message })
                 fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:425',message:'Timeline event creation error',data:{error:timelineErr?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                 // #endregion
               }
             } else {
               // #region agent log
+              console.log('[DEBUG] No posted_date - timeline event skipped')
               fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:430',message:'No posted_date - timeline event skipped',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
               // #endregion
             }
@@ -629,6 +683,7 @@ serve(async (req) => {
 // Inline Craigslist scraping function (same as scrape-all-craigslist-squarebodies)
 function scrapeCraigslistInline(doc: any, url: string): any {
   // #region agent log
+  console.log('[DEBUG] scrapeCraigslistInline entry', { url })
   fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:611',message:'scrapeCraigslistInline entry',data:{url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
   
@@ -642,6 +697,7 @@ function scrapeCraigslistInline(doc: any, url: string): any {
     data.title = titleElement.textContent.trim()
     
     // #region agent log
+    console.log('[DEBUG] Title extracted', { title: data.title })
     fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:620',message:'Title extracted',data:{title:data.title},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
     
@@ -680,22 +736,31 @@ function scrapeCraigslistInline(doc: any, url: string): any {
     if (makeFound && data.make) {
       // Remove year and make from title
       const afterMake = data.title.replace(new RegExp(`\\b(19|20)\\d{2}\\s+${data.make}\\s+`, 'i'), '')
-      // Split at price marker ( - $ or $) or location in parens, but keep everything before
-      // Use greedy match to get full model name including dashes
-      const modelMatch = afterMake.match(/^(.+?)(?:\s*-\s*\$|\s*\$|\([^)]*\)\s*-\s*\$|\([^)]*\)\s*$|$)/)
-      if (modelMatch && modelMatch[1]) {
-        let modelText = modelMatch[1].trim()
-        // Remove trailing location in parens if still present
-        modelText = modelText.replace(/\s*\([^)]+\)\s*$/, '')
-        // Remove common suffixes that aren't part of model (but keep dashes in model name like "F-150")
-        modelText = modelText.replace(/\s+(4x4|4wd|2wd|diesel|gas|automatic|manual)\s*$/i, '').trim()
-        if (modelText && modelText.length > 0) {
-          data.model = modelText
-        }
+      
+      // Strategy: Extract everything until we hit price ($) or end, then clean up
+      // Handle titles like: "F-150 Super Crew Harley-Davidson Edition 4x4 (Edition #2798) - $14,995"
+      let modelText = afterMake
+      
+      // Remove price if present (everything from $ onwards)
+      modelText = modelText.replace(/\s*-\s*\$.*$/, '').replace(/\s*\$.*$/, '')
+      
+      // Remove location in parens at the end (but keep model name with dashes)
+      // Pattern: (Location) or (Edition #123) at the end
+      modelText = modelText.replace(/\s*\([^)]+\)\s*$/, '')
+      
+      // Remove common suffixes that aren't part of model name
+      modelText = modelText.replace(/\s+(4x4|4wd|2wd|diesel|gas|automatic|manual)\s*$/i, '').trim()
+      
+      // Remove emojis and special characters that might be in the title
+      modelText = modelText.replace(/[🚨🏁🏍️✨🧰⚙️🕒🛞🔥💺🧵🌞📡📷🧼🧷🏷️🏢🤝📍📞🌐💳🪙🧾]/g, '').trim()
+      
+      if (modelText && modelText.length > 0) {
+        data.model = modelText
       }
     }
     
     // #region agent log
+    console.log('[DEBUG] Make/model extraction result', { year: data.year, make: data.make, model: data.model, title: data.title })
     fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:680',message:'Make/model extraction result',data:{year:data.year,make:data.make,model:data.model,title:data.title},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
     
@@ -709,6 +774,7 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   const fullText = doc.body?.textContent || ''
   
   // #region agent log
+  console.log('[DEBUG] Before posted_date extraction', { hasPostedDate: !!data.posted_date })
   fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:652',message:'Before posted_date extraction',data:{hasPostedDate:!!data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
   
@@ -728,24 +794,51 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   
   let postedDateFound = false
   
-  // First try: Look for time elements with datetime attribute
-  for (const selector of postedDateSelectors) {
-    const dateElement = doc.querySelector(selector)
-    if (dateElement) {
-      const datetime = dateElement.getAttribute('datetime')
-      if (datetime) {
-        try {
-          const parsedDate = new Date(datetime)
-          if (!isNaN(parsedDate.getTime())) {
-            data.posted_date = parsedDate.toISOString()
-            postedDateFound = true
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:700',message:'Posted date extracted from datetime attribute',data:{selector,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
-            break
+  // First try: Look for time elements with datetime attribute (prioritize the "Posted" one)
+  // The HTML has: <time class="date timeago" datetime="2025-11-27T15:00:37-0800">
+  const timeElements = doc.querySelectorAll('time.date, time[datetime]')
+  for (const dateElement of timeElements) {
+    const datetime = dateElement.getAttribute('datetime')
+    if (datetime) {
+      try {
+        // Parse datetime which may include timezone like "2025-11-27T15:00:37-0800"
+        const parsedDate = new Date(datetime)
+        if (!isNaN(parsedDate.getTime())) {
+          data.posted_date = parsedDate.toISOString()
+          postedDateFound = true
+          // #region agent log
+          console.log('[DEBUG] Posted date extracted from datetime attribute', { datetime, posted_date: data.posted_date })
+          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:740',message:'Posted date extracted from datetime attribute',data:{datetime,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
+          break
+        }
+      } catch (e) {
+        // Continue to next element
+      }
+    }
+  }
+  
+  // Fallback: Try selectors if time elements didn't work
+  if (!postedDateFound) {
+    for (const selector of postedDateSelectors) {
+      const dateElement = doc.querySelector(selector)
+      if (dateElement) {
+        const datetime = dateElement.getAttribute('datetime')
+        if (datetime) {
+          try {
+            const parsedDate = new Date(datetime)
+            if (!isNaN(parsedDate.getTime())) {
+              data.posted_date = parsedDate.toISOString()
+              postedDateFound = true
+              // #region agent log
+              console.log('[DEBUG] Posted date extracted from selector', { selector, posted_date: data.posted_date })
+              fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:760',message:'Posted date extracted from selector',data:{selector,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
+              break
+            }
+          } catch (e) {
+            // Continue to next selector
           }
-        } catch (e) {
-          // Continue to next selector
         }
       }
     }
@@ -764,6 +857,7 @@ function scrapeCraigslistInline(doc: any, url: string): any {
           data.posted_date = parsedDate.toISOString()
           postedDateFound = true
           // #region agent log
+          console.log('[DEBUG] Posted date extracted from text pattern', { posted_date: data.posted_date })
           fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:720',message:'Posted date extracted from text pattern',data:{posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
           // #endregion
         }
@@ -820,6 +914,7 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   }
   
   // #region agent log
+  console.log('[DEBUG] After posted_date extraction', { hasPostedDate: !!data.posted_date, posted_date: data.posted_date })
   fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:702',message:'After posted_date extraction',data:{hasPostedDate:!!data.posted_date,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
   
@@ -868,8 +963,14 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   thumbLinks.forEach((link: any) => {
     const href = link.getAttribute('href')
     if (href && href.startsWith('http')) {
-      // Upgrade to high-res: replace size patterns with 1200x900
-      const highResUrl = href.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      // Upgrade to high-res: handle multiple URL formats
+      let highResUrl = href
+      // Format 1: /600x450/ in path -> /1200x900/
+      highResUrl = highResUrl.replace(/\/\d+x\d+\//, '/1200x900/')
+      // Format 2: _600x450.jpg at end -> _1200x900.jpg
+      highResUrl = highResUrl.replace(/_(\d+)x(\d+)\.jpg$/i, '_1200x900.jpg')
+      // Format 3: /50x50c/ -> /1200x900/
+      highResUrl = highResUrl.replace(/\/50x50c\//, '/1200x900/')
       if (!seenUrls.has(highResUrl)) {
         images.push(highResUrl)
         seenUrls.add(highResUrl)
@@ -886,8 +987,14 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   imgTags.forEach((img: any) => {
     const src = img.getAttribute('src')
     if (src && src.includes('images.craigslist.org')) {
-      // Upgrade to high-res version
-      const highResUrl = src.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      // Upgrade to high-res version - handle multiple URL formats
+      let highResUrl = src
+      // Format 1: /600x450/ in path -> /1200x900/
+      highResUrl = highResUrl.replace(/\/\d+x\d+\//, '/1200x900/')
+      // Format 2: _600x450.jpg at end -> _1200x900.jpg
+      highResUrl = highResUrl.replace(/_(\d+)x(\d+)\.jpg$/i, '_1200x900.jpg')
+      // Format 3: /50x50c/ -> /1200x900/
+      highResUrl = highResUrl.replace(/\/50x50c\//, '/1200x900/')
       if (!seenUrls.has(highResUrl)) {
         images.push(highResUrl)
         seenUrls.add(highResUrl)
@@ -900,7 +1007,14 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   lazyImages.forEach((img: any) => {
     const dataSrc = img.getAttribute('data-src')
     if (dataSrc && dataSrc.includes('images.craigslist.org')) {
-      const highResUrl = dataSrc.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      // Upgrade to high-res version - handle multiple URL formats
+      let highResUrl = dataSrc
+      // Format 1: /600x450/ in path -> /1200x900/
+      highResUrl = highResUrl.replace(/\/\d+x\d+\//, '/1200x900/')
+      // Format 2: _600x450.jpg at end -> _1200x900.jpg
+      highResUrl = highResUrl.replace(/_(\d+)x(\d+)\.jpg$/i, '_1200x900.jpg')
+      // Format 3: /50x50c/ -> /1200x900/
+      highResUrl = highResUrl.replace(/\/50x50c\//, '/1200x900/')
       if (!seenUrls.has(highResUrl)) {
         images.push(highResUrl)
         seenUrls.add(highResUrl)
@@ -915,8 +1029,14 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   while ((regexMatch = imageUrlRegex.exec(htmlText)) !== null) {
     const url = regexMatch[0]
     if (url && url.includes('images.craigslist.org')) {
-      // Upgrade to high-res
-      const highResUrl = url.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      // Upgrade to high-res version - handle multiple URL formats
+      let highResUrl = url
+      // Format 1: /600x450/ in path -> /1200x900/
+      highResUrl = highResUrl.replace(/\/\d+x\d+\//, '/1200x900/')
+      // Format 2: _600x450.jpg at end -> _1200x900.jpg
+      highResUrl = highResUrl.replace(/_(\d+)x(\d+)\.jpg$/i, '_1200x900.jpg')
+      // Format 3: /50x50c/ -> /1200x900/
+      highResUrl = highResUrl.replace(/\/50x50c\//, '/1200x900/')
       if (!seenUrls.has(highResUrl) && !highResUrl.includes('icon') && !highResUrl.includes('logo')) {
         images.push(highResUrl)
         seenUrls.add(highResUrl)
@@ -929,7 +1049,14 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   galleryImages.forEach((elem: any) => {
     const imgSrc = elem.getAttribute('data-src') || elem.getAttribute('data-img') || elem.querySelector('img')?.getAttribute('src')
     if (imgSrc && imgSrc.includes('images.craigslist.org')) {
-      const highResUrl = imgSrc.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      // Upgrade to high-res version - handle multiple URL formats
+      let highResUrl = imgSrc
+      // Format 1: /600x450/ in path -> /1200x900/
+      highResUrl = highResUrl.replace(/\/\d+x\d+\//, '/1200x900/')
+      // Format 2: _600x450.jpg at end -> _1200x900.jpg
+      highResUrl = highResUrl.replace(/_(\d+)x(\d+)\.jpg$/i, '_1200x900.jpg')
+      // Format 3: /50x50c/ -> /1200x900/
+      highResUrl = highResUrl.replace(/\/50x50c\//, '/1200x900/')
       if (!seenUrls.has(highResUrl)) {
         images.push(highResUrl)
         seenUrls.add(highResUrl)
