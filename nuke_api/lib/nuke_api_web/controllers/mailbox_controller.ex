@@ -131,7 +131,7 @@ defmodule NukeApiWeb.MailboxController do
     case Mailbox.resolve_message(message_id, user_id, vehicle_id, resolution_data) do
       {:ok, message} ->
         # Handle specific resolution actions based on message type
-        handle_message_resolution(message, resolution_data)
+        handle_message_resolution(message, resolution_data, vehicle_id)
 
         json(conn, %{
           status: "success",
@@ -306,22 +306,22 @@ defmodule NukeApiWeb.MailboxController do
     })
   end
 
-  defp handle_message_resolution(message, resolution_data) do
+  defp handle_message_resolution(message, resolution_data, vehicle_id) do
     case message.message_type do
       "duplicate_detected" ->
         # Handle duplicate detection resolution
-        handle_duplicate_resolution(message, resolution_data)
+        handle_duplicate_resolution(message, resolution_data, vehicle_id)
 
       "ownership_transfer" ->
         # Handle ownership transfer completion
-        handle_ownership_transfer_resolution(message, resolution_data)
+        handle_ownership_transfer_resolution(message, resolution_data, vehicle_id)
 
       _ ->
         :ok
     end
   end
 
-  defp handle_duplicate_resolution(message, resolution_data) do
+  defp handle_duplicate_resolution(message, resolution_data, vehicle_id) do
     duplicate_vehicle_id = get_in(message.metadata, ["duplicate_vehicle_id"])
     action = Map.get(resolution_data, "action")
 
@@ -329,24 +329,24 @@ defmodule NukeApiWeb.MailboxController do
       "merge" ->
         # Trigger vehicle merge process
         Task.start(fn ->
-          NukeApi.Vehicles.merge_duplicate_vehicles(message.mailbox.vehicle_id, duplicate_vehicle_id)
+          NukeApi.Vehicles.merge_duplicate_vehicles(vehicle_id, duplicate_vehicle_id)
         end)
 
       "ignore" ->
         # Mark as false positive
-        NukeApi.Mailbox.mark_duplicate_as_false_positive(message.mailbox.vehicle_id, duplicate_vehicle_id)
+        NukeApi.Mailbox.mark_duplicate_as_false_positive(vehicle_id, duplicate_vehicle_id)
 
       _ ->
         :ok
     end
   end
 
-  defp handle_ownership_transfer_resolution(message, resolution_data) do
+  defp handle_ownership_transfer_resolution(message, resolution_data, vehicle_id) do
     new_owner_id = Map.get(resolution_data, "new_owner_id")
 
     if new_owner_id do
       Task.start(fn ->
-        NukeApi.Vehicles.transfer_ownership(message.mailbox.vehicle_id, new_owner_id)
+        NukeApi.Vehicles.transfer_ownership(vehicle_id, new_owner_id)
       end)
     end
   end

@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast'
 import MessageList from './MessageList'
 import AccessKeyManager from './AccessKeyManager'
 import DuplicateDetectionModal from './DuplicateDetectionModal'
+import VehicleExpertChat from './VehicleExpertChat'
 import { Link } from 'react-router-dom'
 
 interface VehicleMailbox {
@@ -56,26 +57,31 @@ const VehicleMailbox: React.FC = () => {
       loadMailbox()
       loadMessages()
       loadStamps()
+    }
+  }, [vehicleId])
 
-      // Subscribe to real-time updates
-      const subscription = supabase
-        .channel(`mailbox:${vehicleId}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'mailbox_messages'
-        }, (payload) => {
-          const newMessage = payload.new as MailboxMessage
-          if (newMessage.mailbox_id === mailbox?.id) {
-            setMessages(prev => [newMessage, ...prev])
-            toast.success('New message received')
-          }
-        })
-        .subscribe()
+  // Set up real-time subscription only after mailbox is loaded
+  useEffect(() => {
+    if (!vehicleId || !mailbox?.id) return
 
-      return () => {
-        subscription.unsubscribe()
-      }
+    // Subscribe to real-time updates
+    const subscription = supabase
+      .channel(`mailbox:${vehicleId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'mailbox_messages'
+      }, (payload) => {
+        const newMessage = payload.new as MailboxMessage
+        if (newMessage.mailbox_id === mailbox.id) {
+          setMessages(prev => [newMessage, ...prev])
+          toast.success('New message received')
+        }
+      })
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
     }
   }, [vehicleId, mailbox?.id])
 
@@ -395,13 +401,14 @@ const VehicleMailbox: React.FC = () => {
       {/* Gmail-style layout */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left sidebar - Gmail style */}
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div className="w-64 bg-white border-r-2 border-gray-300 flex flex-col">
           {/* Compose button */}
           <button
             onClick={() => setShowCompose(true)}
-            className="m-4 px-4 py-3 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+            className="m-3 px-3 py-2 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 font-semibold"
+            style={{ fontSize: '8pt' }}
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-3 h-3" />
             Compose
           </button>
 
@@ -409,16 +416,17 @@ const VehicleMailbox: React.FC = () => {
           <nav className="flex-1 px-2 space-y-1">
             <button
               onClick={() => setActiveTab('messages')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`w-full flex items-center gap-2 px-2 py-1.5 border-2 transition-colors ${
                 activeTab === 'messages'
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'text-gray-900 border-gray-300 hover:bg-gray-100'
               }`}
+              style={{ fontSize: '8pt' }}
             >
-              <Inbox className="w-5 h-5" />
+              <Inbox className="w-3 h-3" />
               <span>Inbox</span>
               {unreadCount > 0 && (
-                <span className="ml-auto bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
+                <span className="ml-auto bg-red-600 text-white px-1.5 py-0.5 rounded-full" style={{ fontSize: '7pt' }}>
                   {unreadCount}
                 </span>
               )}
@@ -426,13 +434,14 @@ const VehicleMailbox: React.FC = () => {
 
             <button
               onClick={() => setActiveTab('settings')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`w-full flex items-center gap-2 px-2 py-1.5 border-2 transition-colors ${
                 activeTab === 'settings'
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'text-gray-900 border-gray-300 hover:bg-gray-100'
               }`}
+              style={{ fontSize: '8pt' }}
             >
-              <Settings className="w-5 h-5" />
+              <Settings className="w-3 h-3" />
               <span>Mailbox Settings</span>
             </button>
           </nav>
@@ -441,14 +450,13 @@ const VehicleMailbox: React.FC = () => {
         {/* Main content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="bg-white border-b border-gray-200 px-6 py-3">
+          <div className="bg-white border-b-2 border-gray-300 px-4 py-2">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900">Vehicle Mailbox</h1>
-                <p className="text-xs text-gray-600">VIN: {mailbox.vin}</p>
+              <div style={{ fontSize: '8pt' }} className="text-gray-900 font-semibold">
+                Vehicle Mailbox VIN: {mailbox.vin}
               </div>
               {unreadCount > 0 && (
-                <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-semibold">
+                <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-semibold" style={{ fontSize: '8pt' }}>
                   {unreadCount} unread
                 </span>
               )}
@@ -473,39 +481,40 @@ const VehicleMailbox: React.FC = () => {
               )}
 
               {activeTab === 'settings' && (
-                <div className="p-6 space-y-6">
+                <div className="p-4 space-y-4">
                   {/* Access Management */}
                   {mailbox.user_access_level === 'read_write' && (
                     <div>
-                      <h3 className="text-sm font-semibold text-gray-900 mb-4">Access Management</h3>
+                      <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: '8pt' }}>Access Management</h3>
                       <AccessKeyManager vehicleId={vehicleId!} />
                     </div>
                   )}
 
                   {/* Stamps */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-4">Stamps</h3>
-                    <div className="space-y-3">
-                      <div className="text-sm text-gray-600">
+                    <h3 className="font-semibold text-gray-900 mb-3" style={{ fontSize: '8pt' }}>Stamps</h3>
+                    <div className="space-y-2">
+                      <div className="text-gray-600" style={{ fontSize: '8pt' }}>
                         Owned: {stamps.filter(s => !s.is_burned).length}
                       </div>
                       <button
                         onClick={purchaseStamp}
                         disabled={sending}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm font-medium text-gray-700 transition-colors"
+                        className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 text-gray-900 font-semibold transition-colors"
+                        style={{ fontSize: '8pt' }}
                       >
                         Buy Stamp ($0.01)
                       </button>
                       {purchaseError && (
-                        <div className="text-sm text-red-600">{purchaseError}</div>
+                        <div className="text-red-600" style={{ fontSize: '8pt' }}>{purchaseError}</div>
                       )}
                     </div>
                   </div>
 
                   {/* Notification Settings */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Notification Settings</h3>
-                    <p className="text-sm text-gray-600">Notification preferences coming soon.</p>
+                    <h3 className="font-semibold text-gray-900 mb-2" style={{ fontSize: '8pt' }}>Notification Settings</h3>
+                    <p className="text-gray-600" style={{ fontSize: '8pt' }}>Notification preferences coming soon.</p>
                   </div>
                 </div>
               )}
@@ -513,29 +522,29 @@ const VehicleMailbox: React.FC = () => {
 
             {/* Right panel - Message detail */}
             {selectedMessage && activeTab === 'messages' && (
-              <div className="w-96 border-l border-gray-200 bg-white overflow-y-auto">
-                <div className="p-6 space-y-4">
+              <div className="w-96 border-l-2 border-gray-300 bg-white overflow-y-auto">
+                <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h2 className="text-lg font-semibold text-gray-900 mb-1">{selectedMessage.title}</h2>
-                      <p className="text-xs text-gray-500">
+                      <h2 className="font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>{selectedMessage.title}</h2>
+                      <p className="text-gray-500" style={{ fontSize: '8pt' }}>
                         {new Date(selectedMessage.created_at).toLocaleString()}
                       </p>
                     </div>
                     {getMessageIcon(selectedMessage.message_type, selectedMessage.priority)}
                   </div>
 
-                  <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                  <div className="text-gray-700 leading-relaxed whitespace-pre-wrap" style={{ fontSize: '8pt' }}>
                     {selectedMessage.content}
                   </div>
 
                   {selectedMessage.metadata && (
-                    <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+                    <div className="text-gray-500 bg-gray-50 p-2 border-2 border-gray-300" style={{ fontSize: '8pt' }}>
                       <pre className="whitespace-pre-wrap">{JSON.stringify(selectedMessage.metadata, null, 2)}</pre>
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <div className="flex items-center gap-2 text-gray-600" style={{ fontSize: '8pt' }}>
                     <span>Type: {selectedMessage.message_type}</span>
                     <span>•</span>
                     <span>Priority: {selectedMessage.priority}</span>
@@ -544,14 +553,16 @@ const VehicleMailbox: React.FC = () => {
                   {!selectedMessage.resolved_at ? (
                     <div className="flex gap-2">
                       <button
-                        className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+                        className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors font-semibold"
+                        style={{ fontSize: '8pt' }}
                         onClick={() => resolveMessage(selectedMessage.id)}
                       >
                         Mark as Resolved
                       </button>
                       {selectedMessage.message_type === 'duplicate_detected' && (
                         <button
-                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+                          className="px-3 py-1.5 border-2 border-gray-300 text-gray-900 hover:bg-gray-100 transition-colors font-semibold"
+                          style={{ fontSize: '8pt' }}
                           onClick={() => handleDuplicateMessage(selectedMessage)}
                         >
                           Review Duplicate
@@ -559,7 +570,7 @@ const VehicleMailbox: React.FC = () => {
                       )}
                     </div>
                   ) : (
-                    <div className="text-sm text-green-700 font-medium">Resolved</div>
+                    <div className="text-green-700 font-semibold" style={{ fontSize: '8pt' }}>Resolved</div>
                   )}
                 </div>
               </div>
@@ -571,9 +582,9 @@ const VehicleMailbox: React.FC = () => {
       {/* Compose modal */}
       {showCompose && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">New Message</h3>
+          <div className="bg-white border-2 border-gray-300 w-full max-w-2xl mx-4">
+            <div className="p-3 border-b-2 border-gray-300 flex items-center justify-between bg-gray-100">
+              <h3 className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>New Message</h3>
               <button
                 onClick={() => {
                   setShowCompose(false)
@@ -581,17 +592,19 @@ const VehicleMailbox: React.FC = () => {
                   setDraftBody('')
                   setSendError(null)
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-600 hover:text-gray-900"
+                style={{ fontSize: '8pt' }}
               >
-                <XCircle className="w-5 h-5" />
+                <XCircle className="w-3 h-3" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-4 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>Title</label>
                 <input
-                  className="w-full border rounded px-3 py-2 text-sm"
+                  className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                  style={{ fontSize: '8pt' }}
                   placeholder="Message title"
                   value={draftTitle}
                   onChange={(e) => setDraftTitle(e.target.value)}
@@ -599,9 +612,10 @@ const VehicleMailbox: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>Message</label>
                 <textarea
-                  className="w-full border rounded px-3 py-2 text-sm"
+                  className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                  style={{ fontSize: '8pt' }}
                   rows={6}
                   placeholder="Your message..."
                   value={draftBody}
@@ -612,17 +626,18 @@ const VehicleMailbox: React.FC = () => {
               {/* Stamp selection */}
               {stamps.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Stamp</label>
+                  <label className="block font-semibold text-gray-900 mb-2" style={{ fontSize: '8pt' }}>Select Stamp</label>
                   <div className="flex flex-wrap gap-2">
                     {stamps.map((s) => (
                       <button
                         key={s.id}
                         onClick={() => setSelectedStampId(s.id)}
-                        className={`px-3 py-1.5 border rounded text-xs ${
+                        className={`px-2 py-1 border-2 transition-colors ${
                           selectedStampId === s.id
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                            ? 'border-gray-900 bg-gray-900 text-white'
+                            : 'border-gray-300 text-gray-900 hover:border-gray-600'
                         }`}
+                        style={{ fontSize: '8pt' }}
                       >
                         {s.name || s.sku || 'Stamp'} ({s.remaining_uses ?? 1} uses)
                       </button>
@@ -632,20 +647,22 @@ const VehicleMailbox: React.FC = () => {
               )}
 
               {sendError && (
-                <div className="text-sm text-red-600 bg-red-50 p-3 rounded">{sendError}</div>
+                <div className="text-red-600 bg-red-50 p-2 border-2 border-red-300" style={{ fontSize: '8pt' }}>{sendError}</div>
               )}
 
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between pt-3 border-t-2 border-gray-300">
                 <div className="flex gap-2">
                   <button
-                    className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
+                    style={{ fontSize: '8pt' }}
                     disabled={sending || !selectedStampId}
                     onClick={() => sendMessage('paid')}
                   >
                     Send with Stamp
                   </button>
                   <button
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 border-2 border-gray-300 text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 font-semibold"
+                    style={{ fontSize: '8pt' }}
                     disabled={sending}
                     onClick={() => sendMessage('comment')}
                   >
@@ -655,7 +672,8 @@ const VehicleMailbox: React.FC = () => {
                 {stamps.length === 0 && (
                   <button
                     onClick={purchaseStamp}
-                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-200 transition-colors"
+                    className="px-3 py-1.5 bg-gray-100 text-gray-900 border-2 border-gray-300 hover:bg-gray-200 transition-colors font-semibold"
+                    style={{ fontSize: '8pt' }}
                   >
                     Buy Stamp ($0.01)
                   </button>
@@ -678,6 +696,12 @@ const VehicleMailbox: React.FC = () => {
           }}
         />
       )}
+
+      {/* Vehicle Expert AI Chat */}
+      <VehicleExpertChat
+        vehicleId={vehicleId!}
+        vehicleVIN={mailbox.vin}
+      />
     </div>
   )
 }
