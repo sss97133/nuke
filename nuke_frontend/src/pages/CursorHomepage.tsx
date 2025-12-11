@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
@@ -36,6 +36,42 @@ type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
 type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views';
 type SortDirection = 'asc' | 'desc';
+
+// Component to lazy load images when vehicle card comes into view
+const LazyLoadVehicleImages: React.FC<{
+  vehicleId: string;
+  onVisible: (vehicleId: string) => void;
+  children: React.ReactNode;
+}> = ({ vehicleId, onVisible, children }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            onVisible(vehicleId);
+            observer.disconnect();
+          }
+        });
+      },
+      {
+        rootMargin: '200px', // Start loading 200px before coming into view
+        threshold: 0.01
+      }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [vehicleId, onVisible]);
+
+  return <div ref={ref}>{children}</div>;
+};
 
 // Rotating action verbs hook (inspired by Claude's thinking animation)
 const useRotatingVerb = () => {
@@ -196,6 +232,8 @@ const CursorHomepage: React.FC = () => {
   const [scrollY, setScrollY] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [loadedVehicleImages, setLoadedVehicleImages] = useState<Map<string, any[]>>(new Map());
+  const [loadingImagesFor, setLoadingImagesFor] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -239,6 +277,29 @@ const CursorHomepage: React.FC = () => {
       loadHypeFeed();
     }
   }, [session]);
+
+  // Handle vehicle cards coming into view - batch image loading
+  const visibleVehicleIdsRef = useRef<Set<string>>(new Set());
+  const loadImagesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleVehicleVisible = useCallback((vehicleId: string) => {
+    // Add to batch
+    visibleVehicleIdsRef.current.add(vehicleId);
+    
+    // Debounce: wait 100ms to batch multiple vehicles together
+    if (loadImagesTimeoutRef.current) {
+      clearTimeout(loadImagesTimeoutRef.current);
+    }
+    
+    loadImagesTimeoutRef.current = setTimeout(() => {
+      const idsToLoad = Array.from(visibleVehicleIdsRef.current);
+      visibleVehicleIdsRef.current.clear();
+      
+      if (idsToLoad.length > 0) {
+        loadImagesForVehicles(idsToLoad);
+      }
+    }, 100);
+  }, [loadImagesForVehicles]);
 
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
@@ -301,6 +362,112 @@ const CursorHomepage: React.FC = () => {
       setStatsLoading(false);
     }
   };
+
+  // Load images for vehicles on demand (lazy loading)
+  const loadImagesForVehicles = useCallback(async (vehicleIds: string[]) => {
+    // Filter out vehicles that are already loaded or currently loading
+    const idsToLoad = vehicleIds.filter(id => 
+      !loadedVehicleImages.has(id) && !loadingImagesFor.has(id)
+    );
+    
+    if (idsToLoad.length === 0) return;
+    
+    // Mark as loading
+    setLoadingImagesFor(prev => {
+      const next = new Set(prev);
+      idsToLoad.forEach(id => next.add(id));
+      return next;
+    });
+    
+    try {
+      const BATCH_SIZE = 50;
+      const allImages: any[] = [];
+      
+      // Batch the queries
+      for (let i = 0; i < idsToLoad.length; i += BATCH_SIZE) {
+        const batch = idsToLoad.slice(i, i + BATCH_SIZE);
+        const { data: batchImages, error: imagesError } = await supabase
+          .from('vehicle_images')
+          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, created_at')
+          .in('vehicle_id', batch)
+          .order('is_primary', { ascending: false })
+          .order('created_at', { ascending: false });
+
+        if (imagesError) {
+          console.error(`❌ Error loading images for batch:`, imagesError);
+        } else if (batchImages) {
+          allImages.push(...batchImages);
+        }
+      }
+      
+      // Group images by vehicle_id
+      const newImagesByVehicle = new Map<string, any[]>();
+      allImages.forEach((img: any) => {
+        if (!newImagesByVehicle.has(img.vehicle_id)) {
+          newImagesByVehicle.set(img.vehicle_id, []);
+        }
+        newImagesByVehicle.get(img.vehicle_id)!.push(img);
+      });
+      
+      // Update state with new images
+      setLoadedVehicleImages(prev => {
+        const next = new Map(prev);
+        newImagesByVehicle.forEach((images, vehicleId) => {
+          next.set(vehicleId, images);
+        });
+        return next;
+      });
+      
+      // Update feed vehicles with new images
+      setFeedVehicles(prev => prev.map(vehicle => {
+        const images = newImagesByVehicle.get(vehicle.id);
+        if (!images || images.length === 0) return vehicle;
+        
+        const all_images = images
+          .map((img: any) => {
+            let url = null;
+            if (img.variants && typeof img.variants === 'object') {
+              url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
+            }
+            if (!url) {
+              url = img.medium_url || img.large_url || img.image_url || img.thumbnail_url || null;
+            }
+            return {
+              id: img.id,
+              url: url,
+              is_primary: img.is_primary || false,
+              created_at: img.created_at
+            };
+          })
+          .filter((img: any) => img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '')
+          .sort((a: any, b: any) => {
+            if (a.is_primary && !b.is_primary) return -1;
+            if (!a.is_primary && b.is_primary) return 1;
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          })
+          .slice(0, 5);
+        
+        const primaryImageUrl = all_images[0]?.url || null;
+        
+        return {
+          ...vehicle,
+          primary_image_url: primaryImageUrl || vehicle.primary_image_url,
+          image_url: primaryImageUrl || vehicle.image_url,
+          all_images: all_images.length > 0 ? all_images : vehicle.all_images
+        };
+      }));
+      
+    } catch (error) {
+      console.error('Error loading images for vehicles:', error);
+    } finally {
+      // Remove from loading set
+      setLoadingImagesFor(prev => {
+        const next = new Set(prev);
+        idsToLoad.forEach(id => next.delete(id));
+        return next;
+      });
+    }
+  }, [loadedVehicleImages, loadingImagesFor]);
 
   const getTimePeriodFilter = () => {
     const now = new Date();
@@ -425,26 +592,38 @@ const CursorHomepage: React.FC = () => {
       // Use filtered vehicles if time filter was applied
       const vehiclesToProcess = filteredVehicles || allVehicles || [];
 
-      // Fetch images separately for each vehicle to avoid relationship ambiguity
+      // LAZY LOADING: Only load images for initial visible batch (first 30 vehicles)
+      // Remaining images will be loaded on-demand as vehicles scroll into view
+      const INITIAL_IMAGE_BATCH = 30;
       const vehicleIds = vehiclesToProcess.map((v: any) => v.id);
+      const initialVehicleIds = vehicleIds.slice(0, INITIAL_IMAGE_BATCH);
       
-      // Get all images for these vehicles in one query
-      // Include all possible URL fields and variants
-      const { data: allImages, error: imagesError } = await supabase
-        .from('vehicle_images')
-        .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, created_at')
-        .in('vehicle_id', vehicleIds)
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: false });
+      // Batch image queries to avoid URL length limits and resource exhaustion
+      // Process in chunks of 50 vehicle IDs at a time
+      const BATCH_SIZE = 50;
+      const allImages: any[] = [];
+      
+      // Only fetch images for initial visible batch
+      for (let i = 0; i < initialVehicleIds.length; i += BATCH_SIZE) {
+        const batch = initialVehicleIds.slice(i, i + BATCH_SIZE);
+        const { data: batchImages, error: imagesError } = await supabase
+          .from('vehicle_images')
+          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, created_at')
+          .in('vehicle_id', batch)
+          .order('is_primary', { ascending: false })
+          .order('created_at', { ascending: false });
 
-      if (imagesError) {
-        console.error('❌ Error loading images:', imagesError);
-      } else {
-        console.log(`✅ Loaded ${allImages?.length || 0} images for ${vehicleIds.length} vehicles`);
-        if (allImages && allImages.length > 0) {
-          // Log sample image to see structure
-          console.log('Sample image:', allImages[0]);
+        if (imagesError) {
+          console.error(`❌ Error loading images for batch ${i / BATCH_SIZE + 1}:`, imagesError);
+        } else if (batchImages) {
+          allImages.push(...batchImages);
         }
+      }
+
+      console.log(`✅ Loaded ${allImages.length} images for ${initialVehicleIds.length} vehicles (lazy loading: initial batch only)`);
+      if (allImages.length > 0) {
+        // Log sample image to see structure
+        console.log('Sample image:', allImages[0]);
       }
 
       // Group images by vehicle_id
@@ -455,25 +634,43 @@ const CursorHomepage: React.FC = () => {
         }
         imagesByVehicle.get(img.vehicle_id)!.push(img);
       });
-
-      // Fetch event counts for all vehicles
+      
+      // Store initial loaded images in state (merge with existing)
+      setLoadedVehicleImages(prev => {
+        const next = new Map(prev);
+        imagesByVehicle.forEach((images, vehicleId) => {
+          next.set(vehicleId, images);
+        });
+        return next;
+      });
+      
+      // Fetch event counts for all vehicles (batched)
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: recentEvents } = await supabase
-        .from('timeline_events')
-        .select('vehicle_id')
-        .in('vehicle_id', vehicleIds)
-        .gte('created_at', sevenDaysAgo);
+      const recentEvents: any[] = [];
+      
+      for (let i = 0; i < vehicleIds.length; i += BATCH_SIZE) {
+        const batch = vehicleIds.slice(i, i + BATCH_SIZE);
+        const { data: batchEvents } = await supabase
+          .from('timeline_events')
+          .select('vehicle_id')
+          .in('vehicle_id', batch)
+          .gte('created_at', sevenDaysAgo);
+        
+        if (batchEvents) {
+          recentEvents.push(...batchEvents);
+        }
+      }
 
       // Group events by vehicle_id
       const eventsByVehicle = new Map<string, number>();
-      (recentEvents || []).forEach((event: any) => {
+      recentEvents.forEach((event: any) => {
         const count = eventsByVehicle.get(event.vehicle_id) || 0;
         eventsByVehicle.set(event.vehicle_id, count + 1);
       });
 
       // Process vehicles with their images
       const enriched = vehiclesToProcess.map((v: any) => {
-        // Get images for this vehicle
+        // Get images for this vehicle (use local map first, then state as fallback)
         const images = imagesByVehicle.get(v.id) || [];
         
         // Map images with proper URL extraction - prioritize primary images
@@ -1637,16 +1834,21 @@ const CursorHomepage: React.FC = () => {
             gap: '4px'
           }}>
             {filteredVehicles.map((vehicle) => (
-              <VehicleCardDense
+              <LazyLoadVehicleImages
                 key={vehicle.id}
-                vehicle={{
-                  ...vehicle,
-                  primary_image_url: vehicle.primary_image_url
-                }}
-                viewMode="gallery"
-                showPriceOverlay={filters.showPrices}
-                showDetailOverlay={filters.showDetailOverlay}
-              />
+                vehicleId={vehicle.id}
+                onVisible={handleVehicleVisible}
+              >
+                <VehicleCardDense
+                  vehicle={{
+                    ...vehicle,
+                    primary_image_url: vehicle.primary_image_url
+                  }}
+                  viewMode="gallery"
+                  showPriceOverlay={filters.showPrices}
+                  showDetailOverlay={filters.showDetailOverlay}
+                />
+              </LazyLoadVehicleImages>
             ))}
           </div>
         )}
@@ -1659,16 +1861,21 @@ const CursorHomepage: React.FC = () => {
             gap: '0'
         }}>
             {filteredVehicles.map((vehicle) => (
-            <VehicleCardDense
+            <LazyLoadVehicleImages
               key={vehicle.id}
-              vehicle={{
-                ...vehicle,
-                  primary_image_url: vehicle.primary_image_url
-              }}
-              viewMode="grid"
-              showPriceOverlay={filters.showPrices}
-              showDetailOverlay={filters.showDetailOverlay}
-            />
+              vehicleId={vehicle.id}
+              onVisible={handleVehicleVisible}
+            >
+              <VehicleCardDense
+                vehicle={{
+                  ...vehicle,
+                    primary_image_url: vehicle.primary_image_url
+                }}
+                viewMode="grid"
+                showPriceOverlay={filters.showPrices}
+                showDetailOverlay={filters.showDetailOverlay}
+              />
+            </LazyLoadVehicleImages>
           ))}
         </div>
         )}
