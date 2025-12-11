@@ -367,22 +367,16 @@ const CursorHomepage: React.FC = () => {
       }
 
       // Query vehicles first (without embedded images to avoid relationship ambiguity)
-      // NO LIMIT - infinite scroll
-      let query = supabase
-        .from('vehicles')
-        .select(`
-          id, year, make, model, current_value, purchase_price, sale_price, asking_price, is_for_sale, view_count, created_at, updated_at, mileage, vin
-        `)
-        .eq('is_public', true)
-        .neq('status', 'pending')
-        .order('updated_at', { ascending: false })
-        .limit(1000); // Increased from 100/500 to 1000
-
-      if (timeFilter) {
-        query = query.gte('updated_at', timeFilter);
+      // Use RPC function to get accurate counts and tier
+      const { data: vehicles, error } = await supabase.rpc('get_vehicle_feed_data');
+      
+      // Apply time filter if needed
+      let filteredVehicles = vehicles;
+      if (timeFilter && vehicles) {
+        filteredVehicles = vehicles.filter((v: any) => 
+          new Date(v.updated_at) >= new Date(timeFilter)
+        );
       }
-
-      const { data: vehicles, error } = await query;
       
       console.log('🔍 LoadHypeFeed Debug:', {
         timePeriod,
@@ -413,8 +407,11 @@ const CursorHomepage: React.FC = () => {
         return;
       }
 
+      // Use filtered vehicles if time filter was applied
+      const vehiclesToProcess = filteredVehicles || vehicles || [];
+
       // Fetch images separately for each vehicle to avoid relationship ambiguity
-      const vehicleIds = vehicles?.map((v: any) => v.id) || [];
+      const vehicleIds = vehiclesToProcess.map((v: any) => v.id);
       
       // Get all images for these vehicles in one query
       const { data: allImages, error: imagesError } = await supabase
@@ -453,7 +450,7 @@ const CursorHomepage: React.FC = () => {
       });
 
       // Process vehicles with their images
-      const enriched = vehicles.map((v: any) => {
+      const enriched = vehiclesToProcess.map((v: any) => {
         // Get images for this vehicle
         const images = imagesByVehicle.get(v.id) || [];
         
@@ -524,14 +521,17 @@ const CursorHomepage: React.FC = () => {
             return {
             ...v,
             display_price: displayPrice, // Add smart price for display
-            image_count: totalImages,
+            image_count: v.image_count || totalImages, // Use accurate count from RPC if available
+            view_count: v.view_count || 0, // Use accurate count from RPC
             event_count: activity7d,
             activity_7d: activity7d,
             hype_score: hypeScore,
             hype_reason: hypeReason,
             primary_image_url: primaryImageUrl,
             image_url: primaryImageUrl,
-            all_images: all_images
+            all_images: all_images,
+            tier: v.tier, // From RPC function
+            tier_label: v.tier_label // From RPC function
           };
         });
       

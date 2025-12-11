@@ -25,15 +25,17 @@ serve(async (req) => {
     );
 
     const body: ProcessRequest = await req.json().catch(() => ({}));
-    const { batch_size = 10, priority_only = false, source_id } = body;
+    const { batch_size = 20, priority_only = false, source_id } = body;
 
-    // Get pending items from queue
+    // Get pending items from queue - prioritize items with more data
     let query = supabase
       .from('import_queue')
       .select('*')
       .eq('status', 'pending')
       .lt('attempts', 3)
       .order('priority', { ascending: false })
+      // Prioritize items with year/make/model already known (higher quality)
+      .order('listing_year', { ascending: false, nullsLast: true })
       .order('created_at', { ascending: true })
       .limit(batch_size);
 
@@ -112,9 +114,13 @@ serve(async (req) => {
         const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
         
         // Try Firecrawl first if API key is available (bypasses bot protection)
+        // Use timeout to prevent hanging
         if (firecrawlApiKey) {
           try {
             console.log('🔥 Attempting Firecrawl scrape...');
+            const firecrawlController = new AbortController();
+            const firecrawlTimeout = setTimeout(() => firecrawlController.abort(), 15000); // 15s timeout
+            
             const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
               method: 'POST',
               headers: {
@@ -123,12 +129,15 @@ serve(async (req) => {
               },
               body: JSON.stringify({
                 url: item.listing_url,
-                formats: ['html', 'markdown'],
+                formats: ['html'],
                 pageOptions: {
-                  waitFor: 2000, // Wait 2 seconds for JS to load
+                  waitFor: 1000, // Reduced wait time
                 },
-              })
+              }),
+              signal: firecrawlController.signal
             });
+
+            clearTimeout(firecrawlTimeout);
 
             if (firecrawlResponse.ok) {
               const firecrawlData = await firecrawlResponse.json();
@@ -136,12 +145,19 @@ serve(async (req) => {
                 html = firecrawlData.data.html;
                 scrapeSuccess = true;
                 console.log('✅ Firecrawl scrape successful');
+              } else {
+                console.warn('⚠️ Firecrawl returned no HTML');
               }
             } else {
-              console.warn('⚠️ Firecrawl failed:', firecrawlResponse.status);
+              const errorText = await firecrawlResponse.text().catch(() => '');
+              console.warn(`⚠️ Firecrawl failed: ${firecrawlResponse.status} - ${errorText.substring(0, 100)}`);
             }
-          } catch (error) {
-            console.warn('⚠️ Firecrawl error:', error);
+          } catch (error: any) {
+            if (error.name === 'AbortError') {
+              console.warn('⚠️ Firecrawl timeout');
+            } else {
+              console.warn('⚠️ Firecrawl error:', error.message);
+            }
             // Fall through to direct fetch
           }
         }
@@ -149,19 +165,33 @@ serve(async (req) => {
         // Fallback to direct fetch if Firecrawl didn't work
         if (!scrapeSuccess) {
           console.log('📡 Using direct fetch (fallback)');
-          const response = await fetch(item.listing_url, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              'Accept-Language': 'en-US,en;q=0.9',
-            },
-          });
+          const fetchController = new AbortController();
+          const fetchTimeout = setTimeout(() => fetchController.abort(), 10000); // 10s timeout
+          
+          try {
+            const response = await fetch(item.listing_url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+              },
+              signal: fetchController.signal
+            });
 
-          if (!response.ok) {
-            throw new Error(`Scrape failed: ${response.status}`);
+            clearTimeout(fetchTimeout);
+
+            if (!response.ok) {
+              throw new Error(`Scrape failed: ${response.status}`);
+            }
+
+            html = await response.text();
+          } catch (fetchError: any) {
+            clearTimeout(fetchTimeout);
+            if (fetchError.name === 'AbortError') {
+              throw new Error('Scrape timeout');
+            }
+            throw fetchError;
           }
-
-          html = await response.text();
         }
         const doc = new DOMParser().parseFromString(html, 'text/html');
 
@@ -226,16 +256,39 @@ serve(async (req) => {
           if (scrapeData.data.title) {
             const yearMatch = scrapeData.data.title.match(/\b(19|20)\d{2}\b/);
             if (yearMatch) {
-              scrapeData.data.year = parseInt(yearMatch[0]);
+              const year = parseInt(yearMatch[0]);
+              // Validate year is reasonable
+              if (year >= 1885 && year <= new Date().getFullYear() + 1) {
+                scrapeData.data.year = year;
+              }
             }
-            const parts = scrapeData.data.title.split(' ');
+            
+            // Improved make/model extraction with validation
+            const parts = scrapeData.data.title.split(/\s+/).filter(p => p.length > 0);
             if (parts.length >= 3) {
               let startIndex = 0;
-              if (parts[0] && parts[0].match(/\b(19|20)\d{2}\b/)) {
+              // Skip year if first
+              if (parts[0] && parts[0].match(/^\d{4}$/)) {
                 startIndex = 1;
               }
-              if (parts[startIndex]) scrapeData.data.make = parts[startIndex];
-              if (parts[startIndex + 1]) scrapeData.data.model = parts[startIndex + 1];
+              
+              // Extract make (skip common descriptors)
+              const invalidMakes = ['Classic', 'Featured', 'Fuel-Injected', 'Powered', 'Owned', 'Half-Scale', 'Gray', 'Exotic', 'Vintage', 'Custom'];
+              if (parts[startIndex] && !invalidMakes.includes(parts[startIndex])) {
+                scrapeData.data.make = parts[startIndex].charAt(0).toUpperCase() + parts[startIndex].slice(1).toLowerCase();
+              }
+              
+              // Extract model (rest of title)
+              if (parts.length > startIndex + 1) {
+                const modelParts = parts.slice(startIndex + 1);
+                // Filter out common non-model words
+                const filteredModel = modelParts.filter(p => 
+                  !['for', 'sale', 'wanted', 'needs', 'runs', 'great', 'condition'].includes(p.toLowerCase())
+                );
+                if (filteredModel.length > 0) {
+                  scrapeData.data.model = filteredModel.join(' ');
+                }
+              }
             }
           }
         }
@@ -262,20 +315,42 @@ serve(async (req) => {
           }
         }
 
-        // Create vehicle (minimal insert, forensic system will enrich)
+        // Validate scraped data before creating vehicle
+        const make = (scrapeData.data.make || item.listing_make || '').trim();
+        const model = (scrapeData.data.model || item.listing_model || '').trim();
+        const year = scrapeData.data.year || item.listing_year;
+        
+        // Data quality checks - reject garbage data
+        const invalidMakes = ['Unknown', 'Classic', 'Featured', 'Fuel-Injected', 'Powered', 'Owned'];
+        if (!make || make === '' || invalidMakes.includes(make)) {
+          throw new Error(`Invalid make: "${make}" - cannot create vehicle`);
+        }
+        
+        if (!model || model === '') {
+          throw new Error(`Invalid model: "${model}" - cannot create vehicle`);
+        }
+        
+        if (!year || year < 1885 || year > new Date().getFullYear() + 1) {
+          throw new Error(`Invalid year: ${year} - cannot create vehicle`);
+        }
+        
+        // Create vehicle - START AS PENDING until validated
+        // Store extracted image URLs in metadata for later backfill
         const { data: newVehicle, error: vehicleError} = await supabase
           .from('vehicles')
           .insert({
-            year: scrapeData.data.year || item.listing_year,
-            make: scrapeData.data.make || item.listing_make || 'Unknown',
-            model: scrapeData.data.model || item.listing_model || 'Unknown',
-            status: 'active',
-            is_public: true,
+            year: year,
+            make: make,
+            model: model,
+            status: 'pending', // Start pending - will be activated after validation
+            is_public: false, // Start private - will be made public after validation
             discovery_url: item.listing_url,
             origin_metadata: {
               source_id: item.source_id,
               queue_id: item.id,
-              imported_at: new Date().toISOString()
+              imported_at: new Date().toISOString(),
+              image_urls: scrapeData.data.images || [], // Store for backfill
+              image_count: scrapeData.data.images?.length || 0
             },
             selling_organization_id: organizationId,
             import_queue_id: item.id
@@ -296,8 +371,8 @@ serve(async (req) => {
           p_context: { source_id: item.source_id, queue_id: item.id }
         });
 
-        // Build consensus for critical fields
-        const criticalFields = ['vin', 'trim', 'series', 'drivetrain', 'engine_type', 'mileage'];
+        // Build consensus for critical fields immediately
+        const criticalFields = ['vin', 'trim', 'series', 'drivetrain', 'engine_type', 'mileage', 'color', 'asking_price'];
         for (const field of criticalFields) {
           if (scrapeData.data[field]) {
             await supabase.rpc('build_field_consensus', {
@@ -305,6 +380,54 @@ serve(async (req) => {
               p_field_name: field,
               p_auto_assign: true
             });
+          }
+        }
+        
+        // Update vehicle with any additional scraped fields
+        const updateData: any = {};
+        if (scrapeData.data.description && scrapeData.data.description.length > 10) {
+          updateData.description = scrapeData.data.description;
+        }
+        if (scrapeData.data.location) updateData.location = scrapeData.data.location;
+        if (scrapeData.data.asking_price && scrapeData.data.asking_price > 100 && scrapeData.data.asking_price < 10000000) {
+          updateData.asking_price = scrapeData.data.asking_price;
+        }
+        if (scrapeData.data.vin && scrapeData.data.vin.length === 17) {
+          updateData.vin = scrapeData.data.vin;
+        }
+        
+        if (Object.keys(updateData).length > 0) {
+          await supabase
+            .from('vehicles')
+            .update(updateData)
+            .eq('id', newVehicle.id);
+        }
+        
+        // QUALITY GATE: Validate before making public
+        const { data: validationResult, error: validationError } = await supabase.rpc(
+          'validate_vehicle_before_public',
+          { p_vehicle_id: newVehicle.id }
+        );
+        
+        if (validationError) {
+          console.warn('Validation error:', validationError);
+          // Continue but don't make public
+        } else if (validationResult && validationResult.can_go_live) {
+          // Passed validation - make public and active
+          await supabase
+            .from('vehicles')
+            .update({
+              status: 'active',
+              is_public: true
+            })
+            .eq('id', newVehicle.id);
+          console.log(`✅ Vehicle ${newVehicle.id} passed quality gate - made public`);
+        } else {
+          // Failed validation - keep pending/private
+          console.warn(`⚠️ Vehicle ${newVehicle.id} failed quality gate:`, validationResult?.recommendation);
+          // Log issues for debugging
+          if (validationResult?.issues) {
+            console.warn('Validation issues:', JSON.stringify(validationResult.issues, null, 2));
           }
         }
 
@@ -336,27 +459,47 @@ serve(async (req) => {
             }
           });
 
-        // Queue images for download
+        // Queue images for download - AWAIT to ensure they're processed
         if (scrapeData.data.images && scrapeData.data.images.length > 0) {
-          console.log(`Queuing ${scrapeData.data.images.length} images for vehicle ${newVehicle.id}`);
+          console.log(`📸 Downloading ${scrapeData.data.images.length} images for vehicle ${newVehicle.id}`);
           
-          // Call image backfill for this vehicle
-          fetch(
-            `${Deno.env.get('SUPABASE_URL')}/functions/v1/backfill-images`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-              },
-              body: JSON.stringify({
-                vehicle_id: newVehicle.id,
-                image_urls: scrapeData.data.images,
-                source: 'import_queue',
-                run_analysis: true
-              })
+          try {
+            // Call backfill-images and WAIT for it (with timeout)
+            const backfillResponse = await Promise.race([
+              fetch(
+                `${Deno.env.get('SUPABASE_URL')}/functions/v1/backfill-images`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                  },
+                  body: JSON.stringify({
+                    vehicle_id: newVehicle.id,
+                    image_urls: scrapeData.data.images,
+                    source: 'import_queue',
+                    run_analysis: false, // Skip analysis for speed
+                    listed_date: scrapeData.data.listed_date
+                  })
+                }
+              ),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Backfill timeout')), 60000) // 60s timeout
+              )
+            ]) as Response;
+
+            if (backfillResponse.ok) {
+              const backfillResult = await backfillResponse.json();
+              console.log(`✅ Images backfilled: ${backfillResult.uploaded || 0} uploaded, ${backfillResult.failed || 0} failed`);
+            } else {
+              console.warn(`⚠️ Image backfill returned ${backfillResponse.status}`);
             }
-          ).catch(err => console.error('Image backfill trigger failed:', err));
+          } catch (err) {
+            console.error(`❌ Image backfill failed for vehicle ${newVehicle.id}:`, err);
+            // Don't fail the whole process - images can be backfilled later
+          }
+        } else {
+          console.warn(`⚠️ No images extracted from ${item.listing_url}`);
         }
 
         results.succeeded++;
