@@ -36,6 +36,8 @@ interface VehicleCardDenseProps {
     roi_pct?: number;
     hype_reason?: string;
     all_images?: Array<{ id: string; url: string; is_primary: boolean }>;
+    tier?: string;
+    tier_label?: string;
   };
   viewMode?: 'list' | 'gallery' | 'grid';
   showSocial?: boolean;
@@ -86,9 +88,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     if (!dateString) return null;
     const date = new Date(dateString);
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
 
-    if (diffInHours < 1) return 'Just now';
+    // Show minutes for anything less than 1 hour
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInHours < 24) return `${diffInHours}h ago`;
     if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
     return `${Math.floor(diffInHours / 168)}w ago`;
@@ -313,14 +319,72 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 )}
                 {vehicle.uploader_name && <span>•</span>}
 
-                {vehicle.view_count > 0 && <span>{vehicle.view_count} views</span>}
-
-                {vehicle.image_count && vehicle.image_count > 0 && (
+                {/* Accurate view count - use actual count from database */}
+                {vehicle.view_count !== undefined && vehicle.view_count > 0 && (
                   <>
+                    <span>{vehicle.view_count} {vehicle.view_count === 1 ? 'view' : 'views'}</span>
                     <span>•</span>
-                    <span>{vehicle.image_count} images</span>
                   </>
                 )}
+
+                {/* Accurate image count - use all_images length or image_count */}
+                {(() => {
+                  const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
+                  if (imageCount > 0) {
+                    return (
+                      <>
+                        <span>{imageCount} {imageCount === 1 ? 'image' : 'images'}</span>
+                        <span>•</span>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* Vehicle Tier - use from RPC or calculate */}
+                {(() => {
+                  const tierLabel = vehicle.tier_label || (() => {
+                    // Fallback calculation if not from RPC
+                    const hasVIN = vehicle.vin && vehicle.vin.length === 17;
+                    const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
+                    const hasEvents = (vehicle.event_count || 0) > 0;
+                    const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
+                    
+                    if (imageCount >= 20 && hasVIN && hasPrice && hasEvents) return 'Tier 5';
+                    if (imageCount >= 10 && hasVIN && hasPrice) return 'Tier 4';
+                    if (imageCount >= 5 && (hasVIN || hasEvents)) return 'Tier 3';
+                    if (imageCount >= 1) return 'Tier 2';
+                    return 'Tier 1';
+                  })();
+                  
+                  const tier = vehicle.tier || (tierLabel === 'Tier 5' ? 'complete' :
+                    tierLabel === 'Tier 4' ? 'excellent' :
+                    tierLabel === 'Tier 3' ? 'good' :
+                    tierLabel === 'Tier 2' ? 'fair' : 'minimal');
+                  
+                  if (tierLabel) {
+                    return (
+                      <>
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: tier === 'complete' || tier === 'excellent' 
+                              ? '#10b981' 
+                              : tier === 'good' 
+                              ? '#3b82f6' 
+                              : tier === 'fair'
+                              ? '#f59e0b'
+                              : '#6b7280'
+                          }}
+                        >
+                          {tierLabel}
+                        </span>
+                        <span>•</span>
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {vehicle.condition_rating && (
                   <>
@@ -530,16 +594,78 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             )}
             {vehicle.uploader_name && <span>•</span>}
 
-            {vehicle.view_count > 0 && <span>{vehicle.view_count} views</span>}
-
-            {vehicle.active_viewers > 0 && <span>({vehicle.active_viewers} watching)</span>}
-
-            {vehicle.image_count && vehicle.image_count > 0 && (
+            {/* Accurate view count */}
+            {vehicle.view_count !== undefined && vehicle.view_count > 0 && (
               <>
+                <span>{vehicle.view_count} {vehicle.view_count === 1 ? 'view' : 'views'}</span>
                 <span>•</span>
-                <span>{vehicle.image_count} images</span>
               </>
             )}
+
+            {vehicle.active_viewers > 0 && (
+              <>
+                <span>({vehicle.active_viewers} watching)</span>
+                <span>•</span>
+              </>
+            )}
+
+            {/* Accurate image count */}
+            {(() => {
+              const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
+              if (imageCount > 0) {
+                return (
+                  <>
+                    <span>{imageCount} {imageCount === 1 ? 'image' : 'images'}</span>
+                    <span>•</span>
+                  </>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Vehicle Tier */}
+            {(() => {
+              const tierLabel = vehicle.tier_label || (() => {
+                const hasVIN = vehicle.vin && vehicle.vin.length === 17;
+                const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
+                const hasEvents = (vehicle.event_count || 0) > 0;
+                const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
+                
+                if (imageCount >= 20 && hasVIN && hasPrice && hasEvents) return 'Tier 5';
+                if (imageCount >= 10 && hasVIN && hasPrice) return 'Tier 4';
+                if (imageCount >= 5 && (hasVIN || hasEvents)) return 'Tier 3';
+                if (imageCount >= 1) return 'Tier 2';
+                return 'Tier 1';
+              })();
+              
+              const tier = vehicle.tier || (tierLabel === 'Tier 5' ? 'complete' :
+                tierLabel === 'Tier 4' ? 'excellent' :
+                tierLabel === 'Tier 3' ? 'good' :
+                tierLabel === 'Tier 2' ? 'fair' : 'minimal');
+              
+              if (tierLabel) {
+                return (
+                  <>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: tier === 'complete' || tier === 'excellent' 
+                          ? '#10b981' 
+                          : tier === 'good' 
+                          ? '#3b82f6' 
+                          : tier === 'fair'
+                          ? '#f59e0b'
+                          : '#6b7280'
+                      }}
+                    >
+                      {tierLabel}
+                    </span>
+                    <span>•</span>
+                  </>
+                );
+              }
+              return null;
+            })()}
 
             {vehicle.condition_rating && (
               <span
