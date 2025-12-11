@@ -193,6 +193,9 @@ serve(async (req) => {
             throw fetchError;
           }
         }
+        // Remove "Pending Organization Assignments" HTML blocks before parsing
+        html = html.replace(/<div[^>]*style="[^"]*padding:\s*12px[^"]*background:\s*rgb\(254,\s*243,\s*199\)[^"]*"[^>]*>[\s\S]*?REJECT<\/div>/gi, '');
+        
         const doc = new DOMParser().parseFromString(html, 'text/html');
 
         // Basic data extraction
@@ -229,6 +232,29 @@ serve(async (req) => {
             break;
           }
         }
+
+        // Helper function to identify if vehicle is a truck
+        const isTruck = (make: string, model: string, title: string, description: string): boolean => {
+          const searchText = `${make} ${model} ${title} ${description}`.toLowerCase();
+          
+          // Truck indicators
+          const truckKeywords = [
+            'truck', 'pickup', 'c10', 'c20', 'c30', 'k10', 'k20', 'k30',
+            'c1500', 'c2500', 'c3500', 'k1500', 'k2500', 'k3500',
+            'f150', 'f250', 'f350', 'f450', 'f550',
+            'ram 1500', 'ram 2500', 'ram 3500',
+            'tacoma', 'tundra', 'ranger', 'colorado', 'canyon',
+            'silverado', 'sierra', 'titan', 'frontier'
+          ];
+          
+          // Body style indicators
+          const bodyStyleKeywords = ['pickup', 'truck', 'crew cab', 'extended cab', 'regular cab', 'shortbed', 'longbed'];
+          
+          return truckKeywords.some(kw => searchText.includes(kw)) ||
+                 bodyStyleKeywords.some(kw => searchText.includes(kw)) ||
+                 /^(c|k)\d{1,4}$/i.test(model) ||
+                 /^(c|k)\d{4}$/i.test(model);
+        };
 
         // Craigslist parsing
         if (item.listing_url.includes('craigslist.org')) {
@@ -289,6 +315,12 @@ serve(async (req) => {
                   scrapeData.data.model = filteredModel.join(' ');
                 }
               }
+            }
+            
+            // Identify if truck and set body_type
+            if (isTruck(scrapeData.data.make || '', scrapeData.data.model || '', scrapeData.data.title, scrapeData.data.description)) {
+              scrapeData.data.body_type = 'Truck';
+              scrapeData.data.body_style = 'Pickup';
             }
           }
         }
