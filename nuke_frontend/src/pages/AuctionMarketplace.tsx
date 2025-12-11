@@ -4,6 +4,19 @@ import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
 import '../design-system.css';
 
+// Add pulse animation for LIVE badge
+const liveBadgeStyle = `
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+`;
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = liveBadgeStyle;
+  document.head.appendChild(style);
+}
+
 interface AuctionListing {
   id: string;
   vehicle_id: string;
@@ -303,7 +316,7 @@ export default function AuctionMarketplace() {
               <div>
                 <h1 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>Auction Marketplace</h1>
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Browse live and upcoming auctions across the network.
+                  Browse live and upcoming auctions across the network. Live BaT auctions are automatically imported and displayed here.
                 </div>
               </div>
               {user && (
@@ -525,8 +538,47 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           </div>
         )}
 
-        {/* Platform badge */}
-        {platformName && (
+        {/* LIVE badge - show for active auctions */}
+        {listing.auction_end_time && new Date(listing.auction_end_time) > new Date() && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '6px',
+              background: '#dc2626',
+              color: '#fff',
+              padding: '3px 8px',
+              borderRadius: '3px',
+              fontSize: '7pt',
+              fontWeight: 700,
+              animation: 'pulse 2s infinite',
+            }}
+          >
+            LIVE
+          </div>
+        )}
+
+        {/* Platform badge - show below LIVE if both exist */}
+        {platformName && listing.auction_end_time && new Date(listing.auction_end_time) > new Date() && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '28px',
+              right: '6px',
+              background: listing.platform === 'bat' ? '#1e40af' : '#dc2626',
+              color: '#fff',
+              padding: '3px 8px',
+              borderRadius: '3px',
+              fontSize: '7pt',
+              fontWeight: 700,
+            }}
+          >
+            {platformName}
+          </div>
+        )}
+
+        {/* Platform badge - show in top-right if not live */}
+        {platformName && (!listing.auction_end_time || new Date(listing.auction_end_time) <= new Date()) && (
           <div
             style={{
               position: 'absolute',
