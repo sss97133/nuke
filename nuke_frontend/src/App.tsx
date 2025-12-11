@@ -69,6 +69,7 @@ import AppLayout from './components/layout/AppLayout';
 import ViewerDashboard from './pages/ViewerDashboard';
 import VehicleInteractionManager from './pages/VehicleInteractionManager';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminPendingVehicles from './pages/AdminPendingVehicles';
 import OwnershipVerificationDashboard from './components/admin/OwnershipVerificationDashboard';
 import SquarebodyMarketDashboard from './pages/SquarebodyMarketDashboard';
 import SquarebodyLiveFeed from './pages/SquarebodyLiveFeed';
@@ -368,6 +369,7 @@ function App() {
             {/* Admin & Development */}
             <Route path="/admin" element={<SystemStatus />} />
             <Route path="/admin/old" element={<AdminDashboard />} />
+            <Route path="/admin/pending-vehicles" element={<AdminPendingVehicles />} />
             <Route path="/admin/mission-control" element={<AdminMissionControl />} />
             <Route path="/admin/scripts" element={<ScriptControlCenter />} />
             <Route path="/admin/image-processing" element={<ImageProcessingDashboard />} />

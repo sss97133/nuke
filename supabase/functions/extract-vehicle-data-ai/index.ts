@@ -192,6 +192,9 @@ Return ONLY valid JSON, no other text.`
  * Extract text content from HTML
  */
 function extractTextFromHTML(html: string): string {
+  // Remove "Pending Organization Assignments" HTML blocks first
+  html = html.replace(/<div[^>]*style="[^"]*padding:\s*12px[^"]*background:\s*rgb\(254,\s*243,\s*199\)[^"]*"[^>]*>[\s\S]*?REJECT<\/div>/gi, '');
+  
   // Remove scripts and styles
   let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
   text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')

@@ -616,10 +616,12 @@ const CursorHomepage: React.FC = () => {
         result.sort((a, b) => dir * ((b.mileage || 0) - (a.mileage || 0)));
         break;
       case 'newest':
-        result.sort((a, b) => 
-          dir * (new Date(b.updated_at || b.created_at || 0).getTime() - 
-          new Date(a.updated_at || a.created_at || 0).getTime())
-        );
+        // Sort by created_at first (newest vehicles), then updated_at as fallback
+        result.sort((a, b) => {
+          const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
+          const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
+          return dir * (bTime - aTime); // Descending: newest first
+        });
         break;
       case 'oldest':
         result.sort((a, b) => 
