@@ -10,3 +10,4 @@ CREATE INDEX IF NOT EXISTS idx_ref_docs_metadata ON reference_documents USING GI
 COMMENT ON COLUMN reference_documents.metadata IS 'Stores document structure, indexing status, and other metadata from AI processing';
 
 
+

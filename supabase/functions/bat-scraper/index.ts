@@ -83,8 +83,9 @@ serve(async (req) => {
       }
     }
 
-    // Extract VIN
-    const vinMatch = html.match(/VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i) ||
+    // Extract VIN - BaT uses both "VIN:" and "Chassis:" labels
+    const vinMatch = html.match(/(?:VIN|Chassis)[:\s]*([A-HJ-NPR-Z0-9]{17})/i) ||
+                     html.match(/<li>Chassis:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{17})<\/a><\/li>/i) ||
                      html.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
     if (vinMatch) {
       const vin = vinMatch[1].toUpperCase();
