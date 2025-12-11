@@ -7,8 +7,8 @@
 
 import https from 'https';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjkxOTE5MDMsImV4cCI6MjA0NDc2NzkwM30.pVVB8b0qwHBY9jbDXj5nQQN3UWaJw-JsaaMi9U3-SAs';
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
+const ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 async function getUnanalyzedOrganizations() {
   return new Promise((resolve, reject) => {

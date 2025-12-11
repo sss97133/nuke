@@ -47,6 +47,7 @@ import type { Session } from '@supabase/supabase-js';
 import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
 import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
 import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel';
+import MailboxNotificationBadge from '../components/VehicleMailbox/MailboxNotificationBadge';
 import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 
 const WORKSPACE_TABS = [
@@ -1455,6 +1456,19 @@ const VehicleProfile: React.FC = () => {
             onClaimClick={() => setShowOwnershipClaim(true)}
           />
         </React.Suspense>
+
+        {/* Vehicle Mailbox entry point */}
+        {vehicle && (
+          <div className="card" style={{ marginTop: '8px' }}>
+            <div className="card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+              <div>
+                <div className="text-small text-muted">Mailbox</div>
+                <div className="text" style={{ fontWeight: 600 }}>Vehicle messages & alerts</div>
+              </div>
+              <MailboxNotificationBadge vehicleId={vehicle.id} showIcon showText />
+            </div>
+          </div>
+        )}
 
         {/* Live Auction Banner - Show if vehicle has active auction */}
         {vehicle && (

@@ -181,7 +181,7 @@ export class VehicleSelfHealingService {
 
       // 4. Scrape BAT listing
       console.log('[SelfHealing] Scraping BAT URL:', batUrl);
-      const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('scrape-vehicle', {
+      const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('simple-scraper', {
         body: { url: batUrl }
       });
 

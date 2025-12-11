@@ -21,6 +21,7 @@ import VehicleForm from './components/vehicles/VehicleForm';
 // Lazy load VehicleProfile to avoid circular dependency issues
 const VehicleProfile = React.lazy(() => import('./pages/VehicleProfile'));
 const ImportClassicCars = React.lazy(() => import('./pages/ImportClassicCars'));
+const VehicleMailbox = React.lazy(() => import('./components/VehicleMailbox/VehicleMailbox'));
 // import VehicleEditForm from './pages/VehicleEditForm';
 // import VehicleDateImages from './pages/VehicleDateImages';
 import Dashboard from './pages/Dashboard';
@@ -403,6 +404,11 @@ function App() {
             {/* Additional Vehicle routes */}
             <Route path="/vehicle/:vehicleId/moderate" element={<VehicleModerationDashboard />} />
             <Route path="/vehicle/:vehicleId/contribute" element={<VehicleContributionForm />} />
+            <Route path="/vehicle/:vehicleId/mailbox" element={
+              <Suspense fallback={<div style={{ padding: '20px' }}>Loading mailbox...</div>}>
+                <VehicleMailbox />
+              </Suspense>
+            } />
             <Route path="/vehicle-tasks/:vehicleId" element={<VehicleTasks />} />
             <Route path="/vehicles/:id" element={
               <Suspense fallback={<div style={{ padding: '20px' }}>Loading vehicle...</div>}>

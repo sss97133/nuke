@@ -20,8 +20,8 @@ The anon key works for invoking Edge Functions:
 ```bash
 # Update .env.local with working anon key
 echo "VITE_SUPABASE_URL=https://qkgaybvrernstplzjaam.supabase.co" > nuke_frontend/.env.local
-echo "VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk" >> nuke_frontend/.env.local
-echo "SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk" >> nuke_frontend/.env.local
+echo "VITE_SUPABASE_ANON_KEY=<your-anon-key>" >> nuke_frontend/.env.local
+echo "SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>" >> nuke_frontend/.env.local
 ```
 
 ### Option 2: Process via Edge Functions Directly (Works Now)

@@ -18,7 +18,10 @@ async function fixImagesDirectly() {
   const userId = '0b9f107a-d124-49de-9ded-94698f63c1c4'; // skylar williams
   
   // Create anon client
-  const supabase = createClient(SUPABASE_URL, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk');
+  const supabase = createClient(
+    SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+  );
   
   try {
     console.log('📁 Getting storage files...');

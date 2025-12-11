@@ -29,9 +29,9 @@ serve(async (req) => {
     
     if (!document_id) throw new Error('Missing document_id')
 
-    // Get document
+    // Get document from reference_documents table
     const { data: doc, error: docError } = await supabase
-      .from('library_documents')
+      .from('reference_documents')
       .select('*')
       .eq('id', document_id)
       .single()
@@ -56,9 +56,9 @@ serve(async (req) => {
     let result
     if (mode === 'structure') {
       result = await extractStructure(pdfUrl, llmConfig, doc)
-      // Save structure to metadata
+      // Save structure to metadata column
       await supabase
-        .from('library_documents')
+        .from('reference_documents')
         .update({ metadata: result })
         .eq('id', document_id)
     } else if (mode === 'chunk') {
@@ -110,10 +110,18 @@ serve(async (req) => {
       // Do both
       const structure = await extractStructure(pdfUrl, llmConfig, doc)
       await supabase
-        .from('library_documents')
+        .from('reference_documents')
         .update({ metadata: structure })
         .eq('id', document_id)
-      result = await chunkAndIndex(pdfUrl, llmConfig, doc, supabase)
+      
+      // Reload doc with updated metadata
+      const { data: updatedDoc } = await supabase
+        .from('reference_documents')
+        .select('*')
+        .eq('id', document_id)
+        .single()
+      
+      result = await chunkAndIndex(pdfUrl, llmConfig, updatedDoc || doc, supabase)
       result.structure = structure
     }
 

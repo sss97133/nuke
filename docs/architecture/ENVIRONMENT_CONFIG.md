@@ -9,7 +9,7 @@ Per established protocol, **ALL development must use the remote Supabase instanc
 ### Remote Supabase (PRODUCTION - ALWAYS USE THIS)
 ```
 URL: https://qkgaybvrernstplzjaam.supabase.co
-ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk
+ANON_KEY: <your-supabase-anon-key>
 ```
 
 ### GitHub OAuth Configuration
@@ -28,7 +28,7 @@ The `.env` file in `/nuke_frontend/` should ALWAYS contain:
 ```env
 # PRODUCTION REMOTE SUPABASE - ALWAYS USE THIS
 VITE_SUPABASE_URL=https://qkgaybvrernstplzjaam.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ```
 
 ## Features That Depend on Correct Environment
@@ -53,7 +53,7 @@ After any environment change, verify:
 
 1. **Database Connection**
    ```bash
-   node -e "const {createClient} = require('@supabase/supabase-js'); const s = createClient('https://qkgaybvrernstplzjaam.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk'); s.from('vehicles').select('id').limit(1).then(r => console.log(r.error ? 'FAILED' : 'WORKING'));"
+   node -e "const {createClient} = require('@supabase/supabase-js'); const s = createClient('https://qkgaybvrernstplzjaam.supabase.co', process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY); s.from('vehicles').select('id').limit(1).then(r => console.log(r.error ? 'FAILED' : 'WORKING'));"
    ```
 
 2. **Authentication**

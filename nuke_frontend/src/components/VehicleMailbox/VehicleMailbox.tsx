@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Bell, Mail, Settings, Users, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { Bell, Mail, Settings, Users, AlertTriangle, CheckCircle, XCircle, Plus, Inbox, Send, Archive, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toast } from 'react-hot-toast'
 import MessageList from './MessageList'
 import AccessKeyManager from './AccessKeyManager'
 import DuplicateDetectionModal from './DuplicateDetectionModal'
 import { Link } from 'react-router-dom'
-import CashBalance from '../trading/CashBalance'
-import StampMarket from './StampMarket'
 
 interface VehicleMailbox {
   id: string
@@ -39,9 +37,10 @@ const VehicleMailbox: React.FC = () => {
   const [mailbox, setMailbox] = useState<VehicleMailbox | null>(null)
   const [messages, setMessages] = useState<MailboxMessage[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'messages' | 'access' | 'settings'>('messages')
+  const [activeTab, setActiveTab] = useState<'messages' | 'settings'>('messages')
   const [selectedMessage, setSelectedMessage] = useState<MailboxMessage | null>(null)
   const [showDuplicateModal, setShowDuplicateModal] = useState(false)
+  const [showCompose, setShowCompose] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftBody, setDraftBody] = useState('')
   const [stamps, setStamps] = useState<Array<{ id: string; name?: string; sku?: string; remaining_uses?: number; is_listed?: boolean; list_price_cents?: number }>>([])
@@ -85,6 +84,7 @@ const VehicleMailbox: React.FC = () => {
     const token = data.session?.access_token || localStorage.getItem('auth_token')
     return token ? { 'Authorization': `Bearer ${token}` } : {}
   }
+
 
   const loadStamps = async () => {
     try {
@@ -298,26 +298,85 @@ const VehicleMailbox: React.FC = () => {
   const getMessageIcon = (messageType: string, priority: string) => {
     switch (messageType) {
       case 'duplicate_detected':
-        return <AlertTriangle className={`w-5 h-5 ${priority === 'high' ? 'text-red-500' : 'text-yellow-500'}`} />
+        return <AlertTriangle className={`w-4 h-4 ${priority === 'high' ? 'text-red-500' : 'text-yellow-500'}`} />
       case 'ownership_transfer':
-        return <Users className="w-5 h-5 text-blue-500" />
+        return <Users className="w-4 h-4 text-blue-500" />
       case 'system_alert':
-        return <Bell className="w-5 h-5 text-purple-500" />
+        return <Bell className="w-4 h-4 text-purple-500" />
       default:
-        return <Mail className="w-5 h-5 text-gray-500" />
+        return <Mail className="w-4 h-4 text-gray-500" />
     }
   }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'border-l-red-500 bg-red-50'
+        return 'border-l-red-500'
       case 'high':
-        return 'border-l-orange-500 bg-orange-50'
+        return 'border-l-orange-500'
       case 'medium':
-        return 'border-l-yellow-500 bg-yellow-50'
+        return 'border-l-yellow-500'
       default:
-        return 'border-l-gray-500 bg-gray-50'
+        return 'border-l-gray-300'
+    }
+  }
+
+  const sendMessage = async (mode: 'paid' | 'comment') => {
+    if (!vehicleId) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify(
+          mode === 'paid'
+            ? { stamp_id: selectedStampId, title: draftTitle, content: draftBody, message_type: 'user_message' }
+            : { mode: 'comment', title: draftTitle, content: draftBody, message_type: 'comment' }
+        )
+      })
+      if (res.ok) {
+        toast.success(mode === 'paid' ? 'Sent with stamp (burned)' : 'Posted as comment (free)')
+        setDraftTitle('')
+        setDraftBody('')
+        setShowCompose(false)
+        await loadMessages()
+        if (mode === 'paid') await loadStamps()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSendError(err?.message || 'Send failed')
+      }
+    } catch (error) {
+      console.error(error)
+      setSendError('Send failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const purchaseStamp = async () => {
+    setSending(true)
+    setPurchaseError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/stamps/purchase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ count: 1, cost_cents_per_stamp: 1 })
+      })
+      if (res.ok) {
+        toast.success('Stamp purchased')
+        await loadStamps()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setPurchaseError(err?.message || 'Purchase failed')
+      }
+    } catch (error) {
+      console.error(error)
+      setPurchaseError('Purchase failed')
+    } finally {
+      setSending(false)
     }
   }
 
@@ -329,368 +388,283 @@ const VehicleMailbox: React.FC = () => {
     )
   }
 
-  const vehicleMailboxItems = mailbox ? [{
-    id: mailbox.id,
-    label: mailbox.vin ? `Vehicle ${mailbox.vin}` : 'Vehicle mailbox',
-    unread: mailbox.message_count
-  }] : []
+  const unreadCount = messages.filter(m => !m.read_by?.includes('current_user')).length
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_320px] gap-4">
-        {/* Far-left navigation */}
-        <div className="space-y-3 bg-white shadow rounded-lg p-3 text-[10px]">
-          <div className="border-b pb-2 font-semibold text-gray-900">File Navigation</div>
-          <div className="space-y-2 text-gray-700">
-            <div className="font-semibold text-gray-900">My Mailbox</div>
-            <div className="text-gray-600">Personal mailbox coming soon.</div>
-          </div>
-          <div className="space-y-2 text-gray-700">
-            <div className="font-semibold text-gray-900">Organization Mailboxes</div>
-            <div className="text-gray-600">No organization mailboxes available yet.</div>
-          </div>
-          <div className="space-y-2 text-gray-700">
-            <div className="font-semibold text-gray-900">Vehicle Mailboxes</div>
-            <div className="divide-y divide-gray-200">
-              {vehicleMailboxItems.length === 0 ? (
-                <div className="py-2 text-gray-600">No vehicle mailbox found.</div>
-              ) : vehicleMailboxItems.map((item) => (
-                <Link
-                  key={item.id}
-                  to={`/vehicle/${vehicleId}/mailbox`}
-                  className="flex items-center justify-between py-2 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="text-left">
-                    <div className="text-gray-900 font-medium">{item.label}</div>
-                    <div className="text-gray-500 text-[9px]">Current vehicle</div>
-                  </div>
-                  {item.unread > 0 && (
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-[9px] font-semibold">
-                      {item.unread} unread
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </div>
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Gmail-style layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left sidebar - Gmail style */}
+        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+          {/* Compose button */}
+          <button
+            onClick={() => setShowCompose(true)}
+            className="m-4 px-4 py-3 bg-blue-600 text-white rounded-lg shadow-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+          >
+            <Plus className="w-5 h-5" />
+            Compose
+          </button>
 
-          <div className="border-t pt-2">
-            <div className="text-gray-900 font-semibold mb-1">Wallet</div>
-            <div className="text-[9px] text-gray-600 mb-1">Cash balance (stamps purchases)</div>
-            <div className="text-[9px]">
-              <CashBalance compact showActions={false} />
-            </div>
-          </div>
-        </div>
-
-        {/* Middle: message workspace */}
-        <div className="space-y-3">
-          <div className="bg-white shadow rounded-lg text-[10px]">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <div>
-                <div className="text-[12px] font-bold text-gray-900">Vehicle Mailbox</div>
-                <div className="text-gray-600">VIN: {mailbox.vin}</div>
-                <div className="text-gray-600">Access Level: {mailbox.user_access_level}</div>
-              </div>
-              {mailbox.message_count > 0 && (
-                <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-[9px] font-semibold">
-                  {mailbox.message_count} unread
+          {/* Navigation */}
+          <nav className="flex-1 px-2 space-y-1">
+            <button
+              onClick={() => setActiveTab('messages')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'messages'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <Inbox className="w-5 h-5" />
+              <span>Inbox</span>
+              {unreadCount > 0 && (
+                <span className="ml-auto bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
+                  {unreadCount}
                 </span>
               )}
-            </div>
-            <div className="px-4">
-              <nav className="-mb-px flex space-x-4 overflow-x-auto text-[10px]">
-                <button
-                  onClick={() => setActiveTab('messages')}
-                  className={`py-3 px-2 border-b-2 font-semibold ${
-                    activeTab === 'messages'
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  Messages
-                </button>
-                {mailbox.user_access_level === 'read_write' && (
-                  <button
-                    onClick={() => setActiveTab('access')}
-                    className={`py-3 px-2 border-b-2 font-semibold ${
-                      activeTab === 'access'
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    Access Management
-                  </button>
-                )}
-                <button
-                  onClick={() => setActiveTab('settings')}
-                  className={`py-3 px-2 border-b-2 font-semibold ${
-                    activeTab === 'settings'
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-600 hover:text-gray-800'
-                  }`}
-                >
-                  Settings
-                </button>
-              </nav>
-            </div>
-          </div>
+            </button>
 
-          {/* Compose with stamps + free comment */}
-          <div className="bg-white shadow rounded-lg text-[10px] p-3 space-y-2">
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === 'settings'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <Settings className="w-5 h-5" />
+              <span>Mailbox Settings</span>
+            </button>
+          </nav>
+        </div>
+
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="bg-white border-b border-gray-200 px-6 py-3">
             <div className="flex items-center justify-between">
-              <div className="text-gray-900 font-semibold">Compose</div>
-              <div className="text-gray-600 text-[9px]">Stamps: {stamps.length}</div>
-            </div>
-            <input
-              className="w-full border rounded px-2 py-1 text-[10px]"
-              placeholder="Title"
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-            />
-            <textarea
-              className="w-full border rounded px-2 py-1 text-[10px]"
-              rows={2}
-              placeholder="Your message..."
-              value={draftBody}
-              onChange={(e) => setDraftBody(e.target.value)}
-            />
-            <div className="flex items-center flex-wrap gap-2">
-              {stamps.length === 0 ? (
-                <div className="text-gray-600 text-[9px]">No stamps. Send as comment or acquire stamps.</div>
-              ) : (
-                stamps.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedStampId(s.id)}
-                    className={`px-2 py-1 border rounded text-[9px] ${
-                      selectedStampId === s.id ? 'border-blue-500 text-blue-600' : 'border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    {s.name || s.sku || 'Stamp'} · uses: {s.remaining_uses ?? 1}
-                    {s.is_listed ? ' · listed' : ''}
-                  </button>
-                ))
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">Vehicle Mailbox</h1>
+                <p className="text-xs text-gray-600">VIN: {mailbox.vin}</p>
+              </div>
+              {unreadCount > 0 && (
+                <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-semibold">
+                  {unreadCount} unread
+                </span>
               )}
             </div>
-            {selectedStamp && (
-              <div className="flex items-center gap-2 text-[9px]">
-                {!selectedStamp.is_listed ? (
-                  <button
-                    className="px-2 py-1 border border-gray-300 rounded text-gray-700 hover:border-blue-500"
-                    onClick={() => listStamp(selectedStamp.id)}
-                  >
-                    List for sale
-                  </button>
-                ) : (
-                  <>
-                    <span className="text-gray-600">Listed at ${((selectedStamp.list_price_cents || 0) / 100).toFixed(2)}</span>
-                    <button
-                      className="px-2 py-1 border border-gray-300 rounded text-gray-700 hover:border-blue-500"
-                      onClick={() => unlistStamp(selectedStamp.id)}
-                    >
-                      Unlist
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <button
-                className="px-3 py-1 bg-blue-600 text-white rounded text-[10px] font-semibold disabled:opacity-50"
-                disabled={sending || !selectedStampId}
-                onClick={async () => {
-                  setSending(true)
-                  setSendError(null)
-                  try {
-                    const authHeaders = await getAuthHeaders()
-                    const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/messages`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', ...authHeaders },
-                      body: JSON.stringify({
-                        stamp_id: selectedStampId,
-                        title: draftTitle,
-                        content: draftBody,
-                        message_type: 'user_message'
-                      })
-                    })
-                    if (res.ok) {
-                      toast.success('Sent with stamp (burned)')
-                      setDraftTitle('')
-                      setDraftBody('')
-                      await loadMessages()
-                      await loadStamps()
-                    } else {
-                      const err = await res.json().catch(() => ({}))
-                      setSendError(err?.message || 'Send failed')
-                    }
-                  } catch (error) {
-                    console.error(error)
-                    setSendError('Send failed')
-                  } finally {
-                    setSending(false)
-                  }
-                }}
-              >
-                Send with Stamp
-              </button>
-              <button
-                className="px-2 py-1 text-gray-700 text-[10px] font-semibold"
-                disabled={sending}
-                onClick={async () => {
-                  setSending(true)
-                  setSendError(null)
-                  try {
-                    const authHeaders = await getAuthHeaders()
-                    const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/messages`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', ...authHeaders },
-                      body: JSON.stringify({
-                        mode: 'comment',
-                        title: draftTitle,
-                        content: draftBody,
-                        message_type: 'comment'
-                      })
-                    })
-                    if (res.ok) {
-                      toast.success('Posted as comment (free)')
-                      setDraftTitle('')
-                      setDraftBody('')
-                      await loadMessages()
-                    } else {
-                      const err = await res.json().catch(() => ({}))
-                      setSendError(err?.message || 'Send failed')
-                    }
-                  } catch (error) {
-                    console.error(error)
-                    setSendError('Send failed')
-                  } finally {
-                    setSending(false)
-                  }
-                }}
-              >
-                Post as Comment (free)
-              </button>
-              <button
-                className="px-2 py-1 text-gray-700 text-[10px] font-semibold"
-                disabled={sending}
-                onClick={async () => {
-                  setSending(true)
-                  setPurchaseError(null)
-                  try {
-                    const authHeaders = await getAuthHeaders()
-                    const res = await fetch(`/api/stamps/purchase`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', ...authHeaders },
-                      body: JSON.stringify({ count: 1, cost_cents_per_stamp: 100 })
-                    })
-                    if (res.ok) {
-                      toast.success('Stamp purchased')
-                      await loadStamps()
-                    } else {
-                      const err = await res.json().catch(() => ({}))
-                      setPurchaseError(err?.message || 'Purchase failed')
-                    }
-                  } catch (error) {
-                    console.error(error)
-                    setPurchaseError('Purchase failed')
-                  } finally {
-                    setSending(false)
-                  }
-                }}
-              >
-                Buy Stamp ($1)
-              </button>
-            </div>
-            {sendError && <div className="text-red-600 text-[9px]">{sendError}</div>}
-            {purchaseError && <div className="text-red-600 text-[9px]">{purchaseError}</div>}
           </div>
 
-          <div className="bg-white shadow rounded-lg text-[10px]">
-            {activeTab === 'messages' && (
-              <MessageList
-                messages={messages}
-                loading={loading}
-                onMarkAsRead={markMessageAsRead}
-                onResolve={resolveMessage}
-                onHandleDuplicate={handleDuplicateMessage}
-                onSelect={(msg) => setSelectedMessage(msg)}
-                getMessageIcon={getMessageIcon}
-                getPriorityColor={getPriorityColor}
-              />
-            )}
+          {/* Content */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Message list */}
+            <div className="flex-1 overflow-y-auto bg-white">
+              {activeTab === 'messages' && (
+                <MessageList
+                  messages={messages}
+                  loading={loading}
+                  onMarkAsRead={markMessageAsRead}
+                  onResolve={resolveMessage}
+                  onHandleDuplicate={handleDuplicateMessage}
+                  onSelect={(msg) => setSelectedMessage(msg)}
+                  getMessageIcon={getMessageIcon}
+                  getPriorityColor={getPriorityColor}
+                />
+              )}
 
-            {activeTab === 'access' && mailbox.user_access_level === 'read_write' && (
-              <div className="p-4 text-[10px]">
-                <AccessKeyManager vehicleId={vehicleId!} />
-              </div>
-            )}
+              {activeTab === 'settings' && (
+                <div className="p-6 space-y-6">
+                  {/* Access Management */}
+                  {mailbox.user_access_level === 'read_write' && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900 mb-4">Access Management</h3>
+                      <AccessKeyManager vehicleId={vehicleId!} />
+                    </div>
+                  )}
 
-            {activeTab === 'settings' && (
-              <div className="p-4">
-                <h3 className="text-[12px] font-semibold text-gray-900 mb-2">Notification Settings</h3>
-                <p className="text-gray-600">Notification preferences coming soon.</p>
-              </div>
-            )}
-          </div>
-        </div>
+                  {/* Stamps */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-4">Stamps</h3>
+                    <div className="space-y-3">
+                      <div className="text-sm text-gray-600">
+                        Owned: {stamps.filter(s => !s.is_burned).length}
+                      </div>
+                      <button
+                        onClick={purchaseStamp}
+                        disabled={sending}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm font-medium text-gray-700 transition-colors"
+                      >
+                        Buy Stamp ($0.01)
+                      </button>
+                      {purchaseError && (
+                        <div className="text-sm text-red-600">{purchaseError}</div>
+                      )}
+                    </div>
+                  </div>
 
-        {/* Right: message detail / AI pane */}
-        <div className="bg-white shadow rounded-lg p-4 text-[10px] space-y-3">
-          <div className="border-b pb-2 font-semibold text-gray-900">Message Detail</div>
-          {activeTab !== 'messages' && (
-            <div className="text-gray-600">Switch to Messages to view details.</div>
-          )}
-          {activeTab === 'messages' && !selectedMessage && (
-            <div className="text-gray-600">Select a message to view details.</div>
-          )}
-          {activeTab === 'messages' && selectedMessage && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="font-semibold text-gray-900">{selectedMessage.title}</div>
-                <span className="text-gray-500 text-[9px]">
-                  {new Date(selectedMessage.created_at).toLocaleString()}
-                </span>
-              </div>
-              <div className="text-gray-700 leading-snug">{selectedMessage.content}</div>
-              {selectedMessage.metadata && (
-                <div className="text-gray-500 text-[9px]">
-                  Metadata: {JSON.stringify(selectedMessage.metadata)}
+                  {/* Notification Settings */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Notification Settings</h3>
+                    <p className="text-sm text-gray-600">Notification preferences coming soon.</p>
+                  </div>
                 </div>
               )}
-              <div className="flex items-center justify-between text-gray-600 text-[9px]">
-                <span>Type: {selectedMessage.message_type}</span>
-                <span>Priority: {selectedMessage.priority}</span>
-              </div>
-              {!selectedMessage.resolved_at ? (
-                <div className="flex space-x-2">
-                  <button
-                    className="text-blue-600 hover:text-blue-800 font-semibold"
-                    onClick={() => resolveMessage(selectedMessage.id)}
-                  >
-                    Mark as Resolved
-                  </button>
-                  {selectedMessage.message_type === 'duplicate_detected' && (
-                    <button
-                      className="text-red-600 hover:text-red-800 font-semibold"
-                      onClick={() => handleDuplicateMessage(selectedMessage)}
-                    >
-                      Review Duplicate
-                    </button>
+            </div>
+
+            {/* Right panel - Message detail */}
+            {selectedMessage && activeTab === 'messages' && (
+              <div className="w-96 border-l border-gray-200 bg-white overflow-y-auto">
+                <div className="p-6 space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h2 className="text-lg font-semibold text-gray-900 mb-1">{selectedMessage.title}</h2>
+                      <p className="text-xs text-gray-500">
+                        {new Date(selectedMessage.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    {getMessageIcon(selectedMessage.message_type, selectedMessage.priority)}
+                  </div>
+
+                  <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {selectedMessage.content}
+                  </div>
+
+                  {selectedMessage.metadata && (
+                    <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+                      <pre className="whitespace-pre-wrap">{JSON.stringify(selectedMessage.metadata, null, 2)}</pre>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <span>Type: {selectedMessage.message_type}</span>
+                    <span>•</span>
+                    <span>Priority: {selectedMessage.priority}</span>
+                  </div>
+
+                  {!selectedMessage.resolved_at ? (
+                    <div className="flex gap-2">
+                      <button
+                        className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+                        onClick={() => resolveMessage(selectedMessage.id)}
+                      >
+                        Mark as Resolved
+                      </button>
+                      {selectedMessage.message_type === 'duplicate_detected' && (
+                        <button
+                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+                          onClick={() => handleDuplicateMessage(selectedMessage)}
+                        >
+                          Review Duplicate
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-green-700 font-medium">Resolved</div>
                   )}
                 </div>
-              ) : (
-                <div className="text-green-700 font-semibold">Resolved</div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Marketplace */}
-        <div className="xl:col-span-3">
-          <StampMarket onPurchased={() => loadStamps()} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Compose modal */}
+      {showCompose && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">New Message</h3>
+              <button
+                onClick={() => {
+                  setShowCompose(false)
+                  setDraftTitle('')
+                  setDraftBody('')
+                  setSendError(null)
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  placeholder="Message title"
+                  value={draftTitle}
+                  onChange={(e) => setDraftTitle(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                <textarea
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  rows={6}
+                  placeholder="Your message..."
+                  value={draftBody}
+                  onChange={(e) => setDraftBody(e.target.value)}
+                />
+              </div>
+
+              {/* Stamp selection */}
+              {stamps.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Stamp</label>
+                  <div className="flex flex-wrap gap-2">
+                    {stamps.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => setSelectedStampId(s.id)}
+                        className={`px-3 py-1.5 border rounded text-xs ${
+                          selectedStampId === s.id
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                        }`}
+                      >
+                        {s.name || s.sku || 'Stamp'} ({s.remaining_uses ?? 1} uses)
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {sendError && (
+                <div className="text-sm text-red-600 bg-red-50 p-3 rounded">{sendError}</div>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div className="flex gap-2">
+                  <button
+                    className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    disabled={sending || !selectedStampId}
+                    onClick={() => sendMessage('paid')}
+                  >
+                    Send with Stamp
+                  </button>
+                  <button
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    disabled={sending}
+                    onClick={() => sendMessage('comment')}
+                  >
+                    Post as Comment (free)
+                  </button>
+                </div>
+                {stamps.length === 0 && (
+                  <button
+                    onClick={purchaseStamp}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    Buy Stamp ($0.01)
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Duplicate Detection Modal */}
       {showDuplicateModal && selectedMessage && (

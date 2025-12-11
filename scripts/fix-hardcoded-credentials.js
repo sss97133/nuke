@@ -7,10 +7,11 @@
 const fs = require('fs');
 const path = require('path');
 
-// Sensitive credentials to remove
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODM2OTAyMSwiZXhwIjoyMDUzOTQ1MDIxfQ.NEbqSnSamR5f7Fqon25ierv5yJgdDy_o2nrixOej_Xg';
-const GEMINI_API_KEY = 'AIzaSyCTXqzxp5oRPoW745dHZjGDQ2yFOd4fvDQ';
-const FIRECRAWL_API_KEY = 'fc-12e25be3d7664da4984cd499adff7dc4';
+// Patterns to detect hardcoded credentials (no secrets stored here)
+const SUPABASE_SERVICE_KEY_REGEX = /const\s+SUPABASE_SERVICE_KEY\s*=\s*['"][^'"]+['"];/g;
+const SUPABASE_URL_REGEX = /const\s+SUPABASE_URL\s*=\s*['"]https:\/\/[a-z0-9-]+\.supabase\.co['"];/g;
+const GEMINI_API_KEY_REGEX = /AIza[0-9A-Za-z\-_]{20,}/g;
+const FIRECRAWL_API_KEY_REGEX = /fc-[0-9a-f]{30,}/gi;
 
 function fixFile(filePath) {
   try {
@@ -18,9 +19,18 @@ function fixFile(filePath) {
     let modified = false;
     
     // Check if file contains hardcoded credentials
-    if (!content.includes(SUPABASE_SERVICE_KEY) && 
-        !content.includes(GEMINI_API_KEY) && 
-        !content.includes(FIRECRAWL_API_KEY)) {
+    const hasSupabaseKey = SUPABASE_SERVICE_KEY_REGEX.test(content);
+    const hasGeminiKey = GEMINI_API_KEY_REGEX.test(content);
+    const hasFirecrawlKey = FIRECRAWL_API_KEY_REGEX.test(content);
+    const hasSupabaseUrl = SUPABASE_URL_REGEX.test(content);
+
+    // Reset regex state for subsequent uses
+    SUPABASE_SERVICE_KEY_REGEX.lastIndex = 0;
+    GEMINI_API_KEY_REGEX.lastIndex = 0;
+    FIRECRAWL_API_KEY_REGEX.lastIndex = 0;
+    SUPABASE_URL_REGEX.lastIndex = 0;
+
+    if (!hasSupabaseKey && !hasGeminiKey && !hasFirecrawlKey && !hasSupabaseUrl) {
       return false;
     }
     
@@ -40,43 +50,49 @@ function fixFile(filePath) {
     }
     
     // Replace hardcoded Supabase URL
-    if (content.includes("const SUPABASE_URL = 'https://qkgaybvrernstplzjaam.supabase.co'")) {
+    const foundSupabaseUrl = SUPABASE_URL_REGEX.test(content);
+    SUPABASE_URL_REGEX.lastIndex = 0;
+    if (foundSupabaseUrl) {
       content = content.replace(
-        /const SUPABASE_URL = 'https:\/\/qkgaybvrernstplzjaam\.supabase\.co';/g,
-        "const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';"
+        SUPABASE_URL_REGEX,
+        "const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';"
       );
       modified = true;
       console.log('  ✓ Fixed SUPABASE_URL');
+      SUPABASE_URL_REGEX.lastIndex = 0;
     }
     
     // Replace hardcoded Supabase service key
-    if (content.includes(SUPABASE_SERVICE_KEY)) {
+    const foundSupabaseKey = SUPABASE_SERVICE_KEY_REGEX.test(content);
+    SUPABASE_SERVICE_KEY_REGEX.lastIndex = 0;
+    if (foundSupabaseKey) {
       content = content.replace(
-        new RegExp(`const SUPABASE_SERVICE_KEY = '${SUPABASE_SERVICE_KEY}';`, 'g'),
+        SUPABASE_SERVICE_KEY_REGEX,
         "const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;"
       );
       modified = true;
       console.log('  ✓ Removed hardcoded SUPABASE_SERVICE_KEY');
+      SUPABASE_SERVICE_KEY_REGEX.lastIndex = 0;
     }
     
     // Replace hardcoded Gemini API key
-    if (content.includes(GEMINI_API_KEY)) {
-      content = content.replace(
-        new RegExp(`const GEMINI_API_KEY = '${GEMINI_API_KEY}';`, 'g'),
-        "const GEMINI_API_KEY = process.env.GEMINI_API_KEY;"
-      );
+    const foundGeminiKey = GEMINI_API_KEY_REGEX.test(content);
+    GEMINI_API_KEY_REGEX.lastIndex = 0;
+    if (foundGeminiKey) {
+      content = content.replace(GEMINI_API_KEY_REGEX, "process.env.GEMINI_API_KEY");
       modified = true;
       console.log('  ✓ Removed hardcoded GEMINI_API_KEY');
+      GEMINI_API_KEY_REGEX.lastIndex = 0;
     }
     
     // Replace hardcoded Firecrawl API key
-    if (content.includes(FIRECRAWL_API_KEY)) {
-      content = content.replace(
-        new RegExp(`const FIRECRAWL_API_KEY = '${FIRECRAWL_API_KEY}';`, 'g'),
-        "const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;"
-      );
+    const foundFirecrawlKey = FIRECRAWL_API_KEY_REGEX.test(content);
+    FIRECRAWL_API_KEY_REGEX.lastIndex = 0;
+    if (foundFirecrawlKey) {
+      content = content.replace(FIRECRAWL_API_KEY_REGEX, "process.env.FIRECRAWL_API_KEY");
       modified = true;
       console.log('  ✓ Removed hardcoded FIRECRAWL_API_KEY');
+      FIRECRAWL_API_KEY_REGEX.lastIndex = 0;
     }
     
     // Add validation for required environment variables (after imports, before main logic)

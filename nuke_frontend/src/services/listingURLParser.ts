@@ -557,7 +557,7 @@ class ListingURLParserService {
       // Fetch via edge function (avoids CORS)
       console.log(`Fetching listing from ${source}:`, url);
       
-      const { data, error } = await supabase.functions.invoke('scrape-vehicle', {
+      const { data, error } = await supabase.functions.invoke('simple-scraper', {
         body: { url }
       });
       
@@ -565,11 +565,11 @@ class ListingURLParserService {
         throw new Error(`Failed to fetch listing: ${error?.message || data?.error || 'Unknown error'}`);
       }
       
-      // The scrape-vehicle function returns: { success: true, data: { ...parsedData, html: ... } }
+      // The simple-scraper function returns: { success: true, data: { ...parsedData }, timestamp }
       const scrapedData = data.data || {};
-      
-      // Extract HTML from response (could be in data.html or data.data.html)
-      const html = scrapedData.html || data.html || data.content || '';
+
+      // Extract HTML from response (simple-scraper doesn't return full HTML, just extracted data)
+      const html = scrapedData.raw_html || '';
 
       let parsed: Partial<ParsedListing> = {
         source,
@@ -600,30 +600,39 @@ class ListingURLParserService {
           break;
         
         case 'ksl':
-          // KSL parser already exists in scrape-vehicle function
+          // KSL parser would need to be implemented in simple-scraper function
           parsed.vin = this.extractVIN(html);
           break;
         
         case 'craigslist':
-          // Use parsed data from scrape-vehicle function (already extracted make/model/year)
-          // The scrape-vehicle function returns structured data, so we use that
+          // Use parsed data from simple-scraper function (already extracted make/model/year)
+          // The simple-scraper function returns structured data, so we use that
           if (scrapedData.year) parsed.year = scrapedData.year;
           if (scrapedData.make) parsed.make = scrapedData.make;
           if (scrapedData.model) parsed.model = scrapedData.model;
           if (scrapedData.trim) parsed.trim = scrapedData.trim;
-          if (scrapedData.asking_price) parsed.price = scrapedData.asking_price;
+
+          // Parse price string to number
+          if (scrapedData.price) {
+            const priceMatch = scrapedData.price.toString().match(/[\d,]+/);
+            if (priceMatch) {
+              parsed.price = parseInt(priceMatch[0].replace(/,/g, ''));
+            }
+          }
+
           if (scrapedData.mileage) parsed.mileage = scrapedData.mileage;
           if (scrapedData.location) parsed.location = scrapedData.location;
           if (scrapedData.description) parsed.description = scrapedData.description;
-          if (scrapedData.images) parsed.images = scrapedData.images;
+          if (scrapedData.images && Array.isArray(scrapedData.images)) {
+            parsed.images = scrapedData.images;
+          }
           if (scrapedData.color) parsed.exterior_color = scrapedData.color;
           if (scrapedData.transmission) parsed.transmission = scrapedData.transmission;
           if (scrapedData.drivetrain) parsed.drivetrain = scrapedData.drivetrain;
           if (scrapedData.title_status) parsed.title_status = scrapedData.title_status;
-          // Extract VIN from HTML if not in parsed data
-          if (!parsed.vin) {
-            parsed.vin = this.extractVIN(html) || scrapedData.vin || null;
-          }
+
+          // Simple scraper doesn't extract VIN, would need full HTML analysis for that
+          parsed.vin = null;
           break;
         
         // TODO: Add parsers for other sources

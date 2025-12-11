@@ -101,7 +101,7 @@ export class UniversalDataExtractor {
   ): Promise<ExtractionResult> {
     try {
       // Fetch HTML via edge function
-      const { data, error } = await supabase.functions.invoke('scrape-vehicle', {
+      const { data, error } = await supabase.functions.invoke('simple-scraper', {
         body: { url }
       });
 
@@ -161,7 +161,7 @@ export class UniversalDataExtractor {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('scrape-vehicle', {
+      const { data, error } = await supabase.functions.invoke('simple-scraper', {
         body: { url }
       });
 

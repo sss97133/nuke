@@ -131,7 +131,7 @@ Vercel will auto-deploy to https://n-zero.dev
 
 ```bash
 curl -X POST 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-vehicle' \
-  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' \
+  -H 'Authorization: Bearer <your-supabase-key>' \
   -H 'Content-Type: application/json' \
   -d '{"url": "https://sandiego.craigslist.org/esd/cto/d/el-centro-1972-gmc-suburban/7888155474.html"}'
 ```

@@ -4,8 +4,8 @@ const fs = require('fs');
 const path = require('path');
 
 // Supabase configuration - using the same values from the frontend
-const supabaseUrl = 'https://qkgaybvrernstplzjaam.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU5NDQ0MDksImV4cCI6MjA1MTUyMDQwOX0.nGaEqGUHOFWGgF3dBRBhOGWgJjKAYGpGxJgKqJQSqHs';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

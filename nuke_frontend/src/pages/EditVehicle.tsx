@@ -270,7 +270,7 @@ const EditVehicle: React.FC = () => {
       setIsScraping(true);
       setScrapingError(null);
 
-      const { data: result, error: fnError } = await supabase.functions.invoke('scrape-vehicle', {
+      const { data: result, error: fnError } = await supabase.functions.invoke('simple-scraper', {
         body: { url: importUrl }
       });
 

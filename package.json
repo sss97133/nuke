@@ -4,7 +4,10 @@
     "audit:dry-run": "tsx scripts/run-autonomous-audit.ts --dry-run",
     "audit:verbose": "VERBOSE=true tsx scripts/run-autonomous-audit.ts",
     "process-stuck": "tsx scripts/process-stuck-images.ts stuck",
-    "process-failed": "tsx scripts/process-stuck-images.ts failed"
+    "process-failed": "tsx scripts/process-stuck-images.ts failed",
+    "duplicate-worker": "tsx scripts/duplicate-detection-worker.ts",
+    "detect-duplicates": "tsx scripts/detect-vehicle-duplicates.ts",
+    "backfill-mailboxes": "tsx scripts/backfill-vehicle-mailboxes.ts"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.8.2",

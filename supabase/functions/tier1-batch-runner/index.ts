@@ -21,9 +21,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const fallbackServiceRoleKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODM2OTAyMSwiZXhwIjoyMDUzOTQ1MDIxfQ.NEbqSnSamR5f7Fqon25ierv5yJgdDy_o2nrixOej_Xg";
-    const fallbackAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk";
-
     const envServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
       ?? Deno.env.get("SERVICE_ROLE_KEY");
     const envAnonKey = Deno.env.get("SUPABASE_ANON_KEY")
@@ -31,10 +28,10 @@ serve(async (req) => {
 
     const serviceRoleKey = (envServiceRoleKey && envServiceRoleKey.length > 60)
       ? envServiceRoleKey
-      : fallbackServiceRoleKey;
+      : undefined;
     const anonKey = (envAnonKey && envAnonKey.length > 60)
       ? envAnonKey
-      : fallbackAnonKey;
+      : undefined;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")
       ?? Deno.env.get("PROJECT_URL")
       ?? Deno.env.get("URL");

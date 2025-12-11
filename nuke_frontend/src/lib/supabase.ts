@@ -4,8 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
 // Get environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
 export const SUPABASE_URL = supabaseUrl;
 export const SUPABASE_ANON_KEY = supabaseAnonKey;
@@ -37,12 +37,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(`${message}. Configure these environment variables before running the app.`);
 }
 
-// Suppress 404 errors for missing optional tables
+// Suppress non-critical errors (404s for optional tables, WebSocket connection failures)
 const originalError = console.error;
 console.error = (...args) => {
   const message = args.join(' ');
+  // Suppress image_tags table missing errors
   if (message.includes('image_tags') && (message.includes('404') || message.includes('relation') && message.includes('does not exist'))) {
     console.debug('Image tagging feature not available - table missing');
+    return;
+  }
+  // Suppress WebSocket connection failures (Supabase Realtime will retry automatically)
+  if (message.includes('WebSocket connection') && message.includes('failed')) {
+    // Only log at debug level - these are non-critical and Supabase handles retries
+    console.debug('WebSocket connection attempt (will retry automatically)');
     return;
   }
   originalError.apply(console, args);

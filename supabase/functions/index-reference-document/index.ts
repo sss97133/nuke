@@ -35,7 +35,33 @@ serve(async (req) => {
 
     // Get or create catalog source
     let catalogId = document_id
-    if (!catalogId) {
+    if (document_id) {
+      // If document_id provided, get or create catalog_sources entry linked to reference_documents
+      const { data: existing } = await supabase
+        .from('catalog_sources')
+        .select('id')
+        .eq('pdf_document_id', document_id)
+        .single()
+      
+      if (existing) {
+        catalogId = existing.id
+      } else {
+        // Create catalog source linked to reference_document
+        const { data: newCatalog } = await supabase
+          .from('catalog_sources')
+          .insert({
+            name: pdf_url.split('/').pop()?.replace(/%20/g, ' ') || 'Catalog',
+            provider: pdf_url.includes('lmc') ? 'LMC' : 'Unknown',
+            base_url: pdf_url,
+            pdf_document_id: document_id
+          })
+          .select()
+          .single()
+        
+        catalogId = newCatalog?.id || document_id
+      }
+    } else {
+      // Legacy: create catalog source without document link
       const { data: existing } = await supabase
         .from('catalog_sources')
         .select('id')
@@ -55,7 +81,7 @@ serve(async (req) => {
           .select()
           .single()
         
-        catalogId = newCatalog.id
+        catalogId = newCatalog?.id
       }
     }
 
