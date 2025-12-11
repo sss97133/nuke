@@ -7,6 +7,142 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to clean model name - removes pricing, dealer info, financing text, etc.
+function cleanModelName(model: string): string {
+  if (!model) return '';
+  
+  let cleaned = model.trim();
+  
+  // Remove pricing patterns: "- $X,XXX", "$X,XXX", "(Est. payment OAC†)"
+  cleaned = cleaned.replace(/\s*-\s*\$[\d,]+(?:\.\d{2})?/g, '');
+  cleaned = cleaned.replace(/\s*\(\s*Est\.\s*payment\s*OAC[^)]*\)/gi, '');
+  cleaned = cleaned.replace(/\s*\(\s*\$[\d,]+\s*Est\.\s*payment[^)]*\)/gi, '');
+  
+  // Remove dealer info: "(Dealer Name)", "(Location)", "(Call XXX)"
+  cleaned = cleaned.replace(/\s*\([^)]*call[^)]*\)/gi, '');
+  cleaned = cleaned.replace(/\s*\([^)]*\(?\d{3}\)?\s*[\d-]+\s*\)/g, '');
+  cleaned = cleaned.replace(/\s*\([A-Z][a-z]+\s*[A-Z][a-z]+(?:\s*[A-Z][a-z]+)?\)/g, '');
+  
+  // Remove financing text: "(BUY HERE PAY HERE...)", "(Get Financed Now!)"
+  cleaned = cleaned.replace(/\s*\([^)]*financ[^)]*\)/gi, '');
+  cleaned = cleaned.replace(/\s*\([^)]*credit[^)]*\)/gi, '');
+  cleaned = cleaned.replace(/\s*\([^)]*buy\s+here[^)]*\)/gi, '');
+  
+  // Remove SKU/stock numbers: "SKU:XXX", "Stock #:XXX"
+  cleaned = cleaned.replace(/\s*SKU\s*:\s*\w+/gi, '');
+  cleaned = cleaned.replace(/\s*Stock\s*#?\s*:\s*\w+/gi, '');
+  
+  // Remove BaT platform text
+  cleaned = cleaned.replace(/\s*on\s*BaT\s*Auctions?\s*-?\s*ending[^|]*/gi, '');
+  cleaned = cleaned.replace(/\s*\(Lot\s*#?\s*[\d,]+\)/gi, '');
+  cleaned = cleaned.replace(/\s*\|\s*Bring\s*a\s*Trailer/gi, '');
+  
+  // Remove common descriptors that shouldn't be in model
+  cleaned = cleaned.replace(/\s*\b(classic|vintage|restored|clean|mint|excellent|beautiful|collector['s]?)\b/gi, '');
+  
+  // Remove parenthetical content that looks like dealer info
+  cleaned = cleaned.replace(/\s*\([^)]{20,}\)/g, ''); // Long parentheticals (likely dealer info)
+  
+  // Clean up multiple spaces
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  return cleaned;
+}
+
+// Helper function to validate make against known makes list
+function isValidMake(make: string): boolean {
+  if (!make) return false;
+  
+  const makeLower = make.toLowerCase();
+  
+  // Known valid makes
+  const validMakes = [
+    'chevrolet', 'chevy', 'ford', 'gmc', 'dodge', 'ram', 'toyota', 'honda', 'nissan',
+    'bmw', 'mercedes', 'benz', 'mercedes-benz', 'audi', 'volkswagen', 'vw', 'porsche', 'jaguar',
+    'cadillac', 'buick', 'pontiac', 'oldsmobile', 'lincoln', 'chrysler', 'jeep',
+    'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi', 'suzuki',
+    'hyundai', 'kia', 'volvo', 'tesla', 'genesis', 'alfa', 'romeo', 'alfa romeo', 'fiat', 'mini',
+    'ferrari', 'lamborghini', 'mclaren', 'aston', 'martin', 'aston martin', 'bentley', 'rolls', 'royce', 'rolls-royce',
+    'datsun', 'mercury', 'saturn', 'oldsmobile', 'plymouth', 'eagle', 'isuzu', 'saab'
+  ];
+  
+  // Check if make is in valid list
+  if (validMakes.includes(makeLower)) return true;
+  
+  // Check for two-word makes
+  if (makeLower.includes('alfa romeo') || makeLower.includes('alfa-romeo')) return true;
+  if (makeLower.includes('aston martin') || makeLower.includes('aston-martin')) return true;
+  if (makeLower.includes('rolls royce') || makeLower.includes('rolls-royce')) return true;
+  if (makeLower.includes('mercedes benz') || makeLower.includes('mercedes-benz')) return true;
+  
+  // Invalid makes (descriptors, colors, adjectives)
+  const invalidMakes = [
+    'used', 'restored', 'beautiful', 'collector', 'collectors', 'classic', 'featured',
+    'vintage', 'custom', 'clean', 'mint', 'excellent', 'good', 'fair',
+    'silver', 'black', 'white', 'red', 'blue', 'green', 'yellow', 'gray', 'grey',
+    'fuel-injected', 'powered', 'owned', 'half-scale', 'exotic',
+    '10k-mile', '18k-mile', '47k-mile', '20-years-owned', '5k-mile'
+  ];
+  
+  if (invalidMakes.includes(makeLower)) return false;
+  
+  // If it's a single word and not in valid list, likely invalid
+  if (make.split(/\s+/).length === 1 && !validMakes.includes(makeLower)) {
+    return false;
+  }
+  
+  return true;
+}
+
+// Helper function to extract price from text, avoiding monthly payments
+function extractVehiclePrice(text: string): number | null {
+  if (!text) return null;
+  
+  // First, try to find structured price fields
+  const structuredPatterns = [
+    /Price[:\s]*\$?([\d,]+(?:\.\d{2})?)/i,
+    /Asking[:\s]*\$?([\d,]+(?:\.\d{2})?)/i,
+    /Sale\s+Price[:\s]*\$?([\d,]+(?:\.\d{2})?)/i,
+    /Vehicle\s+Price[:\s]*\$?([\d,]+(?:\.\d{2})?)/i
+  ];
+  
+  for (const pattern of structuredPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const price = parseInt(match[1].replace(/,/g, ''));
+      if (price >= 1000 && price < 10000000) {
+        return price;
+      }
+    }
+  }
+  
+  // Avoid monthly payment patterns
+  if (text.match(/Est\.\s*payment|Monthly\s*payment|OAC[†]?/i)) {
+    // Look for actual vehicle price, not monthly payment
+    const vehiclePriceMatch = text.match(/(?:Price|Asking|Sale)[:\s]*\$?([\d,]+(?:\.\d{2})?)/i);
+    if (vehiclePriceMatch) {
+      const price = parseInt(vehiclePriceMatch[1].replace(/,/g, ''));
+      if (price >= 1000 && price < 10000000) {
+        return price;
+      }
+    }
+    return null; // Don't extract if only monthly payment found
+  }
+  
+  // Extract all prices and prefer the largest (vehicle prices are typically $5,000+)
+  const priceMatches = text.match(/\$([\d,]+(?:\.\d{2})?)/g);
+  if (priceMatches) {
+    const prices = priceMatches.map(m => parseInt(m.replace(/[$,]/g, '')));
+    const validPrices = prices.filter(p => p >= 1000 && p < 10000000);
+    if (validPrices.length > 0) {
+      // Return the largest valid price (likely the vehicle price)
+      return Math.max(...validPrices);
+    }
+  }
+  
+  return null;
+}
+
 interface ProcessRequest {
   batch_size?: number;
   priority_only?: boolean;
@@ -327,18 +463,28 @@ serve(async (req) => {
                 model = model.replace(/\s*ending\s+\w+\s+\d+/i, '');
                 model = model.replace(/\s*lot\s*#?\d+/i, '');
                 model = model.replace(/\s*\|\s*bring\s*a\s*trailer/i, '');
+                // Clean model name
+                model = cleanModelName(model);
                 scrapeData.data.model = model.trim();
               }
               
               console.log(`✅ BaT URL parsed: ${scrapeData.data.year} ${scrapeData.data.make} ${scrapeData.data.model}`);
             } else {
-              // Fallback: assume first word is make
+              // Fallback: assume first word is make (but validate it)
               if (urlParts.length >= 2) {
                 let make = urlParts[0].toLowerCase();
                 if (make === 'chevy') make = 'chevrolet';
-                scrapeData.data.make = make.charAt(0).toUpperCase() + make.slice(1);
-                scrapeData.data.model = urlParts.slice(1).join(' ').trim();
-                console.log(`⚠️ BaT URL parsed (fallback): ${scrapeData.data.year} ${scrapeData.data.make} ${scrapeData.data.model}`);
+                
+                // Only use if valid make
+                if (isValidMake(make)) {
+                  scrapeData.data.make = make.charAt(0).toUpperCase() + make.slice(1);
+                  let model = urlParts.slice(1).join(' ').trim();
+                  model = cleanModelName(model);
+                  scrapeData.data.model = model;
+                  console.log(`⚠️ BaT URL parsed (fallback): ${scrapeData.data.year} ${scrapeData.data.make} ${scrapeData.data.model}`);
+                } else {
+                  console.log(`❌ Invalid make from BaT URL: ${make}`);
+                }
               }
             }
           }
@@ -376,22 +522,10 @@ serve(async (req) => {
             }
           }
           
-          // Extract price - "Current Bid: USD $23,000"
-          const pricePatterns = [
-            /Current\s+Bid[:\s]*USD\s*\$?([\d,]+)/i,
-            /Bid[:\s]*\$?([\d,]+)/i,
-            /Price[:\s]*\$?([\d,]+)/i,
-            /\$([\d,]+)/i
-          ];
-          for (const pattern of pricePatterns) {
-            const match = bodyText.match(pattern);
-            if (match) {
-              const price = parseInt(match[1].replace(/,/g, ''));
-              if (price > 100 && price < 10000000) {
-                scrapeData.data.asking_price = price;
-                break;
-              }
-            }
+          // Extract price - use helper function to avoid monthly payments
+          const extractedPrice = extractVehiclePrice(bodyText);
+          if (extractedPrice) {
+            scrapeData.data.asking_price = extractedPrice;
           }
           
           // Extract color - "finished in Golf Blue", "Golf Blue over black"
@@ -499,8 +633,16 @@ serve(async (req) => {
               const title = titleElement.textContent?.trim() || '';
               scrapeData.data.title = title;
               
-              // Parse from title: "9k-Mile 1992 Chevrolet 454 SS"
-              const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+              // Parse from title: "9k-Mile 1992 Chevrolet 454 SS" or "10k-mile 2009 Porsche 911..."
+              // Remove mileage/ownership descriptors first
+              let cleanTitle = title
+                .replace(/\d+k-?mile/gi, '')
+                .replace(/\d+-years?-owned/gi, '')
+                .replace(/\d+,\d+-mile/gi, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+              
+              const yearMatch = cleanTitle.match(/\b(19|20)\d{2}\b/);
               if (yearMatch) {
                 const year = parseInt(yearMatch[0]);
                 if (year >= 1885 && year <= new Date().getFullYear() + 1) {
@@ -508,21 +650,34 @@ serve(async (req) => {
                 }
                 
                 // Extract make/model after year
-                const afterYear = title.substring(title.indexOf(yearMatch[0]) + 4).trim();
-                const knownMakes = ['chevrolet', 'chevy', 'ford', 'gmc', 'dodge', 'toyota', 'honda', 'nissan', 'bmw', 'mercedes', 'audi', 'volkswagen', 'vw', 'porsche', 'jaguar'];
+                const afterYear = cleanTitle.substring(cleanTitle.indexOf(yearMatch[0]) + 4).trim();
+                const knownMakes = ['chevrolet', 'chevy', 'ford', 'gmc', 'dodge', 'ram', 'toyota', 'honda', 'nissan', 'bmw', 'mercedes', 'benz', 'audi', 'volkswagen', 'vw', 'porsche', 'jaguar', 'cadillac', 'buick', 'pontiac', 'lincoln', 'chrysler', 'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi', 'hyundai', 'kia', 'volvo', 'tesla', 'genesis', 'alfa', 'romeo', 'fiat', 'mini', 'ferrari', 'lamborghini', 'mclaren', 'aston', 'martin', 'bentley', 'rolls', 'royce', 'datsun', 'mercury'];
                 const afterYearLower = afterYear.toLowerCase();
                 
                 for (const makeName of knownMakes) {
-                  if (afterYearLower.includes(makeName)) {
-                    const makeIndex = afterYearLower.indexOf(makeName);
-                    const make = makeName === 'chevy' ? 'Chevrolet' : makeName === 'vw' ? 'Volkswagen' : makeName.charAt(0).toUpperCase() + makeName.slice(1);
-                    scrapeData.data.make = make;
+                  if (afterYearLower.startsWith(makeName + ' ') || afterYearLower.startsWith(makeName + '-')) {
+                    let make = makeName === 'chevy' ? 'Chevrolet' : makeName === 'vw' ? 'Volkswagen' : makeName === 'benz' ? 'Mercedes' : makeName.charAt(0).toUpperCase() + makeName.slice(1);
                     
-                    const afterMake = afterYear.substring(makeIndex + makeName.length).trim();
-                    // Take first 2-3 words as model
-                    const modelParts = afterMake.split(/\s+/).slice(0, 3);
-                    scrapeData.data.model = modelParts.join(' ').trim();
-                    break;
+                    // Handle two-word makes
+                    if (makeName === 'alfa' && afterYearLower.includes('romeo')) {
+                      make = 'Alfa Romeo';
+                    } else if (makeName === 'aston' && afterYearLower.includes('martin')) {
+                      make = 'Aston Martin';
+                    } else if (makeName === 'rolls' && afterYearLower.includes('royce')) {
+                      make = 'Rolls-Royce';
+                    }
+                    
+                    if (isValidMake(make)) {
+                      scrapeData.data.make = make;
+                      
+                      const afterMake = afterYear.substring(makeName.length).trim();
+                      // Take first 2-3 words as model, but clean it
+                      const modelParts = afterMake.split(/\s+/).slice(0, 3);
+                      let model = modelParts.join(' ').trim();
+                      model = cleanModelName(model);
+                      scrapeData.data.model = model;
+                      break;
+                    }
                   }
                 }
               }
@@ -541,12 +696,21 @@ serve(async (req) => {
           if (titleElement) {
             scrapeData.data.title = titleElement.textContent?.trim() || '';
           }
+          // Extract price from Craigslist - use helper to avoid monthly payments
           const priceElement = doc.querySelector('.price');
           if (priceElement) {
             const priceText = priceElement.textContent?.trim();
-            const priceMatch = priceText?.match(/\$?([\d,]+)/);
-            if (priceMatch) {
-              scrapeData.data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''));
+            const extractedPrice = extractVehiclePrice(priceText || '');
+            if (extractedPrice) {
+              scrapeData.data.asking_price = extractedPrice;
+            }
+          }
+          
+          // Also try extracting from title/description if not found
+          if (!scrapeData.data.asking_price) {
+            const titlePrice = extractVehiclePrice(scrapeData.data.title || '');
+            if (titlePrice) {
+              scrapeData.data.asking_price = titlePrice;
             }
           }
           const locationElement = doc.querySelector('.postingtitle .postingtitletext small');
@@ -576,24 +740,29 @@ serve(async (req) => {
                 startIndex = 1;
               }
               
-              // Extract make (skip common descriptors)
-              const invalidMakes = ['Classic', 'Featured', 'Fuel-Injected', 'Powered', 'Owned', 'Half-Scale', 'Gray', 'Exotic', 'Vintage', 'Custom'];
-              if (parts[startIndex] && !invalidMakes.includes(parts[startIndex])) {
+              // Extract make (validate against known makes)
+              if (parts[startIndex]) {
                 let make = parts[startIndex];
                 if (make.toLowerCase() === 'chevy') make = 'Chevrolet';
                 if (make.toLowerCase() === 'vw') make = 'Volkswagen';
-                scrapeData.data.make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase();
-              }
-              
-              // Extract model (rest of title)
-              if (parts.length > startIndex + 1) {
-                const modelParts = parts.slice(startIndex + 1);
-                // Filter out common non-model words
-                const filteredModel = modelParts.filter(p => 
-                  !['for', 'sale', 'wanted', 'needs', 'runs', 'great', 'condition'].includes(p.toLowerCase())
-                );
-                if (filteredModel.length > 0) {
-                  scrapeData.data.model = filteredModel.join(' ');
+                
+                // Only use if valid make
+                if (isValidMake(make)) {
+                  scrapeData.data.make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase();
+                  
+                  // Extract model (rest of title)
+                  if (parts.length > startIndex + 1) {
+                    const modelParts = parts.slice(startIndex + 1);
+                    // Filter out common non-model words
+                    const filteredModel = modelParts.filter(p => 
+                      !['for', 'sale', 'wanted', 'needs', 'runs', 'great', 'condition'].includes(p.toLowerCase())
+                    );
+                    if (filteredModel.length > 0) {
+                      let model = filteredModel.join(' ');
+                      model = cleanModelName(model);
+                      scrapeData.data.model = model;
+                    }
+                  }
                 }
               }
             }
@@ -629,13 +798,29 @@ serve(async (req) => {
         }
 
         // Validate scraped data before creating vehicle
-        const make = (scrapeData.data.make || item.listing_make || '').trim();
-        const model = (scrapeData.data.model || item.listing_model || '').trim();
+        let make = (scrapeData.data.make || item.listing_make || '').trim();
+        let model = (scrapeData.data.model || item.listing_model || '').trim();
         const year = scrapeData.data.year || item.listing_year;
         
+        // Clean model name (remove pricing, dealer info, etc.)
+        model = cleanModelName(model);
+        
+        // Validate make
+        if (make && !isValidMake(make)) {
+          console.warn(`⚠️ Invalid make detected: ${make}, skipping vehicle creation`);
+          await supabase
+            .from('import_queue')
+            .update({
+              status: 'failed',
+              error_message: `Invalid make: ${make}`,
+              processed_at: new Date().toISOString()
+            })
+            .eq('id', item.id);
+          continue;
+        }
+        
         // Data quality checks - reject garbage data
-        const invalidMakes = ['Unknown', 'Classic', 'Featured', 'Fuel-Injected', 'Powered', 'Owned'];
-        if (!make || make === '' || invalidMakes.includes(make)) {
+        if (!make || make === '' || !isValidMake(make)) {
           throw new Error(`Invalid make: "${make}" - cannot create vehicle`);
         }
         
@@ -746,7 +931,7 @@ serve(async (req) => {
           console.log(`🔄 No images from scraping, trying simple-scraper...`);
           try {
             const { data: simpleData, error: simpleError } = await supabase.functions.invoke('simple-scraper', {
-              body: { url: listingUrl }
+              body: { url: item.listing_url }
             });
 
             if (!simpleError && simpleData?.success && simpleData.data?.images && simpleData.data.images.length > 0) {
@@ -779,7 +964,7 @@ serve(async (req) => {
           console.log(`🔄 Auto-backfilling VIN and missing data...`);
           try {
             const { data: extractedData, error: extractError } = await supabase.functions.invoke('extract-vehicle-data-ai', {
-              body: { url: listingUrl }
+              body: { url: item.listing_url }
             });
 
             if (!extractError && extractedData?.success) {

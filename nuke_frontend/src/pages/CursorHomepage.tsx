@@ -238,6 +238,7 @@ const CursorHomepage: React.FC = () => {
     totalValue: 0,
     activeToday: 0
   });
+  const [statsLoading, setStatsLoading] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [filterBarMinimized, setFilterBarMinimized] = useState(false);
   const [scrollY, setScrollY] = useState(0);
@@ -268,9 +269,16 @@ const CursorHomepage: React.FC = () => {
   }, [showFilters]);
 
   useEffect(() => {
+    // Load accurate stats from database
+    loadAccurateStats();
+    // Refresh stats every 30 seconds
+    const statsInterval = setInterval(loadAccurateStats, 30000);
+    
     // Load feed for all users (authenticated and unauthenticated)
     // Public vehicles (is_public=true) are visible to everyone
     loadHypeFeed();
+    
+    return () => clearInterval(statsInterval);
   }, [timePeriod, filters.showPending]);
 
   // Also reload when session changes (user logs in/out)
@@ -318,6 +326,27 @@ const CursorHomepage: React.FC = () => {
         // Table might not exist or other error - silently ignore
         // Don't log to avoid console noise
       }
+    }
+  };
+
+  // Load accurate stats from database (not filtered feed)
+  const loadAccurateStats = async () => {
+    try {
+      const { data: statsData, error: statsError } = await supabase.rpc('get_vehicle_feed_stats');
+      
+      if (!statsError && statsData) {
+        setStats({
+          totalBuilds: statsData.active_builds || 0,
+          totalValue: statsData.total_value || 0,
+          activeToday: statsData.updated_today || 0
+        });
+      } else {
+        console.warn('Failed to load accurate stats:', statsError);
+      }
+    } catch (err) {
+      console.warn('Error loading accurate stats:', err);
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -566,14 +595,8 @@ const CursorHomepage: React.FC = () => {
       const sorted = enriched.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
       setFeedVehicles(sorted);
 
-      const totalValue = enriched.reduce((sum, v) => sum + (v.display_price || 0), 0);
-      const activeCount = enriched.filter(v => (v.activity_7d || 0) > 0).length;
-
-      setStats({
-        totalBuilds: enriched.filter(v => (v.event_count || 0) > 0).length,
-        totalValue: totalValue,
-        activeToday: activeCount
-      });
+      // Stats are now loaded separately via loadAccurateStats() to get real database counts
+      // Don't override with filtered feed stats
 
     } catch (error: any) {
       console.error('❌ Unexpected error loading hype feed:', error);
