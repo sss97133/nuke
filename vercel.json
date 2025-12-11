@@ -7,6 +7,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "cleanUrls": true,

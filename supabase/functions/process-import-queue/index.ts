@@ -256,8 +256,286 @@ serve(async (req) => {
                  /^(c|k)\d{4}$/i.test(model);
         };
 
+        // Bring a Trailer parsing - URL pattern is most reliable
+        if (item.listing_url.includes('bringatrailer.com')) {
+          console.log('🔍 Parsing BaT URL...');
+          scrapeData.data.source = 'Bring a Trailer';
+          
+          // CRITICAL: Parse from URL first - most reliable format: /listing/YEAR-MAKE-MODEL-ID/
+          // Pattern: /listing/1992-chevrolet-454-ss-14/
+          const urlMatch = item.listing_url.match(/listing\/(\d{4})-([^-]+(?:-[^-]+)*?)-(\d+)\/?$/);
+          if (urlMatch) {
+            const year = parseInt(urlMatch[1]);
+            const makeModelStr = urlMatch[2]; // e.g., "chevrolet-454-ss"
+            
+            if (year >= 1885 && year <= new Date().getFullYear() + 1) {
+              scrapeData.data.year = year;
+            }
+            
+            // Split by hyphens and find make
+            const urlParts = makeModelStr.split('-');
+            
+            // Known makes list (check first 1-2 words)
+            const knownMakes = [
+              'chevrolet', 'chevy', 'ford', 'gmc', 'dodge', 'toyota', 'honda', 'nissan',
+              'bmw', 'mercedes', 'benz', 'audi', 'volkswagen', 'vw', 'porsche', 'jaguar',
+              'cadillac', 'buick', 'pontiac', 'oldsmobile', 'lincoln', 'chrysler',
+              'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi',
+              'hyundai', 'kia', 'volvo', 'tesla', 'genesis', 'alfa', 'romeo', 'fiat', 'mini',
+              'ferrari', 'lamborghini', 'mclaren', 'aston', 'martin', 'bentley', 'rolls', 'royce'
+            ];
+            
+            // Find make (check first 1-2 words)
+            let makeFound = false;
+            let makeIndex = 0;
+            
+            // Try single word first
+            if (urlParts.length > 0 && knownMakes.includes(urlParts[0].toLowerCase())) {
+              makeIndex = 1;
+              makeFound = true;
+            }
+            // Try two words (e.g., "alfa romeo", "aston martin")
+            else if (urlParts.length >= 2) {
+              const twoWord = `${urlParts[0]}-${urlParts[1]}`.toLowerCase();
+              if (knownMakes.includes(twoWord) || 
+                  (urlParts[0].toLowerCase() === 'alfa' && urlParts[1].toLowerCase() === 'romeo') ||
+                  (urlParts[0].toLowerCase() === 'aston' && urlParts[1].toLowerCase() === 'martin') ||
+                  (urlParts[0].toLowerCase() === 'rolls' && urlParts[1].toLowerCase() === 'royce')) {
+                makeIndex = 2;
+                makeFound = true;
+              }
+            }
+            
+            if (makeFound) {
+              // Extract make
+              let makeParts = urlParts.slice(0, makeIndex);
+              let make = makeParts.join(' ').toLowerCase();
+              if (make === 'chevy') make = 'chevrolet';
+              if (make === 'vw') make = 'volkswagen';
+              if (make === 'benz') make = 'mercedes';
+              if (make === 'alfa romeo' || make === 'alfa-romeo') make = 'Alfa Romeo';
+              if (make === 'aston martin' || make === 'aston-martin') make = 'Aston Martin';
+              if (make === 'rolls royce' || make === 'rolls-royce') make = 'Rolls-Royce';
+              scrapeData.data.make = make.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+              
+              // Extract model (rest of URL parts, but filter out common BaT suffixes)
+              const modelParts = urlParts.slice(makeIndex);
+              if (modelParts.length > 0) {
+                let model = modelParts.join(' ').trim();
+                // Filter out common BaT-specific terms that might be in the URL
+                model = model.replace(/\s*on\s*bat\s*auctions?/i, '');
+                model = model.replace(/\s*ending\s+\w+\s+\d+/i, '');
+                model = model.replace(/\s*lot\s*#?\d+/i, '');
+                model = model.replace(/\s*\|\s*bring\s*a\s*trailer/i, '');
+                scrapeData.data.model = model.trim();
+              }
+              
+              console.log(`✅ BaT URL parsed: ${scrapeData.data.year} ${scrapeData.data.make} ${scrapeData.data.model}`);
+            } else {
+              // Fallback: assume first word is make
+              if (urlParts.length >= 2) {
+                let make = urlParts[0].toLowerCase();
+                if (make === 'chevy') make = 'chevrolet';
+                scrapeData.data.make = make.charAt(0).toUpperCase() + make.slice(1);
+                scrapeData.data.model = urlParts.slice(1).join(' ').trim();
+                console.log(`⚠️ BaT URL parsed (fallback): ${scrapeData.data.year} ${scrapeData.data.make} ${scrapeData.data.model}`);
+              }
+            }
+          }
+          
+          // Extract comprehensive data from BaT HTML
+          const bodyText = doc.body?.textContent || '';
+          
+          // Extract description (main content)
+          const descriptionEl = doc.querySelector('.post-content, .listing-description, .auction-description, [class*="description"]');
+          if (descriptionEl) {
+            const descText = descriptionEl.textContent?.trim() || '';
+            if (descText.length > 50) {
+              scrapeData.data.description = descText.substring(0, 2000); // Limit to 2000 chars
+            }
+          }
+          
+          // Extract mileage - handle "89k Miles", "31k Miles Shown", etc.
+          const mileagePatterns = [
+            /(\d+(?:,\d+)?)\s*k\s*Miles?\s*(?:Shown)?/i,
+            /(\d+(?:,\d+)?)\s*Miles?\s*Shown/i,
+            /(\d+(?:,\d+)?)\s*Miles?/i,
+            /Odometer[:\s]*(\d+(?:,\d+)?)\s*k?/i
+          ];
+          for (const pattern of mileagePatterns) {
+            const match = bodyText.match(pattern);
+            if (match) {
+              let miles = parseInt(match[1].replace(/,/g, ''));
+              if (match[0].toLowerCase().includes('k')) {
+                miles = miles * 1000;
+              }
+              if (miles > 0 && miles < 10000000) {
+                scrapeData.data.mileage = miles;
+                break;
+              }
+            }
+          }
+          
+          // Extract price - "Current Bid: USD $23,000"
+          const pricePatterns = [
+            /Current\s+Bid[:\s]*USD\s*\$?([\d,]+)/i,
+            /Bid[:\s]*\$?([\d,]+)/i,
+            /Price[:\s]*\$?([\d,]+)/i,
+            /\$([\d,]+)/i
+          ];
+          for (const pattern of pricePatterns) {
+            const match = bodyText.match(pattern);
+            if (match) {
+              const price = parseInt(match[1].replace(/,/g, ''));
+              if (price > 100 && price < 10000000) {
+                scrapeData.data.asking_price = price;
+                break;
+              }
+            }
+          }
+          
+          // Extract color - "finished in Golf Blue", "Golf Blue over black"
+          const colorPatterns = [
+            /finished\s+in\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+            /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+over\s+[a-z]+/i,
+            /Color[:\s]*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+            /Exterior[:\s]*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i
+          ];
+          for (const pattern of colorPatterns) {
+            const match = bodyText.match(pattern);
+            if (match && match[1].length < 30) {
+              scrapeData.data.color = match[1].trim();
+              scrapeData.data.exterior_color = match[1].trim();
+              break;
+            }
+          }
+          
+          // Extract engine - "1,720cc flat-four", "350 V8", "5.7L V8"
+          const enginePatterns = [
+            /(\d+(?:,\d+)?)\s*cc\s+([a-z-]+)/i,
+            /(\d+\.?\d*)\s*[Ll]iter\s+V?(\d+)/i,
+            /(\d+)\s*V(\d+)/i,
+            /Engine[:\s]*([^.\n]+)/i
+          ];
+          for (const pattern of enginePatterns) {
+            const match = bodyText.match(pattern);
+            if (match) {
+              if (match[2]) {
+                scrapeData.data.engine_type = `${match[1]}${match[2] ? ' ' + match[2] : ''}`.trim();
+              } else if (match[1]) {
+                scrapeData.data.engine_type = match[1].trim();
+              }
+              break;
+            }
+          }
+          
+          // Extract transmission - "five-speed manual", "automatic", "5-Speed"
+          const transPatterns = [
+            /(\d+)[-\s]*Speed\s+(Manual|Automatic)/i,
+            /(Manual|Automatic)\s+transaxle/i,
+            /(Manual|Automatic)\s+transmission/i,
+            /Transmission[:\s]*([^.\n]+)/i
+          ];
+          for (const pattern of transPatterns) {
+            const match = bodyText.match(pattern);
+            if (match) {
+              if (match[2]) {
+                scrapeData.data.transmission = `${match[1]}-Speed ${match[2]}`;
+              } else if (match[1]) {
+                scrapeData.data.transmission = match[1];
+              }
+              break;
+            }
+          }
+          
+          // Extract location - "Located in United States", "California"
+          const locationPatterns = [
+            /Located\s+in\s+([^.\n]+)/i,
+            /Location[:\s]*([^.\n]+)/i
+          ];
+          for (const pattern of locationPatterns) {
+            const match = bodyText.match(pattern);
+            if (match && match[1].length < 100) {
+              scrapeData.data.location = match[1].trim();
+              break;
+            }
+          }
+          
+          // Extract VIN
+          const vinMatch = bodyText.match(/(?:VIN|Chassis)[:\s]*([A-HJ-NPR-Z0-9]{17})/i);
+          if (vinMatch) {
+            scrapeData.data.vin = vinMatch[1];
+          }
+          
+          // Fallback: Try simple-scraper for images and additional data
+          if (scrapeData.data.make && scrapeData.data.model) {
+            try {
+              const { data: simpleData, error: simpleError } = await supabase.functions.invoke('simple-scraper', {
+                body: { url: item.listing_url },
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                }
+              });
+
+              if (!simpleError && simpleData?.success && simpleData.data) {
+                // Use images and price from simple-scraper
+                if (simpleData.data.images && simpleData.data.images.length > 0) {
+                  scrapeData.data.images = simpleData.data.images;
+                }
+                if (simpleData.data.price && !scrapeData.data.asking_price) {
+                  scrapeData.data.asking_price = simpleData.data.price;
+                }
+                if (simpleData.data.title && !scrapeData.data.title) {
+                  scrapeData.data.title = simpleData.data.title;
+                }
+              }
+            } catch (batErr: any) {
+              console.warn('⚠️ Simple-scraper failed for BaT:', batErr.message);
+            }
+          } else {
+            // Last resort: Parse from HTML title
+            const titleElement = doc.querySelector('h1.post-title, h1, .post-title, title');
+            if (titleElement) {
+              const title = titleElement.textContent?.trim() || '';
+              scrapeData.data.title = title;
+              
+              // Parse from title: "9k-Mile 1992 Chevrolet 454 SS"
+              const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+              if (yearMatch) {
+                const year = parseInt(yearMatch[0]);
+                if (year >= 1885 && year <= new Date().getFullYear() + 1) {
+                  scrapeData.data.year = year;
+                }
+                
+                // Extract make/model after year
+                const afterYear = title.substring(title.indexOf(yearMatch[0]) + 4).trim();
+                const knownMakes = ['chevrolet', 'chevy', 'ford', 'gmc', 'dodge', 'toyota', 'honda', 'nissan', 'bmw', 'mercedes', 'audi', 'volkswagen', 'vw', 'porsche', 'jaguar'];
+                const afterYearLower = afterYear.toLowerCase();
+                
+                for (const makeName of knownMakes) {
+                  if (afterYearLower.includes(makeName)) {
+                    const makeIndex = afterYearLower.indexOf(makeName);
+                    const make = makeName === 'chevy' ? 'Chevrolet' : makeName === 'vw' ? 'Volkswagen' : makeName.charAt(0).toUpperCase() + makeName.slice(1);
+                    scrapeData.data.make = make;
+                    
+                    const afterMake = afterYear.substring(makeIndex + makeName.length).trim();
+                    // Take first 2-3 words as model
+                    const modelParts = afterMake.split(/\s+/).slice(0, 3);
+                    scrapeData.data.model = modelParts.join(' ').trim();
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          
+          if (isTruck(scrapeData.data.make || '', scrapeData.data.model || '', scrapeData.data.title || '', scrapeData.data.description || '')) {
+            scrapeData.data.body_type = 'Truck';
+            scrapeData.data.body_style = 'Pickup';
+          }
+        }
         // Craigslist parsing
-        if (item.listing_url.includes('craigslist.org')) {
+        else if (item.listing_url.includes('craigslist.org')) {
           scrapeData.data.source = 'Craigslist';
           const titleElement = doc.querySelector('h1 .postingtitletext');
           if (titleElement) {
@@ -301,7 +579,10 @@ serve(async (req) => {
               // Extract make (skip common descriptors)
               const invalidMakes = ['Classic', 'Featured', 'Fuel-Injected', 'Powered', 'Owned', 'Half-Scale', 'Gray', 'Exotic', 'Vintage', 'Custom'];
               if (parts[startIndex] && !invalidMakes.includes(parts[startIndex])) {
-                scrapeData.data.make = parts[startIndex].charAt(0).toUpperCase() + parts[startIndex].slice(1).toLowerCase();
+                let make = parts[startIndex];
+                if (make.toLowerCase() === 'chevy') make = 'Chevrolet';
+                if (make.toLowerCase() === 'vw') make = 'Volkswagen';
+                scrapeData.data.make = make.charAt(0).toUpperCase() + make.slice(1).toLowerCase();
               }
               
               // Extract model (rest of title)
@@ -434,8 +715,108 @@ serve(async (req) => {
             .update(updateData)
             .eq('id', newVehicle.id);
         }
+
+        // CRITICAL: Backfill images IMMEDIATELY (before validation) - required for activation
+        let imagesBackfilled = false;
+        if (scrapeData.data.images && scrapeData.data.images.length > 0) {
+          console.log(`🖼️  Backfilling ${scrapeData.data.images.length} images BEFORE validation...`);
+          try {
+            const { data: backfillResult, error: backfillError } = await supabase.functions.invoke('backfill-images', {
+              body: {
+                vehicle_id: newVehicle.id,
+                image_urls: scrapeData.data.images,
+                source: 'import_queue',
+                run_analysis: false
+              }
+            });
+
+            if (!backfillError && backfillResult?.uploaded) {
+              console.log(`✅ Images backfilled: ${backfillResult.uploaded} uploaded`);
+              imagesBackfilled = true;
+            } else {
+              console.warn(`⚠️ Image backfill failed: ${backfillError?.message || 'Unknown error'}`);
+            }
+          } catch (err: any) {
+            console.error(`❌ Image backfill failed:`, err.message);
+          }
+        }
         
-        // QUALITY GATE: Validate before making public
+        // If no images from scraping, try simple-scraper for better extraction
+        if (!imagesBackfilled) {
+          console.log(`🔄 No images from scraping, trying simple-scraper...`);
+          try {
+            const { data: simpleData, error: simpleError } = await supabase.functions.invoke('simple-scraper', {
+              body: { url: listingUrl }
+            });
+
+            if (!simpleError && simpleData?.success && simpleData.data?.images && simpleData.data.images.length > 0) {
+              console.log(`🖼️  Found ${simpleData.data.images.length} images via simple-scraper`);
+              const { data: backfillResult, error: backfillError } = await supabase.functions.invoke('backfill-images', {
+                body: {
+                  vehicle_id: newVehicle.id,
+                  image_urls: simpleData.data.images,
+                  source: 'simple_scraper',
+                  run_analysis: false
+                }
+              });
+
+              if (!backfillError && backfillResult?.uploaded) {
+                console.log(`✅ Simple-scraper images backfilled: ${backfillResult.uploaded} uploaded`);
+                imagesBackfilled = true;
+              } else {
+                console.warn(`⚠️ Simple-scraper image backfill failed: ${backfillError?.message || 'Unknown'}`);
+              }
+            } else {
+              console.warn(`⚠️ Simple-scraper found no images`);
+            }
+          } catch (simpleErr: any) {
+            console.warn(`⚠️ Simple-scraper failed:`, simpleErr.message);
+          }
+        }
+
+        // AUTO-BACKFILL: Get VIN and other missing data via AI extraction
+        if (!newVehicle.vin) {
+          console.log(`🔄 Auto-backfilling VIN and missing data...`);
+          try {
+            const { data: extractedData, error: extractError } = await supabase.functions.invoke('extract-vehicle-data-ai', {
+              body: { url: listingUrl }
+            });
+
+            if (!extractError && extractedData?.success) {
+              const aiData = extractedData.data;
+              const backfillUpdates: any = {};
+
+              // CRITICAL: Get VIN (required for public)
+              if (aiData.vin && aiData.vin.length === 17) {
+                backfillUpdates.vin = aiData.vin;
+                console.log(`✅ Backfilled VIN`);
+              }
+
+              // Backfill other missing fields
+              if (!newVehicle.description && aiData.description) {
+                backfillUpdates.description = aiData.description;
+              }
+              if (!newVehicle.asking_price && aiData.asking_price) {
+                backfillUpdates.asking_price = aiData.asking_price;
+              }
+              if (!newVehicle.mileage && aiData.mileage) {
+                backfillUpdates.mileage = aiData.mileage;
+              }
+
+              if (Object.keys(backfillUpdates).length > 0) {
+                await supabase
+                  .from('vehicles')
+                  .update(backfillUpdates)
+                  .eq('id', newVehicle.id);
+                console.log(`✅ Backfilled ${Object.keys(backfillUpdates).length} fields`);
+              }
+            }
+          } catch (backfillErr: any) {
+            console.warn(`⚠️ Auto-backfill failed: ${backfillErr.message}`);
+          }
+        }
+        
+        // QUALITY GATE: Validate before making public (images and VIN should be backfilled now)
         const { data: validationResult, error: validationError } = await supabase.rpc(
           'validate_vehicle_before_public',
           { p_vehicle_id: newVehicle.id }
@@ -463,6 +844,25 @@ serve(async (req) => {
           }
         }
 
+        // Re-validate after backfilling (images and VIN should be there now)
+        const { data: finalValidation, error: finalValidationError } = await supabase.rpc(
+          'validate_vehicle_before_public',
+          { p_vehicle_id: newVehicle.id }
+        );
+
+        if (!finalValidationError && finalValidation && finalValidation.can_go_live) {
+          await supabase
+            .from('vehicles')
+            .update({
+              status: 'active',
+              is_public: true
+            })
+            .eq('id', newVehicle.id);
+          console.log(`🎉 Vehicle ${newVehicle.id} ACTIVATED after backfilling!`);
+        } else {
+          console.log(`⚠️ Vehicle ${newVehicle.id} still pending: ${finalValidation?.recommendation || 'Unknown'}`);
+        }
+
         // Update queue item
         await supabase
           .from('import_queue')
@@ -473,70 +873,90 @@ serve(async (req) => {
           })
           .eq('id', item.id);
 
-        // Create timeline event for listing
-        const listedDate = scrapeData.data.listed_date || new Date().toISOString().split('T')[0];
-        await supabase
-          .from('timeline_events')
-          .insert({
-            vehicle_id: newVehicle.id,
-            event_type: 'auction_listed',
-            event_date: listedDate,
-            title: 'Listed for Sale',
-            description: `Listed on ${new URL(item.listing_url).hostname}`,
-            source: 'automated_import',
-            metadata: {
-              source_url: item.listing_url,
-              price: scrapeData.data.price,
-              location: scrapeData.data.location
-            }
-          });
-
-        // Queue images for download - AWAIT to ensure they're processed
-        if (scrapeData.data.images && scrapeData.data.images.length > 0) {
-          console.log(`📸 Downloading ${scrapeData.data.images.length} images for vehicle ${newVehicle.id}`);
-          
+        // CREATE EXTERNAL LISTING FOR LIVE AUCTIONS (BaT)
+        if (item.listing_url.includes('bringatrailer.com') && scrapeData.data.is_live_auction && scrapeData.data.auction_end_date) {
+          console.log(`🎯 Creating external_listing for live BaT auction...`);
           try {
-            // Call backfill-images and WAIT for it (with timeout)
-            const backfillResponse = await Promise.race([
-              fetch(
-                `${Deno.env.get('SUPABASE_URL')}/functions/v1/backfill-images`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-                  },
-                  body: JSON.stringify({
-                    vehicle_id: newVehicle.id,
-                    image_urls: scrapeData.data.images,
-                    source: 'import_queue',
-                    run_analysis: false, // Skip analysis for speed
-                    listed_date: scrapeData.data.listed_date
-                  })
+            // Extract lot number from URL or metadata
+            const lotMatch = item.listing_url.match(/-(\d+)\/?$/);
+            const lotNumber = lotMatch ? lotMatch[1] : null;
+            
+            // Extract current bid from asking_price
+            const currentBid = scrapeData.data.asking_price || null;
+            
+            // Use the same organization_id as the vehicle
+            const orgId = organizationId || null;
+            
+            const { error: externalListingError } = await supabase
+              .from('external_listings')
+              .upsert({
+                vehicle_id: newVehicle.id,
+                organization_id: orgId || null, // Can be null for imported BaT auctions
+                platform: 'bat',
+                listing_url: item.listing_url,
+                listing_id: lotNumber || item.listing_url.split('/').pop() || null,
+                listing_status: 'active',
+                start_date: new Date().toISOString(), // Approximate start
+                end_date: scrapeData.data.auction_end_date,
+                current_bid: currentBid,
+                bid_count: 0, // Will be updated on sync
+                metadata: {
+                  source: 'import_queue',
+                  queue_id: item.id,
+                  lot_number: lotNumber,
+                  is_live: true
                 }
-              ),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Backfill timeout')), 60000) // 60s timeout
-              )
-            ]) as Response;
+              }, {
+                onConflict: 'vehicle_id,platform,listing_id'
+              });
 
-            if (backfillResponse.ok) {
-              const backfillResult = await backfillResponse.json();
-              console.log(`✅ Images backfilled: ${backfillResult.uploaded || 0} uploaded, ${backfillResult.failed || 0} failed`);
+            if (externalListingError) {
+              console.warn(`⚠️ Failed to create external_listing: ${externalListingError.message}`);
             } else {
-              console.warn(`⚠️ Image backfill returned ${backfillResponse.status}`);
+              console.log(`✅ External listing created for live auction`);
             }
-          } catch (err) {
-            console.error(`❌ Image backfill failed for vehicle ${newVehicle.id}:`, err);
-            // Don't fail the whole process - images can be backfilled later
+          } catch (extErr: any) {
+            console.warn(`⚠️ Error creating external_listing: ${extErr.message}`);
           }
-        } else {
-          console.warn(`⚠️ No images extracted from ${item.listing_url}`);
+        }
+
+        // CRITICAL: Create timeline event for listing (ALWAYS, even if other steps fail)
+        const listedDate = scrapeData.data.listed_date || new Date().toISOString().split('T')[0];
+        try {
+          const source = item.listing_url.includes('craigslist') ? 'craigslist' :
+                         item.listing_url.includes('bringatrailer') ? 'bring_a_trailer' :
+                         item.listing_url.includes('hemmings') ? 'hemmings' :
+                         'automated_import';
+          
+          const { error: timelineError } = await supabase
+            .from('timeline_events')
+            .insert({
+              vehicle_id: newVehicle.id,
+              event_type: 'auction_listed',
+              event_date: listedDate,
+              title: 'Listed for Sale',
+              description: `Listed on ${new URL(item.listing_url).hostname}`,
+              source: source,
+              metadata: {
+                source_url: item.listing_url,
+                price: scrapeData.data.price || scrapeData.data.asking_price,
+                location: scrapeData.data.location,
+                discovery: true
+              }
+            });
+
+          if (timelineError) {
+            console.error(`⚠️ Timeline event creation failed: ${timelineError.message}`);
+          } else {
+            console.log(`✅ Created timeline event for vehicle ${newVehicle.id}`);
+          }
+        } catch (timelineErr: any) {
+          console.error(`⚠️ Timeline event creation error: ${timelineErr.message}`);
         }
 
         results.succeeded++;
         results.vehicles_created.push(newVehicle.id);
-        console.log(`Created vehicle ${newVehicle.id} from ${item.listing_url}`);
+        console.log(`✅ Created vehicle ${newVehicle.id} from ${item.listing_url}`);
 
       } catch (error) {
         console.error(`Failed to process ${item.listing_url}:`, error);
@@ -580,13 +1000,22 @@ function extractImageURLs(html: string): string[] {
   const images: string[] = [];
   const seen = new Set<string>();
   
-  // Pattern 1: Standard img tags
-  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  // Pattern 1: Craigslist specific - images.craigslist.org
+  const craigslistImageRegex = /https?:\/\/images\.craigslist\.org\/[^"'\s>]+/gi;
   let match;
-
+  while ((match = craigslistImageRegex.exec(html)) !== null) {
+    const url = match[0];
+    if (url && !seen.has(url)) {
+      images.push(url);
+      seen.add(url);
+    }
+  }
+  
+  // Pattern 2: Standard img tags
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
   while ((match = imgRegex.exec(html)) !== null) {
     const src = match[1];
-    if (src && !src.startsWith('data:') && !src.includes('icon') && !src.includes('logo')) {
+    if (src && !src.startsWith('data:') && !src.includes('icon') && !src.includes('logo') && !src.includes('placeholder')) {
       let fullUrl = src;
       if (src.startsWith('//')) {
         fullUrl = 'https:' + src;
@@ -598,6 +1027,11 @@ function extractImageURLs(html: string): string[] {
         continue;
       }
       
+      // Filter out junk images
+      if (fullUrl.includes('icon') || fullUrl.includes('logo') || fullUrl.includes('placeholder') || fullUrl.includes('avatar')) {
+        continue;
+      }
+      
       if (!seen.has(fullUrl)) {
         images.push(fullUrl);
         seen.add(fullUrl);
@@ -605,7 +1039,7 @@ function extractImageURLs(html: string): string[] {
     }
   }
 
-  // Pattern 2: Data attributes
+  // Pattern 3: Data attributes
   const dataSrcPatterns = [
     /<[^>]+data-src=["']([^"']+)["'][^>]*>/gi,
     /<[^>]+data-lazy-src=["']([^"']+)["'][^>]*>/gi,
