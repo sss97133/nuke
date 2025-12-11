@@ -275,3 +275,4 @@ WHERE catalog_id IN (
 
 **Status:** Ready for production after migrations are applied and edge functions are deployed.
 
+

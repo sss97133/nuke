@@ -269,11 +269,68 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         console.log('Full scrapedData:', scrapedDataStr.length > 500 ? scrapedDataStr.substring(0, 500) + '...' : scrapedDataStr);
         console.log('═══════════════════════════════════════════════════════');
         
+        // Helper function to extract make/model from title as fallback
+        const extractFromTitle = (title: string) => {
+          if (!title) return { make: null, model: null };
+          
+          // Common makes list (expanded)
+          const makePatterns = [
+            'ford', 'chevrolet', 'chevy', 'toyota', 'honda', 'nissan', 'bmw',
+            'mercedes', 'audi', 'volkswagen', 'vw', 'dodge', 'jeep', 'gmc',
+            'cadillac', 'buick', 'pontiac', 'oldsmobile', 'lincoln', 'chrysler',
+            'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi',
+            'hyundai', 'kia', 'volvo', 'porsche', 'jaguar', 'land rover',
+            'range rover', 'tesla', 'genesis', 'alfa romeo', 'fiat', 'mini'
+          ];
+          
+          const titleLower = title.toLowerCase();
+          let extractedMake = null;
+          
+          // Find make in title
+          for (const makeName of makePatterns) {
+            if (titleLower.includes(makeName)) {
+              extractedMake = makeName === 'chevy' ? 'Chevrolet' : 
+                             makeName === 'vw' ? 'Volkswagen' :
+                             makeName === 'land rover' ? 'Land Rover' :
+                             makeName === 'range rover' ? 'Range Rover' :
+                             makeName === 'alfa romeo' ? 'Alfa Romeo' :
+                             makeName.charAt(0).toUpperCase() + makeName.slice(1);
+              break;
+            }
+          }
+          
+          // Try to extract model - look for pattern: year make model
+          let extractedModel = null;
+          if (extractedMake) {
+            const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+            if (yearMatch) {
+              const afterYearMake = title.substring(title.indexOf(yearMatch[0]) + 4)
+                .replace(new RegExp(extractedMake, 'i'), '')
+                .trim();
+              
+              // Take first word or two as model
+              const modelParts = afterYearMake.split(/\s+/).slice(0, 2);
+              if (modelParts.length > 0 && modelParts[0].length > 1) {
+                extractedModel = modelParts.join(' ').split(/[-$\(]/)[0].trim();
+              }
+            }
+          }
+          
+          return { make: extractedMake, model: extractedModel };
+        };
+        
+        // Extract from title as fallback if scraper didn't find make/model
+        const titleExtraction = scrapedData.title ? extractFromTitle(scrapedData.title) : { make: null, model: null };
+        
+        // Use scraped data, fallback to title extraction, fallback to "Unknown" for make (required field)
+        const finalMake = scrapedData.make || titleExtraction.make || 'Unknown';
+        const finalModel = scrapedData.model || titleExtraction.model || 'Unknown';
+        
         // Create vehicle immediately
         const vehicleData: any = {
           year: scrapedData.year ? parseInt(String(scrapedData.year)) : null,
-          make: scrapedData.make || null,
-          model: scrapedData.model || null,
+          make: finalMake,
+          model: finalModel,
           vin: scrapedData.vin || null,
           color: scrapedData.color || scrapedData.exterior_color || null,
           mileage: scrapedData.mileage ? parseInt(String(scrapedData.mileage).replace(/,/g, '')) : null,

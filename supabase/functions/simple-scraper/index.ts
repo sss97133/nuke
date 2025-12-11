@@ -68,7 +68,10 @@ serve(async (req) => {
       const makePatterns = [
         'ford', 'chevrolet', 'chevy', 'toyota', 'honda', 'nissan', 'bmw',
         'mercedes', 'audi', 'volkswagen', 'vw', 'dodge', 'jeep', 'gmc',
-        'cadillac', 'buick', 'pontiac', 'oldsmobile', 'lincoln', 'chrysler'
+        'cadillac', 'buick', 'pontiac', 'oldsmobile', 'lincoln', 'chrysler',
+        'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi',
+        'hyundai', 'kia', 'volvo', 'porsche', 'jaguar', 'land rover',
+        'range rover', 'tesla', 'genesis', 'alfa romeo', 'fiat', 'mini'
       ]
 
       const titleLower = title.toLowerCase()
@@ -80,8 +83,9 @@ serve(async (req) => {
         }
       }
 
-      // Common model patterns (after finding make)
+      // Extract model (after finding make)
       if (make) {
+        // First try common model patterns
         const modelPatterns = [
           'nova', 'camaro', 'corvette', 'chevelle', 'impala', 'malibu', 'silverado',
           'f150', 'f-150', 'mustang', 'explorer', 'escape', 'focus',
@@ -96,6 +100,26 @@ serve(async (req) => {
               word.charAt(0).toUpperCase() + word.slice(1)
             ).join(' ')
             break
+          }
+        }
+        
+        // If no model found in patterns, try to extract from title structure
+        // Pattern: year make model (e.g., "1990 Lexus es250")
+        if (!model) {
+          const yearMatch = title.match(/\b(19|20)\d{2}\b/)
+          if (yearMatch) {
+            const afterYear = title.substring(title.indexOf(yearMatch[0]) + 4).trim()
+            const makeIndex = afterYear.toLowerCase().indexOf(make.toLowerCase())
+            if (makeIndex !== -1) {
+              const afterMake = afterYear.substring(makeIndex + make.length).trim()
+              // Take first word or two as model, stop at common delimiters
+              const modelMatch = afterMake.match(/^([a-z0-9]+(?:\s+[a-z0-9]+)?)/i)
+              if (modelMatch && modelMatch[1]) {
+                model = modelMatch[1].split(/\s+/).map(word =>
+                  word.charAt(0).toUpperCase() + word.slice(1)
+                ).join(' ')
+              }
+            }
           }
         }
       }
