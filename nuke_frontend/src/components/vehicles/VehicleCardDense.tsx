@@ -600,6 +600,24 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     currentImageUrl = imageUrl || null;
   }
   
+  // CRITICAL DEBUG: Log what we have for first few vehicles
+  if (viewMode === 'grid' && (window as any).__debugRenderCount === undefined) {
+    (window as any).__debugRenderCount = 0;
+  }
+  if (viewMode === 'grid' && (window as any).__debugRenderCount < 3) {
+    console.log(`🔍🔍🔍 RENDER DEBUG Vehicle ${vehicle.id}:`, {
+      all_images: vehicle.all_images,
+      all_imagesLength: vehicle.all_images?.length,
+      primary_image_url: vehicle.primary_image_url,
+      image_url: vehicle.image_url,
+      vehicleImages,
+      vehicleImagesLength: vehicleImages.length,
+      currentImageUrl,
+      imageUrl_from_getImageUrl: imageUrl
+    });
+    (window as any).__debugRenderCount++;
+  }
+  
   // #region agent log
   if (viewMode === 'grid' && (window as any).__debugVehicleCardIndex === undefined) {
     (window as any).__debugVehicleCardIndex = 0;

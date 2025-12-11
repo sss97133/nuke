@@ -1099,31 +1099,46 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   if (titleElement) {
     data.title = titleElement.textContent.trim()
     
+    // Improved make/model extraction - handle models with dashes like "F-150"
+    // Strategy: Extract year and make first, then everything else until price is the model
     const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
-    if (yearMatch) data.year = yearMatch[0]
+    if (yearMatch) {
+      data.year = yearMatch[0]
+    }
     
-    // Improved parsing: "1978 GMC High Sierra" or "1985 Chevy K10 4x4"
-    // Match: year + make + model (everything until dash, dollar, or paren)
-    const vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+(.+?)(?:\s*-\s*\$|\s*\$|\(|$)/i)
-    if (vehicleMatch && vehicleMatch[3]) {
-      data.make = vehicleMatch[2]
-      let modelText = vehicleMatch[3].trim()
-      // Remove trailing location in parens if present
-      modelText = modelText.replace(/\s*\([^)]+\)\s*$/, '')
-      // Remove common suffixes that aren't part of model
-      modelText = modelText.replace(/\s+(4x4|4wd|2wd|diesel|gas|automatic|manual)\s*$/i, '').trim()
-      if (modelText) {
-        data.model = modelText
+    // Extract make (common makes)
+    const makePatterns = [
+      /\b(19|20)\d{2}\s+(Ford|Chevrolet|Chevy|GMC|Toyota|Honda|Nissan|Dodge|Jeep|BMW|Mercedes|Audi|Volkswagen|VW|Lexus|Acura|Infiniti|Mazda|Subaru|Mitsubishi|Hyundai|Kia|Volvo|Porsche|Jaguar|Land Rover|Range Rover|Tesla|Genesis|Alfa Romeo|Fiat|Mini|Cadillac|Buick|Pontiac|Oldsmobile|Lincoln|Chrysler)\b/i
+    ]
+    
+    let makeFound = false
+    for (const pattern of makePatterns) {
+      const match = data.title.match(pattern)
+      if (match && match[2]) {
+        data.make = match[2].charAt(0).toUpperCase() + match[2].slice(1).toLowerCase()
+        // Normalize common variations
+        if (data.make.toLowerCase() === 'chevy') data.make = 'Chevrolet'
+        if (data.make.toLowerCase() === 'vw') data.make = 'Volkswagen'
+        makeFound = true
+        break
       }
     }
     
-    // Fallback: if model still empty, try to extract from full title
-    if (!data.model && data.make) {
-      // Remove year and make, what's left is likely the model
+    // Extract model - everything between make and price/location
+    if (makeFound && data.make) {
+      // Remove year and make from title
       const afterMake = data.title.replace(new RegExp(`\\b(19|20)\\d{2}\\s+${data.make}\\s+`, 'i'), '')
-      const modelPart = afterMake.split(/\s*-\s*\$|\s*\$|\(/)[0].trim()
-      if (modelPart && modelPart.length > 0) {
-        data.model = modelPart
+      // Split at price marker ( - $ or $) or location in parens, but keep everything before
+      const modelMatch = afterMake.match(/^(.+?)(?:\s*-\s*\$|\s*\$|\([^)]*\)\s*-\s*\$|\([^)]*\)\s*$|$)/)
+      if (modelMatch && modelMatch[1]) {
+        let modelText = modelMatch[1].trim()
+        // Remove trailing location in parens if still present
+        modelText = modelText.replace(/\s*\([^)]+\)\s*$/, '')
+        // Remove common suffixes that aren't part of model (but keep dashes in model name like "F-150")
+        modelText = modelText.replace(/\s+(4x4|4wd|2wd|diesel|gas|automatic|manual)\s*$/i, '').trim()
+        if (modelText && modelText.length > 0) {
+          data.model = modelText
+        }
       }
     }
     
@@ -1135,6 +1150,100 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   }
 
   const fullText = doc.body?.textContent || ''
+  
+  // Extract posted date from HTML
+  // Craigslist shows "Posted 2025-11-27 15:00" in the HTML
+  const postedDateSelectors = [
+    'time.date',
+    '.postinginfos time',
+    'time[datetime]',
+    '.postinginfo time',
+    'span[class*="date"]',
+    '.postingtitletext time',
+    '.postinginfos',
+    '.date'
+  ]
+  
+  let postedDateFound = false
+  
+  // First try: Look for time elements with datetime attribute
+  for (const selector of postedDateSelectors) {
+    const dateElement = doc.querySelector(selector)
+    if (dateElement) {
+      const datetime = dateElement.getAttribute('datetime')
+      if (datetime) {
+        try {
+          const parsedDate = new Date(datetime)
+          if (!isNaN(parsedDate.getTime())) {
+            data.posted_date = parsedDate.toISOString()
+            postedDateFound = true
+            break
+          }
+        } catch (e) {
+          // Continue to next selector
+        }
+      }
+    }
+  }
+  
+  // Second try: Extract from text content patterns
+  if (!postedDateFound) {
+    // Pattern 1: "Posted 2025-11-27 15:00"
+    const postedTextMatch = fullText.match(/Posted\s+(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i)
+    if (postedTextMatch) {
+      const [, year, month, day, hour, minute] = postedTextMatch
+      const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00`
+      try {
+        const parsedDate = new Date(dateStr)
+        if (!isNaN(parsedDate.getTime())) {
+          data.posted_date = parsedDate.toISOString()
+          postedDateFound = true
+        }
+      } catch (e) {
+        // Continue
+      }
+    }
+    
+    // Pattern 2: "posted: 2025-11-27 15:00" (lowercase)
+    if (!postedDateFound) {
+      const postedLowerMatch = fullText.match(/posted:\s*(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i)
+      if (postedLowerMatch) {
+        const [, year, month, day, hour, minute] = postedLowerMatch
+        const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00`
+        try {
+          const parsedDate = new Date(dateStr)
+          if (!isNaN(parsedDate.getTime())) {
+            data.posted_date = parsedDate.toISOString()
+            postedDateFound = true
+          }
+        } catch (e) {
+          // Continue
+        }
+      }
+    }
+    
+    // Pattern 3: Look for date in postinginfos text
+    if (!postedDateFound) {
+      const postingInfos = doc.querySelector('.postinginfos')
+      if (postingInfos) {
+        const infoText = postingInfos.textContent || ''
+        const dateMatch = infoText.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/)
+        if (dateMatch) {
+          const [, year, month, day, hour, minute] = dateMatch
+          const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00`
+          try {
+            const parsedDate = new Date(dateStr)
+            if (!isNaN(parsedDate.getTime())) {
+              data.posted_date = parsedDate.toISOString()
+              postedDateFound = true
+            }
+          } catch (e) {
+            // Continue
+          }
+        }
+      }
+    }
+  }
   
   // Extract attributes
   const attrGroups = doc.querySelectorAll('.attrgroup')
@@ -1184,15 +1293,78 @@ function scrapeCraigslistInline(doc: any, url: string): any {
     data.description = descElement.textContent.trim().substring(0, 5000)
   }
 
-  // Extract images
+  // Comprehensive image extraction - multiple methods
   const images: string[] = []
+  const seenUrls = new Set<string>()
+  
+  // Method 1: Thumbnail links (a.thumb elements)
   const thumbLinks = doc.querySelectorAll('a.thumb')
   thumbLinks.forEach((link: any) => {
     const href = link.getAttribute('href')
     if (href && href.startsWith('http')) {
-      images.push(href.replace(/\/\d+x\d+\//, '/1200x900/'))
+      // Upgrade to high-res: replace size patterns with 1200x900
+      const highResUrl = href.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!seenUrls.has(highResUrl)) {
+        images.push(highResUrl)
+        seenUrls.add(highResUrl)
+      }
     }
   })
+  
+  // Method 2: img tags with images.craigslist.org URLs
+  const imgTags = doc.querySelectorAll('img[src*="images.craigslist.org"]')
+  imgTags.forEach((img: any) => {
+    const src = img.getAttribute('src')
+    if (src && src.includes('images.craigslist.org')) {
+      const highResUrl = src.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!seenUrls.has(highResUrl)) {
+        images.push(highResUrl)
+        seenUrls.add(highResUrl)
+      }
+    }
+  })
+  
+  // Method 3: data-src attributes (lazy loading)
+  const lazyImages = doc.querySelectorAll('img[data-src*="images.craigslist.org"]')
+  lazyImages.forEach((img: any) => {
+    const dataSrc = img.getAttribute('data-src')
+    if (dataSrc && dataSrc.includes('images.craigslist.org')) {
+      const highResUrl = dataSrc.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!seenUrls.has(highResUrl)) {
+        images.push(highResUrl)
+        seenUrls.add(highResUrl)
+      }
+    }
+  })
+  
+  // Method 4: Extract from HTML regex (fallback for any missed images)
+  const htmlText = doc.body?.innerHTML || ''
+  const imageUrlRegex = /https?:\/\/images\.craigslist\.org\/[^"'\s>]+/gi
+  let regexMatch
+  while ((regexMatch = imageUrlRegex.exec(htmlText)) !== null) {
+    const url = regexMatch[0]
+    if (url && url.includes('images.craigslist.org')) {
+      const highResUrl = url.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!seenUrls.has(highResUrl) && !highResUrl.includes('icon') && !highResUrl.includes('logo')) {
+        images.push(highResUrl)
+        seenUrls.add(highResUrl)
+      }
+    }
+  }
+  
+  // Method 5: Gallery/slideshow images (data attributes)
+  const galleryImages = doc.querySelectorAll('[data-imgid], [data-index]')
+  galleryImages.forEach((elem: any) => {
+    const imgSrc = elem.getAttribute('data-src') || elem.getAttribute('data-img') || elem.querySelector('img')?.getAttribute('src')
+    if (imgSrc && imgSrc.includes('images.craigslist.org')) {
+      const highResUrl = imgSrc.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!seenUrls.has(highResUrl)) {
+        images.push(highResUrl)
+        seenUrls.add(highResUrl)
+      }
+    }
+  })
+  
   if (images.length > 0) {
     data.images = Array.from(new Set(images)).slice(0, 50)
   }
