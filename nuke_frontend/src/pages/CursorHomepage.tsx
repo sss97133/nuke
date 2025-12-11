@@ -388,8 +388,9 @@ const CursorHomepage: React.FC = () => {
         const batch = idsToLoad.slice(i, i + BATCH_SIZE);
         const { data: batchImages, error: imagesError } = await supabase
           .from('vehicle_images')
-          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, created_at')
+          .select('*')
           .in('vehicle_id', batch)
+          .eq('is_document', false)
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -423,30 +424,10 @@ const CursorHomepage: React.FC = () => {
         const images = newImagesByVehicle.get(vehicle.id);
         if (!images || images.length === 0) return vehicle;
         
+        // Use SAME logic as VehicleProfile - just use image_url directly
         const all_images = images
           .map((img: any) => {
-            let url = null;
-            
-            // First try variants (JSONB field)
-            if (img.variants) {
-              if (typeof img.variants === 'object') {
-                url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
-              } else if (typeof img.variants === 'string') {
-                try {
-                  const parsed = JSON.parse(img.variants);
-                  url = parsed.medium || parsed.large || parsed.full || parsed.thumbnail || null;
-                } catch (e) {
-                  // Not valid JSON, skip
-                }
-              }
-            }
-            
-            // Fallback to direct URL fields
-            if (!url || url === '' || url.trim() === '') {
-              url = img.medium_url || img.large_url || img.image_url || img.thumbnail_url || null;
-            }
-            
-            // Final validation
+            const url = img.image_url;
             if (url && typeof url === 'string' && url.trim() !== '') {
               return {
                 id: img.id,
@@ -455,10 +436,9 @@ const CursorHomepage: React.FC = () => {
                 created_at: img.created_at
               };
             }
-            
             return null;
           })
-          .filter((img: any) => img !== null && img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '')
+          .filter((img: any) => img !== null)
           .sort((a: any, b: any) => {
             if (a.is_primary && !b.is_primary) return -1;
             if (!a.is_primary && b.is_primary) return 1;
@@ -466,7 +446,9 @@ const CursorHomepage: React.FC = () => {
           })
           .slice(0, 5);
         
-        const primaryImageUrl = all_images[0]?.url || null;
+        // Use SAME logic as VehicleProfile
+        const primaryImage = images.find((img: any) => img.is_primary === true) || images[0];
+        const primaryImageUrl = primaryImage ? (primaryImage.large_url || primaryImage.image_url) : null;
         
         return {
           ...vehicle,
@@ -622,13 +604,15 @@ const CursorHomepage: React.FC = () => {
       const BATCH_SIZE = 50;
       const allImages: any[] = [];
       
-      // Only fetch images for initial visible batch
+      // Use SAME query as VehicleProfile - select('*') to get all fields
+      // VehicleProfile line 1119-1125
       for (let i = 0; i < initialVehicleIds.length; i += BATCH_SIZE) {
         const batch = initialVehicleIds.slice(i, i + BATCH_SIZE);
         const { data: batchImages, error: imagesError } = await supabase
           .from('vehicle_images')
-          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, created_at')
+          .select('*')
           .in('vehicle_id', batch)
+          .eq('is_document', false) // Filter out documents (same as VehicleProfile line 1122)
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -701,64 +685,25 @@ const CursorHomepage: React.FC = () => {
         // Get images for this vehicle (use local map first, then state as fallback)
         const images = imagesByVehicle.get(v.id) || [];
         
-        // Map images with proper URL extraction - prioritize primary images
-        // Try all possible URL field names including variants
+        // Use the SAME logic as VehicleProfile - simple and reliable
+        // Just use image_url directly from database (like VehicleProfile does)
         const all_images = images
           .map((img: any) => {
-            // Extract URL from variants if available (prefer medium, then large, then full)
-            let url = null;
+            // Use image_url directly (same as VehicleProfile line 1151)
+            const url = img.image_url;
             
-            // First try variants (JSONB field)
-            if (img.variants) {
-              if (typeof img.variants === 'object') {
-                url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
-              } else if (typeof img.variants === 'string') {
-                // If variants is a string, try to parse it
-                try {
-                  const parsed = JSON.parse(img.variants);
-                  url = parsed.medium || parsed.large || parsed.full || parsed.thumbnail || null;
-                } catch (e) {
-                  // Not valid JSON, skip
-                }
-              }
-            }
-            
-            // Fallback to direct URL fields in order of preference
-            if (!url || url === '' || url.trim() === '') {
-              // Try all URL fields - image_url is often the most reliable
-              url = img.image_url || img.medium_url || img.large_url || img.thumbnail_url || null;
-            }
-            
-            // Final validation - ensure URL is a string and not empty
             if (url && typeof url === 'string' && url.trim() !== '') {
-              const cleanUrl = url.trim();
-              // Ensure URL is valid (starts with http or /)
-              if (cleanUrl.startsWith('http') || cleanUrl.startsWith('/') || cleanUrl.startsWith('data:')) {
-                return {
-                  id: img.id,
-                  url: cleanUrl,
-                  is_primary: img.is_primary || false,
-                  created_at: img.created_at
-                };
-              }
-            }
-            
-            // Log if we have an image but couldn't extract a URL
-            if (img.id && !url) {
-              console.warn(`⚠️ Image ${img.id} has no extractable URL:`, {
-                variants: img.variants,
-                image_url: img.image_url,
-                medium_url: img.medium_url,
-                thumbnail_url: img.thumbnail_url
-              });
+              return {
+                id: img.id,
+                url: url.trim(),
+                is_primary: img.is_primary || false,
+                created_at: img.created_at
+              };
             }
             
             return null;
           })
-          .filter((img: any) => {
-            // Only include images with valid, non-empty URLs
-            return img !== null && img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '';
-          })
+          .filter((img: any) => img !== null)
           .sort((a: any, b: any) => {
             // Primary images first
             if (a.is_primary && !b.is_primary) return -1;
@@ -815,8 +760,11 @@ const CursorHomepage: React.FC = () => {
             hypeReason = hypeReason || 'TRENDING';
           }
 
-          // Primary image is already sorted first - ensure we have a valid URL
-          const primaryImageUrl = all_images[0]?.url || null;
+          // Use SAME logic as VehicleProfile - find primary or use first
+          // VehicleProfile line 1131: find((r: any) => r.is_primary === true) || imageRecords[0]
+          const primaryImage = images.find((img: any) => img.is_primary === true) || images[0];
+          // VehicleProfile line 1136: large_url || image_url
+          const primaryImageUrl = primaryImage ? (primaryImage.large_url || primaryImage.image_url) : null;
           
           // Debug logging for first few vehicles to see what's happening
           if (vehiclesToProcess.indexOf(v) < 5) {
