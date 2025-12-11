@@ -47,7 +47,58 @@ serve(async (req) => {
 
     console.log(`Scraping ${source_url} (${source_type})`);
 
-    // Step 1: Scrape with Firecrawl
+    // Step 1: Scrape with Firecrawl STRUCTURED EXTRACTION (AGGRESSIVE)
+    console.log('🔥 Using Firecrawl structured extraction for inventory...');
+    
+    const isAuctionHouse = source_type === 'auction' || source_type === 'auction_house';
+    const extractionSchema = {
+      type: 'object',
+      properties: {
+        dealer_info: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            address: { type: 'string' },
+            city: { type: 'string' },
+            state: { type: 'string' },
+            zip: { type: 'string' },
+            phone: { type: 'string' },
+            email: { type: 'string' },
+            website: { type: 'string' },
+            dealer_license: { type: 'string' },
+            specialties: {
+              type: 'array',
+              items: { type: 'string' }
+            },
+            description: { type: 'string' }
+          }
+        },
+        listings: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              url: { type: 'string' },
+              price: { type: 'number' },
+              year: { type: 'number' },
+              make: { type: 'string' },
+              model: { type: 'string' },
+              trim: { type: 'string' },
+              mileage: { type: 'number' },
+              location: { type: 'string' },
+              thumbnail_url: { type: 'string' },
+              description_snippet: { type: 'string' },
+              vin: { type: 'string' },
+              is_squarebody: { type: 'boolean' }
+            }
+          }
+        },
+        next_page_url: { type: 'string' },
+        total_listings_on_page: { type: 'number' }
+      }
+    };
+
     const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
@@ -56,9 +107,12 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         url: source_url,
-        formats: ['markdown', 'html'],
+        formats: ['markdown', 'html', 'extract'],
+        extract: {
+          schema: extractionSchema
+        },
         onlyMainContent: false,
-        waitFor: 3000
+        waitFor: 4000 // More time for JS-heavy dealer sites
       })
     });
 
@@ -73,13 +127,28 @@ serve(async (req) => {
       throw new Error(`Firecrawl failed: ${JSON.stringify(firecrawlData)}`);
     }
 
-    const { markdown, html, metadata } = firecrawlData.data;
+    const { markdown, html, metadata, extract } = firecrawlData.data;
     console.log(`Scraped ${markdown?.length || 0} chars markdown, ${html?.length || 0} chars html`);
 
     let dealerInfo = null;
     let listings: any[] = [];
 
-    // Step 2: LLM Extraction if enabled
+    // Step 2: Use Firecrawl structured extraction results
+    if (extract) {
+      console.log('✅ Firecrawl structured extraction successful');
+      dealerInfo = extract.dealer_info || null;
+      listings = extract.listings || [];
+      console.log(`Firecrawl extracted: dealer=${!!dealerInfo}, listings=${listings.length}`);
+      
+      // Handle pagination if next_page_url exists
+      if (extract.next_page_url && listings.length > 0) {
+        console.log(`📄 Pagination detected: ${extract.next_page_url}`);
+        // Note: Could recursively scrape next pages here if needed
+      }
+    }
+
+    // Step 3: LLM Extraction fallback if Firecrawl extract failed
+    if (listings.length === 0 && use_llm_extraction && OPENAI_API_KEY) {
     if (use_llm_extraction && OPENAI_API_KEY) {
       console.log('Running LLM extraction...');
 
@@ -190,17 +259,21 @@ Return ONLY valid JSON in this format:
       }
     }
 
-    // Step 3: Fallback regex extraction for listings if LLM failed
+    // Step 4: Last resort - try Firecrawl again with different approach (sitemap or deeper crawl)
     if (listings.length === 0 && html) {
-      console.log('Falling back to regex extraction...');
+      console.log('⚠️ No listings found, attempting Firecrawl with deeper extraction...');
       
-      // Extract listing URLs
+      // Try scraping with actions to interact with page (if needed)
+      // For now, fallback to basic URL extraction
       const listingPatterns = [
         /href="([^"]*\/listing\/[^"]+)"/gi,
         /href="([^"]*\/vehicle\/[^"]+)"/gi,
         /href="([^"]*\/inventory\/[^"]+)"/gi,
         /href="([^"]*\/cars\/[^"]+)"/gi,
-        /href="([^"]*\/trucks\/[^"]+)"/gi
+        /href="([^"]*\/trucks\/[^"]+)"/gi,
+        /href="([^"]*\/inventory\/[^/]+\/[^"]+)"/gi,
+        /data-url="([^"]+)"/gi,
+        /data-href="([^"]+)"/gi
       ];
       
       const foundUrls = new Set<string>();
@@ -212,7 +285,10 @@ Return ONLY valid JSON in this format:
             const baseUrl = new URL(source_url);
             url = `${baseUrl.origin}${url.startsWith('/') ? '' : '/'}${url}`;
           }
-          foundUrls.add(url);
+          // Filter out non-vehicle URLs
+          if (url.match(/\/(vehicle|listing|inventory|cars|trucks|detail|detail\.aspx)/i)) {
+            foundUrls.add(url);
+          }
         }
       }
       
@@ -225,7 +301,7 @@ Return ONLY valid JSON in this format:
         model: null
       }));
       
-      console.log(`Regex extracted ${listings.length} listing URLs`);
+      console.log(`Fallback extracted ${listings.length} listing URLs`);
     }
 
     // Step 4: Create/update source in database
@@ -280,60 +356,96 @@ Return ONLY valid JSON in this format:
       }
     }
 
-    // Step 5: Create organization if dealer info found
+    // Step 5: Create/update business if dealer info found
     let organizationId: string | null = null;
     
     if (dealerInfo && dealerInfo.name) {
-      const slug = dealerInfo.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '');
+      const businessType = (source_type === 'auction' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
       
-      const { data: existingOrg } = await supabase
-        .from('organizations')
-        .select('id')
-        .or(`slug.eq.${slug},website.eq.${dealerInfo.website}`)
-        .single();
+      // Try to find existing business by website (strongest signal)
+      let existingOrg = null;
+      if (dealerInfo.website) {
+        const { data } = await supabase
+          .from('businesses')
+          .select('id, business_name')
+          .eq('website', dealerInfo.website)
+          .maybeSingle();
+        existingOrg = data;
+      }
+      
+      // Fallback: match by name + city + state if no website match
+      if (!existingOrg && dealerInfo.name && dealerInfo.city && dealerInfo.state) {
+        const { data } = await supabase
+          .from('businesses')
+          .select('id, business_name')
+          .ilike('business_name', `%${dealerInfo.name}%`)
+          .ilike('city', `%${dealerInfo.city}%`)
+          .eq('state', dealerInfo.state.toUpperCase())
+          .maybeSingle();
+        existingOrg = data;
+      }
 
       if (existingOrg) {
         organizationId = existingOrg.id;
+        console.log(`✅ Found existing business: ${existingOrg.business_name} (${organizationId})`);
+        
+        // Update inventory counts if we have them
+        const updates: any = {
+          updated_at: new Date().toISOString()
+        };
+        
+        // Only update if we have actual data
+        if (listings.length > 0) {
+          updates.total_vehicles = listings.length;
+        }
+        
+        // Update missing fields
+        if (dealerInfo.website && !existingOrg.website) {
+          updates.website = dealerInfo.website;
+        }
+        if (dealerInfo.dealer_license) {
+          updates.dealer_license = dealerInfo.dealer_license;
+        }
+        
         await supabase
-          .from('organizations')
-          .update({
-            total_inventory: listings.length,
-            squarebody_inventory: listings.filter((l: any) => l.is_squarebody).length,
-            last_inventory_sync: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
+          .from('businesses')
+          .update(updates)
           .eq('id', organizationId);
       } else {
+        // Create new business
         const { data: newOrg, error: orgError } = await supabase
-          .from('organizations')
+          .from('businesses')
           .insert({
-            name: dealerInfo.name,
-            slug,
-            type: source_type === 'auction' ? 'auction_house' : 'dealer',
+            business_name: dealerInfo.name,
+            type: businessType,
+            business_type: businessType === 'auction_house' ? 'other' : 'dealership',
             description: dealerInfo.description,
             address: dealerInfo.address,
             city: dealerInfo.city,
             state: dealerInfo.state,
-            zip: dealerInfo.zip,
+            zip_code: dealerInfo.zip,
             phone: dealerInfo.phone,
             email: dealerInfo.email,
             website: dealerInfo.website,
             dealer_license: dealerInfo.dealer_license,
-            specialties: dealerInfo.specialties,
-            inventory_url: source_url,
-            scrape_source_id: sourceId,
-            total_inventory: listings.length,
-            squarebody_inventory: listings.filter((l: any) => l.is_squarebody).length,
-            last_inventory_sync: new Date().toISOString(),
-            source_url,
-            discovered_via: 'scraper'
+            specializations: dealerInfo.specialties || [],
+            total_vehicles: listings.length || 0,
+            source_url: source_url,
+            discovered_via: 'scraper',
+            metadata: {
+              scrape_source_id: sourceId,
+              inventory_url: source_url,
+              squarebody_count: listings.filter((l: any) => l.is_squarebody).length
+            }
           })
-          .select('id')
+          .select('id, business_name')
           .single();
 
         if (newOrg) {
           organizationId = newOrg.id;
-          console.log(`Created organization: ${dealerInfo.name} (${organizationId})`);
+          console.log(`✅ Created new business: ${newOrg.business_name} (${organizationId})`);
+        } else if (orgError) {
+          console.error('Error creating business:', orgError);
         }
       }
     }

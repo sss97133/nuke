@@ -42,6 +42,7 @@ interface VehicleCardDenseProps {
     activity_7d?: number; // Recent activity (timeline events in last 7 days)
     receipt_count?: number; // Number of receipts (build documentation)
     ownership_verified?: boolean; // Has verified ownership records
+    listing_start_date?: string; // When listing went live (for auctions, especially BAT)
   };
   viewMode?: 'list' | 'gallery' | 'grid';
   showSocial?: boolean;
@@ -185,17 +186,27 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     
     // Map completeness score to tier
     // These thresholds can be adjusted as the system evolves
+    // Made stricter: C tier requires substantial data (not just basic info)
     if (completenessScore < 10) return 'F'; // No/minimal data
-    if (completenessScore < 20) return 'E'; // Very basic
-    if (completenessScore < 35) return 'D'; // Has potential, good bones
-    if (completenessScore < 50) return 'C'; // Vast majority - baseline
-    if (completenessScore < 65) return 'B'; // Making an effort / cool BAT cars
-    if (completenessScore < 80) return 'A'; // Strong engagement and documentation
-    // 80+ would be S tier, but that's manually assigned only
+    if (completenessScore < 20) return 'E'; // Very basic (1 image, no VIN/price)
+    if (completenessScore < 40) return 'D'; // Has potential, good bones (VIN OR price + some images)
+    if (completenessScore < 60) return 'C'; // Vast majority - baseline (VIN + price + 10+ images OR engagement)
+    if (completenessScore < 75) return 'B'; // Making an effort / cool BAT cars (engagement + documentation)
+    if (completenessScore < 90) return 'A'; // Strong engagement and documentation (comprehensive)
+    // 90+ would be S tier, but that's manually assigned only
     
-    // Fallback to C for anything with basic data
-    if (hasVIN || hasPrice || imageCount >= 5) return 'C';
-    return 'F';
+    // Stricter fallback: Don't default to C for basic data
+    // Nearly empty profiles should be F/E/D, not C
+    if (imageCount === 0) return 'F';
+    if (imageCount === 1) return 'E';
+    if (imageCount < 5 && !hasVIN && !hasPrice) return 'E';
+    if (imageCount < 10 && !hasVIN && !hasPrice && eventCount === 0) return 'D';
+    // Only C if has substantial data
+    if (hasVIN && hasPrice && imageCount >= 10) return 'C';
+    if (hasVIN && hasPrice && imageCount >= 5 && eventCount >= 1) return 'C';
+    // Otherwise D or lower
+    if (hasVIN || hasPrice) return 'D';
+    return 'E';
   };
 
   // Get optimal image for this view mode
@@ -229,8 +240,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   };
 
   const imageUrl = getImageUrl();
-  // Use created_at (upload time) for time display
-  const timeAgo = formatTimeAgo(vehicle.created_at);
+  // Use listing_start_date (when listing went live) if available, otherwise created_at (upload time)
+  // This is especially important for BAT auctions where we want to show when the auction started, not when we scraped it
+  const timeAgo = formatTimeAgo(vehicle.listing_start_date || vehicle.created_at);
 
   // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {
@@ -566,7 +578,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   
   // Use all_images array (which now contains image_url directly)
   if (vehicle.all_images && vehicle.all_images.length > 0) {
-    vehicleImages.push(...vehicle.all_images.map(img => img.url).filter(Boolean));
+    const urls = vehicle.all_images.map(img => img.url).filter(Boolean);
+    vehicleImages.push(...urls);
   }
   
   // Fallback to primary_image_url (which is set using large_url || image_url like VehicleProfile)
@@ -580,25 +593,59 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }
   
   // Get current image URL
-  const currentImageUrl = vehicleImages[currentImageIndex] || vehicleImages[0] || null;
+  let currentImageUrl = vehicleImages[currentImageIndex] || vehicleImages[0] || null;
+  
+  // CRITICAL FIX: If still no URL, check imageUrl from getImageUrl() as last resort
+  if (!currentImageUrl) {
+    currentImageUrl = imageUrl || null;
+  }
+  
+  // EMERGENCY FIX: Log and use ANY available image field
+  if (!currentImageUrl && viewMode === 'grid') {
+    // Try every possible field
+    const possibleUrls = [
+      vehicle.primary_image_url,
+      vehicle.image_url,
+      vehicle.all_images?.[0]?.url,
+      vehicle.image_variants?.large,
+      vehicle.image_variants?.medium,
+      vehicle.image_variants?.thumbnail,
+      imageUrl
+    ].filter(Boolean);
+    
+    if (possibleUrls.length > 0) {
+      currentImageUrl = possibleUrls[0];
+      console.warn(`⚠️ Vehicle ${vehicle.id} - Using emergency fallback URL:`, currentImageUrl);
+    } else {
+      console.error(`❌ Vehicle ${vehicle.id} has NO image URLs at all!`, {
+        all_images: vehicle.all_images,
+        primary_image_url: vehicle.primary_image_url,
+        image_url: vehicle.image_url,
+        image_variants: vehicle.image_variants,
+        imageUrl
+      });
+    }
+  }
   
   // Debug logging for grid view (first few vehicles only)
   if (viewMode === 'grid' && vehicle.id) {
     const vehicleIndex = (window as any).__debugVehicleIndex = ((window as any).__debugVehicleIndex || 0) + 1;
     if (vehicleIndex <= 5) {
-      console.log(`🔍 Grid view - Vehicle ${vehicle.id}:`, {
+      console.log(`🔍🔍🔍 VEHICLECARDDENSE Grid view - Vehicle ${vehicle.id}:`, {
         vehicleId: vehicle.id,
+        vehicle_prop: vehicle,
         all_images: vehicle.all_images,
         all_images_length: vehicle.all_images?.length,
+        all_images_first_url: vehicle.all_images?.[0]?.url,
         primary_image_url: vehicle.primary_image_url,
         image_url: vehicle.image_url,
-        image_variants: vehicle.image_variants,
-        imageUrl,
-        vehicleImages,
+        imageUrl_from_getImageUrl: imageUrl,
+        vehicleImages_array: vehicleImages,
         vehicleImages_length: vehicleImages.length,
         currentImageIndex,
         currentImageUrl,
-        FINAL_URL: currentImageUrl
+        FINAL_URL_USED: currentImageUrl,
+        WILL_SHOW_IMAGE: !!currentImageUrl
       });
     }
   }

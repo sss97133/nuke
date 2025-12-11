@@ -75,74 +75,90 @@ const LazyLoadVehicleImages: React.FC<{
 
 // Rotating action verbs hook (inspired by Claude's thinking animation)
 const useRotatingVerb = () => {
+  // Massive randomized list of automotive verbs - 700+ terms covering fabrication, engineering, racing, and physical activities
   const verbs = [
-    // Core Activities
-    'Wrenching', 'Building', 'Restoring', 'Cruising', 'Fabricating', 'Tuning', 'Spinning', 'Racing',
-    'Modding', 'Upgrading', 'Boosting', 'Drifting', 'Revving', 'Detailing', 'Collecting', 'Showing',
-    'Flipping', 'Trading', 'Swapping', 'Hunting', 'Sourcing', 'Inspecting', 'Diagnosing', 'Tweaking',
-    'Dialing', 'Hooning', 'Launching', 'Burnouts', 'Drag', 'Tracking', 'AutoXing', 'Rallying',
-    'Attacking', 'Ripping', 'Shredding', 'Lapping', 'Gridding', 'Pitting', 'Qualifying',
-    
-    // Fabrication & Metalwork
-    'Welding', 'Grinding', 'Cutting', 'Machining', 'Milling', 'Turning', 'Drilling', 'Tapping',
-    'Threading', 'Boring', 'Honing', 'Reaming', 'Countersinking', 'Chamfering', 'Facing', 'Parting',
-    'Grooving', 'Knurling', 'Forming', 'Bending', 'Folding', 'Crimping', 'Flaring', 'Beading',
-    'Swaging', 'Stamping', 'Punching', 'Shearing', 'Sawing', 'Plasma', 'TIG', 'MIG', 'Stick',
-    'Brazing', 'Soldering', 'Forging', 'Casting', 'Pouring', 'Molding', 'Extruding', 'Drawing',
-    'Hammering', 'Planishing', 'Shrinking', 'Stretching', 'Fitting', 'Tacking',
-    
-    // Bodywork & Paint
-    'Painting', 'Polishing', 'Spraying', 'Buffing', 'Claying', 'Correcting', 'Waxing', 'Sealing',
-    'Debadging', 'Shaving', 'Frenching', 'Smoothing', 'Louvering', 'Venting', 'Widening',
-    'Chopping', 'Sectioning', 'Channeling', 'Triangulating', 'Linking', 'Tabbing', 'Bracing',
-    'Caging', 'Gutting', 'Deleting', 'Relocating', 'Blocking', 'Sanding', 'Scuffing', 'Priming',
-    'Basecoating', 'Clearing', 'Masking', 'Taping', 'Stripping', 'Feathering', 'Blending',
-    'Blasting', 'Etching', 'Prepping', 'Filling', 'Skimming', 'Pulling', 'Straightening',
-    'Aligning', 'Gapping',
-    
-    // Finishing & Surface Treatment
-    'Chroming', 'Plating', 'Anodizing', 'Powder', 'Cerakoting', 'Wrapping', 'Dipping',
-    'Coating', 'Electroplating', 'Brushing', 'Finishing', 'Vapor', 'Blasting', 'Shot', 'Peening',
-    'Pickling', 'Passivating', 'Oxidizing', 'Galvanizing',
-    
-    // Suspension & Chassis
-    'Slamming', 'Bagging', 'Coiling', 'Dropping', 'Raising', 'Camber', 'Tucking', 'Stretching',
-    'Stance', 'Squatting', 'Raking', 'Leveling', 'Lifting', 'Lowering', 'Shimming', 'Preloading',
-    'Weighting', 'Balancing', 'Aligning', 'Toeing', 'Castering', 'Adjusting', 'Torquing',
-    'Compressing', 'Extending', 'Rebuilding', 'Revalving', 'Upgrading', 'Replacing',
-    
-    // Engine Work
-    'Rebuilding', 'Boring', 'Stroking', 'Porting', 'Machining', 'Balancing', 'Blueprinting',
-    'Dynoing', 'Mapping', 'Flashing', 'Coding', 'Logging', 'Scanning', 'Tuning', 'Calibrating',
-    'Timing', 'Advancing', 'Retarding', 'Lapping', 'Seating', 'Cutting', 'Reconditioning',
-    'Resurfacing', 'Decking', 'Cleaning', 'Tanking', 'Magnafluxing', 'Testing', 'Benching',
-    'Milling', 'Prepping', 'Installing', 'Sleeving', 'Torquing', 'Sequencing', 'Degreeing',
-    'Fitting', 'Gapping', 'Grinding', 'Polishing', 'Priming',
-    
-    // Electrical & Electronics
-    'Wiring', 'Soldering', 'Crimping', 'Routing', 'Tucking', 'Wrapping', 'Taping', 'Shrinking',
-    'Stripping', 'Splicing', 'Terminating', 'Connecting', 'Testing', 'Troubleshooting', 'Diagnosing',
-    'Scanning', 'Reading', 'Clearing', 'Flashing', 'Programming', 'Mapping', 'Tuning', 'Calibrating',
-    'Installing', 'Mounting', 'Configuring', 'Monitoring',
-    
-    // Transmission & Drivetrain
-    'Rebuilding', 'Clutching', 'Replacing', 'Resurfacing', 'Installing', 'Changing', 'Adjusting',
-    'Rebuilding', 'Setting', 'Balancing', 'Flashing', 'Updating', 'Calibrating',
-    
-    // Brakes & Wheels
-    'Bleeding', 'Flushing', 'Changing', 'Replacing', 'Turning', 'Resurfacing', 'Rebuilding',
-    'Flaring', 'Fitting', 'Testing', 'Diagnosing', 'Balancing', 'Mounting', 'Torquing',
-    'Rotating', 'Programming', 'Repairing', 'Straightening',
-    
-    // Computer & Software (automotive focused)
-    'Coding', 'Programming', 'Scripting', 'Debugging', 'Flashing', 'Mapping', 'Tuning',
-    'Logging', 'Analyzing', 'Processing', 'Monitoring', 'Calibrating', 'Configuring',
-    
-    // Racing & Performance
-    'Dynoing', 'Launching', 'Testing', 'Optimizing', 'Analyzing', 'Data', 'Logging', 'Tuning',
-    
-    // Physical Activities
-    'Lifting', 'Dropping', 'Pushing', 'Pulling', 'Rotating', 'Spinning', 'Rolling', 'Tucking'
+    'Balancing', 'Troubleshooting', 'Cerakoting', 'Installing', 'Checking', 'Fabricating', 'Bending', 'Blocking',
+    'Pressure', 'Relocating', 'Dynoing', 'Fitting', 'Threading', 'Building', 'Vacuum', 'Fusing', 'Toeing', 'Scuffing',
+    'Dollies', 'Burnouts', 'Testing', 'Ring', 'Diagnosing', 'Filling', 'Breaking', 'Brake', 'Proportioning', 'Deleting',
+    'Mounting', 'Logging', 'Running', 'Pinion', 'Dipping', 'Bearings', 'Changing', 'Configuring', 'Claying', 'Priming',
+    'Sequencing', 'Matching', 'Machines', 'Rev', 'Accelerating', 'Pushing', 'Threshold', 'Waxing', 'Parting', 'Caging',
+    'Monitoring', 'Clutching', 'Magnafluxing', 'Seals', 'Braking', 'Grooving', 'Metal', 'And', 'Splicing', 'Castering',
+    'Advancing', 'English', 'Visualizing', 'Setting', 'Camber', 'Compression', 'Feathering', 'Programming', 'Prepping',
+    'Wrenching', 'Slamming', 'Brushing', 'Connecting', 'Coding', 'Reconditioning', 'Bracing', 'Crank', 'Adjusting',
+    'Painting', 'Blasting', 'CV', 'MIG', 'Blending', 'Shrinking', 'Controllers', 'Flaring', 'Milling', 'Heads',
+    'Flexible', 'Heel', 'Fluids', 'Stance', 'Calibrating', 'Blinking', 'U-joints', 'Dropping', 'Bagging', 'Gears',
+    'Preload', 'Glazing', 'Profiling', 'Launching', 'Plasma', 'Overlap', 'Mapping', 'CNC', 'Sanding', 'Polishing',
+    'Pistons', 'Stem', 'Polishers', 'Surface', 'Piston', 'Benching', 'Primer', 'Acid', 'Turning', 'Reading',
+    'Buffers', 'Root', 'Resistance', 'Squatting', 'Bleeding', 'Honing', 'Rebuilding', 'Studs', 'Upgrading', 'Pickling',
+    'Hooning', 'Cutting', 'Punching', 'Joints', 'Restoring', 'Tapping', 'Stretching', 'Backlash', 'Gapping', 'Replacing',
+    'Torquing', 'Working', 'Tucking', 'Resurfacing', 'Designing', 'Taping', 'Lapping', 'Updating', 'Repairing', 'Washing',
+    'Sleeving', 'Coiling', 'Simulating', 'Rolling', 'Bead', 'Leveling', 'Plating', 'Disconnecting', 'PLCs', 'Grinding',
+    'Trading', 'Wiring', 'Human', 'C-notching', 'Fusion', 'Swirling', 'Hydro', 'Scanning', 'Presses', 'Architecting',
+    'Aligning', 'Passivating', 'Systems', 'Satin', 'Applying', 'Shaving', 'Measuring', 'Hot', 'Gutting', 'Forming',
+    'Flow', 'Tuning', 'Modeling', 'Tacking', 'Basecoating', 'Up', 'Interfaces', 'Transmissions', 'Degreeing', 'Wrapping',
+    'Tanking', 'Operating', 'Chroming', 'Straightening', 'Folding', 'Optimizing', 'Attacking', 'Soldering', 'Drifting',
+    'Jeweling', 'Pulling', 'Cylinders', 'SCADA', 'Spinning', 'Cadmium', 'Automation', 'Skimming', 'Sourcing', 'Buffing',
+    'Software', 'Toe', 'Continuity', 'Throat', 'Undercut', 'Stalling', 'Blueprinting', 'Corner', 'Camshaft', 'Tweaking',
+    'Depth', 'Shifting', 'Data', 'TIG', 'Ripping', 'Decking', 'Cornering', 'Rods', 'Finishing', 'Grounding',
+    'Extending', 'Axles', 'Sensors', 'Prototyping', 'Powder', 'Wet', 'Stripping', 'Masking', 'LEDs', 'Versioning',
+    'TPMS', 'Raking', 'Tabbing', 'Weld', 'Spraying', 'Transmission', 'Coating', 'Pilot', 'Face', 'Pass',
+    'Showing', 'Casting', 'Weighting', 'Z-ing', 'Hunting', 'Hoses', 'Retarding', 'Rotors', 'Tires', 'Rendering',
+    'Shearing', 'Smoothing', 'Removing', 'TCMs', 'Beading', 'Flashing', 'Welding', 'Shift', 'Tracking', 'Triangulating',
+    'Leak', 'Hologramming', 'Deck', 'Downshifting', 'Rims', 'Venting', 'Lifting', 'Trail', 'Super', 'Debadging',
+    'Sawing', 'Foot', 'Preloading', 'Etching', 'Clearing', 'Pump', 'Sealing', 'Finding', 'Switching', 'Swaging',
+    'Lathes', 'Programmable', 'Chrome', 'Valves', 'Boosters', 'Raising', 'Stringer', 'Differentials', 'Using', 'Porting',
+    'Penetration', 'Compounding', 'Hiding', 'Countersinking', 'Machining', 'Modding', 'Down', 'Analyzing', 'Chamfering',
+    'Gauges', 'Crimping', 'Porosity', 'Cup', 'Upshifting', 'Denting', 'Timers', 'Slip', 'Cleaning', 'Short',
+    'Galvanizing', 'Boosting', 'Rotating', 'Shimming', 'Cruising', 'Plates', 'Oil', 'Filters', 'Widening', 'Codes',
+    'Lugs', 'Sanders', 'Debugging', 'Refactoring', 'Drag', 'Benchmarking', 'Master', 'Electroplating', 'Bands', 'Compressing',
+    'Nickel', 'Left', 'Processing', 'Converters', 'Zinc', 'Rallying', 'Pressures', 'Linking', 'Acquiring', 'Inspecting',
+    'Vapor', 'Boring', 'Telemetry', 'Iterating', 'Pitting', 'Peening', 'Backing', 'Robots', 'Routing', 'Pouring',
+    'Logic', 'Switches', 'Collecting', 'Shredding', 'Racing', 'Control', 'ABS', 'Walking', 'Chopping', 'Phosphating',
+    'Qualifying', 'Brazing', 'Black', 'Hammering', 'Wheels', 'Flushing', 'Seating', 'Capping', 'Dialing', 'Validating',
+    'Angling', 'Facing', 'Acquisition', 'Knurling', 'Sectioning', 'Controlling', 'Parameters', 'Louvering', 'Throwout',
+    'Clutches', 'Oxidizing', 'Gridding', 'Desoldering', 'Leg', 'Gaskets', 'Channeling', 'Drill', 'Double', 'Supervisory',
+    'Machine', 'Extruding', 'Pads', 'Glass', 'Gold', 'Anodizing', 'Framing', 'Weaving', 'Tinning', 'Flywheels',
+    'Detailing', 'In', 'Passing', 'Revalving', 'Deploying', 'Lowering', 'Steering', 'Forging', 'Patterns', 'Stroking',
+    'Frenching', 'Scripting', 'Voltage', 'Molding', 'Timing', 'AutoXing', 'Lines', 'ECU', 'Planishing', 'Current',
+    'Gouging', 'Dusting', 'Time', 'Grinders', 'Stick', 'Shot', 'Drilling', 'Terminating', 'Stamping', 'Driveshafts',
+    'Compiling', 'Reaming', 'Swapping', 'Counter', 'Drawing', 'HMI', 'Flipping', 'Calipers', 'Revving', 'Relaying',
+    'Correcting', 'Torque', 'Points', 'Carriers', 'Reaming', 'Countersinking', 'Chamfering', 'Facing', 'Parting', 'Grooving',
+    'Knurling', 'Forming', 'Bending', 'Folding', 'Crimping', 'Flaring', 'Beading', 'Swaging', 'Stamping', 'Punching',
+    'Shearing', 'Sawing', 'Plasma', 'TIG', 'MIG', 'Stick', 'Brazing', 'Soldering', 'Forging', 'Casting',
+    'Pouring', 'Molding', 'Extruding', 'Drawing', 'Hammering', 'Planishing', 'Shrinking', 'Stretching', 'Fitting', 'Tacking',
+    'Painting', 'Polishing', 'Spraying', 'Buffing', 'Claying', 'Correcting', 'Waxing', 'Sealing', 'Debadging', 'Shaving',
+    'Frenching', 'Smoothing', 'Louvering', 'Venting', 'Widening', 'Chopping', 'Sectioning', 'Channeling', 'Triangulating',
+    'Linking', 'Tabbing', 'Bracing', 'Caging', 'Gutting', 'Deleting', 'Relocating', 'Blocking', 'Sanding', 'Scuffing',
+    'Priming', 'Basecoating', 'Clearing', 'Masking', 'Taping', 'Stripping', 'Feathering', 'Blending', 'Blasting', 'Etching',
+    'Prepping', 'Filling', 'Skimming', 'Pulling', 'Straightening', 'Aligning', 'Gapping', 'Chroming', 'Plating', 'Anodizing',
+    'Powder', 'Cerakoting', 'Wrapping', 'Dipping', 'Coating', 'Electroplating', 'Brushing', 'Finishing', 'Vapor', 'Blasting',
+    'Shot', 'Peening', 'Pickling', 'Passivating', 'Oxidizing', 'Galvanizing', 'Slamming', 'Bagging', 'Coiling', 'Dropping',
+    'Raising', 'Camber', 'Tucking', 'Stretching', 'Stance', 'Squatting', 'Raking', 'Leveling', 'Lifting', 'Lowering',
+    'Shimming', 'Preloading', 'Weighting', 'Balancing', 'Aligning', 'Toeing', 'Castering', 'Adjusting', 'Torquing', 'Compressing',
+    'Extending', 'Rebuilding', 'Revalving', 'Upgrading', 'Replacing', 'Rebuilding', 'Boring', 'Stroking', 'Porting', 'Machining',
+    'Balancing', 'Blueprinting', 'Dynoing', 'Mapping', 'Flashing', 'Coding', 'Logging', 'Scanning', 'Tuning', 'Calibrating',
+    'Timing', 'Advancing', 'Retarding', 'Lapping', 'Seating', 'Cutting', 'Reconditioning', 'Resurfacing', 'Decking', 'Cleaning',
+    'Tanking', 'Magnafluxing', 'Testing', 'Benching', 'Milling', 'Prepping', 'Installing', 'Sleeving', 'Torquing', 'Sequencing',
+    'Degreeing', 'Fitting', 'Gapping', 'Grinding', 'Polishing', 'Priming', 'Wiring', 'Soldering', 'Crimping', 'Routing',
+    'Tucking', 'Wrapping', 'Taping', 'Shrinking', 'Stripping', 'Splicing', 'Terminating', 'Connecting', 'Testing', 'Troubleshooting',
+    'Diagnosing', 'Scanning', 'Reading', 'Clearing', 'Flashing', 'Programming', 'Mapping', 'Tuning', 'Calibrating', 'Installing',
+    'Mounting', 'Configuring', 'Monitoring', 'Rebuilding', 'Clutching', 'Replacing', 'Resurfacing', 'Installing', 'Changing', 'Adjusting',
+    'Rebuilding', 'Setting', 'Balancing', 'Flashing', 'Updating', 'Calibrating', 'Bleeding', 'Flushing', 'Changing', 'Replacing',
+    'Turning', 'Resurfacing', 'Rebuilding', 'Flaring', 'Fitting', 'Testing', 'Diagnosing', 'Balancing', 'Mounting', 'Torquing',
+    'Rotating', 'Programming', 'Repairing', 'Straightening', 'Coding', 'Programming', 'Scripting', 'Debugging', 'Flashing', 'Mapping',
+    'Tuning', 'Logging', 'Analyzing', 'Processing', 'Monitoring', 'Calibrating', 'Configuring', 'Dynoing', 'Launching', 'Testing',
+    'Optimizing', 'Analyzing', 'Data', 'Logging', 'Tuning', 'Lifting', 'Dropping', 'Pushing', 'Pulling', 'Rotating',
+    'Spinning', 'Rolling', 'Tucking', 'Wrenching', 'Building', 'Restoring', 'Cruising', 'Fabricating', 'Tuning', 'Spinning',
+    'Racing', 'Modding', 'Upgrading', 'Boosting', 'Drifting', 'Revving', 'Detailing', 'Collecting', 'Showing', 'Flipping',
+    'Trading', 'Swapping', 'Hunting', 'Sourcing', 'Inspecting', 'Diagnosing', 'Tweaking', 'Dialing', 'Hooning', 'Launching',
+    'Burnouts', 'Drag', 'Tracking', 'AutoXing', 'Rallying', 'Attacking', 'Ripping', 'Shredding', 'Lapping', 'Gridding',
+    'Pitting', 'Qualifying', 'Cornering', 'Braking', 'Accelerating', 'Shifting', 'Downshifting', 'Upshifting', 'Heel', 'Toeing',
+    'Rev', 'Matching', 'Double', 'Clutching', 'Trail', 'Braking', 'Threshold', 'Braking', 'Left', 'Foot', 'Braking',
+    'Slip', 'Angling', 'Counter', 'Steering', 'CNC', 'Machining', 'Programming', 'Operating', 'Lathes', 'Milling',
+    'Machines', 'Grinders', 'Sanders', 'Polishers', 'Buffers', 'Drill', 'Presses', 'Tapping', 'Machines', 'Threading',
+    'Machines', 'CNC', 'Machines', 'Programming', 'Operating', 'Robots', 'Programming', 'Automation', 'Systems', 'Designing',
+    'PLCs', 'Programmable', 'Logic', 'Controllers', 'Programming', 'SCADA', 'Systems', 'Supervisory', 'Control', 'And',
+    'Data', 'Acquisition', 'Configuring', 'HMI', 'Human', 'Machine', 'Interfaces', 'Designing'
   ];
   const [currentVerb, setCurrentVerb] = useState(verbs[0]);
   
@@ -380,7 +396,8 @@ const CursorHomepage: React.FC = () => {
     });
     
     try {
-      const BATCH_SIZE = 50;
+      // Smaller batch size to prevent URL length 400 errors
+      const BATCH_SIZE = 25;
       const allImages: any[] = [];
       
       // Batch the queries
@@ -545,7 +562,7 @@ const CursorHomepage: React.FC = () => {
             view_count: 0,
             image_count: 0,
             tier: 'minimal',
-            tier_label: 'Tier 1'
+            tier_label: 'F' // Pending vehicles start at F tier
           }));
         }
       }
@@ -593,21 +610,20 @@ const CursorHomepage: React.FC = () => {
       // Use filtered vehicles if time filter was applied
       const vehiclesToProcess = filteredVehicles || allVehicles || [];
 
-      // LAZY LOADING: Only load images for initial visible batch (first 30 vehicles)
-      // Remaining images will be loaded on-demand as vehicles scroll into view
-      const INITIAL_IMAGE_BATCH = 30;
+      // Load images for first 50-100 vehicles initially (smaller batches to avoid URL length issues)
       const vehicleIds = vehiclesToProcess.map((v: any) => v.id);
+      const INITIAL_IMAGE_BATCH = 75; // Load first 75 vehicles' images (50-100 range)
       const initialVehicleIds = vehicleIds.slice(0, INITIAL_IMAGE_BATCH);
       
       // Batch image queries to avoid URL length limits and resource exhaustion
-      // Process in chunks of 50 vehicle IDs at a time
-      const BATCH_SIZE = 50;
+      // Process in chunks of 25 vehicle IDs at a time (smaller to prevent 400 errors)
+      const IMAGE_BATCH_SIZE = 25;
       const allImages: any[] = [];
       
       // Use SAME query as VehicleProfile - select('*') to get all fields
       // VehicleProfile line 1119-1125
-      for (let i = 0; i < initialVehicleIds.length; i += BATCH_SIZE) {
-        const batch = initialVehicleIds.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < initialVehicleIds.length; i += IMAGE_BATCH_SIZE) {
+        const batch = initialVehicleIds.slice(i, i + IMAGE_BATCH_SIZE);
         const { data: batchImages, error: imagesError } = await supabase
           .from('vehicle_images')
           .select('*')
@@ -617,7 +633,7 @@ const CursorHomepage: React.FC = () => {
           .order('created_at', { ascending: false });
 
         if (imagesError) {
-          console.error(`❌ Error loading images for batch ${i / BATCH_SIZE + 1}:`, imagesError);
+          console.error(`❌ Error loading images for batch ${i / IMAGE_BATCH_SIZE + 1}:`, imagesError);
         } else if (batchImages) {
           allImages.push(...batchImages);
         }
@@ -680,8 +696,39 @@ const CursorHomepage: React.FC = () => {
         eventsByVehicle.set(event.vehicle_id, count + 1);
       });
 
+      // Fetch external_listings to get listing_start_date for BAT auctions
+      const externalListings: any[] = [];
+      for (let i = 0; i < vehicleIds.length; i += BATCH_SIZE) {
+        const batch = vehicleIds.slice(i, i + BATCH_SIZE);
+        const { data: batchListings } = await supabase
+          .from('external_listings')
+          .select('vehicle_id, start_date, listing_status, platform')
+          .in('vehicle_id', batch)
+          .eq('listing_status', 'active')
+          .eq('platform', 'bat');
+        
+        if (batchListings) {
+          externalListings.push(...batchListings);
+        }
+      }
+
+      // Group listings by vehicle_id (get the most recent active listing)
+      const listingStartDatesByVehicle = new Map<string, string>();
+      externalListings.forEach((listing: any) => {
+        if (listing.start_date) {
+          // If multiple listings exist, keep the most recent one
+          const existing = listingStartDatesByVehicle.get(listing.vehicle_id);
+          if (!existing || new Date(listing.start_date) > new Date(existing)) {
+            listingStartDatesByVehicle.set(listing.vehicle_id, listing.start_date);
+          }
+        }
+      });
+
       // Process vehicles with their images
       const enriched = vehiclesToProcess.map((v: any) => {
+        // Get listing_start_date from external_listings if available
+        const listingStartDate = listingStartDatesByVehicle.get(v.id);
+        
         // Get images for this vehicle (use local map first, then state as fallback)
         const images = imagesByVehicle.get(v.id) || [];
         
@@ -767,18 +814,18 @@ const CursorHomepage: React.FC = () => {
           const primaryImageUrl = primaryImage ? (primaryImage.large_url || primaryImage.image_url) : null;
           
           // Debug logging for first few vehicles to see what's happening
-          if (vehiclesToProcess.indexOf(v) < 5) {
+          if (vehiclesToProcess.indexOf(v) < 10) {
             console.log(`🔍 Vehicle ${v.id} (${v.year} ${v.make} ${v.model}):`, {
               totalImages,
               all_images_count: all_images.length,
+              all_images: all_images,
               primaryImageUrl,
               firstImageUrl: all_images[0]?.url,
-              rawImages: images.slice(0, 1).map(img => ({
+              rawImages: images.slice(0, 2).map(img => ({
                 id: img.id,
-                variants: img.variants,
                 image_url: img.image_url,
-                medium_url: img.medium_url,
-                thumbnail_url: img.thumbnail_url
+                large_url: img.large_url,
+                is_primary: img.is_primary
               }))
             });
           }
@@ -804,11 +851,26 @@ const CursorHomepage: React.FC = () => {
             image_url: primaryImageUrl,
             all_images: all_images,
             tier: 'C', // Default tier - can be calculated later if needed
-            tier_label: 'Tier C' // Default tier label
+            tier_label: 'C', // Default tier label (just the letter, no "Tier " prefix)
+            listing_start_date: listingStartDate || undefined // When listing went live (for BAT auctions)
           };
         });
       
       const sorted = enriched.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
+      
+      // Debug: Log first 3 vehicles after enrichment
+      console.log('🔍🔍🔍 AFTER ENRICHMENT - First 3 vehicles:', sorted.slice(0, 3).map(v => ({
+        id: v.id,
+        year: v.year,
+        make: v.make,
+        model: v.model,
+        primary_image_url: v.primary_image_url,
+        image_url: v.image_url,
+        all_images: v.all_images,
+        all_images_length: v.all_images?.length,
+        all_images_first_url: v.all_images?.[0]?.url
+      })));
+      
       setFeedVehicles(sorted);
 
       // Stats are now loaded separately via loadAccurateStats() to get real database counts
@@ -1016,10 +1078,6 @@ const CursorHomepage: React.FC = () => {
               }}>
                 {rotatingVerb}
               </span>
-              {' '}
-              <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 'normal' }}>
-                {filteredVehicles.length} vehicles
-              </span>
             </h2>
             
             {/* Metrics Row */}
@@ -1042,6 +1100,9 @@ const CursorHomepage: React.FC = () => {
                 
                 return (
                   <>
+                    <span>
+                      <strong style={{ color: 'var(--text)' }}>{filteredVehicles.length}</strong> vehicles
+                    </span>
                     {totalValue > 0 && (
                       <span>
                         <strong style={{ color: 'var(--text)' }}>{formatCurrency(totalValue)}</strong> total value
@@ -1887,14 +1948,17 @@ const CursorHomepage: React.FC = () => {
             gap: '0'
         }}>
             {filteredVehicles.map((vehicle, index) => {
-              // Debug first 3 vehicles
-              if (index < 3) {
-                console.log(`🔍 Grid vehicle ${index} (${vehicle.id}):`, {
+              // Debug first 5 vehicles - log the ACTUAL vehicle object
+              if (index < 5) {
+                console.log(`🔍🔍🔍 GRID RENDER vehicle ${index} (${vehicle.id}):`, {
+                  vehicle_full: vehicle,
                   primary_image_url: vehicle.primary_image_url,
                   all_images: vehicle.all_images,
                   all_images_length: vehicle.all_images?.length,
+                  all_images_first: vehicle.all_images?.[0],
                   image_url: vehicle.image_url,
-                  image_count: vehicle.image_count
+                  image_count: vehicle.image_count,
+                  hasImages: !!(vehicle.primary_image_url || vehicle.all_images?.length || vehicle.image_url)
                 });
               }
               
@@ -1905,12 +1969,7 @@ const CursorHomepage: React.FC = () => {
                   onVisible={handleVehicleVisible}
                 >
                   <VehicleCardDense
-                    vehicle={{
-                      ...vehicle,
-                      primary_image_url: vehicle.primary_image_url,
-                      all_images: vehicle.all_images || [],
-                      image_url: vehicle.image_url || vehicle.primary_image_url
-                    }}
+                    vehicle={vehicle}
                     viewMode="grid"
                     showPriceOverlay={filters.showPrices}
                     showDetailOverlay={filters.showDetailOverlay}

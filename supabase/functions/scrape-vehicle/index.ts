@@ -64,13 +64,15 @@ serve(async (req) => {
 
     // Extract VIN from HTML - works for multiple sites
     const vinPatterns = [
-      // Pattern 1: Worldwide Vintage Autos format: <div class="spec-line vin">VIN 1Z8749S420546</div>
+      // Pattern 1: Dealer listings with <span class="valu">VIN</span> (Jordan Motorsports pattern)
+      /<span[^>]*class="[^"]*valu[^"]*"[^>]*>([A-HJ-NPR-Z0-9]{17})<\/span>/i,
+      // Pattern 2: Worldwide Vintage Autos format: <div class="spec-line vin">VIN 1Z8749S420546</div>
       /<div[^>]*class="[^"]*spec-line[^"]*vin[^"]*"[^>]*>VIN\s+([A-HJ-NPR-Z0-9]{17})/i,
-      // Pattern 2: General VIN pattern with class containing "vin"
+      // Pattern 3: General VIN pattern with class containing "vin"
       /<[^>]*class="[^"]*vin[^"]*"[^>]*>[\s\S]*?VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
-      // Pattern 3: Simple VIN: pattern
+      // Pattern 4: Simple VIN: pattern
       /VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i,
-      // Pattern 4: Any 17-char alphanumeric near "VIN" text
+      // Pattern 5: Any 17-char alphanumeric near "VIN" text
       /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
     ]
 
@@ -113,6 +115,18 @@ serve(async (req) => {
       const bodyElement = doc.querySelector('#postingbody')
       if (bodyElement) {
         data.description = bodyElement.textContent?.trim() || ''
+      }
+
+      // Extract dealer information from listing (for multi-city dealers like Jordan Motorsports)
+      const dealerInfo = extractDealerInfo(html, data.description || '', data.title || '')
+      if (dealerInfo.name) {
+        data.dealer_name = dealerInfo.name
+      }
+      if (dealerInfo.website) {
+        data.dealer_website = dealerInfo.website
+      }
+      if (dealerInfo.phone) {
+        data.dealer_phone = dealerInfo.phone
       }
 
       // Extract basic vehicle info from title
@@ -378,4 +392,100 @@ function extractImageSize(url: string): number | null {
     return parseInt(sizeMatch[1]) * parseInt(sizeMatch[2])
   }
   return null
+}
+
+/**
+ * Extract dealer information from Craigslist listing
+ * Detects dealers who post across multiple cities (like Jordan Motorsports)
+ */
+function extractDealerInfo(html: string, description: string, title: string): {
+  name: string | null
+  website: string | null
+  phone: string | null
+} {
+  const combinedText = `${title} ${description}`.toLowerCase()
+  const result: { name: string | null; website: string | null; phone: string | null } = {
+    name: null,
+    website: null,
+    phone: null
+  }
+
+  // Extract website URLs from HTML (dealers often include their site)
+  const websitePatterns = [
+    // Full URLs: https://www.jordanmotorsport.com
+    /https?:\/\/(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+\.(?:com|net|org|us|io|co))/gi,
+    // Without protocol: www.jordanmotorsport.com or jordanmotorsport.com
+    /(?:^|\s)(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+\.(?:com|net|org|us|io|co))(?:\s|$|[^\w.])/gi
+  ]
+
+  for (const pattern of websitePatterns) {
+    const matches = html.match(pattern) || combinedText.match(pattern)
+    if (matches) {
+      // Filter out common non-dealer domains
+      const excludeDomains = ['craigslist', 'facebook', 'google', 'youtube', 'instagram', 'twitter']
+      for (const match of matches) {
+        const cleanUrl = match.replace(/^https?:\/\//, '').replace(/^www\./, '').toLowerCase()
+        const domain = cleanUrl.split('/')[0]
+        if (!excludeDomains.some(ex => domain.includes(ex))) {
+          result.website = `https://${cleanUrl}`
+          break
+        }
+      }
+      if (result.website) break
+    }
+  }
+
+  // Extract dealer name from common patterns
+  // Pattern 1: Business name followed by phone or website
+  const namePatterns = [
+    // "Jordan Motorsports" or "JORDAN MOTORSPORTS"
+    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:MOTORSPORTS?|MOTORS?|AUTO|CLASSICS?|COLLECTION|PERFORMANCE)/i,
+    // Dealer name before phone: "Name (555) 123-4567"
+    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*\(?\s*(\d{3})\s*\)?\s*(\d{3})[-\s]?(\d{4})/,
+    // Name with website: "Name www.domain.com"
+    /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s+(?:www\.)?[a-z0-9-]+\.[a-z]+/i,
+    // Uppercase dealer names: "JORDAN MOTORSPORTS" or "DESERT PERFORMANCE"
+    /\b([A-Z]{2,}(?:\s+[A-Z]{2,})+)\s+(?:MOTORSPORTS?|MOTORS?|AUTO|CLASSICS?|PERFORMANCE)/,
+  ]
+
+  for (const pattern of namePatterns) {
+    const match = combinedText.match(pattern) || html.match(pattern)
+    if (match && match[1]) {
+      const name = match[1].trim()
+      // Filter out common false positives
+      if (name.length > 3 && 
+          !['View', 'Click', 'Call', 'Visit', 'Contact', 'Location', 'Mileage'].includes(name)) {
+        result.name = name
+        // Extract phone if present in same match
+        if (match[2] && match[3] && match[4]) {
+          result.phone = `(${match[2]}) ${match[3]}-${match[4]}`
+        }
+        break
+      }
+    }
+  }
+
+  // Extract phone number (if not already extracted)
+  if (!result.phone) {
+    const phonePattern = /\(?\s*(\d{3})\s*\)?\s*[-.\s]?\s*(\d{3})\s*[-.\s]?\s*(\d{4})/
+    const phoneMatch = combinedText.match(phonePattern)
+    if (phoneMatch) {
+      result.phone = `(${phoneMatch[1]}) ${phoneMatch[2]}-${phoneMatch[3]}`
+    }
+  }
+
+  // If we found a website but no name, try to extract name from domain
+  if (result.website && !result.name) {
+    const domainMatch = result.website.match(/https?:\/\/(?:www\.)?([^.]+)/)
+    if (domainMatch) {
+      const domainName = domainMatch[1].replace(/-/g, ' ')
+      // Convert "jordanmotorsport" -> "Jordan Motorsport"
+      result.name = domainName
+        .split(/(?=[A-Z])/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
+    }
+  }
+
+  return result
 }

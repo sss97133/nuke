@@ -268,6 +268,7 @@ async function extractVIN(html: string, batUrl: string): Promise<string | undefi
 /**
  * Extract auction dates from BaT HTML - IMPROVED
  * Looks for dates in multiple formats and locations
+ * PRIORITY: Extract from data-auction-ends attribute first (most accurate)
  */
 function extractAuctionDates(html: string): { start_date?: string; end_date?: string; sale_date?: string } {
   const dates: { start_date?: string; end_date?: string; sale_date?: string } = {};
@@ -298,6 +299,49 @@ function extractAuctionDates(html: string): { start_date?: string; end_date?: st
     return undefined;
   }
   
+  // PRIORITY 1: Extract from data-auction-ends attribute (most accurate for live auctions)
+  // Format: data-auction-ends="2025-12-14-18-05-00" (YYYY-MM-DD-HH-MM-SS)
+  const auctionEndsMatch = html.match(/data-auction-ends=["'](\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})["']/);
+  if (auctionEndsMatch) {
+    try {
+      // Parse format: "2025-12-14-18-05-00"
+      const dateTimeStr = auctionEndsMatch[1];
+      // Split by '-' to get all parts: ["2025", "12", "14", "18", "05", "00"]
+      const parts = dateTimeStr.split('-');
+      if (parts.length === 6) {
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]);
+        const day = parseInt(parts[2]);
+        const hour = parseInt(parts[3]);
+        const minute = parseInt(parts[4]);
+        const second = parseInt(parts[5]);
+        
+        const endDateTime = new Date(
+          year,
+          month - 1,
+          day,
+          hour,
+          minute,
+          second
+        );
+        
+        if (!isNaN(endDateTime.getTime())) {
+          // Store as date string (YYYY-MM-DD) but with time component in mind
+          dates.end_date = endDateTime.toISOString().split('T')[0];
+          
+          // Calculate start date: end - 7 days (BAT auctions run for 7 days)
+          const startDateTime = new Date(endDateTime);
+          startDateTime.setDate(startDateTime.getDate() - 7);
+          dates.start_date = startDateTime.toISOString().split('T')[0];
+          
+          console.log(`✅ Extracted auction dates from data-auction-ends: end=${dates.end_date}, start=${dates.start_date}`);
+        }
+      }
+    } catch (e) {
+      console.log('Error parsing data-auction-ends:', e);
+    }
+  }
+  
   // Extract sale date - look for "Sold for USD $X on MM/DD/YY" or "Bid to USD $X on MM/DD/YY"
   const saleDatePatterns = [
     /Sold for[:\s]*USD\s*\$[0-9,]+\s+on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
@@ -315,6 +359,7 @@ function extractAuctionDates(html: string): { start_date?: string; end_date?: st
       if (parsed) {
         dates.sale_date = parsed;
         // For completed auctions, end_date is usually same as sale_date
+        // Only set if we don't already have end_date from data-auction-ends
         if (!dates.end_date) {
           dates.end_date = parsed;
         }
@@ -323,34 +368,37 @@ function extractAuctionDates(html: string): { start_date?: string; end_date?: st
     }
   }
   
-  // Extract auction end date
-  const endDatePatterns = [
-    /Ended[:\s]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
-    /Auction ended[:\s]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
-    /Closed[:\s]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
-  ];
-  
-  for (const pattern of endDatePatterns) {
-    const match = html.match(pattern);
-    if (match) {
-      const parsed = parseDate(match[1]);
-      if (parsed) {
-        dates.end_date = parsed;
-        break;
+  // Extract auction end date (fallback if data-auction-ends not found)
+  if (!dates.end_date) {
+    const endDatePatterns = [
+      /Ended[:\s]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+      /Auction ended[:\s]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+      /Closed[:\s]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+    ];
+    
+    for (const pattern of endDatePatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        const parsed = parseDate(match[1]);
+        if (parsed) {
+          dates.end_date = parsed;
+          break;
+        }
       }
     }
   }
   
-  // Extract auction start date - look for "Listed" or listing start
+  // Calculate auction start date if we have end_date but not start_date
   // BaT auctions typically run for 7 days, so start = end - 7 days
   if (dates.end_date && !dates.start_date) {
     const endDate = new Date(dates.end_date);
     const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - 7); // Typical BaT auction duration
     dates.start_date = startDate.toISOString().split('T')[0];
+    console.log(`📅 Calculated start_date from end_date: ${dates.start_date} (end: ${dates.end_date})`);
   }
   
-  // Also try to find explicit start date
+  // Also try to find explicit start date (overrides calculated if found)
   const startDatePatterns = [
     /Listed[:\s]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
     /Started[:\s]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
@@ -363,6 +411,7 @@ function extractAuctionDates(html: string): { start_date?: string; end_date?: st
       const parsed = parseDate(match[1]);
       if (parsed) {
         dates.start_date = parsed;
+        console.log(`📅 Found explicit start_date in text: ${dates.start_date}`);
         break;
       }
     }
