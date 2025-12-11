@@ -426,20 +426,39 @@ const CursorHomepage: React.FC = () => {
         const all_images = images
           .map((img: any) => {
             let url = null;
-            if (img.variants && typeof img.variants === 'object') {
-              url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
+            
+            // First try variants (JSONB field)
+            if (img.variants) {
+              if (typeof img.variants === 'object') {
+                url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
+              } else if (typeof img.variants === 'string') {
+                try {
+                  const parsed = JSON.parse(img.variants);
+                  url = parsed.medium || parsed.large || parsed.full || parsed.thumbnail || null;
+                } catch (e) {
+                  // Not valid JSON, skip
+                }
+              }
             }
-            if (!url) {
+            
+            // Fallback to direct URL fields
+            if (!url || url === '' || url.trim() === '') {
               url = img.medium_url || img.large_url || img.image_url || img.thumbnail_url || null;
             }
-            return {
-              id: img.id,
-              url: url,
-              is_primary: img.is_primary || false,
-              created_at: img.created_at
-            };
+            
+            // Final validation
+            if (url && typeof url === 'string' && url.trim() !== '') {
+              return {
+                id: img.id,
+                url: url.trim(),
+                is_primary: img.is_primary || false,
+                created_at: img.created_at
+              };
+            }
+            
+            return null;
           })
-          .filter((img: any) => img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '')
+          .filter((img: any) => img !== null && img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '')
           .sort((a: any, b: any) => {
             if (a.is_primary && !b.is_primary) return -1;
             if (!a.is_primary && b.is_primary) return 1;
@@ -624,6 +643,15 @@ const CursorHomepage: React.FC = () => {
       if (allImages.length > 0) {
         // Log sample image to see structure
         console.log('Sample image:', allImages[0]);
+        console.log('Sample image variants:', allImages[0]?.variants);
+        console.log('Sample image URLs:', {
+          image_url: allImages[0]?.image_url,
+          thumbnail_url: allImages[0]?.thumbnail_url,
+          medium_url: allImages[0]?.medium_url,
+          large_url: allImages[0]?.large_url
+        });
+      } else {
+        console.warn('⚠️ No images loaded for initial batch!');
       }
 
       // Group images by vehicle_id
@@ -679,24 +707,42 @@ const CursorHomepage: React.FC = () => {
           .map((img: any) => {
             // Extract URL from variants if available (prefer medium, then large, then full)
             let url = null;
-            if (img.variants && typeof img.variants === 'object') {
-              url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
+            
+            // First try variants (JSONB field)
+            if (img.variants) {
+              if (typeof img.variants === 'object') {
+                url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
+              } else if (typeof img.variants === 'string') {
+                // If variants is a string, try to parse it
+                try {
+                  const parsed = JSON.parse(img.variants);
+                  url = parsed.medium || parsed.large || parsed.full || parsed.thumbnail || null;
+                } catch (e) {
+                  // Not valid JSON, skip
+                }
+              }
             }
+            
             // Fallback to direct URL fields in order of preference
-            if (!url) {
+            if (!url || url === '' || url.trim() === '') {
               url = img.medium_url || img.large_url || img.image_url || img.thumbnail_url || null;
             }
             
-            return {
-              id: img.id,
-              url: url,
-              is_primary: img.is_primary || false,
-              created_at: img.created_at
-            };
+            // Final validation - ensure URL is a string and not empty
+            if (url && typeof url === 'string' && url.trim() !== '') {
+              return {
+                id: img.id,
+                url: url.trim(),
+                is_primary: img.is_primary || false,
+                created_at: img.created_at
+              };
+            }
+            
+            return null;
           })
           .filter((img: any) => {
             // Only include images with valid, non-empty URLs
-            return img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '';
+            return img !== null && img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '';
           })
           .sort((a: any, b: any) => {
             // Primary images first
@@ -756,6 +802,23 @@ const CursorHomepage: React.FC = () => {
 
           // Primary image is already sorted first - ensure we have a valid URL
           const primaryImageUrl = all_images[0]?.url || null;
+          
+          // Debug logging for first few vehicles to see what's happening
+          if (vehiclesToProcess.indexOf(v) < 5) {
+            console.log(`🔍 Vehicle ${v.id} (${v.year} ${v.make} ${v.model}):`, {
+              totalImages,
+              all_images_count: all_images.length,
+              primaryImageUrl,
+              firstImageUrl: all_images[0]?.url,
+              rawImages: images.slice(0, 1).map(img => ({
+                id: img.id,
+                variants: img.variants,
+                image_url: img.image_url,
+                medium_url: img.medium_url,
+                thumbnail_url: img.thumbnail_url
+              }))
+            });
+          }
           
           // Debug logging for vehicles without images
           if (!primaryImageUrl && totalImages === 0) {
