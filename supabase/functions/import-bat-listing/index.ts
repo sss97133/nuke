@@ -77,9 +77,10 @@ serve(async (req) => {
     const lotMatch = html.match(/Lot.*?#(\d+)/);
     const lotNumber = lotMatch ? lotMatch[1] : '';
 
-    // Extract VIN
-    const vinMatch = html.match(/VIN[:\\s]+([A-HJ-NPR-Z0-9]{17})/i);
-    const vin = vinMatch ? vinMatch[1] : undefined;
+    // Extract VIN - BaT uses both "VIN:" and "Chassis:" labels
+    const vinMatch = html.match(/(?:VIN|Chassis)[:\s]+([A-HJ-NPR-Z0-9]{17})/i) ||
+                     html.match(/<li>Chassis:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{17})<\/a><\/li>/i);
+    const vin = vinMatch ? vinMatch[1].toUpperCase() : undefined;
 
     const listing: BaTListing = {
       url: batUrl,
@@ -135,16 +136,32 @@ serve(async (req) => {
     }
 
     if (vehicleId) {
+      const updateData: any = {
+        sale_price: salePrice,
+        sale_date: saleDate,
+        trim: trim || undefined,
+        description: description,
+        auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met',
+        bat_auction_url: batUrl
+      };
+      
+      // Update VIN if we found one and vehicle doesn't have one
+      if (vin) {
+        const { data: currentVehicle } = await supabase
+          .from('vehicles')
+          .select('vin')
+          .eq('id', vehicleId)
+          .single();
+        
+        // Only update VIN if vehicle doesn't have one, or if it matches (to avoid conflicts)
+        if (!currentVehicle?.vin || currentVehicle.vin === vin) {
+          updateData.vin = vin;
+        }
+      }
+      
       await supabase
         .from('vehicles')
-        .update({
-          sale_price: salePrice,
-          sale_date: saleDate,
-          trim: trim || undefined,
-          description: description,
-          auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met',
-          bat_auction_url: batUrl
-        })
+        .update(updateData)
         .eq('id', vehicleId);
 
       await supabase
@@ -257,8 +274,29 @@ serve(async (req) => {
         user_id: null // System-generated event
       });
     
-    // TODO: Extract and save auction_timeline_events from scraper
-    // Future enhancement: Parse BaT comment thread for individual bid/comment events
+    // Call comprehensive extraction to get full auction data and create timeline events
+    try {
+      const { data: comprehensiveData, error: comprehensiveError } = await supabase.functions.invoke('comprehensive-bat-extraction', {
+        body: { batUrl, vehicleId }
+      });
+      
+      if (!comprehensiveError && comprehensiveData?.success) {
+        console.log('Comprehensive extraction completed:', {
+          vin: comprehensiveData.data.vin,
+          auction_dates: {
+            start: comprehensiveData.data.auction_start_date,
+            end: comprehensiveData.data.auction_end_date,
+            sale: comprehensiveData.data.sale_date
+          },
+          metrics: {
+            bids: comprehensiveData.data.bid_count,
+            views: comprehensiveData.data.view_count
+          }
+        });
+      }
+    } catch (err) {
+      console.log('Comprehensive extraction not available, using basic extraction only');
+    }
 
     return new Response(
       JSON.stringify({
