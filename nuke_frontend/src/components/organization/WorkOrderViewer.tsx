@@ -10,11 +10,12 @@ interface WorkOrderViewerProps {
   organizationName: string;
   laborRate?: number;
   onClose: () => void;
+  onNavigateEvent?: (event: any) => void;
 }
 
 type Tab = 'overview' | 'parts' | 'labor' | 'photos' | 'shop';
 
-export default function WorkOrderViewer({ event, organizationName, laborRate = 0, onClose }: WorkOrderViewerProps) {
+export default function WorkOrderViewer({ event, organizationName, laborRate = 0, onClose, onNavigateEvent }: WorkOrderViewerProps) {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkCount, setBookmarkCount] = useState(0);
@@ -24,9 +25,24 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [prevEvent, setPrevEvent] = useState<any>(null);
+  const [nextEvent, setNextEvent] = useState<any>(null);
+  const [allAuctionEvents, setAllAuctionEvents] = useState<any[]>([]);
   
   const vehicleName = event.metadata?.vehicle_name || 'Unknown Vehicle';
   const vehicleId = event.metadata?.vehicle_id;
+  
+  // Detect if this is an auction event
+  const isAuctionEvent = event.event_type?.startsWith('auction') || 
+                         event.metadata?.platform === 'bat' ||
+                         event.metadata?.source === 'bat_import';
+  
+  // Load all auction events chronologically for navigation
+  useEffect(() => {
+    if (isAuctionEvent && vehicleId) {
+      loadAuctionEventSequence();
+    }
+  }, [event.id, isAuctionEvent, vehicleId]);
   
   // Aggregate images from event (handles both single events and grouped events)
   let images: string[] = [];
@@ -75,12 +91,64 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
   }
 
   useEffect(() => {
-    loadUserData();
-    loadParts();
-    loadLabor();
-    loadCollaborators();
-    checkBookmarkStatus();
-  }, [event.id]);
+    if (!isAuctionEvent) {
+      loadUserData();
+      loadParts();
+      loadLabor();
+      loadCollaborators();
+      checkBookmarkStatus();
+    } else {
+      loadUserData();
+      checkBookmarkStatus();
+    }
+  }, [event.id, isAuctionEvent]);
+
+  const loadAuctionEventSequence = async () => {
+    if (!vehicleId) return;
+    
+    // Load ALL auction events for this vehicle, ordered chronologically
+    // Use event_date first, then created_at for events on the same day
+    const { data: allEvents, error } = await supabase
+      .from('business_timeline_events')
+      .select('*')
+      .eq('business_id', event.business_id)
+      .like('event_type', 'auction%')
+      .eq('metadata->>vehicle_id', vehicleId)
+      .order('event_date', { ascending: true })
+      .order('created_at', { ascending: true });
+    
+    if (error) {
+      console.error('Error loading auction events:', error);
+      return;
+    }
+    
+    if (!allEvents || allEvents.length === 0) return;
+    
+    setAllAuctionEvents(allEvents);
+    
+    // Find current event's position in the sequence
+    const currentIndex = allEvents.findIndex(e => e.id === event.id);
+    
+    if (currentIndex > 0) {
+      setPrevEvent(allEvents[currentIndex - 1]);
+    } else {
+      setPrevEvent(null);
+    }
+    
+    if (currentIndex < allEvents.length - 1) {
+      setNextEvent(allEvents[currentIndex + 1]);
+    } else {
+      setNextEvent(null);
+    }
+  };
+  
+  // Navigate to a different auction event
+  const navigateToEvent = (targetEvent: any) => {
+    if (targetEvent && onNavigateEvent) {
+      // Parent component will update the selected event
+      onNavigateEvent(targetEvent);
+    }
+  };
 
   const loadUserData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -218,6 +286,352 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
   const partsTotal = parts.reduce((sum, p) => sum + (parseFloat(p.total_price) || 0), 0);
   const laborTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.total_cost) || 0), 0);
   const totalHours = laborItems.reduce((sum, l) => sum + (parseFloat(l.hours) || 0), 0);
+
+  // Auction-specific data extraction
+  const auctionPlatform = event.metadata?.platform === 'bat' ? 'Bring a Trailer' : 
+                         event.metadata?.platform ? event.metadata.platform.toUpperCase() : 
+                         event.metadata?.source === 'bat_import' ? 'Bring a Trailer' : 'Auction';
+  const lotNumber = event.metadata?.lot_number || event.metadata?.listing_id;
+  const auctionUrl = event.metadata?.bat_url || event.metadata?.listing_url || event.metadata?.bat_listing_url;
+  const bidAmount = event.metadata?.bid_amount || event.cost_amount;
+  const bidder = event.metadata?.bidder || event.metadata?.bat_username || event.metadata?.buyer;
+  const reserveMet = event.event_type === 'auction_reserve_met';
+  const isSold = event.event_type === 'auction_sold';
+  const finalPrice = isSold ? (event.metadata?.final_price || bidAmount || event.cost_amount) : null;
+  const bidSequence = event.metadata?.bid_sequence || event.metadata?.bid_count;
+
+  // Render auction view
+  const renderAuctionView = () => {
+    const eventDate = new Date(event.event_date);
+    // Format date with time if available (bids have timestamps)
+    const eventDateTime = event.created_at ? new Date(event.created_at) : eventDate;
+    const hasTime = event.created_at && event.event_type === 'auction_bid_placed';
+    
+    const formattedDate = eventDate.toLocaleDateString('en-US', { 
+      month: '2-digit', day: '2-digit', year: 'numeric'
+    });
+    
+    const formattedDateTime = hasTime ? eventDateTime.toLocaleString('en-US', {
+      month: '2-digit', 
+      day: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) : formattedDate;
+    
+    // Get previous/next event dates for display
+    const prevDateStr = prevEvent ? (() => {
+      const d = new Date(prevEvent.event_date);
+      const hasPrevTime = prevEvent.created_at && prevEvent.event_type === 'auction_bid_placed';
+      if (hasPrevTime) {
+        const dt = new Date(prevEvent.created_at);
+        return dt.toLocaleString('en-US', {
+          month: '2-digit', day: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+      }
+      return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    })() : null;
+    
+    const nextDateStr = nextEvent ? (() => {
+      const d = new Date(nextEvent.event_date);
+      const hasNextTime = nextEvent.created_at && nextEvent.event_type === 'auction_bid_placed';
+      if (hasNextTime) {
+        const dt = new Date(nextEvent.created_at);
+        return dt.toLocaleString('en-US', {
+          month: '2-digit', day: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+      }
+      return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    })() : null;
+
+    return ReactDOM.createPortal(
+      <div
+        onClick={onClose}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onClose();
+        }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.75)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '8px',
+          overflow: 'auto'
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: 'rgb(255, 255, 255)',
+            width: '100%',
+            maxWidth: '800px',
+            maxHeight: '90vh',
+            border: '2px solid rgb(0, 0, 0)',
+            fontFamily: 'Arial, sans-serif',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Header with date navigation */}
+          <div style={{
+            padding: '16px',
+            borderBottom: '2px solid #000',
+            background: '#f5f5f5',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (prevEvent) {
+                  navigateToEvent(prevEvent);
+                }
+              }}
+              disabled={!prevEvent}
+              style={{
+                background: prevEvent ? '#000' : '#ccc',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 16px',
+                cursor: prevEvent ? 'pointer' : 'not-allowed',
+                fontSize: '9pt',
+                fontWeight: 600
+              }}
+            >
+              ← PREV
+              {prevEvent && prevDateStr && (
+                <span style={{ display: 'block', fontSize: '7pt', marginTop: '2px', opacity: 0.8 }}>
+                  {prevDateStr}
+                </span>
+              )}
+            </button>
+            
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11pt', fontWeight: 700 }}>
+                {formattedDateTime}
+              </div>
+              {allAuctionEvents.length > 0 && (
+                <div style={{ fontSize: '7pt', color: '#666', marginTop: '2px' }}>
+                  Event {allAuctionEvents.findIndex(e => e.id === event.id) + 1} of {allAuctionEvents.length}
+                </div>
+              )}
+            </div>
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (nextEvent) {
+                  navigateToEvent(nextEvent);
+                }
+              }}
+              disabled={!nextEvent}
+              style={{
+                background: nextEvent ? '#000' : '#ccc',
+                color: '#fff',
+                border: 'none',
+                padding: '8px 16px',
+                cursor: nextEvent ? 'pointer' : 'not-allowed',
+                fontSize: '9pt',
+                fontWeight: 600
+              }}
+            >
+              NEXT →
+              {nextEvent && nextDateStr && (
+                <span style={{ display: 'block', fontSize: '7pt', marginTop: '2px', opacity: 0.8 }}>
+                  {nextDateStr}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Auction Details */}
+          <div style={{ padding: '20px', overflow: 'auto', flex: 1 }}>
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '10pt', color: '#666', marginBottom: '4px' }}>
+                {auctionPlatform}
+                {lotNumber && ` • Lot #${lotNumber}`}
+              </div>
+              {vehicleId && (
+                <a
+                  href={`/vehicle/${vehicleId}`}
+                  style={{ 
+                    fontSize: '14pt', 
+                    fontWeight: 700, 
+                    color: '#000',
+                    textDecoration: 'none',
+                    display: 'block',
+                    marginBottom: '8px'
+                  }}
+                  className="hover:underline"
+                >
+                  {vehicleName}
+                </a>
+              )}
+              <div style={{ fontSize: '12pt', fontWeight: 600, color: '#333', marginBottom: '12px' }}>
+                {event.title}
+              </div>
+              {event.description && (
+                <div style={{ fontSize: '9pt', color: '#666', lineHeight: 1.5, marginBottom: '16px' }}>
+                  {event.description}
+                </div>
+              )}
+            </div>
+
+            {/* Bid Information */}
+            {(bidAmount || bidder) && (
+              <div style={{
+                padding: '16px',
+                background: '#f8f9fa',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                marginBottom: '16px'
+              }}>
+                <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', color: '#666' }}>
+                  {isSold ? 'Final Sale' : event.event_type === 'auction_listed' ? 'Auction Listed' : 'Bid Information'}
+                </div>
+                {bidAmount && (
+                  <div style={{ fontSize: '18pt', fontWeight: 700, color: '#000', marginBottom: '4px' }}>
+                    ${bidAmount.toLocaleString()}
+                  </div>
+                )}
+                {bidder && (
+                  <div style={{ fontSize: '9pt', color: '#666', marginTop: '4px' }}>
+                    {event.event_type === 'auction_bid_placed' && bidSequence ? (
+                      <>Bid #{bidSequence} by <strong>{bidder}</strong></>
+                    ) : bidder ? (
+                      <strong>{bidder}</strong>
+                    ) : null}
+                  </div>
+                )}
+                {reserveMet && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '4px 8px',
+                    background: '#d4edda',
+                    color: '#155724',
+                    fontSize: '8pt',
+                    fontWeight: 600,
+                    display: 'inline-block',
+                    borderRadius: '3px'
+                  }}>
+                    RESERVE MET
+                  </div>
+                )}
+                {isSold && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '4px 8px',
+                    background: '#d1ecf1',
+                    color: '#0c5460',
+                    fontSize: '8pt',
+                    fontWeight: 600,
+                    display: 'inline-block',
+                    borderRadius: '3px'
+                  }}>
+                    SOLD
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Auction Link */}
+            {auctionUrl && (
+              <div style={{ marginBottom: '20px' }}>
+                <a
+                  href={auctionUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-block',
+                    padding: '10px 20px',
+                    background: '#000',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    fontSize: '9pt',
+                    fontWeight: 600,
+                    borderRadius: '4px'
+                  }}
+                  className="hover:opacity-90"
+                >
+                  VIEW AUCTION LISTING →
+                </a>
+              </div>
+            )}
+
+            {/* Event Metadata */}
+            {event.metadata && Object.keys(event.metadata).length > 0 && (
+              <div style={{
+                padding: '12px',
+                background: '#f8f9fa',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '8pt',
+                color: '#666'
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: '6px' }}>Event Details</div>
+                {event.event_type && (
+                  <div>Type: <strong>{event.event_type.replace('_', ' ').toUpperCase()}</strong></div>
+                )}
+                {event.metadata.seller && (
+                  <div>Seller: <strong>{event.metadata.seller}</strong></div>
+                )}
+                {event.metadata.buyer && bidder !== event.metadata.buyer && (
+                  <div>Buyer: <strong>{event.metadata.buyer}</strong></div>
+                )}
+                {event.metadata.bid_count && (
+                  <div>Total Bids: <strong>{event.metadata.bid_count}</strong></div>
+                )}
+                {event.metadata.view_count && (
+                  <div>Views: <strong>{event.metadata.view_count.toLocaleString()}</strong></div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{
+            padding: '12px 16px',
+            borderTop: '2px solid #000',
+            background: '#f5f5f5',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '8pt',
+            color: '#666'
+          }}>
+            <span>[ESC TO CLOSE]</span>
+            <button
+              onClick={onClose}
+              style={{
+                background: '#000',
+                color: '#fff',
+                border: 'none',
+                padding: '6px 12px',
+                cursor: 'pointer',
+                fontSize: '9pt',
+                fontWeight: 600
+              }}
+            >
+              CLOSE
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  // If this is an auction event, render the auction view instead
+  if (isAuctionEvent) {
+    return renderAuctionView();
+  }
 
   return ReactDOM.createPortal(
     <div

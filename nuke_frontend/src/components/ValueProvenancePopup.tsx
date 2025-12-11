@@ -26,6 +26,9 @@ interface Provenance {
   inserted_at: string;
   evidence_count: number;
   can_edit: boolean;
+  bat_url?: string;
+  lot_number?: string;
+  sale_date?: string;
 }
 
 export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
@@ -40,6 +43,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   const [editing, setEditing] = useState(false);
   const [newValue, setNewValue] = useState(value);
   const [evidence, setEvidence] = useState<any[]>([]);
+  const [batAuctionInfo, setBatAuctionInfo] = useState<{ url?: string; lot_number?: string; sale_date?: string } | null>(null);
 
   useEffect(() => {
     loadProvenance();
@@ -48,6 +52,13 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   const loadProvenance = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      
+      // Also load vehicle data to check for BAT auction info
+      const { data: vehicle } = await supabase
+        .from('vehicles')
+        .select('bat_auction_url, sale_date, bat_sale_date, updated_at, user_id, uploaded_by')
+        .eq('id', vehicleId)
+        .single();
       
       // Check field_evidence for this value
       const { data: evidenceData } = await supabase
@@ -61,27 +72,75 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
       
+      // Check timeline_events for sale_price from BAT auctions
+      let batAuctionInfo: any = null;
+      if (field === 'sale_price' && vehicle?.bat_auction_url) {
+        const { data: saleEvent } = await supabase
+          .from('timeline_events')
+          .select('event_date, cost_amount, metadata')
+          .eq('vehicle_id', vehicleId)
+          .eq('event_type', 'auction_sold')
+          .eq('cost_amount', value)
+          .order('event_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (saleEvent) {
+          batAuctionInfo = {
+            url: vehicle.bat_auction_url,
+            lot_number: saleEvent.metadata?.lot_number,
+            sale_date: saleEvent.event_date || vehicle.bat_sale_date || vehicle.sale_date
+          };
+        }
+      }
+      
       setEvidence(evidenceData || []);
       
       if (evidenceData && evidenceData.length > 0) {
         const latest = evidenceData[0];
+        let sourceLabel = latest.source_type;
+        if (batAuctionInfo && field === 'sale_price') {
+          sourceLabel = `Bring a Trailer${batAuctionInfo.lot_number ? ` (Lot #${batAuctionInfo.lot_number})` : ''}`;
+        }
+        
         setProvenance({
-          source: latest.source_type,
+          source: sourceLabel,
           confidence: latest.source_confidence,
           inserted_by: latest.profiles?.id || 'Unknown',
           inserted_by_name: latest.profiles?.raw_user_meta_data?.username || 'Unknown',
           inserted_at: latest.created_at,
           evidence_count: evidenceData.length,
-          can_edit: user?.id === latest.profiles?.id
+          can_edit: user?.id === latest.profiles?.id,
+          bat_url: batAuctionInfo?.url,
+          lot_number: batAuctionInfo?.lot_number,
+          sale_date: batAuctionInfo?.sale_date
         });
+        if (batAuctionInfo) setBatAuctionInfo(batAuctionInfo);
+      } else if (batAuctionInfo && field === 'sale_price') {
+        // No evidence but we have BAT auction info - use that as source
+        setProvenance({
+          source: `Bring a Trailer${batAuctionInfo.lot_number ? ` (Lot #${batAuctionInfo.lot_number})` : ''}`,
+          confidence: 95,
+          inserted_by: 'system',
+          inserted_by_name: 'BAT Import',
+          inserted_at: batAuctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString(),
+          evidence_count: 1,
+          can_edit: false,
+          bat_url: batAuctionInfo.url,
+          lot_number: batAuctionInfo.lot_number,
+          sale_date: batAuctionInfo.sale_date
+        });
+        setBatAuctionInfo(batAuctionInfo);
+        // Add BAT info as evidence
+        setEvidence([{
+          source_type: 'bat_auction',
+          proposed_value: value.toString(),
+          source_confidence: 95,
+          extraction_context: `Auction URL: ${batAuctionInfo.url}`,
+          created_at: batAuctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString()
+        }]);
       } else {
         // No evidence - check who last updated vehicle
-        const { data: vehicle } = await supabase
-          .from('vehicles')
-          .select('updated_at, user_id, uploaded_by')
-          .eq('id', vehicleId)
-          .single();
-        
         setProvenance({
           source: 'Manual entry (no evidence)',
           confidence: 50,
@@ -269,6 +328,41 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               </span>
             </div>
           </div>
+
+          {/* BAT Auction Details */}
+          {(provenance?.bat_url || provenance?.lot_number) && (
+            <div style={{ marginBottom: '16px', padding: '12px', background: '#f9f9f9', border: '1px solid #e0e0e0' }}>
+              <div style={{ fontSize: '7pt', color: '#666', textTransform: 'uppercase', marginBottom: '8px' }}>
+                Auction Details
+              </div>
+              {provenance.lot_number && (
+                <div style={{ fontSize: '9pt', marginBottom: '4px' }}>
+                  <strong>Lot #:</strong> {provenance.lot_number}
+                </div>
+              )}
+              {provenance.sale_date && (
+                <div style={{ fontSize: '9pt', marginBottom: '4px' }}>
+                  <strong>Sale Date:</strong> {new Date(provenance.sale_date).toLocaleDateString()}
+                </div>
+              )}
+              {provenance.bat_url && (
+                <div style={{ marginTop: '8px' }}>
+                  <a 
+                    href={provenance.bat_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{
+                      fontSize: '9pt',
+                      color: '#0066cc',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    View Auction Listing →
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Evidence Count */}
           {evidence.length > 0 && (

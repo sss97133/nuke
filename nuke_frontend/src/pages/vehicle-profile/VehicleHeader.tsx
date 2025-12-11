@@ -73,6 +73,35 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [showOriginDetails, setShowOriginDetails] = useState(false);
   const originDetailsRef = useRef<HTMLDivElement | null>(null);
   const [showProvenancePopup, setShowProvenancePopup] = useState(false);
+  const [priceSources, setPriceSources] = useState<Record<string, boolean>>({});
+
+  // Check if price fields have verified sources (FACT-BASED requirement)
+  useEffect(() => {
+    const checkPriceSources = async () => {
+      if (!vehicle?.id) return;
+      
+      const sources: Record<string, boolean> = {};
+      
+      // Check each price field for verified sources
+      const priceFields = ['sale_price', 'asking_price', 'current_value', 'purchase_price', 'msrp'];
+      
+      for (const field of priceFields) {
+        const { data } = await supabase
+          .from('vehicle_field_sources')
+          .select('id, is_verified')
+          .eq('vehicle_id', vehicle.id)
+          .eq('field_name', field)
+          .eq('is_verified', true)
+          .limit(1);
+        
+        sources[field] = (data && data.length > 0) || false;
+      }
+      
+      setPriceSources(sources);
+    };
+    
+    checkPriceSources();
+  }, [vehicle?.id]);
 
   // Only fetch if not provided via props (eliminates duplicate query)
   useEffect(() => {
@@ -356,12 +385,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (vehicle.auction_source && vehicle.bid_count && typeof vehicle.current_bid === 'number') {
       return { amount: vehicle.current_bid, label: 'Current Bid' };
     }
-    // Asking
+    // Asking - allow without source (user-provided intent)
     if (typeof vehicle.asking_price === 'number') {
       return { amount: vehicle.asking_price, label: 'Asking' };
     }
-    // Sold - respect auction outcome
+    // Sold - FACT-BASED: Only show if has verified source (e.g., BAT auction)
     if (typeof vehicle.sale_price === 'number') {
+      // Check if sale_price has a verified source or BAT URL (BAT URLs are considered verified)
+      const hasVerifiedSource = priceSources.sale_price || !!(vehicle as any).bat_auction_url;
+      
+      if (!hasVerifiedSource) {
+        // No verified source - don't show unverified prices
+        return { amount: null, label: '' };
+      }
+      
       const outcome = (vehicle as any).auction_outcome;
       if (outcome === 'sold') {
         return { amount: vehicle.sale_price, label: 'SOLD FOR' };
@@ -380,15 +417,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (valuation && typeof valuation.estimatedValue === 'number' && valuation.estimatedValue > 0) {
       return { amount: valuation.estimatedValue, label: 'Estimated Value' };
     }
-    // Fallback to database current_value
+    // Fallback to database current_value - FACT-BASED: Only if has verified source
     if (typeof vehicle.current_value === 'number') {
+      if (!priceSources.current_value) {
+        // No verified source - don't show unverified estimates
+        return { amount: null, label: '' };
+      }
       return { amount: vehicle.current_value, label: 'Estimated Value' };
     }
-    // Purchase
+    // Purchase - FACT-BASED: Only if has verified source (e.g., receipt)
     if (typeof vehicle.purchase_price === 'number') {
+      if (!priceSources.purchase_price) {
+        // No verified source - don't show unverified purchase prices
+        return { amount: null, label: '' };
+      }
       return { amount: vehicle.purchase_price, label: 'Purchase Price' };
     }
-    // MSRP
+    // MSRP - manufacturer data is considered verified
     if (typeof vehicle.msrp === 'number') {
       return { amount: vehicle.msrp, label: 'Original MSRP' };
     }
@@ -406,7 +451,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return getAutoDisplay();
     }
     if (mode === 'estimate') {
-      // Prefer unified valuation service
+      // Prefer unified valuation service (these are computed estimates, always show)
       if (valuation && typeof valuation.estimatedValue === 'number' && valuation.estimatedValue > 0) {
         return { amount: valuation.estimatedValue, label: 'Estimated Value' };
       }
@@ -414,33 +459,57 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       if (rpcSignal && typeof rpcSignal.primary_value === 'number' && rpcSignal.primary_label) {
         return { amount: rpcSignal.primary_value, label: rpcSignal.primary_label };
       }
-      const pi = computePrimaryPrice({
-        msrp: (vehicle as any).msrp,
-        current_value: (vehicle as any).current_value,
-        purchase_price: (vehicle as any).purchase_price,
-        asking_price: (vehicle as any).asking_price,
-        sale_price: (vehicle as any).sale_price,
-        is_for_sale: (vehicle as any).is_for_sale,
-      } as any);
-      return { amount: typeof pi.amount === 'number' ? pi.amount : null, label: pi.label || 'Estimated Value' };
+      // FACT-BASED: Only show current_value if has verified source
+      if (typeof vehicle.current_value === 'number' && priceSources.current_value) {
+        return { amount: vehicle.current_value, label: 'Estimated Value' };
+      }
+      // If no verified current_value, return null (don't show unverified estimates)
+      return { amount: null, label: '' };
     }
     if (mode === 'auction') return { amount: typeof vehicle.current_bid === 'number' ? vehicle.current_bid : null, label: 'Current Bid' };
-    if (mode === 'asking') return { amount: typeof vehicle.asking_price === 'number' ? vehicle.asking_price : null, label: 'Asking Price' };
-    if (mode === 'sale') {
-      // Respect auction outcome for proper disclosure
-      if ((vehicle as any).auction_outcome === 'sold') {
-        return { amount: typeof vehicle.sale_price === 'number' ? vehicle.sale_price : null, label: 'SOLD FOR' };
-      } else if ((vehicle as any).auction_outcome === 'reserve_not_met') {
-        // Don't show high bid for RNM - user needs to click for details
-        return { amount: null, label: 'Reserve Not Met' };
-      } else if ((vehicle as any).auction_outcome === 'no_sale') {
-        return { amount: null, label: 'No Sale' };
-      } else if (typeof vehicle.sale_price === 'number') {
-        return { amount: vehicle.sale_price, label: 'Sold for' };
+    if (mode === 'asking') {
+      // Asking price - user intent, but still check for verified source if available
+      if (typeof vehicle.asking_price === 'number') {
+        // Asking price can be shown without verified source (user intent to sell)
+        // But if there IS a source, prefer it
+        return { amount: vehicle.asking_price, label: 'Asking Price' };
       }
       return { amount: null, label: '' };
     }
-    if (mode === 'purchase') return { amount: typeof vehicle.purchase_price === 'number' ? vehicle.purchase_price : null, label: 'Purchase Price' };
+    if (mode === 'sale') {
+      // FACT-BASED: Only show sale_price if it has a verified source
+      if (typeof vehicle.sale_price === 'number') {
+        // Check if sale_price has a verified source
+        if (!priceSources.sale_price && !(vehicle as any).bat_auction_url) {
+          // No verified source - don't show unverified prices
+          return { amount: null, label: '' };
+        }
+        
+        // Respect auction outcome for proper disclosure
+        if ((vehicle as any).auction_outcome === 'sold') {
+          return { amount: vehicle.sale_price, label: 'SOLD FOR' };
+        } else if ((vehicle as any).auction_outcome === 'reserve_not_met') {
+          // Don't show high bid for RNM - user needs to click for details
+          return { amount: null, label: 'Reserve Not Met' };
+        } else if ((vehicle as any).auction_outcome === 'no_sale') {
+          return { amount: null, label: 'No Sale' };
+        } else {
+          return { amount: vehicle.sale_price, label: 'Sold for' };
+        }
+      }
+      return { amount: null, label: '' };
+    }
+    if (mode === 'purchase') {
+      // FACT-BASED: Only show purchase_price if has verified source (e.g., receipt)
+      if (typeof vehicle.purchase_price === 'number') {
+        if (!priceSources.purchase_price) {
+          // No verified source - don't show unverified purchase prices
+          return { amount: null, label: '' };
+        }
+        return { amount: vehicle.purchase_price, label: 'Purchase Price' };
+      }
+      return { amount: null, label: '' };
+    }
     if (mode === 'msrp') return { amount: typeof vehicle.msrp === 'number' ? vehicle.msrp : null, label: 'Original MSRP' };
     return getAutoDisplay();
   };
@@ -1612,7 +1681,24 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       {showProvenancePopup && vehicle && primaryAmount !== null && (
         <ValueProvenancePopup
           vehicleId={vehicle.id}
-          field="current_value"
+          field={(() => {
+            // Determine which field is actually being displayed based on primaryPrice
+            const displayModeValue = displayMode || 'auto';
+            if (displayModeValue === 'sale' || primaryPrice.label?.includes('SOLD') || primaryPrice.label?.includes('Sold')) {
+              return 'sale_price';
+            }
+            if (displayModeValue === 'asking' || primaryPrice.label?.includes('Asking')) {
+              return 'asking_price';
+            }
+            if (displayModeValue === 'purchase' || primaryPrice.label?.includes('Purchase')) {
+              return 'purchase_price';
+            }
+            // Default to sale_price if vehicle has it, otherwise current_value
+            if (vehicle.sale_price && vehicle.sale_price === primaryAmount) {
+              return 'sale_price';
+            }
+            return 'current_value';
+          })()}
           value={primaryAmount}
           onClose={() => setShowProvenancePopup(false)}
           onUpdate={(newValue) => {

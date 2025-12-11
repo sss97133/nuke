@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -103,27 +104,140 @@ serve(async (req) => {
           continue;
         }
 
-        // Call scrape-vehicle to get full details
-        const scrapeResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-vehicle`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-            },
-            body: JSON.stringify({ url: item.listing_url })
-          }
-        );
+        // Scrape vehicle data - try Firecrawl first, then direct fetch
+        console.log('🔍 Scraping URL:', item.listing_url);
+        
+        let html = '';
+        let scrapeSuccess = false;
+        const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+        
+        // Try Firecrawl first if API key is available (bypasses bot protection)
+        if (firecrawlApiKey) {
+          try {
+            console.log('🔥 Attempting Firecrawl scrape...');
+            const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${firecrawlApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                url: item.listing_url,
+                formats: ['html', 'markdown'],
+                pageOptions: {
+                  waitFor: 2000, // Wait 2 seconds for JS to load
+                },
+              })
+            });
 
-        if (!scrapeResponse.ok) {
-          throw new Error(`Scrape failed: ${scrapeResponse.status}`);
+            if (firecrawlResponse.ok) {
+              const firecrawlData = await firecrawlResponse.json();
+              if (firecrawlData.success && firecrawlData.data?.html) {
+                html = firecrawlData.data.html;
+                scrapeSuccess = true;
+                console.log('✅ Firecrawl scrape successful');
+              }
+            } else {
+              console.warn('⚠️ Firecrawl failed:', firecrawlResponse.status);
+            }
+          } catch (error) {
+            console.warn('⚠️ Firecrawl error:', error);
+            // Fall through to direct fetch
+          }
+        }
+        
+        // Fallback to direct fetch if Firecrawl didn't work
+        if (!scrapeSuccess) {
+          console.log('📡 Using direct fetch (fallback)');
+          const response = await fetch(item.listing_url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error(`Scrape failed: ${response.status}`);
+          }
+
+          html = await response.text();
+        }
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+
+        // Basic data extraction
+        const scrapeData: any = {
+          success: true,
+          data: {
+            source: 'Unknown',
+            listing_url: item.listing_url,
+            discovery_url: item.listing_url,
+            title: doc.querySelector('title')?.textContent || '',
+            description: '',
+            images: extractImageURLs(html),
+            timestamp: new Date().toISOString(),
+            year: null,
+            make: null,
+            model: null,
+            asking_price: null,
+            location: null,
+          }
+        };
+
+        // Extract VIN from HTML
+        const vinPatterns = [
+          /<div[^>]*class="[^"]*spec-line[^"]*vin[^"]*"[^>]*>VIN\s+([A-HJ-NPR-Z0-9]{17})/i,
+          /<[^>]*class="[^"]*vin[^"]*"[^>]*>[\s\S]*?VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+          /VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i,
+          /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+        ];
+
+        for (const pattern of vinPatterns) {
+          const match = html.match(pattern);
+          if (match && match[1] && match[1].length === 17 && !/[IOQ]/.test(match[1])) {
+            scrapeData.data.vin = match[1].toUpperCase();
+            break;
+          }
         }
 
-        const scrapeData = await scrapeResponse.json();
-
-        if (!scrapeData.success) {
-          throw new Error(scrapeData.error || 'Scrape returned failure');
+        // Craigslist parsing
+        if (item.listing_url.includes('craigslist.org')) {
+          scrapeData.data.source = 'Craigslist';
+          const titleElement = doc.querySelector('h1 .postingtitletext');
+          if (titleElement) {
+            scrapeData.data.title = titleElement.textContent?.trim() || '';
+          }
+          const priceElement = doc.querySelector('.price');
+          if (priceElement) {
+            const priceText = priceElement.textContent?.trim();
+            const priceMatch = priceText?.match(/\$?([\d,]+)/);
+            if (priceMatch) {
+              scrapeData.data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''));
+            }
+          }
+          const locationElement = doc.querySelector('.postingtitle .postingtitletext small');
+          if (locationElement) {
+            scrapeData.data.location = locationElement.textContent?.trim().replace(/[()]/g, '');
+          }
+          const bodyElement = doc.querySelector('#postingbody');
+          if (bodyElement) {
+            scrapeData.data.description = bodyElement.textContent?.trim() || '';
+          }
+          if (scrapeData.data.title) {
+            const yearMatch = scrapeData.data.title.match(/\b(19|20)\d{2}\b/);
+            if (yearMatch) {
+              scrapeData.data.year = parseInt(yearMatch[0]);
+            }
+            const parts = scrapeData.data.title.split(' ');
+            if (parts.length >= 3) {
+              let startIndex = 0;
+              if (parts[0] && parts[0].match(/\b(19|20)\d{2}\b/)) {
+                startIndex = 1;
+              }
+              if (parts[startIndex]) scrapeData.data.make = parts[startIndex];
+              if (parts[startIndex + 1]) scrapeData.data.model = parts[startIndex + 1];
+            }
+          }
         }
 
         // Get source info for organization linking
@@ -285,4 +399,65 @@ serve(async (req) => {
     });
   }
 });
+
+// Helper function to extract image URLs
+function extractImageURLs(html: string): string[] {
+  const images: string[] = [];
+  const seen = new Set<string>();
+  
+  // Pattern 1: Standard img tags
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  let match;
+
+  while ((match = imgRegex.exec(html)) !== null) {
+    const src = match[1];
+    if (src && !src.startsWith('data:') && !src.includes('icon') && !src.includes('logo')) {
+      let fullUrl = src;
+      if (src.startsWith('//')) {
+        fullUrl = 'https:' + src;
+      } else if (src.startsWith('/')) {
+        continue;
+      } else if (src.startsWith('http')) {
+        fullUrl = src;
+      } else {
+        continue;
+      }
+      
+      if (!seen.has(fullUrl)) {
+        images.push(fullUrl);
+        seen.add(fullUrl);
+      }
+    }
+  }
+
+  // Pattern 2: Data attributes
+  const dataSrcPatterns = [
+    /<[^>]+data-src=["']([^"']+)["'][^>]*>/gi,
+    /<[^>]+data-lazy-src=["']([^"']+)["'][^>]*>/gi,
+    /<[^>]+data-original=["']([^"']+)["'][^>]*>/gi,
+  ];
+  
+  for (const pattern of dataSrcPatterns) {
+    while ((match = pattern.exec(html)) !== null) {
+      const src = match[1];
+      if (src && src.startsWith('http') && !seen.has(src)) {
+        images.push(src);
+        seen.add(src);
+      }
+    }
+  }
+
+  // Filter out thumbnails and junk
+  return images.filter(img => {
+    const lower = img.toLowerCase();
+    const isThumbnail = lower.includes('94x63') || 
+                       lower.includes('thumbnail') || 
+                       lower.includes('thumb/');
+    
+    return !isThumbnail &&
+           !lower.includes('icon') && 
+           !lower.includes('logo') &&
+           !lower.includes('placeholder');
+  });
+}
 
