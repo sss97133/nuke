@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standalone React Test</title>
+</head>
+<body>
+    <div id="root"></div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script>
+        // Standalone test - no bundler, no Vite, just React from CDN
+        const { createRoot } = ReactDOM;
+        const root = document.getElementById('root');
+        if (root) {
+            try {
+                const reactRoot = createRoot(root);
+                reactRoot.render(React.createElement('div', null, 'Standalone React Test - If you see this, React works without bundler'));
+                console.log('[standalone] React render successful');
+            } catch (error) {
+                console.error('[standalone] React render failed:', error);
+                root.innerHTML = '<div style="color: red; padding: 20px;">Error: ' + error.message + '</div>';
+            }
+        }
+    </script>
+</body>
+</html>
+

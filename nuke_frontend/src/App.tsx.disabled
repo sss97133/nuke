@@ -1,4 +1,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:1',message:'App.tsx module start',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+// #endregion
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 // Design system imported via index.css
@@ -10,7 +13,6 @@ import { UploadStatusProvider } from './contexts/UploadStatusContext';
 import GlobalUploadStatus from './components/GlobalUploadStatus';
 import { UploadProgressBar } from './components/UploadProgressBar';
 import { SpeedInsights } from '@vercel/speed-insights/react';
-import { TestMode } from './lib/test-mode';
 
 // Database components
 import DatabaseAudit from './pages/DatabaseAudit';
@@ -18,10 +20,17 @@ import Vehicles from './pages/Vehicles';
 import AddVehicle from './pages/add-vehicle/AddVehicle';
 import EditVehicle from './pages/EditVehicle';
 import VehicleForm from './components/vehicles/VehicleForm';
-// Lazy load VehicleProfile to avoid circular dependency issues
-const VehicleProfile = React.lazy(() => import('./pages/VehicleProfile'));
-const ImportClassicCars = React.lazy(() => import('./pages/ImportClassicCars'));
-const VehicleMailbox = React.lazy(() => import('./components/VehicleMailbox/VehicleMailbox'));
+// Temporarily comment out VehicleProfile import to test if it causes TDZ
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:20',message:'VehicleProfile import commented out for TDZ testing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run12',hypothesisId:'P'})}).catch(()=>{});
+// #endregion
+// import VehicleProfile from './pages/VehicleProfile';
+function VehicleProfile() { return <div>VehicleProfile placeholder - TDZ test</div>; }
+// Temporarily disable other lazy loads
+// const ImportClassicCars = React.lazy(() => import('./pages/ImportClassicCars'));
+// const VehicleMailbox = React.lazy(() => import('./components/VehicleMailbox/VehicleMailbox'));
+function ImportClassicCars() { return <div>ImportClassicCars placeholder</div>; }
+function VehicleMailbox() { return <div>VehicleMailbox placeholder</div>; }
 // import VehicleEditForm from './pages/VehicleEditForm';
 // import VehicleDateImages from './pages/VehicleDateImages';
 import Dashboard from './pages/Dashboard';
@@ -48,10 +57,23 @@ import VehicleApproval from './pages/VehicleApproval';
 // import PublicVehicleProfile from './pages/PublicVehicleProfile';
 import VehicleModerationDashboard from './pages/VehicleModerationDashboard';
 import VehicleContributionForm from './pages/VehicleContributionForm';
-// Lazy load VehicleVerification to avoid blocking app startup
-const VehicleVerification = React.lazy(() => import('./pages/VehicleVerification'));
+// Temporarily comment out VehicleVerification import to test if it causes TDZ
+// import VehicleVerification from './pages/VehicleVerification';
+function VehicleVerification() { return <div>VehicleVerification placeholder - TDZ test</div>; }
 import AllVehicles from './pages/AllVehicles';
-import CursorHomepage from './pages/CursorHomepage';
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:69',message:'Before inline component definition',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run10',hypothesisId:'N'})}).catch(()=>{});
+// #endregion
+// Try inline component definition to bypass module import entirely
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:72',message:'Defining inline CursorHomepage',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run10',hypothesisId:'N'})}).catch(()=>{});
+// #endregion
+function CursorHomepage() {
+  return <div style={{ padding: '20px' }}>Inline Component - If you see this, TDZ is resolved</div>;
+}
+// #region agent log
+fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:76',message:'After inline component definition',data:{hasCursorHomepage:!!CursorHomepage},timestamp:Date.now(),sessionId:'debug-session',runId:'run10',hypothesisId:'N'})}).catch(()=>{});
+// #endregion
 import Search from './pages/Search';
 import ProjectManagement from './pages/ProjectManagement';
 import SimpleProjectManager from './pages/SimpleProjectManager';
@@ -269,10 +291,10 @@ function App() {
         {/* Global Upload Status - Always visible at top */}
         <GlobalUploadStatus />
 
-        <AppLayout>
-          <Routes>
-            {/* Home route - Landing Page */}
-            <Route path="/" element={<CursorHomepage />} />
+        {/* Temporarily bypass AppLayout to test if it's causing TDZ */}
+        <Routes>
+          {/* Home route - Landing Page */}
+          <Route path="/" element={<Suspense fallback={<div>Loading...</div>}><CursorHomepage /></Suspense>} />
 
             {/* Main routes */}
             <Route path="/discover" element={<Discovery />} />
@@ -348,19 +370,11 @@ function App() {
             <Route path="/knowledge" element={<KnowledgeBase />} />
             
             {/* Vehicle Management */}
-            <Route path="/vehicle/:vehicleId" element={
-              <Suspense fallback={<div style={{ padding: '20px' }}>Loading vehicle...</div>}>
-                <VehicleProfile />
-              </Suspense>
-            } />
+            <Route path="/vehicle/:vehicleId" element={<VehicleProfile />} />
             <Route path="/vehicle/:vehicleId/edit" element={<EditVehicle />} />
             {/* <Route path="/vehicle/:vehicleId/date-images" element={<VehicleDateImages />} /> */}
             <Route path="/vehicle-approval/:extractionId" element={<VehicleApproval />} />
-            <Route path="/vehicle-verification/:vehicleId" element={
-              <Suspense fallback={<div>Loading...</div>}>
-                <VehicleVerification />
-              </Suspense>
-            } />
+            <Route path="/vehicle-verification/:vehicleId" element={<VehicleVerification />} />
             
             {/* Secretary Mode - Rapid Curation */}
             <Route path="/curation/queue" element={<CurationQueue />} />
@@ -458,8 +472,8 @@ function App() {
                 </div>
               </div>
             } />
-          </Routes>
-        </AppLayout>
+            </Routes>
+        {/* AppLayout temporarily removed for TDZ testing */}
         {/* Global Upload Progress Bar - Persists across navigation */}
         <UploadProgressBar />
         </Router>
