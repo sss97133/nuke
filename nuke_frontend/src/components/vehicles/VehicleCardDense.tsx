@@ -1,16 +1,6 @@
 import React, { useState, useEffect } from 'react';
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:1',message:'VehicleCardDense module start',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-// #endregion
 import { Link } from 'react-router-dom';
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:3',message:'Before UnifiedPricingService import',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-// #endregion
 import { UnifiedPricingService } from '../../services/unifiedPricingService';
-// #region agent log
-fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:5',message:'After UnifiedPricingService import',data:{hasService:!!UnifiedPricingService},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-// #endregion
-
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -70,16 +60,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showPriceOverlay = true,
   showDetailOverlay = true
 }) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:56',message:'VehicleCardDense component start',data:{vehicleId:vehicle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-  const [displayPrice, setDisplayPrice] = useState<string>('—');
+const [displayPrice, setDisplayPrice] = useState<string>('—');
   const [priceLabel, setPriceLabel] = useState<string>('');
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:64',message:'After useState calls',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-
-  // Load unified price on component mount
+// Load unified price on component mount
   useEffect(() => {
     const loadPrice = async () => {
       try {
@@ -632,18 +615,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     });
     (window as any).__debugRenderCount++;
   }
-  
-  // #region agent log
-  if (viewMode === 'grid' && (window as any).__debugVehicleCardIndex === undefined) {
-    (window as any).__debugVehicleCardIndex = 0;
-  }
-  if (viewMode === 'grid' && (window as any).__debugVehicleCardIndex < 5) {
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:596',message:'VehicleCardDense URL extraction',data:{vehicleId:vehicle.id,all_images:vehicle.all_images,all_imagesLength:vehicle.all_images?.length,primary_image_url:vehicle.primary_image_url,image_url:vehicle.image_url,vehicleImages,vehicleImagesLength:vehicleImages.length,currentImageIndex,currentImageUrl,imageUrl_from_getImageUrl:imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    (window as any).__debugVehicleCardIndex++;
-  }
-  // #endregion
-  
-  // EMERGENCY FIX: Log and use ANY available image field
+// EMERGENCY FIX: Log and use ANY available image field
   if (!currentImageUrl && viewMode === 'grid') {
     // Try every possible field
     const possibleUrls = [
@@ -659,10 +631,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     if (possibleUrls.length > 0) {
       currentImageUrl = possibleUrls[0];
       console.warn(`⚠️ Vehicle ${vehicle.id} - Using emergency fallback URL:`, currentImageUrl);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:620',message:'Emergency fallback used',data:{vehicleId:vehicle.id,fallbackUrl:currentImageUrl,possibleUrls},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
-    } else {
+} else {
       console.error(`❌ Vehicle ${vehicle.id} has NO image URLs at all!`, {
         all_images: vehicle.all_images,
         primary_image_url: vehicle.primary_image_url,
@@ -670,10 +639,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         image_variants: vehicle.image_variants,
         imageUrl
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:630',message:'NO image URLs found',data:{vehicleId:vehicle.id,all_images:vehicle.all_images,primary_image_url:vehicle.primary_image_url,image_url:vehicle.image_url,image_variants:vehicle.image_variants,imageUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
-    }
+}
   }
   
   // Debug logging for grid view (first few vehicles only)
@@ -752,19 +718,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           position: 'relative',
         }}
         onLoad={() => {
-          // #region agent log
-          if ((window as any).__debugVehicleCardIndex < 5) {
-            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:655',message:'Image element loaded',data:{vehicleId:vehicle.id,currentImageUrl,loaded:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-          }
-          // #endregion
-        }}
+}}
         onError={() => {
-          // #region agent log
-          if ((window as any).__debugVehicleCardIndex < 5) {
-            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VehicleCardDense.tsx:662',message:'Image element failed to load',data:{vehicleId:vehicle.id,currentImageUrl,error:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-          }
-          // #endregion
-        }}
+}}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
