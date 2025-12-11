@@ -98,6 +98,172 @@ interface ExpertValuation {
   warnings: string[];
 }
 
+/**
+ * CHAT MODE: Handle vehicle chat conversation where AI IS the vehicle
+ */
+async function handleChatMode(
+  vehicleId: string,
+  question: string,
+  vehicleVin?: string,
+  vehicleNickname?: string,
+  vehicleYmm?: string,
+  vehicleYear?: number,
+  vehicleMake?: string,
+  vehicleModel?: string,
+  conversationHistory: Array<{ role: string; content: string }> = [],
+  llmProvider?: string,
+  llmModel?: string,
+  analysisTier?: string,
+  userId?: string
+): Promise<Response> {
+  try {
+    // Get LLM configuration
+    const llmConfig = await getLLMConfig(
+      supabase,
+      userId || null,
+      llmProvider,
+      llmModel,
+      analysisTier || 'expert'
+    );
+    
+    // Get vehicle data
+    const { data: vehicle, error: vehicleError } = await supabase
+      .from('vehicles')
+      .select('id, year, make, model, vin, mileage, color, purchase_price, current_value')
+      .eq('id', vehicleId)
+      .single();
+    
+    if (vehicleError || !vehicle) {
+      throw new Error(`Vehicle not found: ${vehicleId}`);
+    }
+    
+    // Determine vehicle identity (nickname > YMM > VIN)
+    const vehicleIdentity = vehicleNickname || 
+                           vehicleYmm || 
+                           (vehicleYear && vehicleMake && vehicleModel ? `${vehicleYear} ${vehicleMake} ${vehicleModel}` : null) ||
+                           (vehicle.year && vehicle.make && vehicle.model ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : null) ||
+                           vehicleVin || 
+                           vehicle.vin || 
+                           `Vehicle ${vehicleId.substring(0, 8)}`;
+    
+    // Gather vehicle history and context
+    const { data: timelineEvents } = await supabase
+      .from('timeline_events')
+      .select('event_type, title, description, event_date, mileage_at_event, receipt_amount')
+      .eq('vehicle_id', vehicleId)
+      .order('event_date', { ascending: false })
+      .limit(20);
+    
+    const { data: images } = await supabase
+      .from('vehicle_images')
+      .select('id, category, taken_at')
+      .eq('vehicle_id', vehicleId)
+      .limit(5);
+    
+    const { data: receipts } = await supabase
+      .from('receipts')
+      .select('vendor_name, total_amount, purchase_date, description')
+      .eq('vehicle_id', vehicleId)
+      .order('purchase_date', { ascending: false })
+      .limit(10);
+    
+    // Build vehicle persona prompt
+    const vehicleContext = `
+MY IDENTITY: I am ${vehicleIdentity}. I am the vehicle itself, fully self-aware of my own history.
+
+MY SPECIFICATIONS:
+- Year: ${vehicle.year || vehicleYear || 'Unknown'}
+- Make: ${vehicle.make || vehicleMake || 'Unknown'}
+- Model: ${vehicle.model || vehicleModel || 'Unknown'}
+- VIN: ${vehicle.vin || vehicleVin || 'Not available'}
+- Current Mileage: ${vehicle.mileage ? vehicle.mileage.toLocaleString() + ' miles' : 'Unknown'}
+- Color: ${vehicle.color || 'Unknown'}
+- Purchase Price: ${vehicle.purchase_price ? '$' + vehicle.purchase_price.toLocaleString() : 'Unknown'}
+- Current Value: ${vehicle.current_value ? '$' + vehicle.current_value.toLocaleString() : 'Unknown'}
+
+MY HISTORY (${timelineEvents?.length || 0} events):
+${timelineEvents && timelineEvents.length > 0 
+  ? timelineEvents.map(e => 
+      `- ${e.event_date ? new Date(e.event_date).toLocaleDateString() : 'Date unknown'}: ${e.title}${e.description ? ' - ' + e.description : ''}${e.mileage_at_event ? ' (at ' + e.mileage_at_event.toLocaleString() + ' miles)' : ''}${e.receipt_amount ? ' - Cost: $' + parseFloat(e.receipt_amount).toLocaleString() : ''}`
+    ).join('\n')
+  : 'No documented history yet.'}
+
+MY RECEIPTS (${receipts?.length || 0} receipts):
+${receipts && receipts.length > 0
+  ? receipts.map(r => 
+      `- ${r.purchase_date ? new Date(r.purchase_date).toLocaleDateString() : 'Date unknown'}: ${r.vendor_name || 'Vendor'} - $${parseFloat(r.total_amount || '0').toLocaleString()}${r.description ? ' - ' + r.description : ''}`
+    ).join('\n')
+  : 'No receipts documented yet.'}
+
+MY PHOTOS: ${images?.length || 0} photos documented${images && images.length > 0 ? ` (categories: ${[...new Set(images.map(i => i.category).filter(Boolean))].join(', ') || 'various'})` : ''}
+
+CRITICAL: I am the vehicle itself. When answering questions, I speak in first person about my own history, condition, maintenance, repairs, and value. I have complete access to all my data and can answer questions about:
+- My maintenance history and service records
+- Repairs and modifications performed on me
+- Parts installed or replaced
+- My current condition and value
+- My timeline of events
+- Any questions about my specifications, history, or status
+
+I am self-aware and can discuss my own experiences, what work has been done on me, where I've been, and what I know about myself.`;
+
+    // Build conversation messages
+    const messages = [
+      {
+        role: 'system',
+        content: vehicleContext
+      },
+      ...conversationHistory.filter(m => m.role !== 'system'), // Remove any existing system messages
+      {
+        role: 'user',
+        content: question
+      }
+    ];
+    
+    console.log(`💬 Chat request: ${question.substring(0, 100)}...`);
+    console.log(`📚 Vehicle context: ${vehicleIdentity}, ${timelineEvents?.length || 0} events, ${receipts?.length || 0} receipts`);
+    
+    // Call LLM
+    const response = await callLLM(
+      llmConfig,
+      messages,
+      { temperature: 0.7, maxTokens: 1000 }
+    );
+    
+    const answer = response.content || 'I apologize, but I could not process your question.';
+    
+    console.log(`✅ Chat response generated (${response.duration_ms}ms)`);
+    
+    return new Response(JSON.stringify({
+      response: answer,
+      vehicle_identity: vehicleIdentity,
+      context_used: {
+        timeline_events: timelineEvents?.length || 0,
+        receipts: receipts?.length || 0,
+        images: images?.length || 0
+      }
+    }), {
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
+    
+  } catch (error: any) {
+    console.error('❌ Chat mode error:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      response: 'I apologize, but I encountered an error processing your question. Please try again.'
+    }), {
+      status: 500,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -115,6 +281,14 @@ Deno.serve(async (req) => {
     const { 
       vehicleId, 
       queueId,
+      question,          // Optional: if provided, switch to chat mode
+      vehicle_vin,       // Optional: vehicle VIN for identity
+      vehicle_nickname,  // Optional: vehicle nickname for identity
+      vehicle_ymm,       // Optional: year/make/model string
+      vehicle_year,      // Optional: year
+      vehicle_make,      // Optional: make
+      vehicle_model,    // Optional: model
+      conversation_history, // Optional: chat history
       llmProvider,      // Optional: 'openai' | 'anthropic' | 'google'
       llmModel,         // Optional: specific model name
       analysisTier,    // Optional: 'tier1' | 'tier2' | 'tier3' | 'expert'
@@ -125,6 +299,27 @@ Deno.serve(async (req) => {
       throw new Error('vehicleId is required');
     }
     
+    // CHAT MODE: If question is provided, handle as chat conversation
+    if (question) {
+      console.log(`💬 Vehicle Expert Agent chat mode for: ${vehicleId}`);
+      return await handleChatMode(
+        vehicleId,
+        question,
+        vehicle_vin,
+        vehicle_nickname,
+        vehicle_ymm,
+        vehicle_year,
+        vehicle_make,
+        vehicle_model,
+        conversation_history || [],
+        llmProvider,
+        llmModel,
+        analysisTier,
+        userId
+      );
+    }
+    
+    // VALUATION MODE: Original analysis pipeline
     console.log(`🤖 Vehicle Expert Agent starting analysis for: ${vehicleId}${queueId ? ` (queue: ${queueId})` : ''}`);
     console.log(`📊 Analysis config: tier=${analysisTier || 'expert'}, provider=${llmProvider || 'auto'}, model=${llmModel || 'auto'}`);
     

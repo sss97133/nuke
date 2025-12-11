@@ -9,7 +9,6 @@ import BulkActionsToolbar from '../components/vehicles/BulkActionsToolbar';
 import BulkGPSAssignment from '../components/vehicles/BulkGPSAssignment';
 import VehicleOrganizationToolbar from '../components/vehicles/VehicleOrganizationToolbar';
 import GPSOrganizationSuggestions from '../components/vehicles/GPSOrganizationSuggestions';
-import PendingAssignments from '../components/vehicles/PendingAssignments';
 import VehicleConfirmationQuestions from '../components/vehicles/VehicleConfirmationQuestions';
 import TitleTransferApproval from '../components/ownership/TitleTransferApproval';
 import '../design-system.css';
@@ -1444,17 +1443,6 @@ const VehiclesInner: React.FC = () => {
                                 }}
                               />
                             </div>
-                          )}
-
-                          {/* Pending Assignments */}
-                          {session?.user?.id && (
-                            <PendingAssignments
-                              vehicleId={vehicle.id}
-                              userId={session.user.id}
-                              onAssignmentChange={() => {
-                                loadVehicleRelationships();
-                              }}
-                            />
                           )}
 
                           {/* Organization Toolbar */}
