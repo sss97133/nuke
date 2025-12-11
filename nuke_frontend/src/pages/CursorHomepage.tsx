@@ -634,12 +634,21 @@ const CursorHomepage: React.FC = () => {
 
         if (imagesError) {
           console.error(`❌ Error loading images for batch ${i / IMAGE_BATCH_SIZE + 1}:`, imagesError);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:637',message:'Image query error',data:{batch:i/IMAGE_BATCH_SIZE+1,error:imagesError?.message,vehicleIds:batch.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
         } else if (batchImages) {
           allImages.push(...batchImages);
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:640',message:'Images loaded from DB',data:{batch:i/IMAGE_BATCH_SIZE+1,count:batchImages.length,sampleImage:batchImages[0]?{id:batchImages[0].id,vehicle_id:batchImages[0].vehicle_id,image_url:batchImages[0].image_url,large_url:batchImages[0].large_url}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
         }
       }
 
       console.log(`✅ Loaded ${allImages.length} images for ${initialVehicleIds.length} vehicles (lazy loading: initial batch only)`);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:642',message:'Total images loaded summary',data:{totalImages:allImages.length,vehicleCount:initialVehicleIds.length,sampleImage:allImages[0]?{id:allImages[0].id,vehicle_id:allImages[0].vehicle_id,image_url:allImages[0].image_url}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       if (allImages.length > 0) {
         // Log sample image to see structure
         console.log('Sample image:', allImages[0]);
@@ -663,6 +672,20 @@ const CursorHomepage: React.FC = () => {
         imagesByVehicle.get(img.vehicle_id)!.push(img);
       });
       
+      // CRITICAL DEBUG: Log first few vehicles' image data
+      console.log('🔍🔍🔍 IMAGE GROUPING DEBUG:', {
+        totalImagesLoaded: allImages.length,
+        vehiclesWithImages: imagesByVehicle.size,
+        sampleVehicleId: initialVehicleIds[0],
+        sampleVehicleImages: imagesByVehicle.get(initialVehicleIds[0])?.slice(0, 2).map((img: any) => ({
+          id: img.id,
+          vehicle_id: img.vehicle_id,
+          image_url: img.image_url,
+          large_url: img.large_url,
+          is_primary: img.is_primary
+        }))
+      });
+      
       // Store initial loaded images in state (merge with existing)
       setLoadedVehicleImages(prev => {
         const next = new Map(prev);
@@ -675,9 +698,10 @@ const CursorHomepage: React.FC = () => {
       // Fetch event counts for all vehicles (batched)
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const recentEvents: any[] = [];
+      const TIMELINE_BATCH_SIZE = 25; // Use same batch size as images
       
-      for (let i = 0; i < vehicleIds.length; i += BATCH_SIZE) {
-        const batch = vehicleIds.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < vehicleIds.length; i += TIMELINE_BATCH_SIZE) {
+        const batch = vehicleIds.slice(i, i + TIMELINE_BATCH_SIZE);
         const { data: batchEvents } = await supabase
           .from('timeline_events')
           .select('vehicle_id')
@@ -698,8 +722,9 @@ const CursorHomepage: React.FC = () => {
 
       // Fetch external_listings to get listing_start_date for BAT auctions
       const externalListings: any[] = [];
-      for (let i = 0; i < vehicleIds.length; i += BATCH_SIZE) {
-        const batch = vehicleIds.slice(i, i + BATCH_SIZE);
+      const LISTINGS_BATCH_SIZE = 25; // Use same batch size as images
+      for (let i = 0; i < vehicleIds.length; i += LISTINGS_BATCH_SIZE) {
+        const batch = vehicleIds.slice(i, i + LISTINGS_BATCH_SIZE);
         const { data: batchListings } = await supabase
           .from('external_listings')
           .select('vehicle_id, start_date, listing_status, platform')
@@ -731,6 +756,19 @@ const CursorHomepage: React.FC = () => {
         
         // Get images for this vehicle (use local map first, then state as fallback)
         const images = imagesByVehicle.get(v.id) || [];
+        
+        // CRITICAL DEBUG: Log image extraction for first few vehicles
+        if (vehiclesToProcess.indexOf(v) < 3) {
+          console.log(`🔍🔍🔍 EXTRACTION DEBUG Vehicle ${v.id}:`, {
+            rawImagesCount: images.length,
+            rawImages: images.slice(0, 2).map((img: any) => ({
+              id: img.id,
+              image_url: img.image_url,
+              large_url: img.large_url,
+              is_primary: img.is_primary
+            }))
+          });
+        }
         
         // Use the SAME logic as VehicleProfile - simple and reliable
         // Just use image_url directly from database (like VehicleProfile does)
@@ -813,6 +851,12 @@ const CursorHomepage: React.FC = () => {
           // VehicleProfile line 1136: large_url || image_url
           const primaryImageUrl = primaryImage ? (primaryImage.large_url || primaryImage.image_url) : null;
           
+          // #region agent log
+          if (vehiclesToProcess.indexOf(v) < 5) {
+            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:815',message:'Vehicle enrichment - BEFORE setting on object',data:{vehicleId:v.id,imagesCount:images.length,all_imagesCount:all_images.length,all_images:all_images,primaryImageUrl,primaryImage:primaryImage?{id:primaryImage.id,image_url:primaryImage.image_url,large_url:primaryImage.large_url}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          }
+          // #endregion
+          
           // Debug logging for first few vehicles to see what's happening
           if (vehiclesToProcess.indexOf(v) < 10) {
             console.log(`🔍 Vehicle ${v.id} (${v.year} ${v.make} ${v.model}):`, {
@@ -838,7 +882,7 @@ const CursorHomepage: React.FC = () => {
             console.warn('Images data:', images.slice(0, 2));
           }
 
-            return {
+            const enrichedVehicle = {
             ...v,
             display_price: displayPrice, // Add smart price for display
             image_count: totalImages, // Use actual count from images query
@@ -854,6 +898,14 @@ const CursorHomepage: React.FC = () => {
             tier_label: 'C', // Default tier label (just the letter, no "Tier " prefix)
             listing_start_date: listingStartDate || undefined // When listing went live (for BAT auctions)
           };
+          
+          // #region agent log
+          if (vehiclesToProcess.indexOf(v) < 5) {
+            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:842',message:'Vehicle enrichment - AFTER setting on object',data:{vehicleId:enrichedVehicle.id,primary_image_url:enrichedVehicle.primary_image_url,image_url:enrichedVehicle.image_url,all_images:enrichedVehicle.all_images,all_imagesLength:enrichedVehicle.all_images?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          }
+          // #endregion
+          
+          return enrichedVehicle;
         });
       
       const sorted = enriched.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
@@ -1960,6 +2012,9 @@ const CursorHomepage: React.FC = () => {
                   image_count: vehicle.image_count,
                   hasImages: !!(vehicle.primary_image_url || vehicle.all_images?.length || vehicle.image_url)
                 });
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1955',message:'Passing vehicle to VehicleCardDense',data:{vehicleId:vehicle.id,index,primary_image_url:vehicle.primary_image_url,image_url:vehicle.image_url,all_images:vehicle.all_images,all_imagesLength:vehicle.all_images?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                // #endregion
               }
               
               return (

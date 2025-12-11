@@ -1190,6 +1190,55 @@ serve(async (req) => {
           throw new Error(`Vehicle insert failed: ${vehicleError.message}`);
         }
 
+        // Create dealer_inventory record if this is inventory extraction from a dealer
+        const rawData = item.raw_data || {};
+        const isInventoryExtraction = rawData.inventory_extraction === true || rawData.inventory_extraction === 'true';
+        const businessType = rawData.business_type || 'dealer';
+        
+        if (organizationId && isInventoryExtraction && businessType === 'dealer') {
+          console.log(`📦 Creating dealer_inventory record for vehicle ${newVehicle.id}...`);
+          try {
+            const { error: inventoryError } = await supabase
+              .from('dealer_inventory')
+              .upsert({
+                dealer_id: organizationId,
+                vehicle_id: newVehicle.id,
+                status: 'in_stock',
+                asking_price: scrapeData.data.asking_price || scrapeData.data.price || null,
+                acquisition_type: 'purchase', // Default, could be updated later
+                notes: `Auto-imported from ${new URL(item.listing_url).hostname}`,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }, {
+                onConflict: 'dealer_id,vehicle_id'
+              });
+
+            if (inventoryError) {
+              console.warn(`⚠️ Failed to create dealer_inventory: ${inventoryError.message}`);
+            } else {
+              console.log(`✅ Created dealer_inventory record`);
+            }
+          } catch (invErr: any) {
+            console.warn(`⚠️ Error creating dealer_inventory: ${invErr.message}`);
+          }
+        }
+        
+        // Also ensure organization_vehicles link exists for new vehicles with organization
+        if (organizationId) {
+          await supabase
+            .from('organization_vehicles')
+            .upsert({
+              organization_id: organizationId,
+              vehicle_id: newVehicle.id,
+              relationship_type: isInventoryExtraction && businessType === 'dealer' ? 'inventory' : 'sale',
+              status: 'active',
+              auto_tagged: true
+            }, {
+              onConflict: 'organization_id,vehicle_id'
+            });
+          console.log(`🔗 Linked vehicle to organization ${organizationId}`);
+        }
+
         // Process scraped data through forensic system (REPLACES manual field assignment)
         await supabase.rpc('process_scraped_data_forensically', {
           p_vehicle_id: newVehicle.id,
