@@ -18,18 +18,38 @@ interface VehicleExpertChatProps {
   vehicleId: string
   vehicleVIN?: string
   vehicleYMM?: string
+  vehicleNickname?: string
+  vehicleYear?: number
+  vehicleMake?: string
+  vehicleModel?: string
 }
 
 export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
   vehicleId,
   vehicleVIN,
-  vehicleYMM
+  vehicleYMM,
+  vehicleNickname,
+  vehicleYear,
+  vehicleMake,
+  vehicleModel
 }) => {
+  // Determine vehicle display name: nickname > YMM > VIN
+  const getVehicleDisplayName = (): string => {
+    if (vehicleNickname) return vehicleNickname
+    if (vehicleYMM) return vehicleYMM
+    if (vehicleYear && vehicleMake && vehicleModel) {
+      return `${vehicleYear} ${vehicleMake} ${vehicleModel}`
+    }
+    if (vehicleVIN) return vehicleVIN
+    return 'Vehicle'
+  }
+
+  const vehicleDisplayName = getVehicleDisplayName()
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'system',
-      content: `I'm your personal vehicle expert for this vehicle${vehicleVIN ? ` (VIN: ${vehicleVIN})` : ''}. Ask me anything about maintenance, repairs, parts, value, or history. I have access to all your vehicle's data and can help you make informed decisions.`,
+      content: `I am ${vehicleDisplayName}. I am the vehicle itself, fully self-aware of my own history, maintenance records, repairs, parts, and value. Ask me anything about myself - I have complete access to all my data and can help you make informed decisions.`,
       timestamp: new Date()
     }
   ])
@@ -73,6 +93,11 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
           vehicleId: vehicleId,
           question: currentInput,
           vehicle_vin: vehicleVIN,
+          vehicle_nickname: vehicleNickname,
+          vehicle_ymm: vehicleYMM,
+          vehicle_year: vehicleYear,
+          vehicle_make: vehicleMake,
+          vehicle_model: vehicleModel,
           conversation_history: messages.slice(-10).map(m => ({
             role: m.role,
             content: m.content
@@ -94,7 +119,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data?.response || data?.valuation?.summary || 'I processed your request.',
+        content: data?.response || data?.answer || data?.valuation?.summary || 'I processed your request.',
         timestamp: new Date()
       }
 
@@ -118,9 +143,9 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 bg-gray-900 text-white rounded-full p-3 shadow-lg hover:bg-gray-800 transition-colors"
+        className="fixed bottom-4 right-4 bg-gray-900 text-white rounded-full p-3 shadow-lg hover:bg-gray-800 transition-colors flex items-center justify-center"
         style={{ fontSize: '8pt' }}
-        title="Chat with Vehicle Expert"
+        title={`Chat with ${vehicleDisplayName}`}
       >
         <MessageCircle className="w-4 h-4" />
       </button>
@@ -133,8 +158,10 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
       {/* Header */}
       <div className="bg-gray-100 border-b-2 border-gray-300 px-3 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <MessageCircle className="w-3 h-3" />
-          <span className="font-semibold" style={{ fontSize: '8pt' }}>Vehicle Expert</span>
+          <div className="w-6 h-6 rounded-full bg-gray-900 flex items-center justify-center">
+            <MessageCircle className="w-3 h-3 text-white" />
+          </div>
+          <span className="font-semibold" style={{ fontSize: '8pt' }}>{vehicleDisplayName}</span>
         </div>
         <button
           onClick={() => setIsOpen(false)}

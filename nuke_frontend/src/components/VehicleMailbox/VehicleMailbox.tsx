@@ -38,6 +38,7 @@ const VehicleMailbox: React.FC = () => {
   const [mailbox, setMailbox] = useState<VehicleMailbox | null>(null)
   const [messages, setMessages] = useState<MailboxMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [vehicleData, setVehicleData] = useState<{ year?: number; make?: string; model?: string; nickname?: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'messages' | 'settings'>('messages')
   const [selectedMessage, setSelectedMessage] = useState<MailboxMessage | null>(null)
   const [showDuplicateModal, setShowDuplicateModal] = useState(false)
@@ -57,6 +58,7 @@ const VehicleMailbox: React.FC = () => {
       loadMailbox()
       loadMessages()
       loadStamps()
+      loadVehicleData()
     }
   }, [vehicleId])
 
@@ -177,6 +179,32 @@ const VehicleMailbox: React.FC = () => {
     } catch (error) {
       console.error('Error loading mailbox:', error)
       toast.error('Error loading mailbox')
+    }
+  }
+
+  const loadVehicleData = async () => {
+    if (!vehicleId) return
+
+    try {
+      const { data, error } = await supabase
+        .from('vehicles')
+        .select('year, make, model, nickname')
+        .eq('id', vehicleId)
+        .single()
+
+      if (error) throw error
+
+      if (data) {
+        setVehicleData({
+          year: data.year,
+          make: data.make,
+          model: data.model,
+          nickname: data.nickname
+        })
+      }
+    } catch (error) {
+      console.error('Error loading vehicle data:', error)
+      // Don't show toast - this is optional data
     }
   }
 
@@ -701,6 +729,13 @@ const VehicleMailbox: React.FC = () => {
       <VehicleExpertChat
         vehicleId={vehicleId!}
         vehicleVIN={mailbox.vin}
+        vehicleYMM={vehicleData?.year && vehicleData?.make && vehicleData?.model 
+          ? `${vehicleData.year} ${vehicleData.make} ${vehicleData.model}` 
+          : undefined}
+        vehicleNickname={vehicleData?.nickname}
+        vehicleYear={vehicleData?.year}
+        vehicleMake={vehicleData?.make}
+        vehicleModel={vehicleData?.model}
       />
     </div>
   )
