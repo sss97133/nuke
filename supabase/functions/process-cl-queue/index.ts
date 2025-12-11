@@ -648,29 +648,56 @@ function scrapeCraigslistInline(doc: any, url: string): any {
     const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
     if (yearMatch) data.year = yearMatch[0]
     
-    const vehicleMatch = data.title.match(/\b(19|20)\d{2}\s+([A-Za-z]+)\s+(.+?)(?:\s*-\s*\$|\s*\$|\(|$)/i)
+    // Improved make/model extraction - handle models with dashes like "F-150"
+    // Strategy: Extract year and make first, then everything else until price is the model
+    // Example: "2010 Ford F-150 Super Crew Harley-Davidson Edition - $14,995"
+    
+    // Step 1: Extract year
+    const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
+    if (yearMatch) {
+      data.year = yearMatch[0]
+    }
+    
+    // Step 2: Extract make (common makes)
+    const makePatterns = [
+      /\b(19|20)\d{2}\s+(Ford|Chevrolet|Chevy|GMC|Toyota|Honda|Nissan|Dodge|Jeep|BMW|Mercedes|Audi|Volkswagen|VW|Lexus|Acura|Infiniti|Mazda|Subaru|Mitsubishi|Hyundai|Kia|Volvo|Porsche|Jaguar|Land Rover|Range Rover|Tesla|Genesis|Alfa Romeo|Fiat|Mini|Cadillac|Buick|Pontiac|Oldsmobile|Lincoln|Chrysler)\b/i
+    ]
+    
+    let makeFound = false
+    for (const pattern of makePatterns) {
+      const match = data.title.match(pattern)
+      if (match && match[2]) {
+        data.make = match[2].charAt(0).toUpperCase() + match[2].slice(1).toLowerCase()
+        // Normalize common variations
+        if (data.make.toLowerCase() === 'chevy') data.make = 'Chevrolet'
+        if (data.make.toLowerCase() === 'vw') data.make = 'Volkswagen'
+        makeFound = true
+        break
+      }
+    }
+    
+    // Step 3: Extract model - everything between make and price/location
+    if (makeFound && data.make) {
+      // Remove year and make from title
+      const afterMake = data.title.replace(new RegExp(`\\b(19|20)\\d{2}\\s+${data.make}\\s+`, 'i'), '')
+      // Split at price marker ( - $ or $) or location in parens, but keep everything before
+      // Use greedy match to get full model name including dashes
+      const modelMatch = afterMake.match(/^(.+?)(?:\s*-\s*\$|\s*\$|\([^)]*\)\s*-\s*\$|\([^)]*\)\s*$|$)/)
+      if (modelMatch && modelMatch[1]) {
+        let modelText = modelMatch[1].trim()
+        // Remove trailing location in parens if still present
+        modelText = modelText.replace(/\s*\([^)]+\)\s*$/, '')
+        // Remove common suffixes that aren't part of model (but keep dashes in model name like "F-150")
+        modelText = modelText.replace(/\s+(4x4|4wd|2wd|diesel|gas|automatic|manual)\s*$/i, '').trim()
+        if (modelText && modelText.length > 0) {
+          data.model = modelText
+        }
+      }
+    }
     
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:625',message:'Vehicle regex match result',data:{matched:!!vehicleMatch,make:vehicleMatch?.[2],model:vehicleMatch?.[3]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:680',message:'Make/model extraction result',data:{year:data.year,make:data.make,model:data.model,title:data.title},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
-    
-    if (vehicleMatch && vehicleMatch[3]) {
-      data.make = vehicleMatch[2]
-      let modelText = vehicleMatch[3].trim()
-      modelText = modelText.replace(/\s*\([^)]+\)\s*$/, '')
-      modelText = modelText.replace(/\s+(4x4|4wd|2wd|diesel|gas|automatic|manual)\s*$/i, '').trim()
-      if (modelText) {
-        data.model = modelText
-      }
-    }
-    
-    if (!data.model && data.make) {
-      const afterMake = data.title.replace(new RegExp(`\\b(19|20)\\d{2}\\s+${data.make}\\s+`, 'i'), '')
-      const modelPart = afterMake.split(/\s*-\s*\$|\s*\$|\(/)[0].trim()
-      if (modelPart && modelPart.length > 0) {
-        data.model = modelPart
-      }
-    }
     
     const priceMatch = data.title.match(/\$\s*([\d,]+)/)
     if (priceMatch) data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
@@ -686,21 +713,26 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   // #endregion
   
   // Extract posted date from HTML
-  // Try multiple selectors for posted date
+  // Craigslist shows "Posted 2025-11-27 15:00" in the HTML
+  // Try multiple selectors and text patterns
   const postedDateSelectors = [
     'time.date',
     '.postinginfos time',
     'time[datetime]',
     '.postinginfo time',
     'span[class*="date"]',
-    '.postingtitletext time'
+    '.postingtitletext time',
+    '.postinginfos',
+    '.date'
   ]
   
   let postedDateFound = false
+  
+  // First try: Look for time elements with datetime attribute
   for (const selector of postedDateSelectors) {
     const dateElement = doc.querySelector(selector)
     if (dateElement) {
-      const datetime = dateElement.getAttribute('datetime') || dateElement.textContent?.trim()
+      const datetime = dateElement.getAttribute('datetime')
       if (datetime) {
         try {
           const parsedDate = new Date(datetime)
@@ -708,7 +740,7 @@ function scrapeCraigslistInline(doc: any, url: string): any {
             data.posted_date = parsedDate.toISOString()
             postedDateFound = true
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:675',message:'Posted date extracted from selector',data:{selector,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:700',message:'Posted date extracted from datetime attribute',data:{selector,posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
             // #endregion
             break
           }
@@ -719,8 +751,9 @@ function scrapeCraigslistInline(doc: any, url: string): any {
     }
   }
   
-  // Fallback: try to extract from text content (e.g., "Posted 2025-11-27 15:00")
+  // Second try: Extract from text content patterns
   if (!postedDateFound) {
+    // Pattern 1: "Posted 2025-11-27 15:00"
     const postedTextMatch = fullText.match(/Posted\s+(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i)
     if (postedTextMatch) {
       const [, year, month, day, hour, minute] = postedTextMatch
@@ -731,11 +764,57 @@ function scrapeCraigslistInline(doc: any, url: string): any {
           data.posted_date = parsedDate.toISOString()
           postedDateFound = true
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:695',message:'Posted date extracted from text pattern',data:{posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:720',message:'Posted date extracted from text pattern',data:{posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
           // #endregion
         }
       } catch (e) {
         // Continue
+      }
+    }
+    
+    // Pattern 2: "posted: 2025-11-27 15:00" (lowercase)
+    if (!postedDateFound) {
+      const postedLowerMatch = fullText.match(/posted:\s*(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/i)
+      if (postedLowerMatch) {
+        const [, year, month, day, hour, minute] = postedLowerMatch
+        const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00`
+        try {
+          const parsedDate = new Date(dateStr)
+          if (!isNaN(parsedDate.getTime())) {
+            data.posted_date = parsedDate.toISOString()
+            postedDateFound = true
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:737',message:'Posted date extracted from lowercase pattern',data:{posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+          }
+        } catch (e) {
+          // Continue
+        }
+      }
+    }
+    
+    // Pattern 3: Look for date in postinginfos text
+    if (!postedDateFound) {
+      const postingInfos = doc.querySelector('.postinginfos')
+      if (postingInfos) {
+        const infoText = postingInfos.textContent || ''
+        const dateMatch = infoText.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/)
+        if (dateMatch) {
+          const [, year, month, day, hour, minute] = dateMatch
+          const dateStr = `${year}-${month}-${day}T${hour}:${minute}:00`
+          try {
+            const parsedDate = new Date(dateStr)
+            if (!isNaN(parsedDate.getTime())) {
+              data.posted_date = parsedDate.toISOString()
+              postedDateFound = true
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:755',message:'Posted date extracted from postinginfos',data:{posted_date:data.posted_date},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+              // #endregion
+            }
+          } catch (e) {
+            // Continue
+          }
+        }
       }
     }
   }
@@ -776,45 +855,84 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:730',message:'Before image extraction',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
   
+  // Comprehensive image extraction - multiple methods
   const images: string[] = []
-  const thumbLinks = doc.querySelectorAll('a.thumb')
+  const seenUrls = new Set<string>()
   
+  // Method 1: Thumbnail links (a.thumb elements)
+  const thumbLinks = doc.querySelectorAll('a.thumb')
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:735',message:'Thumb links found',data:{thumbCount:thumbLinks.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:780',message:'Thumb links found',data:{thumbCount:thumbLinks.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
   
   thumbLinks.forEach((link: any) => {
     const href = link.getAttribute('href')
     if (href && href.startsWith('http')) {
-      images.push(href.replace(/\/\d+x\d+\//, '/1200x900/'))
-    }
-  })
-  
-  // Also try extracting from img tags with images.craigslist.org URLs
-  const imgTags = doc.querySelectorAll('img[src*="images.craigslist.org"]')
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:747',message:'Img tags found',data:{imgTagCount:imgTags.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-  
-  imgTags.forEach((img: any) => {
-    const src = img.getAttribute('src')
-    if (src && src.includes('images.craigslist.org') && !images.includes(src)) {
-      // Upgrade to high-res version
-      const highResUrl = src.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
-      if (!images.includes(highResUrl)) {
+      // Upgrade to high-res: replace size patterns with 1200x900
+      const highResUrl = href.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!seenUrls.has(highResUrl)) {
         images.push(highResUrl)
+        seenUrls.add(highResUrl)
       }
     }
   })
   
-  // Also try data-src attributes (lazy loading)
+  // Method 2: img tags with images.craigslist.org URLs
+  const imgTags = doc.querySelectorAll('img[src*="images.craigslist.org"]')
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:795',message:'Img tags found',data:{imgTagCount:imgTags.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+  
+  imgTags.forEach((img: any) => {
+    const src = img.getAttribute('src')
+    if (src && src.includes('images.craigslist.org')) {
+      // Upgrade to high-res version
+      const highResUrl = src.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!seenUrls.has(highResUrl)) {
+        images.push(highResUrl)
+        seenUrls.add(highResUrl)
+      }
+    }
+  })
+  
+  // Method 3: data-src attributes (lazy loading)
   const lazyImages = doc.querySelectorAll('img[data-src*="images.craigslist.org"]')
   lazyImages.forEach((img: any) => {
     const dataSrc = img.getAttribute('data-src')
     if (dataSrc && dataSrc.includes('images.craigslist.org')) {
       const highResUrl = dataSrc.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
-      if (!images.includes(highResUrl)) {
+      if (!seenUrls.has(highResUrl)) {
         images.push(highResUrl)
+        seenUrls.add(highResUrl)
+      }
+    }
+  })
+  
+  // Method 4: Extract from HTML regex (fallback for any missed images)
+  const htmlText = doc.body?.innerHTML || ''
+  const imageUrlRegex = /https?:\/\/images\.craigslist\.org\/[^"'\s>]+/gi
+  let regexMatch
+  while ((regexMatch = imageUrlRegex.exec(htmlText)) !== null) {
+    const url = regexMatch[0]
+    if (url && url.includes('images.craigslist.org')) {
+      // Upgrade to high-res
+      const highResUrl = url.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!seenUrls.has(highResUrl) && !highResUrl.includes('icon') && !highResUrl.includes('logo')) {
+        images.push(highResUrl)
+        seenUrls.add(highResUrl)
+      }
+    }
+  }
+  
+  // Method 5: Gallery/slideshow images (data attributes)
+  const galleryImages = doc.querySelectorAll('[data-imgid], [data-index]')
+  galleryImages.forEach((elem: any) => {
+    const imgSrc = elem.getAttribute('data-src') || elem.getAttribute('data-img') || elem.querySelector('img')?.getAttribute('src')
+    if (imgSrc && imgSrc.includes('images.craigslist.org')) {
+      const highResUrl = imgSrc.replace(/\/\d+x\d+\//, '/1200x900/').replace(/\/50x50c\//, '/1200x900/')
+      if (!seenUrls.has(highResUrl)) {
+        images.push(highResUrl)
+        seenUrls.add(highResUrl)
       }
     }
   })
@@ -822,6 +940,10 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   if (images.length > 0) {
     data.images = Array.from(new Set(images)).slice(0, 50)
   }
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:840',message:'After image extraction',data:{imageCount:data.images?.length||0,methodsUsed:['thumbLinks','imgTags','lazyImages','regex','gallery']},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'process-cl-queue/index.ts:770',message:'After image extraction',data:{imageCount:data.images?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
