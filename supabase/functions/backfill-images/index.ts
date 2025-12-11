@@ -269,11 +269,16 @@ serve(async (req) => {
     }
 
     console.log(`Backfill complete: ${results.uploaded} uploaded, ${results.failed} failed, ${results.analyzed} analyzed`);
+    
+    if (results.errors.length > 0) {
+      console.log(`Errors encountered: ${results.errors.slice(0, 5).join('; ')}`);
+    }
 
     return new Response(JSON.stringify({
       success: true,
       vehicle_id,
-      ...results
+      ...results,
+      error_summary: results.errors.length > 0 ? results.errors.slice(0, 10) : undefined
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

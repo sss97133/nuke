@@ -105,11 +105,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   };
 
   // Calculate alphabet-based tier (F, E, D, C, B, A, S, SSS)
-  // Tier Philosophy:
-  // - F, E, D, C: Vast majority - dealers, flippers, basic listings
-  // - B: "Cool" BAT cars OR people making an effort
-  // - A: Strong engagement and documentation
-  // - S, SSS: ONLY manually assigned (never auto-calculated)
+  // Tier is based on COMPLETENESS and QUALITY of information
+  // Tiers increase as users provide more information - NOT locked in
+  // S and SSS are ONLY manually assigned (never auto-calculated)
   const calculateVehicleTier = (vehicle: VehicleCardDenseProps['vehicle']): string => {
     // If tier is manually set to S or SSS, use it (never override manual assignments)
     if (vehicle.tier_label === 'S' || vehicle.tier_label === 'SSS') {
@@ -119,73 +117,101 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       return vehicle.tier;
     }
     
-    const hasVIN = vehicle.vin && vehicle.vin.length === 17;
-    const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
-    const hasPrice = !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price);
-    const isBATImport = vehicle.profile_origin === 'bat_import';
-    const isScraped = vehicle.profile_origin === 'url_scraper' || vehicle.profile_origin === 'craigslist_scrape' || vehicle.profile_origin === 'ksl_import';
+    // Completeness scoring factors (can be extended/modified as requirements evolve)
+    const completenessFactors = {
+      // Basic identification (required for any tier above F)
+      hasVIN: vehicle.vin && vehicle.vin.length === 17,
+      hasPrice: !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price),
+      hasYearMakeModel: !!(vehicle.year && vehicle.make && vehicle.model),
+      
+      // Visual documentation
+      imageCount: vehicle.all_images?.length || vehicle.image_count || 0,
+      
+      // Engagement & activity (shows user investment)
+      eventCount: vehicle.event_count || 0,
+      recentActivity: vehicle.activity_7d || 0,
+      viewCount: vehicle.view_count || 0,
+      
+      // Documentation quality
+      receiptCount: vehicle.receipt_count || 0,
+      ownershipVerified: vehicle.ownership_verified || false,
+      
+      // Source quality
+      isBATImport: vehicle.profile_origin === 'bat_import',
+      isScraped: vehicle.profile_origin === 'url_scraper' || 
+                 vehicle.profile_origin === 'craigslist_scrape' || 
+                 vehicle.profile_origin === 'ksl_import',
+      isDealer: vehicle.profile_origin === 'url_scraper' || vehicle.profile_origin === 'craigslist_scrape',
+      isFlipper: (vehicle.profile_origin === 'url_scraper' || vehicle.profile_origin === 'craigslist_scrape') && vehicle.is_for_sale,
+    };
     
-    // Engagement metrics
-    const eventCount = vehicle.event_count || 0;
-    const recentActivity = vehicle.activity_7d || 0;
-    const viewCount = vehicle.view_count || 0;
+    const { hasVIN, hasPrice, hasYearMakeModel, imageCount, eventCount, recentActivity, viewCount, 
+            receiptCount, ownershipVerified, isBATImport, isScraped, isDealer, isFlipper } = completenessFactors;
     
-    // F tier: No images, description only, likely pending (dealers, flippers, shit heads)
-    if (imageCount === 0) return 'F';
+    // Calculate completeness score (0-100)
+    // This scoring system can be adjusted as requirements evolve
+    let completenessScore = 0;
     
-    // E tier: Images but like 1 pixelated one (dealers, flippers, shit heads)
-    if (imageCount === 1) return 'E';
+    // Basic identification (20 points)
+    if (hasYearMakeModel) completenessScore += 5;
+    if (hasVIN) completenessScore += 10;
+    if (hasPrice) completenessScore += 5;
     
-    // D tier: 2-4 images, minimal data (dealers, flippers, shit heads)
-    if (imageCount >= 2 && imageCount < 5) return 'D';
+    // Visual documentation (30 points)
+    if (imageCount >= 1) completenessScore += 5;
+    if (imageCount >= 5) completenessScore += 10;
+    if (imageCount >= 10) completenessScore += 10;
+    if (imageCount >= 20) completenessScore += 5;
     
-    // C tier: Vast majority - BAT listings, scraped listings, basic user uploads
-    // This is the baseline for converted listings with images, VIN, price
-    if (imageCount >= 5 && imageCount < 10) {
-      // BAT/scraped listings = C tier
-      if (isBATImport || isScraped) return 'C';
-      // User uploads with minimal data = C tier
-      if (hasVIN || hasPrice) return 'C';
-      return 'D';
+    // Engagement & activity (25 points)
+    if (eventCount >= 1) completenessScore += 5;
+    if (eventCount >= 5) completenessScore += 10;
+    if (eventCount >= 10) completenessScore += 10;
+    if (recentActivity >= 3) completenessScore += 5;
+    if (viewCount >= 50) completenessScore += 5;
+    
+    // Documentation quality (15 points)
+    if (receiptCount >= 1) completenessScore += 5;
+    if (receiptCount >= 5) completenessScore += 5;
+    if (receiptCount >= 10) completenessScore += 5;
+    if (ownershipVerified) completenessScore += 5;
+    
+    // Source quality adjustments (penalties for dealers/flippers)
+    if (isDealer || isFlipper) {
+      // Dealers/flippers need to prove quality through engagement
+      if (!hasVIN || !hasPrice) completenessScore -= 10;
+      if (eventCount < 2 && viewCount < 50) completenessScore -= 5;
     }
     
-    // C tier: 10-19 images - still vast majority
-    if (imageCount >= 10 && imageCount < 20) {
-      // BAT listings with good data = C tier (unless "cool" BAT car)
-      if (isBATImport || isScraped) {
-        // "Cool" BAT cars = B tier (exceptional BAT listings with high views/engagement)
-        if (viewCount >= 100 || eventCount >= 5) return 'B';
-        return 'C';
-      }
-      // User uploads = C tier unless making an effort
-      if (eventCount >= 3 || recentActivity >= 2) return 'B'; // Making an effort
-      if (hasVIN && hasPrice) return 'C';
-      return 'C';
-    }
+    // Map completeness score to tier
+    // These thresholds can be adjusted as the system evolves
+    if (completenessScore < 10) return 'F'; // No/minimal data
+    if (completenessScore < 20) return 'E'; // Very basic
+    if (completenessScore < 35) return 'D'; // Has potential, good bones
+    if (completenessScore < 50) return 'C'; // Vast majority - baseline
+    if (completenessScore < 65) return 'B'; // Making an effort / cool BAT cars
+    if (completenessScore < 80) return 'A'; // Strong engagement and documentation
+    // 80+ would be S tier, but that's manually assigned only
     
-    // B tier: 20+ images + "cool" BAT cars OR people making an effort
-    if (imageCount >= 20 && imageCount < 50) {
-      // "Cool" BAT cars (high engagement BAT listings)
-      if (isBATImport && (viewCount >= 200 || eventCount >= 10)) return 'B';
-      // People making an effort (user engagement)
-      if (eventCount >= 5 || recentActivity >= 3 || viewCount >= 50) return 'B';
-      // Otherwise = C tier (vast majority)
-      return 'C';
-    }
-    
-    // A tier: 50+ images + strong engagement
-    if (imageCount >= 50) {
-      if (eventCount >= 10 || recentActivity >= 5 || viewCount >= 100) return 'A';
-      if (eventCount >= 5 || viewCount >= 50) return 'B';
-      return 'C';
-    }
-    
-    // Default fallback
+    // Fallback to C for anything with basic data
+    if (hasVIN || hasPrice || imageCount >= 5) return 'C';
     return 'F';
   };
 
   // Get optimal image for this view mode
+  // PRIORITY: primary_image_url > all_images[0] > image_variants > image_url
   const getImageUrl = () => {
+    // Always prefer primary_image_url if available
+    if (vehicle.primary_image_url) {
+      return vehicle.primary_image_url;
+    }
+    
+    // Fallback to first image in all_images array
+    if (vehicle.all_images && vehicle.all_images.length > 0 && vehicle.all_images[0]?.url) {
+      return vehicle.all_images[0].url;
+    }
+    
+    // Then check image_variants
     const variants = vehicle.image_variants || {};
     switch (viewMode) {
       case 'list':
@@ -198,7 +224,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         // 300px hero - use large
         return variants.large || variants.medium || vehicle.image_url || null;
       default:
-        return vehicle.primary_image_url;
+        return vehicle.image_url || null;
     }
   };
 
@@ -242,13 +268,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           flexShrink: 0,
           borderRadius: '0px',
           border: '1px solid var(--border)',
-          background: imageUrl ? `url(${imageUrl}) center/cover` : 'var(--grey-200)',
+          background: (imageUrl || vehicle.primary_image_url) ? `url(${imageUrl || vehicle.primary_image_url}) center/cover` : 'var(--grey-200)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: '20px',
         }}>
-          {!imageUrl && '🚗'}
+          {!(imageUrl || vehicle.primary_image_url) && '🚗'}
         </div>
         
         {/* Vehicle - single line */}
@@ -316,8 +342,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           style={{
             width: '100%',
             height: '220px',
-            background: imageUrl ? `url(${imageUrl}) center/cover` : 'url(/n-zero.png) center/contain',
-            backgroundSize: imageUrl ? 'cover' : 'contain',
+            background: (imageUrl || vehicle.primary_image_url) ? `url(${imageUrl || vehicle.primary_image_url}) center/cover` : 'url(/n-zero.png) center/contain',
+            backgroundSize: (imageUrl || vehicle.primary_image_url) ? 'cover' : 'contain',
             backgroundColor: '#000',
             position: 'relative',
           }}
@@ -535,8 +561,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const [touchStart, setTouchStart] = React.useState(0);
   
   // Use all_images array from homepage query (up to 5 images)
-  const vehicleImages = vehicle.all_images?.map(img => img.url) || [imageUrl].filter(Boolean);
-  const currentImageUrl = vehicleImages[currentImageIndex] || imageUrl;
+  // Ensure we have at least primary_image_url as fallback
+  const vehicleImages = vehicle.all_images?.map(img => img.url).filter(Boolean) || 
+                        (vehicle.primary_image_url ? [vehicle.primary_image_url] : []) ||
+                        (imageUrl ? [imageUrl] : []);
+  const currentImageUrl = vehicleImages[currentImageIndex] || vehicle.primary_image_url || imageUrl;
   
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX);
