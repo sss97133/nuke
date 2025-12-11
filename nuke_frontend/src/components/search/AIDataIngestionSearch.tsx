@@ -446,7 +446,7 @@ export default function AIDataIngestionSearch() {
       >
         <input
           type="text"
-          placeholder={currentVehicleData ? "Critique this vehicle..." : (attachedImage ? "Add context..." : "VIN, URL, text...")}
+          placeholder=""
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
