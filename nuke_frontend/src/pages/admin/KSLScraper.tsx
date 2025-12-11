@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import '../design-system.css';
+import '../../design-system.css';
 
 interface ScrapeResult {
   url: string;
