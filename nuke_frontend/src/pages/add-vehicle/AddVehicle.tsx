@@ -356,8 +356,8 @@ Redirecting to vehicle profile...`);
       // URL is new - proceed with scraping
       console.log('New URL - scraping data:', url);
 
-      // Call Supabase Edge Function (scrape-vehicle)
-      const { data: result, error: fnError } = await supabase.functions.invoke('scrape-vehicle', {
+      // Call Supabase Edge Function (simple-scraper)
+      const { data: result, error: fnError } = await supabase.functions.invoke('simple-scraper', {
         body: { url }
       });
       if (fnError) {

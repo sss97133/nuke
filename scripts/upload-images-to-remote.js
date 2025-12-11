@@ -6,12 +6,12 @@ const fs = require('fs');
 const path = require('path');
 
 // Remote Supabase configuration
-const REMOTE_URL = 'https://qkgaybvrernstplzjaam.supabase.co';
-const REMOTE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk';
+const REMOTE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
+const REMOTE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 // Local Supabase configuration
-const LOCAL_URL = 'http://localhost:54321';
-const LOCAL_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const LOCAL_URL = process.env.LOCAL_SUPABASE_URL || 'http://localhost:54321';
+const LOCAL_ANON_KEY = process.env.LOCAL_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 const remoteSupabase = createClient(REMOTE_URL, REMOTE_ANON_KEY);
 const localSupabase = createClient(LOCAL_URL, LOCAL_ANON_KEY);

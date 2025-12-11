@@ -1,8 +1,8 @@
 require('dotenv').config();
 const https = require('https');
 
-const url = 'https://fspbjrzdulesxohceznc.supabase.co/rest/v1/vehicles?select=id&limit=1';
-const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzcGJqcnpkdWxlc3hvaGNlem5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ0OTkwMzcsImV4cCI6MjA1MDA3NTAzN30.kzmRCkfp4zcCqEL8VEaR_sSTyWFwwoNWyVVLKWCK-g0';
+const url = `${process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://fspbjrzdulesxohceznc.supabase.co'}/rest/v1/vehicles?select=id&limit=1`;
+const apiKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 const options = {
   headers: {

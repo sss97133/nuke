@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { aiGateway } from '../lib/aiGateway';
 import vinDecoderService from './vinDecoder';
 import { listingURLParser, type ParsedListing } from './listingURLParser';
 
@@ -41,7 +42,7 @@ export interface ExtractedReceiptData {
 }
 
 export interface ExtractionResult {
-  inputType: 'vin' | 'url' | 'image' | 'text' | 'search' | 'org_search' | 'unknown';
+  inputType: 'vin' | 'url' | 'image' | 'text' | 'search' | 'org_search' | 'vehicle_id' | 'unknown';
   vehicleData?: ExtractedVehicleData;
   receiptData?: ExtractedReceiptData;
   confidence: number;
@@ -96,7 +97,10 @@ class AIDataIngestionService {
             source: 'intent_classification',
             rawData: { query: textInput }
           };
-        
+
+        case 'vehicle_id':
+          return await this.loadVehicleById(textInput);
+
         case 'text':
           return await this.extractFromText(textInput, userId);
         
@@ -120,9 +124,15 @@ class AIDataIngestionService {
   /**
    * Classify input type from text
    */
-  private classifyInput(input: string): 'vin' | 'url' | 'text' | 'search' | 'org_search' | 'unknown' {
+  private classifyInput(input: string): 'vin' | 'url' | 'text' | 'search' | 'org_search' | 'vehicle_id' | 'unknown' {
     const trimmed = input.trim().toLowerCase();
-    
+
+    // Check for UUID (vehicle ID)
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidPattern.test(trimmed)) {
+      return 'vehicle_id';
+    }
+
     // Check for URL
     if (trimmed.match(/^https?:\/\//i) || trimmed.match(/^www\./i)) {
       // Skip PDF/document URLs - these should be handled by AddBrochureUrl component
@@ -279,7 +289,44 @@ class AIDataIngestionService {
    */
   private async extractFromText(text: string, userId?: string): Promise<ExtractionResult> {
     try {
-      // Call edge function for AI-powered extraction
+      // Get caching configuration for vehicle analysis
+      const cachingConfig = aiGateway.getCachingConfig('vehicle-analysis');
+
+      // Try using AI Gateway first
+      try {
+        const gatewayResult = await aiGateway.makeRequest(
+          'openai',
+          'gpt-4o-mini',
+          {
+            input: text,
+            inputType: 'text',
+            userId: userId || null
+          },
+          {
+            cache: cachingConfig.cache,
+            cacheTTL: cachingConfig.cacheTTL,
+            fallback: true,
+            userId
+          }
+        );
+
+        if (gatewayResult && gatewayResult.success) {
+          return {
+            inputType: 'text',
+            vehicleData: gatewayResult.vehicleData,
+            receiptData: gatewayResult.receiptData,
+            confidence: gatewayResult.confidence || 0.7,
+            source: 'ai_gateway_extraction',
+            provider: 'openai',
+            model: 'gpt-4o-mini',
+            rawData: gatewayResult
+          };
+        }
+      } catch (gatewayError) {
+        console.warn('AI Gateway failed for text extraction, falling back to edge function:', gatewayError);
+      }
+
+      // Fallback to edge function
       const { data, error } = await supabase.functions.invoke('extract-and-route-data', {
         body: {
           input: text,
@@ -347,8 +394,10 @@ class AIDataIngestionService {
 
       const imageUrl = urlData.publicUrl;
 
-      // Call edge function for AI-powered image analysis
-      // Include text context if provided
+      // Get caching configuration for image analysis
+      const cachingConfig = aiGateway.getCachingConfig('image-analysis');
+
+      // Prepare request body
       const requestBody: any = {
         input: imageUrl,
         inputType: 'image',
@@ -357,12 +406,43 @@ class AIDataIngestionService {
         fileSize: file.size,
         mimeType: file.type
       };
-      
+
       // Add text context if provided
       if (textContext && textContext.trim()) {
         requestBody.textContext = textContext.trim();
       }
-      
+
+      // Try using AI Gateway first
+      try {
+        const gatewayResult = await aiGateway.makeRequest(
+          'openai',
+          'gpt-4o',
+          requestBody,
+          {
+            cache: cachingConfig.cache,
+            cacheTTL: cachingConfig.cacheTTL,
+            fallback: true,
+            userId
+          }
+        );
+
+        if (gatewayResult && gatewayResult.success) {
+          return {
+            inputType: 'image',
+            vehicleData: gatewayResult.vehicleData,
+            receiptData: gatewayResult.receiptData,
+            confidence: gatewayResult.confidence || 0.7,
+            source: 'ai_gateway_image_analysis',
+            provider: 'openai',
+            model: 'gpt-4o',
+            rawData: gatewayResult
+          };
+        }
+      } catch (gatewayError) {
+        console.warn('AI Gateway failed for image extraction, falling back to edge function:', gatewayError);
+      }
+
+      // Fallback to edge function
       const { data, error } = await supabase.functions.invoke('extract-and-route-data', {
         body: requestBody
       });
@@ -393,6 +473,70 @@ class AIDataIngestionService {
         inputType: 'image',
         confidence: 0,
         errors: [error.message || 'Image extraction failed']
+      };
+    }
+  }
+
+  /**
+   * Load vehicle by ID
+   */
+  private async loadVehicleById(vehicleId: string): Promise<ExtractionResult> {
+    try {
+      const { data: vehicle, error } = await supabase
+        .from('vehicles')
+        .select('*')
+        .eq('id', vehicleId.trim())
+        .single();
+
+      if (error) {
+        console.error('Vehicle lookup error:', error);
+        return {
+          inputType: 'vehicle_id',
+          confidence: 0,
+          errors: ['Vehicle not found']
+        };
+      }
+
+      if (!vehicle) {
+        return {
+          inputType: 'vehicle_id',
+          confidence: 0,
+          errors: ['Vehicle not found']
+        };
+      }
+
+      // Convert vehicle record to ExtractedVehicleData format
+      const vehicleData: ExtractedVehicleData = {
+        vin: vehicle.vin,
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        trim: vehicle.trim,
+        mileage: vehicle.mileage,
+        price: vehicle.asking_price || vehicle.current_value,
+        color: vehicle.exterior_color,
+        transmission: vehicle.transmission,
+        drivetrain: vehicle.drivetrain,
+        engine: vehicle.engine,
+        body_type: vehicle.body_style,
+        location: vehicle.location,
+        description: vehicle.notes,
+        images: [] // TODO: Load associated images
+      };
+
+      return {
+        inputType: 'vehicle_id',
+        vehicleData,
+        confidence: 1.0,
+        source: 'database_lookup',
+        rawData: { vehicle, vehicleId }
+      };
+    } catch (error: any) {
+      console.error('Vehicle ID lookup error:', error);
+      return {
+        inputType: 'vehicle_id',
+        confidence: 0,
+        errors: [error.message || 'Vehicle lookup failed']
       };
     }
   }

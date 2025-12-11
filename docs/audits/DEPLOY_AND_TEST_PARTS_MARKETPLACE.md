@@ -122,7 +122,7 @@ Visit: `https://n-zero.dev/vehicle/a90c008a-3379-41d8-9eb2-b4eda365d74c`
 ```bash
 # Run scraper to populate 500+ parts
 curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-lmc-truck" \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -H "Authorization: Bearer <your-supabase-key>" \
   -H "Content-Type: application/json"
 
 # Expected result:

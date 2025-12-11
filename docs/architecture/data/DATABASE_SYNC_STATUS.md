@@ -57,7 +57,7 @@ Both local and remote databases now have the complete Build Management System wi
 ### **Current Setup** (.env)
 ```bash
 VITE_SUPABASE_URL=https://qkgaybvrernstplzjaam.supabase.co  # REMOTE
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ```
 
 ### **Switch to Local Development**

@@ -82,10 +82,26 @@ defmodule NukeApiWeb.Router do
   # Protected API routes (authentication required)
   scope "/api", NukeApiWeb do
     pipe_through [:api, :auth]
-    
+
     # Vehicle management
     put "/vehicles/:id", VehicleController, :update
     delete "/vehicles/:id", VehicleController, :archive
+
+    # Vehicle Mailbox System
+    get "/vehicles/:vehicle_id/mailbox", MailboxController, :show_vehicle_mailbox
+    get "/vehicles/:vehicle_id/mailbox/messages", MailboxController, :get_messages
+    post "/vehicles/:vehicle_id/mailbox/messages", MailboxController, :create_message
+    patch "/vehicles/:vehicle_id/mailbox/messages/:message_id/read", MailboxController, :mark_read
+    patch "/vehicles/:vehicle_id/mailbox/messages/:message_id/resolve", MailboxController, :resolve_message
+
+    # Mailbox Access Management
+    post "/vehicles/:vehicle_id/mailbox/access", MailboxController, :grant_access
+    delete "/vehicles/:vehicle_id/mailbox/access/:access_key_id", MailboxController, :revoke_access
+    get "/vehicles/:vehicle_id/mailbox/access", MailboxController, :list_access_keys
+
+    # Duplicate Detection Management
+    get "/vehicles/:vehicle_id/mailbox/messages/:message_id/duplicate-details", MailboxController, :get_duplicate_details
+    post "/vehicles/:vehicle_id/mailbox/messages/:message_id/duplicate-confirmation", MailboxController, :handle_duplicate_confirmation
     
     # Timeline management
     post "/vehicles/:vehicle_id/timeline", TimelineController, :create

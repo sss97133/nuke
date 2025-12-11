@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { aiGateway } from '../lib/aiGateway';
 import * as EXIF from 'exif-js';
 
 interface ExtractedImageData {
@@ -183,54 +184,87 @@ export class ImageExtractionService {
       // Convert file to base64
       const base64 = await this.fileToBase64(file);
       
-      // Call OpenAI Vision API
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-      if (!apiKey) {
-        console.warn('OpenAI API key not configured');
-        return tags;
-      }
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4-vision-preview',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: `Analyze this vehicle image and identify:
-                  1. Visible products, tools, or parts (with brand if visible)
-                  2. Any damage or wear
-                  3. Modifications or upgrades
-                  4. Vehicle area (exterior, interior, engine bay, etc.)
-                  5. General condition assessment
-                  
-                  Return as JSON array of tags with format:
-                  [{"text": "description", "type": "product|damage|modification|part|tool", "confidence": 0-100}]`
-                },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:image/jpeg;base64,${base64}`
-                  }
+      const requestPayload = {
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Analyze this vehicle image and identify:
+                1. Visible products, tools, or parts (with brand if visible)
+                2. Any damage or wear
+                3. Modifications or upgrades
+                4. Vehicle area (exterior, interior, engine bay, etc.)
+                5. General condition assessment
+
+                Return as JSON array of tags with format:
+                [{"text": "description", "type": "product|damage|modification|part|tool", "confidence": 0-100}]`
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${base64}`
                 }
-              ]
-            }
-          ],
-          max_tokens: 300
-        })
-      });
-      
-      if (response.ok) {
+              }
+            ]
+          }
+        ],
+        max_tokens: 300
+      };
+
+      // Get caching configuration for image analysis
+      const cachingConfig = aiGateway.getCachingConfig('image-analysis');
+
+      let content: string;
+
+      // Try using AI Gateway first
+      try {
+        const gatewayResult = await aiGateway.makeRequest(
+          'openai',
+          'gpt-4o',
+          requestPayload,
+          {
+            cache: cachingConfig.cache,
+            cacheTTL: cachingConfig.cacheTTL,
+            fallback: true
+          }
+        );
+
+        if (gatewayResult?.choices?.[0]?.message?.content) {
+          content = gatewayResult.choices[0].message.content;
+        } else {
+          throw new Error('Invalid gateway response');
+        }
+      } catch (gatewayError) {
+        console.warn('AI Gateway failed for image analysis, falling back to direct API:', gatewayError);
+
+        // Fallback to direct OpenAI API
+        const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+        if (!apiKey) {
+          console.warn('OpenAI API key not configured');
+          return tags;
+        }
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(requestPayload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`OpenAI API error: ${response.status}`);
+        }
+
         const data = await response.json();
-        const content = data.choices[0]?.message?.content;
-        
+        content = data.choices[0]?.message?.content;
+      }
+
+      if (content) {
         // Parse AI response
         try {
           const aiTags = JSON.parse(content);
@@ -247,6 +281,7 @@ export class ImageExtractionService {
         } catch (parseError) {
           console.warn('Failed to parse AI response:', content);
         }
+      }
       }
     } catch (error) {
       console.error('AI vision analysis failed:', error);

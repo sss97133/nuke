@@ -9,7 +9,7 @@
 
 ### **Remote Supabase (Production Database)**
 - **URL**: `https://qkgaybvrernstplzjaam.supabase.co`
-- **Anon Key**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk`
+- **Anon Key**: `<your-supabase-anon-key>`
 
 ### **Production Frontend**
 - **URL**: `https://nukefrontend.vercel.app`
@@ -179,7 +179,7 @@ curl -s https://nukefrontend.vercel.app/ | grep "Nuke Vehicle Platform"
 ```bash
 # Check if Supabase is accessible
 curl -s "https://qkgaybvrernstplzjaam.supabase.co/rest/v1/" \
-  -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk"
+  -H "apikey: <your-supabase-key>"
 ```
 
 ### **4. Test Vehicle Creation**

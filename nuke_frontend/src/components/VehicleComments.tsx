@@ -371,9 +371,9 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         throw new Error(`Failed to fetch vehicle: ${vehicleError.message}`);
       }
 
-      console.log('[VehicleComments] Calling scrape-vehicle edge function with URL:', batUrl);
+      console.log('[VehicleComments] Calling simple-scraper edge function with URL:', batUrl);
       // Scrape the BAT listing
-      const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('scrape-vehicle', {
+      const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('simple-scraper', {
         body: { url: batUrl }
       });
 

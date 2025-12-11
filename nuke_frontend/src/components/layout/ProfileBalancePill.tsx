@@ -159,7 +159,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
           alignItems: 'center',
           width: `${capsuleWidth}px`,
           height: `${circleSize}px`,
-          backgroundColor: '#1a1a1a',
+          backgroundColor: '#5a5a5a',
           borderRadius: '50px',
           overflow: 'hidden',
           transition: 'width 0.3s ease',
@@ -301,6 +301,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
                 { label: 'Auctions', action: '/auctions' },
                 { label: 'Organizations', action: '/organizations' },
                 { label: 'Photos', action: '/capsule?tab=photos' },
+                { label: 'Settings', action: '/capsule?tab=settings' },
                 ...(isAdmin ? [{ label: 'Admin', action: '/admin' }] : [])
               ].map((item, i) => (
                 <button

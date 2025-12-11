@@ -41,8 +41,8 @@ export const BaTURLDrop: React.FC<BaTURLDropProps> = ({
     setProgress('Scraping BaT listing data...');
 
     try {
-      // Use scrape-vehicle function to extract data and images
-      const { data: scrapeData, error: scrapeError } = await supabase.functions.invoke('scrape-vehicle', {
+      // Use simple-scraper function to extract data and images
+      const { data: scrapeData, error: scrapeError } = await supabase.functions.invoke('simple-scraper', {
         body: { url: url }
       });
       

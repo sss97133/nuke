@@ -1,124 +1,144 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { KnowledgeLibraryService } from '../../services/knowledgeLibraryService';
-import type { KnowledgeArticle } from '../../services/knowledgeLibraryService';
-import { ImageSetService } from '../../services/imageSetService';
-import type { ImageSet } from '../../services/imageSetService';
+import React, { useState, useEffect, useRef } from 'react';
+import { ReferenceDocumentService } from '../../services/referenceDocumentService';
+import type { ReferenceDocument } from '../../services/referenceDocumentService';
 import { useToast } from '../../hooks/useToast';
+import { supabase } from '../../lib/supabase';
 
 interface KnowledgeLibraryProps {
   userId: string;
   isOwnProfile: boolean;
 }
 
+const DOCUMENT_TYPES = [
+  { value: 'brochure', label: 'Brochure' },
+  { value: 'owners_manual', label: "Owner's Manual" },
+  { value: 'service_manual', label: 'Service Manual' },
+  { value: 'parts_catalog', label: 'Parts Catalog' },
+  { value: 'spec_sheet', label: 'Spec Sheet' },
+  { value: 'paint_codes', label: 'Paint Codes' },
+  { value: 'rpo_codes', label: 'RPO Codes' },
+  { value: 'wiring_diagram', label: 'Wiring Diagram' },
+  { value: 'build_sheet', label: 'Build Sheet' },
+  { value: 'recall_notice', label: 'Recall Notice' },
+  { value: 'tsb', label: 'TSB (Technical Service Bulletin)' },
+  { value: 'material_manual', label: 'Material Manual' },
+  { value: 'tds', label: 'TDS (Technical Data Sheet)' },
+  { value: 'other', label: 'Other' }
+];
+
 const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfile }) => {
-  const [articles, setArticles] = useState<KnowledgeArticle[]>([]);
-  const [imageSets, setImageSets] = useState<ImageSet[]>([]);
+  const [documents, setDocuments] = useState<ReferenceDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingArticle, setEditingArticle] = useState<KnowledgeArticle | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [showUploadForm, setShowUploadForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
-    loadArticles();
-  }, [userId]);
+    loadDocuments();
+  }, [userId, isOwnProfile]);
 
-  const loadArticles = async () => {
+  const loadDocuments = async () => {
     try {
       setLoading(true);
-      const articlesData = isOwnProfile
-        ? await KnowledgeLibraryService.getUserArticles(userId, true)
-        : await KnowledgeLibraryService.getPublicArticles(userId);
-      setArticles(articlesData);
-
-      // Also load personal image sets (albums)
-      if (isOwnProfile) {
-        const { data: setsData, error: setsError } = await supabase
-          .from('image_sets')
-          .select(`
-            *,
-            image_set_members(
-              image_id,
-              vehicle_images(image_url, is_primary)
-            )
-          `)
-          .eq('user_id', userId)
-          .eq('is_personal', true)
-          .order('created_at', { ascending: false });
-
-        if (!setsError && setsData) {
-          const setsWithImages = setsData.map((set: any) => {
-            const members = set.image_set_members || [];
-            const coverImage = members.find((m: any) => m.vehicle_images?.is_primary)?.vehicle_images?.image_url 
-              || members[0]?.vehicle_images?.image_url;
-            return {
-              ...set,
-              image_count: members.length,
-              cover_image: coverImage
-            };
-          });
-          setImageSets(setsWithImages as any);
-        }
-      }
+      const docs = isOwnProfile
+        ? await ReferenceDocumentService.getUserDocuments(userId, true)
+        : await ReferenceDocumentService.getPublicDocuments(userId);
+      setDocuments(docs);
     } catch (error) {
-      console.error('Error loading knowledge articles:', error);
+      console.error('Error loading reference documents:', error);
+      showToast('Failed to load documents', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async (article: Partial<KnowledgeArticle>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Show upload form with file pre-selected
+    setShowUploadForm(true);
+    // Store file in component state for later upload
+    (window as any).__pendingUploadFile = file;
+  };
+
+  const handleUpload = async (formData: {
+    document_type: string;
+    title: string;
+    description?: string;
+    year?: number;
+    make?: string;
+    series?: string;
+    is_public?: boolean;
+    is_factory_original?: boolean;
+    tags?: string[];
+  }) => {
+    const file = (window as any).__pendingUploadFile;
+    if (!file) {
+      showToast('No file selected', 'error');
+      return;
+    }
+
     try {
-      if (editingArticle?.id) {
-        await KnowledgeLibraryService.updateArticle(editingArticle.id, article as any);
-        showToast('Article updated', 'success');
-      } else {
-        await KnowledgeLibraryService.createArticle({
-          user_id: userId,
-          title: article.title || '',
-          content: article.content || '',
-          category: article.category || 'general',
-          tags: article.tags || [],
-          is_public: article.is_public || false
-        } as any);
-        showToast('Article created', 'success');
+      setUploading(true);
+      await ReferenceDocumentService.uploadDocument(userId, {
+        file,
+        ...formData,
+        auto_index: true // Automatically trigger indexing
+      });
+      
+      showToast('Document uploaded and indexing started', 'success');
+      setShowUploadForm(false);
+      (window as any).__pendingUploadFile = null;
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-      setEditingArticle(null);
-      setShowAddForm(false);
-      loadArticles();
+      await loadDocuments();
     } catch (error: any) {
-      console.error('Error saving article:', error);
-      showToast(error?.message || 'Failed to save article', 'error');
+      console.error('Error uploading document:', error);
+      showToast(error?.message || 'Failed to upload document', 'error');
+    } finally {
+      setUploading(false);
     }
   };
 
-  const handleDelete = async (articleId: string) => {
-    if (!confirm('Are you sure you want to delete this article?')) return;
+  const handleDelete = async (documentId: string) => {
+    if (!confirm('Are you sure you want to delete this document? This cannot be undone.')) return;
 
     try {
-      await KnowledgeLibraryService.deleteArticle(articleId);
-      showToast('Article deleted', 'success');
-      loadArticles();
+      await ReferenceDocumentService.deleteDocument(documentId, userId);
+      showToast('Document deleted', 'success');
+      await loadDocuments();
     } catch (error: any) {
-      console.error('Error deleting article:', error);
-      showToast(error?.message || 'Failed to delete article', 'error');
+      console.error('Error deleting document:', error);
+      showToast(error?.message || 'Failed to delete document', 'error');
     }
   };
 
-  const filteredArticles = articles.filter(article => {
+  const handleDownload = async (document: ReferenceDocument) => {
+    try {
+      await ReferenceDocumentService.incrementStat(document.id, 'download');
+      window.open(document.file_url, '_blank');
+    } catch (error) {
+      console.error('Error downloading document:', error);
+    }
+  };
+
+  const filteredDocuments = documents.filter(doc => {
     const matchesSearch = !searchTerm || 
-      article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesCategory = selectedCategory === 'all' || article.category === selectedCategory;
+    const matchesType = selectedType === 'all' || doc.document_type === selectedType;
     
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesType;
   });
 
-  const categories = ['all', ...Array.from(new Set(articles.map(a => a.category)))];
+  const documentTypes = ['all', ...Array.from(new Set(documents.map(d => d.document_type)))];
 
   if (loading) {
     return (
@@ -134,211 +154,104 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
     <div>
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 className="heading-3">Knowledge Library ({articles.length + imageSets.length})</h3>
-          {isOwnProfile && (
-            <button
-              onClick={() => {
-                setEditingArticle(null);
-                setShowAddForm(true);
-              }}
-              className="button button-primary"
-              style={{ fontSize: '8pt', padding: '6px 12px' }}
-            >
-              + Add Article
-            </button>
-          )}
+          <h3 className="heading-3">Knowledge Library ({documents.length})</h3>
         </div>
         <div className="card-body">
-          {/* Search and Filter */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-            <input
-              type="text"
-              placeholder="Search articles..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="form-input"
-              style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
-            />
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="form-select"
-              style={{ fontSize: '9pt', padding: '6px 8px' }}
+          {/* Upload entry point */}
+          {isOwnProfile && (
+            <div
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '16px',
+                marginBottom: 'var(--space-3)'
+              }}
             >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat === 'all' ? 'All Categories' : cat}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Add/Edit Form */}
-          {(showAddForm || editingArticle) && isOwnProfile && (
-            <div style={{
-              padding: 'var(--space-3)',
-              border: '1px solid var(--border)',
-              borderRadius: '4px',
-              marginBottom: 'var(--space-3)',
-              background: 'var(--grey-50)'
-            }}>
-              <ArticleForm
-                article={editingArticle}
-                onSave={handleSave}
-                onCancel={() => {
-                  setEditingArticle(null);
-                  setShowAddForm(false);
-                }}
-              />
-            </div>
-          )}
-
-          {/* Image Sets Section */}
-          {imageSets.length > 0 && (
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <h4 className="text font-bold" style={{ marginBottom: 'var(--space-2)' }}>Image Sets ({imageSets.length})</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 'var(--space-2)' }}>
-                {imageSets.map((set: any) => (
-                  <div
-                    key={set.id}
-                    style={{
-                      border: '1px solid var(--border)',
-                      borderRadius: '4px',
-                      overflow: 'hidden',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => {
-                      // Navigate to image set or open in lightbox
-                      if (set.vehicle_id) {
-                        window.location.href = `/vehicle/${set.vehicle_id}`;
-                      }
-                    }}
-                  >
-                    {set.cover_image ? (
-                      <img
-                        src={set.cover_image}
-                        alt={set.name}
-                        style={{
-                          width: '100%',
-                          height: '120px',
-                          objectFit: 'cover'
-                        }}
-                      />
-                    ) : (
-                      <div style={{
-                        width: '100%',
-                        height: '120px',
-                        background: 'var(--grey-200)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '8pt',
-                        color: 'var(--text-muted)'
-                      }}>
-                        No Image
-                      </div>
-                    )}
-                    <div style={{ padding: 'var(--space-2)', background: 'var(--white)' }}>
-                      <div className="text text-small font-bold" style={{ marginBottom: '2px' }}>
-                        {set.name}
-                      </div>
-                      <div className="text text-small text-muted">
-                        {set.image_count || 0} images
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="text font-bold" style={{ marginBottom: '4px' }}>
+                Upload Reference Documents
               </div>
+              <div className="text text-muted" style={{ marginBottom: '8px' }}>
+                Drop brochures, manuals, or images. Everything is detected automatically.
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              />
+              <button
+                className="button button-primary"
+                style={{ fontSize: '9pt', padding: '8px 12px' }}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? 'Uploading...' : 'Upload Document'}
+              </button>
             </div>
           )}
 
-          {/* Articles List */}
-          {filteredArticles.length === 0 && imageSets.length === 0 ? (
+          {/* Upload Form Modal */}
+          {showUploadForm && isOwnProfile && (
+            <DocumentUploadForm
+              onUpload={handleUpload}
+              onCancel={() => {
+                setShowUploadForm(false);
+                (window as any).__pendingUploadFile = null;
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }}
+              uploading={uploading}
+            />
+          )}
+
+          {/* Search and Filter */}
+          {documents.length > 0 && (
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+              <input
+                type="text"
+                placeholder="Search documents..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="form-input"
+                style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+              />
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="form-select"
+                style={{ fontSize: '9pt', padding: '6px 8px' }}
+              >
+                {documentTypes.map(type => (
+                  <option key={type} value={type}>
+                    {type === 'all' ? 'All Types' : DOCUMENT_TYPES.find(dt => dt.value === type)?.label || type}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Documents List */}
+          {filteredDocuments.length === 0 ? (
             <div className="text text-muted" style={{ textAlign: 'center', padding: 'var(--space-4)' }}>
-              {isOwnProfile ? 'No articles or image sets yet. Create your first article!' : 'No public articles to display.'}
+              {isOwnProfile 
+                ? 'No reference documents yet. Upload your first document to get started.' 
+                : 'No public reference documents to display.'}
             </div>
           ) : (
-            filteredArticles.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                {filteredArticles.map(article => (
-                <div
-                  key={article.id}
-                  style={{
-                    padding: 'var(--space-3)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    background: 'var(--white)'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-2)' }}>
-                    <div style={{ flex: 1 }}>
-                      <h4 className="text font-bold" style={{ marginBottom: '4px' }}>
-                        {article.title}
-                        {article.is_public && (
-                          <span style={{
-                            marginLeft: '8px',
-                            padding: '2px 6px',
-                            background: 'var(--success-dim)',
-                            color: 'var(--success)',
-                            fontSize: '7pt',
-                            borderRadius: '2px'
-                          }}>
-                            PUBLIC
-                          </span>
-                        )}
-                      </h4>
-                      <div className="text text-small text-muted">
-                        {article.category} • {new Date(article.created_at).toLocaleDateString()}
-                      </div>
-                      {article.tags.length > 0 && (
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-                          {article.tags.map(tag => (
-                            <span
-                              key={tag}
-                              style={{
-                                padding: '2px 6px',
-                                background: 'var(--grey-200)',
-                                fontSize: '7pt',
-                                borderRadius: '2px'
-                              }}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    {isOwnProfile && (
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button
-                          onClick={() => {
-                            setEditingArticle(article);
-                            setShowAddForm(false);
-                          }}
-                          className="button button-secondary"
-                          style={{ fontSize: '8pt', padding: '4px 8px' }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(article.id)}
-                          className="button button-secondary"
-                          style={{ fontSize: '8pt', padding: '4px 8px' }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="text text-small" style={{ 
-                    maxHeight: '100px', 
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {article.content}
-                  </div>
-                </div>
-                ))}
-              </div>
-            )
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {filteredDocuments.map(doc => (
+                <DocumentCard
+                  key={doc.id}
+                  document={doc}
+                  isOwnProfile={isOwnProfile}
+                  onDelete={() => handleDelete(doc.id)}
+                  onDownload={() => handleDownload(doc)}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -346,104 +259,261 @@ const KnowledgeLibrary: React.FC<KnowledgeLibraryProps> = ({ userId, isOwnProfil
   );
 };
 
-interface ArticleFormProps {
-  article: KnowledgeArticle | null;
-  onSave: (article: Partial<KnowledgeArticle>) => void;
-  onCancel: () => void;
+interface DocumentCardProps {
+  document: ReferenceDocument;
+  isOwnProfile: boolean;
+  onDelete: () => void;
+  onDownload: () => void;
 }
 
-const ArticleForm: React.FC<ArticleFormProps> = ({ article, onSave, onCancel }) => {
-  const [title, setTitle] = useState(article?.title || '');
-  const [content, setContent] = useState(article?.content || '');
-  const [category, setCategory] = useState(article?.category || 'general');
-  const [tags, setTags] = useState(article?.tags?.join(', ') || '');
-  const [isPublic, setIsPublic] = useState(article?.is_public || false);
+const DocumentCard: React.FC<DocumentCardProps> = ({ document, isOwnProfile, onDelete, onDownload }) => {
+  const docTypeLabel = DOCUMENT_TYPES.find(dt => dt.value === document.document_type)?.label || document.document_type;
+  const fileSizeMB = document.file_size_bytes ? (document.file_size_bytes / 1024 / 1024).toFixed(2) : null;
+
+  return (
+    <div
+      style={{
+        padding: 'var(--space-3)',
+        border: '1px solid var(--border)',
+        borderRadius: '4px',
+        background: 'var(--white)'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 'var(--space-2)' }}>
+        <div style={{ flex: 1 }}>
+          <h4 className="text font-bold" style={{ marginBottom: '4px' }}>
+            {document.title}
+            {document.is_public && (
+              <span style={{
+                marginLeft: '8px',
+                padding: '2px 6px',
+                background: 'var(--success-dim)',
+                color: 'var(--success)',
+                fontSize: '7pt',
+                borderRadius: '2px'
+              }}>
+                PUBLIC
+              </span>
+            )}
+            {document.is_factory_original && (
+              <span style={{
+                marginLeft: '8px',
+                padding: '2px 6px',
+                background: 'var(--primary-dim)',
+                color: 'var(--primary)',
+                fontSize: '7pt',
+                borderRadius: '2px'
+              }}>
+                FACTORY
+              </span>
+            )}
+          </h4>
+          <div className="text text-small text-muted" style={{ marginBottom: '4px' }}>
+            {docTypeLabel}
+            {document.year && ` • ${document.year}`}
+            {document.make && ` ${document.make}`}
+            {document.series && ` ${document.series}`}
+            {document.page_count && ` • ${document.page_count} pages`}
+            {fileSizeMB && ` • ${fileSizeMB} MB`}
+          </div>
+          {document.description && (
+            <div className="text text-small" style={{ marginTop: '4px', color: 'var(--text-muted)' }}>
+              {document.description}
+            </div>
+          )}
+          {document.tags && document.tags.length > 0 && (
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+              {document.tags.map(tag => (
+                <span
+                  key={tag}
+                  style={{
+                    padding: '2px 6px',
+                    background: 'var(--grey-200)',
+                    fontSize: '7pt',
+                    borderRadius: '2px'
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        {isOwnProfile && (
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={onDownload}
+              className="button button-secondary"
+              style={{ fontSize: '8pt', padding: '4px 8px' }}
+            >
+              View
+            </button>
+            <button
+              onClick={onDelete}
+              className="button button-secondary"
+              style={{ fontSize: '8pt', padding: '4px 8px' }}
+            >
+              Delete
+            </button>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: '8px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+        {document.view_count > 0 && <span>{document.view_count} views</span>}
+        {document.download_count > 0 && <span>{document.download_count} downloads</span>}
+        {document.link_count > 0 && <span>{document.link_count} vehicles</span>}
+        <span>{new Date(document.uploaded_at).toLocaleDateString()}</span>
+      </div>
+    </div>
+  );
+};
+
+interface DocumentUploadFormProps {
+  onUpload: (data: any) => void;
+  onCancel: () => void;
+  uploading: boolean;
+}
+
+const DocumentUploadForm: React.FC<DocumentUploadFormProps> = ({ onUpload, onCancel, uploading }) => {
+  const [documentType, setDocumentType] = useState('brochure');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [year, setYear] = useState<number | undefined>();
+  const [make, setMake] = useState('');
+  const [series, setSeries] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [isFactoryOriginal, setIsFactoryOriginal] = useState(false);
+  const [tags, setTags] = useState('');
 
   const handleSubmit = () => {
-    if (!title.trim() || !content.trim()) {
-      alert('Title and content are required');
+    if (!title.trim()) {
+      alert('Title is required');
       return;
     }
 
-    onSave({
+    onUpload({
+      document_type: documentType,
       title: title.trim(),
-      content: content.trim(),
-      category: category.trim(),
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-      is_public: isPublic
+      description: description.trim() || undefined,
+      year: year || undefined,
+      make: make.trim() || undefined,
+      series: series.trim() || undefined,
+      is_public: isPublic,
+      is_factory_original: isFactoryOriginal,
+      tags: tags.split(',').map(t => t.trim()).filter(Boolean)
     });
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-      <input
-        type="text"
-        placeholder="Article title..."
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="form-input"
-        style={{ fontSize: '10pt', padding: '8px' }}
-      />
-      <textarea
-        placeholder="Article content..."
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        className="form-input"
-        style={{ 
-          fontSize: '9pt', 
-          padding: '8px',
-          minHeight: '150px',
-          fontFamily: 'inherit'
-        }}
-      />
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+    <div style={{
+      padding: 'var(--space-3)',
+      border: '1px solid var(--border)',
+      borderRadius: '4px',
+      marginBottom: 'var(--space-3)',
+      background: 'var(--grey-50)'
+    }}>
+      <div className="text font-bold" style={{ marginBottom: 'var(--space-2)' }}>
+        Document Information
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        <select
+          value={documentType}
+          onChange={(e) => setDocumentType(e.target.value)}
+          className="form-select"
+          style={{ fontSize: '9pt', padding: '6px 8px' }}
+        >
+          {DOCUMENT_TYPES.map(dt => (
+            <option key={dt.value} value={dt.value}>{dt.label}</option>
+          ))}
+        </select>
         <input
           type="text"
-          placeholder="Category (e.g., technical, guide, reference)"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          placeholder="Document title (required)"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
           className="form-input"
-          style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+          style={{ fontSize: '10pt', padding: '8px' }}
         />
+        <textarea
+          placeholder="Description (optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="form-input"
+          style={{ fontSize: '9pt', padding: '8px', minHeight: '60px', fontFamily: 'inherit' }}
+        />
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <input
+            type="number"
+            placeholder="Year"
+            value={year || ''}
+            onChange={(e) => setYear(e.target.value ? parseInt(e.target.value) : undefined)}
+            className="form-input"
+            style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+          />
+          <input
+            type="text"
+            placeholder="Make"
+            value={make}
+            onChange={(e) => setMake(e.target.value)}
+            className="form-input"
+            style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+          />
+          <input
+            type="text"
+            placeholder="Series (C10, K5, etc.)"
+            value={series}
+            onChange={(e) => setSeries(e.target.value)}
+            className="form-input"
+            style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+          />
+        </div>
         <input
           type="text"
           placeholder="Tags (comma-separated)"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
           className="form-input"
-          style={{ flex: 1, fontSize: '9pt', padding: '6px 8px' }}
+          style={{ fontSize: '9pt', padding: '6px 8px' }}
         />
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <input
-          type="checkbox"
-          checked={isPublic}
-          onChange={(e) => setIsPublic(e.target.checked)}
-          id="is-public"
-        />
-        <label htmlFor="is-public" className="text text-small">
-          Make public (show on profile)
-        </label>
-      </div>
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        <button
-          onClick={handleSubmit}
-          className="button button-primary"
-          style={{ fontSize: '9pt', padding: '6px 12px' }}
-        >
-          {article ? 'Update' : 'Create'}
-        </button>
-        <button
-          onClick={onCancel}
-          className="button button-secondary"
-          style={{ fontSize: '9pt', padding: '6px 12px' }}
-        >
-          Cancel
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt' }}>
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+            />
+            Make public (others can discover and use)
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '9pt' }}>
+            <input
+              type="checkbox"
+              checked={isFactoryOriginal}
+              onChange={(e) => setIsFactoryOriginal(e.target.checked)}
+            />
+            Factory original document
+          </label>
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <button
+            onClick={handleSubmit}
+            className="button button-primary"
+            style={{ fontSize: '9pt', padding: '6px 12px' }}
+            disabled={uploading || !title.trim()}
+          >
+            {uploading ? 'Uploading...' : 'Upload & Index'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="button button-secondary"
+            style={{ fontSize: '9pt', padding: '6px 12px' }}
+            disabled={uploading}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
 export default KnowledgeLibrary;
-

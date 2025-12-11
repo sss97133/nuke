@@ -234,8 +234,8 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         }
 
         // Scrape the listing
-        console.log('📡 Calling scrape-vehicle function...');
-        const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('scrape-vehicle', {
+        console.log('📡 Calling simple-scraper function...');
+        const { data: scrapeResult, error: scrapeError } = await supabase.functions.invoke('simple-scraper', {
           body: { url: searchQuery.trim() }
         });
 
@@ -246,7 +246,15 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           return;
         }
         
-        const scrapedData = scrapeResult.data;
+        const scrapedData = scrapeResult?.data;
+        
+        // Validate scrapedData exists
+        if (!scrapedData) {
+          console.error('❌ No data returned from scraper');
+          onSearchResults([], 'Failed to extract data from listing');
+          setIsSearching(false);
+          return;
+        }
         
         console.log('═══════════════════════════════════════════════════════');
         console.log('✅ SCRAPING RESULT:');
@@ -257,12 +265,13 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         console.log('Images type:', typeof scrapedData?.images);
         console.log('Is array:', Array.isArray(scrapedData?.images));
         console.log('Images value:', scrapedData?.images);
-        console.log('Full scrapedData:', JSON.stringify(scrapedData, null, 2).substring(0, 500));
+        const scrapedDataStr = scrapedData ? JSON.stringify(scrapedData, null, 2) : 'null';
+        console.log('Full scrapedData:', scrapedDataStr.length > 500 ? scrapedDataStr.substring(0, 500) + '...' : scrapedDataStr);
         console.log('═══════════════════════════════════════════════════════');
         
         // Create vehicle immediately
         const vehicleData: any = {
-          year: parseInt(scrapedData.year) || null,
+          year: scrapedData.year ? parseInt(String(scrapedData.year)) : null,
           make: scrapedData.make || null,
           model: scrapedData.model || null,
           vin: scrapedData.vin || null,
@@ -417,13 +426,23 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           
           for (let i = 0; i < imagesToImport.length; i++) {
             const imageUrl = imagesToImport[i];
-            if (!imageUrl || typeof imageUrl !== 'string') continue;
+            if (!imageUrl || typeof imageUrl !== 'string' || imageUrl.trim().length === 0) {
+              console.warn(`⚠️ Skipping invalid image URL at index ${i}:`, imageUrl);
+              continue;
+            }
             
             try {
               // Upgrade to high-res if it's a Craigslist thumbnail
-              const fullSizeUrl = imageUrl.replace('_600x450.jpg', '_1200x900.jpg').replace('_300x300.jpg', '_1200x900.jpg');
+              const fullSizeUrl = String(imageUrl).replace('_600x450.jpg', '_1200x900.jpg').replace('_300x300.jpg', '_1200x900.jpg');
               
-              console.log(`📥 Downloading image ${i + 1}/${imagesToImport.length}: ${fullSizeUrl.substring(0, 80)}...`);
+              // Defensive check before substring
+              if (!fullSizeUrl || typeof fullSizeUrl !== 'string') {
+                console.warn(`⚠️ Invalid fullSizeUrl for image ${i + 1}, skipping`);
+                continue;
+              }
+              
+              const urlPreview = fullSizeUrl.length > 80 ? fullSizeUrl.substring(0, 80) + '...' : fullSizeUrl;
+              console.log(`📥 Downloading image ${i + 1}/${imagesToImport.length}: ${urlPreview}`);
               
               // Download image
               const response = await fetch(fullSizeUrl);

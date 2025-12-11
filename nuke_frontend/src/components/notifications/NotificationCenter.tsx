@@ -77,7 +77,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
       if (!user) return
 
       // Load ALL notification sources in parallel
-      const [userNotifs, workApprovals, vehicleAssignments] = await Promise.all([
+      const [userNotifs, workApprovals] = await Promise.all([
         // Standard user notifications
         supabase
           .from('user_notifications')
@@ -87,10 +87,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
           .limit(50),
         
         // Work approval notifications
-        supabase.rpc('get_pending_work_approvals', { p_user_id: user.id }),
-        
-        // Vehicle assignment notifications  
-        supabase.rpc('get_pending_vehicle_assignments', { p_user_id: user.id })
+        supabase.rpc('get_pending_work_approvals', { p_user_id: user.id })
       ])
 
       // Combine all notifications into unified format
@@ -135,36 +132,6 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
             },
             is_read: false,
             created_at: wa.created_at
-          })
-        })
-      }
-
-      // Add vehicle assignments
-      if (vehicleAssignments.data) {
-        vehicleAssignments.data.forEach((va: any) => {
-          const relationshipDisplay = va.relationship_type
-            .split('_')
-            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ')
-          
-          unifiedNotifications.push({
-            id: `assignment_${va.id}`,
-            notification_type: 'pending_vehicle_assignment',
-            title: `Link ${va.vehicle_name} to ${va.organization_name}`,
-            message: `Suggested as ${relationshipDisplay} (${Math.round(va.confidence)}% confidence)`,
-            vehicle_id: va.vehicle_id,
-            organization_id: va.organization_id,
-            metadata: {
-              requires_confirmation: true,
-              action: 'approve_assignment',
-              assignment_id: va.id,
-              relationship_type: va.relationship_type,
-              confidence: va.confidence,
-              evidence_sources: va.evidence_sources,
-              data_point: `Link ${va.vehicle_name} to ${va.organization_name} as ${relationshipDisplay}?`
-            },
-            is_read: false,
-            created_at: va.created_at
           })
         })
       }

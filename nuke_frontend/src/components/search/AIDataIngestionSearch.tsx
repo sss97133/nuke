@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
 import { aiDataIngestion, type ExtractionResult } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
 import { useToast } from '../../hooks/useToast';
+import VehicleCritiqueMode from './VehicleCritiqueMode';
 import '../../design-system.css';
 
 interface ExtractionPreview {
@@ -31,10 +32,52 @@ export default function AIDataIngestionSearch() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  
+  const [showCritique, setShowCritique] = useState(false);
+  const [currentVehicleData, setCurrentVehicleData] = useState<any>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
+
+  // Auto-detect vehicle page and load data
+  useEffect(() => {
+    const detectVehiclePage = async () => {
+      const path = location.pathname;
+      const vehicleMatch = path.match(/\/vehicle\/([a-f0-9-]{36})/);
+
+      if (vehicleMatch) {
+        const vehicleId = vehicleMatch[1];
+
+        // Auto-populate the input with the current URL
+        const currentUrl = `${window.location.origin}${path}`;
+        setInput(currentUrl);
+
+        // Load vehicle data for critique mode
+        try {
+          const { data: vehicle } = await supabase
+            .from('vehicles')
+            .select('id, year, make, model, status, description')
+            .eq('id', vehicleId)
+            .single();
+
+          if (vehicle) {
+            setCurrentVehicleData(vehicle);
+          }
+        } catch (error) {
+          console.warn('Failed to load vehicle data for critique:', error);
+        }
+      } else {
+        // Clear auto-populated data when not on vehicle page
+        if (input.includes('/vehicle/')) {
+          setInput('');
+        }
+        setCurrentVehicleData(null);
+      }
+    };
+
+    detectVehiclePage();
+  }, [location.pathname]);
 
   // Handle paste from clipboard
   useEffect(() => {
@@ -382,8 +425,8 @@ export default function AIDataIngestionSearch() {
   };
 
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: '100%', minWidth: 0 }}>
-      {/* Main Input Container */}
+    <div style={{ position: 'relative', width: '100%', maxWidth: '100%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      {/* Main Input Container - Extended responsive layout */}
       <div
         style={{
           display: 'flex',
@@ -393,7 +436,9 @@ export default function AIDataIngestionSearch() {
           border: isDragging ? '2px solid #0ea5e9' : '2px solid var(--border)',
           padding: '4px 6px',
           height: '28px',
-          transition: 'all 0.12s ease'
+          transition: 'all 0.12s ease',
+          width: '100%',
+          minWidth: 0
         }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -401,7 +446,7 @@ export default function AIDataIngestionSearch() {
       >
         <input
           type="text"
-          placeholder={attachedImage ? "Add context..." : "VIN, URL, text..."}
+          placeholder={currentVehicleData ? "Critique this vehicle..." : (attachedImage ? "Add context..." : "VIN, URL, text...")}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -414,11 +459,32 @@ export default function AIDataIngestionSearch() {
             fontFamily: '"MS Sans Serif", sans-serif',
             background: 'transparent',
             minWidth: 0,
-            maxWidth: '100px',
+            maxWidth: 'none',
             height: '100%',
             padding: 0
           }}
         />
+
+        {/* Critique Button (when on vehicle page) */}
+        {currentVehicleData && (
+          <button
+            type="button"
+            onClick={() => setShowCritique(!showCritique)}
+            className="button-win95"
+            style={{
+              padding: '2px 6px',
+              fontSize: '8pt',
+              height: '20px',
+              minWidth: 'auto',
+              opacity: 1,
+              background: showCritique ? '#c0c0c0' : 'var(--white)',
+              whiteSpace: 'nowrap'
+            }}
+            title="Open critique mode to provide feedback on this vehicle"
+          >
+            {showCritique ? 'CRIT' : 'CRIT'}
+          </button>
+        )}
 
         {/* Image Attachment Button */}
         <input
@@ -655,6 +721,16 @@ export default function AIDataIngestionSearch() {
         </div>
       )}
 
+      {/* Vehicle Critique Mode */}
+      {showCritique && currentVehicleData && (
+        <VehicleCritiqueMode
+          isVisible={showCritique}
+          onClose={() => setShowCritique(false)}
+          vehicleId={currentVehicleData.id}
+          vehicleData={currentVehicleData}
+        />
+      )}
+
       {/* Error Message */}
       {error && (
         <div style={{
@@ -675,11 +751,12 @@ export default function AIDataIngestionSearch() {
       )}
 
       {/* Click outside to close */}
-      {(showPreview || imagePreview || error) && (
+      {(showPreview || imagePreview || error || showCritique) && (
         <div
           onClick={() => {
             setShowPreview(false);
             setError(null);
+            setShowCritique(false);
           }}
           style={{
             position: 'fixed',

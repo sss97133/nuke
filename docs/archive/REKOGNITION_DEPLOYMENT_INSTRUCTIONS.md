@@ -93,7 +93,7 @@ supabase functions deploy scrape-vehicle --project-ref qkgaybvrernstplzjaam --no
 
 ```bash
 curl -X POST 'https://qkgaybvrernstplzjaam.supabase.co/functions/v1/scrape-vehicle' \
-  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk' \
+  -H 'Authorization: Bearer <your-supabase-key>' \
   -H 'Content-Type: application/json' \
   -d '{"url": "https://sandiego.craigslist.org/esd/cto/d/el-centro-1972-gmc-suburban/7888155474.html"}'
 ```

@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 
 // Use remote Supabase configuration
 const supabaseUrl = 'https://qkgaybvrernstplzjaam.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjQxNzY5NzcsImV4cCI6MjAzOTc1Mjk3N30.4Zt8VJrKNLvXmz5Yz0Rq_579aba44'; // anon key
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY; // anon key
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

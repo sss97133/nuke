@@ -255,18 +255,11 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
               )}
             </div>
 
-            {/* Home link - separate from menu */}
-            <Link 
-              to="/dash" 
-              className={`nav-link ${isActivePage('/dash') ? 'active' : ''}`}
-            >
-              Home
-            </Link>
           </div>
 
           <div className="header-right">
-            {/* Global Search - AI Data Ingestion */}
-            <div style={{ flex: '0 0 auto', minWidth: 0, maxWidth: '400px', marginRight: '8px' }}>
+            {/* Global Search - AI Data Ingestion - Extended to left edge */}
+            <div style={{ flex: '1 1 auto', minWidth: 0, maxWidth: 'none', marginRight: '8px', display: 'flex' }}>
               <AIDataIngestionSearch />
             </div>
 
