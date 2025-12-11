@@ -108,7 +108,20 @@ serve(async (req) => {
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiKey) {
-      throw new Error('OPENAI_API_KEY not configured');
+      const errorMsg = 'OPENAI_API_KEY not configured. Please set it in Supabase Dashboard > Edge Functions > Secrets.';
+      console.error(`❌ ${errorMsg}`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: errorMsg,
+        processed: 0,
+        succeeded: 0,
+        failed: 0,
+        backfilled: 0,
+        vehicles_updated: []
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     for (const item of itemsToProcess) {
@@ -333,7 +346,12 @@ CRITICAL: Only include fields that are actually found or can be confidently infe
 
     return new Response(JSON.stringify({
       success: true,
-      ...results
+      processed: results.processed,
+      succeeded: results.succeeded,
+      failed: results.failed,
+      backfilled: results.backfilled,
+      vehicles_updated: results.vehicles_updated,
+      updated: results.backfilled // Alias for compatibility
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

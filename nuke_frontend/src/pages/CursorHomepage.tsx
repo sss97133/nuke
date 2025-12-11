@@ -204,6 +204,7 @@ interface FilterState {
   radiusMiles: number;
   showPrices: boolean;
   showDetailOverlay: boolean;
+  showPending: boolean;
 }
 
 const CursorHomepage: React.FC = () => {
@@ -229,7 +230,8 @@ const CursorHomepage: React.FC = () => {
     zipCode: '',
     radiusMiles: 50,
     showPrices: true,
-    showDetailOverlay: true
+    showDetailOverlay: true,
+    showPending: false
   });
   const [stats, setStats] = useState({
     totalBuilds: 0,
@@ -269,7 +271,7 @@ const CursorHomepage: React.FC = () => {
     // Load feed for all users (authenticated and unauthenticated)
     // Public vehicles (is_public=true) are visible to everyone
     loadHypeFeed();
-  }, [timePeriod]);
+  }, [timePeriod, filters.showPending]);
 
   // Also reload when session changes (user logs in/out)
   useEffect(() => {
@@ -370,10 +372,36 @@ const CursorHomepage: React.FC = () => {
       // Use RPC function to get accurate counts and tier
       const { data: vehicles, error } = await supabase.rpc('get_vehicle_feed_data');
       
+      // If showPending filter is enabled, also fetch pending vehicles
+      let pendingVehicles: any[] = [];
+      if (filters.showPending) {
+        const { data: pending, error: pendingError } = await supabase
+          .from('vehicles')
+          .select('id, year, make, model, current_value, purchase_price, sale_price, asking_price, is_for_sale, mileage, vin, condition_rating, created_at, updated_at')
+          .eq('status', 'pending')
+          .eq('is_public', true)
+          .order('created_at', { ascending: false })
+          .limit(500);
+        
+        if (!pendingError && pending) {
+          // Add basic tier info for pending vehicles
+          pendingVehicles = pending.map((v: any) => ({
+            ...v,
+            view_count: 0,
+            image_count: 0,
+            tier: 'minimal',
+            tier_label: 'Tier 1'
+          }));
+        }
+      }
+      
+      // Merge active and pending vehicles
+      const allVehicles = [...(vehicles || []), ...pendingVehicles];
+      
       // Apply time filter if needed
-      let filteredVehicles = vehicles;
-      if (timeFilter && vehicles) {
-        filteredVehicles = vehicles.filter((v: any) => 
+      let filteredVehicles = allVehicles;
+      if (timeFilter && allVehicles) {
+        filteredVehicles = allVehicles.filter((v: any) => 
           new Date(v.updated_at) >= new Date(timeFilter)
         );
       }
@@ -400,7 +428,7 @@ const CursorHomepage: React.FC = () => {
         return;
       }
       
-      if (!vehicles || vehicles.length === 0) {
+      if (!allVehicles || allVehicles.length === 0) {
         console.warn('⚠️ No vehicles found with is_public=true');
         setFeedVehicles([]);
         setLoading(false);
@@ -408,7 +436,7 @@ const CursorHomepage: React.FC = () => {
       }
 
       // Use filtered vehicles if time filter was applied
-      const vehiclesToProcess = filteredVehicles || vehicles || [];
+      const vehiclesToProcess = filteredVehicles || allVehicles || [];
 
       // Fetch images separately for each vehicle to avoid relationship ambiguity
       const vehicleIds = vehiclesToProcess.map((v: any) => v.id);
@@ -1021,6 +1049,18 @@ const CursorHomepage: React.FC = () => {
                     onChange={(e) => setFilters({...filters, forSale: e.target.checked})}
                   />
                   <span>For Sale Only</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                  <input
+                    type="checkbox"
+                    checked={filters.showPending}
+                    onChange={(e) => {
+                      setFilters({...filters, showPending: e.target.checked});
+                      // Reload feed when this changes
+                      setTimeout(() => loadHypeFeed(), 100);
+                    }}
+                  />
+                  <span>Show Pending Vehicles</span>
                 </label>
                 <div style={{ marginTop: '6px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '2px' }}>
