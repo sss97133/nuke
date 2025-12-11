@@ -104,16 +104,47 @@ const VehiclePriceSection: React.FC<VehiclePriceSectionProps> = ({ vehicleId, is
     try {
       setSaving(true);
 
+      // Get current user for source attribution
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Use price source service to update prices with source attribution
+      const { updatePriceWithSource } = await import('../../services/priceSourceService');
+      
+      const priceFields = [
+        { field: 'msrp' as const, value: editData.msrp },
+        { field: 'current_value' as const, value: editData.current_value },
+        { field: 'purchase_price' as const, value: editData.purchase_price },
+        { field: 'asking_price' as const, value: editData.asking_price },
+        { field: 'sale_price' as const, value: editData.sale_price }
+      ];
+
+      // Update each price field with source attribution
+      for (const { field, value } of priceFields) {
+        const before = (priceData as any)?.[field];
+        const after = value;
+        
+        // Only update if changed
+        if (after !== before) {
+          await updatePriceWithSource(
+            vehicleId,
+            field,
+            typeof after === 'number' ? after : null,
+            {
+              source: 'user_input',
+              updated_at: new Date().toISOString()
+            },
+            user?.id
+          );
+        }
+      }
+
+      // Update other non-price fields directly
       const { error } = await supabase
         .from('vehicles')
         .update({
-          msrp: editData.msrp,
-          current_value: editData.current_value,
-          purchase_price: editData.purchase_price,
           purchase_date: editData.purchase_date,
-          asking_price: editData.asking_price,
-          sale_price: editData.sale_price,
-          is_for_sale: editData.is_for_sale
+          is_for_sale: editData.is_for_sale,
+          updated_at: new Date().toISOString()
         })
         .eq('id', vehicleId);
 

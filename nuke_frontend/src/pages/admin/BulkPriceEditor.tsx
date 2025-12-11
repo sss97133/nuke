@@ -178,8 +178,51 @@ const BulkPriceEditor: React.FC = () => {
     try {
       const payload: any = { ...changes };
       delete payload._dirty;
-      const { error } = await supabase.from('vehicles').update(payload).eq('id', id);
-      if (error) throw error;
+      
+      // Get current user for source attribution
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Separate price fields from other fields
+      const priceFields = ['msrp', 'current_value', 'purchase_price', 'asking_price', 'sale_price'] as const;
+      const priceUpdates: Record<string, number | null> = {};
+      const otherUpdates: any = {};
+      
+      for (const key in payload) {
+        if (priceFields.includes(key as any)) {
+          priceUpdates[key] = payload[key];
+        } else {
+          otherUpdates[key] = payload[key];
+        }
+      }
+      
+      // Update price fields with source attribution
+      const { updatePriceWithSource } = await import('../../services/priceSourceService');
+      const before = rows.find(r => r.id === id);
+      
+      for (const field of priceFields) {
+        const after = priceUpdates[field];
+        const prior = (before as any)?.[field];
+        
+        if (after !== prior) {
+          await updatePriceWithSource(
+            id,
+            field as any,
+            typeof after === 'number' ? after : null,
+            {
+              source: 'admin_edit',
+              updated_at: new Date().toISOString()
+            },
+            user?.id
+          );
+        }
+      }
+      
+      // Update other fields directly
+      if (Object.keys(otherUpdates).length > 0) {
+        const { error } = await supabase.from('vehicles').update(otherUpdates).eq('id', id);
+        if (error) throw error;
+      }
+      
       // Reflect in UI
       setRows(prev => prev.map(r => (r.id === id ? { ...r, ...payload } : r)));
       setDraft(prev => { const { [id]: _, ...rest } = prev; return rest; });
@@ -193,7 +236,6 @@ const BulkPriceEditor: React.FC = () => {
           { key: 'asking_price', type: 'asking' },
           { key: 'sale_price', type: 'sale' },
         ];
-        const before = rows.find(r => r.id === id);
         const entries: any[] = [];
         mappings.forEach(({ key, type }) => {
           const after = (payload as any)[key];

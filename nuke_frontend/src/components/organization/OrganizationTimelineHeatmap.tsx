@@ -54,7 +54,8 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
         .from('business_timeline_events')
         .select('id, business_id, event_type, event_date, cost_amount, labor_hours, image_urls, metadata, title, description, event_category')
         .eq('business_id', organizationId)
-        .gte('event_date', `${year - 1}-01-01`) // Load last 2 years
+        .gte('event_date', `${year}-01-01`) // Only load events from the selected year onwards
+        .lte('event_date', `${year}-12-31`) // And up to the end of the selected year
         .order('event_date', { ascending: false });
 
       if (error) throw error;
@@ -80,10 +81,19 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
   };
 
   // Group events by date with activity metrics
+  // Only include events from the selected year to prevent showing incorrect dates
   const daily = new Map<string, { events: TimelineEvent[]; count: number; hours: number; value: number; types: Set<string> }>();
   
   for (const event of events) {
     const date = toDateOnly(event.event_date);
+    const eventYear = new Date(date).getFullYear();
+    
+    // Only process events that fall within the selected year
+    // This prevents events with incorrect dates (e.g., 2022 auctions dated as 2025) from appearing
+    if (eventYear !== year) {
+      continue;
+    }
+    
     const entry = daily.get(date) || { events: [], count: 0, hours: 0, value: 0, types: new Set() };
     
     entry.events.push(event);
@@ -400,6 +410,10 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
           organizationName={organization.business_name}
           laborRate={organization.labor_rate}
           onClose={() => setSelectedWorkOrder(null)}
+          onNavigateEvent={(newEvent) => {
+            // Update to show the new event
+            setSelectedWorkOrder(newEvent);
+          }}
         />
       )}
     </div>

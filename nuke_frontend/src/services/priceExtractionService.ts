@@ -107,11 +107,13 @@ export async function recordExtractedPrice(
 
 /**
  * Update vehicle price field if the new price is better
+ * FACT-BASED: Creates source attribution when updating
  */
 async function maybeUpdateVehiclePrice(
   vehicleId: string,
   newPrice: number,
-  field: 'asking_price' | 'current_value'
+  field: 'asking_price' | 'current_value',
+  metadata?: { url?: string; platform?: string; comment_id?: string }
 ): Promise<void> {
   try {
     // Get current vehicle data
@@ -132,10 +134,21 @@ async function maybeUpdateVehiclePrice(
       (newPrice > currentPrice * 0.5 && newPrice < currentPrice * 2);
     
     if (shouldUpdate) {
-      await supabase
-        .from('vehicles')
-        .update({ [field]: newPrice, updated_at: new Date().toISOString() })
-        .eq('id', vehicleId);
+      // Use price source service to update with source attribution
+      const { updatePriceWithSource } = await import('./priceSourceService');
+      
+      await updatePriceWithSource(
+        vehicleId,
+        field,
+        newPrice,
+        {
+          source: metadata?.url ? 'market_listing' : 'comment_extraction',
+          url: metadata?.url,
+          platform: metadata?.platform,
+          comment_id: metadata?.comment_id,
+          updated_at: new Date().toISOString()
+        }
+      );
     }
   } catch (error) {
     console.error('Error updating vehicle price:', error);

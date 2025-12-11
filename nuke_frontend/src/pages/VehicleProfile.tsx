@@ -1155,47 +1155,71 @@ const VehicleProfile: React.FC = () => {
         // Would generate 400 errors: createSignedUrl calls failing
         // Using direct public URLs instead which work fine
       } else {
-        // No DB rows: attempt storage fallback (canonical + legacy) to avoid empty hero/gallery
-        try {
-          const bucketCanonical = supabase.storage.from('vehicle-data');
-          const bucketLegacy = supabase.storage.from('vehicle-images');
-          const gathered: string[] = [];
+        // No DB rows: try origin_metadata images first (from scraping)
+        if (vehicle.origin_metadata?.images && Array.isArray(vehicle.origin_metadata.images)) {
+          const originImages = vehicle.origin_metadata.images
+            .filter((url: string) => 
+              url && 
+              typeof url === 'string' && 
+              url.startsWith('http') &&
+              !url.includes('94x63') && // Filter out thumbnails
+              !url.includes('youtube.com') && // Filter out YouTube thumbnails
+              !url.includes('thumbnail')
+            );
+          
+          if (originImages.length > 0) {
+            images = originImages;
+            setVehicleImages(images);
+            if (!leadImageUrl && images[0]) {
+              setLeadImageUrl(images[0]);
+            }
+            console.log(`✅ Using ${originImages.length} images from origin_metadata`);
+          }
+        }
+        
+        // If still no images, attempt storage fallback (canonical + legacy) to avoid empty hero/gallery
+        if (images.length === 0) {
+          try {
+            const bucketCanonical = supabase.storage.from('vehicle-data');
+            const bucketLegacy = supabase.storage.from('vehicle-images');
+            const gathered: string[] = [];
 
-          const listPath = async (bucketRef: ReturnType<typeof supabase.storage.from>, path: string) => {
-            const { data: files, error: listErr } = await bucketRef.list(path, { limit: 1000 });
-            if (listErr || !files) return;
-            for (const f of files) {
-              if (f.name && !f.name.endsWith('/')) {
-                const full = path ? `${path}/${f.name}` : f.name;
-                // Use public URLs for both buckets to avoid 400 errors
-                const { data: pub } = bucketRef.getPublicUrl(full);
-                if (pub?.publicUrl) gathered.push(pub.publicUrl);
+            const listPath = async (bucketRef: ReturnType<typeof supabase.storage.from>, path: string) => {
+              const { data: files, error: listErr } = await bucketRef.list(path, { limit: 1000 });
+              if (listErr || !files) return;
+              for (const f of files) {
+                if (f.name && !f.name.endsWith('/')) {
+                  const full = path ? `${path}/${f.name}` : f.name;
+                  // Use public URLs for both buckets to avoid 400 errors
+                  const { data: pub } = bucketRef.getPublicUrl(full);
+                  if (pub?.publicUrl) gathered.push(pub.publicUrl);
+                }
+              }
+            };
+
+            // Canonical path
+            await listPath(bucketCanonical, `vehicles/${vehicle.id}`);
+            const { data: eventDirsB } = await bucketCanonical.list(`vehicles/${vehicle.id}/events`, { limit: 1000 });
+            if (eventDirsB && eventDirsB.length > 0) {
+              for (const dir of eventDirsB) {
+                if (dir.name) await listPath(bucketCanonical, `vehicles/${vehicle.id}/events/${dir.name}`);
               }
             }
-          };
 
-          // Canonical path
-          await listPath(bucketCanonical, `vehicles/${vehicle.id}`);
-          const { data: eventDirsB } = await bucketCanonical.list(`vehicles/${vehicle.id}/events`, { limit: 1000 });
-          if (eventDirsB && eventDirsB.length > 0) {
-            for (const dir of eventDirsB) {
-              if (dir.name) await listPath(bucketCanonical, `vehicles/${vehicle.id}/events/${dir.name}`);
+            // Legacy path (read-only)
+            await listPath(bucketLegacy, `${vehicle.id}`);
+            const { data: eventDirsA } = await bucketLegacy.list(`${vehicle.id}/events`, { limit: 1000 });
+            if (eventDirsA && eventDirsA.length > 0) {
+              for (const dir of eventDirsA) {
+                if (dir.name) await listPath(bucketLegacy, `${vehicle.id}/events/${dir.name}`);
+              }
             }
-          }
 
-          // Legacy path (read-only)
-          await listPath(bucketLegacy, `${vehicle.id}`);
-          const { data: eventDirsA } = await bucketLegacy.list(`${vehicle.id}/events`, { limit: 1000 });
-          if (eventDirsA && eventDirsA.length > 0) {
-            for (const dir of eventDirsA) {
-              if (dir.name) await listPath(bucketLegacy, `${vehicle.id}/events/${dir.name}`);
-            }
+            images = Array.from(new Set(gathered));
+            if (images.length > 0 && !leadImageUrl) setLeadImageUrl(images[0]);
+          } catch (e) {
+            console.warn('Storage fallback for hero/gallery failed:', e);
           }
-
-          images = Array.from(new Set(gathered));
-          if (images.length > 0 && !leadImageUrl) setLeadImageUrl(images[0]);
-        } catch (e) {
-          console.warn('Storage fallback for hero/gallery failed:', e);
         }
       }
     } catch (error) {

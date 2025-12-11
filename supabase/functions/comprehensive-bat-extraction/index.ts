@@ -1144,6 +1144,42 @@ serve(async (req) => {
         .select()
         .single();
       
+      // CRITICAL: Create source attribution for sale_price if we're updating it
+      // This ensures every price has a verifiable source mapped back to the BAT listing
+      // Reverse map: price → BAT listing URL, lot number, sale date, etc.
+      if (extractedData.sale_price && !updateError) {
+        await supabase
+          .from('vehicle_field_sources')
+          .upsert({
+            vehicle_id: vehicleId,
+            field_name: 'sale_price',
+            field_value: extractedData.sale_price.toString(),
+            source_type: 'ai_scraped',
+            source_url: batUrl,
+            extraction_method: 'bat_listing_scraping',
+            confidence_score: 100,
+            is_verified: true,
+            metadata: {
+              source: 'bat_import',
+              bat_url: batUrl,
+              lot_number: extractedData.lot_number || null,
+              sale_date: extractedData.sale_date || null,
+              extraction_date: new Date().toISOString(),
+              seller: extractedData.seller || null,
+              buyer: extractedData.buyer || null,
+              bid_count: extractedData.bid_count || null,
+              view_count: extractedData.view_count || null,
+              // Reverse mapping: all data points back to the BAT listing
+              verified_from: 'bringatrailer_listing',
+              listing_url: batUrl
+            }
+          }, {
+            onConflict: 'vehicle_id,field_name,source_type,source_url'
+          })
+          .then(() => console.log('✅ Created sale_price source attribution with reverse mapping'))
+          .catch(err => console.error('Failed to create source attribution:', err));
+      }
+      
       if (updateError) {
         console.error('Error updating vehicle:', updateError);
         console.error('Update error details:', JSON.stringify(updateError, null, 2));
@@ -1358,7 +1394,8 @@ serve(async (req) => {
               event_category: 'ownership',
               title: `First Bid: $${firstBid.amount.toLocaleString()}`,
               description: `First bid placed on auction${firstBid.bidder ? ` by ${firstBid.bidder}` : ''}`,
-              event_date: firstBid.timestamp || extractedData.auction_start_date || extractedData.sale_date || new Date().toISOString().split('T')[0],
+              // Don't use today's date as fallback - only create event if we have a valid date
+              event_date: firstBid.timestamp || extractedData.auction_start_date || extractedData.sale_date || extractedData.auction_end_date,
               source: 'Bring a Trailer',
               source_type: 'dealer_record',
               confidence_score: 90,
@@ -1384,7 +1421,8 @@ serve(async (req) => {
                 event_category: 'ownership',
                 title: 'Reserve Met',
                 description: `Reserve price of $${extractedData.reserve_price.toLocaleString()} met with bid of $${reserveMetBid.amount.toLocaleString()}`,
-                event_date: reserveMetBid.timestamp || extractedData.auction_start_date || extractedData.sale_date || new Date().toISOString().split('T')[0],
+                // Don't use today's date as fallback - only create event if we have a valid date
+                event_date: reserveMetBid.timestamp || extractedData.auction_start_date || extractedData.sale_date || extractedData.auction_end_date,
                 source: 'Bring a Trailer',
                 source_type: 'dealer_record',
                 confidence_score: 95,
@@ -1409,7 +1447,8 @@ serve(async (req) => {
               event_category: 'ownership',
               title: `High Bid: $${sortedBids[0].amount.toLocaleString()}`,
               description: `Highest bid reached${sortedBids[0].bidder ? ` by ${sortedBids[0].bidder}` : ''}`,
-              event_date: sortedBids[0].timestamp || extractedData.auction_end_date || extractedData.auction_start_date || new Date().toISOString().split('T')[0],
+              // Don't use today's date as fallback - only create event if we have a valid date
+              event_date: sortedBids[0].timestamp || extractedData.auction_end_date || extractedData.auction_start_date || extractedData.sale_date,
               source: 'Bring a Trailer',
               source_type: 'dealer_record',
               confidence_score: 90,
@@ -1530,6 +1569,40 @@ serve(async (req) => {
         await supabase
           .from('data_validations')
           .upsert(validations, { onConflict: 'vehicle_id,field_name' });
+      }
+      
+      // Also ensure vehicle_field_sources exists for sale_price if we have it
+      // This creates the reverse map from price → BAT listing (all data annotated)
+      // Every price claim must have a verifiable source mapped back to the listing
+      if (extractedData.sale_price && vehicleId) {
+        await supabase
+          .from('vehicle_field_sources')
+          .upsert({
+            vehicle_id: vehicleId,
+            field_name: 'sale_price',
+            field_value: extractedData.sale_price.toString(),
+            source_type: 'ai_scraped',
+            source_url: batUrl,
+            extraction_method: 'bat_listing_scraping',
+            confidence_score: 100,
+            is_verified: true,
+            metadata: {
+              source: 'bat_import',
+              bat_url: batUrl,
+              lot_number: extractedData.lot_number || null,
+              sale_date: extractedData.sale_date || null,
+              extraction_date: new Date().toISOString(),
+              seller: extractedData.seller || null,
+              buyer: extractedData.buyer || null,
+              bid_count: extractedData.bid_count || null,
+              view_count: extractedData.view_count || null,
+              // Reverse mapping: all data points back to the BAT listing
+              verified_from: 'bringatrailer_listing',
+              listing_url: batUrl
+            }
+          }, {
+            onConflict: 'vehicle_id,field_name,source_type,source_url'
+          });
       }
     }
 

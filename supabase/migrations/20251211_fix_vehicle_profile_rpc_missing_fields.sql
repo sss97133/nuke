@@ -1,7 +1,6 @@
--- Fix RPC function to use correct column for documented costs
--- The receipt_amount column doesn't exist - should calculate from vehicle_documents.amount instead
+-- Fix get_vehicle_profile_data RPC to include external_listings and price_signal
+-- These fields are expected by the frontend but were missing from the RPC response
 
--- Update vehicle profile RPC to correct cost aggregation
 CREATE OR REPLACE FUNCTION public.get_vehicle_profile_data(p_vehicle_id UUID)
 RETURNS JSON AS $$
 DECLARE
@@ -66,7 +65,6 @@ BEGIN
       'comment_count', (SELECT COUNT(*) FROM public.vehicle_comments WHERE vehicle_id = p_vehicle_id),
       'document_count', (SELECT COUNT(*) FROM public.vehicle_documents WHERE vehicle_id = p_vehicle_id),
       'last_activity', (SELECT MAX(created_at) FROM public.timeline_events WHERE vehicle_id = p_vehicle_id),
-      -- Calculate total documented costs from vehicle_documents instead of timeline_events
       'total_documented_costs', (
         SELECT COALESCE(SUM(amount), 0) 
         FROM public.vehicle_documents 
@@ -90,6 +88,5 @@ $$ LANGUAGE plpgsql
 GRANT EXECUTE ON FUNCTION public.get_vehicle_profile_data(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_vehicle_profile_data(UUID) TO anon;
 
--- Add comment
-COMMENT ON FUNCTION public.get_vehicle_profile_data IS 'Returns complete vehicle profile data in a single query for performance optimization';
+COMMENT ON FUNCTION public.get_vehicle_profile_data IS 'Returns complete vehicle profile data in a single query for performance optimization - includes external_listings and price_signal';
 
