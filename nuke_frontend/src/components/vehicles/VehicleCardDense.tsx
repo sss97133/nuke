@@ -207,34 +207,9 @@ const [displayPrice, setDisplayPrice] = useState<string>('—');
     return 'E';
   };
 
-  // Get optimal image for this view mode
-  // PRIORITY: primary_image_url > all_images[0] > image_variants > image_url
+  // Simple image fallback - no complex logic
   const getImageUrl = () => {
-    // Always prefer primary_image_url if available
-    if (vehicle.primary_image_url) {
-      return vehicle.primary_image_url;
-    }
-    
-    // Fallback to first image in all_images array
-    if (vehicle.all_images && vehicle.all_images.length > 0 && vehicle.all_images[0]?.url) {
-      return vehicle.all_images[0].url;
-    }
-    
-    // Then check image_variants
-    const variants = vehicle.image_variants || {};
-    switch (viewMode) {
-      case 'list':
-        // 120px thumbnail - use smallest
-        return variants.thumbnail || variants.medium || vehicle.image_url || null;
-      case 'grid':
-        // ~200px squares - use medium
-        return variants.medium || variants.thumbnail || vehicle.image_url || null;
-      case 'gallery':
-        // 300px hero - use large
-        return variants.large || variants.medium || vehicle.image_url || null;
-      default:
-        return vehicle.image_url || null;
-    }
+    return vehicle.primary_image_url || vehicle.image_url || null;
   };
 
   const imageUrl = getImageUrl();
@@ -598,72 +573,7 @@ const [displayPrice, setDisplayPrice] = useState<string>('—');
     currentImageUrl = imageUrl || null;
   }
   
-  // CRITICAL DEBUG: Log what we have for first few vehicles
-  if (viewMode === 'grid' && (window as any).__debugRenderCount === undefined) {
-    (window as any).__debugRenderCount = 0;
-  }
-  if (viewMode === 'grid' && (window as any).__debugRenderCount < 3) {
-    console.log(`🔍🔍🔍 RENDER DEBUG Vehicle ${vehicle.id}:`, {
-      all_images: vehicle.all_images,
-      all_imagesLength: vehicle.all_images?.length,
-      primary_image_url: vehicle.primary_image_url,
-      image_url: vehicle.image_url,
-      vehicleImages,
-      vehicleImagesLength: vehicleImages.length,
-      currentImageUrl,
-      imageUrl_from_getImageUrl: imageUrl
-    });
-    (window as any).__debugRenderCount++;
-  }
-// EMERGENCY FIX: Log and use ANY available image field
-  if (!currentImageUrl && viewMode === 'grid') {
-    // Try every possible field
-    const possibleUrls = [
-      vehicle.primary_image_url,
-      vehicle.image_url,
-      vehicle.all_images?.[0]?.url,
-      vehicle.image_variants?.large,
-      vehicle.image_variants?.medium,
-      vehicle.image_variants?.thumbnail,
-      imageUrl
-    ].filter(Boolean);
-    
-    if (possibleUrls.length > 0) {
-      currentImageUrl = possibleUrls[0];
-      console.warn(`⚠️ Vehicle ${vehicle.id} - Using emergency fallback URL:`, currentImageUrl);
-} else {
-      console.error(`❌ Vehicle ${vehicle.id} has NO image URLs at all!`, {
-        all_images: vehicle.all_images,
-        primary_image_url: vehicle.primary_image_url,
-        image_url: vehicle.image_url,
-        image_variants: vehicle.image_variants,
-        imageUrl
-      });
-}
-  }
   
-  // Debug logging for grid view (first few vehicles only)
-  if (viewMode === 'grid' && vehicle.id) {
-    const vehicleIndex = (window as any).__debugVehicleIndex = ((window as any).__debugVehicleIndex || 0) + 1;
-    if (vehicleIndex <= 5) {
-      console.log(`🔍🔍🔍 VEHICLECARDDENSE Grid view - Vehicle ${vehicle.id}:`, {
-        vehicleId: vehicle.id,
-        vehicle_prop: vehicle,
-        all_images: vehicle.all_images,
-        all_images_length: vehicle.all_images?.length,
-        all_images_first_url: vehicle.all_images?.[0]?.url,
-        primary_image_url: vehicle.primary_image_url,
-        image_url: vehicle.image_url,
-        imageUrl_from_getImageUrl: imageUrl,
-        vehicleImages_array: vehicleImages,
-        vehicleImages_length: vehicleImages.length,
-        currentImageIndex,
-        currentImageUrl,
-        FINAL_URL_USED: currentImageUrl,
-        WILL_SHOW_IMAGE: !!currentImageUrl
-      });
-    }
-  }
   
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.touches[0].clientX);
