@@ -38,6 +38,8 @@ type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views';
 type SortDirection = 'asc' | 'desc';
 
+const DEBUG_CURSOR_HOMEPAGE = false;
+
 /**
  * Image URL normalization for feed cards.
  *
@@ -145,148 +147,11 @@ const getOriginImages = (vehicle: any): string[] => {
     .filter((url: string) => !url.toLowerCase().includes('thumbnail'));
 };
 
-// Component to lazy load images when vehicle card comes into view
-const LazyLoadVehicleImages: React.FC<{
-  vehicleId: string;
-  onVisible: (vehicleId: string) => void;
-  children: React.ReactNode;
-}> = ({ vehicleId, onVisible, children }) => {
-  const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            onVisible(vehicleId);
-            observer.disconnect();
-          }
-        });
-      },
-      {
-        rootMargin: '200px', // Start loading 200px before coming into view
-        threshold: 0.01
-      }
-    );
-
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [vehicleId, onVisible]);
-
-  return <div ref={ref}>{children}</div>;
-};
-
-// Rotating action verbs hook (inspired by Claude's thinking animation)
-const useRotatingVerb = () => {
-  const verbs = [
-    // Core Activities
-    'Wrenching', 'Building', 'Restoring', 'Cruising', 'Fabricating', 'Tuning', 'Spinning', 'Racing',
-    'Modding', 'Upgrading', 'Boosting', 'Drifting', 'Revving', 'Detailing', 'Collecting', 'Showing',
-    'Flipping', 'Trading', 'Swapping', 'Hunting', 'Sourcing', 'Inspecting', 'Diagnosing', 'Tweaking',
-    'Dialing', 'Hooning', 'Launching', 'Burnouts', 'Drag', 'Tracking', 'AutoXing', 'Rallying',
-    'Attacking', 'Ripping', 'Shredding', 'Lapping', 'Gridding', 'Pitting', 'Qualifying',
-    
-    // Fabrication & Metalwork
-    'Welding', 'Grinding', 'Cutting', 'Machining', 'Milling', 'Turning', 'Drilling', 'Tapping',
-    'Threading', 'Boring', 'Honing', 'Reaming', 'Countersinking', 'Chamfering', 'Facing', 'Parting',
-    'Grooving', 'Knurling', 'Forming', 'Bending', 'Folding', 'Crimping', 'Flaring', 'Beading',
-    'Swaging', 'Stamping', 'Punching', 'Shearing', 'Sawing', 'Plasma', 'TIG', 'MIG', 'Stick',
-    'Brazing', 'Soldering', 'Forging', 'Casting', 'Pouring', 'Molding', 'Extruding', 'Drawing',
-    'Hammering', 'Planishing', 'Shrinking', 'Stretching', 'Fitting', 'Tacking',
-    
-    // Bodywork & Paint
-    'Painting', 'Polishing', 'Spraying', 'Buffing', 'Claying', 'Correcting', 'Waxing', 'Sealing',
-    'Debadging', 'Shaving', 'Frenching', 'Smoothing', 'Louvering', 'Venting', 'Widening',
-    'Chopping', 'Sectioning', 'Channeling', 'Triangulating', 'Linking', 'Tabbing', 'Bracing',
-    'Caging', 'Gutting', 'Deleting', 'Relocating', 'Blocking', 'Sanding', 'Scuffing', 'Priming',
-    'Basecoating', 'Clearing', 'Masking', 'Taping', 'Stripping', 'Feathering', 'Blending',
-    'Blasting', 'Etching', 'Prepping', 'Filling', 'Skimming', 'Pulling', 'Straightening',
-    'Aligning', 'Gapping',
-    
-    // Finishing & Surface Treatment
-    'Chroming', 'Plating', 'Anodizing', 'Powder', 'Cerakoting', 'Wrapping', 'Dipping',
-    'Coating', 'Electroplating', 'Brushing', 'Finishing', 'Vapor', 'Blasting', 'Shot', 'Peening',
-    'Pickling', 'Passivating', 'Oxidizing', 'Galvanizing',
-    
-    // Suspension & Chassis
-    'Slamming', 'Bagging', 'Coiling', 'Dropping', 'Raising', 'Camber', 'Tucking', 'Stretching',
-    'Stance', 'Squatting', 'Raking', 'Leveling', 'Lifting', 'Lowering', 'Shimming', 'Preloading',
-    'Weighting', 'Balancing', 'Aligning', 'Toeing', 'Castering', 'Adjusting', 'Torquing',
-    'Compressing', 'Extending', 'Rebuilding', 'Revalving', 'Upgrading', 'Replacing',
-    
-    // Engine Work
-    'Rebuilding', 'Boring', 'Stroking', 'Porting', 'Machining', 'Balancing', 'Blueprinting',
-    'Dynoing', 'Mapping', 'Flashing', 'Coding', 'Logging', 'Scanning', 'Tuning', 'Calibrating',
-    'Timing', 'Advancing', 'Retarding', 'Lapping', 'Seating', 'Cutting', 'Reconditioning',
-    'Resurfacing', 'Decking', 'Cleaning', 'Tanking', 'Magnafluxing', 'Testing', 'Benching',
-    'Milling', 'Prepping', 'Installing', 'Sleeving', 'Torquing', 'Sequencing', 'Degreeing',
-    'Fitting', 'Gapping', 'Grinding', 'Polishing', 'Priming',
-    
-    // Electrical & Electronics
-    'Wiring', 'Soldering', 'Crimping', 'Routing', 'Tucking', 'Wrapping', 'Taping', 'Shrinking',
-    'Stripping', 'Splicing', 'Terminating', 'Connecting', 'Testing', 'Troubleshooting', 'Diagnosing',
-    'Scanning', 'Reading', 'Clearing', 'Flashing', 'Programming', 'Mapping', 'Tuning', 'Calibrating',
-    'Installing', 'Mounting', 'Configuring', 'Monitoring',
-    
-    // Transmission & Drivetrain
-    'Rebuilding', 'Clutching', 'Replacing', 'Resurfacing', 'Installing', 'Changing', 'Adjusting',
-    'Rebuilding', 'Setting', 'Balancing', 'Flashing', 'Updating', 'Calibrating',
-    
-    // Brakes & Wheels
-    'Bleeding', 'Flushing', 'Changing', 'Replacing', 'Turning', 'Resurfacing', 'Rebuilding',
-    'Flaring', 'Fitting', 'Testing', 'Diagnosing', 'Balancing', 'Mounting', 'Torquing',
-    'Rotating', 'Programming', 'Repairing', 'Straightening',
-    
-    // Computer & Software (automotive focused)
-    'Coding', 'Programming', 'Scripting', 'Debugging', 'Flashing', 'Mapping', 'Tuning',
-    'Logging', 'Analyzing', 'Processing', 'Monitoring', 'Calibrating', 'Configuring',
-    
-    // Racing & Performance
-    'Dynoing', 'Launching', 'Testing', 'Optimizing', 'Analyzing', 'Data', 'Logging', 'Tuning',
-    
-    // Physical Activities
-    'Lifting', 'Dropping', 'Pushing', 'Pulling', 'Rotating', 'Spinning', 'Rolling', 'Tucking'
-  ];
-  const [currentVerb, setCurrentVerb] = useState(verbs[0]);
-  
-  useEffect(() => {
-    const getRandomInterval = () => {
-      // Variable speeds: 50% chance fast (500-1000ms), 30% medium (1000-2000ms), 20% slow (2000-4000ms)
-      const rand = Math.random();
-      if (rand < 0.5) {
-        return Math.random() * 500 + 500; // 500-1000ms (FAST)
-      } else if (rand < 0.8) {
-        return Math.random() * 1000 + 1000; // 1000-2000ms (MEDIUM)
-      } else {
-        return Math.random() * 2000 + 2000; // 2000-4000ms (SLOW)
-      }
-    };
-    
-    let timeoutId: NodeJS.Timeout;
-    
-    const scheduleNext = () => {
-      timeoutId = setTimeout(() => {
-        setCurrentVerb(prev => {
-          const currentIndex = verbs.indexOf(prev);
-          const nextIndex = (currentIndex + 1) % verbs.length;
-          return verbs[nextIndex];
-        });
-        scheduleNext();
-      }, getRandomInterval());
-    };
-    
-    scheduleNext();
-    
-    return () => clearTimeout(timeoutId);
-  }, []);
-  
-  return currentVerb;
-};
+// Simple static verb - no animation to avoid performance issues
+const StaticVerbText = React.memo(function StaticVerbText() {
+  return <>Building</>;
+});
 
 interface FilterState {
   yearMin: number | null;
@@ -304,7 +169,6 @@ interface FilterState {
 }
 
 const CursorHomepage: React.FC = () => {
-  const rotatingVerb = useRotatingVerb();
   const [feedVehicles, setFeedVehicles] = useState<HypeVehicle[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<HypeVehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -337,33 +201,41 @@ const CursorHomepage: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [filterBarMinimized, setFilterBarMinimized] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
-  const [loadedVehicleImages, setLoadedVehicleImages] = useState<Map<string, any[]>>(new Map());
-  const [loadingImagesFor, setLoadingImagesFor] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
+
 
   useEffect(() => {
     loadSession();
     
     // Scroll listener for sticky filter bar and scroll-to-top button
+    let rafId: number | null = null;
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      setScrollY(currentScrollY);
-      
-      // Show scroll-to-top button after scrolling down 500px
-      setShowScrollTop(currentScrollY > 500);
-      
-      // Minimize filter bar after scrolling down 200px (if filters are shown)
-      // Only auto-minimize, don't auto-expand (let user control expansion)
-      if (showFilters && currentScrollY > 200 && !filterBarMinimized) {
-        setFilterBarMinimized(true);
-      }
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        const currentScrollY = window.scrollY;
+
+        // Show scroll-to-top button after scrolling down 500px (only update on change)
+        const shouldShowScrollTop = currentScrollY > 500;
+        setShowScrollTop((prev) => (prev === shouldShowScrollTop ? prev : shouldShowScrollTop));
+
+        // Minimize filter bar after scrolling down 200px (if filters are shown)
+        // Only auto-minimize, don't auto-expand (let user control expansion)
+        if (showFilters && currentScrollY > 200 && !filterBarMinimized) {
+          setFilterBarMinimized(true);
+        }
+      });
     };
     
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
   }, [showFilters]);
 
   useEffect(() => {
@@ -386,9 +258,6 @@ const CursorHomepage: React.FC = () => {
     }
   }, [session]);
 
-  // Handle vehicle cards coming into view - batch image loading
-  const visibleVehicleIdsRef = useRef<Set<string>>(new Set());
-  const loadImagesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
@@ -452,126 +321,6 @@ const CursorHomepage: React.FC = () => {
     }
   };
 
-  // Load images for vehicles on demand (lazy loading)
-  const loadImagesForVehicles = useCallback(async (vehicleIds: string[]) => {
-    // Filter out vehicles that are already loaded or currently loading
-    const idsToLoad = vehicleIds.filter(id => 
-      !loadedVehicleImages.has(id) && !loadingImagesFor.has(id)
-    );
-    
-    if (idsToLoad.length === 0) return;
-    
-    // Mark as loading
-    setLoadingImagesFor(prev => {
-      const next = new Set(prev);
-      idsToLoad.forEach(id => next.add(id));
-      return next;
-    });
-    
-    try {
-      const BATCH_SIZE = 50;
-      const allImages: any[] = [];
-      
-      // Batch the queries
-      for (let i = 0; i < idsToLoad.length; i += BATCH_SIZE) {
-        const batch = idsToLoad.slice(i, i + BATCH_SIZE);
-        const { data: batchImages, error: imagesError } = await supabase
-          .from('vehicle_images')
-          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, storage_path, is_primary, created_at')
-          .in('vehicle_id', batch)
-          .order('is_primary', { ascending: false })
-          .order('created_at', { ascending: false });
-
-        if (imagesError) {
-          console.error(`❌ Error loading images for batch:`, imagesError);
-        } else if (batchImages) {
-          allImages.push(...batchImages);
-        }
-      }
-      
-      // Group images by vehicle_id
-      const newImagesByVehicle = new Map<string, any[]>();
-      allImages.forEach((img: any) => {
-        if (!newImagesByVehicle.has(img.vehicle_id)) {
-          newImagesByVehicle.set(img.vehicle_id, []);
-        }
-        newImagesByVehicle.get(img.vehicle_id)!.push(img);
-      });
-      
-      // Update state with new images
-      setLoadedVehicleImages(prev => {
-        const next = new Map(prev);
-        newImagesByVehicle.forEach((images, vehicleId) => {
-          next.set(vehicleId, images);
-        });
-        return next;
-      });
-      
-      // Update feed vehicles with new images
-      setFeedVehicles(prev => prev.map(vehicle => {
-        const images = newImagesByVehicle.get(vehicle.id);
-        if (!images || images.length === 0) return vehicle;
-        
-        const all_images = images
-          .map((img: any) => {
-            const url = resolveVehicleImageUrl(img);
-            return {
-              id: img.id,
-              url: url,
-              is_primary: img.is_primary || false,
-              created_at: img.created_at
-            };
-          })
-          .filter((img: any) => img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '')
-          .sort((a: any, b: any) => {
-            if (a.is_primary && !b.is_primary) return -1;
-            if (!a.is_primary && b.is_primary) return 1;
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-          })
-          .slice(0, 5);
-        
-        const primaryImageUrl = all_images[0]?.url || null;
-        
-        return {
-          ...vehicle,
-          primary_image_url: primaryImageUrl || vehicle.primary_image_url,
-          image_url: primaryImageUrl || vehicle.image_url,
-          all_images: all_images.length > 0 ? all_images : vehicle.all_images
-        };
-      }));
-      
-    } catch (error) {
-      console.error('Error loading images for vehicles:', error);
-    } finally {
-      // Remove from loading set
-      setLoadingImagesFor(prev => {
-        const next = new Set(prev);
-        idsToLoad.forEach(id => next.delete(id));
-        return next;
-      });
-    }
-  }, [loadedVehicleImages, loadingImagesFor]);
-
-  // Handle vehicle cards coming into view - batch image loading
-  // IMPORTANT: defined *after* loadImagesForVehicles to avoid TDZ in deps array
-  const handleVehicleVisible = useCallback((vehicleId: string) => {
-    // Add to batch
-    visibleVehicleIdsRef.current.add(vehicleId);
-    
-    // Debounce: wait 100ms to batch multiple vehicles together
-    if (loadImagesTimeoutRef.current) {
-      clearTimeout(loadImagesTimeoutRef.current);
-    }
-    
-    loadImagesTimeoutRef.current = setTimeout(() => {
-      const idsToLoad = Array.from(visibleVehicleIdsRef.current);
-      visibleVehicleIdsRef.current.clear();
-      
-      if (idsToLoad.length > 0) {
-        loadImagesForVehicles(idsToLoad);
-      }
-    }, 100);
-  }, [loadImagesForVehicles]);
 
   const getTimePeriodFilter = () => {
     const now = new Date();
@@ -598,310 +347,86 @@ const CursorHomepage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const timeFilter = getTimePeriodFilter();
 
-      // Check Supabase connection first
-      const { data: healthCheck, error: healthError } = await supabase
+      // Simplified query - just get basic vehicle data
+      let query = supabase
         .from('vehicles')
-        .select('id')
-        .limit(1);
-
-      if (healthError) {
-        console.error('❌ Supabase connection error:', healthError);
-        setError(`Database connection failed: ${healthError.message}`);
-        setDebugInfo({
-          error: healthError.message,
-          code: healthError.code,
-          details: healthError.details,
-          hint: healthError.hint
-        });
-        setFeedVehicles([]);
-        setLoading(false);
-        return;
-      }
-
-      // Query vehicles directly with is_public filter
-      // Get vehicles with basic info - we'll fetch images separately for better performance
-      const { data: vehicles, error } = await supabase
-        .from('vehicles')
-        .select('id, year, make, model, vin, created_at, updated_at, sale_price, current_value, purchase_price, asking_price, is_for_sale, mileage, condition_rating, status, is_public, origin_metadata')
+        .select(`
+          id, year, make, model, vin, created_at, updated_at,
+          sale_price, current_value, purchase_price, asking_price,
+          is_for_sale, mileage, status, is_public
+        `)
         .eq('is_public', true)
-        .neq('status', 'pending')
         .order('updated_at', { ascending: false })
-        .limit(1000);
-      
-      // If showPending filter is enabled, also fetch pending vehicles
-      let pendingVehicles: any[] = [];
-      if (filters.showPending) {
-        const { data: pending, error: pendingError } = await supabase
-          .from('vehicles')
-          .select('id, year, make, model, current_value, purchase_price, sale_price, asking_price, is_for_sale, mileage, vin, condition_rating, created_at, updated_at, origin_metadata')
-          .eq('status', 'pending')
-          .eq('is_public', true)
-          .order('created_at', { ascending: false })
-          .limit(500);
-        
-        if (!pendingError && pending) {
-          // Add basic tier info for pending vehicles
-          pendingVehicles = pending.map((v: any) => ({
-            ...v,
-            view_count: 0,
-            image_count: 0,
-            tier: 'minimal',
-            tier_label: 'Tier 1'
-          }));
-        }
+        .limit(500);
+
+      if (!filters.showPending) {
+        query = query.neq('status', 'pending');
       }
-      
-      // Merge active and pending vehicles
-      const allVehicles = [...(vehicles || []), ...pendingVehicles];
-      
-      // Apply time filter if needed
-      let filteredVehicles = allVehicles;
-      if (timeFilter && allVehicles) {
-        filteredVehicles = allVehicles.filter((v: any) => 
-          new Date(v.updated_at) >= new Date(timeFilter)
-        );
-      }
-      
-      console.log('🔍 LoadHypeFeed Debug:', {
-        timePeriod,
-        timeFilter,
-        vehicleCount: vehicles?.length || 0,
-        error: error?.message,
-        hasSupabaseUrl: !!import.meta.env.VITE_SUPABASE_URL,
-        hasSupabaseKey: !!import.meta.env.VITE_SUPABASE_ANON_KEY
-      });
+
+      const { data: vehicles, error } = await query;
 
       if (error) {
         console.error('❌ Error loading vehicles:', error);
         setError(`Failed to load vehicles: ${error.message}`);
-        setDebugInfo({
-          error: error.message,
-          code: error.code,
-          details: error.details
-        });
         setFeedVehicles([]);
-        setLoading(false);
-        return;
-      }
-      
-      if (!allVehicles || allVehicles.length === 0) {
-        console.warn('⚠️ No vehicles found with is_public=true');
-        setFeedVehicles([]);
-        setLoading(false);
         return;
       }
 
-      // Use filtered vehicles if time filter was applied
-      const vehiclesToProcess = filteredVehicles || allVehicles || [];
-
-      // LAZY LOADING: Only load images for initial visible batch (first 30 vehicles)
-      // Remaining images will be loaded on-demand as vehicles scroll into view
-      const INITIAL_IMAGE_BATCH = 30;
-      const vehicleIds = vehiclesToProcess.map((v: any) => v.id);
-      const initialVehicleIds = vehicleIds.slice(0, INITIAL_IMAGE_BATCH);
-      
-      // Batch image queries to avoid URL length limits and resource exhaustion
-      // Process in chunks of 50 vehicle IDs at a time
-      const BATCH_SIZE = 50;
-      const allImages: any[] = [];
-      
-      // Only fetch images for initial visible batch
-      for (let i = 0; i < initialVehicleIds.length; i += BATCH_SIZE) {
-        const batch = initialVehicleIds.slice(i, i + BATCH_SIZE);
-        const { data: batchImages, error: imagesError } = await supabase
-          .from('vehicle_images')
-          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, storage_path, is_primary, created_at')
-          .in('vehicle_id', batch)
-          .order('is_primary', { ascending: false })
-          .order('created_at', { ascending: false });
-
-        if (imagesError) {
-          console.error(`❌ Error loading images for batch ${i / BATCH_SIZE + 1}:`, imagesError);
-        } else if (batchImages) {
-          allImages.push(...batchImages);
-        }
+      if (!vehicles || vehicles.length === 0) {
+        setFeedVehicles([]);
+        return;
       }
 
-      console.log(`✅ Loaded ${allImages.length} images for ${initialVehicleIds.length} vehicles (lazy loading: initial batch only)`);
-      if (allImages.length > 0) {
-        // Log sample image to see structure
-        console.log('Sample image:', allImages[0]);
+      // Apply time filter
+      const timeFilter = getTimePeriodFilter();
+      let filteredVehicles = vehicles;
+      if (timeFilter) {
+        filteredVehicles = vehicles.filter((v: any) =>
+          new Date(v.updated_at) >= new Date(timeFilter)
+        );
       }
 
-      // Group images by vehicle_id
-      const imagesByVehicle = new Map<string, any[]>();
-      (allImages || []).forEach((img: any) => {
-        if (!imagesByVehicle.has(img.vehicle_id)) {
-          imagesByVehicle.set(img.vehicle_id, []);
-        }
-        imagesByVehicle.get(img.vehicle_id)!.push(img);
-      });
-      
-      // Store initial loaded images in state (merge with existing)
-      setLoadedVehicleImages(prev => {
-        const next = new Map(prev);
-        imagesByVehicle.forEach((images, vehicleId) => {
-          next.set(vehicleId, images);
-        });
-        return next;
-      });
-      
-      // Fetch event counts for all vehicles (batched)
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const recentEvents: any[] = [];
-      
-      for (let i = 0; i < vehicleIds.length; i += BATCH_SIZE) {
-        const batch = vehicleIds.slice(i, i + BATCH_SIZE);
-        const { data: batchEvents } = await supabase
-          .from('timeline_events')
-          .select('vehicle_id')
-          .in('vehicle_id', batch)
-          .gte('created_at', sevenDaysAgo);
-        
-        if (batchEvents) {
-          recentEvents.push(...batchEvents);
-        }
-      }
+      // Process vehicles with basic data
+      const processed = filteredVehicles.map((v: any) => {
+        const salePrice = v.sale_price ? Number(v.sale_price) : 0;
+        const askingPrice = v.asking_price ? Number(v.asking_price) : 0;
+        const currentValue = v.current_value ? Number(v.current_value) : 0;
 
-      // Group events by vehicle_id
-      const eventsByVehicle = new Map<string, number>();
-      recentEvents.forEach((event: any) => {
-        const count = eventsByVehicle.get(event.vehicle_id) || 0;
-        eventsByVehicle.set(event.vehicle_id, count + 1);
-      });
+        const displayPrice = salePrice > 0 ? salePrice : askingPrice > 0 ? askingPrice : currentValue;
+        const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
 
-      // Process vehicles with their images
-      const enriched = vehiclesToProcess.map((v: any) => {
-        // Get images for this vehicle (use local map first, then state as fallback)
-        const images = imagesByVehicle.get(v.id) || [];
-        const originImages = getOriginImages(v);
-        
-        // Map images with proper URL extraction - prioritize primary images
-        // Try all possible URL field names including variants
-        let all_images = images
-          .map((img: any) => {
-            const url = resolveVehicleImageUrl(img);
-            
-            return {
-              id: img.id,
-              url: url,
-              is_primary: img.is_primary || false,
-              created_at: img.created_at
-            };
-          })
-          .filter((img: any) => {
-            // Only include images with valid, non-empty URLs
-            return img.url !== null && img.url !== undefined && img.url !== '' && img.url.trim() !== '';
-          })
-          .sort((a: any, b: any) => {
-            // Primary images first
-            if (a.is_primary && !b.is_primary) return -1;
-            if (!a.is_primary && b.is_primary) return 1;
-            // Then by creation date (newest first)
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-          })
-          .slice(0, 5); // Limit to 5 for performance
+        let hypeScore = 0;
+        let hypeReason = '';
 
-        // If no DB image rows are present, fall back to origin_metadata images (scraped sources)
-        if (all_images.length === 0 && originImages.length > 0) {
-          all_images = originImages.slice(0, 5).map((url: string, idx: number) => ({
-            id: `origin-${idx}`,
-            url,
-            is_primary: idx === 0
-          }));
+        if (age_hours < 24) {
+          hypeScore += 50;
+          hypeReason = 'NEW';
         }
 
-          // SMART PRICING: Use hierarchy (sale_price > asking_price > current_value)
-          // Priority: actual sale > owner asking > estimated value
-          // Convert to numbers and handle nulls explicitly
-          const salePrice = v.sale_price ? Number(v.sale_price) : 0;
-          const askingPrice = v.asking_price ? Number(v.asking_price) : 0;
-          const currentValue = v.current_value ? Number(v.current_value) : 0;
-          
-          const displayPrice = salePrice > 0 
-            ? salePrice 
-            : askingPrice > 0
-            ? askingPrice
-            : currentValue;
+        return {
+          ...v,
+          display_price: displayPrice,
+          image_count: 0,
+          view_count: 0,
+          event_count: 0,
+          activity_7d: 0,
+          hype_score: hypeScore,
+          hype_reason: hypeReason,
+          primary_image_url: null,
+          image_url: null,
+          all_images: [],
+          tier: 'C',
+          tier_label: 'Tier C'
+        };
+      });
 
-          const activity7d = eventsByVehicle.get(v.id) || 0;
-          const totalImages = images.length > 0 ? images.length : originImages.length; // Use DB count if available, otherwise origin images count
-          const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
-          const update_hours = (Date.now() - new Date(v.updated_at).getTime()) / (1000 * 60 * 60);
-          const is_new = age_hours < 24;
-          const is_hot = update_hours < 1;
-
-          let hypeScore = 0;
-          let hypeReason = '';
-
-          if (is_hot && timePeriod === 'RT') {
-            hypeScore += 60;
-            hypeReason = 'LIVE NOW';
-          }
-
-          if (is_new && totalImages > 10) {
-            hypeScore += 50;
-            hypeReason = hypeReason || 'JUST POSTED';
-          }
-
-          if (activity7d >= 5) {
-            hypeScore += 30;
-            hypeReason = hypeReason || 'ACTIVE BUILD';
-          }
-
-          if (totalImages > 100) {
-            hypeScore += 20;
-          }
-
-          if ((v.view_count || 0) > 20) {
-            hypeScore += 15;
-            hypeReason = hypeReason || 'TRENDING';
-          }
-
-          // Primary image is already sorted first - ensure we have a valid URL
-          const primaryImageUrl = all_images[0]?.url || null;
-          
-          // Debug logging for vehicles without images
-          if (!primaryImageUrl && totalImages === 0) {
-            console.warn(`⚠️ Vehicle ${v.id} (${v.year} ${v.make} ${v.model}) has no images`);
-          } else if (!primaryImageUrl && totalImages > 0) {
-            console.warn(`⚠️ Vehicle ${v.id} has ${totalImages} images but no valid URL in all_images array`);
-            console.warn('Images data:', images.slice(0, 2));
-          }
-
-            return {
-            ...v,
-            display_price: displayPrice, // Add smart price for display
-            image_count: totalImages, // Use actual count from images query
-            view_count: 0, // TODO: Add view_count query if needed
-            event_count: activity7d,
-            activity_7d: activity7d,
-            hype_score: hypeScore,
-            hype_reason: hypeReason,
-            primary_image_url: primaryImageUrl,
-            image_url: primaryImageUrl,
-            all_images: all_images,
-            tier: 'C', // Default tier - can be calculated later if needed
-            tier_label: 'Tier C' // Default tier label
-          };
-        });
-      
-      const sorted = enriched.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
+      const sorted = processed.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
       setFeedVehicles(sorted);
 
-      // Stats are now loaded separately via loadAccurateStats() to get real database counts
-      // Don't override with filtered feed stats
-
     } catch (error: any) {
-      console.error('❌ Unexpected error loading hype feed:', error);
+      console.error('❌ Unexpected error loading feed:', error);
       setError(`Unexpected error: ${error?.message || 'Unknown error'}`);
-      setDebugInfo({
-        error: error?.message,
-        stack: error?.stack,
-        name: error?.name
-      });
       setFeedVehicles([]);
     } finally {
       setLoading(false);
@@ -1094,7 +619,7 @@ const CursorHomepage: React.FC = () => {
                 display: 'inline-block',
                 minWidth: '80px' // keep search/nav from shifting when verb length changes
               }}>
-                {rotatingVerb}
+                <StaticVerbText />
               </span>
               {' '}
               <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 'normal' }}>
@@ -1430,8 +955,6 @@ const CursorHomepage: React.FC = () => {
                     checked={filters.showPending}
                     onChange={(e) => {
                       setFilters({...filters, showPending: e.target.checked});
-                      // Reload feed when this changes
-                      setTimeout(() => loadHypeFeed(), 100);
                     }}
                   />
                   <span>Show Pending Vehicles</span>
@@ -1941,48 +1464,32 @@ const CursorHomepage: React.FC = () => {
             gap: '4px'
           }}>
             {filteredVehicles.map((vehicle) => (
-              <LazyLoadVehicleImages
-                key={vehicle.id}
-                vehicleId={vehicle.id}
-                onVisible={handleVehicleVisible}
-              >
                 <VehicleCardDense
-                  vehicle={{
-                    ...vehicle,
-                    primary_image_url: vehicle.primary_image_url
-                  }}
+                  key={vehicle.id}
+                  vehicle={vehicle}
                   viewMode="gallery"
                   showPriceOverlay={filters.showPrices}
                   showDetailOverlay={filters.showDetailOverlay}
                 />
-              </LazyLoadVehicleImages>
             ))}
           </div>
         )}
 
         {/* Grid View - Instagram-style with zero spacing */}
         {viewMode === 'grid' && (
-          <div style={{ 
-            display: 'grid', 
+          <div style={{
+            display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
             gap: '0'
         }}>
             {filteredVehicles.map((vehicle) => (
-            <LazyLoadVehicleImages
-              key={vehicle.id}
-              vehicleId={vehicle.id}
-              onVisible={handleVehicleVisible}
-            >
               <VehicleCardDense
-                vehicle={{
-                  ...vehicle,
-                    primary_image_url: vehicle.primary_image_url
-                }}
+                key={vehicle.id}
+                vehicle={vehicle}
                 viewMode="grid"
                 showPriceOverlay={filters.showPrices}
                 showDetailOverlay={filters.showDetailOverlay}
               />
-            </LazyLoadVehicleImages>
           ))}
         </div>
         )}
