@@ -30,12 +30,120 @@ interface HypeVehicle {
   vin?: string;
   is_for_sale?: boolean;
   all_images?: Array<{ id: string; url: string; is_primary: boolean }>;
+  origin_metadata?: any;
 }
 
 type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
 type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views';
 type SortDirection = 'asc' | 'desc';
+
+/**
+ * Image URL normalization for feed cards.
+ *
+ * We have a mix of legacy/public URLs, occasionally-stored signed URLs, and sometimes raw storage paths.
+ * The homepage must never prefer expiring signed URLs (they break image loading in production).
+ */
+const parseVariants = (variants: any): Record<string, string> | null => {
+  if (!variants) return null;
+  if (typeof variants === 'object') return variants as Record<string, string>;
+  if (typeof variants === 'string') {
+    try {
+      const parsed = JSON.parse(variants);
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, string>;
+    } catch {
+      // ignore parse failures
+    }
+  }
+  return null;
+};
+
+const normalizeSupabaseStorageUrl = (raw: any): string | null => {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+
+  // Convert signed URLs to stable public URLs (strip token and swap path segment).
+  // Signed:  .../storage/v1/object/sign/<bucket>/<path>?token=...
+  // Public:  .../storage/v1/object/public/<bucket>/<path>
+  if (s.includes('/storage/v1/object/sign/')) {
+    const base = s.split('?')[0];
+    return base.replace('/storage/v1/object/sign/', '/storage/v1/object/public/');
+  }
+
+  return s;
+};
+
+const isUsableImageSrc = (url: string | null): url is string => {
+  if (!url) return false;
+  return (
+    url.startsWith('https://') ||
+    url.startsWith('http://') ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:') ||
+    url.startsWith('/')
+  );
+};
+
+const getPublicUrlFromStoragePath = (storagePath: any): string | null => {
+  if (!storagePath) return null;
+  const path = String(storagePath).replace(/^\/+/, '').trim();
+  if (!path) return null;
+
+  // Heuristic: canonical bucket uses `vehicles/...` prefixed paths.
+  const preferBucket = path.startsWith('vehicles/') ? 'vehicle-data' : 'vehicle-images';
+  const altBucket = preferBucket === 'vehicle-data' ? 'vehicle-images' : 'vehicle-data';
+
+  try {
+    const { data: preferred } = supabase.storage.from(preferBucket).getPublicUrl(path);
+    if (preferred?.publicUrl) return preferred.publicUrl;
+  } catch {
+    // ignore
+  }
+  try {
+    const { data: alt } = supabase.storage.from(altBucket).getPublicUrl(path);
+    return alt?.publicUrl || null;
+  } catch {
+    return null;
+  }
+};
+
+const resolveVehicleImageUrl = (img: any): string | null => {
+  if (!img) return null;
+
+  const variants = parseVariants(img.variants);
+  const candidates = [
+    variants?.large,
+    variants?.medium,
+    variants?.full,
+    variants?.thumbnail,
+    img.large_url,
+    img.medium_url,
+    img.image_url,
+    img.thumbnail_url,
+    getPublicUrlFromStoragePath(img.storage_path),
+  ];
+
+  for (const c of candidates) {
+    const normalized = normalizeSupabaseStorageUrl(c);
+    if (isUsableImageSrc(normalized)) return normalized;
+  }
+
+  return null;
+};
+
+const getOriginImages = (vehicle: any): string[] => {
+  const raw = vehicle?.origin_metadata?.images;
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter((url: any) => typeof url === 'string')
+    .map((url: string) => url.trim())
+    .filter((url: string) => url.startsWith('http'))
+    .filter((url: string) => !url.includes('94x63'))
+    .filter((url: string) => !url.includes('youtube.com'))
+    .filter((url: string) => !url.toLowerCase().includes('thumbnail'));
+};
 
 // Component to lazy load images when vehicle card comes into view
 const LazyLoadVehicleImages: React.FC<{
@@ -369,7 +477,7 @@ const CursorHomepage: React.FC = () => {
         const batch = idsToLoad.slice(i, i + BATCH_SIZE);
         const { data: batchImages, error: imagesError } = await supabase
           .from('vehicle_images')
-          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, created_at')
+          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, storage_path, is_primary, created_at')
           .in('vehicle_id', batch)
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: false });
@@ -406,13 +514,7 @@ const CursorHomepage: React.FC = () => {
         
         const all_images = images
           .map((img: any) => {
-            let url = null;
-            if (img.variants && typeof img.variants === 'object') {
-              url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
-            }
-            if (!url) {
-              url = img.medium_url || img.large_url || img.image_url || img.thumbnail_url || null;
-            }
+            const url = resolveVehicleImageUrl(img);
             return {
               id: img.id,
               url: url,
@@ -522,7 +624,7 @@ const CursorHomepage: React.FC = () => {
       // Get vehicles with basic info - we'll fetch images separately for better performance
       const { data: vehicles, error } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, vin, created_at, updated_at, sale_price, current_value, purchase_price, asking_price, is_for_sale, mileage, condition_rating, status, is_public')
+        .select('id, year, make, model, vin, created_at, updated_at, sale_price, current_value, purchase_price, asking_price, is_for_sale, mileage, condition_rating, status, is_public, origin_metadata')
         .eq('is_public', true)
         .neq('status', 'pending')
         .order('updated_at', { ascending: false })
@@ -533,7 +635,7 @@ const CursorHomepage: React.FC = () => {
       if (filters.showPending) {
         const { data: pending, error: pendingError } = await supabase
           .from('vehicles')
-          .select('id, year, make, model, current_value, purchase_price, sale_price, asking_price, is_for_sale, mileage, vin, condition_rating, created_at, updated_at')
+          .select('id, year, make, model, current_value, purchase_price, sale_price, asking_price, is_for_sale, mileage, vin, condition_rating, created_at, updated_at, origin_metadata')
           .eq('status', 'pending')
           .eq('is_public', true)
           .order('created_at', { ascending: false })
@@ -610,7 +712,7 @@ const CursorHomepage: React.FC = () => {
         const batch = initialVehicleIds.slice(i, i + BATCH_SIZE);
         const { data: batchImages, error: imagesError } = await supabase
           .from('vehicle_images')
-          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, created_at')
+          .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, variants, storage_path, is_primary, created_at')
           .in('vehicle_id', batch)
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: false });
@@ -674,20 +776,13 @@ const CursorHomepage: React.FC = () => {
       const enriched = vehiclesToProcess.map((v: any) => {
         // Get images for this vehicle (use local map first, then state as fallback)
         const images = imagesByVehicle.get(v.id) || [];
+        const originImages = getOriginImages(v);
         
         // Map images with proper URL extraction - prioritize primary images
         // Try all possible URL field names including variants
-        const all_images = images
+        let all_images = images
           .map((img: any) => {
-            // Extract URL from variants if available (prefer medium, then large, then full)
-            let url = null;
-            if (img.variants && typeof img.variants === 'object') {
-              url = img.variants.medium || img.variants.large || img.variants.full || img.variants.thumbnail || null;
-            }
-            // Fallback to direct URL fields in order of preference
-            if (!url) {
-              url = img.medium_url || img.large_url || img.image_url || img.thumbnail_url || null;
-            }
+            const url = resolveVehicleImageUrl(img);
             
             return {
               id: img.id,
@@ -709,6 +804,15 @@ const CursorHomepage: React.FC = () => {
           })
           .slice(0, 5); // Limit to 5 for performance
 
+        // If no DB image rows are present, fall back to origin_metadata images (scraped sources)
+        if (all_images.length === 0 && originImages.length > 0) {
+          all_images = originImages.slice(0, 5).map((url: string, idx: number) => ({
+            id: `origin-${idx}`,
+            url,
+            is_primary: idx === 0
+          }));
+        }
+
           // SMART PRICING: Use hierarchy (sale_price > asking_price > current_value)
           // Priority: actual sale > owner asking > estimated value
           // Convert to numbers and handle nulls explicitly
@@ -723,7 +827,7 @@ const CursorHomepage: React.FC = () => {
             : currentValue;
 
           const activity7d = eventsByVehicle.get(v.id) || 0;
-          const totalImages = images.length; // Use actual total, not limited all_images
+          const totalImages = images.length > 0 ? images.length : originImages.length; // Use DB count if available, otherwise origin images count
           const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
           const update_hours = (Date.now() - new Date(v.updated_at).getTime()) / (1000 * 60 * 60);
           const is_new = age_hours < 24;
