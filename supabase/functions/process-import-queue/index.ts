@@ -1239,7 +1239,8 @@ serve(async (req) => {
               .eq('id', item.id);
             
             console.log(`✅ Merged listing with existing vehicle ${existingVehicle.id}`);
-            processedCount++;
+            results.duplicates++;
+            results.processed++;
             continue; // Skip to next item
           }
         }
