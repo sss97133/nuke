@@ -348,7 +348,7 @@ const CursorHomepage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Simplified query - just get basic vehicle data
+      // Get vehicles with basic data
       let query = supabase
         .from('vehicles')
         .select(`
@@ -387,7 +387,21 @@ const CursorHomepage: React.FC = () => {
         );
       }
 
-      // Process vehicles with basic data
+      // Load primary images for all vehicles
+      const vehicleIds = filteredVehicles.map(v => v.id);
+      const { data: images } = await supabase
+        .from('vehicle_images')
+        .select('vehicle_id, image_url, medium_url, large_url, is_primary')
+        .in('vehicle_id', vehicleIds)
+        .eq('is_primary', true);
+
+      // Create image lookup map
+      const imageMap = new Map();
+      (images || []).forEach(img => {
+        imageMap.set(img.vehicle_id, img.large_url || img.medium_url || img.image_url);
+      });
+
+      // Process vehicles with image data
       const processed = filteredVehicles.map((v: any) => {
         const salePrice = v.sale_price ? Number(v.sale_price) : 0;
         const askingPrice = v.asking_price ? Number(v.asking_price) : 0;
@@ -395,6 +409,7 @@ const CursorHomepage: React.FC = () => {
 
         const displayPrice = salePrice > 0 ? salePrice : askingPrice > 0 ? askingPrice : currentValue;
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
+        const primaryImageUrl = imageMap.get(v.id) || null;
 
         let hypeScore = 0;
         let hypeReason = '';
@@ -407,15 +422,15 @@ const CursorHomepage: React.FC = () => {
         return {
           ...v,
           display_price: displayPrice,
-          image_count: 0,
+          image_count: primaryImageUrl ? 1 : 0,
           view_count: 0,
           event_count: 0,
           activity_7d: 0,
           hype_score: hypeScore,
           hype_reason: hypeReason,
-          primary_image_url: null,
-          image_url: null,
-          all_images: [],
+          primary_image_url: primaryImageUrl,
+          image_url: primaryImageUrl,
+          all_images: primaryImageUrl ? [{ id: '1', url: primaryImageUrl, is_primary: true }] : [],
           tier: 'C',
           tier_label: 'Tier C'
         };
