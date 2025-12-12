@@ -6,6 +6,135 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type DealerInfo = {
+  name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  dealer_license?: string | null;
+  specialties?: string[] | null;
+  description?: string | null;
+};
+
+function safeString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const s = value.trim();
+  if (!s) return null;
+  return s;
+}
+
+function looksLikeUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value) || /^www\./i.test(value);
+}
+
+function normalizeWebsiteUrl(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const candidate = s.startsWith('http://') || s.startsWith('https://') ? s : (s.startsWith('www.') ? `https://${s}` : s);
+  try {
+    const url = new URL(candidate);
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    // Normalize to origin (drop paths/params) to improve dedupe matching.
+    return url.origin.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
+function normalizeEmail(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const cleaned = s.replace(/^mailto:/i, '').trim();
+  // Very lightweight sanity check (DB-level validation is separate).
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) return null;
+  return cleaned.toLowerCase();
+}
+
+function normalizeState(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const two = s.toUpperCase();
+  if (/^[A-Z]{2}$/.test(two)) return two;
+  return null;
+}
+
+function normalizeZip(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const digits = s.replace(/[^\d]/g, '');
+  if (digits.length === 5) return digits;
+  if (digits.length === 9) return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  return null;
+}
+
+function normalizePhone(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const digits = s.replace(/[^\d]/g, '');
+  // US-only normalization for now; keep null if it doesn't look plausible.
+  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  return null;
+}
+
+function normalizeTextArray(raw: unknown, maxItems = 25): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw.slice(0, maxItems)) {
+    const s = safeString(item);
+    if (!s) continue;
+    const cleaned = s.replace(/\s+/g, ' ').trim();
+    if (!cleaned) continue;
+    // Drop obviously bad values.
+    if (cleaned.length > 120) continue;
+    if (looksLikeUrl(cleaned)) continue;
+    out.push(cleaned);
+  }
+  return Array.from(new Set(out));
+}
+
+function normalizeDealerInfo(raw: any): DealerInfo | null {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const name = safeString(raw.name);
+  // If the model hallucinated a URL into "name", drop it.
+  const cleanName = name && !looksLikeUrl(name) ? name.replace(/\s+/g, ' ').trim() : null;
+
+  const website = normalizeWebsiteUrl(raw.website);
+  const email = normalizeEmail(raw.email);
+  const phone = normalizePhone(raw.phone);
+  const state = normalizeState(raw.state);
+  const zip = normalizeZip(raw.zip);
+  const address = safeString(raw.address);
+  const city = safeString(raw.city);
+  const dealer_license = safeString(raw.dealer_license);
+  const description = safeString(raw.description);
+  const specialties = normalizeTextArray(raw.specialties);
+
+  // “Greenlight” for creating/updating a business profile:
+  // - require a real name, and at least one strong contact/location signal.
+  const hasStrongSignal = !!(website || phone || email || (city && state) || dealer_license);
+  if (!cleanName || !hasStrongSignal) return null;
+
+  return {
+    name: cleanName,
+    website,
+    email,
+    phone,
+    address: address ? address.replace(/\s+/g, ' ').trim() : null,
+    city: city ? city.replace(/\s+/g, ' ').trim() : null,
+    state,
+    zip,
+    dealer_license,
+    description: description ? description.replace(/\s+/g, ' ').trim() : null,
+    specialties,
+  };
+}
+
 interface ScrapeRequest {
   source_url: string;
   source_type: 'dealer' | 'auction' | 'auction_house' | 'dealer_website' | 'marketplace' | 'classifieds';
@@ -155,7 +284,6 @@ serve(async (req) => {
 
     // Step 3: LLM Extraction fallback if Firecrawl extract failed
     if (listings.length === 0 && use_llm_extraction && OPENAI_API_KEY) {
-    if (use_llm_extraction && OPENAI_API_KEY) {
       console.log('Running LLM extraction...');
 
       const extractionPrompt = `You are a data extraction expert for automotive listings. Analyze this webpage and extract structured data.
@@ -383,30 +511,40 @@ Return ONLY valid JSON in this format:
       }
     }
     
-    if (!organizationId && dealerInfo && dealerInfo.name) {
+    // Normalize/sanitize dealer info before writing to the businesses table.
+    const normalizedDealer = normalizeDealerInfo(dealerInfo);
+    if (!normalizedDealer && dealerInfo && dealerInfo.name) {
+      console.warn('⚠️  Dealer info extracted but failed validation; skipping business create/update to protect DB quality.');
+    }
+
+    if (!organizationId && normalizedDealer && normalizedDealer.name) {
         businessType = (source_type === 'auction' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
         
         // Try to find existing business by website (strongest signal)
       let existingOrg = null;
-      if (dealerInfo.website) {
+      let existingOrgFull: any = null;
+
+      if (normalizedDealer.website) {
         const { data } = await supabase
           .from('businesses')
-          .select('id, business_name')
-          .eq('website', dealerInfo.website)
+          .select('id, business_name, website, dealer_license, type, business_type, address, city, state, zip_code, phone, email')
+          .eq('website', normalizedDealer.website)
           .maybeSingle();
         existingOrg = data;
+        existingOrgFull = data;
       }
       
       // Fallback: match by name + city + state if no website match
-      if (!existingOrg && dealerInfo.name && dealerInfo.city && dealerInfo.state) {
+      if (!existingOrg && normalizedDealer.name && normalizedDealer.city && normalizedDealer.state) {
         const { data } = await supabase
           .from('businesses')
-          .select('id, business_name')
-          .ilike('business_name', `%${dealerInfo.name}%`)
-          .ilike('city', `%${dealerInfo.city}%`)
-          .eq('state', dealerInfo.state.toUpperCase())
+          .select('id, business_name, website, dealer_license, type, business_type, address, city, state, zip_code, phone, email')
+          .ilike('business_name', `%${normalizedDealer.name}%`)
+          .ilike('city', `%${normalizedDealer.city}%`)
+          .eq('state', normalizedDealer.state)
           .maybeSingle();
         existingOrg = data;
+        existingOrgFull = data;
       }
 
       if (existingOrg) {
@@ -424,12 +562,22 @@ Return ONLY valid JSON in this format:
           updates.total_vehicles = listings.length;
         }
         
-        // Update missing fields
-        if (dealerInfo.website && !existingOrg.website) {
-          updates.website = dealerInfo.website;
+        // Update missing fields only (never overwrite existing with new scrape unless empty).
+        if (normalizedDealer.website && !existingOrgFull?.website) {
+          updates.website = normalizedDealer.website;
         }
-        if (dealerInfo.dealer_license) {
-          updates.dealer_license = dealerInfo.dealer_license;
+        if (normalizedDealer.dealer_license && !existingOrgFull?.dealer_license) {
+          updates.dealer_license = normalizedDealer.dealer_license;
+        }
+        if (normalizedDealer.address && !existingOrgFull?.address) updates.address = normalizedDealer.address;
+        if (normalizedDealer.city && !existingOrgFull?.city) updates.city = normalizedDealer.city;
+        if (normalizedDealer.state && !existingOrgFull?.state) updates.state = normalizedDealer.state;
+        if (normalizedDealer.zip && !existingOrgFull?.zip_code) updates.zip_code = normalizedDealer.zip;
+        if (normalizedDealer.phone && !existingOrgFull?.phone) updates.phone = normalizedDealer.phone;
+        if (normalizedDealer.email && !existingOrgFull?.email) updates.email = normalizedDealer.email;
+        if (normalizedDealer.description && !existingOrgFull?.description) updates.description = normalizedDealer.description;
+        if (Array.isArray(normalizedDealer.specialties) && normalizedDealer.specialties.length > 0 && (!existingOrgFull?.specializations || existingOrgFull?.specializations?.length === 0)) {
+          updates.specializations = normalizedDealer.specialties;
         }
         
         await supabase
@@ -441,26 +589,27 @@ Return ONLY valid JSON in this format:
         const { data: newOrg, error: orgError } = await supabase
           .from('businesses')
           .insert({
-            business_name: dealerInfo.name,
+            business_name: normalizedDealer.name,
             type: businessType,
             business_type: businessType === 'auction_house' ? 'other' : 'dealership',
-            description: dealerInfo.description,
-            address: dealerInfo.address,
-            city: dealerInfo.city,
-            state: dealerInfo.state,
-            zip_code: dealerInfo.zip,
-            phone: dealerInfo.phone,
-            email: dealerInfo.email,
-            website: dealerInfo.website,
-            dealer_license: dealerInfo.dealer_license,
-            specializations: dealerInfo.specialties || [],
+            description: normalizedDealer.description,
+            address: normalizedDealer.address,
+            city: normalizedDealer.city,
+            state: normalizedDealer.state,
+            zip_code: normalizedDealer.zip,
+            phone: normalizedDealer.phone,
+            email: normalizedDealer.email,
+            website: normalizedDealer.website,
+            dealer_license: normalizedDealer.dealer_license,
+            specializations: normalizedDealer.specialties || [],
             total_vehicles: listings.length || 0,
             source_url: source_url,
             discovered_via: 'scraper',
             metadata: {
               scrape_source_id: sourceId,
               inventory_url: source_url,
-              squarebody_count: listings.filter((l: any) => l.is_squarebody).length
+              squarebody_count: listings.filter((l: any) => l.is_squarebody).length,
+              raw_dealer_info: dealerInfo || null
             }
           })
           .select('id, business_name')

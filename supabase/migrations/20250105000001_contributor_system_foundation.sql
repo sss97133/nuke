@@ -1,6 +1,55 @@
 -- Foundation tables for contributor system
 -- These tables are required by shops_core.sql and shops_admin_integration.sql
 
+-- Guard: ensure referenced tables exist for local resets / fresh schemas.
+-- These minimal definitions are additive; later migrations can extend them.
+CREATE TABLE IF NOT EXISTS shops (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid()
+);
+
+-- Ensure minimal columns used by early admin/shop integration migrations
+ALTER TABLE shops
+  ADD COLUMN IF NOT EXISTS name TEXT,
+  ADD COLUMN IF NOT EXISTS owner_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS city TEXT,
+  ADD COLUMN IF NOT EXISTS state TEXT,
+  ADD COLUMN IF NOT EXISTS country TEXT,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+CREATE TABLE IF NOT EXISTS admin_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE admin_users
+  ADD COLUMN IF NOT EXISTS can_manage_content BOOLEAN DEFAULT false;
+
+-- Minimal vehicle_contributors table for policy references (later migrations can extend)
+CREATE TABLE IF NOT EXISTS vehicle_contributors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  vehicle_id UUID NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (vehicle_id, user_id)
+);
+
+-- Minimal shop membership table for onboarding validation triggers
+CREATE TABLE IF NOT EXISTS shop_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'member',
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (shop_id, user_id)
+);
+
+ALTER TABLE shop_members
+  ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'member';
+
 -- 1) Vehicle Contributor Roles (extended version of vehicle_contributors)
 CREATE TABLE IF NOT EXISTS vehicle_contributor_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,11 +111,19 @@ CREATE TABLE IF NOT EXISTS department_presets (
   business_type TEXT NOT NULL, -- 'dealer', 'garage', 'builder', 'transporter'
   department_type TEXT NOT NULL,
   department_name TEXT NOT NULL,
+  preset_name TEXT,
   description TEXT,
   typical_roles TEXT[] DEFAULT '{}',
   is_active BOOLEAN DEFAULT true,
+  is_recommended BOOLEAN DEFAULT true,
+  sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE department_presets
+  ADD COLUMN IF NOT EXISTS is_recommended BOOLEAN DEFAULT true,
+  ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS preset_name TEXT;
 
 -- 5) Indexes
 CREATE INDEX IF NOT EXISTS idx_vehicle_contributor_roles_vehicle ON vehicle_contributor_roles(vehicle_id);
@@ -93,7 +150,7 @@ DROP POLICY IF EXISTS contributor_roles_select ON vehicle_contributor_roles;
 CREATE POLICY contributor_roles_select ON vehicle_contributor_roles FOR SELECT
 USING (
   user_id = auth.uid() OR
-  vehicle_id IN (SELECT id FROM vehicles WHERE uploaded_by = auth.uid()) OR
+  vehicle_id IN (SELECT id FROM vehicles WHERE user_id = auth.uid()) OR
   EXISTS (SELECT 1 FROM vehicle_contributors vc WHERE vc.vehicle_id = vehicle_contributor_roles.vehicle_id AND vc.user_id = auth.uid())
 );
 
@@ -102,7 +159,7 @@ DROP POLICY IF EXISTS contributor_docs_select ON contributor_documentation;
 CREATE POLICY contributor_docs_select ON contributor_documentation FOR SELECT
 USING (
   uploaded_by = auth.uid() OR
-  vehicle_id IN (SELECT id FROM vehicles WHERE uploaded_by = auth.uid())
+  vehicle_id IN (SELECT id FROM vehicles WHERE user_id = auth.uid())
 );
 
 DROP POLICY IF EXISTS contributor_docs_insert ON contributor_documentation;
@@ -114,7 +171,7 @@ DROP POLICY IF EXISTS contributor_onboarding_select ON contributor_onboarding;
 CREATE POLICY contributor_onboarding_select ON contributor_onboarding FOR SELECT
 USING (
   user_id = auth.uid() OR
-  vehicle_id IN (SELECT id FROM vehicles WHERE uploaded_by = auth.uid())
+  vehicle_id IN (SELECT id FROM vehicles WHERE user_id = auth.uid())
 );
 
 DROP POLICY IF EXISTS contributor_onboarding_insert ON contributor_onboarding;

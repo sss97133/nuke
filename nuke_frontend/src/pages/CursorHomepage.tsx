@@ -348,13 +348,13 @@ const CursorHomepage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Get vehicles with basic data
+      // Get vehicles with basic data including origin_metadata for fallback images
       let query = supabase
         .from('vehicles')
         .select(`
           id, year, make, model, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
-          is_for_sale, mileage, status, is_public
+          is_for_sale, mileage, status, is_public, origin_metadata
         `)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
@@ -387,21 +387,27 @@ const CursorHomepage: React.FC = () => {
         );
       }
 
-      // Load primary images for all vehicles
+      // Load ANY images for vehicles (not just primary) - handle NULL vehicle_id issue
       const vehicleIds = filteredVehicles.map(v => v.id);
       const { data: images } = await supabase
         .from('vehicle_images')
         .select('vehicle_id, image_url, medium_url, large_url, is_primary')
         .in('vehicle_id', vehicleIds)
-        .eq('is_primary', true);
+        .not('vehicle_id', 'is', null)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: false });
 
-      // Create image lookup map
+      // Create image lookup map - prefer primary images
       const imageMap = new Map();
       (images || []).forEach(img => {
-        imageMap.set(img.vehicle_id, img.large_url || img.medium_url || img.image_url);
+        if (img.vehicle_id && !imageMap.has(img.vehicle_id)) {
+          imageMap.set(img.vehicle_id, img.large_url || img.medium_url || img.image_url);
+        }
       });
 
-      // Process vehicles with image data
+      console.log(`Found ${images?.length || 0} total images, mapped to ${imageMap.size} unique vehicles`);
+
+      // Process vehicles with image data (database + origin metadata fallback)
       const processed = filteredVehicles.map((v: any) => {
         const salePrice = v.sale_price ? Number(v.sale_price) : 0;
         const askingPrice = v.asking_price ? Number(v.asking_price) : 0;
@@ -409,7 +415,15 @@ const CursorHomepage: React.FC = () => {
 
         const displayPrice = salePrice > 0 ? salePrice : askingPrice > 0 ? askingPrice : currentValue;
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
-        const primaryImageUrl = imageMap.get(v.id) || null;
+
+        // Get image from database first, then fallback to origin metadata
+        let primaryImageUrl = imageMap.get(v.id) || null;
+
+        // Fallback to origin_metadata images if no database image
+        if (!primaryImageUrl && v.origin_metadata?.images) {
+          const originImages = getOriginImages(v);
+          primaryImageUrl = originImages[0] || null;
+        }
 
         let hypeScore = 0;
         let hypeReason = '';
@@ -613,13 +627,18 @@ const CursorHomepage: React.FC = () => {
         margin: '0 auto',
         padding: 'var(--space-4)'
       }}>
-        {/* Unified Header (without global search to avoid layout shifts) */}
+        {/* Unified Header with global search */}
         <div style={{
           background: 'var(--white)',
           border: '2px solid var(--border)',
           padding: 'var(--space-3)',
           marginBottom: 'var(--space-4)'
         }}>
+          {/* Search Bar */}
+          <div style={{ marginBottom: 'var(--space-3)' }}>
+            <VehicleSearch />
+          </div>
+
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -629,10 +648,10 @@ const CursorHomepage: React.FC = () => {
             gap: '12px'
           }}>
             <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0 }}>
-              <span style={{ 
+              <span style={{
                 transition: 'opacity 0.3s ease',
                 display: 'inline-block',
-                minWidth: '80px' // keep search/nav from shifting when verb length changes
+                minWidth: '80px'
               }}>
                 <StaticVerbText />
               </span>

@@ -18,6 +18,20 @@ interface SearchResult {
   image_url: string | null;
 }
 
+// Get fallback images from origin metadata
+const getOriginImages = (vehicle: any): string[] => {
+  const raw = vehicle?.origin_metadata?.images;
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .filter((url: any) => typeof url === 'string')
+    .map((url: string) => url.trim())
+    .filter((url: string) => url.startsWith('http'))
+    .filter((url: string) => !url.includes('94x63'))
+    .filter((url: string) => !url.includes('youtube.com'))
+    .filter((url: string) => !url.toLowerCase().includes('thumbnail'));
+};
+
 export default function VehicleSearch() {
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -44,7 +58,7 @@ export default function VehicleSearch() {
       setLoading(true);
       const searchLower = searchTerm.toLowerCase();
 
-      // Search vehicles table
+      // Search vehicles table - simplified query without broken image joins
       const { data, error } = await supabase
         .from('vehicles')
         .select(`
@@ -57,21 +71,22 @@ export default function VehicleSearch() {
           mileage,
           asking_price,
           is_for_sale,
-          vehicle_images!left(image_url, is_primary, variants)
+          origin_metadata
         `)
         .eq('is_public', true)
         .or(`make.ilike.%${searchLower}%,model.ilike.%${searchLower}%,year.eq.${parseInt(searchTerm) || 0}`)
-        .limit(20);
+        .limit(50);
 
       if (error) {
         console.error('Search error:', error);
         return;
       }
 
-      // Process results to get primary images
+      // Process results with fallback to origin_metadata images
       const processedResults = (data || []).map(vehicle => {
-        const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
-        const imageUrl = primaryImage?.variants?.medium || primaryImage?.image_url;
+        // Try origin_metadata images as fallback
+        const originImages = getOriginImages(vehicle);
+        const imageUrl = originImages[0] || null;
 
         return {
           id: vehicle.id,

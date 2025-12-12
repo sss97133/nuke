@@ -1489,7 +1489,16 @@ const VehicleProfile: React.FC = () => {
                 <div className="text-small text-muted">Mailbox</div>
                 <div className="text" style={{ fontWeight: 600 }}>Vehicle messages & alerts</div>
               </div>
-              <MailboxNotificationBadge vehicleId={vehicle.id} showIcon showText />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  className="button button-secondary"
+                  style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}
+                  onClick={() => navigate(`/vehicle/${vehicle.id}/jobs`)}
+                >
+                  Job Desk
+                </button>
+                <MailboxNotificationBadge vehicleId={vehicle.id} showIcon showText />
+              </div>
             </div>
           </div>
         )}

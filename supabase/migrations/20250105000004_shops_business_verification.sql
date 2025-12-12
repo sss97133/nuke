@@ -1,5 +1,22 @@
 -- Extend shops with business verification fields and tables
 
+-- 0) Ensure documentation_type enum exists (used by shop_documents below)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'documentation_type') THEN
+    CREATE TYPE documentation_type AS ENUM (
+      'unknown',
+      'ein_assignment_notice',
+      'state_business_license',
+      'articles_of_organization',
+      'operating_agreement',
+      'business_bank_statement',
+      'dba_certificate'
+    );
+  END IF;
+END;
+$$;
+
 -- 1) Extend documentation_type enum with business documents
 DO $$
 BEGIN
