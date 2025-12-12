@@ -26,6 +26,115 @@ interface DealerProfileData {
   auctions_url: string | null;
 }
 
+function safeString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const s = value.trim();
+  if (!s) return null;
+  return s;
+}
+
+function looksLikeUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value) || /^www\./i.test(value);
+}
+
+function normalizeWebsiteUrl(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const candidate = s.startsWith('http://') || s.startsWith('https://') ? s : (s.startsWith('www.') ? `https://${s}` : s);
+  try {
+    const url = new URL(candidate);
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    return url.origin.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
+function normalizeEmail(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const cleaned = s.replace(/^mailto:/i, '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) return null;
+  return cleaned.toLowerCase();
+}
+
+function normalizeState(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const two = s.toUpperCase();
+  if (/^[A-Z]{2}$/.test(two)) return two;
+  return null;
+}
+
+function normalizeZip(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const digits = s.replace(/[^\d]/g, '');
+  if (digits.length === 5) return digits;
+  if (digits.length === 9) return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  return null;
+}
+
+function normalizePhone(raw: unknown): string | null {
+  const s = safeString(raw);
+  if (!s) return null;
+  const digits = s.replace(/[^\d]/g, '');
+  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  return null;
+}
+
+function normalizeTextArray(raw: unknown, maxItems = 25): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw.slice(0, maxItems)) {
+    const s = safeString(item);
+    if (!s) continue;
+    const cleaned = s.replace(/\s+/g, ' ').trim();
+    if (!cleaned) continue;
+    if (cleaned.length > 120) continue;
+    if (looksLikeUrl(cleaned)) continue;
+    out.push(cleaned);
+  }
+  return Array.from(new Set(out));
+}
+
+function sanitizeDealerProfileData(raw: DealerProfileData): DealerProfileData | null {
+  const nameRaw = safeString(raw.name);
+  const name = nameRaw && !looksLikeUrl(nameRaw) ? nameRaw.replace(/\s+/g, ' ').trim() : null;
+  const logoUrl = safeString(raw.logo_url);
+  const website = normalizeWebsiteUrl(raw.website);
+  const email = normalizeEmail(raw.email);
+  const phone = normalizePhone(raw.phone);
+  const state = normalizeState(raw.state);
+  const zip = normalizeZip(raw.zip);
+  const city = safeString(raw.city);
+  const address = safeString(raw.address);
+  const dealerLicense = safeString(raw.dealer_license);
+  const description = safeString(raw.description);
+  const specialties = normalizeTextArray(raw.specialties);
+
+  // Greenlight: require name + logo, and at least one strong signal.
+  const hasStrongSignal = !!(website || phone || email || (city && state) || dealerLicense);
+  if (!name || !logoUrl || !hasStrongSignal) return null;
+
+  return {
+    ...raw,
+    name,
+    logo_url: logoUrl,
+    website,
+    email,
+    phone,
+    state,
+    zip,
+    city: city ? city.replace(/\s+/g, ' ').trim() : null,
+    address: address ? address.replace(/\s+/g, ' ').trim() : null,
+    dealer_license: dealerLicense,
+    description: description ? description.replace(/\s+/g, ' ').trim() : null,
+    specialties,
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -136,12 +245,13 @@ serve(async (req) => {
       throw new Error('Failed to extract dealer data');
     }
 
-    // Step 3: Check greenlight signals
-    if (!shouldCreateOrganization(dealerData)) {
+    // Step 3: Sanitize + check greenlight signals
+    const sanitizedDealerData = sanitizeDealerProfileData(dealerData);
+    if (!sanitizedDealerData) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Missing required greenlight signals (name, logo, license)' 
+          error: 'Dealer profile extracted but failed validation (insufficient/invalid signals)' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
@@ -152,23 +262,23 @@ serve(async (req) => {
     let faviconUrl: string | null = null;
     let primaryImageUrl: string | null = null;
     
-    if (dealerData.logo_url) {
-      logoUrl = await downloadAndStoreLogo(dealerData.logo_url, dealerData.website || '', supabase);
+    if (sanitizedDealerData.logo_url) {
+      logoUrl = await downloadAndStoreLogo(sanitizedDealerData.logo_url, sanitizedDealerData.website || '', supabase);
     }
     
     // Also try to extract favicon from website (for small UI areas)
-    if (dealerData.website) {
+    if (sanitizedDealerData.website) {
       try {
-        faviconUrl = await extractWebsiteFavicon(dealerData.website, supabase);
+        faviconUrl = await extractWebsiteFavicon(sanitizedDealerData.website, supabase);
       } catch (err) {
         console.warn('Failed to extract website favicon:', err);
       }
     }
     
     // Extract primary image (property front - keeping expectations low for now)
-    if (dealerData.website) {
+    if (sanitizedDealerData.website) {
       try {
-        primaryImageUrl = await extractPrimaryImage(dealerData.website, supabase);
+        primaryImageUrl = await extractPrimaryImage(sanitizedDealerData.website, supabase);
       } catch (err) {
         console.warn('Failed to extract primary image:', err);
       }
@@ -176,7 +286,7 @@ serve(async (req) => {
 
     // Step 5: Find or create organization using geographic logic
     const organization = await findOrCreateOrganizationWithGeographicLogic(
-      dealerData,
+      sanitizedDealerData,
       logoUrl,
       faviconUrl,
       primaryImageUrl,
@@ -185,26 +295,26 @@ serve(async (req) => {
     );
 
     // Step 6: Queue inventory extraction if website available
-    if (organization && dealerData.website) {
+    if (organization && sanitizedDealerData.website) {
       await queueInventoryExtraction({
         organization_id: organization.id,
-        business_type: dealerData.business_type,
-        website: dealerData.website,
-        inventory_url: dealerData.inventory_url,
-        auctions_url: dealerData.auctions_url
+        business_type: sanitizedDealerData.business_type,
+        website: sanitizedDealerData.website,
+        inventory_url: sanitizedDealerData.inventory_url,
+        auctions_url: sanitizedDealerData.auctions_url
       }, supabase);
     }
 
     // Step 7: Extract and store team/employee data from dealer website (private, for future email outreach)
     let teamDataStored = 0;
-    if (organization?.id && dealerData.website) {
+    if (organization?.id && sanitizedDealerData.website) {
       try {
         const { storeTeamData } = await import('../_shared/storeTeamData.ts');
         
         // Use extract-using-catalog to get team data from website
         const { data: extractResult } = await supabase.functions.invoke('extract-using-catalog', {
           body: {
-            url: dealerData.website,
+            url: sanitizedDealerData.website,
             use_catalog: true,
             fallback_to_ai: true
           }
@@ -217,7 +327,7 @@ serve(async (req) => {
               supabase,
               organization.id,
               teamMembers,
-              dealerData.website,
+              sanitizedDealerData.website,
               0.8 // Confidence score
             );
             teamDataStored = result.stored;
@@ -238,7 +348,7 @@ serve(async (req) => {
         logo_url: logoUrl,
         favicon_url: faviconUrl, // Cached in source_favicons table
         banner_url: primaryImageUrl, // Property front image (using banner_url column)
-        dealer_data: dealerData,
+        dealer_data: sanitizedDealerData,
         team_members_stored: teamDataStored,
         action: organization?.id ? 'created' : 'found_existing'
       }),
@@ -409,19 +519,7 @@ function extractDealerProfileData(doc: any, html: string): DealerProfileData {
   return data;
 }
 
-/**
- * Check if we should create organization (greenlight signals)
- * Greenlight: name + logo (license is nice-to-have, can be looked up from business records)
- */
-function shouldCreateOrganization(data: DealerProfileData): boolean {
-  // Required: name and logo (images are a strong signal)
-  // License is optional since it often requires business records lookup
-  return !!(
-    data.name && 
-    data.name.length > 2 &&
-    data.logo_url
-  );
-}
+// Note: greenlight / validation is handled by sanitizeDealerProfileData()
 
 /**
  * Download logo and store as organization favicon/logo

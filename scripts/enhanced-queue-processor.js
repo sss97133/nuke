@@ -206,6 +206,10 @@ async function processPendingItems() {
     console.log(`📦 Processing Batch ${batchNum} (${BATCH_SIZE} items)`);
     console.log('='.repeat(60));
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H5',location:'scripts/enhanced-queue-processor.js:call_process_import_queue',message:'Calling process-import-queue',data:{SUPABASE_URL,endpoint:`${SUPABASE_URL}/functions/v1/process-import-queue`,batch_size:BATCH_SIZE,has_service_key:!!SUPABASE_SERVICE_ROLE_KEY},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     const processResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-import-queue`, {
       method: 'POST',
       headers: {

@@ -7,6 +7,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Production-safe debug logging (DB) + local ingest (if reachable).
+const debugSupabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  { auth: { persistSession: false } }
+);
+
+function debugLog(payload: {
+  sessionId: string;
+  runId: string;
+  hypothesisId: string;
+  location: string;
+  message: string;
+  data: Record<string, any>;
+}) {
+  // Local ingest (works only when running function on the same machine as the ingest server)
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ ...payload, timestamp: Date.now() })}).catch(()=>{});
+  // #endregion
+
+  // Production-safe: write to DB (service-role only table)
+  // NOTE: supabase-js query builders in Deno are not always Promise-like; use an async IIFE.
+  (async () => {
+    try {
+      await debugSupabase
+        .from('debug_runtime_logs')
+        .insert({
+          source: 'process-import-queue',
+          run_id: payload.runId,
+          hypothesis_id: payload.hypothesisId,
+          location: payload.location,
+          message: payload.message,
+          data: payload.data,
+        });
+    } catch {
+      // swallow (debug should never break execution)
+    }
+  })();
+}
+
 // Helper function to clean model name - removes pricing, dealer info, financing text, etc.
 function cleanModelName(model: string): string {
   if (!model) return '';
@@ -211,6 +251,15 @@ serve(async (req) => {
   }
 
   try {
+    debugLog({
+      sessionId: 'debug-session',
+      runId: 'pre-fix',
+      hypothesisId: 'H5',
+      location: 'supabase/functions/process-import-queue/index.ts:entry',
+      message: 'process-import-queue invoked',
+      data: { method: req.method, has_body: req.body !== null, content_type: req.headers.get('content-type') },
+    });
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -218,6 +267,14 @@ serve(async (req) => {
 
     const body: ProcessRequest = await req.json().catch(() => ({}));
     const { batch_size = 20, priority_only = false, source_id } = body;
+    debugLog({
+      sessionId: 'debug-session',
+      runId: 'pre-fix',
+      hypothesisId: 'H5',
+      location: 'supabase/functions/process-import-queue/index.ts:parsed_body',
+      message: 'Parsed request body',
+      data: { batch_size, priority_only, source_id },
+    });
 
     // Get pending items from queue - prioritize items with more data
     let query = supabase
@@ -256,6 +313,14 @@ serve(async (req) => {
     }
 
     console.log(`Processing ${queueItems.length} queue items`);
+    debugLog({
+      sessionId: 'debug-session',
+      runId: 'pre-fix',
+      hypothesisId: 'H5',
+      location: 'supabase/functions/process-import-queue/index.ts:process_start',
+      message: 'Fetched import_queue items',
+      data: { batch_size, priority_only, source_id, items: queueItems.length, item_ids: queueItems.slice(0, 5).map((x: any) => x.id) },
+    });
 
     const results = {
       processed: 0,
@@ -267,6 +332,15 @@ serve(async (req) => {
 
     for (const item of queueItems) {
       try {
+        debugLog({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'supabase/functions/process-import-queue/index.ts:item_start',
+          message: 'Start processing queue item',
+          data: { queue_id: item.id, listing_url: item.listing_url, listing_year: item.listing_year, listing_make: item.listing_make, listing_model: item.listing_model, source_id: item.source_id, raw_flags: { inventory_extraction: item.raw_data?.inventory_extraction, business_type: item.raw_data?.business_type } },
+        });
+
         // Mark as processing
         await supabase
           .from('import_queue')
@@ -929,7 +1003,6 @@ serve(async (req) => {
         // Enhanced organization detection: check for VIN + dealer combo
         // This enables intelligent cross-city dealer detection
         const dealerWebsite = scrapeData.data.dealer_website || null;
-        const listingVIN = scrapeData.data.vin || null;
         
         // Get or create organization (intelligent dealer detection)
         if ((dealerName && dealerName.length > 2) || dealerWebsite) {
@@ -1063,6 +1136,15 @@ serve(async (req) => {
         
         // Clean model name (remove pricing, dealer info, etc.)
         model = cleanModelName(model);
+
+        debugLog({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H2',
+          location: 'supabase/functions/process-import-queue/index.ts:after_extract',
+          message: 'Scraped + normalized vehicle identity fields',
+          data: { queue_id: item.id, source: scrapeData?.data?.source, title: (scrapeData?.data?.title || '').slice(0, 120), year, make, model, vin_present: !!scrapeData?.data?.vin, asking_price: scrapeData?.data?.asking_price || null, keys: Object.keys(scrapeData?.data || {}).slice(0, 40) },
+        });
         
         // Validate make
         if (make && !isValidMake(make)) {
@@ -1188,6 +1270,15 @@ serve(async (req) => {
         if (vehicleError) {
           throw new Error(`Vehicle insert failed: ${vehicleError.message}`);
         }
+
+        debugLog({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H4',
+          location: 'supabase/functions/process-import-queue/index.ts:vehicle_inserted',
+          message: 'Inserted vehicles row (initial form baseline)',
+          data: { queue_id: item.id, vehicle_id: newVehicle.id, year, make, model, status: 'pending', is_public: false, org_id: organizationId || null },
+        });
 
         // CRITICAL FIX: Immediately download and upload images (don't wait for backfill)
         const imageUrls = scrapeData.data.images || [];
@@ -1344,12 +1435,21 @@ serve(async (req) => {
         }
 
         // Process scraped data through forensic system (REPLACES manual field assignment)
-        await supabase.rpc('process_scraped_data_forensically', {
+        const { data: forensicResult, error: forensicError } = await supabase.rpc('process_scraped_data_forensically', {
           p_vehicle_id: newVehicle.id,
           p_scraped_data: scrapeData.data,
           p_source_url: item.listing_url,
           p_scraper_name: 'import-queue',
           p_context: { source_id: item.source_id, queue_id: item.id }
+        });
+
+        debugLog({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'supabase/functions/process-import-queue/index.ts:forensic_rpc',
+          message: 'Forensic processing result',
+          data: { queue_id: item.id, vehicle_id: newVehicle.id, forensic_ok: !forensicError, forensic_error: forensicError?.message || null, forensic_summary: forensicResult ? { evidence_collected: forensicResult.evidence_collected, anomalies_detected: forensicResult.anomalies_detected, scraper: forensicResult.scraper } : null },
         });
 
         // Build consensus for critical fields immediately
@@ -1518,6 +1618,15 @@ serve(async (req) => {
           'validate_vehicle_before_public',
           { p_vehicle_id: newVehicle.id }
         );
+
+        debugLog({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H3',
+          location: 'supabase/functions/process-import-queue/index.ts:quality_gate',
+          message: 'validate_vehicle_before_public result',
+          data: { queue_id: item.id, vehicle_id: newVehicle.id, validation_ok: !validationError, validation_error: validationError?.message ?? null, can_go_live: validationResult?.can_go_live ?? false, recommendation: validationResult?.recommendation ?? null, quality_score: validationResult?.quality_score ?? null, image_count: validationResult?.image_count ?? null, issue_count: Array.isArray(validationResult?.issues) ? validationResult.issues.length : null },
+        });
         
         if (validationError) {
           console.warn('Validation error:', validationError);
@@ -1667,6 +1776,14 @@ serve(async (req) => {
 
       } catch (error) {
         console.error(`Failed to process ${item.listing_url}:`, error);
+        debugLog({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'supabase/functions/process-import-queue/index.ts:item_error',
+          message: 'Queue item processing failed',
+          data: { queue_id: item?.id || null, listing_url: item?.listing_url || null, error_message: (error as any)?.message || String(error) },
+        });
 
         await supabase
           .from('import_queue')
@@ -1692,6 +1809,14 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Process queue error:', error);
+    debugLog({
+      sessionId: 'debug-session',
+      runId: 'pre-fix',
+      hypothesisId: 'H5',
+      location: 'supabase/functions/process-import-queue/index.ts:outer_error',
+      message: 'Top-level handler error',
+      data: { error_message: (error as any)?.message || String(error) },
+    });
     return new Response(JSON.stringify({
       success: false,
       error: error.message
