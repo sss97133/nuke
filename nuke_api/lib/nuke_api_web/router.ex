@@ -91,6 +91,7 @@ defmodule NukeApiWeb.Router do
     get "/vehicles/:vehicle_id/mailbox", MailboxController, :show_vehicle_mailbox
     get "/vehicles/:vehicle_id/mailbox/messages", MailboxController, :get_messages
     post "/vehicles/:vehicle_id/mailbox/messages", MailboxController, :create_message
+    post "/vehicles/:vehicle_id/mailbox/work-orders/draft", MailboxController, :draft_work_order
     patch "/vehicles/:vehicle_id/mailbox/messages/:message_id/read", MailboxController, :mark_read
     patch "/vehicles/:vehicle_id/mailbox/messages/:message_id/resolve", MailboxController, :resolve_message
 

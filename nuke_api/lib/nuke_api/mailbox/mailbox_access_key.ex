@@ -33,7 +33,8 @@ defmodule NukeApi.Mailbox.MailboxAccessKey do
     belongs_to :org, Organization
     belongs_to :granted_by, User, foreign_key: :granted_by
 
-    timestamps(type: :utc_datetime)
+    # Supabase SQL migrations use created_at/updated_at column names.
+    timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
 
   @doc false

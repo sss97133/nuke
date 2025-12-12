@@ -45,6 +45,8 @@ const VehicleMailbox: React.FC = () => {
   const [showCompose, setShowCompose] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftBody, setDraftBody] = useState('')
+  const [draftUrgency, setDraftUrgency] = useState<'low' | 'normal' | 'high' | 'emergency'>('normal')
+  const [draftFundsUsd, setDraftFundsUsd] = useState<string>('')
   const [stamps, setStamps] = useState<Array<{ id: string; name?: string; sku?: string; remaining_uses?: number; is_listed?: boolean; list_price_cents?: number }>>([])
   const [selectedStampId, setSelectedStampId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -389,6 +391,47 @@ const VehicleMailbox: React.FC = () => {
     }
   }
 
+  const draftWorkOrder = async () => {
+    if (!vehicleId) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const amountUsd = Number(draftFundsUsd || 0)
+      const amountCents = Number.isFinite(amountUsd) && amountUsd > 0 ? Math.floor(amountUsd * 100) : 0
+
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          title: draftTitle,
+          description: draftBody,
+          urgency: draftUrgency,
+          funds_committed: amountCents > 0 ? { amount_cents: amountCents, currency: 'USD' } : null,
+          source_message_ids: []
+        })
+      })
+
+      if (res.ok) {
+        toast.success('Work order drafted')
+        setDraftTitle('')
+        setDraftBody('')
+        setDraftFundsUsd('')
+        setDraftUrgency('normal')
+        setShowCompose(false)
+        await loadMessages()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSendError(err?.message || 'Draft failed')
+      }
+    } catch (error) {
+      console.error(error)
+      setSendError('Draft failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
   const purchaseStamp = async () => {
     setSending(true)
     setPurchaseError(null)
@@ -651,6 +694,34 @@ const VehicleMailbox: React.FC = () => {
                 />
               </div>
 
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>Urgency</label>
+                  <select
+                    className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                    style={{ fontSize: '8pt' }}
+                    value={draftUrgency}
+                    onChange={(e) => setDraftUrgency(e.target.value as any)}
+                  >
+                    <option value="low">low</option>
+                    <option value="normal">normal</option>
+                    <option value="high">high</option>
+                    <option value="emergency">emergency</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-gray-900 mb-1" style={{ fontSize: '8pt' }}>Funds committed (USD, optional)</label>
+                  <input
+                    className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                    style={{ fontSize: '8pt' }}
+                    placeholder="1500"
+                    inputMode="numeric"
+                    value={draftFundsUsd}
+                    onChange={(e) => setDraftFundsUsd(e.target.value)}
+                  />
+                </div>
+              </div>
+
               {/* Stamp selection */}
               {stamps.length > 0 && (
                 <div>
@@ -695,6 +766,14 @@ const VehicleMailbox: React.FC = () => {
                     onClick={() => sendMessage('comment')}
                   >
                     Post as Comment (free)
+                  </button>
+                  <button
+                    className="px-3 py-1.5 border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 font-semibold"
+                    style={{ fontSize: '8pt' }}
+                    disabled={sending || !draftTitle.trim() || !draftBody.trim()}
+                    onClick={draftWorkOrder}
+                  >
+                    Draft Work Order
                   </button>
                 </div>
                 {stamps.length === 0 && (

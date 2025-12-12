@@ -443,7 +443,16 @@ export class ImageUploadService {
       }
 
       // Detect document type
-      const docDetection = DocumentTypeDetector.detectFromFile(file);
+      // IMPORTANT: If the caller explicitly uploads as a document, force document classification.
+      // Relying on filename keywords alone is unreliable (camera rolls are "IMG_1234.jpg").
+      const docDetection = category === 'document'
+        ? {
+            type: 'other_document' as const,
+            confidence: 1.0,
+            suggestedRoute: 'documents' as const,
+            reasoning: 'User selected document upload'
+          }
+        : DocumentTypeDetector.detectFromFile(file);
       const isDocument = docDetection.type !== 'vehicle_photo';
       const documentCategory = isDocument ? this.mapDocumentTypeToCategory(docDetection.type) : null;
 
@@ -829,8 +838,15 @@ export class ImageUploadService {
         const { ImageVehicleMatcher } = await import('./imageVehicleMatcher');
         const match = await ImageVehicleMatcher.matchImage(imageId, { userId });
         if (match && match.vehicleId) {
-          await ImageVehicleMatcher.applyMatches([match]);
-          console.log(`✅ Auto-matched image ${imageId} to vehicle ${match.vehicleId} (confidence: ${(match.confidence * 100).toFixed(0)}%)`);
+          // SAFETY: do not auto-apply; only store suggestion.
+          await supabase
+            .from('vehicle_images')
+            .update({
+              suggested_vehicle_id: match.vehicleId,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', imageId);
+          console.log(`✅ Suggested match for image ${imageId}: vehicle ${match.vehicleId} (confidence: ${(match.confidence * 100).toFixed(0)}%)`);
         }
         return;
       }
@@ -842,14 +858,13 @@ export class ImageUploadService {
 
       // Get the best match (highest confidence)
       const bestMatch = matches[0];
-      
-      // Apply the match
+
+      // SAFETY: never auto-assign vehicle_id based on heuristic matching.
+      // This prevents cross-vehicle contamination; we only store a suggestion for review.
       const { error: updateError } = await supabase
         .from('vehicle_images')
         .update({
-          vehicle_id: bestMatch.vehicle_id,
-          organization_status: 'organized',
-          organized_at: new Date().toISOString(),
+          suggested_vehicle_id: bestMatch.vehicle_id,
           updated_at: new Date().toISOString()
         })
         .eq('id', imageId);
@@ -859,7 +874,7 @@ export class ImageUploadService {
         return;
       }
 
-      console.log(`✅ Auto-matched image ${imageId} to vehicle ${bestMatch.vehicle_id} (confidence: ${(bestMatch.confidence * 100).toFixed(0)}%)`);
+      console.log(`✅ Suggested match for image ${imageId}: vehicle ${bestMatch.vehicle_id} (confidence: ${(bestMatch.confidence * 100).toFixed(0)}%)`);
       console.log('Match reasons:', bestMatch.match_reasons);
 
       // Notify UI that image was matched

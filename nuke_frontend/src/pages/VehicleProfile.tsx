@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { useValuationIntel } from '../hooks/useValuationIntel';
@@ -62,6 +62,7 @@ type WorkspaceTabId = typeof WORKSPACE_TABS[number]['id'];
 const VehicleProfile: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // All state hooks must be declared before any conditional returns
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
@@ -125,6 +126,25 @@ const VehicleProfile: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // URL-driven claim flow fallback: /vehicle/:id?claim=1 opens the ownership modal
+  // This makes "Claim this vehicle" work even if onClick handlers are flaky on some devices.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search || '');
+      if (params.get('claim') === '1') {
+        setShowOwnershipClaim(true);
+        params.delete('claim');
+        const nextSearch = params.toString();
+        const nextUrl = `${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`;
+        // Replace so refresh doesn't re-open forever
+        navigate(nextUrl, { replace: true });
+      }
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, location.pathname]);
 
   // VALUATION HOOK - Re-enabled after fixing TDZ
   const {
@@ -1147,8 +1167,8 @@ const VehicleProfile: React.FC = () => {
             .eq('id', imageRecords[0].id);
         }
 
-        // Load all images using public URLs (fast)
-        images = imageRecords.map((r: any) => r.image_url);
+        // Load all images using public URLs (fast) and de-dupe (storage/variants can create repeats)
+        images = Array.from(new Set((imageRecords || []).map((r: any) => r?.image_url).filter(Boolean)));
         setVehicleImages(images);
 
         // Signed URL generation disabled due to storage configuration issues
@@ -1188,12 +1208,21 @@ const VehicleProfile: React.FC = () => {
               const { data: files, error: listErr } = await bucketRef.list(path, { limit: 1000 });
               if (listErr || !files) return;
               for (const f of files) {
-                if (f.name && !f.name.endsWith('/')) {
-                  const full = path ? `${path}/${f.name}` : f.name;
+                if (!f?.name) continue;
+                const name = String(f.name);
+                const lower = name.toLowerCase();
+
+                // Skip directories and non-image files
+                if (!/\.(jpg|jpeg|png|webp|gif)$/.test(lower)) continue;
+
+                const full = path ? `${path}/${name}` : name;
+
+                // Do not pollute hero/gallery with ownership verification documents
+                if (full.includes('/ownership/')) continue;
+
                   // Use public URLs for both buckets to avoid 400 errors
                   const { data: pub } = bucketRef.getPublicUrl(full);
                   if (pub?.publicUrl) gathered.push(pub.publicUrl);
-                }
               }
             };
 
@@ -1493,9 +1522,9 @@ const VehicleProfile: React.FC = () => {
                 <button
                   className="button button-secondary"
                   style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}
-                  onClick={() => navigate(`/vehicle/${vehicle.id}/jobs`)}
+                  onClick={() => navigate(`/vehicle/${vehicle.id}/mailbox`)}
                 >
-                  Job Desk
+                  Open Mailbox
                 </button>
                 <MailboxNotificationBadge vehicleId={vehicle.id} showIcon showText />
               </div>

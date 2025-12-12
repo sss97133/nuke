@@ -224,6 +224,49 @@ const ImageGallery = ({
     }
   };
 
+  const dedupeFetchedImages = (images: any[]): any[] => {
+    // Defensive UI de-dupe: older rows may not have is_duplicate populated,
+    // or multiple rows may point at the same underlying file/variant.
+    const keyFor = (img: any): string => {
+      return (
+        img?.file_hash ||
+        img?.storage_path ||
+        img?.variants?.full ||
+        img?.variants?.large ||
+        img?.image_url ||
+        img?.large_url ||
+        img?.medium_url ||
+        img?.thumbnail_url ||
+        img?.id ||
+        ''
+      );
+    };
+
+    const prioritized = [...(images || [])].sort((a: any, b: any) => {
+      // Primary first, then newest
+      if (a?.is_primary && !b?.is_primary) return -1;
+      if (!a?.is_primary && b?.is_primary) return 1;
+      const da = new Date(a?.taken_at || a?.created_at || 0).getTime();
+      const db = new Date(b?.taken_at || b?.created_at || 0).getTime();
+      if (da !== db) return db - da;
+      return String(a?.id || '').localeCompare(String(b?.id || ''));
+    });
+
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const img of prioritized) {
+      const k = keyFor(img);
+      if (!k) {
+        out.push(img);
+        continue;
+      }
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(img);
+    }
+    return out;
+  };
+
   // Define loadMoreImages BEFORE the useEffect that uses it
   const loadMoreImages = useCallback(() => {
     if (loadingMore || displayedImages.length >= allImages.length) return;
@@ -363,13 +406,15 @@ const ImageGallery = ({
         setLoading(true);
         const { data: rawImages, error } = await supabase
           .from('vehicle_images')
-          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
+          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
           .eq('vehicle_id', vehicleId)
           .eq('is_document', false) // Filter out documents - they should be in a separate section
+          // Hide duplicate rows by default (upload pipeline marks true duplicates)
+          .or('is_duplicate.is.null,is_duplicate.eq.false')
           .order('is_primary', { ascending: false });
 
         if (error) throw error;
-        const images = rawImages || [];
+        const images = dedupeFetchedImages(rawImages || []);
         setAllImages(images);
         // Load an initial batch (50 or fewer) immediately
         const sorted = [...images].sort((a: any, b: any) => {
@@ -420,11 +465,13 @@ const ImageGallery = ({
               .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
               .eq('vehicle_id', vehicleId)
               .eq('is_document', false)
+              .or('is_duplicate.is.null,is_duplicate.eq.false')
               .order('is_primary', { ascending: false });
             
             if (!error && refreshedImages) {
+              const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
               // Check if the specific image was updated
-              const updatedImage = refreshedImages.find(img => img.id === imageId);
+              const updatedImage = refreshedDeduped.find(img => img.id === imageId) || (refreshedImages || []).find((img: any) => img.id === imageId);
               if (updatedImage) {
                 const hasNewAnalysis = updatedImage.ai_scan_metadata?.tier_1_analysis || 
                                       updatedImage.angle || 
@@ -432,7 +479,7 @@ const ImageGallery = ({
                 
                 if (hasNewAnalysis || index === refreshAttempts.length - 1) {
                   // Analysis is complete or this is the last attempt
-                  setAllImages(refreshedImages);
+                  setAllImages(refreshedDeduped);
                   const sorted = getSortedImages();
                   setDisplayedImages(sorted.slice(0, Math.max(displayedImages.length, 50)));
                   onImagesUpdated?.();
@@ -621,15 +668,17 @@ const ImageGallery = ({
         .select('id, image_url, thumbnail_url, medium_url, large_url, is_primary, caption, created_at, taken_at, is_document, document_category')
         .eq('vehicle_id', vehicleId)
         .eq('is_document', false) // Filter out documents
+        .or('is_duplicate.is.null,is_duplicate.eq.false')
         .order('is_primary', { ascending: false });
 
-      setAllImages(refreshedImages || []);
+      const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
+      setAllImages(refreshedDeduped);
       
       // Always show images after upload and refresh the display
       setShowImages(true);
       
       // Refresh displayed images with the new uploads
-      const sortedImages = (refreshedImages || []).sort((a: any, b: any) => {
+      const sortedImages = (refreshedDeduped || []).sort((a: any, b: any) => {
         if (sortBy === 'primary') {
           if (a.is_primary && !b.is_primary) return -1;
           if (!a.is_primary && b.is_primary) return 1;
@@ -993,6 +1042,13 @@ const ImageGallery = ({
           >
             Upload Images
           </button>
+          <div className="text-small text-muted" style={{ marginTop: '10px', fontSize: '8pt' }}>
+            Uploading a title/ownership document? Use{' '}
+            <a href={`/vehicle/${vehicleId}?claim=1`} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+              Claim Ownership
+            </a>{' '}
+            so it’s processed correctly (and doesn’t land in the gallery).
+          </div>
         </div>
         
         {/* Onboarding Modal */}
@@ -1119,6 +1175,12 @@ const ImageGallery = ({
           >
             Upload
           </button>
+          <span className="text-small text-muted" style={{ fontSize: '8pt' }}>
+            Title/ownership doc?{' '}
+            <a href={`/vehicle/${vehicleId}?claim=1`} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+              Claim Ownership
+            </a>
+          </span>
         </div>
       </div>
 

@@ -3,6 +3,7 @@ defmodule NukeApiWeb.MailboxController do
 
   alias NukeApi.Mailbox
   alias NukeApi.Mailbox.{VehicleMailbox, MailboxMessage, MailboxAccessKey}
+  alias NukeApi.WorkOrders
 
   # Get vehicle mailbox with user's access level
   def show_vehicle_mailbox(conn, %{"vehicle_id" => vehicle_id}) do
@@ -96,6 +97,148 @@ defmodule NukeApiWeb.MailboxController do
           message: "Invalid message data",
           errors: format_changeset_errors(changeset)
         })
+    end
+  end
+
+  # Draft a structured work order from mailbox input (MVP agent seam).
+  #
+  # POST /api/vehicles/:vehicle_id/mailbox/work-orders/draft
+  #
+  # Body:
+  # {
+  #   "title": "Undercarriage patch work",
+  #   "description": "Details...",
+  #   "urgency": "normal",
+  #   "organization_id": null,
+  #   "images": [],
+  #   "source_message_ids": [],
+  #   "funds_committed": { "amount_cents": 150000, "currency": "USD" }
+  # }
+  def draft_work_order(conn, %{"vehicle_id" => vehicle_id} = params) do
+    user_id = get_user_id(conn)
+
+    title = String.trim(to_string(Map.get(params, "title", "")))
+    description = String.trim(to_string(Map.get(params, "description", "")))
+    urgency = Map.get(params, "urgency", "normal")
+    organization_id = Map.get(params, "organization_id")
+    images = Map.get(params, "images", [])
+    source_message_ids = Map.get(params, "source_message_ids", [])
+    funds = Map.get(params, "funds_committed")
+
+    if title == "" or description == "" do
+      conn
+      |> put_status(:bad_request)
+      |> json(%{status: "error", message: "title and description required"})
+    else
+      # 1) Record the user's request as a mailbox message
+      message_params = %{
+        "vehicle_id" => vehicle_id,
+        "sender_id" => user_id,
+        "sender_type" => "user",
+        "message_type" => "work_request",
+        "title" => title,
+        "content" => description,
+        "priority" => "medium",
+        "metadata" => %{"source" => "work_order_draft"}
+      }
+
+      with {:ok, user_msg} <- Mailbox.create_message(message_params, user_id),
+           {:ok, mailbox} <- Mailbox.get_vehicle_mailbox_with_access(vehicle_id, user_id),
+           {:ok, work_order} <-
+             WorkOrders.create_draft_work_order(%{
+               "organization_id" => organization_id,
+               "customer_id" => user_id,
+               "vehicle_id" => vehicle_id,
+               "title" => title,
+               "description" => description,
+               "urgency" => urgency,
+               "images" => images,
+               "request_source" => "mailbox",
+               "status" => "draft",
+               "metadata" => %{
+                 "mailbox_id" => mailbox.id,
+                 "source_message_ids" => List.wrap(source_message_ids),
+                 "user_message_id" => user_msg.id
+               }
+             }),
+           {:ok, wo_msg} <-
+             Mailbox.create_message(
+               %{
+                 "vehicle_id" => vehicle_id,
+                 "sender_id" => user_id,
+                 "sender_type" => "system",
+                 "message_type" => "work_order",
+                 "title" => "Work order drafted",
+                 "content" => title,
+                 "priority" => "medium",
+                 "metadata" => %{
+                   "work_order_id" => work_order.id,
+                   "draft" => true,
+                   "source_message_ids" => List.wrap(source_message_ids),
+                   "user_message_id" => user_msg.id
+                 }
+               },
+               user_id
+             ) do
+        # 2) Optional funds committed credibility signal
+        funds_msg =
+          case funds do
+            %{"amount_cents" => amount_cents} ->
+              currency = Map.get(funds, "currency", "USD")
+              amount = to_int(amount_cents)
+
+              if amount > 0 do
+                case Mailbox.create_message(
+                       %{
+                         "vehicle_id" => vehicle_id,
+                         "sender_id" => user_id,
+                         "sender_type" => "user",
+                         "message_type" => "funds_committed",
+                         "title" => "Funds committed",
+                         "content" => "#{div(amount, 100)} #{currency} committed",
+                         "priority" => "high",
+                         "metadata" => %{
+                           "amount_cents" => amount,
+                           "currency" => currency,
+                           "work_order_id" => work_order.id
+                         }
+                       },
+                       user_id
+                     ) do
+                  {:ok, m} -> m
+                  _ -> nil
+                end
+              else
+                nil
+              end
+
+            _ ->
+              nil
+          end
+
+        json(conn, %{
+          status: "success",
+          data: %{
+            work_order: work_order,
+            mailbox_messages: Enum.filter([user_msg, wo_msg, funds_msg], & &1)
+          }
+        })
+      else
+        {:error, :unauthorized} ->
+          conn
+          |> put_status(:forbidden)
+          |> json(%{status: "error", message: "Access denied"})
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:bad_request)
+          |> json(%{status: "error", message: "Invalid work order data", errors: format_changeset_errors(changeset)})
+
+        other ->
+          conn
+          |> put_status(:internal_server_error)
+          |> json(%{status: "error", message: "Failed to draft work order", detail: inspect(other)})
+      end
     end
   end
 
@@ -372,4 +515,14 @@ defmodule NukeApiWeb.MailboxController do
       end)
     end)
   end
+
+  defp to_int(v) when is_integer(v), do: v
+  defp to_int(v) when is_binary(v) do
+    case Integer.parse(v) do
+      {n, _} -> n
+      _ -> 0
+    end
+  end
+  defp to_int(v) when is_float(v), do: trunc(v)
+  defp to_int(_), do: 0
 end

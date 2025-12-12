@@ -1,6 +1,6 @@
 // src/routes/modules/vehicle/routes.tsx
 import React, { Suspense } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Lazy load VehicleProfile to defer module initialization and avoid TDZ
 const VehicleProfile = React.lazy(() => import('../../../pages/VehicleProfile'));
@@ -20,7 +20,10 @@ const VehicleModuleRoutes = () => {
         <Route path="/:vehicleId" element={<VehicleProfile />} />
         <Route path="/:vehicleId/edit" element={<EditVehicle />} />
         <Route path="/:vehicleId/mailbox" element={<VehicleMailbox />} />
-        <Route path="/:vehicleId/jobs" element={<VehicleJobs />} />
+        {/* Legacy: keep /jobs as alias but steer users to mailbox-first workflow */}
+        <Route path="/:vehicleId/jobs" element={<Navigate to="../mailbox" replace />} />
+        {/* Work items page (legacy utility) */}
+        <Route path="/:vehicleId/work" element={<VehicleJobs />} />
       </Routes>
     </Suspense>
   );

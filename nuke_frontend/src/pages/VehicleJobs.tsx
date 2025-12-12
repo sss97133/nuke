@@ -14,7 +14,7 @@ interface VehicleRow {
   vin: string | null;
 }
 
-interface VehicleJobRow {
+interface VehicleWorkItemRow {
   id: string;
   vehicle_id: string;
   created_by: string | null;
@@ -54,7 +54,7 @@ export default function VehicleJobs() {
   const [vehicle, setVehicle] = useState<VehicleRow | null>(null);
 
   const [loading, setLoading] = useState(true);
-  const [jobs, setJobs] = useState<VehicleJobRow[]>([]);
+  const [jobs, setJobs] = useState<VehicleWorkItemRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Quick capture
@@ -108,14 +108,14 @@ export default function VehicleJobs() {
 
         // Load jobs
         const { data: j, error: jErr } = await supabase
-          .from('vehicle_jobs')
+          .from('vehicle_work_items')
           .select('*')
           .eq('vehicle_id', vehicleId)
           .order('created_at', { ascending: false });
         if (jErr) throw jErr;
-        setJobs((j as VehicleJobRow[]) || []);
+        setJobs((j as VehicleWorkItemRow[]) || []);
       } catch (e: any) {
-        setError(e?.message || 'Failed to load jobs');
+        setError(e?.message || 'Failed to load work items');
       } finally {
         setLoading(false);
       }
@@ -124,7 +124,7 @@ export default function VehicleJobs() {
     load();
   }, [vehicleId]);
 
-  const bestEffortCreateTimelineEvent = async (job: VehicleJobRow) => {
+  const bestEffortCreateTimelineEvent = async (job: VehicleWorkItemRow) => {
     try {
       // timeline_events schema varies across migrations; keep it minimal and flexible.
       await supabase.from('timeline_events').insert([
@@ -162,7 +162,7 @@ export default function VehicleJobs() {
   const createHoldIfNeeded = async (jobId: string, amountCents: number) => {
     if (!amountCents || amountCents <= 0) return;
     try {
-      await supabase.from('vehicle_job_holds').insert([
+      await supabase.from('vehicle_work_item_holds').insert([
         {
           job_id: jobId,
           created_by: session?.user?.id || null,
@@ -186,14 +186,14 @@ export default function VehicleJobs() {
     return Math.floor(n * 100);
   };
 
-  const createJob = async (payload: Partial<VehicleJobRow> & { title: string }) => {
+  const createJob = async (payload: Partial<VehicleWorkItemRow> & { title: string }) => {
     if (!vehicleId) return;
     if (!session?.user?.id) {
-      setError('Please sign in to create jobs.');
+      setError('Please sign in to create work items.');
       return;
     }
     const { data, error: insErr } = await supabase
-      .from('vehicle_jobs')
+      .from('vehicle_work_items')
       .insert([
         {
           vehicle_id: vehicleId,
@@ -216,7 +216,7 @@ export default function VehicleJobs() {
       .select('*')
       .single();
     if (insErr) throw insErr;
-    return data as VehicleJobRow;
+    return data as VehicleWorkItemRow;
   };
 
   const onSubmitFull = async () => {
@@ -250,7 +250,7 @@ export default function VehicleJobs() {
         if (allowHold && budgetCents) {
           await createHoldIfNeeded(job.id, budgetCents);
           await supabase
-            .from('vehicle_jobs')
+            .from('vehicle_work_items')
             .update({ funding_status: 'requested' })
             .eq('id', job.id);
           job.funding_status = 'requested';
@@ -293,8 +293,8 @@ export default function VehicleJobs() {
       const fundingStatus: FundingStatus =
         quickDefaultHold && budgetCents ? 'requested' : 'none';
 
-      // Create jobs sequentially to keep timeline events aligned and avoid rate spikes.
-      const created: VehicleJobRow[] = [];
+      // Create work items sequentially to keep timeline events aligned and avoid rate spikes.
+      const created: VehicleWorkItemRow[] = [];
       for (const t of lines.slice(0, 25)) {
         const job = await createJob({
           title: t,
@@ -316,7 +316,7 @@ export default function VehicleJobs() {
           if (quickDefaultHold && budgetCents) {
             await createHoldIfNeeded(job.id, budgetCents);
             await supabase
-              .from('vehicle_jobs')
+              .from('vehicle_work_items')
               .update({ funding_status: 'requested' })
               .eq('id', job.id);
             job.funding_status = 'requested';
@@ -329,13 +329,13 @@ export default function VehicleJobs() {
       setJobs(prev => [...created, ...prev]);
       setQuickText('');
     } catch (e: any) {
-      setError(e?.message || 'Failed to create jobs');
+      setError(e?.message || 'Failed to create work items');
     } finally {
       setQuickSubmitting(false);
     }
   };
 
-  const statusBadge = (job: VehicleJobRow) => {
+  const statusBadge = (job: VehicleWorkItemRow) => {
     const label = job.status.toUpperCase();
     const color =
       job.status === 'completed'
@@ -348,7 +348,7 @@ export default function VehicleJobs() {
     return <span className={`badge ${color}`}>{label}</span>;
   };
 
-  const fundingBadge = (job: VehicleJobRow) => {
+  const fundingBadge = (job: VehicleWorkItemRow) => {
     if (!job.allow_hold) return null;
     const label = job.funding_status === 'requested' ? 'HOLD REQUESTED' : job.funding_status.toUpperCase();
     const color =
@@ -376,7 +376,7 @@ export default function VehicleJobs() {
         <div className="card">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
             <div>
-              <div className="text-small text-muted">Job Desk</div>
+              <div className="text-small text-muted">Work</div>
               <div className="text" style={{ fontWeight: 700 }}>{vehicleLabel}</div>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -400,7 +400,7 @@ export default function VehicleJobs() {
                 <div className="card-header">Quick capture (paste a list)</div>
                 <div className="card-body">
                   <div className="text-small text-muted" style={{ marginBottom: '8px' }}>
-                    Paste one job per line. This creates draft job listings you can refine later.
+                    Paste one work item per line. This creates drafts you can refine later.
                   </div>
                   <textarea
                     className="input"
@@ -438,7 +438,7 @@ export default function VehicleJobs() {
                       onClick={onSubmitQuick}
                       disabled={quickSubmitting || !quickText.trim()}
                     >
-                      {quickSubmitting ? 'Creating...' : 'Create Draft Jobs'}
+                      {quickSubmitting ? 'Creating...' : 'Create Draft Work Items'}
                     </button>
                   </div>
                 </div>
@@ -516,7 +516,7 @@ export default function VehicleJobs() {
 
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button className="button button-primary" onClick={onSubmitFull} disabled={submitting || !title.trim()}>
-                          {submitting ? 'Creating...' : 'Create Job Listing'}
+                          {submitting ? 'Creating...' : 'Create Work Item'}
                         </button>
                         <button className="button button-secondary" onClick={() => setShowFullForm(false)} disabled={submitting}>
                           Cancel
@@ -534,9 +534,9 @@ export default function VehicleJobs() {
                 </div>
                 <div className="card-body">
                   {loading ? (
-                    <div className="text-small text-muted">Loading jobs...</div>
+                    <div className="text-small text-muted">Loading work items...</div>
                   ) : jobs.length === 0 ? (
-                    <div className="text-small text-muted">No jobs yet. Add a quick list above.</div>
+                    <div className="text-small text-muted">No work items yet. Add a quick list above.</div>
                   ) : (
                     <div style={{ display: 'grid', gap: '10px' }}>
                       {jobs.map(job => (

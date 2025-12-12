@@ -1181,7 +1181,10 @@ serve(async (req) => {
         if (listingVIN && listingVIN.length === 17 && !listingVIN.startsWith('VIVA-')) {
           const { data: existingVehicle } = await supabase
             .from('vehicles')
-            .select('id, discovery_url, origin_organization_id')
+            // IMPORTANT: Do not let external listings overwrite a claimed/verified vehicle profile.
+            // Once ownership is verified, the profile should be anchored to title/evidence context,
+            // and external listings should be treated as optional references only.
+            .select('id, discovery_url, origin_organization_id, ownership_verified, ownership_verification_id')
             .eq('vin', listingVIN)
             .limit(1)
             .maybeSingle();
@@ -1191,7 +1194,8 @@ serve(async (req) => {
             console.log(`✅ Found existing vehicle with VIN ${listingVIN}, updating instead of creating duplicate`);
             
             // Update discovery URL if this listing is different (cross-city detection)
-            if (existingVehicle.discovery_url !== item.listing_url) {
+            const isOwnershipLocked = existingVehicle.ownership_verified === true || !!existingVehicle.ownership_verification_id;
+            if (!isOwnershipLocked && existingVehicle.discovery_url !== item.listing_url) {
               await supabase
                 .from('vehicles')
                 .update({ 
@@ -1200,6 +1204,8 @@ serve(async (req) => {
                 })
                 .eq('id', existingVehicle.id);
               console.log(`📍 Updated discovery URL for cross-city listing: ${item.listing_url}`);
+            } else if (isOwnershipLocked && existingVehicle.discovery_url !== item.listing_url) {
+              console.log(`🔒 Skipped discovery_url overwrite for ownership-locked vehicle ${existingVehicle.id} (VIN ${listingVIN})`);
             }
             
             // Link to organization if not already linked
