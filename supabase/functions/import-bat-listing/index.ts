@@ -28,11 +28,16 @@ serve(async (req) => {
   }
 
   try {
-    const { batUrl, organizationId } = await req.json();
+    const payload = await req.json();
+    // Backwards/compat: accept {url} (process-url-drop) or {batUrl}
+    const batUrl = payload?.batUrl || payload?.url;
+    const organizationId = payload?.organizationId || null;
+    // Safety: fuzzy match is a major contamination source; default off.
+    const allowFuzzyMatch = payload?.allowFuzzyMatch === true;
 
-    if (!batUrl || !organizationId) {
+    if (!batUrl) {
       return new Response(
-        JSON.stringify({ error: 'batUrl and organizationId required' }),
+        JSON.stringify({ error: 'batUrl (or url) required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -120,7 +125,7 @@ serve(async (req) => {
       }
     }
 
-    if (!vehicleId) {
+    if (!vehicleId && allowFuzzyMatch) {
       const { data: fuzzyMatches } = await supabase
         .from('vehicles')
         .select('id, vin, year, make, model')
@@ -164,15 +169,18 @@ serve(async (req) => {
         .update(updateData)
         .eq('id', vehicleId);
 
-      await supabase
-        .from('organization_vehicles')
-        .update({
-          sale_price: salePrice,
-          sale_date: saleDate,
-          listing_status: 'sold'
-        })
-        .eq('vehicle_id', vehicleId)
-        .eq('organization_id', organizationId);
+      // Optional org update if organizationId provided
+      if (organizationId) {
+        await supabase
+          .from('organization_vehicles')
+          .update({
+            sale_price: salePrice,
+            sale_date: saleDate,
+            listing_status: 'sold'
+          })
+          .eq('vehicle_id', vehicleId)
+          .eq('organization_id', organizationId);
+      }
 
       console.log(`Updated existing vehicle: ${vehicleId}`);
     } else {
@@ -189,7 +197,11 @@ serve(async (req) => {
           description,
           auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met',
           bat_auction_url: batUrl,
-          imported_by: null
+          imported_by: null,
+          listing_url: batUrl,
+          discovery_url: batUrl,
+          profile_origin: 'bat_import',
+          discovery_source: 'bat_import'
         })
         .select()
         .single();
@@ -200,16 +212,18 @@ serve(async (req) => {
 
       vehicleId = newVehicle.id;
 
-      await supabase
-        .from('organization_vehicles')
-        .insert({
-          organization_id: organizationId,
-          vehicle_id: vehicleId,
-          relationship_type: 'sold_by',
-          listing_status: 'sold',
-          sale_price: salePrice,
-          sale_date: saleDate
-        });
+      if (organizationId) {
+        await supabase
+          .from('organization_vehicles')
+          .insert({
+            organization_id: organizationId,
+            vehicle_id: vehicleId,
+            relationship_type: 'sold_by',
+            listing_status: 'sold',
+            sale_price: salePrice,
+            sale_date: saleDate
+          });
+      }
 
       console.log(`Created new vehicle: ${vehicleId}`);
     }
@@ -302,7 +316,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         vehicleId,
-        listing,
+        vehicle: listing,
         action: vehicleId ? 'updated' : 'created'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

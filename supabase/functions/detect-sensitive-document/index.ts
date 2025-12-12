@@ -29,7 +29,8 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SERVICE_ROLE_KEY') ?? '',
+      // Support both env var names (older deploys used SERVICE_ROLE_KEY)
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '',
       {
         auth: {
           persistSession: false,
@@ -49,14 +50,77 @@ serve(async (req) => {
     if (analysisResult.is_sensitive) {
       console.log(`🚨 SENSITIVE DOCUMENT DETECTED: ${analysisResult.document_type}`);
       
-      // Mark image as sensitive
+      // Mark image as sensitive AND as a document.
+      // This prevents sensitive uploads (title/registration/etc) from appearing in the public image gallery.
+      // Ownership verification uploads should happen via the Ownership flow, but if a user uploads a title into
+      // the gallery, we still need to route it out of the gallery for safety + correctness.
       await supabase
         .from('vehicle_images')
         .update({
           is_sensitive: true,
-          sensitive_type: analysisResult.document_type
+          sensitive_type: analysisResult.document_type,
+          is_document: true,
+          document_category: analysisResult.document_type && analysisResult.document_type !== 'other'
+            ? analysisResult.document_type
+            : 'other_document'
         })
         .eq('id', image_id);
+
+      // If this is likely a title document, best-effort attach it to an ownership verification record
+      // so it participates in the claim workflow (instead of staying as a random gallery upload).
+      //
+      // We only do this at high confidence to avoid accidental claims from false positives.
+      if (analysisResult.document_type === 'title' && (analysisResult.confidence || 0) >= 0.85) {
+        try {
+          const { data: imgRow } = await supabase
+            .from('vehicle_images')
+            .select('user_id')
+            .eq('id', image_id)
+            .maybeSingle();
+
+          const uploaderId = (imgRow as any)?.user_id || null;
+          if (uploaderId) {
+            const { data: existing } = await supabase
+              .from('ownership_verifications')
+              .select('id, status, title_document_url, drivers_license_url')
+              .eq('vehicle_id', vehicle_id)
+              .eq('user_id', uploaderId)
+              .maybeSingle();
+
+            const patch: any = {
+              vehicle_id,
+              user_id: uploaderId,
+              verification_type: 'title',
+              title_document_url: image_url,
+              // If no DL on file, mark as pending so the user can complete the flow.
+              drivers_license_url: (existing as any)?.drivers_license_url || 'pending',
+              status: (existing as any)?.status && ['approved', 'rejected'].includes((existing as any).status)
+                ? (existing as any).status
+                : 'pending',
+              updated_at: new Date().toISOString()
+            };
+
+            if (existing?.id) {
+              await supabase
+                .from('ownership_verifications')
+                .update(patch)
+                .eq('id', existing.id);
+            } else {
+              await supabase
+                .from('ownership_verifications')
+                .insert({
+                  ...patch,
+                  // Required fields in some schemas; provide safe placeholders if missing.
+                  drivers_license_url: 'pending',
+                  submitted_at: new Date().toISOString()
+                } as any);
+            }
+          }
+        } catch (e) {
+          // Non-fatal; doc should still be protected and extracted into vehicle_title_documents.
+          console.warn('Failed to attach title to ownership_verifications (non-fatal):', (e as any)?.message || e);
+        }
+      }
 
       // Store extracted document data
       if (analysisResult.document_type && analysisResult.document_type !== 'other') {

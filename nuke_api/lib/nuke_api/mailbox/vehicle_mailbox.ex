@@ -18,18 +18,23 @@ defmodule NukeApi.Mailbox.VehicleMailbox do
     # Virtual fields for API responses
     field :user_access_level, :string, virtual: true
     field :unread_count, :integer, virtual: true
+    # Legacy field name used by some UI components (kept as an alias for unread_count for now)
+    field :message_count, :integer, virtual: true
 
-    timestamps(type: :utc_datetime)
+    # Supabase SQL migrations use created_at/updated_at column names.
+    timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
 
   @doc false
   def changeset(vehicle_mailbox, attrs) do
     vehicle_mailbox
     |> cast(attrs, [:vehicle_id, :vin])
-    |> validate_required([:vehicle_id, :vin])
+    |> validate_required([:vehicle_id])
+    # VIN is optional during onboarding; enforce length only when present.
     |> validate_length(:vin, is: 17)
     |> unique_constraint(:vehicle_id)
-    |> unique_constraint(:vin)
+    # VIN uniqueness is enforced by a partial unique index (vin IS NOT NULL)
+    |> unique_constraint(:vin, name: :idx_vehicle_mailboxes_vin_unique)
     |> foreign_key_constraint(:vehicle_id)
   end
 end

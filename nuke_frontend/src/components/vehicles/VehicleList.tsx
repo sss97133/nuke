@@ -20,7 +20,7 @@ const VehicleList = () => {
       <div className="text-center p-8">
         <p className="mb-4">No vehicles found.</p>
         <Link
-          to="/vehicles/new"
+          to="/vehicle/add"
           className="button button-primary"
         >
           Add Your First Vehicle
@@ -34,7 +34,7 @@ const VehicleList = () => {
       <div className="flex justify-between items-center section">
         <h1 className="page-title">Your Vehicles</h1>
         <Link
-          to="/vehicles/new"
+          to="/vehicle/add"
           className="button button-primary"
         >
           Add Vehicle
@@ -45,7 +45,7 @@ const VehicleList = () => {
         {vehicles.map((vehicle) => (
           <Link
             key={vehicle.id}
-            to={`/vehicles/${vehicle.id}`}
+            to={`/vehicle/${vehicle.id}`}
             className="vehicle-thumbnail-link"
           >
             <div className="relative">

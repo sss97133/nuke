@@ -700,14 +700,14 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                         return;
                       }
                       if (result.success) {
-                        alert(`✅ Ownership verified! Names match with ${result.confidence || 0}% confidence.`);
+                        alert(`Ownership verified. Names match with ${result.confidence || 0}% confidence.`);
                       } else if (result.errors && result.errors.length > 0) {
                         if (result.errors[0].includes('Waiting')) {
-                          alert('📋 Document saved. Please upload your ' + 
+                          alert('Document saved. Please upload your ' + 
                                 (claimType === 'title' ? 'driver\'s license' : 'vehicle title') + 
                                 ' to complete verification.');
                         } else {
-                          alert('⚠️ Verification requires manual review: ' + result.errors.join(', '));
+                          alert('Verification requires manual review: ' + result.errors.join(', '));
                         }
                       }
                       loadOwnershipData();

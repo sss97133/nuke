@@ -542,6 +542,103 @@ Deno.serve(async (req) => {
         return json(200, { status: "success", data })
       }
 
+      // POST /mailbox/vehicles/:vehicle_id/mailbox/work-orders/draft
+      // Draft a structured work order from the conversation (AI or client supplies structured fields).
+      // Users should not have to fill this out manually; this is the "graduation" step.
+      if (req.method === "POST" && action === "work-orders" && subId === "draft") {
+        const mailbox = await getMailboxWithAccess(vehicleId, userId)
+        if (!mailbox) return json(404, { status: "error", message: "Mailbox not found" })
+        if (!userId) return json(403, { status: "error", message: "Unauthorized" })
+
+        const body = await req.json().catch(() => ({}))
+        const title = String(body.title || "").trim()
+        const description = String(body.description || "").trim()
+        const urgency = String(body.urgency || "normal")
+        const organizationId = body.organization_id || body.organizationId || null
+        const images = Array.isArray(body.images) ? body.images : []
+        const sourceMessageIds = Array.isArray(body.source_message_ids) ? body.source_message_ids : []
+
+        if (!title || !description) {
+          return json(400, { status: "error", message: "title and description required" })
+        }
+
+        const workOrderInsert = {
+          organization_id: organizationId,
+          customer_id: userId,
+          vehicle_id: vehicleId,
+          title,
+          description,
+          urgency,
+          status: "draft",
+          request_source: "mailbox",
+          images,
+          metadata: {
+            mailbox_id: mailbox.id,
+            source_message_ids: sourceMessageIds
+          }
+        }
+
+        const { data: workOrder, error: woErr } = await supabaseAdmin
+          .from("work_orders")
+          .insert(workOrderInsert)
+          .select("*")
+          .maybeSingle()
+        if (woErr) throw woErr
+
+        // Post a structured mailbox message that links to the drafted work order
+        const { data: msg, error: msgErr } = await supabaseAdmin
+          .from("mailbox_messages")
+          .insert({
+            mailbox_id: mailbox.id,
+            vehicle_id: vehicleId,
+            message_type: "work_order",
+            title: "Work order drafted",
+            content: title,
+            priority: "medium",
+            sender_type: "system",
+            metadata: {
+              work_order_id: workOrder?.id,
+              draft: true,
+              source_message_ids: sourceMessageIds
+            },
+            read_by: [],
+            resolved_at: null,
+            resolved_by: null
+          })
+          .select()
+          .maybeSingle()
+        if (msgErr) throw msgErr
+
+        // Optional: if caller indicates funds are already committed, log it as a credibility signal
+        const fundsCommitted = body.funds_committed
+        if (fundsCommitted && typeof fundsCommitted === "object") {
+          const amountCents = Number(fundsCommitted.amount_cents ?? fundsCommitted.amountCents ?? 0)
+          const currency = String(fundsCommitted.currency || "USD")
+          if (amountCents > 0) {
+            await supabaseAdmin.from("mailbox_messages").insert({
+              mailbox_id: mailbox.id,
+              vehicle_id: vehicleId,
+              message_type: "funds_committed",
+              title: "Funds committed",
+              content: `${Math.round(amountCents / 100)} ${currency} committed`,
+              priority: "high",
+              sender_type: "user",
+              sender_id: userId,
+              metadata: {
+                amount_cents: amountCents,
+                currency,
+                work_order_id: workOrder?.id
+              },
+              read_by: [],
+              resolved_at: null,
+              resolved_by: null
+            })
+          }
+        }
+
+        return json(200, { status: "success", data: { work_order: workOrder, mailbox_message: msg } })
+      }
+
       // GET access keys
       if (req.method === "GET" && action === "access") {
         // Placeholder: return empty list (implement access control when schema confirmed)

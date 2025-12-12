@@ -24,7 +24,9 @@ defmodule NukeApi.Mailbox do
       mailbox_with_access = %{
         mailbox
         | user_access_level: access_level,
-          unread_count: get_unread_message_count(mailbox.id, user_id)
+          unread_count: get_unread_message_count(mailbox.id, user_id),
+          # Keep UI-compatible alias; currently represents unread count.
+          message_count: get_unread_message_count(mailbox.id, user_id)
       }
 
       {:ok, mailbox_with_access}
@@ -289,8 +291,14 @@ defmodule NukeApi.Mailbox do
   end
 
   defp get_unread_message_count(mailbox_id, user_id) do
+    # read_by is stored as JSONB array; use @> against jsonb.
+    # NOTE: we compare against the string form of user_id since JSONB stores values as strings.
+    jsonb_list = [to_string(user_id)]
+
     from(m in MailboxMessage,
-      where: m.mailbox_id == ^mailbox_id and not fragment("? @> ?", m.read_by, ^[user_id]),
+      where:
+        m.mailbox_id == ^mailbox_id and
+          not fragment("? @> ?", m.read_by, type(^jsonb_list, :map)),
       select: count()
     )
     |> Repo.one()

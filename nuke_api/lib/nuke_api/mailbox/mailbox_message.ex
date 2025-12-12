@@ -4,11 +4,16 @@ defmodule NukeApi.Mailbox.MailboxMessage do
 
   alias NukeApi.Mailbox.VehicleMailbox
   alias NukeApi.Accounts.User
+  alias NukeApi.Vehicles.Vehicle
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
+  # Keep in sync with Supabase CHECK constraint from:
+  # - supabase/migrations/20251212000008_mailbox_messages_work_types_and_shims.sql
+  # - supabase/migrations/20251212000009_mailbox_messages_service_alias_types.sql
   @message_types [
+    # Existing system notifications
     "duplicate_detected",
     "ownership_transfer",
     "service_reminder",
@@ -16,7 +21,30 @@ defmodule NukeApi.Mailbox.MailboxMessage do
     "recall_notice",
     "registration_due",
     "inspection_due",
-    "system_alert"
+    "system_alert",
+
+    # Human + inbox workflow
+    "comment",
+    "user_message",
+
+    # Work workflow (canonical wording)
+    "work_request",
+    "work_order",
+    "quote",
+    "acceptance",
+    "status_update",
+    "work_completed",
+    "receipt",
+    "funds_committed",
+
+    # Service aliases (allowed synonyms)
+    "service_request",
+    "service_order",
+    "service_completed",
+
+    # Money aliases (allowed synonyms)
+    "funds_hold",
+    "payment_hold"
   ]
 
   @priority_levels ["low", "medium", "high", "urgent"]
@@ -29,14 +57,17 @@ defmodule NukeApi.Mailbox.MailboxMessage do
     field :priority, :string, default: "medium"
     field :sender_type, :string, default: "system"
     field :metadata, :map
-    field :read_by, {:array, :binary_id}, default: []
+    # Supabase schema stores read_by as JSONB array, not uuid[].
+    field :read_by, :map, default: []
     field :resolved_at, :utc_datetime
     field :resolved_by, :binary_id
 
     belongs_to :mailbox, VehicleMailbox
     belongs_to :sender, User, foreign_key: :sender_id
+    belongs_to :vehicle, Vehicle
 
-    timestamps(type: :utc_datetime)
+    # Supabase SQL migrations use created_at/updated_at column names.
+    timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
 
   @doc false
@@ -44,6 +75,7 @@ defmodule NukeApi.Mailbox.MailboxMessage do
     mailbox_message
     |> cast(attrs, [
       :mailbox_id,
+      :vehicle_id,
       :message_type,
       :title,
       :content,
@@ -62,6 +94,7 @@ defmodule NukeApi.Mailbox.MailboxMessage do
     |> validate_length(:title, max: 200)
     |> foreign_key_constraint(:mailbox_id)
     |> foreign_key_constraint(:sender_id)
+    |> foreign_key_constraint(:vehicle_id)
   end
 
   def message_types, do: @message_types

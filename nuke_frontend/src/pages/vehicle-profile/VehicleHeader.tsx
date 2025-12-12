@@ -545,6 +545,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   };
 
   const isOwnerLike = isVerifiedOwner || contributorRole === 'owner';
+  // IMPORTANT: Claim flow should work even if React onClick handlers are flaky.
+  // We intentionally use a normal href to navigate to `?claim=1`,
+  // and VehicleProfile will open the claim modal from the URL param and then clean it up.
+  const claimHref = vehicle?.id ? `/vehicle/${vehicle.id}?claim=1` : '#';
 
   const computeResponsibleLabel = (): string => {
     const mode = responsibleMode || 'auto';
@@ -874,7 +878,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {identityLabel}
           </span>
-          {vehicle && (vehicle as any).profile_origin && (() => {
+          {/* Hide external import/source badge once the profile is claimed/verified to avoid contaminating context */}
+          {!isVerifiedOwner && vehicle && (vehicle as any).profile_origin && (() => {
             // Don't show origin badge if we're showing organization name (avoid duplication)
             const isAutomatedImport = vehicle?.profile_origin === 'dropbox_import' && 
                                       (vehicle?.origin_metadata?.automated_import === true || 
@@ -1172,14 +1177,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 
                 if (isDiscoveredVehicle) {
                   return (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // TODO: Open claim modal/flow
-                        alert('Claim vehicle flow - upload title document to verify ownership');
-                      }}
+                    <a
+                      href={claimHref}
                       style={{
                         border: '2px solid var(--border)',
                         background: 'var(--white)',
@@ -1189,33 +1188,31 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         cursor: 'pointer',
                         fontSize: '8pt',
                         borderRadius: '3px',
-                        transition: 'all 0.12s ease'
+                        transition: 'all 0.12s ease',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--grey-100)';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
+                        (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'var(--white)';
-                        e.currentTarget.style.transform = 'translateY(0)';
+                        (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
+                        (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
                       }}
                       title="Upload title document to claim ownership"
                     >
                       Claim this vehicle
-                    </button>
+                    </a>
                   );
                 }
                 
                 // For user-uploaded vehicles, show "Claim this vehicle" button instead of uploader name
-                if (!isOrgName && !isVerified && onClaimClick) {
+                if (!isOrgName && !isVerified) {
                   return (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onClaimClick();
-                      }}
+                    <a
+                      href={claimHref}
                       style={{
                         border: '2px solid var(--border)',
                         background: 'var(--white)',
@@ -1225,20 +1222,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         cursor: 'pointer',
                         fontSize: '8pt',
                         borderRadius: '3px',
-                        transition: 'all 0.12s ease'
+                        transition: 'all 0.12s ease',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--grey-100)';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
+                        (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'var(--white)';
-                        e.currentTarget.style.transform = 'translateY(0)';
+                        (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
+                        (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
                       }}
                       title="Upload title document to claim ownership"
                     >
                       Claim this vehicle
-                    </button>
+                    </a>
                   );
                 }
                 
@@ -1278,15 +1278,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 );
               })()
             ) : (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (onClaimClick) {
-                    onClaimClick();
-                  }
-                }}
+              <a
+                href={claimHref}
                 style={{
                   border: '1px solid var(--primary)',
                   background: 'var(--surface)',
@@ -1295,11 +1288,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   padding: '2px 8px',
                   borderRadius: '4px',
                   cursor: 'pointer',
-                  fontSize: '8pt'
+                  fontSize: '8pt',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center'
                 }}
               >
                 Claim This Vehicle
-            </button>
+              </a>
             )}
             {responsibleName && showOwnerCard && ownerProfile && (
               <div

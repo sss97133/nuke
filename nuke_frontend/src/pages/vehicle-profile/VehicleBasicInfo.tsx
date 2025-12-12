@@ -75,6 +75,79 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     return listingSourceLabel.includes('craigslist');
   }, [listingSourceLabel]);
 
+  const isBringATrailerListing = React.useMemo(() => {
+    return typeof listingUrl === 'string' && listingUrl.toLowerCase().includes('bringatrailer.com');
+  }, [listingUrl]);
+
+  const detachExternalListing = React.useCallback(async () => {
+    if (!canEdit) return;
+    if (!vehicle?.id) return;
+    if (!listingUrl) return;
+
+    const ok = confirm(
+      'Detach this external listing from the vehicle profile?\n\nThis removes the listing URL linkage to prevent cross-contamination. It does not delete your images or timeline.'
+    );
+    if (!ok) return;
+
+    try {
+      const currentMetadata = (vehicle as any)?.origin_metadata || {};
+      const nextMetadata = { ...currentMetadata };
+      // Best-effort scrub of common keys (does not mutate server-side JSON in place)
+      delete (nextMetadata as any).discovery_url;
+      delete (nextMetadata as any).bat_url;
+      delete (nextMetadata as any).matched_from;
+      delete (nextMetadata as any).import_source;
+
+      const { error } = await supabase
+        .from('vehicles')
+        .update({
+          discovery_url: null,
+          listing_url: null,
+          discovery_source: null,
+          listing_source: null,
+          bat_auction_url: null,
+          origin_metadata: nextMetadata,
+          updated_at: new Date().toISOString()
+        } as any)
+        .eq('id', vehicle.id);
+
+      if (error) throw error;
+      showToast('External listing detached. Refreshing…', 'success', 3200);
+      setTimeout(() => window.location.reload(), 350);
+    } catch (err: any) {
+      console.error('Detach listing failed:', err);
+      showToast(err?.message || 'Failed to detach listing', 'error', 4200);
+    }
+  }, [canEdit, listingUrl, showToast, vehicle]);
+
+  const splitFromExternalListing = React.useCallback(async () => {
+    if (!canEdit) return;
+    if (!vehicle?.id) return;
+    if (!listingUrl) return;
+
+    const ok = confirm(
+      'Split this Source URL into a new vehicle profile?\n\nThis will:\n- Create a NEW vehicle profile originating from the listing URL\n- Trigger the listing extraction/import pipeline on the NEW vehicle\n- Leave this vehicle anchored to its existing evidence\n\nRecommended when the listing contradicts scanned evidence (data plate/title/etc).'
+    );
+    if (!ok) return;
+
+    try {
+      showToast('Creating new vehicle from source URL…', 'info', 3200);
+      const { data, error } = await supabase.functions.invoke('split-vehicle-from-source', {
+        body: { vehicleId: vehicle.id, sourceUrl: listingUrl }
+      });
+      if (error) throw error;
+      const newVehicleId = (data as any)?.newVehicleId;
+      if (!newVehicleId) throw new Error('Split succeeded but no newVehicleId returned');
+
+      showToast('Split created. Opening new profile…', 'success', 2600);
+      // Navigate to the new vehicle profile
+      navigate(`/vehicle/${newVehicleId}`);
+    } catch (err: any) {
+      console.error('Split failed:', err);
+      showToast(err?.message || 'Failed to split vehicle from listing', 'error', 4200);
+    }
+  }, [canEdit, listingUrl, navigate, showToast, vehicle?.id]);
+
   const handleCraigslistToast = React.useCallback((fieldLabel: string) => {
     const siteLabel = listingHost || 'Craigslist';
     let message = `${fieldLabel} verified from ${siteLabel} listing.`;
@@ -375,8 +448,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           {/* Additional details */}
           {renderVehicleDetails()}
 
-          {/* Sources Section - At the end, supports multiple sources */}
-          {listingUrl && (
+          {/* Sources Section - hide once claimed/verified to avoid contaminating context */}
+          {!isVerifiedOwner && listingUrl && (
             <div style={{ 
               marginTop: '8px', 
               paddingTop: '8px', 
@@ -411,6 +484,54 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                       {listingSourceLabel || listingHost || 'External Listing'}
                     </span>
                   </a>
+                  {/* Decontamination action: allow editors to detach incorrect external listing links */}
+                  {canEdit && isBringATrailerListing && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        detachExternalListing();
+                      }}
+                      style={{
+                        marginLeft: '6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--grey-100)',
+                        color: 'var(--text)',
+                        fontSize: '7pt',
+                        padding: '1px 6px',
+                        cursor: 'pointer',
+                        borderRadius: '3px'
+                      }}
+                      title="Detach external listing link to prevent cross-contamination"
+                    >
+                      Detach
+                    </button>
+                  )}
+                  {canEdit && isBringATrailerListing && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        splitFromExternalListing();
+                      }}
+                      style={{
+                        marginLeft: '6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--white)',
+                        color: 'var(--text)',
+                        fontSize: '7pt',
+                        padding: '1px 6px',
+                        cursor: 'pointer',
+                        borderRadius: '3px',
+                        fontWeight: 700
+                      }}
+                      title="Create a new vehicle profile originating from this BaT URL (prevents cross-contamination)"
+                    >
+                      Split
+                    </button>
+                  )}
                   {listingCapturedDate && (
                     <span style={{ fontSize: '6pt', color: 'var(--text-muted)', marginLeft: '4px' }}>
                       ({new Date(listingCapturedDate).toLocaleDateString()})

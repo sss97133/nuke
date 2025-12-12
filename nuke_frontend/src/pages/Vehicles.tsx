@@ -96,6 +96,24 @@ const VehiclesInner: React.FC = () => {
     is_hidden: boolean;
     collection_name: string | null;
   }>>(new Map());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarSections, setSidebarSections] = useState<{
+    selection: boolean;
+    inbox: boolean;
+    context: boolean;
+    library: boolean;
+    relationships: boolean;
+    sources: boolean;
+    vehicles: boolean;
+  }>({
+    selection: true,
+    inbox: true,
+    context: true,
+    library: true,
+    relationships: true,
+    sources: true,
+    vehicles: true
+  });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlSearchQuery = searchParams.get('search') || '';
@@ -1034,6 +1052,70 @@ const VehiclesInner: React.FC = () => {
     });
 
 
+  const tabMeta: Array<{ key: VehiclesTab; label: string; count: number }> = [
+    { key: 'associated', label: 'All', count: allRelationships.length },
+    { key: 'owned', label: 'Owned', count: vehicleRelationships.owned.length },
+    { key: 'discovered', label: 'Discovered', count: vehicleRelationships.discovered.length },
+    { key: 'curated', label: 'Curated', count: vehicleRelationships.curated.length },
+    { key: 'consigned', label: 'Consigned', count: vehicleRelationships.consigned.length },
+    { key: 'previously_owned', label: 'Previously Owned', count: vehicleRelationships.previously_owned.length },
+    { key: 'contributing', label: 'Contributing', count: vehicleRelationships.contributing.length },
+    { key: 'interested', label: 'Interested', count: vehicleRelationships.interested.length }
+  ];
+
+  const toggleSidebarSection = (key: keyof typeof sidebarSections) => {
+    setSidebarSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const currentTabLabel = tabMeta.find(t => t.key === activeTab)?.label || activeTab;
+
+  const SidebarSection: React.FC<{
+    title: string;
+    sectionKey: keyof typeof sidebarSections;
+    right?: React.ReactNode;
+    children: React.ReactNode;
+    hidden?: boolean;
+  }> = ({ title, sectionKey, right, children, hidden }) => {
+    if (hidden) return null;
+    const open = sidebarSections[sectionKey];
+    return (
+      <div className="vehicle-sidebar-section">
+        <div
+          className="vehicle-sidebar-section-title"
+          role="button"
+          tabIndex={0}
+          onClick={() => toggleSidebarSection(sectionKey)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') toggleSidebarSection(sectionKey);
+          }}
+        >
+          <span>{title}</span>
+          <span style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {right}
+            <span className="vehicle-sidebar-mini">{open ? 'HIDE' : 'SHOW'}</span>
+          </span>
+        </div>
+        {open && <div className="vehicle-sidebar-section-body">{children}</div>}
+      </div>
+    );
+  };
+
+  const SidebarItem: React.FC<{
+    active?: boolean;
+    onClick: () => void;
+    label: string;
+    right?: React.ReactNode;
+  }> = ({ active, onClick, label, right }) => (
+    <button
+      type="button"
+      className={`vehicle-sidebar-item ${active ? 'vehicle-sidebar-item-active' : ''}`}
+      onClick={onClick}
+    >
+      <span style={{ textAlign: 'left' }}>{label}</span>
+      {right}
+    </button>
+  );
+
   return (
     <>
       {loading ? (
@@ -1042,399 +1124,387 @@ const VehiclesInner: React.FC = () => {
           <p>Loading vehicles...</p>
         </div>
       ) : (
-        <div className="fade-in">
-          {/* Page Header with Add Vehicle Button */}
-          <section className="section">
-            <div className="card">
-              <div className="card-body">
-                <button 
-                  className="button button-primary w-full"
-                  onClick={() => navigate('/add-vehicle')}
+        <div className="fade-in vehicle-library-layout">
+          <aside
+            className={`vehicle-library-sidebar ${sidebarCollapsed ? 'vehicle-library-sidebar-collapsed' : ''}`}
+            aria-label="Vehicle sidebar"
+          >
+            <div className="vehicle-library-sidebar-header">
+              <button
+                type="button"
+                className="button button-secondary button-small"
+                onClick={() => setSidebarCollapsed(v => !v)}
+              >
+                {sidebarCollapsed ? 'EXPAND' : 'COLLAPSE'}
+              </button>
+              {!sidebarCollapsed && (
+                <button
+                  type="button"
+                  className="button button-primary button-small"
+                  onClick={() => navigate('/vehicle/add')}
                 >
-                  Add Vehicle
+                  ADD VEHICLE
                 </button>
-              </div>
+              )}
             </div>
-          </section>
 
-          {/* Organization Context Filter */}
-          {session?.user?.id && (
-            <section className="section">
-              <div className="card">
-                <div className="card-body">
+            {!sidebarCollapsed && (
+              <div className="vehicle-library-sidebar-scroll">
+                <SidebarSection
+                  title={`Selection (${selectedVehicleIds.size})`}
+                  sectionKey="selection"
+                  hidden={!session?.user?.id || selectedVehicleIds.size === 0}
+                >
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="button button-secondary button-small"
+                      onClick={() => setSelectedVehicleIds(new Set())}
+                    >
+                      CLEAR SELECTION
+                    </button>
+                  </div>
+                  {session?.user?.id && selectedVehicleIds.size > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <BulkActionsToolbar
+                        selectedVehicleIds={Array.from(selectedVehicleIds)}
+                        userId={session.user.id}
+                        onDeselectAll={() => setSelectedVehicleIds(new Set())}
+                        onUpdate={() => {
+                          loadVehiclePreferences();
+                          loadVehicleRelationships();
+                        }}
+                      />
+                      <BulkGPSAssignment
+                        selectedVehicleIds={Array.from(selectedVehicleIds)}
+                        userId={session.user.id}
+                        onComplete={() => {
+                          loadVehicleRelationships();
+                          setSelectedVehicleIds(new Set());
+                        }}
+                        onDeselectAll={() => setSelectedVehicleIds(new Set())}
+                      />
+                    </div>
+                  )}
+                </SidebarSection>
+
+                <SidebarSection
+                  title="Inbox"
+                  sectionKey="inbox"
+                  hidden={!session?.user?.id || !!selectedOrganizationId}
+                  right={<span className="vehicle-sidebar-mini">REVIEW</span>}
+                >
+                  {session?.user?.id && !selectedOrganizationId && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <TitleTransferApproval
+                        userId={session.user.id}
+                        onUpdate={() => {
+                          loadVehicleRelationships();
+                          loadVehiclePreferences();
+                        }}
+                      />
+                      <VehicleConfirmationQuestions
+                        userId={session.user.id}
+                        onUpdate={() => {
+                          loadVehicleRelationships();
+                          loadVehiclePreferences();
+                        }}
+                      />
+                    </div>
+                  )}
+                </SidebarSection>
+
+                <SidebarSection title="Context" sectionKey="context" hidden={!session?.user?.id}>
                   <OrganizationContextFilter
                     selectedOrganizationId={selectedOrganizationId}
                     onOrganizationChange={(orgId) => {
                       setSelectedOrganizationId(orgId);
-                      setSelectedVehicleIds(new Set()); // Clear selection when switching context
+                      setSelectedVehicleIds(new Set());
                     }}
                     showPersonalView={true}
                   />
-                </div>
-              </div>
-            </section>
-          )}
+                </SidebarSection>
 
-          {/* Title Transfer Approvals (Critical - Show First) */}
-          {session?.user?.id && !selectedOrganizationId && (
-            <section className="section">
-              <TitleTransferApproval
-                userId={session.user.id}
-                onUpdate={() => {
-                  loadVehicleRelationships();
-                  loadVehiclePreferences();
-                }}
-              />
-            </section>
-          )}
-
-          {/* Vehicle Confirmation Questions */}
-          {session?.user?.id && !selectedOrganizationId && (
-            <section className="section">
-              <VehicleConfirmationQuestions
-                userId={session.user.id}
-                onUpdate={() => {
-                  loadVehicleRelationships();
-                  loadVehiclePreferences();
-                }}
-              />
-            </section>
-          )}
-
-          {/* Bulk Actions Toolbar */}
-          {session?.user?.id && selectedVehicleIds.size > 0 && (
-            <>
-              <section className="section">
-                <BulkActionsToolbar
-                  selectedVehicleIds={Array.from(selectedVehicleIds)}
-                  userId={session.user.id}
-                  onDeselectAll={() => setSelectedVehicleIds(new Set())}
-                  onUpdate={() => {
-                    loadVehiclePreferences();
-                    loadVehicleRelationships();
-                  }}
-                />
-              </section>
-              <section className="section">
-                <BulkGPSAssignment
-                  selectedVehicleIds={Array.from(selectedVehicleIds)}
-                  userId={session.user.id}
-                  onComplete={() => {
-                    loadVehicleRelationships();
-                    setSelectedVehicleIds(new Set());
-                  }}
-                  onDeselectAll={() => setSelectedVehicleIds(new Set())}
-                />
-              </section>
-            </>
-          )}
-
-          {/* Preference Filters (only in personal view) */}
-          {session?.user?.id && !selectedOrganizationId && (
-            <section className="section">
-              <div className="card">
-                <div className="card-body">
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <label style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text-muted)' }}>
-                      Filter:
-                    </label>
-                    {(['all', 'favorites', 'hidden', 'collection'] as const).map((filter) => (
-                      <button
-                        key={filter}
-                        onClick={() => {
-                          setPreferenceFilter(filter);
-                          if (filter !== 'collection') setCollectionFilter(null);
-                        }}
-                        style={{
-                          padding: '6px 12px',
-                          fontSize: '8pt',
-                          fontWeight: 600,
-                          border: preferenceFilter === filter ? '2px solid var(--accent)' : '1px solid var(--border)',
-                          background: preferenceFilter === filter ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
-                          color: preferenceFilter === filter ? 'var(--accent)' : 'var(--text-muted)',
-                          cursor: 'pointer',
-                          borderRadius: '4px',
-                          transition: 'all 0.12s ease'
-                        }}
-                      >
-                        {filter === 'all' ? 'ALL' : filter === 'favorites' ? 'FAVORITES' : filter === 'hidden' ? 'HIDDEN' : 'COLLECTION'}
-                      </button>
-                    ))}
+                <SidebarSection title="Library" sectionKey="library" hidden={!session?.user?.id || !!selectedOrganizationId}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <SidebarItem
+                      active={preferenceFilter === 'all'}
+                      onClick={() => {
+                        setPreferenceFilter('all');
+                        setCollectionFilter(null);
+                      }}
+                      label="All"
+                    />
+                    <SidebarItem
+                      active={preferenceFilter === 'favorites'}
+                      onClick={() => {
+                        setPreferenceFilter('favorites');
+                        setCollectionFilter(null);
+                      }}
+                      label="Favorites"
+                    />
+                    <SidebarItem
+                      active={preferenceFilter === 'hidden'}
+                      onClick={() => {
+                        setPreferenceFilter('hidden');
+                        setCollectionFilter(null);
+                      }}
+                      label="Hidden"
+                    />
+                    <SidebarItem
+                      active={preferenceFilter === 'collection'}
+                      onClick={() => setPreferenceFilter('collection')}
+                      label="Collection"
+                    />
                     {preferenceFilter === 'collection' && (
                       <select
                         value={collectionFilter || ''}
                         onChange={(e) => setCollectionFilter(e.target.value || null)}
-                        style={{
-                          padding: '6px 12px',
-                          fontSize: '8pt',
-                          border: '1px solid var(--border)',
-                          borderRadius: '4px'
-                        }}
+                        className="select"
                       >
                         <option value="">Select collection...</option>
-                        {Array.from(new Set(
-                          Array.from(vehiclePreferences.values())
-                            .map(p => p.collection_name)
-                            .filter(Boolean)
-                        )).map((collection) => (
-                          <option key={collection} value={collection}>{collection}</option>
+                        {Array.from(
+                          new Set(
+                            Array.from(vehiclePreferences.values())
+                              .map(p => p.collection_name)
+                              .filter(Boolean)
+                          )
+                        ).map((collection) => (
+                          <option key={collection} value={collection}>
+                            {collection}
+                          </option>
                         ))}
                       </select>
                     )}
                   </div>
-                </div>
-              </div>
-            </section>
-          )}
+                </SidebarSection>
 
-          {/* Relationship Tabs */}
-          <section className="section">
-            <div className="card">
-              <div className="card-header">
-                <div className="vehicle-controls-container">
-                  {/* Filter Buttons */}
-                  <div className="filter-buttons">
-                    <button
-                      className={`button-win95 ${
-                        activeTab === 'associated' ? 'button-win95-pressed' : ''
-                      }`}
-                      onClick={() => setActiveTab('associated')}
-                    >
-                      Associated ({allRelationships.length})
-                    </button>
-                    <button
-                      className={`button-win95 ${
-                        activeTab === 'owned' ? 'button-win95-pressed' : ''
-                      }`}
-                      onClick={() => setActiveTab('owned')}
-                    >
-                      Owned ({vehicleRelationships.owned.length})
-                    </button>
-                    <button
-                      className={`button-win95 ${
-                        activeTab === 'discovered' ? 'button-win95-pressed' : ''
-                      }`}
-                      onClick={() => setActiveTab('discovered')}
-                    >
-                      Discovered ({vehicleRelationships.discovered.length})
-                    </button>
-                    <button
-                      className={`button-win95 ${
-                        activeTab === 'curated' ? 'button-win95-pressed' : ''
-                      }`}
-                      onClick={() => setActiveTab('curated')}
-                    >
-                      Curated ({vehicleRelationships.curated.length})
-                    </button>
-                    <button
-                      className={`button-win95 ${
-                        activeTab === 'consigned' ? 'button-win95-pressed' : ''
-                      }`}
-                      onClick={() => setActiveTab('consigned')}
-                    >
-                      Consigned ({vehicleRelationships.consigned.length})
-                    </button>
-                    <button
-                      className={`button-win95 ${
-                        activeTab === 'previously_owned' ? 'button-win95-pressed' : ''
-                      }`}
-                      onClick={() => setActiveTab('previously_owned')}
-                    >
-                      Previously Owned ({vehicleRelationships.previously_owned.length})
-                    </button>
-                    <button
-                      className={`button-win95 ${
-                        activeTab === 'contributing' ? 'button-win95-pressed' : ''
-                      }`}
-                      onClick={() => setActiveTab('contributing')}
-                    >
-                      Contributing ({vehicleRelationships.contributing.length})
-                    </button>
-                    <button
-                      className={`button-win95 ${
-                        activeTab === 'interested' ? 'button-win95-pressed' : ''
-                      }`}
-                      onClick={() => setActiveTab('interested')}
-                    >
-                      Interested ({vehicleRelationships.interested.length})
-                    </button>
+                <SidebarSection title="Relationships" sectionKey="relationships">
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {tabMeta.map(t => (
+                      <SidebarItem
+                        key={t.key}
+                        active={activeTab === t.key}
+                        onClick={() => {
+                          setActiveTab(t.key);
+                          setSelectedVehicleIds(new Set());
+                          if (t.key !== 'discovered') setDiscoverySourceFilter(null);
+                        }}
+                        label={t.label}
+                        right={<span className="vehicle-sidebar-mini">{t.count}</span>}
+                      />
+                    ))}
                   </div>
+                </SidebarSection>
 
-                  {/* Discovery Source Filter (only for discovered tab) */}
-                  {activeTab === 'discovered' && vehicleRelationships.discovered.length > 0 && (
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: '8px', 
-                      alignItems: 'center', 
-                      flexWrap: 'wrap',
-                      marginTop: '12px',
-                      paddingTop: '12px',
-                      borderTop: '1px solid var(--border)'
-                    }}>
-                      <label style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text-muted)' }}>
-                        Source:
-                      </label>
-                      <button
-                        onClick={() => setDiscoverySourceFilter(null)}
+                <SidebarSection
+                  title="Sources"
+                  sectionKey="sources"
+                  hidden={activeTab !== 'discovered' || vehicleRelationships.discovered.length === 0}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <SidebarItem
+                      active={discoverySourceFilter === null}
+                      onClick={() => setDiscoverySourceFilter(null)}
+                      label="All sources"
+                    />
+                    {Array.from(
+                      new Set(vehicleRelationships.discovered.map(r => r.context).filter(Boolean))
+                    )
+                      .sort()
+                      .map((source) => (
+                        <SidebarItem
+                          key={String(source)}
+                          active={discoverySourceFilter === source}
+                          onClick={() => setDiscoverySourceFilter(source || null)}
+                          label={String(source)}
+                        />
+                      ))}
+                  </div>
+                </SidebarSection>
+
+                <SidebarSection title={`Vehicles (${filteredRelationships.length})`} sectionKey="vehicles">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {filteredRelationships.slice(0, 60).map((rel) => (
+                      <Link
+                        key={rel.vehicle.id}
+                        to={`/vehicle/${rel.vehicle.id}`}
                         style={{
-                          padding: '6px 12px',
-                          fontSize: '8pt',
-                          fontWeight: 600,
-                          border: discoverySourceFilter === null ? '2px solid var(--accent)' : '1px solid var(--border)',
-                          background: discoverySourceFilter === null ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
-                          color: discoverySourceFilter === null ? 'var(--accent)' : 'var(--text-muted)',
-                          cursor: 'pointer',
-                          borderRadius: '4px',
-                          transition: 'all 0.12s ease'
+                          display: 'block',
+                          padding: '8px 10px',
+                          border: '1px solid var(--border-light)',
+                          background: 'var(--white)',
+                          textDecoration: 'none',
+                          color: 'inherit'
                         }}
                       >
-                        ALL
-                      </button>
-                      {Array.from(new Set(
-                        vehicleRelationships.discovered
-                          .map(r => r.context)
-                          .filter(Boolean)
-                      )).sort().map((source) => (
-                        <button
-                          key={source}
-                          onClick={() => setDiscoverySourceFilter(source || null)}
-                          style={{
-                            padding: '6px 12px',
-                            fontSize: '8pt',
-                            fontWeight: 600,
-                            border: discoverySourceFilter === source ? '2px solid var(--accent)' : '1px solid var(--border)',
-                            background: discoverySourceFilter === source ? 'rgba(var(--accent-rgb), 0.1)' : 'white',
-                            color: discoverySourceFilter === source ? 'var(--accent)' : 'var(--text-muted)',
-                            cursor: 'pointer',
-                            borderRadius: '4px',
-                            transition: 'all 0.12s ease'
-                          }}
-                        >
-                          {source?.toUpperCase()}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                        <div style={{ fontSize: '8pt', fontWeight: 700 }}>
+                          {rel.vehicle.year} {rel.vehicle.make} {rel.vehicle.model}
+                        </div>
+                        <div className="vehicle-sidebar-mini">
+                          {rel.relationshipType.toUpperCase()}
+                          {rel.context ? ` · ${rel.context}` : ''}
+                        </div>
+                      </Link>
+                    ))}
+                    {filteredRelationships.length > 60 && (
+                      <div className="vehicle-sidebar-mini">
+                        Showing first 60. Use search to narrow.
+                      </div>
+                    )}
+                  </div>
+                </SidebarSection>
 
-                  {/* Search and Sort Controls */}
-                  {currentRelationships.length > 0 && (
-                    <div className="search-sort-controls">
-                      <input
-                        type="text"
-                        placeholder="Search vehicles..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="input-win95"
-                      />
-                      <button className="button-win95 sort-button">
-                        <select
-                          value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value)}
-                          className="select-win95"
-                        >
-                          <option value="created_at">Sort by Date Added</option>
-                          <option value="year">Sort by Year</option>
-                          <option value="make">Sort by Make</option>
-                          <option value="model">Sort by Model</option>
-                        </select>
+                {!session && Object.values(vehicleRelationships).some(arr => arr.length > 0) && (
+                  <div className="vehicle-sidebar-section">
+                    <div className="vehicle-sidebar-section-title">Sync</div>
+                    <div className="vehicle-sidebar-section-body">
+                      <p className="text-small" style={{ marginBottom: '12px' }}>
+                        Your vehicles are stored locally. Sign in to sync across devices.
+                      </p>
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        onClick={() => navigate('/login')}
+                      >
+                        SIGN IN
                       </button>
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )}
+          </aside>
+
+          <main className="vehicle-library-main">
+            <div className="vehicle-library-toolbar">
+              <div className="vehicle-library-toolbar-left">
+                <div style={{ fontSize: '8pt', fontWeight: 700 }}>
+                  {currentTabLabel} ({filteredRelationships.length})
                 </div>
+                <input
+                  type="text"
+                  placeholder="Search vehicles..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="input"
+                  style={{ maxWidth: '420px' }}
+                />
+              </div>
+              <div className="vehicle-library-toolbar-right">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="select"
+                >
+                  <option value="created_at">Sort by Date Added</option>
+                  <option value="year">Sort by Year</option>
+                  <option value="make">Sort by Make</option>
+                  <option value="model">Sort by Model</option>
+                </select>
+                <button
+                  type="button"
+                  className="button button-secondary button-small"
+                  onClick={() => loadVehicleRelationships()}
+                >
+                  REFRESH
+                </button>
+                <button
+                  type="button"
+                  className="button button-primary button-small"
+                  onClick={() => navigate('/vehicle/add')}
+                >
+                  ADD
+                </button>
               </div>
             </div>
-          </section>
 
-          {/* Empty State */}
-          {currentRelationships.length === 0 && (
-            <section className="section">
-              <div className="card">
-                <div className="card-body text-center" style={{ padding: '48px 24px' }}>
-                  <h3 style={{ fontSize: '8px', marginBottom: '0' }}>
-                    {activeTab === 'associated' ? 'No associated vehicles' : `No ${activeTab} vehicles`}
-                  </h3>
+            <div className="vehicle-library-scroll">
+              {currentRelationships.length === 0 && (
+                <div className="card">
+                  <div className="card-body text-center" style={{ padding: '48px 24px' }}>
+                    <div style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '8px' }}>
+                      No vehicles yet
+                    </div>
+                    <div className="text-small" style={{ marginBottom: '16px' }}>
+                      Add a vehicle to start building a clean, low-stress library.
+                    </div>
+                    <button
+                      type="button"
+                      className="button button-primary"
+                      onClick={() => navigate('/vehicle/add')}
+                    >
+                      ADD VEHICLE
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </section>
-          )}
+              )}
 
-
-          {/* Vehicle Relationships Grid */}
-          {filteredRelationships && filteredRelationships.length > 0 ? (
-                <section className="section">
-                  <div 
-                    style={{ 
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                      gap: '12px',
-                      padding: '8px'
-                    }}
-                  >
-                    {filteredRelationships.map((relationship) => {
-                      const vehicle = relationship?.vehicle;
-                      if (!vehicle || !relationship) return null;
-                      const isSelected = selectedVehicleIds.has(vehicle.id);
-                      const prefs = vehiclePreferences.get(vehicle.id);
-                      return (
-                        <div key={vehicle.id} style={{ position: 'relative' }}>
-                          {/* Selection Checkbox */}
-                          {session?.user?.id && (
-                            <div style={{
+              {filteredRelationships && filteredRelationships.length > 0 && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: '12px'
+                  }}
+                >
+                  {filteredRelationships.map((relationship) => {
+                    const vehicle = relationship?.vehicle;
+                    if (!vehicle || !relationship) return null;
+                    const isSelected = selectedVehicleIds.has(vehicle.id);
+                    return (
+                      <div key={vehicle.id} style={{ position: 'relative' }}>
+                        {session?.user?.id && (
+                          <div
+                            style={{
                               position: 'absolute',
                               top: '8px',
                               left: '8px',
                               zIndex: 10,
                               background: 'white',
-                              border: '2px solid var(--accent)',
-                              borderRadius: '4px',
+                              border: '1px solid var(--border-light)',
                               padding: '4px'
-                            }}>
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={(e) => {
-                                  const newSelection = new Set(selectedVehicleIds);
-                                  if (e.target.checked) {
-                                    newSelection.add(vehicle.id);
-                                  } else {
-                                    newSelection.delete(vehicle.id);
-                                  }
-                                  setSelectedVehicleIds(newSelection);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                style={{
-                                  width: '18px',
-                                  height: '18px',
-                                  cursor: 'pointer'
-                                }}
-                              />
-                            </div>
-                          )}
-
-                          <GarageVehicleCard
-                            vehicle={vehicle}
-                            relationship={relationship}
-                            onRefresh={() => {
-                              loadVehicleRelationships();
-                              loadVehiclePreferences();
                             }}
-                            onEditRelationship={(vehicleId, current) => {
-                              setRelationshipModal({
-                                vehicleId,
-                                currentRelationship: current
-                              });
-                            }}
-                          />
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                const newSelection = new Set(selectedVehicleIds);
+                                if (e.target.checked) newSelection.add(vehicle.id);
+                                else newSelection.delete(vehicle.id);
+                                setSelectedVehicleIds(newSelection);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                            />
+                          </div>
+                        )}
 
-                          {/* GPS Organization Suggestions */}
-                          {session?.user?.id && (
-                            <div style={{
-                              marginTop: '8px',
-                              padding: '8px',
-                              background: '#f0f9ff',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '4px'
-                            }}>
+                        <GarageVehicleCard
+                          vehicle={vehicle}
+                          relationship={relationship}
+                          onRefresh={() => {
+                            loadVehicleRelationships();
+                            loadVehiclePreferences();
+                          }}
+                          onEditRelationship={(vehicleId, current) => {
+                            setRelationshipModal({
+                              vehicleId,
+                              currentRelationship: current
+                            });
+                          }}
+                        />
+
+                        {session?.user?.id && isSelected && (
+                          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div
+                              style={{
+                                padding: '8px',
+                                background: 'var(--grey-50)',
+                                border: '1px solid var(--border-light)'
+                              }}
+                            >
                               <GPSOrganizationSuggestions
                                 vehicleId={vehicle.id}
                                 userId={session.user.id}
@@ -1443,17 +1513,13 @@ const VehiclesInner: React.FC = () => {
                                 }}
                               />
                             </div>
-                          )}
-
-                          {/* Organization Toolbar */}
-                          {session?.user?.id && (
-                            <div style={{
-                              marginTop: '8px',
-                              padding: '8px',
-                              background: '#f9fafb',
-                              border: '1px solid var(--border)',
-                              borderRadius: '4px'
-                            }}>
+                            <div
+                              style={{
+                                padding: '8px',
+                                background: 'var(--grey-50)',
+                                border: '1px solid var(--border-light)'
+                              }}
+                            >
                               <VehicleOrganizationToolbar
                                 vehicleId={vehicle.id}
                                 userId={session.user.id}
@@ -1463,43 +1529,15 @@ const VehiclesInner: React.FC = () => {
                                 }}
                               />
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              ) : (
-                <section className="section">
-                  <div className="card">
-                    <div className="card-body text-center">
-                      <h3 style={{ fontSize: '8px', marginBottom: '0' }}>
-                        {activeTab === 'associated' ? 'No associated vehicles' : `No ${activeTab} vehicles`}
-                      </h3>
-                    </div>
-                  </div>
-                </section>
-              )}
-
-          {/* Authentication Notice */}
-          {!session && Object.values(vehicleRelationships).some(arr => arr.length > 0) && (
-            <section className="section">
-              <div className="card">
-                <div className="card-header">Local Storage Notice</div>
-                <div className="card-body">
-                  <p className="text-small" style={{ marginBottom: '12px' }}>
-                    Your vehicles are stored locally. Sign in to sync across devices and access advanced features.
-                  </p>
-                  <button 
-                    className="button button-primary"
-                    onClick={() => navigate('/login')}
-                  >
-                    Sign In to Sync
-                  </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            </section>
-          )}
+              )}
+            </div>
+          </main>
         </div>
       )}
       {/* Profile relationship editor modal */}

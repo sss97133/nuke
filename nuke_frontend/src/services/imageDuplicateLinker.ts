@@ -49,15 +49,11 @@ export class ImageDuplicateLinker {
   ): Promise<LinkResult> {
     try {
       console.log(`🔑 [DuplicateLinker] Checking image "${filename}" for duplicates...`);
-      
-      // 1. Search by filename first (fast)
-      const filenameMatches = await this.findByFilename(filename, imageId);
-      
-      // 2. If no filename match, search by EXIF signature
-      let matches = filenameMatches;
-      if (matches.length === 0 && exifData) {
-        matches = await this.findByExifSignature(exifData, imageId);
-      }
+
+      // SAFETY: Cross-vehicle contamination is unacceptable.
+      // Only auto-link when we have a true image-identity match (hash-based).
+      // Filename/EXIF similarity can collide across vehicles and must never auto-assign vehicle_id.
+      const matches = await this.findByHashSignature(imageId);
       
       if (matches.length === 0) {
         console.log(`🔑 [DuplicateLinker] No duplicates found for "${filename}"`);
@@ -105,6 +101,7 @@ export class ImageDuplicateLinker {
   
   /**
    * Find existing images with same filename
+   * NOTE: This is intentionally NOT used for auto-linking due to cross-vehicle contamination risk.
    */
   private static async findByFilename(
     filename: string,
@@ -147,6 +144,7 @@ export class ImageDuplicateLinker {
   /**
    * Find existing images with matching EXIF signature
    * (same camera, same timestamp, similar GPS)
+   * NOTE: This is intentionally NOT used for auto-linking due to cross-vehicle contamination risk.
    */
   private static async findByExifSignature(
     exifData: any,
@@ -252,6 +250,61 @@ export class ImageDuplicateLinker {
     
     // Sort by confidence
     return matches.sort((a, b) => b.matchConfidence - a.matchConfidence);
+  }
+
+  /**
+   * Find duplicates by true identity: file/perceptual/dhash match.
+   * This is the ONLY safe basis for auto-linking images across vehicles.
+   */
+  private static async findByHashSignature(imageId: string): Promise<DuplicateMatch[]> {
+    const { data: img, error: imgErr } = await supabase
+      .from('vehicle_images')
+      .select('id, file_hash, perceptual_hash, dhash')
+      .eq('id', imageId)
+      .maybeSingle();
+
+    if (imgErr || !img) return [];
+
+    const fileHash = img.file_hash || null;
+    const pHash = img.perceptual_hash || null;
+    const dHash = img.dhash || null;
+
+    // If we don't have any hashes, we cannot safely auto-link.
+    if (!fileHash && !pHash && !dHash) return [];
+
+    // Build OR filter across available hashes.
+    const orParts: string[] = [];
+    if (fileHash) orParts.push(`file_hash.eq.${fileHash}`);
+    if (pHash) orParts.push(`perceptual_hash.eq.${pHash}`);
+    if (dHash) orParts.push(`dhash.eq.${dHash}`);
+
+    if (orParts.length === 0) return [];
+
+    const { data, error } = await supabase
+      .from('vehicle_images')
+      .select(`
+        id,
+        vehicle_id,
+        vehicles!inner ( id, year, make, model )
+      `)
+      .neq('id', imageId)
+      .not('vehicle_id', 'is', null)
+      .or(orParts.join(','))
+      .limit(10);
+
+    if (error || !data) return [];
+
+    return data.map((row: any) => ({
+      originalImageId: row.id,
+      vehicleId: row.vehicle_id,
+      vehicleInfo: {
+        year: row.vehicles?.year || 0,
+        make: row.vehicles?.make || 'Unknown',
+        model: row.vehicles?.model || 'Unknown'
+      },
+      matchConfidence: 1.0,
+      matchReasons: ['Hash match']
+    }));
   }
   
   /**
