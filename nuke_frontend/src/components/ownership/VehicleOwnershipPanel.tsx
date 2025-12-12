@@ -579,15 +579,18 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     return;
                   }
 
-                  // Upload directly to Supabase storage
-                  const fileExt = documentFile.name.split('.').pop();
+                  // Upload ownership documents to the PRIVATE bucket.
+                  // - Keeps documents out of public paths (prevents leaks)
+                  // - Uses signed URLs for short-lived OCR verification
+                  const fileExt = documentFile.name.split('.').pop() || 'bin';
                   const fileName = `${Date.now()}_${claimType}.${fileExt}`;
-                  const filePath = `vehicles/${vehicle.id}/ownership/${fileName}`;
+                  // IMPORTANT: ownership-documents bucket policy expects the FIRST folder to be the user id.
+                  const storagePath = `${session.user.id}/${vehicle.id}/${fileName}`;
+                  const bucket = 'ownership-documents';
 
-                  // Upload to Supabase storage bucket
                   const { data: uploadData, error: uploadError } = await supabase.storage
-                    .from('vehicle-data')
-                    .upload(filePath, documentFile, {
+                    .from(bucket)
+                    .upload(storagePath, documentFile, {
                       cacheControl: '3600',
                       upsert: false
                     });
@@ -598,14 +601,22 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     return;
                   }
 
-                  // Get public URL for the uploaded file
-                  const { data: { publicUrl } } = supabase.storage
-                    .from('vehicle-data')
-                    .getPublicUrl(filePath);
+                  // Generate a signed URL for short-lived access (OCR + immediate verification flow).
+                  // Do NOT store public URLs for ownership docs.
+                  const { data: signed, error: signedErr } = await supabase.storage
+                    .from(bucket)
+                    .createSignedUrl(storagePath, 60 * 60); // 1 hour
+
+                  if (signedErr || !signed?.signedUrl) {
+                    console.error('Signed URL error:', signedErr);
+                    alert('Upload succeeded but access link could not be created. Please try again.');
+                    return;
+                  }
                   
                   const document = { 
-                    file_url: publicUrl,
-                    file_path: filePath,
+                    file_url: signed.signedUrl,
+                    file_path: storagePath,
+                    bucket: bucket,
                     document_type: claimType 
                   };
 
@@ -617,7 +628,8 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     .eq('user_id', session.user.id)
                     .maybeSingle();
 
-                  // Only title makes user confirmed owner, others make pending
+                  // Only title makes user confirmed owner, others make pending.
+                  // NOTE: This "approved" is legacy behavior; true approval should be via reviewer pipeline.
                   const status = claimType === 'title' ? 'approved' : 'pending';
 
                   // Map claim type to proper document URL field
@@ -628,7 +640,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     status: status
                   };
 
-                  // Set the appropriate document URL field
+                  // Set the appropriate document URL field (SIGNED URL for immediate verification)
                   if (claimType === 'title') {
                     verificationData.title_document_url = document.file_url;
                   } else if (claimType === 'drivers_license' || claimType === 'id') {
@@ -640,6 +652,19 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                   } else if (claimType === 'bill_of_sale') {
                     verificationData.bill_of_sale_url = document.file_url;
                   }
+
+                  // Also append to supporting_documents (durable reference to storage path)
+                  // This lets the back office re-issue signed URLs later without relying on an expired signed URL.
+                  const supportingDocEntry = {
+                    type: claimType,
+                    bucket,
+                    storage_path: storagePath,
+                    signed_url: document.file_url,
+                    uploaded_at: new Date().toISOString(),
+                    file_name: documentFile.name,
+                    file_size: documentFile.size,
+                    mime_type: documentFile.type
+                  };
 
                   // Set pending for ID if uploading title (unless already present)
                   if (claimType === 'title' && !verificationData.drivers_license_url && (!existing || !existing.drivers_license_url)) {
@@ -655,6 +680,18 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
 
                   if (existing) {
                     // Update existing record
+                    // Best-effort merge supporting_documents if column exists
+                    try {
+                      const { data: existingRow } = await supabase
+                        .from('ownership_verifications')
+                        .select('supporting_documents')
+                        .eq('id', existing.id)
+                        .maybeSingle();
+                      const prevDocs = Array.isArray((existingRow as any)?.supporting_documents) ? (existingRow as any).supporting_documents : [];
+                      verificationData.supporting_documents = [...prevDocs, supportingDocEntry];
+                    } catch {
+                      // ignore if column doesn't exist in this environment
+                    }
                     const { data: updatedData, error: updateError } = await supabase
                       .from('ownership_verifications')
                       .update(verificationData)
@@ -665,6 +702,8 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     verifyError = updateError;
                   } else {
                     // Create new ownership verification record
+                    // Best-effort include supporting_documents if column exists
+                    verificationData.supporting_documents = [supportingDocEntry];
                     const { data: insertedData, error: insertError } = await supabase
                       .from('ownership_verifications')
                       .insert(verificationData)
@@ -678,14 +717,15 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     console.error('Verification error:', verifyError);
                     // Try to clean up the uploaded file
                     await supabase.storage
-                      .from('vehicle-data')
-                      .remove([filePath]);
+                      .from(bucket)
+                      .remove([storagePath]);
                     alert('Verification record failed: ' + verifyError.message);
                     return;
                   }
 
-                  // Run OCR verification if this is a title or ID document
-                  if (claimType === 'title' || claimType === 'drivers_license' || claimType === 'id') {
+                  // Run OCR verification if this is a title or ID document (images only)
+                  const isPdf = documentFile.type === 'application/pdf' || documentFile.name.toLowerCase().endsWith('.pdf');
+                  if (!isPdf && (claimType === 'title' || claimType === 'drivers_license' || claimType === 'id')) {
                     alert('Document uploaded! Running verification...');
                     
                     // Process the document asynchronously
@@ -713,6 +753,8 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                       loadOwnershipData();
                     });
                     }
+                  } else if (isPdf && (claimType === 'title' || claimType === 'drivers_license' || claimType === 'id')) {
+                    alert('PDF uploaded successfully. Automatic OCR is not available for PDFs yet; this will require review.');
                   } else {
                     alert('Document submitted successfully!');
                   }
