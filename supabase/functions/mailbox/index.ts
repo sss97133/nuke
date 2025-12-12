@@ -80,7 +80,21 @@ const getMailboxWithAccess = async (vehicleId: string, userId: string | null) =>
 
   if (error || !data) return null
 
-  // TODO: implement real access control; for now, allow if mailbox exists
+  // Enforce access using mailbox_access_keys (Edge uses service role; must gate here)
+  if (!userId) return null
+  const { data: keyRow, error: keyErr } = await supabaseAdmin
+    .from("mailbox_access_keys")
+    .select("permission_level, expires_at")
+    .eq("mailbox_id", data.id)
+    .eq("user_id", userId)
+    .in("permission_level", ["read_write", "read_only", "filtered", "write_only"])
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (keyErr || !keyRow) return null
+  if (keyRow.expires_at && new Date(keyRow.expires_at).getTime() <= Date.now()) return null
+
   const messageCount = await supabaseAdmin
     .from("mailbox_messages")
     .select("id", { count: "exact", head: true })
@@ -88,7 +102,7 @@ const getMailboxWithAccess = async (vehicleId: string, userId: string | null) =>
 
   return {
     ...data,
-    user_access_level: "read_write", // placeholder access level
+    user_access_level: keyRow.permission_level || "read_only",
     message_count: messageCount.count || 0
   } as Mailbox
 }
