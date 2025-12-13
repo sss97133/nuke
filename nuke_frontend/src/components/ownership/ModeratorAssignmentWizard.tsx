@@ -101,7 +101,8 @@ const ModeratorAssignmentWizard: React.FC<ModeratorAssignmentWizardProps> = ({
               role: 'moderator',
               status: 'active'
             }, {
-              onConflict: 'vehicle_id,user_id'
+              // Matches DB constraint: UNIQUE(vehicle_id, user_id, role)
+              onConflict: 'vehicle_id,user_id,role'
             });
 
           if (contribError) throw contribError;

@@ -129,6 +129,13 @@ async function handleChatMode(
   userId?: string
 ): Promise<Response> {
   try {
+    // Deterministic "Cursor-like tools" for robustness:
+    // - /context: show what evidence exists for this vehicle (docs, receipt-like images, timeline)
+    // - /search <term>: search across vehicle_documents, receipt-like images, and timeline events
+    const rawQuestion = String(question || '');
+    const trimmedQuestion = rawQuestion.trim();
+    const qLower = trimmedQuestion.toLowerCase();
+
     // Get LLM configuration
     let llmConfig: any | null = null;
     try {
@@ -183,7 +190,7 @@ async function handleChatMode(
                            vehicle.vin || 
                            `Vehicle ${vehicleId.substring(0, 8)}`;
     
-    // Gather vehicle history and context
+    // Gather vehicle history and context (service role reads; never assume empty)
     const { data: timelineEvents } = await supabase
       .from('timeline_events')
       .select('event_type, title, description, event_date, mileage_at_event, receipt_amount')
@@ -196,18 +203,512 @@ async function handleChatMode(
       .select('id, category, taken_at')
       .eq('vehicle_id', vehicleId)
       .limit(5);
-    
-    const { data: receipts } = await supabase
-      .from('receipts')
-      .select('vendor_name, total_amount, purchase_date, description')
+
+    // "Receipt-like" images (docs that were uploaded as images but not yet promoted to vehicle_documents).
+    // This is critical so the agent doesn't incorrectly say "no receipts" when there are doc-flagged images.
+    const { data: receiptLikeImages } = await supabase
+      .from('vehicle_images')
+      .select('id, caption, description, created_at, is_document, doc_flag, document_classification, document_category')
       .eq('vehicle_id', vehicleId)
-      .order('purchase_date', { ascending: false })
-      .limit(10);
+      .or('is_document.eq.true,doc_flag.eq.true')
+      .order('created_at', { ascending: false })
+      .limit(25);
+    
+    // IMPORTANT: Use vehicle_documents as the source of truth for uploaded receipts/invoices/manuals.
+    // The project has multiple receipt schemas across time; vehicle_documents is consistently written by SmartInvoiceUploader.
+    const { data: vehicleDocs } = await supabase
+      .from('vehicle_documents')
+      .select('id, document_type, title, vendor_name, amount, currency, document_date, file_url, created_at')
+      .eq('vehicle_id', vehicleId)
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+    const docs = Array.isArray(vehicleDocs) ? vehicleDocs : [];
+    const receiptDocTypes = new Set(['receipt', 'invoice', 'service_record', 'parts_order']);
+    const manualDocTypes = new Set(['manual']);
+    const receiptDocs = docs.filter((d: any) => receiptDocTypes.has(String(d?.document_type || '').toLowerCase()));
+    const manualDocs = docs.filter((d: any) => manualDocTypes.has(String(d?.document_type || '').toLowerCase()));
+
+    const receiptLike = Array.isArray(receiptLikeImages) ? receiptLikeImages : [];
+
+    // --- Deterministic tool responses ---
+    const makeToolResponse = (payload: any) =>
+      new Response(JSON.stringify(payload), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      });
+
+    const truncate = (s: unknown, max = 1400): string => {
+      const str = typeof s === 'string' ? s : (() => { try { return JSON.stringify(s, null, 2); } catch { return String(s ?? ''); } })();
+      if (!str) return '';
+      if (str.length <= max) return str;
+      return str.slice(0, Math.max(0, max - 20)) + '\n... (truncated)';
+    };
+
+    const isUuid = (v: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+
+    // /context: show evidence snapshot without calling LLM (fast + grounded)
+    if (qLower === '/context' || qLower === 'context' || qLower === 'show context') {
+      const vehicleIdentityForUi =
+        vehicleNickname ||
+        vehicleYmm ||
+        (vehicleYear && vehicleMake && vehicleModel ? `${vehicleYear} ${vehicleMake} ${vehicleModel}` : null) ||
+        (vehicle.year && vehicle.make && vehicle.model ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : null) ||
+        vehicleVin ||
+        vehicle.vin ||
+        `Vehicle ${vehicleId.substring(0, 8)}`;
+
+      return makeToolResponse({
+        response: `Context snapshot for ${vehicleIdentityForUi}.`,
+        ui: {
+          text: `Context snapshot for ${vehicleIdentityForUi}.`,
+          intent: 'other',
+          cards: [
+            {
+              type: 'context_snapshot',
+              vehicle: {
+                id: vehicleId,
+                identity: vehicleIdentityForUi,
+                year: vehicle.year,
+                make: vehicle.make,
+                model: vehicle.model,
+                vin: vehicle.vin || null
+              },
+              counts: {
+                timeline_events_loaded: timelineEvents?.length || 0,
+                vehicle_documents_loaded: docs.length,
+                receipts_in_vehicle_documents: receiptDocs.length,
+                manuals_in_vehicle_documents: manualDocs.length,
+                receipt_like_images: receiptLike.length,
+                recent_photos_loaded: images?.length || 0
+              },
+              recent_documents: docs.slice(0, 8).map((d: any) => ({
+                ref: `vehicle_document:${d.id}`,
+                document_type: d.document_type,
+                title: d.title,
+                vendor_name: d.vendor_name,
+                amount: d.amount,
+                currency: d.currency,
+                document_date: d.document_date,
+                file_url: d.file_url
+              })),
+              receipt_like_images: receiptLike.slice(0, 8).map((img: any) => ({
+                ref: `vehicle_image:${img.id}`,
+                classification: img.document_classification,
+                category: img.document_category,
+                caption: img.caption,
+                created_at: img.created_at
+              })),
+              next_suggestions: [
+                { id: 'search_vehicle', label: 'Search receipts/docs/images', payload: { suggested_user_text: '/search wiring' } },
+                { id: 'upload_document', label: 'Upload receipt/manual', payload: { hint: 'Upload receipts/invoices/manual pinouts to improve accuracy.' } }
+              ]
+            }
+          ]
+        },
+        vehicle_identity: vehicleIdentityForUi,
+        context_used: {
+          timeline_events: timelineEvents?.length || 0,
+          receipts: receiptDocs.length,
+          manuals: manualDocs.length,
+          vehicle_documents: docs.length,
+          receipt_like_images: receiptLike.length,
+          images: images?.length || 0
+        }
+      });
+    }
+
+    // /search <term>: deterministic search across docs + receipt-like images + timeline events
+    if (qLower.startsWith('/search')) {
+      const term = trimmedQuestion.replace(/^\/search\s*/i, '').trim();
+      if (!term) {
+        return makeToolResponse({
+          response: 'Usage: /search <term>',
+          ui: {
+            text: 'Usage: /search <term>',
+            intent: 'other',
+            cards: [
+              {
+                type: 'clarifying_questions',
+                questions: [
+                  'What should I search for? Example: /search motec, /search painless, /search fuel pump, /search invoice'
+                ]
+              }
+            ]
+          }
+        });
+      }
+
+      const ilike = `%${term}%`;
+      const { data: matchingDocs } = await supabase
+        .from('vehicle_documents')
+        .select('id, document_type, title, vendor_name, amount, currency, document_date, file_url, created_at')
+        .eq('vehicle_id', vehicleId)
+        .or(`title.ilike.${ilike},vendor_name.ilike.${ilike},document_type.ilike.${ilike}`)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const { data: matchingImages } = await supabase
+        .from('vehicle_images')
+        .select('id, caption, description, created_at, is_document, doc_flag, document_classification, document_category')
+        .eq('vehicle_id', vehicleId)
+        .or(`caption.ilike.${ilike},description.ilike.${ilike},document_classification.ilike.${ilike},document_category.ilike.${ilike}`)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const { data: matchingEvents } = await supabase
+        .from('timeline_events')
+        .select('id, event_type, title, description, event_date, receipt_amount')
+        .eq('vehicle_id', vehicleId)
+        .or(`title.ilike.${ilike},description.ilike.${ilike},event_type.ilike.${ilike}`)
+        .order('event_date', { ascending: false })
+        .limit(20);
+
+      const docsRes = Array.isArray(matchingDocs) ? matchingDocs : [];
+      const imgsRes = Array.isArray(matchingImages) ? matchingImages : [];
+      const eventsRes = Array.isArray(matchingEvents) ? matchingEvents : [];
+
+      return makeToolResponse({
+        response: `Search results for "${term}".`,
+        ui: {
+          text: `Search results for "${term}".`,
+          intent: 'other',
+          cards: [
+            {
+              type: 'search_results',
+              query: term,
+              totals: { documents: docsRes.length, images: imgsRes.length, timeline_events: eventsRes.length },
+              results: [
+                ...docsRes.slice(0, 10).map((d: any) => ({
+                  kind: 'vehicle_document',
+                  ref: `vehicle_document:${d.id}`,
+                  title: d.title || d.document_type,
+                  subtitle: [d.document_type, d.vendor_name].filter(Boolean).join(' — '),
+                  file_url: d.file_url || null
+                })),
+                ...imgsRes.slice(0, 10).map((img: any) => ({
+                  kind: 'vehicle_image',
+                  ref: `vehicle_image:${img.id}`,
+                  title: img.caption || img.document_classification || img.document_category || 'Image',
+                  subtitle: [
+                    img.is_document || img.doc_flag ? 'doc-like' : null,
+                    img.document_classification,
+                    img.document_category
+                  ].filter(Boolean).join(' — '),
+                })),
+                ...eventsRes.slice(0, 10).map((e: any) => ({
+                  kind: 'timeline_event',
+                  ref: `timeline_event:${e.id}`,
+                  title: e.title || e.event_type || 'Event',
+                  subtitle: e.event_date ? new Date(e.event_date).toLocaleDateString() : ''
+                }))
+              ].slice(0, 25),
+              next_suggestions: [
+                { id: 'upload_document', label: 'Upload receipt/manual', payload: { hint: 'Upload receipts/invoices/manual pinouts to improve accuracy.' } }
+              ]
+            }
+          ]
+        }
+      });
+    }
+
+    // /open <ref>: open a specific source and show its structured contents (no LLM)
+    if (qLower.startsWith('/open')) {
+      const arg = trimmedQuestion.replace(/^\/open\s*/i, '').trim();
+      if (!arg) {
+        return makeToolResponse({
+          response: 'Usage: /open <ref> (ex: /open vehicle_document:<uuid>, /open receipt:<uuid>, /open vehicle_image:<uuid>, /open timeline_event:<uuid>)',
+          ui: {
+            text: 'Usage: /open <ref>',
+            intent: 'other',
+            cards: [
+              {
+                type: 'clarifying_questions',
+                questions: [
+                  'Paste a reference like vehicle_document:<uuid>, receipt:<uuid>, vehicle_image:<uuid>, or timeline_event:<uuid>.',
+                  'Tip: run /context or /search to find refs, then click attach/open in the UI.'
+                ]
+              }
+            ]
+          }
+        });
+      }
+
+      const parts = arg.split(':');
+      const kind = String(parts[0] || '').trim();
+      const id = String(parts[1] || '').trim();
+      if (!kind || !id || !isUuid(id)) {
+        return makeToolResponse({
+          response: 'Invalid ref. Expected: kind:uuid',
+          ui: {
+            text: 'Invalid ref. Expected: kind:uuid',
+            intent: 'other',
+            cards: [
+              {
+                type: 'clarifying_questions',
+                questions: [
+                  'Example: /open vehicle_document:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+                  'Run /context to get valid refs for this vehicle.'
+                ]
+              }
+            ]
+          }
+        });
+      }
+
+      // Helper: load a receipt + items by receipt id
+      const loadReceipt = async (receiptId: string) => {
+        const { data: r } = await supabase
+          .from('receipts')
+          .select('id, vendor_name, receipt_date, total, subtotal, tax, currency, payment_method, invoice_number, purchase_order, status, raw_json, created_at')
+          .eq('id', receiptId)
+          .single();
+
+        const { data: items } = await supabase
+          .from('receipt_items')
+          .select('id, description, part_number, brand, category, quantity, unit_price, line_total, sku, upc, installation_status, installation_date, confidence_score, extracted_by_ai')
+          .eq('receipt_id', receiptId)
+          .order('created_at', { ascending: true })
+          .limit(50);
+
+        return { receipt: r || null, items: Array.isArray(items) ? items : [] };
+      };
+
+      // VEHICLE DOCUMENT
+      if (kind === 'vehicle_document' || kind === 'vehicle_documents') {
+        const { data: doc } = await supabase
+          .from('vehicle_documents')
+          .select('id, vehicle_id, uploaded_by, document_type, title, description, file_url, file_type, amount, vendor_name, currency, created_at, updated_at')
+          .eq('id', id)
+          .single();
+
+        if (!doc) {
+          return makeToolResponse({ response: 'Document not found.', ui: { text: 'Document not found.', intent: 'other', cards: [] } });
+        }
+
+        // Link to receipt rows created by ReceiptPersistService (source_document_table='vehicle_documents')
+        const { data: linkedReceipt } = await supabase
+          .from('receipts')
+          .select('id')
+          .eq('source_document_table', 'vehicle_documents')
+          .eq('source_document_id', id)
+          .limit(1)
+          .maybeSingle();
+
+        const receiptBundle = linkedReceipt?.id ? await loadReceipt(linkedReceipt.id) : { receipt: null, items: [] };
+
+        return makeToolResponse({
+          response: `Opened vehicle document ${id}.`,
+          ui: {
+            text: `Opened document: ${doc.title || doc.document_type || 'Document'}`,
+            intent: 'other',
+            cards: [
+              {
+                type: 'source_open',
+                ref: `vehicle_document:${doc.id}`,
+                source_kind: 'vehicle_document',
+                title: doc.title || doc.document_type || 'Document',
+                metadata: {
+                  document_type: doc.document_type,
+                  vendor_name: doc.vendor_name,
+                  amount: doc.amount,
+                  currency: doc.currency,
+                  file_type: doc.file_type,
+                  created_at: doc.created_at
+                },
+                links: doc.file_url ? [{ label: 'Open file', url: doc.file_url }] : [],
+                receipt: receiptBundle.receipt
+                  ? {
+                      ref: `receipt:${receiptBundle.receipt.id}`,
+                      vendor_name: receiptBundle.receipt.vendor_name,
+                      receipt_date: receiptBundle.receipt.receipt_date,
+                      total: receiptBundle.receipt.total,
+                      currency: receiptBundle.receipt.currency,
+                      invoice_number: receiptBundle.receipt.invoice_number,
+                      status: receiptBundle.receipt.status
+                    }
+                  : null,
+                receipt_items: receiptBundle.items.slice(0, 25),
+                excerpts: [
+                  doc.description ? { label: 'Description', text: truncate(doc.description, 800) } : null,
+                  receiptBundle.receipt?.raw_json ? { label: 'Receipt raw_json', text: truncate(receiptBundle.receipt.raw_json, 1200) } : null
+                ].filter(Boolean)
+              }
+            ]
+          }
+        });
+      }
+
+      // RECEIPT
+      if (kind === 'receipt' || kind === 'receipts') {
+        const bundle = await loadReceipt(id);
+        if (!bundle.receipt) {
+          return makeToolResponse({ response: 'Receipt not found.', ui: { text: 'Receipt not found.', intent: 'other', cards: [] } });
+        }
+        return makeToolResponse({
+          response: `Opened receipt ${id}.`,
+          ui: {
+            text: `Opened receipt: ${bundle.receipt.vendor_name || 'Receipt'}`,
+            intent: 'other',
+            cards: [
+              {
+                type: 'source_open',
+                ref: `receipt:${bundle.receipt.id}`,
+                source_kind: 'receipt',
+                title: bundle.receipt.vendor_name || 'Receipt',
+                metadata: {
+                  receipt_date: bundle.receipt.receipt_date,
+                  total: bundle.receipt.total,
+                  subtotal: bundle.receipt.subtotal,
+                  tax: bundle.receipt.tax,
+                  currency: bundle.receipt.currency,
+                  payment_method: bundle.receipt.payment_method,
+                  invoice_number: bundle.receipt.invoice_number,
+                  purchase_order: bundle.receipt.purchase_order,
+                  status: bundle.receipt.status,
+                  created_at: bundle.receipt.created_at
+                },
+                links: [],
+                receipt: { ref: `receipt:${bundle.receipt.id}` },
+                receipt_items: bundle.items.slice(0, 25),
+                excerpts: bundle.receipt.raw_json ? [{ label: 'Receipt raw_json', text: truncate(bundle.receipt.raw_json, 1400) }] : []
+              }
+            ]
+          }
+        });
+      }
+
+      // VEHICLE IMAGE
+      if (kind === 'vehicle_image' || kind === 'vehicle_images') {
+        const { data: img } = await supabase
+          .from('vehicle_images')
+          .select('id, vehicle_id, image_url, safe_preview_url, category, caption, description, created_at, taken_at, is_document, doc_flag, document_classification, document_category, ai_scan_metadata, components, tags')
+          .eq('id', id)
+          .single();
+
+        if (!img) {
+          return makeToolResponse({ response: 'Image not found.', ui: { text: 'Image not found.', intent: 'other', cards: [] } });
+        }
+
+        // Try to find receipts linked to this image (if any pipeline wrote source_document_table='vehicle_images')
+        const { data: imageReceipt } = await supabase
+          .from('receipts')
+          .select('id')
+          .eq('source_document_table', 'vehicle_images')
+          .eq('source_document_id', id)
+          .limit(1)
+          .maybeSingle();
+
+        const bundle = imageReceipt?.id ? await loadReceipt(imageReceipt.id) : { receipt: null, items: [] };
+
+        return makeToolResponse({
+          response: `Opened image ${id}.`,
+          ui: {
+            text: `Opened image: ${img.caption || img.document_classification || img.document_category || 'Image'}`,
+            intent: 'other',
+            cards: [
+              {
+                type: 'source_open',
+                ref: `vehicle_image:${img.id}`,
+                source_kind: 'vehicle_image',
+                title: img.caption || img.document_classification || img.document_category || 'Image',
+                metadata: {
+                  category: img.category,
+                  taken_at: img.taken_at,
+                  created_at: img.created_at,
+                  is_document: img.is_document || img.doc_flag || false,
+                  document_classification: img.document_classification,
+                  document_category: img.document_category
+                },
+                links: [
+                  img.safe_preview_url ? { label: 'Preview', url: img.safe_preview_url } : null,
+                  img.image_url ? { label: 'Original', url: img.image_url } : null
+                ].filter(Boolean),
+                receipt: bundle.receipt ? { ref: `receipt:${bundle.receipt.id}`, vendor_name: bundle.receipt.vendor_name } : null,
+                receipt_items: bundle.items.slice(0, 15),
+                excerpts: [
+                  img.description ? { label: 'Description', text: truncate(img.description, 700) } : null,
+                  img.ai_scan_metadata ? { label: 'AI scan metadata', text: truncate(img.ai_scan_metadata, 900) } : null,
+                  img.components ? { label: 'Components', text: truncate(img.components, 900) } : null,
+                  img.tags ? { label: 'Tags', text: truncate(img.tags, 900) } : null
+                ].filter(Boolean)
+              }
+            ]
+          }
+        });
+      }
+
+      // TIMELINE EVENT
+      if (kind === 'timeline_event' || kind === 'timeline_events') {
+        const { data: ev } = await supabase
+          .from('timeline_events')
+          .select('id, event_type, title, description, event_date, mileage_at_event, cost_amount, cost_currency, receipt_data, metadata, parts_used, parts_mentioned, tools_mentioned, labor_hours, service_provider_name, invoice_number, verification_documents')
+          .eq('id', id)
+          .single();
+
+        if (!ev) {
+          return makeToolResponse({ response: 'Timeline event not found.', ui: { text: 'Timeline event not found.', intent: 'other', cards: [] } });
+        }
+
+        return makeToolResponse({
+          response: `Opened timeline event ${id}.`,
+          ui: {
+            text: `Opened event: ${ev.title || ev.event_type || 'Event'}`,
+            intent: 'other',
+            cards: [
+              {
+                type: 'source_open',
+                ref: `timeline_event:${ev.id}`,
+                source_kind: 'timeline_event',
+                title: ev.title || ev.event_type || 'Event',
+                metadata: {
+                  event_type: ev.event_type,
+                  event_date: ev.event_date,
+                  mileage_at_event: ev.mileage_at_event,
+                  cost_amount: ev.cost_amount,
+                  cost_currency: ev.cost_currency,
+                  service_provider_name: ev.service_provider_name,
+                  invoice_number: ev.invoice_number,
+                  labor_hours: ev.labor_hours
+                },
+                links: [],
+                receipt: null,
+                receipt_items: [],
+                excerpts: [
+                  ev.description ? { label: 'Description', text: truncate(ev.description, 900) } : null,
+                  ev.parts_used ? { label: 'Parts used', text: truncate(ev.parts_used, 900) } : null,
+                  ev.receipt_data ? { label: 'Receipt data', text: truncate(ev.receipt_data, 1200) } : null,
+                  ev.metadata ? { label: 'Metadata', text: truncate(ev.metadata, 900) } : null
+                ].filter(Boolean)
+              }
+            ]
+          }
+        });
+      }
+
+      return makeToolResponse({
+        response: `Unknown ref kind "${kind}".`,
+        ui: {
+          text: `Unknown ref kind "${kind}".`,
+          intent: 'other',
+          cards: [
+            { type: 'clarifying_questions', questions: ['Supported: vehicle_document, receipt, vehicle_image, timeline_event'] }
+          ]
+        }
+      });
+    }
     
     // Build vehicle advisor prompt (not a roleplay; optimized for actionable guidance)
     const vehicleContext = `
 YOU ARE: Nuke Vehicle Expert (service advisor + parts planner). You do NOT roleplay as the vehicle.
 You help the user get work done: identify needed parts, estimate labor, provide options, and propose next actions.
+
+IMPORTANT CAPABILITY:
+- The UI CAN upload and save documents (receipts/invoices/manuals) directly into this vehicle profile.
+- If you need proof of parts purchased, or need pinouts/diagrams, ask the user to click the "Upload receipt/manual" action.
 
 VEHICLE CONTEXT:
 - Year: ${vehicle.year || vehicleYear || 'Unknown'}
@@ -226,22 +727,43 @@ ${timelineEvents && timelineEvents.length > 0
     ).join('\n')
   : 'No documented history yet.'}
 
-RECENT RECEIPTS (${receipts?.length || 0} receipts):
-${receipts && receipts.length > 0
-  ? receipts.map(r => 
-      `- ${r.purchase_date ? new Date(r.purchase_date).toLocaleDateString() : 'Date unknown'}: ${r.vendor_name || 'Vendor'} - $${parseFloat(r.total_amount || '0').toLocaleString()}${r.description ? ' - ' + r.description : ''}`
-    ).join('\n')
-  : 'No receipts documented yet.'}
+DOCUMENTS ON FILE (${docs.length}):
+- Receipts/Invoices: ${receiptDocs.length}
+- Manuals: ${manualDocs.length}
+ - Receipt-like images (not yet attached as documents): ${receiptLike.length}
+${docs.length > 0
+  ? docs.slice(0, 10).map((d: any) => {
+      const dt = String(d?.document_type || 'document');
+      const title = String(d?.title || dt);
+      const vendor = d?.vendor_name ? ` — ${String(d.vendor_name)}` : '';
+      const amt = typeof d?.amount === 'number' ? ` — ${d.currency || 'USD'} ${Number(d.amount).toFixed(2)}` : '';
+      const date = d?.document_date ? ` (${new Date(d.document_date).toLocaleDateString()})` : '';
+      return `- ${dt}: ${title}${vendor}${amt}${date}`;
+    }).join('\n')
+  : 'No documents attached yet. If you need receipts/pinouts/diagrams, ask the user to upload them.'}
+
+RECEIPT-LIKE IMAGES (${receiptLike.length}):
+${receiptLike.length > 0
+  ? receiptLike.slice(0, 8).map((img: any) => {
+      const cls = String(img?.document_classification || '').trim();
+      const cat = String(img?.document_category || '').trim();
+      const caption = String(img?.caption || '').trim();
+      const created = img?.created_at ? new Date(img.created_at).toLocaleDateString() : 'date unknown';
+      return `- vehicle_image:${img.id} (${created})${cls ? ` — ${cls}` : ''}${cat ? ` — ${cat}` : ''}${caption ? ` — ${caption}` : ''}`;
+    }).join('\n')
+  : 'None flagged. If you have receipts as photos, upload them or mark them as documents.'}
 
 PHOTOS: ${images?.length || 0} photos documented${images && images.length > 0 ? ` (categories: ${[...new Set(images.map(i => i.category).filter(Boolean))].join(', ') || 'various'})` : ''}
 
 RESPONSE RULES (IMPORTANT):
 - Be interactive and execution-focused. Default to giving concrete options, not a generic explanation.
 - If the user is asking for parts, provide parts options immediately (with fitment questions only if required).
-- Always include cost breakdown: parts range + labor hours range + assumed labor rate + total range.
+- Always include cost breakdown, BUT do not invent hard numbers. If you don't have evidence, set unknowns to 0 and explicitly state assumptions and LOW confidence.
+- If you need to ground on a specific document, ask the user to run /context, /search, and /open a ref (vehicle_document:..., receipt:..., vehicle_image:..., timeline_event:...) and to attach it in the chat.
 - Provide 2-3 options (e.g. Budget / Balanced / Premium) and recommend one.
 - Include a "do it for me" option: propose a draft work order payload the UI can create.
 - Keep it concise; prefer bullet points and short sections.
+- DO NOT output random external links. If you include a URL, it must start with https:// and must be a vendor search page; otherwise omit it.
 - Return ONLY valid JSON matching this schema:
 {
   "text": "string (short, user-facing summary)",
@@ -259,7 +781,9 @@ RESPONSE RULES (IMPORTANT):
         "total_low": 0,
         "total_high": 0
       },
-      "assumptions": ["..."]
+      "assumptions": ["..."],
+      "confidence": "low|medium|high",
+      "evidence": [{ "type": "receipt|catalog|vehicle_data|other", "ref": "string" }]
     },
     {
       "type": "parts_options",
@@ -282,6 +806,11 @@ RESPONSE RULES (IMPORTANT):
           "payload": {
             "work_order_draft": { "title": "string", "description": "string", "urgency": "normal", "funds_committed": null }
           }
+        },
+        {
+          "id": "upload_document",
+          "label": "Upload receipt/manual",
+          "payload": { "hint": "Upload receipts/invoices/manual pinouts to improve accuracy." }
         }
       ]
     }
@@ -303,7 +832,7 @@ RESPONSE RULES (IMPORTANT):
     ];
     
     console.log(`Chat request: ${question.substring(0, 100)}...`);
-    console.log(`Vehicle context: ${vehicleIdentity}, ${timelineEvents?.length || 0} events, ${receipts?.length || 0} receipts`);
+    console.log(`Vehicle context: ${vehicleIdentity}, ${timelineEvents?.length || 0} events, ${docs.length} docs (receipts=${receiptDocs.length}, manuals=${manualDocs.length})`);
     
     // Call LLM
     const response = await callLLM(
@@ -332,6 +861,69 @@ RESPONSE RULES (IMPORTANT):
         ? ui.text.trim()
         : (raw || 'I could not generate a response. Please try again.');
 
+    // Deterministic safety net: if the user asks about receipts/docs or wiring and we have no docs,
+    // ensure there's an Upload action so the UI can actually collect missing evidence.
+    try {
+      const q = (question || '').toLowerCase();
+      const looksDocRelated =
+        q.includes('receipt') ||
+        q.includes('invoice') ||
+        q.includes('manual') ||
+        q.includes('pinout') ||
+        q.includes('diagram') ||
+        q.includes('wiring') ||
+        q.includes('harness') ||
+        q.includes('motec') ||
+        q.includes('pdm') ||
+        q.includes('ecu');
+
+      if (ui && typeof ui === 'object') {
+        if (!Array.isArray(ui.cards)) ui.cards = [];
+        const hasNextActions = ui.cards.some((c: any) => c && c.type === 'next_actions');
+        const hasUpload = ui.cards.some((c: any) =>
+          c && c.type === 'next_actions' && Array.isArray(c.actions) && c.actions.some((a: any) => String(a?.id || '') === 'upload_document')
+        );
+
+        if ((docs.length === 0 || looksDocRelated) && !hasUpload) {
+          const actionsCard = hasNextActions
+            ? ui.cards.find((c: any) => c && c.type === 'next_actions')
+            : null;
+          if (actionsCard) {
+            if (!Array.isArray(actionsCard.actions)) actionsCard.actions = [];
+            actionsCard.actions.push({ id: 'upload_document', label: 'Upload receipt/manual', payload: { hint: 'Upload receipts/invoices/manual pinouts to improve accuracy.' } });
+          } else {
+            ui.cards.push({
+              type: 'next_actions',
+              actions: [{ id: 'upload_document', label: 'Upload receipt/manual', payload: { hint: 'Upload receipts/invoices/manual pinouts to improve accuracy.' } }]
+            });
+          }
+        }
+
+        // If the conversation is about wiring/harness routing, request the 3D panel.
+        // The frontend will auto-load a model from the user's uploads or the system registry when available.
+        const looksHarnessRelated =
+          q.includes('wiring') ||
+          q.includes('harness') ||
+          q.includes('loom') ||
+          q.includes('routing') ||
+          q.includes('grommet') ||
+          q.includes('firewall') ||
+          q.includes('bulkhead') ||
+          q.includes('pdm') ||
+          q.includes('ecu');
+
+        const hasModelViewer = Array.isArray(ui.cards) && ui.cards.some((c: any) => c && c.type === 'model_viewer');
+        if (looksHarnessRelated && !hasModelViewer) {
+          ui.cards.unshift({
+            type: 'model_viewer',
+            title: '3D harness drafting'
+          });
+        }
+      }
+    } catch {
+      // ignore UI patch failures
+    }
+
     // Best-effort: if parts are requested and the model didn't include URLs, provide real vendor search URLs.
     try {
       if (ui && typeof ui === 'object' && Array.isArray(ui.cards)) {
@@ -342,6 +934,24 @@ RESPONSE RULES (IMPORTANT):
         const summitSearch = (q: string) => `https://www.summitracing.com/search?keyword=${encodeURIComponent(q)}`;
         const jegsSearch = (q: string) => `https://www.jegs.com/i/search?searchTerm=${encodeURIComponent(q)}`;
 
+        const normalizeVendorUrl = (rawUrl: unknown): string | null => {
+          if (typeof rawUrl !== 'string') return null;
+          const s = rawUrl.trim();
+          if (!s) return null;
+          if (s.startsWith('/')) return null;
+          const withProtocol = s.startsWith('http://') || s.startsWith('https://') ? s : (s.startsWith('www.') ? `https://${s}` : s);
+          try {
+            const u = new URL(withProtocol);
+            if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+            const host = u.hostname.toLowerCase();
+            const allowedHosts = ['summitracing.com', 'jegs.com', 'rockauto.com'];
+            if (!allowedHosts.some(h => host === h || host.endsWith(`.${h}`))) return null;
+            return u.toString();
+          } catch {
+            return null;
+          }
+        };
+
         for (const card of ui.cards) {
           if (card && card.type === 'parts_options' && Array.isArray(card.items)) {
             for (const item of card.items) {
@@ -349,14 +959,27 @@ RESPONSE RULES (IMPORTANT):
               const name = String(item.name || '').trim();
               if (!name) continue;
               if (!Array.isArray(item.options)) item.options = [];
-              const hasAnyUrl = item.options.some((o: any) => o && typeof o.url === 'string' && o.url.trim());
-              if (!hasAnyUrl) {
-                const query = `${ymm} ${name}`.trim();
-                item.options.unshift(
-                  { vendor: 'Summit Racing', part_number: '', price_estimate_usd: 0, url: summitSearch(query) },
-                  { vendor: 'Jegs', part_number: '', price_estimate_usd: 0, url: jegsSearch(query) }
-                );
+
+              // Sanitize model-provided URLs and remove hallucinated pricing unless backed by evidence.
+              for (const opt of item.options) {
+                if (!opt || typeof opt !== 'object') continue;
+                const normalized = normalizeVendorUrl((opt as any).url);
+                if (normalized) (opt as any).url = normalized;
+                else delete (opt as any).url;
+
+                // If there's no evidence for pricing, don't present it as a fact.
+                const evidence = (opt as any).evidence;
+                const hasEvidence = Array.isArray(evidence) ? evidence.length > 0 : Boolean(evidence);
+                if (!hasEvidence) {
+                  delete (opt as any).price_estimate_usd;
+                }
               }
+
+              // Always provide deterministic vendor SEARCH links (safe, https, non-404 relative).
+              const query = `${ymm} ${name}`.trim();
+              const existingVendors = new Set(item.options.map((o: any) => String(o?.vendor || '').toLowerCase()));
+              if (!existingVendors.has('summit racing')) item.options.unshift({ vendor: 'Summit Racing', part_number: '', url: summitSearch(query) });
+              if (!existingVendors.has('jegs')) item.options.unshift({ vendor: 'Jegs', part_number: '', url: jegsSearch(query) });
             }
           }
         }
@@ -373,7 +996,9 @@ RESPONSE RULES (IMPORTANT):
       vehicle_identity: vehicleIdentity,
       context_used: {
         timeline_events: timelineEvents?.length || 0,
-        receipts: receipts?.length || 0,
+        receipts: receiptDocs.length,
+        manuals: manualDocs.length,
+        vehicle_documents: docs.length,
         images: images?.length || 0
       }
     }), {

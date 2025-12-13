@@ -97,6 +97,46 @@
           "allowed_headers": ["*"]
         }
       ]
+    },
+    {
+      "name": "vehicle-models",
+      "public": false,
+      "file_size_limit": 524288000,
+      "allowed_mime_types": [
+        "application/octet-stream",
+        "application/zip",
+        "application/json",
+        "text/csv",
+        "model/gltf-binary",
+        "model/gltf+json",
+        "application/x-fbx"
+      ],
+      "cors_rules": [
+        {
+          "origin": "*",
+          "methods": ["GET"]
+        },
+        {
+          "origin": "http://localhost:5173",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        },
+        {
+          "origin": "http://localhost:5174",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        },
+        {
+          "origin": "http://localhost:5175",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        },
+        {
+          "origin": "https://*.vercel.app",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "allowed_headers": ["*"]
+        }
+      ]
     }
   ]
 }

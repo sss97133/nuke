@@ -1353,7 +1353,7 @@ const VehicleProfile: React.FC = () => {
                     alignItems: 'center',
                     gap: '4px'
                   }}>
-                    WIRING QUERY
+                    WIRING PLAN
                   </div>
                   <WiringQueryContextBar
                     vehicleId={vehicle.id}

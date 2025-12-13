@@ -130,6 +130,9 @@ const VehicleMailbox: React.FC = () => {
         if ((result.data || []).length > 0 && !selectedStampId) {
           setSelectedStampId(result.data[0].id)
         }
+      } else if (res.status === 401) {
+        // Not signed in / no access; keep mailbox usable without stamps.
+        setStamps([])
       }
     } catch (error) {
       console.error('Error loading stamps:', error)
@@ -155,6 +158,10 @@ const VehicleMailbox: React.FC = () => {
         toast.success('Listed')
         await loadStamps()
       } else {
+        if (res.status === 401) {
+          toast.error('Sign in required')
+          return
+        }
         const err = await res.json().catch(() => ({}))
         toast.error(err?.message || 'List failed')
       }
@@ -176,6 +183,10 @@ const VehicleMailbox: React.FC = () => {
         toast.success('Unlisted')
         await loadStamps()
       } else {
+        if (res.status === 401) {
+          toast.error('Sign in required')
+          return
+        }
         const err = await res.json().catch(() => ({}))
         toast.error(err?.message || 'Unlist failed')
       }

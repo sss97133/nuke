@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase'
 import { toast } from 'react-hot-toast'
 
 interface Stamp {
@@ -19,11 +19,16 @@ interface Props {
 const StampMarket: React.FC<Props> = ({ onPurchased }) => {
   const [loading, setLoading] = useState(false)
   const [listed, setListed] = useState<Stamp[]>([])
+  const [authRequired, setAuthRequired] = useState(false)
 
   const getAuthHeaders = async () => {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token || localStorage.getItem('auth_token')
-    return token ? { 'Authorization': `Bearer ${token}` } : {}
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    // Vercel rewrites /api/* → Supabase Edge Function domain which expects apikey header
+    if (SUPABASE_ANON_KEY) headers['apikey'] = SUPABASE_ANON_KEY
+    return headers
   }
 
   const loadMarket = async () => {
@@ -34,6 +39,11 @@ const StampMarket: React.FC<Props> = ({ onPurchased }) => {
       if (res.ok) {
         const result = await res.json()
         setListed(result.data || [])
+        setAuthRequired(false)
+      } else if (res.status === 401) {
+        // Not signed in / no access. Don't spam errors; just show a friendly state.
+        setListed([])
+        setAuthRequired(true)
       }
     } catch (err) {
       console.error(err)
@@ -59,6 +69,11 @@ const StampMarket: React.FC<Props> = ({ onPurchased }) => {
         await loadMarket()
         if (onPurchased) onPurchased()
       } else {
+        if (res.status === 401) {
+          toast.error('Sign in required')
+          setAuthRequired(true)
+          return
+        }
         const err = await res.json().catch(() => ({}))
         toast.error(err?.message || 'Purchase failed')
       }
@@ -81,7 +96,9 @@ const StampMarket: React.FC<Props> = ({ onPurchased }) => {
         </button>
       </div>
       {listed.length === 0 && (
-        <div className="text-gray-600 text-[9px]">No listings.</div>
+        <div className="text-gray-600 text-[9px]">
+          {authRequired ? 'Sign in to view marketplace listings.' : 'No listings.'}
+        </div>
       )}
       <div className="space-y-2">
         {listed.map((s) => (
