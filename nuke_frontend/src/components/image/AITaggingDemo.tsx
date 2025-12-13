@@ -43,7 +43,7 @@ const AITaggingDemo = () => {
       fontFamily: 'Arial, sans-serif'
     }}>
       <h3 style={{ fontSize: '8pt', fontWeight: 'bold', margin: '0 0 8px 0' }}>
-        🤖 AI Image Analysis Demo
+        AI Image Analysis Demo
       </h3>
 
       <div style={{ marginBottom: '12px' }}>
@@ -100,7 +100,7 @@ const AITaggingDemo = () => {
             cursor: analyzing ? 'not-allowed' : 'pointer'
           }}
         >
-          {analyzing ? '🔄 Analyzing...' : '🤖 Analyze Image'}
+          {analyzing ? 'Analyzing...' : 'Analyze Image'}
         </button>
       </div>
 

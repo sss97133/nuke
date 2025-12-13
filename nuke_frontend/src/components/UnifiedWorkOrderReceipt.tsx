@@ -336,7 +336,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
                 Evidence Set ({evidence.length} photos)
               </div>
               <div style={{ fontSize: '7pt', color: '#666' }}>
-                {workOrder.metadata?.ai_analysis_status === 'pending' ? '⏳ AI analysis pending' : '✓ Analyzed'}
+                {workOrder.metadata?.ai_analysis_status === 'pending' ? 'AI analysis pending' : 'Analyzed'}
               </div>
             </div>
             

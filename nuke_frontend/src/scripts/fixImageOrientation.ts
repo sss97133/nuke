@@ -15,7 +15,7 @@ interface ImageRecord {
 }
 
 async function fixImageOrientation() {
-  console.log('🔄 Starting image orientation fix...');
+  console.log('Starting image orientation fix...');
 
   try {
     // Get all vehicle images that need reprocessing
@@ -41,7 +41,7 @@ async function fixImageOrientation() {
 
     for (const image of images) {
       try {
-        console.log(`🔄 Processing ${image.filename} (${processed + 1}/${images.length})`);
+        console.log(`Processing ${image.filename} (${processed + 1}/${images.length})`);
 
         // Generate properly oriented variants
         const result = await imageOptimizationService.generateVariantBlobs(

@@ -623,7 +623,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
         </div>
       ) : validationResult?.validation_status === 'pending' ? (
         <div>
-          <div style={{ fontSize: '64px', marginBottom: '16px' }}>⏳</div>
+          <div style={{ fontSize: '18px', marginBottom: '16px', fontWeight: 700 }}>Processing</div>
           <h3 className="text-large font-bold text-warning" style={{ marginBottom: '16px' }}>
             Validation Pending
           </h3>

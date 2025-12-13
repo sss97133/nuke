@@ -972,7 +972,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
               PARTS & MATERIALS:
               {receiptItems.some(item => item.extracted_by_ai) && (
                 <span style={{ fontSize: '7pt', marginLeft: '8px', padding: '2px 6px', background: '#dbeafe', border: '1px solid #3b82f6', borderRadius: '2px' }}>
-                  🤖 AI-extracted
+                  AI-extracted
                 </span>
               )}
             </div>

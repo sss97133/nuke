@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Bell, Mail, Settings, Users, AlertTriangle, CheckCircle, XCircle, Plus, Inbox, Send, Archive, Trash2 } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase, SUPABASE_ANON_KEY } from '../../lib/supabase'
 import { toast } from 'react-hot-toast'
 import MessageList from './MessageList'
 import AccessKeyManager from './AccessKeyManager'
@@ -62,6 +62,7 @@ const VehicleMailbox: React.FC = () => {
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [purchaseError, setPurchaseError] = useState<string | null>(null)
+  const [messagesMode, setMessagesMode] = useState<'inbox' | 'expert'>('inbox')
 
   const selectedStamp = stamps.find(s => s.id === selectedStampId)
 
@@ -73,6 +74,14 @@ const VehicleMailbox: React.FC = () => {
       loadVehicleData()
     }
   }, [vehicleId])
+
+  // Default to expert mode when the mailbox is empty (big pane should not be blank)
+  useEffect(() => {
+    if (activeTab !== 'messages') return
+    if ((messages || []).length === 0) {
+      setMessagesMode('expert')
+    }
+  }, [activeTab, messages?.length])
 
   // Set up real-time subscription only after mailbox is loaded
   useEffect(() => {
@@ -102,7 +111,12 @@ const VehicleMailbox: React.FC = () => {
   const getAuthHeaders = async () => {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token || localStorage.getItem('auth_token')
-    return token ? { 'Authorization': `Bearer ${token}` } : {}
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    // Vercel rewrites /api/* → Supabase Edge Function domain, which expects apikey header.
+    // supabase-js adds this automatically for supabase.functions.invoke, but our fetch() needs it.
+    if (SUPABASE_ANON_KEY) headers['apikey'] = SUPABASE_ANON_KEY
+    return headers
   }
 
 
@@ -435,6 +449,39 @@ const VehicleMailbox: React.FC = () => {
       }
     } catch (error) {
       console.error(error)
+      setSendError('Draft failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const draftWorkOrderFromAI = async (draft: { title: string; description: string; urgency?: string; funds_committed?: { amount_cents: number; currency: 'USD' } | null }) => {
+    if (!vehicleId) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          title: draft.title,
+          description: draft.description,
+          urgency: (draft.urgency as any) || 'normal',
+          funds_committed: draft.funds_committed || null,
+          source_message_ids: []
+        })
+      })
+      if (res.ok) {
+        toast.success('Work order drafted')
+        await loadMessages()
+        await loadMailbox()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSendError(err?.message || 'Draft failed')
+      }
+    } catch (e) {
+      console.error(e)
       setSendError('Draft failed')
     } finally {
       setSending(false)
@@ -818,6 +865,34 @@ const VehicleMailbox: React.FC = () => {
               <div style={{ fontSize: '8pt' }} className="text-gray-900 font-semibold">
                 Vehicle Mailbox VIN: {mailbox.vin}
               </div>
+              {activeTab === 'messages' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMessagesMode('inbox')}
+                    className={`px-2 py-1 border-2 font-semibold transition-colors ${
+                      messagesMode === 'inbox'
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-100'
+                    }`}
+                    style={{ fontSize: '8pt' }}
+                  >
+                    Inbox
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMessagesMode('expert')}
+                    className={`px-2 py-1 border-2 font-semibold transition-colors ${
+                      messagesMode === 'expert'
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-100'
+                    }`}
+                    style={{ fontSize: '8pt' }}
+                  >
+                    Expert
+                  </button>
+                </div>
+              )}
               {unreadCount > 0 && (
                 <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-semibold" style={{ fontSize: '8pt' }}>
                   {unreadCount} unread
@@ -831,16 +906,33 @@ const VehicleMailbox: React.FC = () => {
             {/* Message list */}
             <div className="flex-1 overflow-y-auto bg-white">
               {activeTab === 'messages' && (
-                <MessageList
-                  messages={messages}
-                  loading={loading}
-                  onMarkAsRead={markMessageAsRead}
-                  onResolve={resolveMessage}
-                  onHandleDuplicate={handleDuplicateMessage}
-                  onSelect={(msg) => setSelectedMessage(msg)}
-                  getMessageIcon={getMessageIcon}
-                  getPriorityColor={getPriorityColor}
-                />
+                messagesMode === 'expert' ? (
+                  <div className="h-full">
+                    <VehicleExpertChat
+                      vehicleId={vehicleId!}
+                      vehicleVIN={mailbox.vin}
+                      vehicleYMM={vehicleData?.year && vehicleData?.make && vehicleData?.model
+                        ? `${vehicleData.year} ${vehicleData.make} ${vehicleData.model}`
+                        : undefined}
+                      vehicleYear={vehicleData?.year}
+                      vehicleMake={vehicleData?.make}
+                      vehicleModel={vehicleData?.model}
+                      variant="embedded"
+                      onDraftWorkOrder={draftWorkOrderFromAI}
+                    />
+                  </div>
+                ) : (
+                  <MessageList
+                    messages={messages}
+                    loading={loading}
+                    onMarkAsRead={markMessageAsRead}
+                    onResolve={resolveMessage}
+                    onHandleDuplicate={handleDuplicateMessage}
+                    onSelect={(msg) => setSelectedMessage(msg)}
+                    getMessageIcon={getMessageIcon}
+                    getPriorityColor={getPriorityColor}
+                  />
+                )
               )}
 
               {activeTab === 'settings' && (
@@ -1323,17 +1415,7 @@ const VehicleMailbox: React.FC = () => {
         />
       )}
 
-      {/* Vehicle Expert AI Chat */}
-      <VehicleExpertChat
-        vehicleId={vehicleId!}
-        vehicleVIN={mailbox.vin}
-        vehicleYMM={vehicleData?.year && vehicleData?.make && vehicleData?.model 
-          ? `${vehicleData.year} ${vehicleData.make} ${vehicleData.model}` 
-          : undefined}
-        vehicleYear={vehicleData?.year}
-        vehicleMake={vehicleData?.make}
-        vehicleModel={vehicleData?.model}
-      />
+      {/* Expert chat is embedded in the main mailbox pane (messagesMode === 'expert') */}
     </div>
   )
 }

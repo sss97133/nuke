@@ -91,7 +91,7 @@ export default function LiveProcessingMonitor() {
               ✅ {data.chunksCompleted || 0} chunks done
             </div>
             <div>
-              ⏳ {data.chunksPending || 0} chunks pending
+              {data.chunksPending || 0} chunks pending
             </div>
           </div>
         </div>

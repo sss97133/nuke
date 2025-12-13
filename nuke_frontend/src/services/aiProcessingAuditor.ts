@@ -151,7 +151,7 @@ export class AIProcessingAuditor {
     succeeded: number;
     failed: number;
   }> {
-    console.log('🔄 Retrying failed images...');
+    console.log('Retrying failed images...');
     
     const { data: failedImages } = await supabase
       .from('vehicle_images')
@@ -165,7 +165,7 @@ export class AIProcessingAuditor {
       return { retried: 0, succeeded: 0, failed: 0 };
     }
     
-    console.log(`🔄 Retrying ${failedImages.length} failed images...`);
+    console.log(`Retrying ${failedImages.length} failed images...`);
     
     for (const image of failedImages) {
       // Reset to pending, then let processStuckImages handle it

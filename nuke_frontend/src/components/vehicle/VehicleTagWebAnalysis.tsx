@@ -347,7 +347,7 @@ const VehicleTagWebAnalysis: React.FC<VehicleTagWebAnalysisProps> = ({ vehicleId
             onClick={loadAnalysis}
             style={{ marginRight: '12px' }}
           >
-            🔄 Refresh Analysis
+            Refresh Analysis
           </button>
           <span className="text-small text-muted">
             Last updated: {new Date().toLocaleTimeString()}

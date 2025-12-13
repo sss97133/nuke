@@ -472,7 +472,7 @@ const ImageGallery = ({
       // Only refresh if this event is for our vehicle
       if (eventVehicleId && eventVehicleId !== vehicleId) return;
       
-      console.log('🔄 Image processing complete, refreshing gallery:', imageId);
+      console.log('Image processing complete, refreshing gallery:', imageId);
       
       // Wait a moment for database to update, then refresh
       // Try multiple times with increasing delays (analysis might take 5-10 seconds, SPID detection adds time)
@@ -481,7 +481,7 @@ const ImageGallery = ({
       refreshAttempts.forEach((delay, index) => {
         setTimeout(async () => {
           try {
-            console.log(`🔄 Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
+            console.log(`Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
             const { data: refreshedImages, error } = await supabase
               .from('vehicle_images')
               .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
@@ -1140,7 +1140,7 @@ const ImageGallery = ({
             onChange={(e) => {
               const newSort = e.target.value as any;
               if (newSort === 'quality') {
-                alert('⏳ Presentation sorting requires AI angle analysis.\n\nImages will be analyzed automatically on upload in the future.\n\nUsing newest first for now.');
+                alert('Presentation sorting requires AI angle analysis.\n\nImages will be analyzed automatically on upload in the future.\n\nUsing newest first for now.');
                 setSortBy('date_desc');
               } else {
                 setSortBy(newSort);

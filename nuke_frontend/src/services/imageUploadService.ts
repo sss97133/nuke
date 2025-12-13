@@ -627,7 +627,7 @@ export class ImageUploadService {
         });
       }
 
-      // 🤖 TRIGGER AI ANALYSIS AUTOMATICALLY ON UPLOAD
+      // Trigger AI analysis automatically on upload
       // This MUST trigger for every image upload - no exceptions
       if (isImage && dbResult?.id && !duplicateOf) {
         console.log('🚀 Triggering AI analysis for uploaded image:', dbResult.id);

@@ -349,7 +349,7 @@ const BidForm: React.FC<BidFormProps> = ({ auction, onBidSubmitted, onCancel }) 
             opacity: isSubmitting ? 0.7 : 1
           }}
         >
-          {isSubmitting ? '⏳ Submitting...' : '🔨 Place Bid'}
+          {isSubmitting ? 'Submitting...' : 'PLACE BID'}
         </button>
         <button
           onClick={onCancel}

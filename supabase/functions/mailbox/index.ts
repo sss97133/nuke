@@ -49,7 +49,9 @@ const json = (status: number, body: unknown) =>
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "authorization, content-type",
+      // Be permissive: in production `/api/*` is rewritten by Vercel, but direct calls can still
+      // hit the function domain and require CORS to allow Supabase-style headers.
+      "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
       "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS"
     }
   })
@@ -63,10 +65,10 @@ const parseAuth = (req: Request) => {
 
 const getUserId = async (token: string | null) => {
   if (!token) return null
-  const client = createClient(SUPABASE_URL, token, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  })
-  const { data, error } = await client.auth.getUser()
+  // IMPORTANT:
+  // The second arg to createClient must be the Supabase anon/service key, NOT a user JWT.
+  // We already have a service-role client; use it to validate and resolve the user from the JWT.
+  const { data, error } = await supabaseAdmin.auth.getUser(token)
   if (error || !data?.user?.id) return null
   return data.user.id
 }

@@ -181,31 +181,63 @@ export async function callLLM(
 }
 
 async function callOpenAI(config: LLMConfig, messages: any[], options?: any): Promise<any> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages,
-      temperature: options?.temperature ?? 0.7,
-      max_tokens: options?.maxTokens,
-    }),
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+  const endpoint = 'https://api.openai.com/v1/chat/completions';
+  const candidates = [
+    config.model,
+    // Fallbacks for project-scoped keys with restricted model access
+    'gpt-4o',
+    'gpt-4-turbo',
+    'gpt-3.5-turbo',
+  ].filter(Boolean);
+
+  const tried = new Set<string>();
+  let lastErrorText = '';
+  let lastStatus = 0;
+
+  for (const model of candidates) {
+    if (tried.has(model)) continue;
+    tried.add(model);
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: options?.temperature ?? 0.7,
+        max_tokens: options?.maxTokens,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        content: data.choices[0]?.message?.content || '',
+        usage: data.usage,
+        finish_reason: data.choices[0]?.finish_reason,
+      };
+    }
+
+    lastStatus = response.status;
+    lastErrorText = await response.text();
+
+    const errLower = String(lastErrorText || '').toLowerCase();
+    const isModelAccessError =
+      errLower.includes('does not have access to model') ||
+      errLower.includes('model_not_found') ||
+      errLower.includes('"code":"model_not_found"') ||
+      errLower.includes('the model') && errLower.includes('does not exist');
+
+    // Only fall back for model selection problems. Otherwise fail fast.
+    if (!isModelAccessError) {
+      break;
+    }
   }
-  
-  const data = await response.json();
-  return {
-    content: data.choices[0]?.message?.content || '',
-    usage: data.usage,
-    finish_reason: data.choices[0]?.finish_reason,
-  };
+
+  throw new Error(`OpenAI API error: ${lastStatus || 500} - ${lastErrorText}`);
 }
 
 async function callAnthropic(config: LLMConfig, messages: any[], options?: any): Promise<any> {
@@ -217,34 +249,64 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.content,
     }));
-  
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': config.apiKey,
-      'anthropic-version': '2023-06-01',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: config.model,
-      max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.7,
-      system: systemMessage,
-      messages: conversationMessages,
-    }),
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Anthropic API error: ${response.status} - ${error}`);
+
+  const endpoint = 'https://api.anthropic.com/v1/messages';
+  const candidates = [
+    config.model,
+    // Fallbacks when a specific model name isn't enabled for the key
+    'claude-3-5-sonnet-latest',
+    'claude-3-5-haiku-20241022',
+    'claude-3-5-haiku-latest',
+  ].filter(Boolean);
+
+  const tried = new Set<string>();
+  let lastErrorText = '';
+  let lastStatus = 0;
+
+  for (const model of candidates) {
+    if (tried.has(model)) continue;
+    tried.add(model);
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'x-api-key': config.apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: options?.maxTokens ?? 4096,
+        temperature: options?.temperature ?? 0.7,
+        system: systemMessage,
+        messages: conversationMessages,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        content: data.content[0]?.text || '',
+        usage: data.usage,
+        finish_reason: data.stop_reason,
+      };
+    }
+
+    lastStatus = response.status;
+    lastErrorText = await response.text();
+
+    const errLower = String(lastErrorText || '').toLowerCase();
+    const isModelNotFound =
+      lastStatus === 404 ||
+      errLower.includes('not_found_error') ||
+      errLower.includes('model:');
+
+    if (!isModelNotFound) {
+      break;
+    }
   }
-  
-  const data = await response.json();
-  return {
-    content: data.content[0]?.text || '',
-    usage: data.usage,
-    finish_reason: data.stop_reason,
-  };
+
+  throw new Error(`Anthropic API error: ${lastStatus || 500} - ${lastErrorText}`);
 }
 
 async function callGoogle(config: LLMConfig, messages: any[], options?: any): Promise<any> {

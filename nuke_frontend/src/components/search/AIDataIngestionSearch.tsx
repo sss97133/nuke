@@ -34,9 +34,10 @@ export default function AIDataIngestionSearch() {
   const [isDragging, setIsDragging] = useState(false);
   const [showCritique, setShowCritique] = useState(false);
   const [currentVehicleData, setCurrentVehicleData] = useState<any>(null);
-  const [showActionButtons, setShowActionButtons] = useState(true);
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
@@ -73,15 +74,17 @@ export default function AIDataIngestionSearch() {
     detectVehiclePage();
   }, [location.pathname]);
 
-  // Persist the action button collapse state
+  // Close actions menu on outside click
   useEffect(() => {
-    const stored = window.localStorage.getItem('ai_data_ingestion_show_action_buttons');
-    if (stored === 'false') setShowActionButtons(false);
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem('ai_data_ingestion_show_action_buttons', String(showActionButtons));
-  }, [showActionButtons]);
+    if (!actionsOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const el = containerRef.current;
+      if (!el) return;
+      if (!el.contains(e.target as Node)) setActionsOpen(false);
+    };
+    window.addEventListener('mousedown', onMouseDown);
+    return () => window.removeEventListener('mousedown', onMouseDown);
+  }, [actionsOpen]);
 
   // Handle paste from clipboard
   useEffect(() => {
@@ -425,11 +428,15 @@ export default function AIDataIngestionSearch() {
     if (e.key === 'Escape') {
       setShowPreview(false);
       setExtractionPreview(null);
+      setActionsOpen(false);
     }
   };
 
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: '100%', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+    <div
+      ref={containerRef}
+      style={{ position: 'relative', width: '100%', maxWidth: '100%', minWidth: 0, display: 'flex', flexDirection: 'column' }}
+    >
       {/* Main Input Container - Extended responsive layout */}
       <div
         style={{
@@ -462,7 +469,7 @@ export default function AIDataIngestionSearch() {
             fontSize: '8pt',
             fontFamily: '"MS Sans Serif", sans-serif',
             background: 'transparent',
-            minWidth: 0,
+            minWidth: '80px',
             maxWidth: 'none',
             height: '100%',
             padding: 0
@@ -471,108 +478,129 @@ export default function AIDataIngestionSearch() {
 
         <button
           type="button"
-          onClick={() => setShowActionButtons((v) => !v)}
+          onClick={() => setActionsOpen((v) => !v)}
           className="button-win95"
           style={{
             padding: '2px 6px',
             fontSize: '8pt',
             height: '20px',
-            minWidth: '48px',
+            minWidth: '26px',
             opacity: 1,
             whiteSpace: 'nowrap'
           }}
-          title={showActionButtons ? 'Hide action buttons' : 'Show action buttons'}
+          title={actionsOpen ? 'Hide actions' : 'Show actions'}
         >
-          {showActionButtons ? 'LESS' : 'MORE'}
+          ...
         </button>
+      </div>
 
-        {showActionButtons && (
-          <>
-            {/* Critique Button (when on vehicle page) */}
-            {currentVehicleData && (
-              <button
-                type="button"
-                onClick={() => setShowCritique(!showCritique)}
-                className="button-win95"
-                style={{
-                  padding: '2px 6px',
-                  fontSize: '8pt',
-                  height: '20px',
-                  minWidth: 'auto',
-                  opacity: 1,
-                  background: showCritique ? '#c0c0c0' : 'var(--white)',
-                  whiteSpace: 'nowrap'
-                }}
-                title="Open critique mode to provide feedback on this vehicle"
-              >
-                CRIT
-              </button>
-            )}
-
-            {/* Image Attachment Button */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-              accept="image/*"
-              style={{ display: 'none' }}
-            />
+      {/* Actions Menu (Win95-style) */}
+      {actionsOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '30px',
+            right: 0,
+            background: 'var(--white)',
+            border: '2px solid var(--border)',
+            boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
+            padding: '6px',
+            zIndex: 1200,
+            display: 'flex',
+            gap: '6px',
+            alignItems: 'center'
+          }}
+        >
+          {/* Critique Button (when on vehicle page) */}
+          {currentVehicleData && (
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isProcessing}
+              onClick={() => setShowCritique(!showCritique)}
               className="button-win95"
               style={{
                 padding: '2px 6px',
                 fontSize: '8pt',
                 height: '20px',
-                minWidth: '40px',
+                minWidth: 'auto',
+                opacity: 1,
+                background: showCritique ? '#c0c0c0' : 'var(--white)',
+                whiteSpace: 'nowrap'
+              }}
+              title="Open critique mode to provide feedback on this vehicle"
+            >
+              CRIT
+            </button>
+          )}
+
+          {/* Image Attachment Button */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            accept="image/*"
+            style={{ display: 'none' }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isProcessing}
+            className="button-win95"
+            style={{
+              padding: '2px 6px',
+              fontSize: '8pt',
+              height: '20px',
+              minWidth: '40px',
+              opacity: isProcessing ? 0.5 : 1
+            }}
+            title="Attach image"
+          >
+            IMG
+          </button>
+
+          {/* Process/Submit Button */}
+          {!showPreview ? (
+            <button
+              type="button"
+              onClick={() => {
+                setActionsOpen(false);
+                processInput();
+              }}
+              disabled={isProcessing || (!input.trim() && !attachedImage)}
+              className="button-win95"
+              style={{
+                padding: '2px 8px',
+                fontSize: '8pt',
+                height: '20px',
+                minWidth: '35px',
+                opacity: (isProcessing || (!input.trim() && !attachedImage)) ? 0.5 : 1
+              }}
+              title="Process input"
+            >
+              {isProcessing ? '...' : 'GO'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setActionsOpen(false);
+                confirmAndSave();
+              }}
+              disabled={isProcessing}
+              className="button-win95"
+              style={{
+                padding: '2px 8px',
+                fontSize: '8pt',
+                height: '20px',
+                minWidth: '35px',
                 opacity: isProcessing ? 0.5 : 1
               }}
-              title="Attach image"
+              title="Confirm and save"
             >
-              IMG
+              {isProcessing ? '...' : 'OK'}
             </button>
-
-            {/* Process/Submit Button */}
-            {!showPreview ? (
-              <button
-                type="button"
-                onClick={processInput}
-                disabled={isProcessing || (!input.trim() && !attachedImage)}
-                className="button-win95"
-                style={{
-                  padding: '2px 8px',
-                  fontSize: '8pt',
-                  height: '20px',
-                  minWidth: '35px',
-                  opacity: (isProcessing || (!input.trim() && !attachedImage)) ? 0.5 : 1
-                }}
-                title="Process input"
-              >
-                {isProcessing ? '...' : 'GO'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={confirmAndSave}
-                disabled={isProcessing}
-                className="button-win95"
-                style={{
-                  padding: '2px 8px',
-                  fontSize: '8pt',
-                  height: '20px',
-                  minWidth: '35px',
-                  opacity: isProcessing ? 0.5 : 1
-                }}
-                title="Confirm and save"
-              >
-                {isProcessing ? '...' : 'OK'}
-              </button>
-            )}
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Image Preview */}
       {imagePreview && (
@@ -674,7 +702,7 @@ export default function AIDataIngestionSearch() {
               borderRadius: '2px'
             }}>
               <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                {extractionPreview.matchResult.shouldMerge ? '✓ Strong Match Found' : '⚠ Potential Match'}
+                {extractionPreview.matchResult.shouldMerge ? 'STRONG MATCH FOUND' : 'POTENTIAL MATCH'}
               </div>
               <div style={{ paddingLeft: '8px', fontSize: '7pt' }}>
                 <div>Match Score: {(extractionPreview.matchResult.matchScore * 100).toFixed(0)}%</div>

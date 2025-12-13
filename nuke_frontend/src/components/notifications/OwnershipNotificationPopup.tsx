@@ -32,7 +32,7 @@ const OwnershipNotificationPopup = ({
   const getIcon = () => {
     switch (type) {
       case 'success': return '✅';
-      case 'duplicate': return '⏳';
+      case 'duplicate': return 'Pending';
       case 'error': return '❌';
       default: return 'ℹ️';
     }
@@ -178,9 +178,9 @@ const OwnershipNotificationPopup = ({
             fontWeight: 'bold',
             textAlign: 'center'
           }}>
-            {type === 'success' && '⏳ Awaiting Admin Approval'}
-            {type === 'duplicate' && '⏳ Awaiting Admin Approval'}
-            {type === 'error' && '🔄 Please Try Again Later'}
+            {type === 'success' && 'Awaiting Admin Approval'}
+            {type === 'duplicate' && 'Awaiting Admin Approval'}
+            {type === 'error' && 'Please Try Again Later'}
           </div>
 
           {/* Action Buttons */}

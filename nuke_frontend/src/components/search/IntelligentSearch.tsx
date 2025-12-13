@@ -682,9 +682,9 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     const trimmed = initialQuery?.trim();
     if (trimmed && lastSearchedRef.current !== trimmed) {
       console.log('═══════════════════════════════════════════════════════');
-      console.log('🔄 AUTO-TRIGGER FIRING - NEW CODE VERSION');
-      console.log('🔄 initialQuery:', trimmed);
-      console.log('🔄 initialQuery type:', typeof trimmed);
+      console.log('AUTO-TRIGGER FIRING - NEW CODE VERSION');
+      console.log('initialQuery:', trimmed);
+      console.log('initialQuery type:', typeof trimmed);
       console.log('═══════════════════════════════════════════════════════');
       lastSearchedRef.current = trimmed;
       setHasInitialSearched(true);

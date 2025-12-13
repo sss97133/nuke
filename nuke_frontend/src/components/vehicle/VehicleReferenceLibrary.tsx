@@ -356,7 +356,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                         borderRadius: '4px',
                         marginBottom: '8px'
                       }}>
-                        {book.extraction.status === 'pending_review' ? '⏳ Processing' : '✓ Extracted'}
+                        {book.extraction.status === 'pending_review' ? 'Processing' : 'Extracted'}
                         {book.extraction.colors > 0 && ` • ${book.extraction.colors} colors`}
                         {book.extraction.engines > 0 && ` • ${book.extraction.engines} engines`}
                       </div>

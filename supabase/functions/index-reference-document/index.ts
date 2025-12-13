@@ -5,6 +5,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getUserApiKey } from '../_shared/getUserApiKey.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,8 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SERVICE_ROLE_KEY') ?? '',
+      // Support both env var names (some functions use SUPABASE_SERVICE_ROLE_KEY)
+      Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
@@ -28,10 +30,20 @@ serve(async (req) => {
     console.log(`Indexing: ${pdf_url} [${processingMode}] Pages: ${page_start || 'all'}-${page_end || 'all'}`)
 
     // Get API Key
-    const { getUserApiKey } = await import('../_shared/getUserApiKey.ts')
-    const geminiKeyResult = await getUserApiKey(supabase, user_id || null, 'google', 'GEMINI_API_KEY')
-    
-    if (!geminiKeyResult.apiKey) throw new Error('GEMINI_API_KEY required')
+    // Support both secret names. Some environments store this as GOOGLE_AI_API_KEY.
+    let geminiKeyResult = await getUserApiKey(supabase, user_id || null, 'google', 'GOOGLE_AI_API_KEY')
+    if (!geminiKeyResult.apiKey) {
+      geminiKeyResult = await getUserApiKey(supabase, user_id || null, 'google', 'GEMINI_API_KEY')
+    }
+    if (!geminiKeyResult.apiKey) throw new Error('GOOGLE_AI_API_KEY or GEMINI_API_KEY required')
+
+    function inferProvider(pdfUrl: string): string {
+      const u = pdfUrl.toLowerCase()
+      if (u.includes('lmctruck') || u.includes('/lmc') || u.includes('cccomplete.pdf')) return 'LMC'
+      if (u.includes('scottdrake') || u.includes('scott drake') || u.includes('scottdrakecatalog') || u.includes('scottdrakecatalog_mustang') || u.includes('scottdrakecatalog_mustang.pdf') || u.includes('scottdrakecatalog_mustang')) return 'Scott Drake'
+      if (u.includes('mustang') && u.includes('drake')) return 'Scott Drake'
+      return 'Unknown'
+    }
 
     // Get or create catalog source
     let catalogId = document_id
@@ -51,7 +63,7 @@ serve(async (req) => {
           .from('catalog_sources')
           .insert({
             name: pdf_url.split('/').pop()?.replace(/%20/g, ' ') || 'Catalog',
-            provider: pdf_url.includes('lmc') ? 'LMC' : 'Unknown',
+            provider: inferProvider(pdf_url),
             base_url: pdf_url,
             pdf_document_id: document_id
           })
@@ -75,7 +87,7 @@ serve(async (req) => {
           .from('catalog_sources')
           .insert({
             name: pdf_url.split('/').pop()?.replace(/%20/g, ' ') || 'Catalog',
-            provider: pdf_url.includes('lmc') ? 'LMC' : 'Unknown',
+            provider: inferProvider(pdf_url),
             base_url: pdf_url
           })
           .select()

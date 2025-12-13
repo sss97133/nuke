@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { MyOrganizationsService } from '../../services/myOrganizationsService';
 import type { MyOrganization } from '../../services/myOrganizationsService';
+import { useAuth } from '../../hooks/useAuth';
 
 interface BulkActionsToolbarProps {
   selectedVehicleIds: string[];
@@ -16,6 +17,7 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
   onDeselectAll,
   onUpdate
 }) => {
+  const { user, loading: authLoading } = useAuth();
   const [action, setAction] = useState<string | null>(null);
   const [collectionName, setCollectionName] = useState('');
   const [showCollectionInput, setShowCollectionInput] = useState(false);
@@ -26,14 +28,19 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
   const [loadingOrgs, setLoadingOrgs] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (showOrgAssignment && organizations.length === 0) {
       loadOrganizations();
     }
-  }, [showOrgAssignment]);
+  }, [showOrgAssignment, authLoading, user?.id]);
 
   const loadOrganizations = async () => {
     setLoadingOrgs(true);
     try {
+      if (!user?.id) {
+        setOrganizations([]);
+        return;
+      }
       const orgs = await MyOrganizationsService.getMyOrganizations({ status: 'active' });
       setOrganizations(orgs);
     } catch (error) {

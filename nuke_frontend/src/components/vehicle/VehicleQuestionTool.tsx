@@ -79,7 +79,7 @@ export const VehicleQuestionTool: React.FC<VehicleQuestionToolProps> = ({ vehicl
           disabled={asking || !question.trim()}
           style={styles.button}
         >
-          {asking ? '⏳' : '🤖'}
+          {asking ? 'WAIT' : 'AI'}
         </button>
       </div>
 
