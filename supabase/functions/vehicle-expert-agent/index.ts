@@ -10,7 +10,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getLLMConfig, callLLM, type LLMProvider, type AnalysisTier } from '../_shared/llmProvider.ts';
+import { getLLMConfig, callLLM, type LLMProvider, type AnalysisTier } from './_shared/llmProvider.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY =
