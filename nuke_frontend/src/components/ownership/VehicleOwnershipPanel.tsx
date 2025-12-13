@@ -77,6 +77,10 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string>('');
+  const [claimUploading, setClaimUploading] = useState(false);
+  const [claimStep, setClaimStep] = useState<string>('');
+  const [claimProgress, setClaimProgress] = useState<number>(0);
+  const [claimSuccessMessage, setClaimSuccessMessage] = useState<string>('');
   const ownershipUploadId = `ownership-upload-${vehicle.id}`;
 
   useEffect(() => {
@@ -250,7 +254,8 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         `)
         .eq('vehicle_id', vehicle.id)
         .eq('status', 'active')
-        .single();
+        // 406 (Not Acceptable) happens when .single() receives 0 rows. We want "not assigned" instead.
+        .maybeSingle();
 
       if (moderatorData) {
         const moderatorName = moderatorData.profiles?.full_name || moderatorData.profiles?.email || 'Unknown';
@@ -579,6 +584,14 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     return;
                   }
 
+                  setClaimSuccessMessage('');
+                  setClaimUploading(true);
+                  setClaimStep('Uploading document…');
+                  setClaimProgress(5);
+                  const progressTimer = window.setInterval(() => {
+                    setClaimProgress((p) => (p < 85 ? p + 3 : p));
+                  }, 250);
+
                   // Upload ownership documents to the PRIVATE bucket.
                   // - Keeps documents out of public paths (prevents leaks)
                   // - Uses signed URLs for short-lived OCR verification
@@ -597,9 +610,27 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
 
                   if (uploadError) {
                     console.error('Upload error:', uploadError);
-                    alert('Upload failed: ' + uploadError.message);
+                    const msg = (uploadError as any)?.message || 'Upload failed';
+                    // Most common production failure mode: storage.objects RLS policy not applied yet.
+                    if (String(msg).toLowerCase().includes('row-level security')) {
+                      alert(
+                        'Upload blocked by Storage permissions (RLS).\n\n' +
+                        'Fix: apply the latest Supabase migrations for ownership-documents storage policies, ' +
+                        'then retry.\n\n' +
+                        `Details: ${msg}`
+                      );
+                    } else {
+                      alert('Upload failed: ' + msg);
+                    }
+                    window.clearInterval(progressTimer);
+                    setClaimUploading(false);
+                    setClaimStep('');
+                    setClaimProgress(0);
                     return;
                   }
+
+                  setClaimStep('Securing access link…');
+                  setClaimProgress(88);
 
                   // Generate a signed URL for short-lived access (OCR + immediate verification flow).
                   // Do NOT store public URLs for ownership docs.
@@ -610,6 +641,10 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                   if (signedErr || !signed?.signedUrl) {
                     console.error('Signed URL error:', signedErr);
                     alert('Upload succeeded but access link could not be created. Please try again.');
+                    window.clearInterval(progressTimer);
+                    setClaimUploading(false);
+                    setClaimStep('');
+                    setClaimProgress(0);
                     return;
                   }
                   
@@ -619,6 +654,9 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                     bucket: bucket,
                     document_type: claimType 
                   };
+
+                  setClaimStep('Submitting claim…');
+                  setClaimProgress(92);
 
                   // Check for existing verification record first
                   const { data: existing } = await supabase
@@ -720,13 +758,22 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                       .from(bucket)
                       .remove([storagePath]);
                     alert('Verification record failed: ' + verifyError.message);
+                    window.clearInterval(progressTimer);
+                    setClaimUploading(false);
+                    setClaimStep('');
+                    setClaimProgress(0);
                     return;
                   }
+
+                  setClaimStep('Finalizing…');
+                  setClaimProgress(100);
+                  window.clearInterval(progressTimer);
 
                   // Run OCR verification if this is a title or ID document (images only)
                   const isPdf = documentFile.type === 'application/pdf' || documentFile.name.toLowerCase().endsWith('.pdf');
                   if (!isPdf && (claimType === 'title' || claimType === 'drivers_license' || claimType === 'id')) {
-                    alert('Document uploaded! Running verification...');
+                    // Keep user informed without blocking the flow
+                    setClaimStep('Running verification…');
                     
                     // Process the document asynchronously
                     if (session?.user?.id) {
@@ -740,31 +787,61 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                         return;
                       }
                       if (result.success) {
-                        alert(`Ownership verified. Names match with ${result.confidence || 0}% confidence.`);
+                        setClaimSuccessMessage('Document verified. Ownership check completed.');
                       } else if (result.errors && result.errors.length > 0) {
                         if (result.errors[0].includes('Waiting')) {
-                          alert('Document saved. Please upload your ' + 
-                                (claimType === 'title' ? 'driver\'s license' : 'vehicle title') + 
-                                ' to complete verification.');
+                          setClaimSuccessMessage('Document saved. Please upload the companion document to complete verification.');
                         } else {
-                          alert('Verification requires manual review: ' + result.errors.join(', '));
+                          setClaimSuccessMessage('Verification saved and queued for review.');
                         }
                       }
                       loadOwnershipData();
                     });
                     }
                   } else if (isPdf && (claimType === 'title' || claimType === 'drivers_license' || claimType === 'id')) {
-                    alert('PDF uploaded successfully. Automatic OCR is not available for PDFs yet; this will require review.');
+                    setClaimSuccessMessage('PDF uploaded. OCR is not available for PDFs yet; this will be reviewed.');
                   } else {
-                    alert('Document submitted successfully!');
+                    setClaimSuccessMessage('Document submitted successfully.');
                   }
                   
                   await loadOwnershipData();
-                  setShowOwnershipForm(false);
+                  // Close modal shortly after so user sees success state
+                  window.setTimeout(() => {
+                    setShowOwnershipForm(false);
+                    setClaimSuccessMessage('');
+                    setClaimUploading(false);
+                    setClaimStep('');
+                    setClaimProgress(0);
+                    setSelectedFileName('');
+                  }, 900);
                 } catch (error: any) {
+                  console.error('Claim submit error:', error);
+                  setClaimUploading(false);
+                  setClaimStep('');
+                  setClaimProgress(0);
+                  setClaimSuccessMessage('');
                   alert('Error: ' + (error?.message || 'Unknown error'));
+                } finally {
+                  // Ensure button re-enables if we early-returned without timeout close
+                  setClaimUploading(false);
                 }
               }}>
+
+                {(claimUploading || claimSuccessMessage) && (
+                  <div style={{ marginBottom: '12px', padding: '10px', border: '1px solid var(--border)', borderRadius: '4px', background: 'var(--bg-secondary)' }}>
+                    <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '6px' }}>
+                      {claimSuccessMessage ? 'Submitted' : 'Uploading'}
+                    </div>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                      {claimSuccessMessage || claimStep || 'Working…'}
+                    </div>
+                    {!claimSuccessMessage && (
+                      <div style={{ height: '10px', border: '1px solid var(--border)', borderRadius: '3px', background: 'var(--white)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${Math.max(0, Math.min(100, claimProgress))}%`, background: 'var(--accent)', transition: 'width 0.18s ease' }} />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div style={{ marginBottom: '8px' }}>
                   <div style={{ marginBottom: '4px' }}>Document Type:</div>
@@ -828,8 +905,9 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                   <button
                     type="submit"
                     className="button button-primary"
+                    disabled={claimUploading}
                   >
-                    Submit
+                    {claimUploading ? 'Uploading…' : 'Submit'}
                   </button>
                 </div>
               </form>

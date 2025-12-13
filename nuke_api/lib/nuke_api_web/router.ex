@@ -92,6 +92,15 @@ defmodule NukeApiWeb.Router do
     get "/vehicles/:vehicle_id/mailbox/messages", MailboxController, :get_messages
     post "/vehicles/:vehicle_id/mailbox/messages", MailboxController, :create_message
     post "/vehicles/:vehicle_id/mailbox/work-orders/draft", MailboxController, :draft_work_order
+    post "/vehicles/:vehicle_id/mailbox/work-orders/:work_order_id/publish", MailboxController, :publish_work_order
+    post "/vehicles/:vehicle_id/mailbox/work-orders/:work_order_id/proofs", MailboxController, :add_work_order_proof
+    post "/vehicles/:vehicle_id/mailbox/work-orders/:work_order_id/complete", MailboxController, :complete_work_order
+    post "/vehicles/:vehicle_id/mailbox/work-orders/:work_order_id/complete-request", MailboxController, :request_work_order_completion
+    get "/vehicles/:vehicle_id/mailbox/work-orders/:work_order_id", MailboxController, :get_work_order
+    get "/vehicles/:vehicle_id/mailbox/work-orders/:work_order_id/quotes", MailboxController, :list_work_order_quotes
+    post "/vehicles/:vehicle_id/mailbox/work-orders/:work_order_id/quotes", MailboxController, :create_work_order_quote
+    post "/vehicles/:vehicle_id/mailbox/work-orders/:work_order_id/quotes/assemble", MailboxController, :assemble_work_order_quote
+    post "/vehicles/:vehicle_id/mailbox/work-orders/:work_order_id/quotes/:quote_id/accept", MailboxController, :accept_work_order_quote
     patch "/vehicles/:vehicle_id/mailbox/messages/:message_id/read", MailboxController, :mark_read
     patch "/vehicles/:vehicle_id/mailbox/messages/:message_id/resolve", MailboxController, :resolve_message
 

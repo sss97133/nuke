@@ -37,8 +37,10 @@ export class DocumentVerificationService {
            1. Owner's full name
            2. VIN number
            3. Vehicle year, make, and model
-           4. Any lienholder information
-           Format as JSON with keys: ownerName, vin, year, make, model, lienholder`
+           4. Title issue/print date (the date printed/issued on the title; NOT the deal date)
+           5. Any lienholder information
+           Format as JSON with keys: ownerName, vin, year, make, model, issueDate, lienholder
+           issueDate should be "YYYY-MM-DD" when possible.`
         : `Extract the following from this driver's license or ID:
            1. Full name
            2. Date of birth
@@ -186,6 +188,7 @@ export class DocumentVerificationService {
       const titleName = titleData.extractedData?.ownerName || '';
       const idName = idData.extractedData?.fullName || '';
       const vin = titleData.extractedData?.vin || '';
+      const issueDate = titleData.extractedData?.issueDate || titleData.extractedData?.issue_date || '';
       
       console.log('Extracted names:', { titleName, idName });
       
@@ -193,20 +196,25 @@ export class DocumentVerificationService {
       const nameMatchScore = this.compareNames(titleName, idName);
       const isVerified = nameMatchScore >= 80; // 80% match threshold
       
-      // Save verification results
+      // Save verification results (match current ownership_verifications schema)
       const { error: updateError } = await supabase
         .from('ownership_verifications')
         .update({
-          title_extracted_name: titleName,
-          id_extracted_name: idName,
-          extracted_vin: vin,
-          name_match_score: nameMatchScore,
-          auto_verified: isVerified,
-          verification_status: isVerified ? 'verified' : 'manual_review',
-          verified_at: isVerified ? new Date().toISOString() : null,
-          verification_notes: `Name match score: ${nameMatchScore}%. ${
-            isVerified ? 'Auto-verified' : 'Requires manual review'
-          }`
+          title_owner_name: titleName || null,
+          license_holder_name: idName || null,
+          vehicle_vin_from_title: vin || null,
+          name_match_score: Math.max(0, Math.min(1, nameMatchScore / 100)),
+          vin_match_confirmed: !!vin,
+          extracted_data: {
+            issue_date: issueDate || null,
+            title: titleData.extractedData || {},
+            id: idData.extractedData || {},
+            name_match_score: nameMatchScore,
+            last_verified_at: new Date().toISOString()
+          },
+          ai_processed_at: new Date().toISOString(),
+          status: isVerified ? 'approved' : 'human_review',
+          updated_at: new Date().toISOString()
         })
         .eq('vehicle_id', vehicleId)
         .eq('user_id', userId);
@@ -215,20 +223,9 @@ export class DocumentVerificationService {
         console.error('Failed to update verification record:', updateError);
       }
 
-      // Update vehicle ownership if verified
-      if (isVerified) {
-        const { error: vehicleError } = await supabase
-          .from('vehicles')
-          .update({
-            verified_owner_id: userId,
-            ownership_verified_at: new Date().toISOString()
-          })
-          .eq('id', vehicleId);
-          
-        if (vehicleError) {
-          console.error('Failed to update vehicle ownership:', vehicleError);
-        }
-      }
+      // NOTE: Do NOT directly update vehicles ownership here.
+      // Ownership should be finalized via the approve_ownership_verification function (reviewer pipeline),
+      // which also writes vehicle_ownerships and ownership_transfers using evidence-based effective dates.
 
       return {
         success: isVerified,

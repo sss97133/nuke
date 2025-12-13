@@ -55,8 +55,9 @@ This document defines the **mailbox-first** workflow for getting work done on a 
 #### 5) Routing + quoting (future wiring)
 - The system proposes relevant technicians/orgs and collects quotes.
 - DB writes (planned):
-  - `mailbox_messages` `quote` messages referencing quote ids
-  - `mailbox_messages` `acceptance` when approved
+  - `work_order_quotes` rows linked to `work_orders`
+  - `mailbox_messages` `quote` messages referencing `work_order_quote_id`
+  - `mailbox_messages` `acceptance` when a quote is accepted (also advances `work_orders.status`)
   - `mailbox_messages` `status_update` during execution
   - `mailbox_messages` `receipt` with proofs + receipts attached
 

@@ -166,25 +166,20 @@ const VehicleProfile: React.FC = () => {
   } = useVehiclePermissions(vehicleId || null, session, vehicle);
 
   // Additional permission checks - use database function for claim status
-  const [claimStatus, setClaimStatus] = useState<any>(null);
-  
-  useEffect(() => {
-    if (vehicleId && session?.user?.id) {
-      supabase
-        .rpc('get_vehicle_claim_status', {
-          p_vehicle_id: vehicleId,
-          p_user_id: session.user.id
-        })
-        .then(({ data, error }) => {
-          if (!error && data) {
-            setClaimStatus(data);
-          }
-        })
-        .catch(err => console.warn('Error checking claim status:', err));
-    }
-  }, [vehicleId, session?.user?.id]);
-  
-  const isVerifiedOwner = claimStatus?.user_has_claim === true || false;
+  // Ownership claim status should not rely on missing RPCs. Use ownership_verifications directly.
+  const userOwnershipClaim = React.useMemo(() => {
+    const uid = session?.user?.id;
+    if (!uid) return null;
+    return (ownershipVerifications || []).find((v: any) => v?.user_id === uid) || null;
+  }, [ownershipVerifications, session?.user?.id]);
+
+  const isVerifiedOwner = Boolean((vehicle as any)?.ownership_verified) || (() => {
+    // Strict: only treat as verified owner when BOTH documents are present and status is approved.
+    if (!userOwnershipClaim) return false;
+    const hasTitle = !!userOwnershipClaim.title_document_url && userOwnershipClaim.title_document_url !== 'pending';
+    const hasId = !!userOwnershipClaim.drivers_license_url && userOwnershipClaim.drivers_license_url !== 'pending';
+    return userOwnershipClaim.status === 'approved' && hasTitle && hasId;
+  })();
   const isDbUploader = Boolean(session?.user?.id && vehicle?.uploaded_by === session.user.id);
 
   // Consolidated permissions object
@@ -645,11 +640,13 @@ const VehicleProfile: React.FC = () => {
 
   const loadOwnershipVerifications = async () => {
     try {
-      if (!vehicle?.id) return;
+      // Use route param vehicleId (vehicle may not be loaded yet)
+      const vid = vehicle?.id || vehicleId;
+      if (!vid) return;
       const { data, error } = await supabase
         .from('ownership_verifications')
         .select('*')
-        .eq('vehicle_id', vehicle.id)
+        .eq('vehicle_id', vid)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -1344,7 +1341,7 @@ const VehicleProfile: React.FC = () => {
             </React.Suspense>
 
             {/* Wiring Query Context Bar & AI Parts Quote Generator */}
-            {permissions.isOwner && (
+            {(isRowOwner || isVerifiedOwner) && (
               <section className="section">
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ 
@@ -1507,6 +1504,8 @@ const VehicleProfile: React.FC = () => {
             initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
             organizationLinks={linkedOrganizations}
             onClaimClick={() => setShowOwnershipClaim(true)}
+            userOwnershipClaim={userOwnershipClaim as any}
+            suppressExternalListing={!!userOwnershipClaim}
           />
         </React.Suspense>
 
@@ -1717,7 +1716,7 @@ const VehicleProfile: React.FC = () => {
                 session={session}
                 isOwner={isRowOwner || isVerifiedOwner}
                 hasContributorAccess={hasContributorAccess}
-                contributorRole={contributorRole}
+                contributorRole={contributorRole ?? undefined}
               />
             </div>
           </div>

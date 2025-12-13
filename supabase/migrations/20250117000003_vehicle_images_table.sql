@@ -83,3 +83,5 @@ CREATE TRIGGER update_vehicle_images_updated_at
     BEFORE UPDATE ON vehicle_images
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+

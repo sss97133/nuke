@@ -5,6 +5,7 @@ defmodule NukeApi.Mailbox.MailboxMessage do
   alias NukeApi.Mailbox.VehicleMailbox
   alias NukeApi.Accounts.User
   alias NukeApi.Vehicles.Vehicle
+  alias NukeApi.EctoTypes.JsonbStringArray
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -50,6 +51,24 @@ defmodule NukeApi.Mailbox.MailboxMessage do
   @priority_levels ["low", "medium", "high", "urgent"]
   @sender_types ["user", "system", "organization"]
 
+  @derive {Jason.Encoder,
+           only: [
+             :id,
+             :mailbox_id,
+             :vehicle_id,
+             :message_type,
+             :title,
+             :content,
+             :priority,
+             :sender_id,
+             :sender_type,
+             :metadata,
+             :read_by,
+             :resolved_at,
+             :resolved_by,
+             :created_at,
+             :updated_at
+           ]}
   schema "mailbox_messages" do
     field :message_type, :string
     field :title, :string
@@ -58,7 +77,8 @@ defmodule NukeApi.Mailbox.MailboxMessage do
     field :sender_type, :string, default: "system"
     field :metadata, :map
     # Supabase schema stores read_by as JSONB array, not uuid[].
-    field :read_by, :map, default: []
+    # Ecto cannot set default [] for :map; use DB default and treat nil as [] in code.
+    field :read_by, JsonbStringArray
     field :resolved_at, :utc_datetime
     field :resolved_by, :binary_id
 

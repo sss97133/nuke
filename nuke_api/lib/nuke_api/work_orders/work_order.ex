@@ -11,14 +11,13 @@ defmodule NukeApi.WorkOrders.WorkOrder do
 
   alias NukeApi.Accounts.User
   alias NukeApi.Vehicles.Vehicle
-  alias NukeApi.Organizations.Organization
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
   schema "work_orders" do
     # Where the request is routed (nullable for early draft)
-    belongs_to :organization, Organization, foreign_key: :organization_id
+    field :organization_id, :binary_id
 
     # Who requested it
     belongs_to :customer, User, foreign_key: :customer_id
@@ -46,6 +45,12 @@ defmodule NukeApi.WorkOrders.WorkOrder do
     field :request_source, :string, default: "mailbox"
     field :status, :string, default: "draft"
 
+    # publish gating (added via supabase migration)
+    field :is_published, :boolean, default: false
+    field :published_at, :utc_datetime
+    field :published_by, :binary_id
+    field :visibility, :string, default: "private"
+
     field :metadata, :map, default: %{}
 
     # Supabase migrations use created_at/updated_at
@@ -55,6 +60,7 @@ defmodule NukeApi.WorkOrders.WorkOrder do
   @urgencies ["low", "normal", "high", "emergency"]
   @request_sources ["web", "sms", "phone", "email", "mailbox", "system"]
   @statuses ["draft", "pending", "quoted", "approved", "scheduled", "in_progress", "completed", "paid", "cancelled"]
+  @visibilities ["private", "invited", "marketplace"]
 
   @doc false
   def changeset(work_order, attrs) do
@@ -75,12 +81,17 @@ defmodule NukeApi.WorkOrders.WorkOrder do
       :actual_hours,
       :request_source,
       :status,
+      :is_published,
+      :published_at,
+      :published_by,
+      :visibility,
       :metadata
     ])
     |> validate_required([:title, :description])
     |> validate_inclusion(:urgency, @urgencies)
     |> validate_inclusion(:request_source, @request_sources)
     |> validate_inclusion(:status, @statuses)
+    |> validate_inclusion(:visibility, @visibilities)
     |> validate_length(:title, max: 200)
     |> foreign_key_constraint(:organization_id)
     |> foreign_key_constraint(:customer_id)

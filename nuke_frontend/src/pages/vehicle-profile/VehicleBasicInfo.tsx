@@ -239,6 +239,15 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       });
   };
 
+  const sanitizeInlineValue = (val: any): string => {
+    const s = (val ?? '').toString();
+    // Guard against contaminated imports (e.g. CSS blobs accidentally scraped into a field)
+    if (!s) return '';
+    if (s.length > 80) return '';
+    if (s.includes('{') || s.includes('}') || s.includes(';') || s.includes('}.') || s.includes('/*') || s.includes('*/')) return '';
+    return s;
+  };
+
   return (
     <div style={{
       background: 'var(--bg)',
@@ -441,7 +450,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              {vehicle.color || 'Not specified'}
+              {sanitizeInlineValue(vehicle.color) || 'Not specified'}
             </span>
           </div>
 

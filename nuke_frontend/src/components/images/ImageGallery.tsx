@@ -267,6 +267,19 @@ const ImageGallery = ({
     return out;
   };
 
+  const dedupeById = (images: any[]): any[] => {
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const img of images || []) {
+      const id = String(img?.id || '');
+      if (!id) continue;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push(img);
+    }
+    return out;
+  };
+
   // Define loadMoreImages BEFORE the useEffect that uses it
   const loadMoreImages = useCallback(() => {
     if (loadingMore || displayedImages.length >= allImages.length) return;
@@ -277,13 +290,22 @@ const ImageGallery = ({
     }
     
     setLoadingMore(true);
-    const currentCount = displayedImages.length;
     const sortedImages = getSortedImages();
-    const nextBatch = sortedImages.slice(currentCount, currentCount + imagesPerPage);
+    // Robust pagination: always append the next N images NOT already displayed.
+    // This prevents duplicates when the sort order changes between calls.
+    const alreadyShown = new Set(displayedImages.map((img: any) => String(img?.id || '')).filter(Boolean));
+    const nextBatch: any[] = [];
+    for (const img of sortedImages) {
+      const id = String(img?.id || '');
+      if (!id) continue;
+      if (alreadyShown.has(id)) continue;
+      nextBatch.push(img);
+      if (nextBatch.length >= imagesPerPage) break;
+    }
 
     setTimeout(() => {
       setDisplayedImages(prev => {
-        const newImages = [...prev, ...nextBatch];
+        const newImages = dedupeById([...prev, ...nextBatch]);
         // Load tag counts after state updates
         setTimeout(() => loadImageTagCounts(), 100);
         // Also load comment counts, uploader names, and tag texts for new batch
@@ -1043,11 +1065,7 @@ const ImageGallery = ({
             Upload Images
           </button>
           <div className="text-small text-muted" style={{ marginTop: '10px', fontSize: '8pt' }}>
-            Uploading a title/ownership document? Use{' '}
-            <a href={`/vehicle/${vehicleId}?claim=1`} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
-              Claim Ownership
-            </a>{' '}
-            so it’s processed correctly (and doesn’t land in the gallery).
+            Ownership/title documents should be submitted via the Ownership panel (not the gallery).
           </div>
         </div>
         
@@ -1176,10 +1194,7 @@ const ImageGallery = ({
             Upload
           </button>
           <span className="text-small text-muted" style={{ fontSize: '8pt' }}>
-            Title/ownership doc?{' '}
-            <a href={`/vehicle/${vehicleId}?claim=1`} style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
-              Claim Ownership
-            </a>
+            Ownership/title documents should be submitted via the Ownership panel.
           </span>
         </div>
       </div>

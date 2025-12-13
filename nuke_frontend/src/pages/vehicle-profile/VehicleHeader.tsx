@@ -9,6 +9,8 @@ import { VehicleValuationService } from '../../services/vehicleValuationService'
 import TradePanel from '../../components/trading/TradePanel';
 import { VehicleDeduplicationService } from '../../services/vehicleDeduplicationService';
 import { ValueProvenancePopup } from '../../components/ValueProvenancePopup';
+import DataValidationPopup from '../../components/vehicle/DataValidationPopup';
+import { useVINProofs } from '../../hooks/useVINProofs';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -37,11 +39,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   initialValuation,
   initialPriceSignal,
   organizationLinks = [],
-  onClaimClick
+  onClaimClick,
+  userOwnershipClaim,
+  suppressExternalListing = false
 }) => {
   const navigate = useNavigate();
   const { isVerifiedOwner, contributorRole } = permissions || {};
   const isVerified = isVerifiedOwner || isOwner;
+  const hasClaim = !!userOwnershipClaim;
+  const claimHasTitle = !!userOwnershipClaim?.title_document_url && userOwnershipClaim?.title_document_url !== 'pending';
+  const claimHasId = !!userOwnershipClaim?.drivers_license_url && userOwnershipClaim?.drivers_license_url !== 'pending';
+  const claimNeedsId = hasClaim && !claimHasId;
   const [rpcSignal, setRpcSignal] = useState<any | null>(initialPriceSignal || null);
   const [trendPct, setTrendPct] = useState<number | null>(null);
   const [trendPeriod, setTrendPeriod] = useState<'live' | '1w' | '30d' | '6m' | '1y' | '5y'>('30d');
@@ -74,6 +82,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const originDetailsRef = useRef<HTMLDivElement | null>(null);
   const [showProvenancePopup, setShowProvenancePopup] = useState(false);
   const [priceSources, setPriceSources] = useState<Record<string, boolean>>({});
+  const [showVinValidation, setShowVinValidation] = useState(false);
+
+  const { summary: vinProofSummary } = useVINProofs(vehicle?.id);
+  // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
+  // (VIN plate/stamping photo OCR, title OCR, etc). Manual entry alone is not enough.
+  const vinIsEvidenceBacked = !!vinProofSummary?.hasConclusiveProof;
 
   // Check if price fields have verified sources (FACT-BASED requirement)
   useEffect(() => {
@@ -724,6 +738,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   
   // Auction outcome badge and link
   const getAuctionContext = () => {
+    if (suppressExternalListing || hasClaim) {
+      return { badge: null, link: null, outcome: null };
+    }
     const outcome = (vehicle as any)?.auction_outcome;
     const batUrl = (vehicle as any)?.bat_auction_url || ((vehicle as any)?.discovery_url?.includes('bringatrailer') ? (vehicle as any)?.discovery_url : null);
     const kslUrl = (vehicle as any)?.discovery_url?.includes('ksl.com') ? (vehicle as any)?.discovery_url : null;
@@ -1201,9 +1218,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
                         (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
                       }}
-                      title="Upload title document to claim ownership"
+                      title={
+                        hasClaim
+                          ? (claimNeedsId ? 'Claim started. Upload your driver’s license to complete.' : 'Claim submitted.')
+                          : 'Upload title document to claim ownership'
+                      }
                     >
-                      Claim this vehicle
+                      {hasClaim ? (claimNeedsId ? 'Complete claim' : 'Claim submitted') : 'Claim this vehicle'}
                     </a>
                   );
                 }
@@ -1235,9 +1256,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
                         (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
                       }}
-                      title="Upload title document to claim ownership"
+                      title={
+                        hasClaim
+                          ? (claimNeedsId ? 'Claim started. Upload your driver’s license to complete.' : 'Claim submitted.')
+                          : 'Upload title document to claim ownership'
+                      }
                     >
-                      Claim this vehicle
+                      {hasClaim ? (claimNeedsId ? 'Complete claim' : 'Claim submitted') : 'Claim this vehicle'}
                     </a>
                   );
                 }
@@ -1504,16 +1529,47 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   style={{
                     fontSize: '6pt',
                     fontWeight: 700,
-                    color: '#22c55e',
-                    background: '#dcfce7',
+                    color: vinIsEvidenceBacked ? '#22c55e' : '#334155',
+                    background: vinIsEvidenceBacked ? '#dcfce7' : '#e2e8f0',
                     padding: '2px 6px',
                     borderRadius: '3px',
                     letterSpacing: '0.5px',
-                    lineHeight: 1
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
                   }}
-                  title="Factory specs verified via VIN decode"
+                  title={
+                    vinIsEvidenceBacked
+                      ? `VIN evidence available (${vinProofSummary?.proofCount || 0} proof${(vinProofSummary?.proofCount || 0) === 1 ? '' : 's'}). Click to view citations.`
+                      : 'VIN present, but no cited proof yet. Click to see sources and add proof.'
+                  }
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowVinValidation(true);
+                  }}
                 >
-                  VIN VERIFIED
+                  {vinIsEvidenceBacked ? 'VIN VERIFIED' : 'VIN PROVIDED'}
+                </span>
+              )}
+
+              {/* Ownership Verified Badge (separate from VIN VERIFIED) */}
+              {isVerifiedOwner && (
+                <span
+                  style={{
+                    fontSize: '6pt',
+                    fontWeight: 700,
+                    color: '#155e75',
+                    background: '#cffafe',
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    letterSpacing: '0.5px',
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="Ownership verified (title-based claim). Ownership effective date is anchored to the title issue/print date when available."
+                >
+                  OWNERSHIP VERIFIED
                 </span>
               )}
               
@@ -1640,6 +1696,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 </button>
               </div>
             </div>
+          )}
+
+          {showVinValidation && vehicle?.id && vehicle?.vin && (
+            <DataValidationPopup
+              vehicleId={vehicle.id}
+              fieldName="vin"
+              fieldValue={vehicle.vin}
+              onClose={() => setShowVinValidation(false)}
+            />
           )}
         </div>
       </div>
