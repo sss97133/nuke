@@ -24,6 +24,8 @@ ALTER TABLE shops ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
 
 -- Ensure email, phone, website_url exist (may have different names)
 ALTER TABLE shops ADD COLUMN IF NOT EXISTS website_url TEXT;
+-- shops_core expects a slug for friendly URLs/search; add if missing
+ALTER TABLE shops ADD COLUMN IF NOT EXISTS slug TEXT;
 
 -- Rename columns if they exist with different names
 DO $$
@@ -55,4 +57,14 @@ CREATE INDEX IF NOT EXISTS idx_shops_owner ON shops(owner_user_id);
 CREATE INDEX IF NOT EXISTS idx_shops_slug ON shops(slug);
 
 COMMENT ON COLUMN shops.owner_user_id IS 'Primary owner/creator of the shop - used by shops_core.sql';
-COMMENT ON COLUMN shops.created_by IS 'Legacy column - shop creator, may be same as owner_user_id';
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'shops' AND column_name = 'created_by'
+  ) THEN
+    EXECUTE 'COMMENT ON COLUMN shops.created_by IS ''Legacy column - shop creator, may be same as owner_user_id''';
+  END IF;
+END $$;

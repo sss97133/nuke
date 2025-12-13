@@ -34,6 +34,7 @@ export default function AIDataIngestionSearch() {
   const [isDragging, setIsDragging] = useState(false);
   const [showCritique, setShowCritique] = useState(false);
   const [currentVehicleData, setCurrentVehicleData] = useState<any>(null);
+  const [showActionButtons, setShowActionButtons] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -48,10 +49,6 @@ export default function AIDataIngestionSearch() {
 
       if (vehicleMatch) {
         const vehicleId = vehicleMatch[1];
-
-        // Auto-populate the input with the current URL
-        const currentUrl = `${window.location.origin}${path}`;
-        setInput(currentUrl);
 
         // Load vehicle data for critique mode
         try {
@@ -68,16 +65,23 @@ export default function AIDataIngestionSearch() {
           console.warn('Failed to load vehicle data for critique:', error);
         }
       } else {
-        // Clear auto-populated data when not on vehicle page
-        if (input.includes('/vehicle/')) {
-          setInput('');
-        }
         setCurrentVehicleData(null);
+        setShowCritique(false);
       }
     };
 
     detectVehiclePage();
   }, [location.pathname]);
+
+  // Persist the action button collapse state
+  useEffect(() => {
+    const stored = window.localStorage.getItem('ai_data_ingestion_show_action_buttons');
+    if (stored === 'false') setShowActionButtons(false);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('ai_data_ingestion_show_action_buttons', String(showActionButtons));
+  }, [showActionButtons]);
 
   // Handle paste from clipboard
   useEffect(() => {
@@ -446,7 +450,7 @@ export default function AIDataIngestionSearch() {
       >
         <input
           type="text"
-          placeholder=""
+          placeholder="Paste URL, text, or drop an image"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -465,87 +469,108 @@ export default function AIDataIngestionSearch() {
           }}
         />
 
-        {/* Critique Button (when on vehicle page) */}
-        {currentVehicleData && (
-          <button
-            type="button"
-            onClick={() => setShowCritique(!showCritique)}
-            className="button-win95"
-            style={{
-              padding: '2px 6px',
-              fontSize: '8pt',
-              height: '20px',
-              minWidth: 'auto',
-              opacity: 1,
-              background: showCritique ? '#c0c0c0' : 'var(--white)',
-              whiteSpace: 'nowrap'
-            }}
-            title="Open critique mode to provide feedback on this vehicle"
-          >
-            {showCritique ? 'CRIT' : 'CRIT'}
-          </button>
-        )}
-
-        {/* Image Attachment Button */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-          accept="image/*"
-          style={{ display: 'none' }}
-        />
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isProcessing}
+          onClick={() => setShowActionButtons((v) => !v)}
           className="button-win95"
           style={{
             padding: '2px 6px',
             fontSize: '8pt',
             height: '20px',
-            minWidth: '40px',
-            opacity: isProcessing ? 0.5 : 1
+            minWidth: '48px',
+            opacity: 1,
+            whiteSpace: 'nowrap'
           }}
-          title="Attach image"
+          title={showActionButtons ? 'Hide action buttons' : 'Show action buttons'}
         >
-          {attachedImage ? 'IMG' : 'IMG'}
+          {showActionButtons ? 'LESS' : 'MORE'}
         </button>
 
-        {/* Process/Submit Button */}
-        {!showPreview ? (
-          <button
-            type="button"
-            onClick={processInput}
-            disabled={isProcessing || (!input.trim() && !attachedImage)}
-            className="button-win95"
-            style={{
-              padding: '2px 8px',
-              fontSize: '8pt',
-              height: '20px',
-              minWidth: '35px',
-              opacity: (isProcessing || (!input.trim() && !attachedImage)) ? 0.5 : 1
-            }}
-            title="Process input"
-          >
-            {isProcessing ? '...' : 'GO'}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={confirmAndSave}
-            disabled={isProcessing}
-            className="button-win95"
-            style={{
-              padding: '2px 8px',
-              fontSize: '8pt',
-              height: '20px',
-              minWidth: '35px',
-              opacity: isProcessing ? 0.5 : 1
-            }}
-            title="Confirm and save"
-          >
-            {isProcessing ? '...' : 'OK'}
-          </button>
+        {showActionButtons && (
+          <>
+            {/* Critique Button (when on vehicle page) */}
+            {currentVehicleData && (
+              <button
+                type="button"
+                onClick={() => setShowCritique(!showCritique)}
+                className="button-win95"
+                style={{
+                  padding: '2px 6px',
+                  fontSize: '8pt',
+                  height: '20px',
+                  minWidth: 'auto',
+                  opacity: 1,
+                  background: showCritique ? '#c0c0c0' : 'var(--white)',
+                  whiteSpace: 'nowrap'
+                }}
+                title="Open critique mode to provide feedback on this vehicle"
+              >
+                CRIT
+              </button>
+            )}
+
+            {/* Image Attachment Button */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/*"
+              style={{ display: 'none' }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isProcessing}
+              className="button-win95"
+              style={{
+                padding: '2px 6px',
+                fontSize: '8pt',
+                height: '20px',
+                minWidth: '40px',
+                opacity: isProcessing ? 0.5 : 1
+              }}
+              title="Attach image"
+            >
+              IMG
+            </button>
+
+            {/* Process/Submit Button */}
+            {!showPreview ? (
+              <button
+                type="button"
+                onClick={processInput}
+                disabled={isProcessing || (!input.trim() && !attachedImage)}
+                className="button-win95"
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '8pt',
+                  height: '20px',
+                  minWidth: '35px',
+                  opacity: (isProcessing || (!input.trim() && !attachedImage)) ? 0.5 : 1
+                }}
+                title="Process input"
+              >
+                {isProcessing ? '...' : 'GO'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={confirmAndSave}
+                disabled={isProcessing}
+                className="button-win95"
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '8pt',
+                  height: '20px',
+                  minWidth: '35px',
+                  opacity: isProcessing ? 0.5 : 1
+                }}
+                title="Confirm and save"
+              >
+                {isProcessing ? '...' : 'OK'}
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -590,7 +615,7 @@ export default function AIDataIngestionSearch() {
             }}
             title="Remove image"
           >
-            ✕
+            X
           </button>
         </div>
       )}

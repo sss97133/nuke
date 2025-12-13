@@ -49,7 +49,7 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
     {
       id: '1',
       role: 'system',
-      content: `I am ${vehicleDisplayName}. I am the vehicle itself, fully self-aware of my own history, maintenance records, repairs, parts, and value. Ask me anything about myself - I have complete access to all my data and can help you make informed decisions.`,
+      content: `Vehicle assistant for ${vehicleDisplayName}. Ask questions about history, maintenance, parts, and what to do next. I will use your vehicle profile and linked records; if I need a missing detail (fitment, side, quantity), I will ask.`,
       timestamp: new Date()
     }
   ])
@@ -70,15 +70,16 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
     e.preventDefault()
     if (!input.trim() || isProcessing) return
 
+    const currentInput = input.trim()
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: currentInput,
       timestamp: new Date()
     }
 
     setMessages(prev => [...prev, userMessage])
-    const currentInput = input.trim()
     setInput('')
     setIsProcessing(true)
 
@@ -98,7 +99,8 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
           vehicle_year: vehicleYear,
           vehicle_make: vehicleMake,
           vehicle_model: vehicleModel,
-          conversation_history: messages.slice(-10).map(m => ({
+          userId: user.id,
+          conversation_history: [...messages, userMessage].slice(-10).map(m => ({
             role: m.role,
             content: m.content
           }))
@@ -115,21 +117,30 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
       })
 
       if (error) throw error
+      if ((data as any)?.error) throw new Error((data as any)?.error)
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data?.response || data?.answer || data?.valuation?.summary || 'I processed your request.',
+        content: data?.response || data?.answer || data?.valuation?.summary || 'No response returned. Please try again.',
         timestamp: new Date()
       }
 
       setMessages(prev => [...prev, assistantMessage])
 
     } catch (error: any) {
+      const details =
+        error?.message ||
+        error?.context?.message ||
+        (typeof error === 'string' ? error : '') ||
+        (() => {
+          try { return JSON.stringify(error) } catch { return '' }
+        })()
+
       const errorMessage: Message = {
         id: (Date.now() + 2).toString(),
         role: 'assistant',
-        content: `Error: ${error.message || 'Failed to process request. Please try again.'}`,
+        content: `Error: ${details || 'Failed to process request. Please try again.'}`,
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])

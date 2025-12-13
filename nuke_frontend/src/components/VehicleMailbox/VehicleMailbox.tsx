@@ -47,6 +47,16 @@ const VehicleMailbox: React.FC = () => {
   const [draftBody, setDraftBody] = useState('')
   const [draftUrgency, setDraftUrgency] = useState<'low' | 'normal' | 'high' | 'emergency'>('normal')
   const [draftFundsUsd, setDraftFundsUsd] = useState<string>('')
+  const [quoteAmountUsd, setQuoteAmountUsd] = useState<string>('')
+  const [quoteNotes, setQuoteNotes] = useState<string>('')
+  const [workOrderQuotes, setWorkOrderQuotes] = useState<any[]>([])
+  const [quotesLoading, setQuotesLoading] = useState(false)
+  const [publishVisibility, setPublishVisibility] = useState<'private' | 'invited' | 'marketplace'>('invited')
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState<any | null>(null)
+  const [workOrderLoading, setWorkOrderLoading] = useState(false)
+  const [proofType, setProofType] = useState<'before_photos' | 'after_photos' | 'timelapse' | 'receipt' | 'note' | 'other'>('after_photos')
+  const [proofUrlsText, setProofUrlsText] = useState<string>('')
+  const [proofNotes, setProofNotes] = useState<string>('')
   const [stamps, setStamps] = useState<Array<{ id: string; name?: string; sku?: string; remaining_uses?: number; is_listed?: boolean; list_price_cents?: number }>>([])
   const [selectedStampId, setSelectedStampId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -432,6 +442,289 @@ const VehicleMailbox: React.FC = () => {
     }
   }
 
+  const selectedWorkOrderId = (selectedMessage?.metadata as any)?.work_order_id || (selectedMessage?.metadata as any)?.workOrderId
+  const selectedWorkOrderIsDraft = Boolean((selectedMessage?.metadata as any)?.draft)
+  const selectedSourceMessageId = selectedMessage?.id
+
+  const loadSelectedWorkOrder = async () => {
+    if (!vehicleId || !selectedWorkOrderId) {
+      setSelectedWorkOrder(null)
+      return
+    }
+    setWorkOrderLoading(true)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/${selectedWorkOrderId}`, {
+        headers: { ...authHeaders }
+      })
+      if (res.ok) {
+        const result = await res.json()
+        setSelectedWorkOrder(result.data || null)
+      } else {
+        setSelectedWorkOrder(null)
+      }
+    } catch (e) {
+      console.error(e)
+      setSelectedWorkOrder(null)
+    } finally {
+      setWorkOrderLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedWorkOrderId) {
+      loadSelectedWorkOrder()
+    } else {
+      setSelectedWorkOrder(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWorkOrderId, vehicleId])
+
+  const loadQuotesForSelectedWorkOrder = async () => {
+    if (!vehicleId || !selectedWorkOrderId) return
+    setQuotesLoading(true)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/${selectedWorkOrderId}/quotes`, {
+        headers: { ...authHeaders }
+      })
+      if (res.ok) {
+        const result = await res.json()
+        setWorkOrderQuotes(result.data || [])
+      } else {
+        setWorkOrderQuotes([])
+      }
+    } catch (e) {
+      console.error(e)
+      setWorkOrderQuotes([])
+    } finally {
+      setQuotesLoading(false)
+    }
+  }
+
+  const publishSelectedWorkOrder = async () => {
+    if (!vehicleId || !selectedWorkOrderId) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/${selectedWorkOrderId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ visibility: publishVisibility })
+      })
+      if (res.ok) {
+        toast.success('Published')
+        await loadSelectedWorkOrder()
+        await loadMessages()
+        await loadMailbox()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSendError(err?.message || 'Publish failed')
+      }
+    } catch (e) {
+      console.error(e)
+      setSendError('Publish failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const submitProofForSelectedWorkOrder = async () => {
+    if (!vehicleId || !selectedWorkOrderId) return
+    const urls = proofUrlsText
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 20)
+    if (urls.length === 0 && !proofNotes.trim()) {
+      toast.error('Add a URL or a note')
+      return
+    }
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/${selectedWorkOrderId}/proofs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          proof_type: proofType,
+          urls,
+          notes: proofNotes || null
+        })
+      })
+      if (res.ok) {
+        toast.success('Proof saved')
+        setProofUrlsText('')
+        setProofNotes('')
+        await loadSelectedWorkOrder()
+        await loadMessages()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSendError(err?.message || 'Proof failed')
+      }
+    } catch (e) {
+      console.error(e)
+      setSendError('Proof failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const completeSelectedWorkOrder = async () => {
+    if (!vehicleId || !selectedWorkOrderId) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/${selectedWorkOrderId}/complete`, {
+        method: 'POST',
+        headers: { ...authHeaders }
+      })
+      if (res.ok) {
+        toast.success('Completed')
+        await loadSelectedWorkOrder()
+        await loadMessages()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        if (Array.isArray(err?.missing_deliverables) && err.missing_deliverables.length > 0) {
+          toast.error(`Missing: ${err.missing_deliverables.join(', ')}`)
+        }
+        setSendError(err?.message || 'Complete failed')
+      }
+    } catch (e) {
+      console.error(e)
+      setSendError('Complete failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const requestCompletionForSelectedWorkOrder = async () => {
+    if (!vehicleId || !selectedWorkOrderId) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/${selectedWorkOrderId}/complete-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ note: proofNotes || null })
+      })
+      if (res.ok) {
+        toast.success('Completion requested')
+        await loadSelectedWorkOrder()
+        await loadMessages()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSendError(err?.message || 'Request failed')
+      }
+    } catch (e) {
+      console.error(e)
+      setSendError('Request failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const draftWorkOrderFromSelectedMessage = async () => {
+    if (!vehicleId || !selectedMessage) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          title: selectedMessage.title || 'Work request',
+          description: selectedMessage.content || '',
+          urgency: 'normal',
+          create_request_message: false,
+          source_message_ids: [selectedMessage.id]
+        })
+      })
+      if (res.ok) {
+        toast.success('Draft created')
+        await loadMessages()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSendError(err?.message || 'Draft failed')
+      }
+    } catch (e) {
+      console.error(e)
+      setSendError('Draft failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const createQuoteForSelectedWorkOrder = async () => {
+    if (!vehicleId || !selectedWorkOrderId) return
+    const amountUsd = Number(quoteAmountUsd || 0)
+    const amountCents = Number.isFinite(amountUsd) && amountUsd > 0 ? Math.floor(amountUsd * 100) : 0
+    if (amountCents <= 0) {
+      toast.error('Quote amount required')
+      return
+    }
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/${selectedWorkOrderId}/quotes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          amount_cents: amountCents,
+          currency: 'USD',
+          notes: quoteNotes || null
+        })
+      })
+      if (res.ok) {
+        toast.success('Quote posted')
+        setQuoteAmountUsd('')
+        setQuoteNotes('')
+        await loadMessages()
+        await loadQuotesForSelectedWorkOrder()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSendError(err?.message || 'Quote failed')
+      }
+    } catch (e) {
+      console.error(e)
+      setSendError('Quote failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const acceptQuote = async (quoteId: string) => {
+    if (!vehicleId || !selectedWorkOrderId) return
+    setSending(true)
+    setSendError(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch(`/api/vehicles/${vehicleId}/mailbox/work-orders/${selectedWorkOrderId}/quotes/${quoteId}/accept`, {
+        method: 'POST',
+        headers: { ...authHeaders }
+      })
+      if (res.ok) {
+        toast.success('Quote accepted')
+        await loadMessages()
+        await loadQuotesForSelectedWorkOrder()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setSendError(err?.message || 'Accept failed')
+      }
+    } catch (e) {
+      console.error(e)
+      setSendError('Accept failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
   const purchaseStamp = async () => {
     setSending(true)
     setPurchaseError(null)
@@ -620,6 +913,233 @@ const VehicleMailbox: React.FC = () => {
                     <span>•</span>
                     <span>Priority: {selectedMessage.priority}</span>
                   </div>
+
+                  {/* Work order actions */}
+                  {selectedWorkOrderId && (
+                    <div className="border-2 border-gray-300 bg-gray-50 p-3 space-y-2">
+                      <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Work Order</div>
+                      <div className="text-gray-600" style={{ fontSize: '8pt' }}>
+                        ID: <span className="font-mono">{String(selectedWorkOrderId)}</span>
+                      </div>
+
+                      {/* Progress (visual cue) */}
+                      <div className="border border-gray-300 bg-white p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-gray-900 font-semibold" style={{ fontSize: '8pt' }}>Progress</div>
+                          <div className="text-gray-600" style={{ fontSize: '8pt' }}>
+                            {workOrderLoading ? 'Loading…' : (selectedWorkOrder?.status || (selectedWorkOrderIsDraft ? 'draft' : '—'))}
+                            {selectedWorkOrder?.is_published ? ' • published' : ''}
+                          </div>
+                        </div>
+
+                        {(() => {
+                          const woId = String(selectedWorkOrderId)
+                          const msgsForWO = messages.filter(m => String((m?.metadata as any)?.work_order_id || (m?.metadata as any)?.workOrderId || '') === woId)
+                          const hasAcceptance = msgsForWO.some(m => m.message_type === 'acceptance')
+                          const hasProof = msgsForWO.some(m => Boolean((m?.metadata as any)?.work_order_proof_id))
+                          const hasCompletionRequest = msgsForWO.some(m =>
+                            m.message_type === 'work_completed' && Boolean((m?.metadata as any)?.completion_request)
+                          )
+                          const status = String(selectedWorkOrder?.status || (selectedWorkOrderIsDraft ? 'draft' : '')).toLowerCase()
+                          const isPublished = Boolean(selectedWorkOrder?.is_published)
+                          const isCompleted = status === 'completed' || status === 'paid'
+                          const steps = [
+                            { label: 'Draft', done: status === 'draft' || selectedWorkOrderIsDraft },
+                            { label: 'Published', done: isPublished },
+                            { label: 'Accepted', done: hasAcceptance || ['approved', 'scheduled', 'in_progress', 'completed', 'paid'].includes(status) },
+                            { label: 'Proof', done: hasProof || isCompleted },
+                            { label: 'Request', done: hasCompletionRequest || isCompleted },
+                            { label: 'Completed', done: isCompleted }
+                          ]
+                          return (
+                            <div className="mt-2 space-y-1">
+                              {steps.map((s) => (
+                                <div key={s.label} className="flex items-center gap-2" style={{ fontSize: '8pt' }}>
+                                  {s.done ? (
+                                    <CheckCircle className="w-3 h-3 text-green-700" />
+                                  ) : (
+                                    <XCircle className="w-3 h-3 text-gray-400" />
+                                  )}
+                                  <span className={s.done ? 'text-gray-900' : 'text-gray-500'}>{s.label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })()}
+                      </div>
+
+                      {selectedWorkOrderIsDraft && (
+                        <div className="space-y-2">
+                          <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Availability</div>
+                          <select
+                            className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                            style={{ fontSize: '8pt' }}
+                            value={publishVisibility}
+                            onChange={(e) => setPublishVisibility(e.target.value as any)}
+                          >
+                            <option value="private">private</option>
+                            <option value="invited">invited</option>
+                            <option value="marketplace">marketplace</option>
+                          </select>
+                          <button
+                            className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
+                            style={{ fontSize: '8pt' }}
+                            disabled={sending}
+                            onClick={publishSelectedWorkOrder}
+                          >
+                            Publish
+                          </button>
+                        </div>
+                      )}
+
+                      <button
+                        className="px-3 py-1.5 border-2 border-gray-300 text-gray-900 hover:bg-gray-100 transition-colors font-semibold"
+                        style={{ fontSize: '8pt' }}
+                        disabled={quotesLoading}
+                        onClick={loadQuotesForSelectedWorkOrder}
+                      >
+                        {quotesLoading ? 'Loading quotes...' : 'Load Quotes'}
+                      </button>
+
+                      <div className="space-y-2">
+                        <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Post a Quote (USD)</div>
+                        <input
+                          className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                          style={{ fontSize: '8pt' }}
+                          placeholder="1500"
+                          inputMode="numeric"
+                          value={quoteAmountUsd}
+                          onChange={(e) => setQuoteAmountUsd(e.target.value)}
+                        />
+                        <textarea
+                          className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                          style={{ fontSize: '8pt' }}
+                          rows={3}
+                          placeholder="Notes (optional)"
+                          value={quoteNotes}
+                          onChange={(e) => setQuoteNotes(e.target.value)}
+                        />
+                        {sendError && (
+                          <div className="text-red-600" style={{ fontSize: '8pt' }}>{sendError}</div>
+                        )}
+                        <button
+                          className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
+                          style={{ fontSize: '8pt' }}
+                          disabled={sending || !quoteAmountUsd.trim()}
+                          onClick={createQuoteForSelectedWorkOrder}
+                        >
+                          Post Quote
+                        </button>
+                      </div>
+
+                      {workOrderQuotes.length > 0 && (
+                        <div className="space-y-2 pt-2 border-t border-gray-300">
+                          <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Quotes</div>
+                          {workOrderQuotes.map((q: any) => (
+                            <div key={q.id} className="bg-white border border-gray-300 p-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-gray-900 font-semibold" style={{ fontSize: '8pt' }}>
+                                  ${(Number(q.amount_cents || 0) / 100).toFixed(0)} {q.currency || 'USD'}
+                                </div>
+                                <div className="text-gray-500" style={{ fontSize: '8pt' }}>{String(q.status || '')}</div>
+                              </div>
+                              {q.notes && (
+                                <div className="text-gray-600 whitespace-pre-wrap" style={{ fontSize: '8pt' }}>{q.notes}</div>
+                              )}
+                              {q.status !== 'accepted' && (
+                                <button
+                                  className="mt-2 px-2 py-1 border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-colors font-semibold"
+                                  style={{ fontSize: '8pt' }}
+                                  disabled={sending}
+                                  onClick={() => acceptQuote(q.id)}
+                                >
+                                  Accept
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="space-y-2 pt-2 border-t border-gray-300">
+                        <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Proof</div>
+                        <select
+                          className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                          style={{ fontSize: '8pt' }}
+                          value={proofType}
+                          onChange={(e) => setProofType(e.target.value as any)}
+                        >
+                          <option value="before_photos">before_photos</option>
+                          <option value="after_photos">after_photos</option>
+                          <option value="timelapse">timelapse</option>
+                          <option value="receipt">receipt</option>
+                          <option value="note">note</option>
+                          <option value="other">other</option>
+                        </select>
+                        <textarea
+                          className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                          style={{ fontSize: '8pt' }}
+                          rows={3}
+                          placeholder="Paste URLs (one per line)"
+                          value={proofUrlsText}
+                          onChange={(e) => setProofUrlsText(e.target.value)}
+                        />
+                        <textarea
+                          className="w-full border-2 border-gray-300 px-2 py-1 focus:outline-none focus:border-gray-900"
+                          style={{ fontSize: '8pt' }}
+                          rows={2}
+                          placeholder="Notes (optional)"
+                          value={proofNotes}
+                          onChange={(e) => setProofNotes(e.target.value)}
+                        />
+                        <button
+                          className="px-3 py-1.5 border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 font-semibold"
+                          style={{ fontSize: '8pt' }}
+                          disabled={sending}
+                          onClick={submitProofForSelectedWorkOrder}
+                        >
+                          Save Proof
+                        </button>
+                        <button
+                          className="px-3 py-1.5 border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 font-semibold"
+                          style={{ fontSize: '8pt' }}
+                          disabled={sending}
+                          onClick={requestCompletionForSelectedWorkOrder}
+                        >
+                          Request Completion
+                        </button>
+                        <button
+                          className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
+                          style={{ fontSize: '8pt' }}
+                          disabled={sending}
+                          onClick={completeSelectedWorkOrder}
+                        >
+                          Mark Completed
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Agent-style suggestion: draft a work order from a selected work request message */}
+                  {!selectedWorkOrderId && (selectedMessage.message_type === 'work_request' || selectedMessage.message_type === 'user_message') && (
+                    <div className="border-2 border-gray-300 bg-gray-50 p-3 space-y-2">
+                      <div className="font-semibold text-gray-900" style={{ fontSize: '8pt' }}>Suggestion</div>
+                      <div className="text-gray-600" style={{ fontSize: '8pt' }}>
+                        Draft a work order from this message.
+                      </div>
+                      {sendError && (
+                        <div className="text-red-600" style={{ fontSize: '8pt' }}>{sendError}</div>
+                      )}
+                      <button
+                        className="px-3 py-1.5 bg-gray-900 text-white border-2 border-gray-900 hover:bg-gray-800 transition-colors disabled:opacity-50 font-semibold"
+                        style={{ fontSize: '8pt' }}
+                        disabled={sending || !selectedMessage.content}
+                        onClick={draftWorkOrderFromSelectedMessage}
+                      >
+                        Create Draft
+                      </button>
+                    </div>
+                  )}
 
                   {!selectedMessage.resolved_at ? (
                     <div className="flex gap-2">

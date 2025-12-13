@@ -8,8 +8,10 @@ import Config
 config :nuke_api, NukeApi.Repo,
   username: "postgres",
   password: "postgres",
-  hostname: "localhost",
-  database: "nuke_api_test#{System.get_env("MIX_TEST_PARTITION")}",
+  hostname: "127.0.0.1",
+  port: 54322,
+  # Use the local Supabase DB (already migrated by Supabase migrations).
+  database: "postgres",
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
 

@@ -109,6 +109,16 @@ export interface VehicleHeaderProps {
   initialPriceSignal?: any;
   organizationLinks?: any[];
   onClaimClick?: () => void;
+  userOwnershipClaim?: {
+    id: string;
+    status: string;
+    verification_type?: string | null;
+    title_document_url?: string | null;
+    drivers_license_url?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+  } | null;
+  suppressExternalListing?: boolean;
 }
 
 export interface VehicleHeroImageProps {

@@ -47,6 +47,45 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
       setLoading(true);
       const sources: ValidationSource[] = [];
 
+      // 0. VIN-specific: include conclusive, cited sources from data_validation_sources
+      if (fieldName === 'vin') {
+        const { data: vinSources } = await supabase
+          .from('data_validation_sources')
+          .select('id, source_type, source_image_id, source_url, confidence_score, extraction_method, verification_notes, created_at')
+          .eq('vehicle_id', vehicleId)
+          .eq('data_field', 'vin')
+          .order('confidence_score', { ascending: false })
+          .order('created_at', { ascending: false });
+
+        if (vinSources && vinSources.length > 0) {
+          const imageIds = vinSources.map((v: any) => v.source_image_id).filter(Boolean) as string[];
+          const imageUrlById = new Map<string, string>();
+          if (imageIds.length > 0) {
+            const { data: images } = await supabase
+              .from('vehicle_images')
+              .select('id, thumbnail_url, medium_url, image_url')
+              .in('id', imageIds);
+            images?.forEach((img: any) => {
+              imageUrlById.set(img.id, img.thumbnail_url || img.medium_url || img.image_url);
+            });
+          }
+
+          vinSources.forEach((v: any) => {
+            const imgUrl = v.source_image_id ? imageUrlById.get(v.source_image_id) : undefined;
+            sources.push({
+              validation_source: v.source_type || 'unknown_source',
+              confidence_score: typeof v.confidence_score === 'number' ? v.confidence_score : 0,
+              source_url: imgUrl || v.source_url || undefined,
+              notes: [
+                v.extraction_method ? `Method: ${v.extraction_method}` : null,
+                v.verification_notes ? v.verification_notes : null
+              ].filter(Boolean).join(' • '),
+              created_at: v.created_at
+            });
+          });
+        }
+      }
+
       // 1. Get ownership verifications (title, registration uploads)
       const { data: ownershipDocs } = await supabase
         .from('ownership_verifications')
@@ -162,6 +201,17 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
   const getSourceIcon = (source: string) => {
     // NO EMOJIS - use text labels only
     return '';
+  };
+
+  const isLikelyImageUrl = (url: string) => {
+    const lower = url.toLowerCase();
+    return lower.includes('/storage/v1/object/') && (
+      lower.endsWith('.png') ||
+      lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.webp') ||
+      lower.endsWith('.gif')
+    );
   };
 
   const getSourceLabel = (source: string) => {
@@ -314,6 +364,28 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
 
                       {validation.source_url && (
                         <div style={{ marginTop: '6px' }}>
+                          {isLikelyImageUrl(validation.source_url) && (
+                            <a
+                              href={validation.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ display: 'inline-block', marginBottom: '8px' }}
+                              title="Open cited image in a new tab"
+                            >
+                              <img
+                                src={validation.source_url}
+                                alt="Cited proof"
+                                style={{
+                                  width: 160,
+                                  maxWidth: '100%',
+                                  height: 'auto',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: 4,
+                                  display: 'block'
+                                }}
+                              />
+                            </a>
+                          )}
                           <a
                             href={validation.source_url}
                             target="_blank"

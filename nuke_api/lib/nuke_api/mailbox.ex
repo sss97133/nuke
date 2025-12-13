@@ -273,7 +273,10 @@ defmodule NukeApi.Mailbox do
           ak.mailbox_id == ^mailbox_id and
             (ak.user_id == ^user_id or
                ak.org_id in subquery(
-                 from(uo in "user_organizations", where: uo.user_id == ^user_id, select: uo.organization_id)
+                 from(uo in "user_organizations",
+                   where: uo.user_id == type(^user_id, :binary_id),
+                   select: uo.organization_id
+                 )
                )) and
             (is_nil(ak.expires_at) or ak.expires_at > ^DateTime.utc_now()),
         order_by: [desc: ak.permission_level],
@@ -294,11 +297,12 @@ defmodule NukeApi.Mailbox do
     # read_by is stored as JSONB array; use @> against jsonb.
     # NOTE: we compare against the string form of user_id since JSONB stores values as strings.
     jsonb_list = [to_string(user_id)]
+    jsonb_param = Jason.encode!(jsonb_list)
 
     from(m in MailboxMessage,
       where:
         m.mailbox_id == ^mailbox_id and
-          not fragment("? @> ?", m.read_by, type(^jsonb_list, :map)),
+          not fragment("? @> ?::jsonb", m.read_by, ^jsonb_param),
       select: count()
     )
     |> Repo.one()

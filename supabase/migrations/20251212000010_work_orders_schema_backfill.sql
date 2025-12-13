@@ -8,7 +8,9 @@ create table if not exists public.work_orders (
   id uuid primary key default gen_random_uuid(),
 
   -- Where the request is routed (nullable for early "draft" before matching)
-  organization_id uuid references public.businesses(id) on delete set null,
+  -- NOTE: in some local/dev schemas the businesses system may not exist yet.
+  -- We keep this as a plain UUID and add the FK constraint only when businesses exists.
+  organization_id uuid,
 
   -- Who requested it
   customer_id uuid references auth.users(id) on delete set null,
@@ -67,17 +69,22 @@ create policy "work_orders_select_customer" on public.work_orders
 
 -- Business members can view requests routed to their org
 -- NOTE: uses business_user_roles (businesses system) rather than legacy organizations.
-drop policy if exists "work_orders_select_business_member" on public.work_orders;
-create policy "work_orders_select_business_member" on public.work_orders
-  for select using (
-    organization_id is not null and exists (
-      select 1
-      from public.business_user_roles bur
-      where bur.business_id = work_orders.organization_id
-        and bur.user_id = auth.uid()
-        and bur.status = 'active'
-    )
-  );
+do $$
+begin
+  if to_regclass('public.business_user_roles') is not null then
+    drop policy if exists "work_orders_select_business_member" on public.work_orders;
+    create policy "work_orders_select_business_member" on public.work_orders
+      for select using (
+        organization_id is not null and exists (
+          select 1
+          from public.business_user_roles bur
+          where bur.business_id = work_orders.organization_id
+            and bur.user_id = auth.uid()
+            and bur.status = 'active'
+        )
+      );
+  end if;
+end $$;
 
 -- Customers can insert their own work orders
 drop policy if exists "work_orders_insert_customer" on public.work_orders;
@@ -95,26 +102,47 @@ create policy "work_orders_update_customer_draft" on public.work_orders
   );
 
 -- Business members can update requests routed to their org
-drop policy if exists "work_orders_update_business_member" on public.work_orders;
-create policy "work_orders_update_business_member" on public.work_orders
-  for update using (
-    organization_id is not null and exists (
-      select 1
-      from public.business_user_roles bur
-      where bur.business_id = work_orders.organization_id
-        and bur.user_id = auth.uid()
-        and bur.status = 'active'
-    )
-  )
-  with check (
-    organization_id is not null and exists (
-      select 1
-      from public.business_user_roles bur
-      where bur.business_id = work_orders.organization_id
-        and bur.user_id = auth.uid()
-        and bur.status = 'active'
-    )
-  );
+do $$
+begin
+  if to_regclass('public.business_user_roles') is not null then
+    drop policy if exists "work_orders_update_business_member" on public.work_orders;
+    create policy "work_orders_update_business_member" on public.work_orders
+      for update using (
+        organization_id is not null and exists (
+          select 1
+          from public.business_user_roles bur
+          where bur.business_id = work_orders.organization_id
+            and bur.user_id = auth.uid()
+            and bur.status = 'active'
+        )
+      )
+      with check (
+        organization_id is not null and exists (
+          select 1
+          from public.business_user_roles bur
+          where bur.business_id = work_orders.organization_id
+            and bur.user_id = auth.uid()
+            and bur.status = 'active'
+        )
+      );
+  end if;
+end $$;
+
+-- Best-effort FK to businesses if the table exists (keeps prod constraints while allowing local bootstrap)
+do $$
+begin
+  if to_regclass('public.businesses') is not null then
+    if not exists (
+      select 1 from pg_constraint
+      where conname = 'work_orders_organization_id_fkey'
+        and conrelid = 'public.work_orders'::regclass
+    ) then
+      alter table public.work_orders
+        add constraint work_orders_organization_id_fkey
+        foreign key (organization_id) references public.businesses(id) on delete set null;
+    end if;
+  end if;
+end $$;
 
 commit;
 

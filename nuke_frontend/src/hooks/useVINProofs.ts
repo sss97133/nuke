@@ -9,24 +9,25 @@ import { supabase } from '../lib/supabase';
 interface VINProof {
   id: string;
   vin: string;
-  validation_source: string;
+  source_type: string;
   source_image_id: string | null;
   image_url?: string;
   confidence_score: number;
-  validation_method: string;
-  is_verified: boolean;
-  condition: string;
+  extraction_method?: string | null;
+  source_url?: string | null;
+  is_conclusive: boolean;
   created_at: string;
-  notes?: string;
+  notes?: string | null;
 }
 
 interface VINProofSummary {
   vin: string;
   proofCount: number;
+  conclusiveProofCount: number;
   totalConfidence: number;
   sources: string[];
   proofs: VINProof[];
-  isHighConfidence: boolean; // 3+ proofs
+  hasConclusiveProof: boolean;
 }
 
 export function useVINProofs(vehicleId: string | undefined) {
@@ -41,35 +42,38 @@ export function useVINProofs(vehicleId: string | undefined) {
 
     async function loadProofs() {
       try {
-        // Get all VIN validations for this vehicle
-        const { data: validations, error } = await supabase
-          .from('vin_validations')
+        // Canonical VIN proof table: data_validation_sources (vin proofs should always cite a source)
+        const { data: sourcesRows, error } = await supabase
+          .from('data_validation_sources')
           .select(`
             id,
-            vin,
-            validation_source,
+            vehicle_id,
+            data_field,
+            data_value,
+            source_type,
             source_image_id,
+            source_url,
             confidence_score,
-            validation_method,
-            is_verified,
-            condition,
-            created_at,
-            notes
+            extraction_method,
+            verification_notes,
+            created_at
           `)
           .eq('vehicle_id', vehicleId)
-          .order('created_at', { ascending: true });
+          .eq('data_field', 'vin')
+          .order('confidence_score', { ascending: false })
+          .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        if (!validations || validations.length === 0) {
+        if (!sourcesRows || sourcesRows.length === 0) {
           setSummary(null);
           setLoading(false);
           return;
         }
 
         // Get image URLs for proofs with images
-        const imageIds = validations
-          .map(v => v.source_image_id)
+        const imageIds = sourcesRows
+          .map((v: any) => v.source_image_id)
           .filter(Boolean) as string[];
         
         let imageUrls: Map<string, string> = new Map();
@@ -84,31 +88,59 @@ export function useVINProofs(vehicleId: string | undefined) {
           });
         }
 
-        // Build summary
-        const proofs: VINProof[] = validations.map(v => ({
-          ...v,
-          image_url: v.source_image_id ? imageUrls.get(v.source_image_id) : undefined
-        }));
+        const isConclusiveSourceType = (t: string) => {
+          // Anything that ties the VIN to an actual artifact (photo/doc) counts as conclusive.
+          // Manual entry does not.
+          const type = (t || '').toLowerCase();
+          return (
+            type === 'image' ||
+            type === 'document' ||
+            type === 'title' ||
+            type === 'registration' ||
+            type === 'spid' ||
+            type === 'build_sheet' ||
+            type === 'receipt'
+          );
+        };
 
-        // Get unique VIN (should all be the same)
-        const vin = validations[0].vin;
-        const sources = [...new Set(validations.map(v => v.validation_source))];
+        // Build summary
+        const proofs: VINProof[] = sourcesRows.map((v: any) => {
+          const imageUrl = v.source_image_id ? imageUrls.get(v.source_image_id) : undefined;
+          const conclusive = isConclusiveSourceType(v.source_type) && (v.confidence_score ?? 0) >= 80 && (!!imageUrl || !!v.source_url);
+          return {
+            id: v.id,
+            vin: (v.data_value || '').toString(),
+            source_type: v.source_type || 'unknown',
+            source_image_id: v.source_image_id || null,
+            image_url: imageUrl,
+            source_url: v.source_url || null,
+            confidence_score: Number(v.confidence_score ?? 0),
+            extraction_method: v.extraction_method || null,
+            is_conclusive: conclusive,
+            created_at: v.created_at,
+            notes: v.verification_notes || null,
+          };
+        });
+
+        const vin = proofs.find(p => p.vin)?.vin || '';
+        const sources = [...new Set(proofs.map(p => p.source_type))];
         
         // Calculate aggregate confidence
-        // Multiple proofs increase confidence
         const avgConfidence = Math.round(
-          validations.reduce((sum, v) => sum + (v.confidence_score || 0), 0) / validations.length
+          proofs.reduce((sum, v) => sum + (v.confidence_score || 0), 0) / proofs.length
         );
-        const multiProofBonus = validations.length >= 3 ? 15 : validations.length === 2 ? 8 : 0;
+        const conclusiveProofCount = proofs.filter(p => p.is_conclusive).length;
+        const multiProofBonus = conclusiveProofCount >= 2 ? 10 : 0;
         const totalConfidence = Math.min(avgConfidence + multiProofBonus, 100);
 
         setSummary({
           vin,
-          proofCount: validations.length,
+          proofCount: proofs.length,
+          conclusiveProofCount,
           totalConfidence,
           sources,
           proofs,
-          isHighConfidence: validations.length >= 3
+          hasConclusiveProof: conclusiveProofCount >= 1
         });
 
       } catch (err) {

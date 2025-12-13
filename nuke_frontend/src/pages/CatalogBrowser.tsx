@@ -28,6 +28,7 @@ interface CatalogPart {
   catalog: {
     name: string;
     provider: string;
+    base_url?: string | null;
   };
 }
 
@@ -100,7 +101,7 @@ export default function CatalogBrowser() {
       .select(`
         *,
         page:catalog_pages(page_number, image_url),
-        catalog:catalog_sources(name, provider)
+        catalog:catalog_sources(name, provider, base_url)
       `)
       .order('part_number', { ascending: true })
       .limit(100);
@@ -128,6 +129,10 @@ export default function CatalogBrowser() {
     setLoading(false);
   };
 
+  const providerName = parts?.[0]?.catalog?.provider || 'Provider';
+  const providerBaseUrl = parts?.[0]?.catalog?.base_url || null;
+  const providerHref = providerBaseUrl || null;
+
   return (
     <div style={{ padding: '16px', maxWidth: '1600px', margin: '0 auto', background: '#fff', minHeight: '100vh' }}>
       
@@ -140,6 +145,19 @@ export default function CatalogBrowser() {
           <span>Total Parts: {stats.total.toLocaleString()}</span>
           <span>With Images: {stats.with_images.toLocaleString()}</span>
           <span>In Stock: {stats.in_stock.toLocaleString()}</span>
+        </div>
+        <div style={{ marginTop: '6px', fontSize: '8pt', color: '#666' }}>
+          Provider:{' '}
+          <span style={{ fontWeight: 700, color: '#111' }}>
+            {providerName}
+          </span>
+          {providerHref && (
+            <span style={{ marginLeft: '8px' }}>
+              <a href={providerHref} target="_blank" rel="noreferrer" style={{ color: '#0066cc', textDecoration: 'none' }}>
+                Open provider site
+              </a>
+            </span>
+          )}
         </div>
       </div>
 

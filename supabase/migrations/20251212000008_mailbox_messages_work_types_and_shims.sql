@@ -107,15 +107,8 @@ select v.id, v.vin
  );
 
 -- Backfill: best-effort access keys for existing vehicles
--- - owner_id/user_id get master owner key
--- - uploaded_by gets inherited trusted_party key
-insert into public.mailbox_access_keys (mailbox_id, user_id, key_type, permission_level, relationship_type, granted_by)
-select vm.id, v.owner_id, 'master', 'read_write', 'owner', v.owner_id
-  from public.vehicles v
-  join public.vehicle_mailboxes vm on vm.vehicle_id = v.id
- where v.owner_id is not null
-on conflict do nothing;
-
+-- - user_id gets master owner key
+-- - uploaded_by gets inherited trusted_party key (if vehicles schema has uploaded_by)
 insert into public.mailbox_access_keys (mailbox_id, user_id, key_type, permission_level, relationship_type, granted_by)
 select vm.id, v.user_id, 'master', 'read_write', 'owner', v.user_id
   from public.vehicles v
@@ -123,12 +116,20 @@ select vm.id, v.user_id, 'master', 'read_write', 'owner', v.user_id
  where v.user_id is not null
 on conflict do nothing;
 
-insert into public.mailbox_access_keys (mailbox_id, user_id, key_type, permission_level, relationship_type, granted_by)
-select vm.id, v.uploaded_by, 'inherited', 'read_write', 'trusted_party', v.uploaded_by
-  from public.vehicles v
-  join public.vehicle_mailboxes vm on vm.vehicle_id = v.id
- where v.uploaded_by is not null
-on conflict do nothing;
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'vehicles' and column_name = 'uploaded_by'
+  ) then
+    insert into public.mailbox_access_keys (mailbox_id, user_id, key_type, permission_level, relationship_type, granted_by)
+    select vm.id, v.uploaded_by, 'inherited', 'read_write', 'trusted_party', v.uploaded_by
+      from public.vehicles v
+      join public.vehicle_mailboxes vm on vm.vehicle_id = v.id
+     where v.uploaded_by is not null
+    on conflict do nothing;
+  end if;
+end $$;
 
 commit;
 
