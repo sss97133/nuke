@@ -49,13 +49,22 @@ const DataValidationPopup: React.FC<DataValidationPopupProps> = ({
 
       // 0. VIN-specific: include conclusive, cited sources from data_validation_sources
       if (fieldName === 'vin') {
-        const { data: vinSources } = await supabase
+        const { data: vinSources, error: vinSourcesError } = await supabase
           .from('data_validation_sources')
           .select('id, source_type, source_image_id, source_url, confidence_score, extraction_method, verification_notes, created_at')
           .eq('vehicle_id', vehicleId)
           .eq('data_field', 'vin')
           .order('confidence_score', { ascending: false })
           .order('created_at', { ascending: false });
+
+        if (vinSourcesError) {
+          const status = (vinSourcesError as any)?.status;
+          const message = String((vinSourcesError as any)?.message || '');
+          // If migration/table isn't deployed yet, PostgREST returns 404. Ignore silently.
+          if (!(status === 404 || message.includes('404'))) {
+            throw vinSourcesError;
+          }
+        }
 
         if (vinSources && vinSources.length > 0) {
           const imageIds = vinSources.map((v: any) => v.source_image_id).filter(Boolean) as string[];

@@ -56,7 +56,9 @@ export default function VehicleSearch() {
   const performSearch = async () => {
     try {
       setLoading(true);
+      const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
       const searchLower = searchTerm.toLowerCase();
+      const searchLowerSafe = escapeILike(searchLower);
 
       // Search vehicles table - simplified query without broken image joins
       const { data, error } = await supabase
@@ -74,7 +76,7 @@ export default function VehicleSearch() {
           origin_metadata
         `)
         .eq('is_public', true)
-        .or(`make.ilike.%${searchLower}%,model.ilike.%${searchLower}%,year.eq.${parseInt(searchTerm) || 0}`)
+        .or(`make.ilike.%${searchLowerSafe}%,model.ilike.%${searchLowerSafe}%,year.eq.${parseInt(searchTerm) || 0}`)
         .limit(50);
 
       if (error) {

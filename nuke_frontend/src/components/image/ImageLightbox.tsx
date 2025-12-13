@@ -1778,8 +1778,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                 setAnalyzingImage(true);
                                 try {
                                   const { data: { user } } = await supabase.auth.getUser();
-                                  const { data, error } = await supabase.functions.invoke('analyze-image-tier1', {
-                                    body: { image_url: imageUrl, vehicle_id: vehicleId, image_id: imageId || null, user_id: user?.id || null }
+                                  const { data, error } = await supabase.functions.invoke('analyze-image', {
+                                    body: { image_url: imageUrl, image_id: imageId || null, vehicle_id: vehicleId, timeline_event_id: null, user_id: user?.id || null }
                                   });
                                   if (error) {
                                     alert(`Analysis failed: ${error.message}`);

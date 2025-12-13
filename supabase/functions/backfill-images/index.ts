@@ -12,6 +12,61 @@ interface BackfillRequest {
   source?: string;
   run_analysis?: boolean;
   listed_date?: string;
+  max_images?: number;
+}
+
+const CRAIGSLIST_HIRES_SIZE = '1200x900';
+
+function isProbablyThumbnail(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    lower.includes('94x63') ||
+    lower.includes('thumbnail') ||
+    lower.includes('thumb/') ||
+    lower.includes('_50x50') ||
+    lower.includes('50x50c') ||
+    lower.endsWith('.svg')
+  );
+}
+
+function normalizeSourceUrl(raw: string): string {
+  let imageUrl = raw
+    .replace(/&#038;/g, '&')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .trim();
+
+  // Remove resize parameters for BaT
+  if (imageUrl.includes('bringatrailer.com')) {
+    imageUrl = imageUrl
+      .replace(/[?&]w=\d+/g, '')
+      .replace(/[?&]resize=[^&]*/g, '')
+      .replace(/[?&]fit=[^&]*/g, '')
+      .replace(/[?&]$/, '');
+    if (imageUrl.includes('-scaled.')) {
+      imageUrl = imageUrl.replace('-scaled.', '.');
+    }
+  }
+
+  return imageUrl;
+}
+
+function candidateUrlsForSourceUrl(imageUrl: string): string[] {
+  // Prefer higher-res on Craigslist when possible, but keep fallback to original.
+  // Example: ..._600x450.jpg -> ..._1200x900.jpg
+  if (imageUrl.includes('images.craigslist.org') && /_\d+x\d+\.(jpg|jpeg|png|webp)(\?|$)/i.test(imageUrl)) {
+    const hi = imageUrl.replace(/_(\d+)x(\d+)\.(jpg|jpeg|png|webp)(\?|$)/i, `_${CRAIGSLIST_HIRES_SIZE}.$3$4`);
+    if (hi !== imageUrl) return [hi, imageUrl];
+  }
+  return [imageUrl];
+}
+
+async function sha1Hex(input: string): Promise<string> {
+  const bytes = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest('SHA-1', bytes);
+  const arr = Array.from(new Uint8Array(digest));
+  return arr.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 serve(async (req) => {
@@ -26,13 +81,13 @@ serve(async (req) => {
     );
 
     const body: BackfillRequest = await req.json();
-    const { vehicle_id, image_urls, source = 'backfill', run_analysis = true, listed_date } = body;
+    const { vehicle_id, image_urls, source = 'backfill', run_analysis = true, listed_date, max_images = 50 } = body;
 
     if (!vehicle_id || !image_urls || image_urls.length === 0) {
       throw new Error('vehicle_id and image_urls required');
     }
 
-    console.log(`Backfilling ${image_urls.length} images for vehicle ${vehicle_id}`);
+    console.log(`Backfilling ${image_urls.length} images for vehicle ${vehicle_id} (max_images=${max_images})`);
 
     // Get vehicle info for context
     const { data: vehicle } = await supabase
@@ -61,26 +116,34 @@ serve(async (req) => {
       errors: [] as string[]
     };
 
-    for (let i = 0; i < image_urls.length; i++) {
-      let imageUrl = image_urls[i];
-      
-      // Clean HTML entities from URL
-      imageUrl = imageUrl
-        .replace(/&#038;/g, '&')
-        .replace(/&#039;/g, "'")
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"');
-      
-      // Remove resize parameters for BaT
-      if (imageUrl.includes('bringatrailer.com')) {
-        imageUrl = imageUrl
-          .replace(/[?&]w=\d+/g, '')
-          .replace(/[?&]resize=[^&]*/g, '')
-          .replace(/[?&]fit=[^&]*/g, '')
-          .replace(/[?&]$/, '');
-        if (imageUrl.includes('-scaled.')) {
-          imageUrl = imageUrl.replace('-scaled.', '.');
-        }
+    // Dedupe: skip images already linked by source_url for this vehicle
+    const { data: existingRows } = await supabase
+      .from('vehicle_images')
+      .select('source_url')
+      .eq('vehicle_id', vehicle_id)
+      .not('source_url', 'is', null)
+      .limit(5000);
+    const existingSourceUrls = new Set((existingRows || []).map((r: any) => String(r.source_url)));
+
+    const normalizedInput = image_urls
+      .map((u) => normalizeSourceUrl(String(u)))
+      .filter((u) => u && u.startsWith('http'))
+      .filter((u) => !isProbablyThumbnail(u));
+
+    // Keep input order but remove exact duplicates
+    const uniqueUrls: string[] = [];
+    const seen = new Set<string>();
+    for (const u of normalizedInput) {
+      if (seen.has(u)) continue;
+      seen.add(u);
+      uniqueUrls.push(u);
+    }
+
+    for (let i = 0; i < uniqueUrls.length && results.uploaded < max_images; i++) {
+      const rawUrl = uniqueUrls[i];
+      if (existingSourceUrls.has(rawUrl)) {
+        results.skipped++;
+        continue;
       }
       
       try {
@@ -98,31 +161,41 @@ serve(async (req) => {
           headers['Referer'] = 'https://bringatrailer.com/';
         }
         
-        console.log(`Downloading image ${i + 1}/${image_urls.length}: ${imageUrl.substring(0, 80)}...`);
+        const candidates = candidateUrlsForSourceUrl(rawUrl);
+        console.log(`Downloading image ${i + 1}/${uniqueUrls.length}: ${rawUrl.substring(0, 80)}...`);
         let imageResponse: Response;
         try {
           // Add timeout (30 seconds)
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000);
-          
-          imageResponse = await fetch(imageUrl, { 
-            headers,
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-        } catch (fetchError: any) {
-          if (fetchError.name === 'AbortError') {
-            console.log(`Timeout fetching ${imageUrl}`);
-          } else {
-            console.log(`Fetch error for ${imageUrl}: ${fetchError.message || fetchError}`);
+
+          // Try higher-res variant first where applicable, fallback to original.
+          let ok = false;
+          let last: Response | null = null;
+          for (const candidateUrl of candidates) {
+            const resp = await fetch(candidateUrl, { headers, signal: controller.signal });
+            last = resp;
+            if (resp.ok) {
+              imageResponse = resp;
+              ok = true;
+              // If we successfully fetched a different URL than rawUrl, use it as provenance too.
+              // Keep `rawUrl` as `source_url` so reruns dedupe consistently.
+              break;
+            }
           }
+          clearTimeout(timeoutId);
+          if (!ok) {
+            imageResponse = last as Response;
+          }
+        } catch (fetchError: any) {
+          if (fetchError.name === 'AbortError') console.log(`Timeout fetching ${rawUrl}`);
+          else console.log(`Fetch error for ${rawUrl}: ${fetchError.message || fetchError}`);
           results.failed++;
           continue;
         }
         
         if (!imageResponse.ok) {
-          console.log(`Failed to download ${imageUrl}: ${imageResponse.status} ${imageResponse.statusText}`);
+          console.log(`Failed to download ${rawUrl}: ${imageResponse.status} ${imageResponse.statusText}`);
           try {
             const errorText = await imageResponse.text();
             if (errorText && errorText.length < 500) {
@@ -172,10 +245,11 @@ serve(async (req) => {
         console.log(`Image size: ${(imageBytes.length / 1024).toFixed(1)}KB, type: ${contentType}`);
         
         const extension = contentType.includes('png') ? 'png' : 'jpg';
-        
-        // Generate unique filename
-        const filename = `${source}_${Date.now()}_${i}.${extension}`;
-        const storagePath = `${vehicle_id}/${filename}`;
+
+        // Deterministic storage path prevents re-upload storms during re-runs.
+        const urlHash = await sha1Hex(`${rawUrl}|${extension}`);
+        const filename = `${source}_${urlHash}.${extension}`;
+        const storagePath = `${vehicle_id}/${source}/${filename}`;
         
         console.log(`Uploading to storage: ${storagePath}`);
         
@@ -189,11 +263,17 @@ serve(async (req) => {
           });
 
         if (uploadError) {
+          // If the object already exists, we can reuse the public URL and just ensure DB linkage.
+          const msg = String((uploadError as any).message || '');
+          if (msg.toLowerCase().includes('already exists')) {
+            results.skipped++;
+          } else {
           const errorMsg = `Upload failed for ${filename}: ${uploadError.message || JSON.stringify(uploadError)}`;
           console.log(`❌ ${errorMsg}`);
           results.errors.push(errorMsg);
           results.failed++;
           continue;
+          }
         }
         
         console.log(`✅ Uploaded ${filename} (${(imageBytes.length / 1024).toFixed(1)}KB)`);
@@ -212,12 +292,16 @@ serve(async (req) => {
             image_url: publicUrl,
             storage_path: storagePath,
             source: source,
+            source_url: rawUrl,
             is_primary: i === 0,
             taken_at: imageDate,
-            metadata: {
-              original_url: imageUrl,
+            // `vehicle_images` does NOT have a generic `metadata` column in production.
+            // Store import provenance in `exif_data` (jsonb) and `source_url` (text).
+            exif_data: {
+              original_url: rawUrl,
               import_source: source,
-              import_index: i
+              import_index: i,
+              imported_at: new Date().toISOString()
             }
           })
           .select('id')
@@ -232,11 +316,11 @@ serve(async (req) => {
         results.uploaded++;
         console.log(`Uploaded image ${i + 1}/${image_urls.length}: ${filename}`);
 
-        // Run Tier 1 analysis if requested
+        // Run vision analysis if requested
         if (run_analysis && imageRecord) {
           try {
             const analysisResponse = await fetch(
-              `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-image-tier1`,
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-image`,
               {
                 method: 'POST',
                 headers: {
@@ -246,7 +330,8 @@ serve(async (req) => {
                 body: JSON.stringify({
                   image_url: publicUrl,
                   vehicle_id,
-                  image_id: imageRecord.id
+                  image_id: imageRecord.id,
+                  user_id: adminUserId
                 })
               }
             );

@@ -184,15 +184,16 @@ async function triggerAIAnalysis(
   vehicleId?: string | null,
   userId?: string | null
 ): Promise<void> {
-  // Tier 1 analysis (basic organization)
-  supabase.functions.invoke('analyze-image-tier1', {
+  // Vision analysis (replaces deprecated analyze-image-tier1)
+  supabase.functions.invoke('analyze-image', {
     body: {
       image_url: imageUrl,
-      vehicle_id: vehicleId,
       image_id: imageId,
+      vehicle_id: vehicleId,
+      timeline_event_id: null,
       user_id: userId
     }
-  }).catch(err => console.warn('Tier 1 analysis failed:', err));
+  }).catch(err => console.warn('Vision analysis failed:', err));
   
   // Sensitive document detection
   supabase.functions.invoke('detect-sensitive-document', {
@@ -203,15 +204,7 @@ async function triggerAIAnalysis(
     }
   }).catch(err => console.warn('Sensitive document detection failed:', err));
   
-  // Full analysis (non-blocking)
-  supabase.functions.invoke('analyze-image', {
-    body: {
-      image_url: imageUrl,
-      vehicle_id: vehicleId,
-      timeline_event_id: null,
-      user_id: userId
-    }
-  }).catch(err => console.warn('Full analysis failed:', err));
+  // NOTE: analyze-image already covers tags + VIN/SPID OCR + metadata; no separate secondary call.
 }
 
 /**

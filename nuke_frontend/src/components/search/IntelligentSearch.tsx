@@ -49,6 +49,7 @@ interface IntelligentSearchProps {
 }
 
 const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }: IntelligentSearchProps) => {
+  const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
   const [query, setQuery] = useState(initialQuery);
   const [isSearching, setIsSearching] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
@@ -700,6 +701,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   const searchVehicles = async (query: string, analysis: any): Promise<SearchResult[]> => {
     try {
       const searchTerm = query.replace(/near me|for sale|buy/gi, '').trim();
+      const searchTermSafe = escapeILike(searchTerm);
       
       if (!searchTerm) {
         return [];
@@ -732,10 +734,10 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         const yearMatch = searchTerm.match(/^\d{4}$/);
         if (yearMatch) {
           const year = parseInt(yearMatch[0]);
-          vehicleQuery = vehicleQuery.or(`year.eq.${year},make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+          vehicleQuery = vehicleQuery.or(`year.eq.${year},make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
         } else {
           // Text search across multiple fields
-          vehicleQuery = vehicleQuery.or(`make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+          vehicleQuery = vehicleQuery.or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
         }
 
         const { data: simpleResults, error } = await vehicleQuery.limit(20);
@@ -876,6 +878,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   const searchShops = async (query: string, analysis: any): Promise<SearchResult[]> => {
     try {
       const searchTerm = query.trim();
+      const searchTermSafe = escapeILike(searchTerm);
       if (!searchTerm) {
         return [];
       }
@@ -884,7 +887,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         .from('shops')
         .select('id, name, description, location_city, location_state, created_at')
         .eq('is_verified', true) // Only show verified shops
-        .or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+        .or(`name.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`)
         .limit(10);
 
       if (error) {
@@ -915,6 +918,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   const searchOrganizations = async (query: string, analysis: any): Promise<SearchResult[]> => {
     try {
       const searchTerm = query.trim();
+      const searchTermSafe = escapeILike(searchTerm);
       if (!searchTerm) {
         return [];
       }
@@ -931,9 +935,9 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       
       if (yearMatch) {
         const year = parseInt(yearMatch[0]);
-        relatedVehiclesQuery = relatedVehiclesQuery.or(`year.eq.${year},make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
+        relatedVehiclesQuery = relatedVehiclesQuery.or(`year.eq.${year},make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%`);
       } else {
-        relatedVehiclesQuery = relatedVehiclesQuery.or(`make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`);
+        relatedVehiclesQuery = relatedVehiclesQuery.or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%`);
       }
       
       const { data: relatedVehicles } = await relatedVehiclesQuery.limit(5);
@@ -1071,6 +1075,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   const searchDocuments = async (query: string, analysis: any): Promise<SearchResult[]> => {
     try {
       const searchTerm = query.trim();
+      const searchTermSafe = escapeILike(searchTerm);
       if (!searchTerm) {
         return [];
       }
@@ -1086,7 +1091,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           created_at,
           vehicle_id
         `)
-        .or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,document_type.ilike.%${searchTerm}%`)
+        .or(`title.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%,document_type.ilike.%${searchTermSafe}%`)
         .limit(10);
 
       if (error) {
@@ -1140,7 +1145,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       const { data: matchingVehicles } = await supabase
         .from('vehicles')
         .select('id')
-        .or(`make.ilike.%${searchTerm}%,model.ilike.%${searchTerm}%`)
+        .or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%`)
         .limit(50);
 
       if (!matchingVehicles || matchingVehicles.length === 0) {

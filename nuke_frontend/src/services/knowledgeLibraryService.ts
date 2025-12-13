@@ -146,11 +146,13 @@ export class KnowledgeLibraryService {
    */
   static async searchArticles(userId: string, searchTerm: string): Promise<KnowledgeArticle[]> {
     try {
+      const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
+      const searchSafe = escapeILike(searchTerm);
       const { data, error } = await supabase
         .from('user_knowledge_library')
         .select('*')
         .eq('user_id', userId)
-        .or(`title.ilike.%${searchTerm}%,content.ilike.%${searchTerm}%`)
+        .or(`title.ilike.%${searchSafe}%,content.ilike.%${searchSafe}%`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

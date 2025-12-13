@@ -10,6 +10,122 @@ const corsHeaders = {
   'Expires': '0',
 }
 
+// Robust identity cleanup (prevents saving listing junk into make/model downstream).
+function cleanModelName(raw: any): string | null {
+  if (!raw) return null
+  let s = String(raw).replace(/\s+/g, ' ').trim()
+  if (!s) return null
+  // Remove common “listing title junk”
+  s = s.replace(/\s*-\s*\$[\d,]+(?:\.\d{2})?.*$/i, '').trim()
+  s = s.replace(/\s*\(\s*Est\.\s*payment.*$/i, '').trim()
+  s = s.replace(/\s*-\s*craigslist\b.*$/i, '').trim()
+  // Remove trailing parenthetical location/dealer
+  s = s.replace(/\s*\([^)]*\)\s*$/i, '').trim()
+  if (!s || s.length > 140) return null
+  return s
+}
+
+function cleanMakeName(raw: any): string | null {
+  if (!raw) return null
+  const s0 = String(raw).replace(/[/_]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!s0 || s0 === '*' || s0.length > 40) return null
+  const lower = s0.toLowerCase()
+  if (lower === 'chevy') return 'Chevrolet'
+  if (lower === 'vw') return 'Volkswagen'
+  if (lower === 'benz') return 'Mercedes'
+  // Title-case-ish
+  return s0
+    .split(' ')
+    .map((p) => (p.length <= 2 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
+    .join(' ')
+}
+
+function normalizeImageUrls(urls: any[]): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of urls) {
+    if (typeof raw !== 'string') continue
+    const s = raw.trim()
+    if (!s.startsWith('http')) continue
+    const lower = s.toLowerCase()
+    if (lower.includes('youtube.com')) continue
+    if (lower.includes('logo') || lower.includes('icon') || lower.includes('avatar')) continue
+    if (lower.endsWith('.svg')) continue
+    // Craigslist thumbnails: 50x50c / other tiny thumbs
+    if (lower.includes('_50x50')) continue
+    if (lower.includes('94x63')) continue
+    if (lower.includes('thumbnail')) continue
+    if (!seen.has(s)) {
+      out.push(s)
+      seen.add(s)
+    }
+  }
+  return out
+}
+
+async function tryFirecrawl(url: string): Promise<any | null> {
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY')
+  if (!FIRECRAWL_API_KEY) return null
+
+  const extractionSchema = {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      year: { type: 'number' },
+      make: { type: 'string' },
+      model: { type: 'string' },
+      trim: { type: 'string' },
+      vin: { type: 'string' },
+      asking_price: { type: 'number' },
+      price: { type: 'number' },
+      mileage: { type: 'number' },
+      location: { type: 'string' },
+      description: { type: 'string' },
+      thumbnail_url: { type: 'string' },
+      images: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+  }
+
+  try {
+    const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+      },
+      body: JSON.stringify({
+        url,
+        formats: ['extract', 'html'],
+        extract: { schema: extractionSchema },
+        onlyMainContent: false,
+        waitFor: 4000,
+      }),
+    })
+
+    if (!firecrawlResponse.ok) {
+      const errorText = await firecrawlResponse.text().catch(() => '')
+      console.warn(`Firecrawl HTTP error ${firecrawlResponse.status}: ${errorText?.slice(0, 200) || ''}`)
+      return null
+    }
+
+    const firecrawlData = await firecrawlResponse.json()
+    if (!firecrawlData?.success) {
+      console.warn(`Firecrawl failed: ${JSON.stringify(firecrawlData)?.slice(0, 300)}`)
+      return null
+    }
+
+    const extract = firecrawlData?.data?.extract || null
+    if (!extract || typeof extract !== 'object') return null
+    return extract
+  } catch (e: any) {
+    console.warn(`Firecrawl exception: ${e?.message || String(e)}`)
+    return null
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -28,38 +144,76 @@ serve(async (req) => {
 
     console.log('🔍 Scraping URL:', url)
 
-    // Simple fetch to get the page
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    })
+    // Robust path: Firecrawl structured extraction first (works better on JS-heavy dealer sites).
+    const firecrawlExtract = await tryFirecrawl(url)
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    let html = ''
+    let doc: any = null
+
+    // Fallback path: fetch and parse HTML
+    if (!firecrawlExtract) {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      html = await response.text()
+      doc = new DOMParser().parseFromString(html, 'text/html')
     }
 
-    const html = await response.text()
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-
-    // Basic data extraction
+    // Basic data extraction (normalized output shape)
     const data: any = {
       success: true,
       source: 'Unknown',
       listing_url: url,
       discovery_url: url,
-      title: doc.querySelector('title')?.textContent || '',
+      title: firecrawlExtract?.title || doc?.querySelector('title')?.textContent || '',
       description: '', // Initialize with empty string to prevent undefined
-      images: extractImageURLs(html),
+      images: [],
       timestamp: new Date().toISOString(),
       year: null,
       make: null,
       model: null,
       asking_price: null,
       location: null,
-      _function_version: '2.0'  // Debug version identifier
+      thumbnail_url: null,
+      _function_version: firecrawlExtract ? '2.1-firecrawl' : '2.1-html'  // Debug version identifier
+    }
+
+    // If Firecrawl returned structured fields, use them as the primary truth.
+    if (firecrawlExtract) {
+      data.source = 'Firecrawl'
+      data.year = typeof firecrawlExtract.year === 'number' ? firecrawlExtract.year : null
+      data.make = cleanMakeName(firecrawlExtract.make) || null
+      data.model = cleanModelName(firecrawlExtract.model) || null
+      data.vin = firecrawlExtract.vin ? String(firecrawlExtract.vin).toUpperCase() : null
+      data.asking_price =
+        typeof firecrawlExtract.asking_price === 'number'
+          ? firecrawlExtract.asking_price
+          : typeof firecrawlExtract.price === 'number'
+            ? firecrawlExtract.price
+            : null
+      data.location = firecrawlExtract.location ? String(firecrawlExtract.location).trim() : null
+      data.description = firecrawlExtract.description ? String(firecrawlExtract.description).trim() : ''
+      data.thumbnail_url = firecrawlExtract.thumbnail_url ? String(firecrawlExtract.thumbnail_url).trim() : null
+
+      const imgs = normalizeImageUrls([
+        ...(data.thumbnail_url ? [data.thumbnail_url] : []),
+        ...(Array.isArray(firecrawlExtract.images) ? firecrawlExtract.images : []),
+      ])
+      data.images = imgs
+    }
+
+    // If Firecrawl didn’t yield images (or it wasn’t used), use HTML extraction.
+    if ((!data.images || data.images.length === 0) && html) {
+      data.images = normalizeImageUrls(extractImageURLs(html))
     }
 
     // Extract VIN from HTML - works for multiple sites
@@ -77,7 +231,7 @@ serve(async (req) => {
     ]
 
     for (const pattern of vinPatterns) {
-      const match = html.match(pattern)
+      const match = html ? html.match(pattern) : null
       if (match && match[1] && match[1].length === 17 && !/[IOQ]/.test(match[1])) {
         data.vin = match[1].toUpperCase()
         console.log(`✅ VIN extracted: ${data.vin}`)
@@ -90,13 +244,13 @@ serve(async (req) => {
       data.source = 'Craigslist'
 
       // Extract title
-      const titleElement = doc.querySelector('h1 .postingtitletext')
+      const titleElement = doc?.querySelector('h1 .postingtitletext')
       if (titleElement) {
         data.title = titleElement.textContent?.trim()
       }
 
       // Extract price
-      const priceElement = doc.querySelector('.price')
+      const priceElement = doc?.querySelector('.price')
       if (priceElement) {
         const priceText = priceElement.textContent?.trim()
         const priceMatch = priceText?.match(/\$?([\d,]+)/)
@@ -106,13 +260,13 @@ serve(async (req) => {
       }
 
       // Extract location
-      const locationElement = doc.querySelector('.postingtitle .postingtitletext small')
+      const locationElement = doc?.querySelector('.postingtitle .postingtitletext small')
       if (locationElement) {
         data.location = locationElement.textContent?.trim().replace(/[()]/g, '')
       }
 
       // Extract description
-      const bodyElement = doc.querySelector('#postingbody')
+      const bodyElement = doc?.querySelector('#postingbody')
       if (bodyElement) {
         data.description = bodyElement.textContent?.trim() || ''
       }
@@ -158,6 +312,10 @@ serve(async (req) => {
         location: data.location
       })
     }
+
+    // Final normalization pass (regardless of source)
+    data.make = cleanMakeName(data.make) || data.make
+    data.model = cleanModelName(data.model) || data.model
 
     // Worldwide Vintage Autos detection and parsing
     if (url.includes('worldwidevintageautos.com')) {

@@ -29,6 +29,25 @@ const getSupabaseClient = () => {
   return supabase;
 };
 
+function escapeILikePattern(s: string): string {
+  // Escape `%`, `_`, `\` to prevent PostgreSQL LIKE/ILIKE pattern injection.
+  return String(s || '').replace(/([%_\\])/g, '\\$1');
+}
+
+function isAllowedHost(host: string, allowedBase: string): boolean {
+  const h = String(host || '').toLowerCase();
+  const base = String(allowedBase || '').toLowerCase();
+  if (!h || !base) return false;
+  if (h === base) return true;
+  if (h === `www.${base}`) return true;
+  const suffix = `.${base}`;
+  if (!h.endsWith(suffix)) return false;
+  const sub = h.slice(0, -suffix.length);
+  // Only allow a single-label subdomain; reject deep subdomains.
+  if (!sub || sub.includes('.')) return false;
+  return /^[a-z0-9-]+$/.test(sub);
+}
+
 interface VehicleContext {
   year: number;
   make: string;
@@ -342,7 +361,7 @@ async function handleChatMode(
         });
       }
 
-      const ilike = `%${term}%`;
+      const ilike = `%${escapeILikePattern(term)}%`;
       const { data: matchingDocs } = await supabase
         .from('vehicle_documents')
         .select('id, document_type, title, vendor_name, amount, currency, document_date, file_url, created_at')
@@ -945,7 +964,7 @@ RESPONSE RULES (IMPORTANT):
             if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
             const host = u.hostname.toLowerCase();
             const allowedHosts = ['summitracing.com', 'jegs.com', 'rockauto.com'];
-            if (!allowedHosts.some(h => host === h || host.endsWith(`.${h}`))) return null;
+            if (!allowedHosts.some(h => isAllowedHost(host, h))) return null;
             return u.toString();
           } catch {
             return null;
@@ -1737,7 +1756,7 @@ async function saveValuation(vehicleId: string, valuation: ExpertValuation): Pro
       .from('image_tags')
       .select('id')
       .eq('vehicle_id', vehicleId)
-      .ilike('tag_name', `%${component.name.split(' ')[0]}%`)
+      .ilike('tag_name', `%${escapeILikePattern(String(component.name || '').split(' ')[0] || '')}%`)
       .limit(10);
     
     if (matchingTags && matchingTags.length > 0) {

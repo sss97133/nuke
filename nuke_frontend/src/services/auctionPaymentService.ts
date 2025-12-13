@@ -12,7 +12,13 @@ let stripePromise: Promise<Stripe | null> | null = null;
 const getStripe = () => {
   if (!stripePromise) {
     const key = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-    stripePromise = loadStripe(key);
+    if (!key) {
+      // Do not call loadStripe with an empty string / undefined.
+      // Returning null keeps the rest of the UI functional when Stripe isn't configured.
+      stripePromise = Promise.resolve(null);
+    } else {
+      stripePromise = loadStripe(key);
+    }
   }
   return stripePromise;
 };

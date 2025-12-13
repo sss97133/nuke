@@ -287,6 +287,7 @@ export class BusinessService {
     state?: string;
     specializations?: string[];
   } = {}): Promise<Business[]> {
+    const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
     let queryBuilder = supabase
       .from('businesses')
       .select('*')
@@ -296,7 +297,8 @@ export class BusinessService {
 
     // Text search
     if (query) {
-      queryBuilder = queryBuilder.or(`business_name.ilike.%${query}%,description.ilike.%${query}%`);
+      const querySafe = escapeILike(query);
+      queryBuilder = queryBuilder.or(`business_name.ilike.%${querySafe}%,description.ilike.%${querySafe}%`);
     }
 
     // Filters

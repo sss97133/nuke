@@ -28,6 +28,8 @@
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.4.2",
     "@stripe/react-stripe-js": "^5.4.1",
     "@stripe/stripe-js": "^8.5.3",
     "@supabase/supabase-js": "^2.75.0",
@@ -67,6 +69,7 @@
     "swiper": "^12.0.3",
     "tailwind-merge": "^3.3.1",
     "tesseract.js": "^6.0.1",
+    "three": "^0.182.0",
     "x402-hono": "^0.7.3",
     "xlsx": "^0.18.5",
     "zod": "^3.24.4"
