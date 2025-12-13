@@ -160,12 +160,16 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
 
       // Fallback: make/model/year catalog match (public entries only by RLS)
       if (vehicleYear && vehicleMake && vehicleModel) {
+        const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1')
+        const makeSafe = escapeILike(vehicleMake)
+        const modelSafe = escapeILike(vehicleModel)
         const byYmm = await supabase
           .from('vehicle_3d_models')
           .select(select)
           .eq('year', vehicleYear)
-          .ilike('make', vehicleMake)
-          .ilike('model', vehicleModel)
+          // Escape `%`, `_`, `\` so user-controlled strings can't inject LIKE patterns.
+          .ilike('make', makeSafe)
+          .ilike('model', modelSafe)
           .order('created_at', { ascending: false })
           .limit(1)
 
@@ -267,15 +271,18 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
         if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
         // Basic allowlist: keep users on real commerce/search pages, avoid model hallucinating random domains.
         const host = u.hostname.toLowerCase()
-        const allowedHosts = [
-          'www.summitracing.com',
-          'summitracing.com',
-          'www.jegs.com',
-          'jegs.com',
-          'www.rockauto.com',
-          'rockauto.com',
-        ]
-        if (!allowedHosts.some(h => host === h || host.endsWith(`.${h}`))) return null
+        const allowedBaseDomains = ['summitracing.com', 'jegs.com', 'rockauto.com']
+        const isAllowedHost = (h: string, allowedBase: string) => {
+          if (h === allowedBase) return true
+          if (h === `www.${allowedBase}`) return true
+          const suffix = `.${allowedBase}`
+          if (!h.endsWith(suffix)) return false
+          const sub = h.slice(0, -suffix.length)
+          // Only allow a single-label subdomain (prevents deep-subdomain impersonation).
+          if (!sub || sub.includes('.')) return false
+          return /^[a-z0-9-]+$/.test(sub)
+        }
+        if (!allowedBaseDomains.some(d => isAllowedHost(host, d))) return null
         return u.toString()
       } catch {
         return null

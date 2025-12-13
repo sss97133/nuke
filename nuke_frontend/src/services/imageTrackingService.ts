@@ -207,13 +207,19 @@ export class ImageTrackingService {
     try {
       // Check for timeline events on the same date that mention this image URL
       const uploadDateOnly = uploadDate.split('T')[0];
+      const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
+      // Ensure we don't break the PostgREST JSON array syntax.
+      const safeJsonString = (s: string) => String(s || '').replace(/(["\\])/g, '\\$1');
+      const filename = String(imageUrl || '').split('/').pop() || '';
+      const filenameSafe = escapeILike(filename);
+      const imageUrlSafe = safeJsonString(imageUrl);
       
       const { data, error } = await supabase
         .from('timeline_events')
         .select('id')
         .eq('vehicle_id', vehicleId)
         .eq('event_date', uploadDateOnly)
-        .or(`metadata->uploadedUrls.cs.["${imageUrl}"],description.ilike.%${imageUrl.split('/').pop()}%`)
+        .or(`metadata->uploadedUrls.cs.["${imageUrlSafe}"],description.ilike.%${filenameSafe}%`)
         .limit(1);
 
       if (error) {

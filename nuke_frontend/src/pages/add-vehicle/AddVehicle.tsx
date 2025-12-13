@@ -244,6 +244,59 @@ const AddVehicle: React.FC<AddVehicleProps> = ({
     return files;
   };
 
+  // Normalize scraper-imported identity so we don't save raw listing junk into make/model.
+  const cleanImportedIdentity = (input: { year?: any; make?: any; model?: any; title?: any }) => {
+    const out: { year?: number; make?: string; model?: string } = {};
+    const yearNum = Number(input.year);
+    if (Number.isFinite(yearNum) && yearNum >= 1885 && yearNum <= new Date().getFullYear() + 1) {
+      out.year = yearNum;
+    }
+
+    const normalizeMake = (raw: any): string | null => {
+      if (!raw) return null;
+      const s = String(raw).replace(/[/_]+/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!s || s === '*' || s.length > 40) return null;
+      const lower = s.toLowerCase();
+      if (lower === 'chevy') return 'Chevrolet';
+      if (lower === 'vw') return 'Volkswagen';
+      if (lower === 'benz') return 'Mercedes';
+      return s
+        .split(' ')
+        .map((p) => (p.length <= 2 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
+        .join(' ');
+    };
+
+    const normalizeModel = (raw: any): string | null => {
+      if (!raw) return null;
+      let s = String(raw).replace(/\s+/g, ' ').trim();
+      if (!s) return null;
+      s = s.replace(/\s*-\s*\$[\d,]+(?:\.\d{2})?.*$/i, '').trim();
+      s = s.replace(/\s*\([^)]*\)\s*$/i, '').trim();
+      s = s.replace(/\s*-\s*craigslist\b.*$/i, '').trim();
+      if (!s || s.length > 120) return null;
+      return s;
+    };
+
+    const make = normalizeMake(input.make);
+    const model = normalizeModel(input.model);
+    if (make) out.make = make;
+    if (model) out.model = model;
+
+    // If make/model are unusable, try to salvage from the listing title.
+    const title = String(input.title || '').trim();
+    if ((!out.make || !out.model) && title) {
+      const cleanedTitle = title.replace(/\s*-\s*craigslist\b.*$/i, '').trim();
+      const yearMatch = cleanedTitle.match(/\b(19|20)\d{2}\b/);
+      const afterYear = yearMatch ? cleanedTitle.slice(cleanedTitle.indexOf(yearMatch[0]) + yearMatch[0].length).trim() : cleanedTitle;
+      const parts = afterYear.split(/\s+/).filter(Boolean);
+      if (!out.make && parts.length >= 1) out.make = normalizeMake(parts[0]) || out.make;
+      if (!out.model && parts.length >= 2) out.model = normalizeModel(parts.slice(1).join(' ')) || out.model;
+      if (!out.year && yearMatch) out.year = Number(yearMatch[0]);
+    }
+
+    return out;
+  };
+
   // Handle title scan completion
   const handleTitleScanComplete = useCallback((scannedData: any) => {
     // Automatically set relationship to owned when title is scanned
@@ -356,16 +409,29 @@ Redirecting to vehicle profile...`);
       // URL is new - proceed with scraping
       console.log('New URL - scraping data:', url);
 
-      // Call Supabase Edge Function (simple-scraper)
-      const { data: result, error: fnError } = await supabase.functions.invoke('simple-scraper', {
-        body: { url }
-      });
+      // Prefer robust server-side scraper (supports Firecrawl structured extraction).
+      // Fallback to legacy `simple-scraper` if needed.
+      let result: any = null;
+      let fnError: any = null;
+
+      const robust = await supabase.functions.invoke('scrape-vehicle', { body: { url } });
+      result = robust.data;
+      fnError = robust.error;
+
+      if (fnError || !result?.success) {
+        const legacy = await supabase.functions.invoke('simple-scraper', { body: { url } });
+        result = legacy.data;
+        fnError = legacy.error;
+      }
+
       if (fnError) {
         throw new Error(`Scraping failed: ${fnError.message || fnError}`);
       }
 
-      if (result.success && result.data) {
-        const scrapedData = result.data;
+      // `scrape-vehicle` returns { success: true, ...fields } while `simple-scraper` returns { success: true, data: {...} }
+      const payload = result?.data && result?.success ? result.data : result;
+      if (payload?.success) {
+        const scrapedData = payload;
         console.log('Full scraped data received:', scrapedData);
 
         // Map ALL scraped data to form fields
@@ -417,6 +483,9 @@ Redirecting to vehicle profile...`);
         if (scrapedData.source) {
           updates.listing_source = scrapedData.source;
         }
+
+        // Persist last scraped data for submit-time backfill + provenance
+        setLastScrapedData(scrapedData);
 
         const parseListingDateText = (value?: string): string | null => {
           if (!value) return null;
@@ -813,9 +882,25 @@ Redirecting to vehicle profile...`);
           import_date: new Date().toISOString().split('T')[0],
           ...(formData.bat_auction_url && { bat_url: formData.bat_auction_url }),
           ...(formData.import_url && { discovery_url: formData.import_url }),
-          ...(lastScrapedData?.source && { scraped_source: lastScrapedData.source })
+          ...(lastScrapedData?.source && { scraped_source: lastScrapedData.source }),
+          ...(formData.import_url && Array.isArray(lastScrapedData?.images) && lastScrapedData.images.length > 0
+            ? { image_urls: lastScrapedData.images }
+            : {})
         }
       };
+
+      // If this is a URL-scraped vehicle, normalize identity fields before insert.
+      if (formData.import_url) {
+        const normalized = cleanImportedIdentity({
+          year: vehicleData.year ?? formData.year,
+          make: vehicleData.make ?? formData.make,
+          model: vehicleData.model ?? formData.model,
+          title: lastScrapedData?.title,
+        });
+        if (normalized.year) vehicleData.year = normalized.year;
+        if (normalized.make) vehicleData.make = normalized.make;
+        if (normalized.model) vehicleData.model = normalized.model;
+      }
       
       const numericColumns = new Set([
         'year',
@@ -871,6 +956,24 @@ Redirecting to vehicle profile...`);
 
       if (vehicle) {
         const vehicleId = vehicle.id;
+
+        // If we scraped images from an external listing, convert them into stable Supabase Storage images now.
+        // This avoids hotlink blocks and ensures the homepage can render thumbnails.
+        if (formData.import_url && Array.isArray(lastScrapedData?.images) && lastScrapedData.images.length > 0) {
+          try {
+            await supabase.functions.invoke('backfill-images', {
+              body: {
+                vehicle_id: vehicleId,
+                image_urls: lastScrapedData.images.slice(0, 20),
+                source: 'external_import',
+                run_analysis: false
+              }
+            });
+          } catch (err) {
+            // Non-fatal: vehicle was created; images can be backfilled later.
+            console.warn('URL image backfill failed (non-fatal):', err);
+          }
+        }
         
         // Create timeline event for vehicle creation or discovery
         try {

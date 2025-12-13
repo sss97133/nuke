@@ -44,8 +44,32 @@ serve(async (req) => {
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
-    const { image_url, timeline_event_id, vehicle_id, user_id } = await req.json()
+    const { image_url, image_id, timeline_event_id, vehicle_id, user_id } = await req.json()
     if (!image_url) throw new Error('Missing image_url')
+
+    // Best-effort: mark as processing early to avoid stuck "pending" jobs
+    try {
+      if (image_id) {
+        await supabase
+          .from('vehicle_images')
+          .update({
+            ai_processing_status: 'processing',
+            ai_processing_started_at: new Date().toISOString()
+          })
+          .eq('id', image_id)
+      } else {
+        await supabase
+          .from('vehicle_images')
+          .update({
+            ai_processing_status: 'processing',
+            ai_processing_started_at: new Date().toISOString()
+          })
+          .eq('image_url', image_url)
+      }
+    } catch (err) {
+      // Non-blocking
+      console.warn('Failed to mark image as processing (non-blocking):', err)
+    }
 
     // 1. Run Rekognition (Label Detection)
     let rekognitionData: any = {}
@@ -211,9 +235,24 @@ serve(async (req) => {
 
     // 5. Save Everything
     // Update image metadata with appraiser result, SPID data, and VIN tag data
+    const tier1Compat = {
+      category: context || 'general',
+      angle: context || null,
+      condition_glance: appraiserResult?.condition_glance
+        ?? appraiserResult?.condition
+        ?? appraiserResult?.appraisal?.condition
+        ?? null,
+      components_visible: appraiserResult?.components_visible
+        ?? appraiserResult?.components
+        ?? appraiserResult?.visible_components
+        ?? []
+    }
+
     const metadataUpdate: any = {
       rekognition: rekognitionData,
-      scanned_at: new Date().toISOString()
+      scanned_at: new Date().toISOString(),
+      processing_tier_reached: 1,
+      tier_1_analysis: tier1Compat
     }
     if (appraiserResult) {
       metadataUpdate.appraiser = appraiserResult
@@ -226,16 +265,20 @@ serve(async (req) => {
     }
     
     // Update image record
-    const { data: imageRecord } = await supabase
-      .from('vehicle_images')
-      .select('id')
-      .eq('image_url', image_url)
-      .maybeSingle()
+    const imageLookup = image_id
+      ? supabase.from('vehicle_images').select('id, ai_scan_metadata').eq('id', image_id)
+      : supabase.from('vehicle_images').select('id, ai_scan_metadata').eq('image_url', image_url)
+    const { data: imageRecord } = await imageLookup.maybeSingle()
     
     if (imageRecord) {
+      const existing = imageRecord.ai_scan_metadata || {}
       await supabase
         .from('vehicle_images')
-        .update({ ai_scan_metadata: metadataUpdate })
+        .update({
+          ai_scan_metadata: { ...existing, ...metadataUpdate },
+          ai_processing_status: 'complete',
+          ai_processing_completed_at: new Date().toISOString()
+        })
         .eq('id', imageRecord.id)
       
       // If SPID data was extracted, also save to dedicated table
@@ -309,6 +352,40 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error)
     const errorStack = error instanceof Error ? error.stack : undefined
     console.error('Error details:', { message: errorMessage, stack: errorStack })
+
+    // Best-effort: mark image as failed and store error in ai_scan_metadata (no ai_processing_error column on vehicle_images)
+    try {
+      const body = await req.json().catch(() => ({} as any))
+      const imageId = body?.image_id ?? null
+      const imageUrl = body?.image_url ?? null
+      const q = imageId
+        ? supabase.from('vehicle_images').select('id, ai_scan_metadata').eq('id', imageId)
+        : (imageUrl ? supabase.from('vehicle_images').select('id, ai_scan_metadata').eq('image_url', imageUrl) : null)
+
+      if (q) {
+        const { data: img } = await q.maybeSingle()
+        if (img?.id) {
+          const existing = img.ai_scan_metadata || {}
+          await supabase
+            .from('vehicle_images')
+            .update({
+              ai_processing_status: 'failed',
+              ai_processing_completed_at: new Date().toISOString(),
+              ai_scan_metadata: {
+                ...existing,
+                last_error: {
+                  message: errorMessage,
+                  at: new Date().toISOString()
+                }
+              }
+            })
+            .eq('id', img.id)
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to mark image as failed (non-blocking):', err)
+    }
+
     return new Response(
       JSON.stringify({ 
         error: errorMessage,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, SUPABASE_URL } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { UserInteractionService } from '../services/userInteractionService';
 import VehicleSearch from '../components/VehicleSearch';
@@ -70,8 +70,14 @@ const normalizeSupabaseStorageUrl = (raw: any): string | null => {
   // Public:  .../storage/v1/object/public/<bucket>/<path>
   if (s.includes('/storage/v1/object/sign/')) {
     const base = s.split('?')[0];
-    return base.replace('/storage/v1/object/sign/', '/storage/v1/object/public/');
+    const publicUrl = base.replace('/storage/v1/object/sign/', '/storage/v1/object/public/');
+    // Some code paths store path-only URLs (starting with /storage/...). Prefix with Supabase host.
+    if (SUPABASE_URL && publicUrl.startsWith('/storage/')) return `${SUPABASE_URL}${publicUrl}`;
+    return publicUrl;
   }
+
+  // If a path-only Supabase storage URL is stored, prefix with Supabase host so it loads cross-origin.
+  if (SUPABASE_URL && s.startsWith('/storage/')) return `${SUPABASE_URL}${s}`;
 
   return s;
 };
@@ -135,16 +141,55 @@ const resolveVehicleImageUrl = (img: any): string | null => {
 };
 
 const getOriginImages = (vehicle: any): string[] => {
-  const raw = vehicle?.origin_metadata?.images;
-  if (!Array.isArray(raw)) return [];
+  // Different ingestion paths have used different keys over time.
+  // Prefer `images` but also support `image_urls` (used by import/backfill pipelines).
+  const raw = vehicle?.origin_metadata?.images || vehicle?.origin_metadata?.image_urls;
+  const list = Array.isArray(raw) ? raw : [];
 
-  return raw
+  // Some scrapers store a single thumbnail URL rather than an array.
+  const thumb =
+    (typeof vehicle?.origin_metadata?.thumbnail_url === 'string' && vehicle.origin_metadata.thumbnail_url) ||
+    (typeof vehicle?.origin_metadata?.thumbnail === 'string' && vehicle.origin_metadata.thumbnail) ||
+    null;
+
+  const candidates = [
+    ...(thumb ? [thumb] : []),
+    ...list,
+  ];
+
+  return candidates
     .filter((url: any) => typeof url === 'string')
     .map((url: string) => url.trim())
     .filter((url: string) => url.startsWith('http'))
-    .filter((url: string) => !url.includes('94x63'))
+    // Keep the filters minimal: we want *something* to render on the homepage.
     .filter((url: string) => !url.includes('youtube.com'))
-    .filter((url: string) => !url.toLowerCase().includes('thumbnail'));
+    .filter((url: string) => !url.toLowerCase().endsWith('.svg'));
+};
+
+const cleanDisplayMake = (raw: any): string | null => {
+  if (!raw) return null;
+  const s = String(raw).replace(/[/_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!s || s === '*' || s.length > 40) return null;
+  // Basic title-case unless it's already all-caps.
+  if (s.toUpperCase() === s && s.length <= 6) return s;
+  return s
+    .split(' ')
+    .map((p) => (p.length <= 2 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
+    .join(' ');
+};
+
+const cleanDisplayModel = (raw: any): string | null => {
+  if (!raw) return null;
+  let s = String(raw).replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+  // Strip common listing junk: " - $12,999 (City)" / "(Dealer Name)" / finance blips.
+  s = s.replace(/\s*-\s*\$[\d,]+(?:\.\d{2})?.*$/i, '').trim();
+  s = s.replace(/\s*\([^)]*\)\s*$/i, '').trim();
+  s = s.replace(/\s*\(\s*Est\.\s*payment.*$/i, '').trim();
+  // Remove trailing "- craigslist" from <title> tags, if it leaked into model.
+  s = s.replace(/\s*-\s*craigslist\b.*$/i, '').trim();
+  if (!s || s.length > 120) return null;
+  return s;
 };
 
 
@@ -185,7 +230,8 @@ const CursorHomepage: React.FC = () => {
     makes: [],
     priceMin: null,
     priceMax: null,
-    hasImages: false,
+    // Hide “F-tier” no-image profiles by default (still discoverable via search / toggles).
+    hasImages: true,
     forSale: false,
     zipCode: '',
     radiusMiles: 50,
@@ -352,9 +398,9 @@ const CursorHomepage: React.FC = () => {
       let query = supabase
         .from('vehicles')
         .select(`
-          id, year, make, model, vin, created_at, updated_at,
+          id, year, make, model, title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
-          is_for_sale, mileage, status, is_public, origin_metadata
+          is_for_sale, mileage, status, is_public, origin_metadata, primary_image_url, image_url
         `)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
@@ -391,7 +437,7 @@ const CursorHomepage: React.FC = () => {
       const vehicleIds = filteredVehicles.map(v => v.id);
       const { data: images } = await supabase
         .from('vehicle_images')
-        .select('vehicle_id, image_url, medium_url, large_url, is_primary')
+        .select('vehicle_id, image_url, medium_url, large_url, thumbnail_url, is_primary, storage_path, variants')
         .in('vehicle_id', vehicleIds)
         .not('vehicle_id', 'is', null)
         .order('is_primary', { ascending: false })
@@ -400,9 +446,10 @@ const CursorHomepage: React.FC = () => {
       // Create image lookup map - prefer primary images
       const imageMap = new Map();
       (images || []).forEach(img => {
-        if (img.vehicle_id && !imageMap.has(img.vehicle_id)) {
-          imageMap.set(img.vehicle_id, img.large_url || img.medium_url || img.image_url);
-        }
+        if (!img?.vehicle_id) return;
+        if (imageMap.has(img.vehicle_id)) return;
+        const resolved = resolveVehicleImageUrl(img);
+        if (resolved) imageMap.set(img.vehicle_id, resolved);
       });
 
       console.log(`Found ${images?.length || 0} total images, mapped to ${imageMap.size} unique vehicles`);
@@ -416,14 +463,31 @@ const CursorHomepage: React.FC = () => {
         const displayPrice = salePrice > 0 ? salePrice : askingPrice > 0 ? askingPrice : currentValue;
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
 
-        // Get image from database first, then fallback to origin metadata
+        // Get image from database first, then fallback to vehicle row fields / origin metadata.
         let primaryImageUrl = imageMap.get(v.id) || null;
+
+        if (!primaryImageUrl) {
+          primaryImageUrl =
+            normalizeSupabaseStorageUrl(v.primary_image_url) ||
+            normalizeSupabaseStorageUrl(v.image_url) ||
+            null;
+        }
 
         // Fallback to origin_metadata images if no database image
         if (!primaryImageUrl && v.origin_metadata?.images) {
           const originImages = getOriginImages(v);
           primaryImageUrl = originImages[0] || null;
         }
+
+        // Fix: origin scrapes also commonly store `origin_metadata.image_urls` (not `images`).
+        if (!primaryImageUrl) {
+          const originImages = getOriginImages(v);
+          primaryImageUrl = originImages[0] || null;
+        }
+
+        // Clean display fields to avoid showing raw listing junk on the homepage.
+        const displayMake = cleanDisplayMake(v.make) || cleanDisplayMake(v.origin_metadata?.make) || v.make || null;
+        const displayModel = cleanDisplayModel(v.model) || cleanDisplayModel(v.origin_metadata?.model) || v.model || null;
 
         let hypeScore = 0;
         let hypeReason = '';
@@ -435,6 +499,8 @@ const CursorHomepage: React.FC = () => {
 
         return {
           ...v,
+          make: displayMake || v.make,
+          model: displayModel || v.model,
           display_price: displayPrice,
           image_count: primaryImageUrl ? 1 : 0,
           view_count: 0,

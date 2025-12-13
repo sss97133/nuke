@@ -20,9 +20,10 @@ export class VercelAIGateway {
 
   constructor() {
     // Get configuration from environment
-    this.gatewayId = import.meta.env.VITE_VERCEL_AI_GATEWAY_ID || 'nzero_key';
-    this.apiKey = import.meta.env.VITE_VERCEL_AI_GATEWAY_KEY || 'vck_35jTijuTZkX8JfExhBpTkbSGFflOGsSUaQUrmh8U6ZsMrkl1qT1V4lCI';
-    this.enabled = import.meta.env.VITE_VERCEL_AI_GATEWAY_ENABLED === 'true' || true;
+    this.gatewayId = import.meta.env.VITE_VERCEL_AI_GATEWAY_ID || '';
+    this.apiKey = import.meta.env.VITE_VERCEL_AI_GATEWAY_KEY || '';
+    // Disabled by default unless explicitly enabled AND configured.
+    this.enabled = import.meta.env.VITE_VERCEL_AI_GATEWAY_ENABLED === 'true' && !!this.gatewayId && !!this.apiKey;
   }
 
   /**
@@ -104,7 +105,14 @@ export class VercelAIGateway {
           console.warn('AI Gateway failed, falling back to direct call');
           return this.makeFallbackRequest(provider, model, payload, options);
         }
-        throw new Error(`AI Gateway request failed: ${response.status} ${response.statusText}`);
+        let bodyText = '';
+        try {
+          bodyText = await response.text();
+        } catch {
+          // ignore
+        }
+        const detail = bodyText ? ` — ${bodyText.slice(0, 500)}` : '';
+        throw new Error(`AI Gateway request failed: ${response.status} ${response.statusText}${detail}`);
       }
 
       const result = await response.json();
@@ -136,32 +144,45 @@ export class VercelAIGateway {
     payload: any,
     options?: any
   ): Promise<any> {
-    // Route to appropriate Edge Function based on provider
-    let functionName = 'openai-proxy'; // Default
+    // Route to appropriate Edge Function based on payload shape.
+    // - openai-proxy expects OpenAI/Anthropic-style chat payloads (messages, etc.)
+    // - extract-and-route-data expects our internal ingestion payloads ({ input, inputType, ... })
+    const looksLikeIngestionPayload =
+      !!payload &&
+      typeof payload === 'object' &&
+      'inputType' in payload &&
+      'input' in payload;
+
+    // Default
+    let functionName = looksLikeIngestionPayload ? 'extract-and-route-data' : 'openai-proxy';
 
     switch (provider) {
       case 'anthropic':
-        functionName = 'openai-proxy'; // Your proxy handles multiple providers
+        functionName = looksLikeIngestionPayload ? 'extract-and-route-data' : 'openai-proxy';
         break;
       case 'google':
-        functionName = 'openai-proxy'; // Your proxy handles multiple providers
+        functionName = looksLikeIngestionPayload ? 'extract-and-route-data' : 'openai-proxy';
         break;
       case 'openai':
       default:
-        functionName = 'openai-proxy';
+        functionName = looksLikeIngestionPayload ? 'extract-and-route-data' : 'openai-proxy';
         break;
     }
 
     const { data, error } = await supabase.functions.invoke(functionName, {
       body: {
-        provider,
-        model,
-        ...payload,
+        ...(looksLikeIngestionPayload ? payload : { provider, model, ...payload }),
         userId: options?.userId
       }
     });
 
-    if (error) throw error;
+    if (error) {
+      const status = (error as any)?.context?.status ?? (error as any)?.status;
+      const msg = (error as any)?.message || String(error);
+      const body = (error as any)?.context?.body;
+      const detail = body ? ` — ${String(body).slice(0, 500)}` : '';
+      throw new Error(`Edge Function ${functionName} failed${status ? ` (${status})` : ''}: ${msg}${detail}`);
+    }
     return data;
   }
 

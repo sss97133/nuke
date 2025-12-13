@@ -90,12 +90,13 @@ export class AIProcessingAuditor {
           })
           .eq('id', image.id);
         
-        // Call tier 1 analysis
-        const { data, error: funcError } = await supabase.functions.invoke('analyze-image-tier1', {
+        // Call vision analysis (replaces deprecated analyze-image-tier1)
+        const { data, error: funcError } = await supabase.functions.invoke('analyze-image', {
           body: {
             image_url: image.image_url,
             vehicle_id: image.vehicle_id,
-            image_id: image.id
+            image_id: image.id,
+            timeline_event_id: null
           }
         });
         
@@ -122,11 +123,26 @@ export class AIProcessingAuditor {
         console.error(`  ❌ Failed: ${error.message}`);
         
         // Mark as failed (don't leave stuck on "pending")
+        // NOTE: vehicle_images does not have ai_processing_error; store errors in ai_scan_metadata instead
+        const { data: row } = await supabase
+          .from('vehicle_images')
+          .select('ai_scan_metadata')
+          .eq('id', image.id)
+          .maybeSingle();
+        
         await supabase
           .from('vehicle_images')
           .update({
             ai_processing_status: 'failed',
-            ai_processing_error: error.message
+            ai_processing_completed_at: new Date().toISOString(),
+            ai_scan_metadata: {
+              ...(row?.ai_scan_metadata || {}),
+              last_error: {
+                message: error.message || 'Unknown error',
+                at: new Date().toISOString(),
+                source: 'AIProcessingAuditor'
+              }
+            }
           })
           .eq('id', image.id);
         
@@ -173,7 +189,6 @@ export class AIProcessingAuditor {
         .from('vehicle_images')
         .update({
           ai_processing_status: 'pending',
-          ai_processing_error: null,
           ai_processing_started_at: null
         })
         .eq('id', image.id);

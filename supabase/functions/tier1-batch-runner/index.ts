@@ -1,7 +1,7 @@
 /**
  * Tier1 Batch Runner (Small Batches)
  * - Cloud-only: runs inside Supabase Edge Functions.
- * - Pulls a tiny batch (default 2) of pending images and invokes analyze-image-tier1.
+ * - Pulls a tiny batch (default 2) of pending images and invokes analyze-image (vision).
  * - Uses service role key from env.
  */
 
@@ -80,7 +80,7 @@ serve(async (req) => {
 
       const fnKey = anonKey || serviceRoleKey;
       const callOnce = async () =>
-        await fetch(`${supabaseUrl}/functions/v1/analyze-image-tier1`, {
+        await fetch(`${supabaseUrl}/functions/v1/analyze-image`, {
           method: "POST",
           headers: {
             "apikey": fnKey,

@@ -646,25 +646,25 @@ export class ImageUploadService {
         // Get user for API key
         const { data: { user } } = await supabase.auth.getUser();
 
-        // PRIMARY: Tier 1 analysis (basic organization - angle, category, quality)
-        // This is the main analysis that MUST run on every upload
-        supabase.functions.invoke('analyze-image-tier1', {
+        // PRIMARY: Vision analysis (replaces deprecated analyze-image-tier1)
+        supabase.functions.invoke('analyze-image', {
           body: {
             image_url: urlData.publicUrl,
-            vehicle_id: vehicleId,
             image_id: dbResult.id,
+            vehicle_id: vehicleId,
+            timeline_event_id: null,
             user_id: user?.id || null
           }
         }).then(({ data, error }) => {
           if (error) {
-            console.error('❌ Tier 1 AI analysis failed:', error);
+            console.error('❌ Vision AI analysis failed:', error);
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('image_processing_failed', {
                 detail: { imageId: dbResult.id, error: error.message }
               }));
             }
           } else {
-            console.log('✅ Tier 1 AI analysis succeeded:', data);
+            console.log('✅ Vision AI analysis succeeded:', data);
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('image_processing_complete', {
                 detail: { imageId: dbResult.id, result: data }
@@ -672,7 +672,7 @@ export class ImageUploadService {
             }
           }
         }).catch(err => {
-          console.error('❌ Tier 1 AI analysis error:', err);
+          console.error('❌ Vision AI analysis error:', err);
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('image_processing_failed', {
               detail: { imageId: dbResult.id, error: err.message || 'Unknown error' }
@@ -709,33 +709,17 @@ export class ImageUploadService {
           console.warn('⚠️ Sensitive document detection error:', err);
         });
 
-        // TERTIARY: Full analysis (tagging, parts detection, etc.)
-        // This provides additional detailed analysis beyond tier 1
-        supabase.functions.invoke('analyze-image', {
-          body: {
-            image_url: urlData.publicUrl,
-            vehicle_id: vehicleId,
-            timeline_event_id: null,
-            user_id: user?.id || null
-          }
-        }).then(({ data, error }) => {
-          if (error) {
-            console.warn('⚠️ Full AI analysis failed (non-critical):', error);
-          } else {
-            console.log('✅ Full AI analysis completed:', data);
-          }
-        }).catch(err => {
-          console.warn('⚠️ Full AI analysis error (non-critical):', err);
-        });
+        // NOTE: analyze-image already covers tags + VIN/SPID OCR + metadata, so no separate tertiary call.
       } else if (isImage && !dbResult?.id) {
         // Fallback: If database insert failed but image was uploaded, still try analysis
         console.warn('⚠️ Database insert failed but image uploaded, attempting analysis anyway');
         const { data: { user } } = await supabase.auth.getUser();
-        supabase.functions.invoke('analyze-image-tier1', {
+        supabase.functions.invoke('analyze-image', {
           body: {
             image_url: urlData.publicUrl,
             vehicle_id: vehicleId,
             image_id: null, // No image_id available
+            timeline_event_id: null,
             user_id: user?.id || null
           }
         }).catch(err => {

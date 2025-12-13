@@ -6,7 +6,6 @@
  */
 
 import { supabase } from '../lib/supabase';
-import { aiGateway } from '../lib/aiGateway';
 import vinDecoderService from './vinDecoder';
 import { listingURLParser, type ParsedListing } from './listingURLParser';
 
@@ -289,44 +288,8 @@ class AIDataIngestionService {
    */
   private async extractFromText(text: string, userId?: string): Promise<ExtractionResult> {
     try {
-      // Get caching configuration for vehicle analysis
-      const cachingConfig = aiGateway.getCachingConfig('vehicle-analysis');
-
-      // Try using AI Gateway first
-      try {
-        const gatewayResult = await aiGateway.makeRequest(
-          'openai',
-          'gpt-4o-mini',
-          {
-            input: text,
-            inputType: 'text',
-            userId: userId || null
-          },
-          {
-            cache: cachingConfig.cache,
-            cacheTTL: cachingConfig.cacheTTL,
-            fallback: true,
-            userId
-          }
-        );
-
-        if (gatewayResult && gatewayResult.success) {
-          return {
-            inputType: 'text',
-            vehicleData: gatewayResult.vehicleData,
-            receiptData: gatewayResult.receiptData,
-            confidence: gatewayResult.confidence || 0.7,
-            source: 'ai_gateway_extraction',
-            provider: 'openai',
-            model: 'gpt-4o-mini',
-            rawData: gatewayResult
-          };
-        }
-      } catch (gatewayError) {
-        console.warn('AI Gateway failed for text extraction, falling back to edge function:', gatewayError);
-      }
-
-      // Fallback to edge function
+      // Primary path: use the dedicated ingestion Edge Function.
+      // This keeps search/ingestion working even when Vercel AI Gateway is unreachable.
       const { data, error } = await supabase.functions.invoke('extract-and-route-data', {
         body: {
           input: text,
@@ -394,9 +357,6 @@ class AIDataIngestionService {
 
       const imageUrl = urlData.publicUrl;
 
-      // Get caching configuration for image analysis
-      const cachingConfig = aiGateway.getCachingConfig('image-analysis');
-
       // Prepare request body
       const requestBody: any = {
         input: imageUrl,
@@ -412,37 +372,7 @@ class AIDataIngestionService {
         requestBody.textContext = textContext.trim();
       }
 
-      // Try using AI Gateway first
-      try {
-        const gatewayResult = await aiGateway.makeRequest(
-          'openai',
-          'gpt-4o',
-          requestBody,
-          {
-            cache: cachingConfig.cache,
-            cacheTTL: cachingConfig.cacheTTL,
-            fallback: true,
-            userId
-          }
-        );
-
-        if (gatewayResult && gatewayResult.success) {
-          return {
-            inputType: 'image',
-            vehicleData: gatewayResult.vehicleData,
-            receiptData: gatewayResult.receiptData,
-            confidence: gatewayResult.confidence || 0.7,
-            source: 'ai_gateway_image_analysis',
-            provider: 'openai',
-            model: 'gpt-4o',
-            rawData: gatewayResult
-          };
-        }
-      } catch (gatewayError) {
-        console.warn('AI Gateway failed for image extraction, falling back to edge function:', gatewayError);
-      }
-
-      // Fallback to edge function
+      // Primary path: use the dedicated ingestion Edge Function.
       const { data, error } = await supabase.functions.invoke('extract-and-route-data', {
         body: requestBody
       });

@@ -111,30 +111,41 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Insert image records (direct links to BaT - no download)
-    const imagesToInsert = imageUrls.slice(0, 15).map((url, i) => ({
-      vehicle_id,
-      image_url: url,
-      user_id: Deno.env.get('VIVA_USER_ID') || '0b9f107a-d124-49de-9ded-94698f63c1c4',
-      category: 'bat_listing',
-      is_primary: i === 0,
-      filename: `bat_image_${i}.jpg`
-    }));
+    // IMPORTANT: Direct hotlinks to BaT frequently fail in browsers (anti-hotlink/CORS).
+    // Instead, download + upload into Supabase Storage via `backfill-images` to produce stable public URLs.
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl || !serviceKey) {
+      throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not configured');
+    }
 
-    const { error: insertError } = await supabase
-      .from('vehicle_images')
-      .insert(imagesToInsert);
+    const backfillResp = await fetch(`${supabaseUrl}/functions/v1/backfill-images`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({
+        vehicle_id,
+        image_urls: imageUrls.slice(0, 15),
+        source: 'bat_import',
+        run_analysis: false,
+      }),
+    });
 
-    if (insertError) {
-      throw insertError;
+    const backfillText = await backfillResp.text();
+    if (!backfillResp.ok) {
+      throw new Error(`backfill-images failed: ${backfillResp.status} ${backfillText}`);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         vehicle_id,
-        images_linked: imagesToInsert.length,
-        listing_url: listingUrl
+        listing_url: listingUrl,
+        backfill: (() => {
+          try { return JSON.parse(backfillText); } catch { return { raw: backfillText }; }
+        })(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

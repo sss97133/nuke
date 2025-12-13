@@ -230,34 +230,36 @@ async function processListingURL(supabase: any, item: QueueItem) {
       };
     }
 
-    // Import images
+    // Import images robustly:
+    // Hotlinking external images is unreliable in browsers (often shows blank). Store them in Supabase Storage instead.
     let imageCount = 0;
     if (scrapedData.images && scrapedData.images.length > 0) {
-      for (const imageUrl of scrapedData.images.slice(0, 50)) {
-        try {
-          const { error: imageError } = await supabase
-            .from('vehicle_images')
-            .insert({
+      try {
+        const backfillResp = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/backfill-images`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+            },
+            body: JSON.stringify({
               vehicle_id: item.vehicle_id,
-              image_url: imageUrl,
-              user_id: item.user_id,
-              category: 'listing_import',
-              source: scrapeResult.source || 'unknown',
-              ai_scan_metadata: {
-                source: 'comment_extraction',
-                listing_url: item.raw_content,
-                scraped_at: new Date().toISOString(),
-                vin_match: vinMatch,
-                comment_id: item.comment_id
-              }
-            });
-
-          if (!imageError) {
-            imageCount++;
+              image_urls: scrapedData.images.slice(0, 50),
+              source: 'external_import',
+              run_analysis: false
+            })
           }
-        } catch (err) {
-          console.warn('Image import error:', err);
+        );
+
+        if (backfillResp.ok) {
+          const backfillResult = await backfillResp.json().catch(() => null);
+          imageCount = Number(backfillResult?.uploaded || 0);
+        } else {
+          console.warn(`backfill-images failed: ${backfillResp.status}`);
         }
+      } catch (err) {
+        console.warn('Image backfill error:', err);
       }
     }
 

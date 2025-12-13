@@ -525,6 +525,8 @@ export class PersonalPhotoLibraryService {
     }
 
     const userId = session.session.user.id;
+    const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
+    const querySafe = escapeILike(query);
 
     const { data, error } = await supabase
       .from('vehicle_images')
@@ -533,7 +535,7 @@ export class PersonalPhotoLibraryService {
       .is('vehicle_id', null)
       // Treat NULL organization_status as "unorganized" so legacy uploads still show
       .or('organization_status.eq.unorganized,organization_status.is.null')
-      .or(`file_name.ilike.%${query}%,ai_detected_angle.ilike.%${query}%`)
+      .or(`file_name.ilike.%${querySafe}%,ai_detected_angle.ilike.%${querySafe}%`)
       .order('created_at', { ascending: false })
       .limit(100);
 

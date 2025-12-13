@@ -40,6 +40,7 @@ docs/
 - **[Reference Library Upload Guide](reference-system/REFERENCE_LIBRARY_UPLOAD_GUIDE.md)** - How to add reference data
 - **[Component Knowledge System](reference-system/COMPONENT_KNOWLEDGE_SYSTEM_COMPLETE.md)** - System overview
 - **[KSL Extraction Audit](ksl-scraper/KSL_EXTRACTION_AUDIT.md)** - Quality analysis
+- **[Vehicle 3D Scan Contributor Rating](systems/VEHICLE_3D_SCAN_CONTRIBUTOR_REPUTATION.md)** - Rating grounded in paid scan work (receipts) + validation evidence + work-order matching
 - **[Organization Summary](../ORGANIZATION_SUMMARY.md)** - Repository organization
 
 All documentation is version-controlled and pushed to GitHub.

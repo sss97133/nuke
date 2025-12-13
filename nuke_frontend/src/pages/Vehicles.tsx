@@ -6,9 +6,7 @@ import GarageVehicleCard from '../components/vehicles/GarageVehicleCard';
 import VehicleRelationshipManager from '../components/VehicleRelationshipManager';
 import OrganizationContextFilter from '../components/vehicles/OrganizationContextFilter';
 import BulkActionsToolbar from '../components/vehicles/BulkActionsToolbar';
-import BulkGPSAssignment from '../components/vehicles/BulkGPSAssignment';
 import VehicleOrganizationToolbar from '../components/vehicles/VehicleOrganizationToolbar';
-import GPSOrganizationSuggestions from '../components/vehicles/GPSOrganizationSuggestions';
 import VehicleConfirmationQuestions from '../components/vehicles/VehicleConfirmationQuestions';
 import TitleTransferApproval from '../components/ownership/TitleTransferApproval';
 import '../design-system.css';
@@ -81,7 +79,9 @@ const VehiclesInner: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('created_at');
-  const [activeTab, setActiveTab] = useState<VehiclesTab>('associated');
+  // Default to "Owned" so users land on "their stuff" first.
+  // If they have no owned vehicles, we'll fall back to "All" after loading.
+  const [activeTab, setActiveTab] = useState<VehiclesTab>('owned');
   const [relationshipModal, setRelationshipModal] = useState<{
     vehicleId: string;
     currentRelationship: string | null;
@@ -96,7 +96,16 @@ const VehiclesInner: React.FC = () => {
     is_hidden: boolean;
     collection_name: string | null;
   }>>(new Map());
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Default collapsed: users shouldn't have to constantly manage sidebar real estate.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      const v = localStorage.getItem('vehicles.sidebarCollapsed');
+      if (v === null) return true;
+      return v === 'true';
+    } catch {
+      return true;
+    }
+  });
   const [sidebarSections, setSidebarSections] = useState<{
     selection: boolean;
     inbox: boolean;
@@ -108,7 +117,8 @@ const VehiclesInner: React.FC = () => {
   }>({
     selection: true,
     inbox: true,
-    context: true,
+    // Organizations selector should be available but not constantly expanded by default.
+    context: false,
     library: true,
     relationships: true,
     sources: true,
@@ -139,6 +149,14 @@ const VehiclesInner: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, [searchParams, urlSearchQuery]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('vehicles.sidebarCollapsed', String(sidebarCollapsed));
+    } catch {
+      // ignore
+    }
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     loadVehicleRelationships();
@@ -316,7 +334,7 @@ const VehiclesInner: React.FC = () => {
           }
         });
 
-        // Process vehicles uploaded by user that don't have explicit relationships
+        // Process vehicles uploaded/added by user that don't have explicit relationships
         const explicitVehicleIds = new Set([
           ...verifiedOwnerships.map((o: any) => o.vehicle_id),
           ...discoveredVehicles.map((d: any) => d.vehicles?.id).filter(Boolean)
@@ -327,6 +345,32 @@ const VehiclesInner: React.FC = () => {
 
           const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
           const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
+
+          // IMPORTANT: Legacy data used vehicles.user_id as "uploaded by" before uploaded_by existed.
+          // To avoid classifying legacy uploader rows as "Owned", only treat vehicles.user_id as ownership
+          // when uploaded_by is present (newer schema shape).
+          // "Verified Owner" is reserved for ownership_verifications.status = approved.
+          if (vehicle.user_id === session.user.id && !!vehicle.uploaded_by) {
+            owned.push({
+              vehicle: {
+                id: vehicle.id,
+                year: vehicle.year,
+                make: vehicle.make,
+                model: vehicle.model,
+                vin: vehicle.vin,
+                color: vehicle.color,
+                mileage: vehicle.mileage,
+                primaryImageUrl: imageUrl,
+                isAnonymous: false,
+                created_at: vehicle.created_at
+              },
+              relationshipType: 'owned',
+              role: 'Owner',
+              lastActivity: vehicle.created_at
+            });
+            explicitVehicleIds.add(vehicle.id);
+            return;
+          }
 
           contributing.push({
             vehicle: {
@@ -347,8 +391,32 @@ const VehiclesInner: React.FC = () => {
           });
         });
 
-        setVehicleRelationships({ owned, contributing, interested, discovered, curated, consigned, previously_owned });
-        console.log(`[Vehicles] RPC: ${owned.length} owned, ${contributing.length} contributing, ${interested.length} interested`);
+        // De-duplicate: if something is owned, it should not also appear in other buckets
+        const ownedIds = new Set(owned.map(r => r.vehicle.id));
+        const dedupe = (arr: VehicleRelationship[]) => arr.filter(r => !ownedIds.has(r.vehicle.id));
+        const dedupedContributing = dedupe(contributing);
+        const dedupedInterested = dedupe(interested);
+        const dedupedDiscovered = dedupe(discovered);
+        const dedupedCurated = dedupe(curated);
+        const dedupedConsigned = dedupe(consigned);
+        const dedupedPreviouslyOwned = dedupe(previously_owned);
+
+        setVehicleRelationships({
+          owned,
+          contributing: dedupedContributing,
+          interested: dedupedInterested,
+          discovered: dedupedDiscovered,
+          curated: dedupedCurated,
+          consigned: dedupedConsigned,
+          previously_owned: dedupedPreviouslyOwned
+        });
+        console.log(`[Vehicles] RPC: ${owned.length} owned, ${dedupedContributing.length} contributing, ${dedupedInterested.length} interested`);
+
+        // UX: If we defaulted to Owned but the user has none, fall back to All.
+        setActiveTab((prev) => {
+          if (prev !== 'owned') return prev;
+          return owned.length > 0 ? 'owned' : 'associated';
+        });
         return;
       }
       
@@ -653,9 +721,8 @@ const VehiclesInner: React.FC = () => {
         }
       });
 
-      // Process vehicles uploaded by user that don't have explicit relationships
-      // IMPORTANT: These are vehicles where uploaded_by matches but no relationship is explicitly set
-      // The uploader is NOT automatically the owner - they need to verify ownership separately
+      // Process vehicles uploaded/added by user that don't have explicit relationships
+      // IMPORTANT: uploaded_by is NOT automatically the owner. However, vehicles.user_id indicates direct ownership.
       const explicitVehicleIds = new Set([
         ...(verifiedOwnerships || []).map((o: any) => o.vehicle_id),
         ...(discoveredVehicles || []).map((d: any) => d.vehicles?.id).filter(Boolean)
@@ -680,11 +747,35 @@ const VehiclesInner: React.FC = () => {
           return;
         }
 
-        // Place in contributing section - uploaders are contributors, not automatic owners
-        // Only for manually uploaded vehicles (not URL finds)
         const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
         const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
 
+        // Direct owner should show as Owned (even without title verification) for newer rows.
+        // For legacy rows (uploaded_by is null), user_id historically meant uploader.
+        if (vehicle.user_id === session.user.id && !!vehicle.uploaded_by) {
+          owned.push({
+            vehicle: {
+              id: vehicle.id,
+              year: vehicle.year,
+              make: vehicle.make,
+              model: vehicle.model,
+              vin: vehicle.vin,
+              color: vehicle.color,
+              mileage: vehicle.mileage,
+              primaryImageUrl: imageUrl,
+              isAnonymous: false,
+              created_at: vehicle.created_at
+            },
+            relationshipType: 'owned',
+            role: 'Owner',
+            lastActivity: vehicle.created_at
+          });
+          explicitVehicleIds.add(vehicle.id);
+          return;
+        }
+
+        // Place in contributing section - uploaders are contributors, not automatic owners
+        // Only for manually uploaded vehicles (not URL finds)
         contributing.push({
           vehicle: {
             id: vehicle.id,
@@ -704,14 +795,24 @@ const VehiclesInner: React.FC = () => {
         });
       });
 
+      // De-duplicate: if something is owned, it should not also appear in other buckets
+      const ownedIds = new Set(owned.map(r => r.vehicle.id));
+      const dedupe = (arr: VehicleRelationship[]) => arr.filter(r => !ownedIds.has(r.vehicle.id));
+      const dedupedContributing = dedupe(contributing);
+      const dedupedInterested = dedupe(interested);
+      const dedupedDiscovered = dedupe(discovered);
+      const dedupedCurated = dedupe(curated);
+      const dedupedConsigned = dedupe(consigned);
+      const dedupedPreviouslyOwned = dedupe(previously_owned);
+
       // Filter by organization context if selected
       let filteredOwned = owned;
-      let filteredContributing = contributing;
-      let filteredInterested = interested;
-      let filteredDiscovered = discovered;
-      let filteredCurated = curated;
-      let filteredConsigned = consigned;
-      let filteredPreviouslyOwned = previously_owned;
+      let filteredContributing = dedupedContributing;
+      let filteredInterested = dedupedInterested;
+      let filteredDiscovered = dedupedDiscovered;
+      let filteredCurated = dedupedCurated;
+      let filteredConsigned = dedupedConsigned;
+      let filteredPreviouslyOwned = dedupedPreviouslyOwned;
 
       if (selectedOrganizationId) {
         // Load vehicles linked to this organization
@@ -724,12 +825,12 @@ const VehiclesInner: React.FC = () => {
         const orgVehicleIds = new Set((orgVehicles || []).map((ov: any) => ov.vehicle_id));
 
         filteredOwned = owned.filter(r => orgVehicleIds.has(r.vehicle.id));
-        filteredContributing = contributing.filter(r => orgVehicleIds.has(r.vehicle.id));
-        filteredInterested = interested.filter(r => orgVehicleIds.has(r.vehicle.id));
-        filteredDiscovered = discovered.filter(r => orgVehicleIds.has(r.vehicle.id));
-        filteredCurated = curated.filter(r => orgVehicleIds.has(r.vehicle.id));
-        filteredConsigned = consigned.filter(r => orgVehicleIds.has(r.vehicle.id));
-        filteredPreviouslyOwned = previously_owned.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredContributing = dedupedContributing.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredInterested = dedupedInterested.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredDiscovered = dedupedDiscovered.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredCurated = dedupedCurated.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredConsigned = dedupedConsigned.filter(r => orgVehicleIds.has(r.vehicle.id));
+        filteredPreviouslyOwned = dedupedPreviouslyOwned.filter(r => orgVehicleIds.has(r.vehicle.id));
       }
 
       setVehicleRelationships({
@@ -743,6 +844,12 @@ const VehiclesInner: React.FC = () => {
       });
       
       console.log(`Categorized vehicles: ${filteredOwned.length} owned, ${filteredContributing.length} contributing, ${filteredInterested.length} interested`);
+
+      // UX: If we defaulted to Owned but the user has none, fall back to All.
+      setActiveTab((prev) => {
+        if (prev !== 'owned') return prev;
+        return filteredOwned.length > 0 ? 'owned' : 'associated';
+      });
     } catch (error) {
       console.error('Error in loadVehicleRelationships:', error);
     } finally {
@@ -988,6 +1095,41 @@ const VehiclesInner: React.FC = () => {
       ? allRelationships
       : vehicleRelationships[activeTab as Exclude<VehiclesTab, 'associated'>] || [];
 
+  const relationshipLabel = (t: VehicleRelationship['relationshipType']) => {
+    switch (t) {
+      case 'owned': return 'Owned';
+      case 'previously_owned': return 'Previously Owned';
+      case 'discovered': return 'Discovered (Craigslist, etc.)';
+      case 'curated': return 'Curated';
+      case 'consigned': return 'Consigned';
+      case 'contributing': return 'Contributing';
+      case 'interested': return 'Interested';
+      default: return String(t);
+    }
+  };
+
+  const relationshipOrder: VehicleRelationship['relationshipType'][] = [
+    'owned',
+    'previously_owned',
+    'contributing',
+    'consigned',
+    'curated',
+    'discovered',
+    'interested'
+  ];
+
+  const groupByRelationship = (rels: VehicleRelationship[]) => {
+    const map = new Map<VehicleRelationship['relationshipType'], VehicleRelationship[]>();
+    rels.forEach((r) => {
+      const key = r.relationshipType;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    });
+    return relationshipOrder
+      .map((k) => ({ type: k, items: map.get(k) || [] }))
+      .filter((g) => g.items.length > 0);
+  };
+
   // Filter and sort current relationships
   const filteredRelationships = currentRelationships
     .filter(relationship => {
@@ -1051,6 +1193,8 @@ const VehiclesInner: React.FC = () => {
       }
     });
 
+  const groupedRelationships = activeTab === 'associated' ? groupByRelationship(filteredRelationships) : [];
+
 
   const tabMeta: Array<{ key: VehiclesTab; label: string; count: number }> = [
     { key: 'associated', label: 'All', count: allRelationships.length },
@@ -1092,7 +1236,8 @@ const VehiclesInner: React.FC = () => {
           <span>{title}</span>
           <span style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {right}
-            <span className="vehicle-sidebar-mini">{open ? 'HIDE' : 'SHOW'}</span>
+            {/* Less noisy than SHOW/HIDE but still communicates state */}
+            <span className="vehicle-sidebar-mini">{open ? '▼' : '▶'}</span>
           </span>
         </div>
         {open && <div className="vehicle-sidebar-section-body">{children}</div>}
@@ -1150,43 +1295,7 @@ const VehiclesInner: React.FC = () => {
 
             {!sidebarCollapsed && (
               <div className="vehicle-library-sidebar-scroll">
-                <SidebarSection
-                  title={`Selection (${selectedVehicleIds.size})`}
-                  sectionKey="selection"
-                  hidden={!session?.user?.id || selectedVehicleIds.size === 0}
-                >
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className="button button-secondary button-small"
-                      onClick={() => setSelectedVehicleIds(new Set())}
-                    >
-                      CLEAR SELECTION
-                    </button>
-                  </div>
-                  {session?.user?.id && selectedVehicleIds.size > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <BulkActionsToolbar
-                        selectedVehicleIds={Array.from(selectedVehicleIds)}
-                        userId={session.user.id}
-                        onDeselectAll={() => setSelectedVehicleIds(new Set())}
-                        onUpdate={() => {
-                          loadVehiclePreferences();
-                          loadVehicleRelationships();
-                        }}
-                      />
-                      <BulkGPSAssignment
-                        selectedVehicleIds={Array.from(selectedVehicleIds)}
-                        userId={session.user.id}
-                        onComplete={() => {
-                          loadVehicleRelationships();
-                          setSelectedVehicleIds(new Set());
-                        }}
-                        onDeselectAll={() => setSelectedVehicleIds(new Set())}
-                      />
-                    </div>
-                  )}
-                </SidebarSection>
+                {/* Selection tools removed (bulk GPS assignment was too heavy/noisy for day-to-day use). */}
 
                 <SidebarSection
                   title="Inbox"
@@ -1214,7 +1323,7 @@ const VehiclesInner: React.FC = () => {
                   )}
                 </SidebarSection>
 
-                <SidebarSection title="Context" sectionKey="context" hidden={!session?.user?.id}>
+                <SidebarSection title="Organizations" sectionKey="context" hidden={!session?.user?.id}>
                   <OrganizationContextFilter
                     selectedOrganizationId={selectedOrganizationId}
                     onOrganizationChange={(orgId) => {
@@ -1441,100 +1550,163 @@ const VehiclesInner: React.FC = () => {
               )}
 
               {filteredRelationships && filteredRelationships.length > 0 && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: '12px'
-                  }}
-                >
-                  {filteredRelationships.map((relationship) => {
-                    const vehicle = relationship?.vehicle;
-                    if (!vehicle || !relationship) return null;
-                    const isSelected = selectedVehicleIds.has(vehicle.id);
-                    return (
-                      <div key={vehicle.id} style={{ position: 'relative' }}>
-                        {session?.user?.id && (
+                <>
+                  {/* All view: group by relationship so buckets never mix (e.g., Discovered vs Previously Owned) */}
+                  {activeTab === 'associated' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                      {groupedRelationships.map((group) => (
+                        <div key={group.type}>
+                          <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '8px' }}>
+                            {relationshipLabel(group.type)} ({group.items.length})
+                          </div>
                           <div
                             style={{
-                              position: 'absolute',
-                              top: '8px',
-                              left: '8px',
-                              zIndex: 10,
-                              background: 'white',
-                              border: '1px solid var(--border-light)',
-                              padding: '4px'
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                              gap: '12px'
                             }}
                           >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={(e) => {
-                                const newSelection = new Set(selectedVehicleIds);
-                                if (e.target.checked) newSelection.add(vehicle.id);
-                                else newSelection.delete(vehicle.id);
-                                setSelectedVehicleIds(newSelection);
+                            {group.items.map((relationship) => {
+                              const vehicle = relationship?.vehicle;
+                              if (!vehicle || !relationship) return null;
+                              const isSelected = selectedVehicleIds.has(vehicle.id);
+                              return (
+                                <div key={vehicle.id} style={{ position: 'relative' }}>
+                                  {session?.user?.id && (
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        top: '8px',
+                                        left: '8px',
+                                        zIndex: 10,
+                                        background: 'white',
+                                        border: '1px solid var(--border-light)',
+                                        padding: '4px'
+                                      }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={(e) => {
+                                          const newSelection = new Set(selectedVehicleIds);
+                                          if (e.target.checked) newSelection.add(vehicle.id);
+                                          else newSelection.delete(vehicle.id);
+                                          setSelectedVehicleIds(newSelection);
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                      />
+                                    </div>
+                                  )}
+
+                                  <GarageVehicleCard
+                                    vehicle={vehicle}
+                                    relationship={relationship}
+                                    onRefresh={() => {
+                                      loadVehicleRelationships();
+                                      loadVehiclePreferences();
+                                    }}
+                                    onEditRelationship={(vehicleId, current) => {
+                                      setRelationshipModal({
+                                        vehicleId,
+                                        currentRelationship: current
+                                      });
+                                    }}
+                                  />
+
+                                  {session?.user?.id && isSelected && (
+                                    <div style={{ marginTop: '8px', padding: '8px', background: 'var(--grey-50)', border: '1px solid var(--border-light)' }}>
+                                      <VehicleOrganizationToolbar
+                                        vehicleId={vehicle.id}
+                                        userId={session.user.id}
+                                        onUpdate={() => {
+                                          loadVehiclePreferences();
+                                          loadVehicleRelationships();
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: '12px'
+                      }}
+                    >
+                      {filteredRelationships.map((relationship) => {
+                        const vehicle = relationship?.vehicle;
+                        if (!vehicle || !relationship) return null;
+                        const isSelected = selectedVehicleIds.has(vehicle.id);
+                        return (
+                          <div key={vehicle.id} style={{ position: 'relative' }}>
+                            {session?.user?.id && (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  left: '8px',
+                                  zIndex: 10,
+                                  background: 'white',
+                                  border: '1px solid var(--border-light)',
+                                  padding: '4px'
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    const newSelection = new Set(selectedVehicleIds);
+                                    if (e.target.checked) newSelection.add(vehicle.id);
+                                    else newSelection.delete(vehicle.id);
+                                    setSelectedVehicleIds(newSelection);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                />
+                              </div>
+                            )}
+
+                            <GarageVehicleCard
+                              vehicle={vehicle}
+                              relationship={relationship}
+                              onRefresh={() => {
+                                loadVehicleRelationships();
+                                loadVehiclePreferences();
                               }}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                              onEditRelationship={(vehicleId, current) => {
+                                setRelationshipModal({
+                                  vehicleId,
+                                  currentRelationship: current
+                                });
+                              }}
                             />
-                          </div>
-                        )}
 
-                        <GarageVehicleCard
-                          vehicle={vehicle}
-                          relationship={relationship}
-                          onRefresh={() => {
-                            loadVehicleRelationships();
-                            loadVehiclePreferences();
-                          }}
-                          onEditRelationship={(vehicleId, current) => {
-                            setRelationshipModal({
-                              vehicleId,
-                              currentRelationship: current
-                            });
-                          }}
-                        />
-
-                        {session?.user?.id && isSelected && (
-                          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div
-                              style={{
-                                padding: '8px',
-                                background: 'var(--grey-50)',
-                                border: '1px solid var(--border-light)'
-                              }}
-                            >
-                              <GPSOrganizationSuggestions
-                                vehicleId={vehicle.id}
-                                userId={session.user.id}
-                                onAssign={() => {
-                                  loadVehicleRelationships();
-                                }}
-                              />
-                            </div>
-                            <div
-                              style={{
-                                padding: '8px',
-                                background: 'var(--grey-50)',
-                                border: '1px solid var(--border-light)'
-                              }}
-                            >
-                              <VehicleOrganizationToolbar
-                                vehicleId={vehicle.id}
-                                userId={session.user.id}
-                                onUpdate={() => {
-                                  loadVehiclePreferences();
-                                  loadVehicleRelationships();
-                                }}
-                              />
-                            </div>
+                            {session?.user?.id && isSelected && (
+                              <div style={{ marginTop: '8px', padding: '8px', background: 'var(--grey-50)', border: '1px solid var(--border-light)' }}>
+                                <VehicleOrganizationToolbar
+                                  vehicleId={vehicle.id}
+                                  userId={session.user.id}
+                                  onUpdate={() => {
+                                    loadVehiclePreferences();
+                                    loadVehicleRelationships();
+                                  }}
+                                />
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </main>

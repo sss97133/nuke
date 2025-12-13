@@ -1359,7 +1359,12 @@ serve(async (req) => {
                   image_url: publicUrl, // CRITICAL: Set image_url field
                   user_id: importUserId,
                   is_primary: i === 0, // First image is primary
-                  source: 'import_queue',
+                  // IMPORTANT: `vehicle_images_attribution_check` requires either user_id/ghost_user_id/imported_by
+                  // OR a whitelisted `source`. Edge Functions often have no auth user context, so importUserId can be null.
+                  // Use a whitelisted source to prevent inserts from silently failing.
+                  source: organizationId ? 'organization_import' : 'external_import',
+                  source_url: imageUrl,
+                  storage_path: storagePath,
                   taken_at: new Date().toISOString(),
                   exif_data: {
                     source_url: imageUrl,

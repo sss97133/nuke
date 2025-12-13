@@ -35,12 +35,33 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
         return;
       }
       const orgs = await MyOrganizationsService.getMyOrganizations({ status: 'active' });
-      setOrganizations(orgs);
+      // Sort pinned orgs first so users with many affiliations see favorites at the top.
+      const sorted = [...orgs].sort((a, b) => {
+        const ap = a.preferences?.is_pinned ? 1 : 0;
+        const bp = b.preferences?.is_pinned ? 1 : 0;
+        if (ap !== bp) return bp - ap;
+        // Higher display_order first, then name
+        const ao = a.preferences?.display_order || 0;
+        const bo = b.preferences?.display_order || 0;
+        if (ao !== bo) return bo - ao;
+        return (a.organization.business_name || '').localeCompare(b.organization.business_name || '');
+      });
+      setOrganizations(sorted);
     } catch (error) {
       console.error('Error loading organizations:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const togglePinned = async (org: MyOrganization) => {
+    const nextPinned = !(org.preferences?.is_pinned || false);
+    const res = await MyOrganizationsService.togglePin(org.organization_id, nextPinned);
+    if (!res.success) {
+      alert(res.error || 'Failed to favorite organization');
+      return;
+    }
+    await loadOrganizations();
   };
 
   if (loading) {
@@ -95,6 +116,36 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
             gap: '6px'
           }}
         >
+          {/* Favorite/pin toggle */}
+          <span
+            role="button"
+            tabIndex={0}
+            title={org.preferences?.is_pinned ? 'Unfavorite organization' : 'Favorite organization'}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              togglePinned(org);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                togglePinned(org);
+              }
+            }}
+            style={{
+              fontSize: '9pt',
+              lineHeight: 1,
+              opacity: org.preferences?.is_pinned ? 1 : 0.4,
+              color: org.preferences?.is_pinned ? 'var(--accent)' : 'var(--text-muted)',
+              userSelect: 'none'
+            }}
+            aria-label={org.preferences?.is_pinned ? 'Unfavorite organization' : 'Favorite organization'}
+          >
+            ★
+          </span>
           {org.organization.logo_url && (
             <img
               src={org.organization.logo_url}

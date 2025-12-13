@@ -135,10 +135,12 @@ export async function getGMPaintCode(code: string) {
  */
 export async function searchGMPaintCodes(search: string) {
   try {
+    const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
+    const searchSafe = escapeILike(search);
     const { data, error } = await supabase
       .from('gm_paint_codes')
       .select('*')
-      .or(`code.ilike.%${search}%,name.ilike.%${search}%`)
+      .or(`code.ilike.%${searchSafe}%,name.ilike.%${searchSafe}%`)
       .order('name');
 
     if (error) throw error;

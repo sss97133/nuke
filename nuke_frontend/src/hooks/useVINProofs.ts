@@ -63,7 +63,18 @@ export function useVINProofs(vehicleId: string | undefined) {
           .order('confidence_score', { ascending: false })
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        // If the migration hasn't been applied yet, PostgREST returns 404 for missing table.
+        // Treat that as "no proofs available" rather than a fatal error.
+        if (error) {
+          const status = (error as any)?.status;
+          const message = String((error as any)?.message || '');
+          if (status === 404 || message.includes('404')) {
+            setSummary(null);
+            setLoading(false);
+            return;
+          }
+          throw error;
+        }
 
         if (!sourcesRows || sourcesRows.length === 0) {
           setSummary(null);
@@ -144,6 +155,7 @@ export function useVINProofs(vehicleId: string | undefined) {
         });
 
       } catch (err) {
+        // Avoid noisy logs if the feature isn't deployed.
         console.error('Error loading VIN proofs:', err);
         setSummary(null);
       } finally {
