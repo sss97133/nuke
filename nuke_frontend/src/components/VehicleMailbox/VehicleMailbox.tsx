@@ -38,7 +38,7 @@ const VehicleMailbox: React.FC = () => {
   const [mailbox, setMailbox] = useState<VehicleMailbox | null>(null)
   const [messages, setMessages] = useState<MailboxMessage[]>([])
   const [loading, setLoading] = useState(true)
-  const [vehicleData, setVehicleData] = useState<{ year?: number; make?: string; model?: string; nickname?: string } | null>(null)
+  const [vehicleData, setVehicleData] = useState<{ year?: number; make?: string; model?: string } | null>(null)
   const [activeTab, setActiveTab] = useState<'messages' | 'settings'>('messages')
   const [selectedMessage, setSelectedMessage] = useState<MailboxMessage | null>(null)
   const [showDuplicateModal, setShowDuplicateModal] = useState(false)
@@ -200,7 +200,7 @@ const VehicleMailbox: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('vehicles')
-        .select('year, make, model, nickname')
+        .select('year, make, model')
         .eq('id', vehicleId)
         .single()
 
@@ -210,8 +210,7 @@ const VehicleMailbox: React.FC = () => {
         setVehicleData({
           year: data.year,
           make: data.make,
-          model: data.model,
-          nickname: data.nickname
+          model: data.model
         })
       }
     } catch (error) {
@@ -1331,7 +1330,6 @@ const VehicleMailbox: React.FC = () => {
         vehicleYMM={vehicleData?.year && vehicleData?.make && vehicleData?.model 
           ? `${vehicleData.year} ${vehicleData.make} ${vehicleData.model}` 
           : undefined}
-        vehicleNickname={vehicleData?.nickname}
         vehicleYear={vehicleData?.year}
         vehicleMake={vehicleData?.make}
         vehicleModel={vehicleData?.model}

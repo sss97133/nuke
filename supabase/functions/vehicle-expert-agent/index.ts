@@ -12,10 +12,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getLLMConfig, callLLM, type LLMProvider, type AnalysisTier } from '../_shared/llmProvider.ts';
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-);
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const SERVICE_ROLE_KEY =
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+  Deno.env.get('SERVICE_ROLE_KEY') ??
+  '';
+
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
 interface VehicleContext {
   year: number;
@@ -278,6 +281,22 @@ Deno.serve(async (req) => {
   }
   
   try {
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+      return new Response(
+        JSON.stringify({
+          error: 'Missing Supabase secrets',
+          detail: 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SERVICE_ROLE_KEY) for vehicle-expert-agent.'
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        }
+      );
+    }
+
     const { 
       vehicleId, 
       queueId,

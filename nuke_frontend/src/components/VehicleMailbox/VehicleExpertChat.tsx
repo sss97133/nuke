@@ -116,7 +116,12 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
         })
       })
 
-      if (error) throw error
+      if (error) {
+        const status = (error as any)?.context?.status
+        const body = (error as any)?.context?.body
+        const msg = status ? `Edge Function error ${status}` : error.message
+        throw new Error(body ? `${msg}: ${body}` : msg)
+      }
       if ((data as any)?.error) throw new Error((data as any)?.error)
 
       const assistantMessage: Message = {
