@@ -61,7 +61,7 @@ const ExtractionQueueStatus: React.FC<ExtractionQueueStatusProps> = ({ vehicleId
 
   const statusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return '⏳';
+      case 'pending': return 'Pending';
       case 'processing': return '⚙️';
       case 'completed': return '✓';
       case 'failed': return '✗';

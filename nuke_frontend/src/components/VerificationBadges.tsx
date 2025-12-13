@@ -19,7 +19,7 @@ const VerificationBadges: React.FC<VerificationBadgesProps> = ({
       'ai-imported': {
         label: 'AI Imported',
         color: 'bg-gray-100 text-gray-600',
-        icon: '🤖',
+        icon: 'AI',
         description: 'Data imported via AI analysis'
       },
       'owner-verified': {

@@ -741,7 +741,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
             
             <div className="modal-body">
               <div className="info-box" style={{ marginBottom: '16px' }}>
-                <strong>🤖 AI-Powered Receipt Import</strong>
+                <strong>AI-Powered Receipt Import</strong>
                 <p style={{ margin: '8px 0 0 0', fontSize: '13px' }}>
                   Claude AI will intelligently parse your receipt to extract all tool information.
                   Supports Snap-on, Mac Tools, Matco, and other professional tool suppliers.

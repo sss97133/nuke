@@ -118,7 +118,7 @@ const TagReviewModal: React.FC<TagReviewModalProps> = ({ isOpen, onClose, vehicl
                   <div key={tag.id} className="tag-review-item">
                     <div className="tag-info">
                       <div className="tag-details">
-                        <span className="tag-name">🤖 {tag.tag_name}</span>
+                        <span className="tag-name">AI {tag.tag_name}</span>
                         <span className="confidence-score">
                           {Math.round(tag.confidence >= 1 ? tag.confidence : tag.confidence * 100)}% confidence
                         </span>

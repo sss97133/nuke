@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { formatSupabaseInvokeError } from '../utils/formatSupabaseInvokeError';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { useValuationIntel } from '../hooks/useValuationIntel';
 import { TimelineEventService } from '../services/timelineEventService';
@@ -234,7 +235,7 @@ const VehicleProfile: React.FC = () => {
       const { error } = await supabase.functions.invoke('vehicle-expert-agent', {
         body: { vehicleId: vehId }
       });
-      if (error) throw error;
+      if (error) throw new Error(await formatSupabaseInvokeError(error));
       const { data } = await supabase
         .from('vehicle_valuations')
         .select('id, estimated_value, documented_components, confidence_score, components, environmental_context, value_justification, valuation_date')

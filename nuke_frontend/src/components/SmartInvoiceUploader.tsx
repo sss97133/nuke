@@ -4,6 +4,7 @@ import { receiptExtractionService } from '../services/receiptExtractionService';
 import { receiptPersistService } from '../services/receiptPersistService';
 import { ValuationEngine as VehicleValuationService } from '../services/valuationEngine';
 import type { ParsedReceipt } from '../services/receiptExtractionService';
+import { formatSupabaseInvokeError } from '../utils/formatSupabaseInvokeError';
 
 interface SmartInvoiceUploaderProps {
   vehicleId: string;
@@ -368,7 +369,11 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
             confidence: Math.round(expertResult.confidence || 0) 
           });
         } else {
-          console.warn('Expert agent failed, using legacy calculation as fallback');
+          if (expertError) {
+            console.warn('Expert agent failed:', await formatSupabaseInvokeError(expertError));
+          } else {
+            console.warn('Expert agent failed, using legacy calculation as fallback');
+          }
           VehicleValuationService.clearCache(vehicleId);
           const after = await VehicleValuationService.calculateValuation(vehicleId);
           setValueDelta({ 
@@ -555,7 +560,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
               {/* Status */}
               {(status === 'uploading' || status === 'parsing') && (
                 <div style={{ padding: 'var(--space-3)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
-                  <div style={{ marginBottom: 'var(--space-2)' }}>⏳ {message}</div>
+                  <div style={{ marginBottom: 'var(--space-2)' }}>{message}</div>
                   <div style={{ width: '100%', height: '4px', background: 'var(--grey-200)', borderRadius: '2px', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: '60%', background: 'var(--accent)', animation: 'pulse 1.5s ease-in-out infinite' }} />
                   </div>

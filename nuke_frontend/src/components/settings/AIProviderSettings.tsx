@@ -219,7 +219,7 @@ const AIProviderSettings: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '4px' }}>
-                    {provider.provider === 'openai' && '🤖 '}
+                    {provider.provider === 'openai' && ''}
                     {provider.provider === 'anthropic' && '🧠 '}
                     {provider.provider === 'google' && '🔷 '}
                     {provider.provider === 'gemini' && '🔷 '}

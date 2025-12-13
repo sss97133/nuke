@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { MyOrganizationsService } from '../../services/myOrganizationsService';
 import type { MyOrganization } from '../../services/myOrganizationsService';
+import { useAuth } from '../../hooks/useAuth';
 
 interface OrganizationContextFilterProps {
   selectedOrganizationId: string | null;
@@ -16,14 +17,23 @@ const OrganizationContextFilter: React.FC<OrganizationContextFilterProps> = ({
 }) => {
   const [organizations, setOrganizations] = useState<MyOrganization[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Wait for auth hydration; otherwise supabase.auth.getUser() can be null briefly,
+    // which would cause a silent "no orgs" state that never refreshes.
+    if (authLoading) return;
     loadOrganizations();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.id]);
 
   const loadOrganizations = async () => {
     try {
       setLoading(true);
+      if (!user?.id) {
+        setOrganizations([]);
+        return;
+      }
       const orgs = await MyOrganizationsService.getMyOrganizations({ status: 'active' });
       setOrganizations(orgs);
     } catch (error) {

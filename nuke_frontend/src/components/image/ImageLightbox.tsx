@@ -740,7 +740,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             filter: `id=eq.${imageId}`
           },
           (payload) => {
-            console.log('🔄 Image metadata updated, reloading...', payload);
+            console.log('Image metadata updated, reloading...', payload);
             // Reload metadata when image is updated
             loadImageMetadata();
           }

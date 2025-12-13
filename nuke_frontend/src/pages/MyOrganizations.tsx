@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { MyOrganizationsService, type MyOrganization } from '../services/myOrganizationsService';
 import OrganizationCard from '../components/organization/OrganizationCard';
+import { useAuth } from '../hooks/useAuth';
 import '../design-system.css';
 
 const MyOrganizations: React.FC = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [organizations, setOrganizations] = useState<MyOrganization[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [summaryStats, setSummaryStats] = useState({
     total_organizations: 0,
     active_organizations: 0,
@@ -26,12 +29,28 @@ const MyOrganizations: React.FC = () => {
   });
 
   useEffect(() => {
+    if (authLoading) return;
+    // Not signed in: show empty state (but stop spinner)
+    if (!user?.id) {
+      setOrganizations([]);
+      setSummaryStats({
+        total_organizations: 0,
+        active_organizations: 0,
+        total_vehicles: 0,
+        total_value: 0,
+        total_contributions: 0,
+      });
+      setLoading(false);
+      return;
+    }
     loadOrganizations();
     loadSummaryStats();
-  }, [filters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, authLoading, user?.id]);
 
   const loadOrganizations = async () => {
     try {
+      setLoadError(null);
       setLoading(true);
       const data = await MyOrganizationsService.getMyOrganizations(filters);
       
@@ -46,6 +65,7 @@ const MyOrganizations: React.FC = () => {
       setOrganizations(sorted);
     } catch (error) {
       console.error('Error loading organizations:', error);
+      setLoadError(error instanceof Error ? error.message : 'Failed to load organizations');
     } finally {
       setLoading(false);
     }
@@ -211,6 +231,16 @@ const MyOrganizations: React.FC = () => {
       </div>
 
       {/* Organizations Grid */}
+      {loadError && (
+        <div className="card" style={{ padding: '16px', marginBottom: 'var(--space-4)' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}>
+            Organizations failed to load
+          </div>
+          <div style={{ fontSize: '12px', color: '#666' }}>
+            {loadError}
+          </div>
+        </div>
+      )}
       {organizations.length === 0 ? (
         <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
           <div style={{ fontSize: '18px', marginBottom: '10px' }}>

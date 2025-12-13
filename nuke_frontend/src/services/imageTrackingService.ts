@@ -123,7 +123,7 @@ export class ImageTrackingService {
    * Backfill timeline events and contributions for existing images
    */
   static async backfillImageTracking(): Promise<{ processed: number; errors: number }> {
-    console.log('🔄 Starting image tracking backfill...');
+    console.log('Starting image tracking backfill...');
     
     let processed = 0;
     let errors = 0;
@@ -325,7 +325,7 @@ export class ImageTrackingService {
    */
   static async validateUserContributions(): Promise<void> {
     try {
-      console.log('🔄 Validating user contribution counts...');
+      console.log('Validating user contribution counts...');
 
       // Get all users with images
       const { data: users } = await supabase

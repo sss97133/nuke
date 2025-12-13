@@ -38,7 +38,7 @@ const FieldAuditTrail: React.FC<FieldAuditTrailProps> = ({
   const getSourceTypeIcon = (sourceType: string) => {
     switch (sourceType) {
       case 'human_input': return '👤';
-      case 'ai_scan': return '🤖';
+      case 'ai_scan': return 'AI';
       case 'ai_extraction': return '📄';
       case 'ocr': return 'OCR';
       default: return '❓';

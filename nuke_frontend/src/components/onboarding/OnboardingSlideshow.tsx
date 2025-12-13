@@ -21,7 +21,7 @@ const slides = [
       "OCR for receipts, titles, and documents",
       "Smart categorization (exterior, interior, engine, etc.)"
     ],
-    visual: "🤖" // Will be replaced with actual screenshots
+    visual: "AI" // Will be replaced with actual screenshots
   },
   {
     title: "Professional Vehicle Profiles",

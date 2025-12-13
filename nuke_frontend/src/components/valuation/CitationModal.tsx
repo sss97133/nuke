@@ -95,7 +95,7 @@ export default function CitationModal({
       market_listing: { label: '📊 Market', color: '#f59e0b' },
       appraisal_doc: { label: '✓ Appraisal', color: '#059669' },
       user_input: { label: '👤 User', color: '#6b7280' },
-      ai_extraction: { label: '🤖 AI', color: '#ec4899' },
+      ai_extraction: { label: 'AI', color: '#ec4899' },
       system_calculation: { label: '⚙️ System', color: '#64748b' }
     };
     return badges[evidenceType] || { label: evidenceType, color: '#9ca3af' };

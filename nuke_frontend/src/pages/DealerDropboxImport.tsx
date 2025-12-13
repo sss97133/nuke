@@ -107,7 +107,7 @@ const DealerDropboxImport: React.FC = () => {
     if (!orgId || folders.length === 0) return;
 
     setAutoSyncInProgress(true);
-    console.log(`🔄 Auto-sync: Checking ${folders.length} vehicles for missing images...`);
+    console.log(`Auto-sync: Checking ${folders.length} vehicles for missing images...`);
 
     try {
       // Get user with retry on network errors

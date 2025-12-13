@@ -328,7 +328,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
                         tool.verification_status === 'pending' ? 'text-warning' : 'text-muted'
                       }`}>
                         {tool.verification_status === 'verified' ? '✓ Verified' :
-                         tool.verification_status === 'pending' ? '⏳ Pending' : '○ Unverified'}
+                         tool.verification_status === 'pending' ? 'Pending' : 'Unverified'}
                       </span>
                     </div>
                   </div>

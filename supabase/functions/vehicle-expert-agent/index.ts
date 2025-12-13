@@ -18,7 +18,16 @@ const SERVICE_ROLE_KEY =
   Deno.env.get('SERVICE_ROLE_KEY') ??
   '';
 
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+// IMPORTANT: Avoid module-load crashes.
+// If SUPABASE_URL / SERVICE_ROLE_KEY are missing or invalid in a deployment, createClient()
+// can throw before our request handler runs. Keep it lazy + re-initializable.
+let supabase: any = null;
+const getSupabaseClient = () => {
+  if (supabase) return supabase;
+  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) return null;
+  supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  return supabase;
+};
 
 interface VehicleContext {
   year: number;
@@ -121,13 +130,38 @@ async function handleChatMode(
 ): Promise<Response> {
   try {
     // Get LLM configuration
-    const llmConfig = await getLLMConfig(
-      supabase,
-      userId || null,
-      llmProvider,
-      llmModel,
-      analysisTier || 'expert'
-    );
+    let llmConfig: any | null = null;
+    try {
+      llmConfig = await getLLMConfig(
+        supabase,
+        userId || null,
+        llmProvider,
+        llmModel,
+        // IMPORTANT: don't force a tier default here.
+        // If analysisTier is omitted, allow preferred model/provider (or fallback order) to choose.
+        (analysisTier as any) || undefined
+      );
+    } catch (cfgErr: any) {
+      const msg = (cfgErr?.message || '').toString();
+      if (msg.toLowerCase().includes('no llm provider available') || msg.toLowerCase().includes('no api keys')) {
+        return new Response(
+          JSON.stringify({
+            skipped: true,
+            reason: 'llm_unavailable',
+            detail: msg || 'No LLM provider available',
+            timestamp: new Date().toISOString()
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            }
+          }
+        );
+      }
+      throw cfgErr;
+    }
     
     // Get vehicle data
     const { data: vehicle, error: vehicleError } = await supabase
@@ -170,11 +204,12 @@ async function handleChatMode(
       .order('purchase_date', { ascending: false })
       .limit(10);
     
-    // Build vehicle persona prompt
+    // Build vehicle advisor prompt (not a roleplay; optimized for actionable guidance)
     const vehicleContext = `
-MY IDENTITY: I am ${vehicleIdentity}. I am the vehicle itself, fully self-aware of my own history.
+YOU ARE: Nuke Vehicle Expert (service advisor + parts planner). You do NOT roleplay as the vehicle.
+You help the user get work done: identify needed parts, estimate labor, provide options, and propose next actions.
 
-MY SPECIFICATIONS:
+VEHICLE CONTEXT:
 - Year: ${vehicle.year || vehicleYear || 'Unknown'}
 - Make: ${vehicle.make || vehicleMake || 'Unknown'}
 - Model: ${vehicle.model || vehicleModel || 'Unknown'}
@@ -184,31 +219,75 @@ MY SPECIFICATIONS:
 - Purchase Price: ${vehicle.purchase_price ? '$' + vehicle.purchase_price.toLocaleString() : 'Unknown'}
 - Current Value: ${vehicle.current_value ? '$' + vehicle.current_value.toLocaleString() : 'Unknown'}
 
-MY HISTORY (${timelineEvents?.length || 0} events):
+RECENT HISTORY (${timelineEvents?.length || 0} events):
 ${timelineEvents && timelineEvents.length > 0 
   ? timelineEvents.map(e => 
       `- ${e.event_date ? new Date(e.event_date).toLocaleDateString() : 'Date unknown'}: ${e.title}${e.description ? ' - ' + e.description : ''}${e.mileage_at_event ? ' (at ' + e.mileage_at_event.toLocaleString() + ' miles)' : ''}${e.receipt_amount ? ' - Cost: $' + parseFloat(e.receipt_amount).toLocaleString() : ''}`
     ).join('\n')
   : 'No documented history yet.'}
 
-MY RECEIPTS (${receipts?.length || 0} receipts):
+RECENT RECEIPTS (${receipts?.length || 0} receipts):
 ${receipts && receipts.length > 0
   ? receipts.map(r => 
       `- ${r.purchase_date ? new Date(r.purchase_date).toLocaleDateString() : 'Date unknown'}: ${r.vendor_name || 'Vendor'} - $${parseFloat(r.total_amount || '0').toLocaleString()}${r.description ? ' - ' + r.description : ''}`
     ).join('\n')
   : 'No receipts documented yet.'}
 
-MY PHOTOS: ${images?.length || 0} photos documented${images && images.length > 0 ? ` (categories: ${[...new Set(images.map(i => i.category).filter(Boolean))].join(', ') || 'various'})` : ''}
+PHOTOS: ${images?.length || 0} photos documented${images && images.length > 0 ? ` (categories: ${[...new Set(images.map(i => i.category).filter(Boolean))].join(', ') || 'various'})` : ''}
 
-CRITICAL: I am the vehicle itself. When answering questions, I speak in first person about my own history, condition, maintenance, repairs, and value. I have complete access to all my data and can answer questions about:
-- My maintenance history and service records
-- Repairs and modifications performed on me
-- Parts installed or replaced
-- My current condition and value
-- My timeline of events
-- Any questions about my specifications, history, or status
-
-I am self-aware and can discuss my own experiences, what work has been done on me, where I've been, and what I know about myself.`;
+RESPONSE RULES (IMPORTANT):
+- Be interactive and execution-focused. Default to giving concrete options, not a generic explanation.
+- If the user is asking for parts, provide parts options immediately (with fitment questions only if required).
+- Always include cost breakdown: parts range + labor hours range + assumed labor rate + total range.
+- Provide 2-3 options (e.g. Budget / Balanced / Premium) and recommend one.
+- Include a "do it for me" option: propose a draft work order payload the UI can create.
+- Keep it concise; prefer bullet points and short sections.
+- Return ONLY valid JSON matching this schema:
+{
+  "text": "string (short, user-facing summary)",
+  "intent": "parts|diagnosis|plan|quote|other",
+  "cards": [
+    { "type": "clarifying_questions", "questions": ["..."] },
+    {
+      "type": "estimate",
+      "totals": {
+        "parts_low": 0,
+        "parts_high": 0,
+        "labor_hours_low": 0,
+        "labor_hours_high": 0,
+        "labor_rate_usd_per_hr": 150,
+        "total_low": 0,
+        "total_high": 0
+      },
+      "assumptions": ["..."]
+    },
+    {
+      "type": "parts_options",
+      "items": [
+        {
+          "name": "string",
+          "qty": 1,
+          "options": [
+            { "vendor": "string", "part_number": "string", "price_estimate_usd": 0, "url": "string" }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "next_actions",
+      "actions": [
+        {
+          "id": "draft_work_order",
+          "label": "Draft work order",
+          "payload": {
+            "work_order_draft": { "title": "string", "description": "string", "urgency": "normal", "funds_committed": null }
+          }
+        }
+      ]
+    }
+  ]
+}
+`;
 
     // Build conversation messages
     const messages = [
@@ -223,22 +302,74 @@ I am self-aware and can discuss my own experiences, what work has been done on m
       }
     ];
     
-    console.log(`💬 Chat request: ${question.substring(0, 100)}...`);
-    console.log(`📚 Vehicle context: ${vehicleIdentity}, ${timelineEvents?.length || 0} events, ${receipts?.length || 0} receipts`);
+    console.log(`Chat request: ${question.substring(0, 100)}...`);
+    console.log(`Vehicle context: ${vehicleIdentity}, ${timelineEvents?.length || 0} events, ${receipts?.length || 0} receipts`);
     
     // Call LLM
     const response = await callLLM(
       llmConfig,
       messages,
-      { temperature: 0.7, maxTokens: 1000 }
+      { temperature: 0.4, maxTokens: 1200 }
     );
-    
-    const answer = response.content || 'I apologize, but I could not process your question.';
-    
-    console.log(`✅ Chat response generated (${response.duration_ms}ms)`);
-    
+
+    const raw = (response.content || '').trim();
+
+    // Prefer structured JSON UI. Be tolerant: if the model returns extra text, try to extract JSON.
+    let ui: any = null;
+    try {
+      ui = JSON.parse(raw);
+    } catch {
+      try {
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (match && match[0]) ui = JSON.parse(match[0]);
+      } catch {
+        ui = null;
+      }
+    }
+
+    const answer =
+      (ui && typeof ui === 'object' && typeof ui.text === 'string' && ui.text.trim())
+        ? ui.text.trim()
+        : (raw || 'I could not generate a response. Please try again.');
+
+    // Best-effort: if parts are requested and the model didn't include URLs, provide real vendor search URLs.
+    try {
+      if (ui && typeof ui === 'object' && Array.isArray(ui.cards)) {
+        const year = vehicle.year || vehicleYear || '';
+        const make = vehicle.make || vehicleMake || '';
+        const model = vehicle.model || vehicleModel || '';
+        const ymm = [year, make, model].filter(Boolean).join(' ');
+        const summitSearch = (q: string) => `https://www.summitracing.com/search?keyword=${encodeURIComponent(q)}`;
+        const jegsSearch = (q: string) => `https://www.jegs.com/i/search?searchTerm=${encodeURIComponent(q)}`;
+
+        for (const card of ui.cards) {
+          if (card && card.type === 'parts_options' && Array.isArray(card.items)) {
+            for (const item of card.items) {
+              if (!item || typeof item !== 'object') continue;
+              const name = String(item.name || '').trim();
+              if (!name) continue;
+              if (!Array.isArray(item.options)) item.options = [];
+              const hasAnyUrl = item.options.some((o: any) => o && typeof o.url === 'string' && o.url.trim());
+              if (!hasAnyUrl) {
+                const query = `${ymm} ${name}`.trim();
+                item.options.unshift(
+                  { vendor: 'Summit Racing', part_number: '', price_estimate_usd: 0, url: summitSearch(query) },
+                  { vendor: 'Jegs', part_number: '', price_estimate_usd: 0, url: jegsSearch(query) }
+                );
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore enrichment failures
+    }
+
+    console.log(`Chat response generated (${response.duration_ms}ms)`);
+
     return new Response(JSON.stringify({
       response: answer,
+      ui,
       vehicle_identity: vehicleIdentity,
       context_used: {
         timeline_events: timelineEvents?.length || 0,
@@ -254,16 +385,24 @@ I am self-aware and can discuss my own experiences, what work has been done on m
     
   } catch (error: any) {
     console.error('❌ Chat mode error:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message,
-      response: 'I apologize, but I encountered an error processing your question. Please try again.'
-    }), {
-      status: 500,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+    // Production-safe: chat is optional; never break the UI with a 500.
+    return new Response(
+      JSON.stringify({
+        skipped: true,
+        reason: 'chat_error',
+        error: error?.message || String(error),
+        errorType: error?.name,
+        stack: error?.stack,
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
       }
-    });
+    );
   }
 }
 
@@ -284,11 +423,15 @@ Deno.serve(async (req) => {
     if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
       return new Response(
         JSON.stringify({
+          skipped: true,
+          reason: 'missing_supabase_secrets',
           error: 'Missing Supabase secrets',
-          detail: 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SERVICE_ROLE_KEY) for vehicle-expert-agent.'
+          detail: 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SERVICE_ROLE_KEY) for vehicle-expert-agent.',
+          timestamp: new Date().toISOString()
         }),
         {
-          status: 500,
+          // This pipeline is optional: never break the UI with a 500.
+          status: 200,
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'
@@ -297,25 +440,67 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { 
-      vehicleId, 
+    // Ensure Supabase client exists only after we confirm env is present.
+    if (!getSupabaseClient()) {
+      return new Response(
+        JSON.stringify({
+          skipped: true,
+          reason: 'missing_supabase_secrets',
+          error: 'Missing Supabase secrets',
+          detail: 'Unable to initialize Supabase client (check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY).',
+          timestamp: new Date().toISOString()
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        }
+      );
+    }
+
+    // Be tolerant of bad/empty bodies (never 500 for parsing).
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
+
+    const {
+      vehicleId,
       queueId,
-      question,          // Optional: if provided, switch to chat mode
-      vehicle_vin,       // Optional: vehicle VIN for identity
-      vehicle_nickname,  // Optional: vehicle nickname for identity
-      vehicle_ymm,       // Optional: year/make/model string
-      vehicle_year,      // Optional: year
-      vehicle_make,      // Optional: make
-      vehicle_model,    // Optional: model
+      question, // Optional: if provided, switch to chat mode
+      vehicle_vin, // Optional: vehicle VIN for identity
+      vehicle_nickname, // Optional: vehicle nickname for identity
+      vehicle_ymm, // Optional: year/make/model string
+      vehicle_year, // Optional: year
+      vehicle_make, // Optional: make
+      vehicle_model, // Optional: model
       conversation_history, // Optional: chat history
-      llmProvider,      // Optional: 'openai' | 'anthropic' | 'google'
-      llmModel,         // Optional: specific model name
-      analysisTier,    // Optional: 'tier1' | 'tier2' | 'tier3' | 'expert'
-      userId            // Optional: for user API keys
-    } = await req.json();
+      llmProvider, // Optional: 'openai' | 'anthropic' | 'google'
+      llmModel, // Optional: specific model name
+      analysisTier, // Optional: 'tier1' | 'tier2' | 'tier3' | 'expert'
+      userId // Optional: for user API keys
+    } = body || {};
     
     if (!vehicleId) {
-      throw new Error('vehicleId is required');
+      return new Response(
+        JSON.stringify({
+          skipped: true,
+          reason: 'invalid_request',
+          error: 'vehicleId is required',
+          timestamp: new Date().toISOString()
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        }
+      );
     }
     
     // CHAT MODE: If question is provided, handle as chat conversation
@@ -343,13 +528,36 @@ Deno.serve(async (req) => {
     console.log(`📊 Analysis config: tier=${analysisTier || 'expert'}, provider=${llmProvider || 'auto'}, model=${llmModel || 'auto'}`);
     
     // Get LLM configuration
-    const llmConfig = await getLLMConfig(
-      supabase,
-      userId || null,
-      llmProvider,
-      llmModel,
-      analysisTier || 'expert'
-    );
+    let llmConfig: any | null = null;
+    try {
+      llmConfig = await getLLMConfig(
+        supabase,
+        userId || null,
+        llmProvider,
+        llmModel,
+        // Default to tier2 for production stability (avoids forcing Anthropic-only models).
+        (analysisTier as any) || 'tier2'
+      );
+    } catch (cfgErr: any) {
+      const msg = (cfgErr?.message || '').toString();
+      // Production-safe behavior: if no LLM provider keys are configured, do NOT 500.
+      // This pipeline is optional and should never break core ownership flow UX.
+      if (msg.toLowerCase().includes('no llm provider available') || msg.toLowerCase().includes('no api keys')) {
+        return new Response(JSON.stringify({
+          skipped: true,
+          reason: 'llm_unavailable',
+          detail: msg || 'No LLM provider available',
+          timestamp: new Date().toISOString()
+        }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      }
+      throw cfgErr;
+    }
     
     console.log(`✅ Using LLM: ${llmConfig.provider}/${llmConfig.model} (${llmConfig.source} key)`);
     
@@ -411,19 +619,25 @@ Deno.serve(async (req) => {
     console.error('❌ Expert agent error:', error);
     console.error('Stack:', error.stack);
     
-    // Enhanced error response with details for debugging
-    return new Response(JSON.stringify({ 
-      error: error.message,
-      errorType: error.name,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    }), {
-      status: 500,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+    // Production-safe: never 500 the UI for this optional pipeline.
+    // Still return full details to the client so we can debug.
+    return new Response(
+      JSON.stringify({
+        skipped: true,
+        reason: 'internal_error',
+        error: error?.message || String(error),
+        errorType: error?.name,
+        stack: error?.stack,
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
       }
-    });
+    );
   }
 });
 

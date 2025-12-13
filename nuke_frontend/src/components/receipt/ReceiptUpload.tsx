@@ -145,7 +145,7 @@ const ReceiptUpload = ({ onUploadComplete }: ReceiptUploadProps) => {
 
         {uploading ? (
           <div>
-            <div style={{ fontSize: '16pt', marginBottom: '8px' }}>⏳</div>
+            <div style={{ fontSize: '10pt', marginBottom: '8px', fontWeight: 700 }}>Processing</div>
             <div style={{ fontSize: '8pt' }}>Uploading...</div>
           </div>
         ) : (

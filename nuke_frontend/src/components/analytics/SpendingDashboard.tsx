@@ -229,7 +229,7 @@ const SpendingDashboard = () => {
             cursor: loading ? 'not-allowed' : 'pointer'
           }}
         >
-          {loading ? '🔄 Loading...' : '🔄 Refresh'}
+          {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
 

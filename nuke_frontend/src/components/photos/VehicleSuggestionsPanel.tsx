@@ -28,7 +28,7 @@ export const VehicleSuggestionsPanel: React.FC<VehicleSuggestionsPanelProps> = (
           textAlign: 'center',
           padding: '60px 20px'
         }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🤖</div>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>AI</div>
           <div className="text font-bold" style={{ fontSize: '14px', marginBottom: '8px' }}>No AI Suggestions Yet</div>
           <div className="text text-small text-muted">
             Upload photos and AI will automatically group them by vehicle

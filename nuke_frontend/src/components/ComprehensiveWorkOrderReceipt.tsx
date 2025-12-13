@@ -584,7 +584,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                   </>
                 ) : (
                   <>
-                    <span>⏳</span>
+                    <span>Processing</span>
                     <span>AI pending</span>
                   </>
                 )}

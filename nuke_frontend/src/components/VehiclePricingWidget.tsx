@@ -131,7 +131,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   const triggerAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      console.log('🤖 Queueing analysis for vehicle:', vehicleId);
+      console.log('Queueing analysis for vehicle:', vehicleId);
       console.log('📊 Analysis config:', analysisConfig);
       
       // Import supabase to queue the analysis

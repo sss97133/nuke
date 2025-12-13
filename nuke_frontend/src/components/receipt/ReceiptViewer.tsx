@@ -123,9 +123,9 @@ const ReceiptViewer = ({ receiptId }: ReceiptViewerProps) => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'processed': return '✅';
-      case 'processing': return '🔄';
+      case 'processing': return 'Processing';
       case 'failed': return '❌';
-      default: return '⏳';
+      default: return 'Pending';
     }
   };
 

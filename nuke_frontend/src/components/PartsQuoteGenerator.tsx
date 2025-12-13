@@ -157,7 +157,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
             marginBottom: '16px'
           }}
         >
-          {loading ? '🤖 ANALYZING VEHICLE IMAGES...' : '🤖 GENERATE AI QUOTE'}
+          {loading ? 'ANALYZING VEHICLE IMAGES...' : 'GENERATE AI QUOTE'}
         </button>
       )}
 

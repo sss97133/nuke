@@ -486,7 +486,7 @@ const Library: React.FC = () => {
                     fontSize: '7pt'
                   }}>
                     <div style={{ fontWeight: 600, marginBottom: '4px' }}>
-                      {book.extraction.status === 'pending_review' ? '⏳ Processing...' : 
+                      {book.extraction.status === 'pending_review' ? 'Processing...' : 
                        book.extraction.status === 'applied' ? '✓ Extracted' : 
                        book.extraction.status === 'rejected' ? '✗ Rejected' : 'Processing'}
                     </div>
