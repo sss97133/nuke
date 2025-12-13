@@ -545,7 +545,8 @@ const DealerDropboxImport: React.FC = () => {
               status: 'active',
               notes: `Contributed ${uploadedCount} images via Dropbox bulk import`
             }, {
-              onConflict: 'vehicle_id,user_id',
+              // Matches DB constraint: UNIQUE(vehicle_id, user_id, role)
+              onConflict: 'vehicle_id,user_id,role',
               ignoreDuplicates: false
             });
 

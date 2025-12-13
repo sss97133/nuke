@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
 import { aiDataIngestion, type ExtractionResult } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
 import { useToast } from '../../hooks/useToast';
 import VehicleCritiqueMode from './VehicleCritiqueMode';
+import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
 import '../../design-system.css';
 
 interface ExtractionPreview {
@@ -36,11 +37,97 @@ export default function AIDataIngestionSearch() {
   const [currentVehicleData, setCurrentVehicleData] = useState<any>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
 
+  // Wiring workbench (chat-like) state
+  const [showWiringWorkbench, setShowWiringWorkbench] = useState(false);
+  const [wiringMessages, setWiringMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([]);
+  const [showWiringUploader, setShowWiringUploader] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
+
+  const vehicleIdFromRoute = useMemo(() => {
+    const m = location.pathname.match(/\/vehicle\/([a-f0-9-]{36})/);
+    return m ? m[1] : null;
+  }, [location.pathname]);
+
+  const isWiringIntent = (text: string) => {
+    const t = (text || '').toLowerCase();
+    if (!t) return false;
+    // Keep this permissive; chat will ask clarifying questions anyway.
+    return (
+      t.includes('wiring') ||
+      t.includes('harness') ||
+      t.includes('pdm') ||
+      t.includes('ecu') ||
+      t.includes('pinout') ||
+      t.includes('bulkhead') ||
+      t.includes('motec') ||
+      t.includes('loom') ||
+      t.includes('awg') ||
+      t.includes('can ') ||
+      t.includes('canbus') ||
+      t.includes('can-bus')
+    );
+  };
+
+  const runWiringWorkbench = async (userText: string) => {
+    const vid = vehicleIdFromRoute || currentVehicleData?.id;
+    if (!vid) {
+      setWiringMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: `I can do wiring planning, but I need a vehicle context. Open a vehicle page or paste a /vehicle/<id> link.` }
+      ]);
+      setShowWiringWorkbench(true);
+      return;
+    }
+
+    // Check what evidence we have attached to this vehicle (receipts/invoices/manuals).
+    // If anything is missing, ask immediately (chat-driven).
+    let totalDocs = 0;
+    let financialDocs = 0;
+    let manualDocs = 0;
+
+    try {
+      const [{ count: totalCount, error: totalErr }, { count: finCount, error: finErr }, { count: manCount, error: manErr }] = await Promise.all([
+        supabase.from('vehicle_documents').select('id', { count: 'exact', head: true }).eq('vehicle_id', vid),
+        supabase.from('vehicle_documents').select('id', { count: 'exact', head: true }).eq('vehicle_id', vid).in('document_type', ['receipt', 'invoice', 'service_record', 'parts_order']),
+        supabase.from('vehicle_documents').select('id', { count: 'exact', head: true }).eq('vehicle_id', vid).in('document_type', ['manual'])
+      ]);
+      if (!totalErr) totalDocs = totalCount || 0;
+      if (!finErr) financialDocs = finCount || 0;
+      if (!manErr) manualDocs = manCount || 0;
+    } catch {
+      // If RLS blocks, we still proceed with questions.
+    }
+
+    const needsReceipts = financialDocs === 0;
+    const needsManuals = manualDocs === 0;
+
+    const questions: string[] = [];
+    if (needsReceipts) {
+      questions.push(`I don’t see any receipts/invoices attached to this vehicle yet. Do you want to upload them now so I can build the parts inventory from proof?`);
+    }
+    if (needsManuals) {
+      questions.push(`Do you have service manual pages (wiring diagrams / connector views / pinouts)? Uploading those lets me build accurate endpoint + pin maps.`);
+    }
+
+    // Always ask for the minimal architecture inputs if they aren't grounded by docs yet.
+    questions.push(`What ECU are you using (exact model), and what PDM/fusebox (exact model)?`);
+    questions.push(`Where are the main endpoints physically (zones are fine): ECU/PDM, bulkhead passthrough, fuel pump module, fans, injectors/coils, dash?`);
+    questions.push(`Any networks or signal classes: CAN buses (how many), crank/cam triggers (shielded), wideband/analog sensors, DBW?`);
+
+    const header = `WIRING WORKBENCH — ${currentVehicleData?.year || ''} ${currentVehicleData?.make || ''} ${currentVehicleData?.model || ''}`.trim();
+    const inventoryLine = `Evidence check: documents=${totalDocs}, receipts/invoices=${financialDocs}, manuals=${manualDocs}.`;
+
+    setWiringMessages((prev) => [
+      ...prev,
+      { role: 'assistant', text: `${header}\n${inventoryLine}\n\n${questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}` }
+    ]);
+    setShowWiringWorkbench(true);
+  };
 
   // Auto-detect vehicle page and load data
   useEffect(() => {
@@ -170,9 +257,24 @@ export default function AIDataIngestionSearch() {
       return;
     }
 
+    // Wiring should be chat-driven and flexible: do NOT force users into a "query" UX.
+    // If on a vehicle page and the message looks wiring-related, open the Wiring Workbench panel instead.
+    if (!attachedImage && currentVehicleData && isWiringIntent(input.trim())) {
+      const msg = input.trim();
+      setShowPreview(false);
+      setExtractionPreview(null);
+      setError(null);
+      setActionsOpen(false);
+      setInput('');
+      setWiringMessages((prev) => [...prev, { role: 'user', text: msg }]);
+      await runWiringWorkbench(msg);
+      return;
+    }
+
     setIsProcessing(true);
     setError(null);
     setExtractionPreview(null);
+    setShowWiringWorkbench(false);
 
     try {
       const userId = await getCurrentUserId();
@@ -348,7 +450,21 @@ export default function AIDataIngestionSearch() {
       setShowPreview(true);
     } catch (err: any) {
       console.error('Processing error:', err);
-      setError(err.message || 'Failed to process input');
+      // If AI services are down (Gateway/edge function), still allow basic search for text-only input.
+      // This keeps "header search" usable even when extraction is unavailable.
+      if (!attachedImage && input.trim()) {
+        const searchQuery = input.trim();
+        showToast('AI extraction unavailable. Running basic search instead.', 'warning');
+        setInput('');
+        setShowPreview(false);
+        setExtractionPreview(null);
+        setActionsOpen(false);
+        setError(null);
+        navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+        return;
+      }
+
+      setError(err?.message || 'Failed to process input');
     } finally {
       setIsProcessing(false);
     }
@@ -435,7 +551,16 @@ export default function AIDataIngestionSearch() {
   return (
     <div
       ref={containerRef}
-      style={{ position: 'relative', width: '100%', maxWidth: '100%', minWidth: 0, display: 'flex', flexDirection: 'column' }}
+      // Keep this above the click-outside backdrop so the input is always focusable/clickable.
+      style={{
+        position: 'relative',
+        zIndex: 1201,
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column'
+      }}
     >
       {/* Main Input Container - Extended responsive layout */}
       <div
@@ -659,7 +784,7 @@ export default function AIDataIngestionSearch() {
           background: 'var(--white)',
           border: '2px solid var(--border)',
           padding: '12px',
-          zIndex: 1000,
+          zIndex: 1202,
           maxHeight: '400px',
           overflowY: 'auto',
           boxShadow: '2px 2px 8px rgba(0,0,0,0.2)'
@@ -784,6 +909,92 @@ export default function AIDataIngestionSearch() {
         />
       )}
 
+      {/* Wiring Workbench (chat-like) */}
+      {showWiringWorkbench && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          marginTop: '4px',
+          background: 'var(--white)',
+          border: '2px solid var(--border)',
+          padding: '10px',
+          zIndex: 1202,
+          maxHeight: '360px',
+          overflowY: 'auto',
+          boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
+          fontSize: '8pt',
+          whiteSpace: 'pre-wrap',
+          lineHeight: 1.35
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ fontWeight: 'bold' }}>Wiring Workbench</div>
+            <button
+              type="button"
+              className="button-win95"
+              style={{ padding: '2px 6px', fontSize: '8pt', height: '20px' }}
+              onClick={() => setShowWiringWorkbench(false)}
+              title="Close"
+            >
+              X
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gap: '8px' }}>
+            {wiringMessages.slice(-6).map((m, idx) => (
+              <div key={idx} style={{
+                padding: '8px',
+                border: '1px solid var(--border)',
+                background: m.role === 'user' ? 'var(--grey-50)' : 'var(--white)'
+              }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{m.role === 'user' ? 'You' : 'AI'}</div>
+                <div>{m.text}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            {currentVehicleData?.id && (
+              <button
+                type="button"
+                className="button-win95"
+                style={{ padding: '2px 8px', fontSize: '8pt', height: '20px' }}
+                onClick={() => setShowWiringUploader(true)}
+                title="Upload receipts/manuals so the workbench can prove parts + extract pinouts"
+              >
+                Upload receipt/manual
+              </button>
+            )}
+            {currentVehicleData?.id && (
+              <button
+                type="button"
+                className="button-win95"
+                style={{ padding: '2px 8px', fontSize: '8pt', height: '20px' }}
+                onClick={() => navigate(`/vehicle/${currentVehicleData.id}/wiring`)}
+                title="Open full Wiring Plan page (long-form output)"
+              >
+                Open Wiring Plan
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showWiringUploader && currentVehicleData?.id && (
+        <SmartInvoiceUploader
+          vehicleId={currentVehicleData.id}
+          onClose={() => setShowWiringUploader(false)}
+          onSaved={() => {
+            // After saving docs, re-run a fresh evidence check so the next chat step adapts.
+            setShowWiringUploader(false);
+            setWiringMessages((prev) => [...prev, { role: 'assistant', text: 'Got it. I saved that document. Re-checking evidence…' }]);
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            runWiringWorkbench('evidence refresh');
+          }}
+        />
+      )}
+
       {/* Error Message */}
       {error && (
         <div style={{
@@ -797,19 +1008,20 @@ export default function AIDataIngestionSearch() {
           padding: '8px',
           fontSize: '8pt',
           color: '#c00',
-          zIndex: 1000
+          zIndex: 1202
         }}>
           {error}
         </div>
       )}
 
       {/* Click outside to close */}
-      {(showPreview || imagePreview || error || showCritique) && (
+      {(showPreview || imagePreview || error || showCritique || showWiringWorkbench) && (
         <div
           onClick={() => {
             setShowPreview(false);
             setError(null);
             setShowCritique(false);
+            setShowWiringWorkbench(false);
           }}
           style={{
             position: 'fixed',
@@ -817,7 +1029,8 @@ export default function AIDataIngestionSearch() {
             left: 0,
             right: 0,
             bottom: 0,
-            zIndex: 999
+            // Below the search input + popovers so it can't block focus/typing.
+            zIndex: 1200
           }}
         />
       )}

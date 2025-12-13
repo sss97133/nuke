@@ -88,6 +88,44 @@ function uniqStrings(arr: string[]): string[] {
   return Array.from(new Set(arr.map((s) => s.trim()).filter(Boolean)));
 }
 
+function extractInternalLinks(html: string, pageUrl: string): string[] {
+  let origin: string;
+  try {
+    origin = new URL(pageUrl).origin;
+  } catch {
+    return [];
+  }
+
+  const out: string[] = [];
+  const re = /href\s*=\s*["']([^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const href = m[1];
+    if (!href) continue;
+    const lower = href.toLowerCase();
+    if (lower.startsWith("mailto:") || lower.startsWith("tel:") || lower.startsWith("javascript:")) continue;
+    if (lower.startsWith("#")) continue;
+    try {
+      const abs = new URL(href, pageUrl);
+      if (abs.origin !== origin) continue;
+      abs.hash = "";
+      out.push(abs.toString());
+    } catch {
+      // ignore
+    }
+    if (out.length >= 3000) break;
+  }
+
+  return Array.from(new Set(out)).filter((u) => {
+    const low = u.toLowerCase();
+    if (low.includes("/account/")) return false;
+    if (low.includes("/cart/")) return false;
+    if (low.includes("/checkout")) return false;
+    if (low.includes("logout")) return false;
+    return true;
+  });
+}
+
 function extractJsonLd(html: string): any[] {
   const out: any[] = [];
   const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -312,6 +350,8 @@ serve(async (req) => {
     const markdown: string = firecrawlData.data?.markdown || "";
     const extract = firecrawlData.data?.extract || {};
 
+    const discoveredLinks = extractInternalLinks(html, pageUrl);
+
     let products: Product[] = [];
 
     // 1) Firecrawl schema extraction
@@ -451,6 +491,8 @@ serve(async (req) => {
         extracted_products: products.length,
         stored: stored.length,
         updated: updated.length,
+        discovered_links_count: discoveredLinks.length,
+        discovered_links: discoveredLinks.slice(0, 200),
         preview: products.slice(0, 5),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },

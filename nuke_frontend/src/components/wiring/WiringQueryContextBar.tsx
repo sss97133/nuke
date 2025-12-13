@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
 interface WiringQueryContextBarProps {
@@ -30,6 +31,7 @@ export default function WiringQueryContextBar({
   onQuoteGenerated,
   className = ''
 }: WiringQueryContextBarProps) {
+  const navigate = useNavigate()
   const [input, setInput] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,44 +47,12 @@ export default function WiringQueryContextBar({
   const handleQuery = async () => {
     if (!input.trim() || isProcessing) return
 
-    setIsProcessing(true)
+    // This UI is intentionally lightweight: wiring output belongs on a dedicated page.
+    const q = input.trim()
     setError(null)
     setQuoteResult(null)
-
-    try {
-      // Call query-wiring-needs function
-      const { data, error: queryError } = await supabase.functions.invoke('query-wiring-needs', {
-        body: {
-          query: input.trim(),
-          vehicle_id: vehicleId,
-          vehicle_year: vehicleInfo?.year,
-          vehicle_make: vehicleInfo?.make,
-          vehicle_model: vehicleInfo?.model
-        }
-      })
-
-      if (queryError) {
-        throw new Error(queryError.message || 'Failed to process query')
-      }
-
-      if (data?.error) {
-        throw new Error(data.error)
-      }
-
-      setQuoteResult(data)
-      
-      if (onQuoteGenerated && data?.quote) {
-        onQuoteGenerated(data.quote)
-      }
-
-      // Clear input after successful query
-      setInput('')
-    } catch (err: any) {
-      setError(err.message || 'Failed to process wiring query')
-      console.error('Wiring query error:', err)
-    } finally {
-      setIsProcessing(false)
-    }
+    navigate(`/vehicle/${vehicleId}/wiring?q=${encodeURIComponent(q)}`)
+    setInput('')
   }
 
   // Detect if user is mid-project (has recent timeline events or images)
@@ -171,9 +141,9 @@ export default function WiringQueryContextBar({
             opacity: (isProcessing || !input.trim()) ? 0.5 : 1,
             cursor: (isProcessing || !input.trim()) ? 'not-allowed' : 'pointer'
           }}
-          title="Query wiring needs"
+          title="Open Wiring Plan"
         >
-          {isProcessing ? '...' : 'QUOTE'}
+          {isProcessing ? '...' : 'PLAN'}
         </button>
       </div>
 
@@ -195,48 +165,7 @@ export default function WiringQueryContextBar({
       )}
 
       {/* Quote Result Display */}
-      {quoteResult && (
-        <div
-          style={{
-            marginTop: '8px',
-            padding: '8px',
-            background: 'var(--white)',
-            border: '2px solid var(--border)',
-            borderRadius: '2px',
-            fontSize: '8pt'
-          }}
-        >
-          {quoteResult.recommendations && (
-            <div style={{ marginBottom: '8px' }}>
-              <strong>Recommendations:</strong>
-              <ul style={{ margin: '4px 0', paddingLeft: '16px' }}>
-                {quoteResult.recommendations.slice(0, 3).map((rec: any, idx: number) => (
-                  <li key={idx}>{rec.name || rec.part_number}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {quoteResult.quote && (
-            <div>
-              <strong>Quote Summary:</strong>
-              <div style={{ marginTop: '4px' }}>
-                <div>Parts: ${quoteResult.quote.pricing?.parts_subtotal?.toFixed(2) || '0.00'}</div>
-                <div>Labor: ${quoteResult.quote.pricing?.labor_total?.toFixed(2) || '0.00'}</div>
-                <div style={{ fontWeight: 'bold', marginTop: '4px' }}>
-                  Total: ${quoteResult.quote.pricing?.grand_total?.toFixed(2) || '0.00'}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {quoteResult.next_steps && (
-            <div style={{ marginTop: '8px', fontSize: '7pt', color: '#666' }}>
-              {quoteResult.next_steps}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Results intentionally not rendered here; Wiring Plan lives on /vehicle/:id/wiring */}
     </div>
   )
 }
