@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, SUPABASE_URL } from '../lib/supabase';
 
 interface AutoTagResult {
   success: boolean;
@@ -27,7 +27,7 @@ export const useAutoTagging = () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auto-tag-objects`,
+        `${SUPABASE_URL}/functions/v1/auto-tag-objects`,
         {
           method: 'POST',
           headers: {

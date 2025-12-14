@@ -49,6 +49,7 @@ type CliOptions = {
   url: string;
   dryRun: boolean;
   upsert: boolean;
+  upsertViaEdge: boolean;
   writeJson: boolean;
   limit: number | null;
 };
@@ -83,6 +84,7 @@ function parseArgs(argv: string[]): CliOptions {
     url: DEFAULT_URL,
     dryRun: false,
     upsert: false,
+    upsertViaEdge: false,
     writeJson: true,
     limit: null,
   };
@@ -101,6 +103,10 @@ function parseArgs(argv: string[]): CliOptions {
       opts.upsert = true;
       continue;
     }
+    if (a === '--upsert-via-edge') {
+      opts.upsertViaEdge = true;
+      continue;
+    }
     if (a === '--no-json') {
       opts.writeJson = false;
       continue;
@@ -113,8 +119,11 @@ function parseArgs(argv: string[]): CliOptions {
   }
 
   // Safety: default to dry-run unless explicitly asked to upsert.
-  if (!opts.upsert) opts.dryRun = true;
-  if (opts.dryRun) opts.upsert = false;
+  if (!opts.upsert && !opts.upsertViaEdge) opts.dryRun = true;
+  if (opts.dryRun) {
+    opts.upsert = false;
+    opts.upsertViaEdge = false;
+  }
 
   return opts;
 }
@@ -500,7 +509,7 @@ async function main() {
 
   console.log('Indexing BaT Local Partners');
   console.log(`URL: ${opts.url}`);
-  console.log(`Mode: ${opts.dryRun ? 'dry-run' : 'upsert'}`);
+  console.log(`Mode: ${opts.dryRun ? 'dry-run' : (opts.upsertViaEdge ? 'upsert-via-edge' : 'upsert')}`);
 
   const html = await fetchHtml(opts.url);
   const facilities = parsePartnerFacilities(html, opts.url, opts.limit);
@@ -521,19 +530,46 @@ async function main() {
   }
 
   const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const SUPABASE_SERVICE_ROLE_KEY =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || null;
+  const INVOKE_KEY =
+    SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
     null;
 
   if (!SUPABASE_URL) {
     throw new Error('Missing SUPABASE_URL (or VITE_SUPABASE_URL)');
   }
-  if (!SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY (or VITE_SUPABASE_SERVICE_ROLE_KEY). Refusing to upsert because `businesses` is RLS-protected.');
+  if (!opts.upsertViaEdge && !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      'Missing SUPABASE_SERVICE_ROLE_KEY. Either provide it locally for --upsert, or use --upsert-via-edge (requires only anon key for invocation).'
+    );
+  }
+  if (opts.upsertViaEdge && !INVOKE_KEY) {
+    throw new Error('Missing a Supabase key to invoke Edge Functions (anon or service role).');
   }
 
-  const stats = await upsertBusinesses(facilities, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  if (opts.upsertViaEdge) {
+    const endpoint = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/upsert-bat-local-partners`;
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${INVOKE_KEY}`,
+      },
+      body: JSON.stringify({
+        facilities,
+      }),
+    });
+    const text = await resp.text();
+    if (!resp.ok) {
+      throw new Error(`upsert-bat-local-partners failed: HTTP ${resp.status} ${text.slice(0, 240)}`);
+    }
+    console.log(`Upsert-via-edge complete: ${text.slice(0, 400)}`);
+    return;
+  }
+
+  const stats = await upsertBusinesses(facilities, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY!);
   console.log(`Upsert complete: created=${stats.created} updated=${stats.updated} skipped=${stats.skipped}`);
 }
 

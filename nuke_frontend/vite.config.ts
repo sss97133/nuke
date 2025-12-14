@@ -5,6 +5,10 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Expose both Vite-standard env vars and legacy names used in some deploy setups.
+  // This lets production builds read `SUPABASE_URL` / `SUPABASE_ANON_KEY` if those are
+  // what the platform provides, while still supporting `VITE_SUPABASE_*`.
+  envPrefix: ['VITE_', 'SUPABASE_'],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

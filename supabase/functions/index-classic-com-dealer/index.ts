@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
+import { extractBrandAssetsFromHtml } from '../_shared/extractBrandAssets.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -299,12 +300,20 @@ serve(async (req) => {
       }
     }
 
+    // Final fallback: ensure we always have some banner candidate for the org profile.
+    // Order: website banner/hero -> stored logo -> favicon
+    const bannerUrlResolved = resolveBannerFallback({
+      banner_url: primaryImageUrl,
+      logo_url: logoUrl,
+      favicon_url: faviconUrl,
+    });
+
     // Step 5: Find or create organization using geographic logic
     const organization = await findOrCreateOrganizationWithGeographicLogic(
       sanitizedDealerData,
       logoUrl,
       faviconUrl,
-      primaryImageUrl,
+      bannerUrlResolved,
       profile_url,
       supabase
     );
@@ -362,7 +371,7 @@ serve(async (req) => {
         organization_name: organization?.name,
         logo_url: logoUrl,
         favicon_url: faviconUrl, // Cached in source_favicons table
-        banner_url: primaryImageUrl, // Property front image (using banner_url column)
+        banner_url: bannerUrlResolved, // Primary image for org profile (using banner_url column)
         dealer_data: sanitizedDealerData,
         team_members_stored: teamDataStored,
         action: organization?.id ? 'created' : 'found_existing'
@@ -706,29 +715,47 @@ async function extractWebsiteFavicon(website: string, supabase: any): Promise<st
 async function extractPrimaryImage(website: string, supabase: any): Promise<string | null> {
   try {
     const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
-    if (!firecrawlApiKey) return null;
+    let html: string | null = null;
 
-    // Try to scrape homepage for property images
-    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${firecrawlApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: website,
-        formats: ['html'],
-        pageOptions: { waitFor: 2000 }
-      }),
-      signal: AbortSignal.timeout(10000)
-    });
+    if (firecrawlApiKey) {
+      // Try to scrape homepage for property images
+      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${firecrawlApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: website,
+          formats: ['html'],
+          pageOptions: { waitFor: 2000 }
+        }),
+        signal: AbortSignal.timeout(10000)
+      });
 
-    if (!response.ok) return null;
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data?.html) html = data.data.html;
+      }
+    }
 
-    const data = await response.json();
-    if (!data.success || !data.data?.html) return null;
+    // Fallback: direct fetch HTML (works even without Firecrawl)
+    if (!html) {
+      const resp = await fetch(website, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: AbortSignal.timeout(15000),
+      }).catch(() => null);
+      if (resp && resp.ok) {
+        html = await resp.text().catch(() => null);
+      }
+    }
 
-    const html = data.data.html;
+    if (!html) return null;
     
     // Look for property/building images (hero images, about page images, etc.)
     // Patterns: hero, about, property, building, facility, location
@@ -757,11 +784,31 @@ async function extractPrimaryImage(website: string, supabase: any): Promise<stri
       }
     }
 
+    // Brand DNA fallback: pick banner/og image if present.
+    try {
+      const assets = extractBrandAssetsFromHtml(html, website);
+      const fallback =
+        assets.banner_url ||
+        (Array.isArray(assets.primary_image_urls) ? assets.primary_image_urls[0] : null) ||
+        null;
+      return fallback || null;
+    } catch {
+      // ignore
+    }
+
     return null;
   } catch (err) {
     console.warn('Primary image extraction failed:', err);
     return null;
   }
+}
+
+function resolveBannerFallback(params: {
+  banner_url: string | null;
+  logo_url: string | null;
+  favicon_url: string | null;
+}): string | null {
+  return params.banner_url || params.logo_url || params.favicon_url || null;
 }
 
 /**

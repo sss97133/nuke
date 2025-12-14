@@ -57,6 +57,35 @@ function extractSellerTypeFromHtml(html: string): string | undefined {
   return 'unknown';
 }
 
+async function findLocalPartnerBusinessIdByBatUsername(
+  supabase: any,
+  batUsername: string | null,
+): Promise<string | null> {
+  const u = typeof batUsername === 'string' ? batUsername.trim() : '';
+  if (!u) return null;
+
+  // Local Partners indexer stores:
+  // businesses.metadata.bat_local_partners.bat_username
+  // Use a JSON-path filter; PostgREST supports this syntax.
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('metadata->bat_local_partners->>bat_username', u)
+    .limit(1);
+
+  if (!error && Array.isArray(data) && data[0]?.id) return data[0].id;
+
+  // Best-effort fallback: case-insensitive match
+  const { data: dataIlike, error: errorIlike } = await supabase
+    .from('businesses')
+    .select('id')
+    .ilike('metadata->bat_local_partners->>bat_username', u)
+    .limit(1);
+
+  if (!errorIlike && Array.isArray(dataIlike) && dataIlike[0]?.id) return dataIlike[0].id;
+  return null;
+}
+
 async function upsertBatUser(
   supabase: any,
   username: string | null,
@@ -98,8 +127,10 @@ serve(async (req) => {
     const payload = await req.json();
     // Backwards/compat: accept {listingUrl}, {batUrl}, {bat_url}, {url}
     const batUrlRaw = coalesceString(payload?.listingUrl, payload?.batUrl, payload?.bat_url, payload?.url);
-    // Optional: only set when listing indicates a dealer/org is actually involved.
+    // Optional: when provided, this is the SELLER business id to link the listing to (public.businesses.id).
+    // For safety we don't auto-link unless the listing indicates a dealer OR the caller explicitly forces linking.
     const organizationId = coalesceString(payload?.organizationId, payload?.organization_id);
+    const forceDealerLink = payload?.forceDealerLink === true;
     // Safety: fuzzy match is a major contamination source; default off.
     const allowFuzzyMatch = payload?.allowFuzzyMatch === true;
     const imageBatchSize = Math.max(10, Math.min(100, Number(payload?.imageBatchSize || 50)));
@@ -187,6 +218,19 @@ serve(async (req) => {
       upsertBatUser(supabase, seller || null),
       upsertBatUser(supabase, buyer || null),
     ]);
+
+    // Determine whether we can/should link this listing to a seller organization (public.businesses).
+    // 1) If caller provided organizationId, treat it as the intended seller business id.
+    // 2) Else, if seller matches a Local Partner BaT username, auto-link to that org.
+    let sellerOrganizationId: string | null = organizationId;
+    let sellerOrgDiscoveredViaLocalPartners = false;
+    if (!sellerOrganizationId && sellerUser?.username) {
+      sellerOrganizationId = await findLocalPartnerBusinessIdByBatUsername(supabase, sellerUser.username);
+      sellerOrgDiscoveredViaLocalPartners = !!sellerOrganizationId;
+    }
+
+    const shouldLinkSellerOrg =
+      !!sellerOrganizationId && (sellerType === 'dealer' || forceDealerLink || sellerOrgDiscoveredViaLocalPartners);
 
     let vehicleId: string | null = null;
     let createdVehicle = false;
@@ -281,6 +325,8 @@ serve(async (req) => {
           bat_buyer_user_id: buyerUser.id,
           bat_buyer_profile_url: buyerUser.profile_url,
           bat_seller_type: sellerType || null,
+          seller_business_id: sellerOrganizationId,
+          seller_business_linked: shouldLinkSellerOrg,
           imported_at: new Date().toISOString(),
         }
       };
@@ -304,8 +350,8 @@ serve(async (req) => {
         .update(updateData)
         .eq('id', vehicleId);
 
-      // Optional org update ONLY when seller is a dealer/broker and an orgId is explicitly provided.
-      if (organizationId && sellerType === 'dealer') {
+      // Optional seller org update when we are confident this listing belongs to a seller business.
+      if (sellerOrganizationId && shouldLinkSellerOrg) {
         await supabase
           .from('organization_vehicles')
           .update({
@@ -314,7 +360,7 @@ serve(async (req) => {
             listing_status: 'sold'
           })
           .eq('vehicle_id', vehicleId)
-          .eq('organization_id', organizationId);
+          .eq('organization_id', sellerOrganizationId);
       }
 
       console.log(`Updated existing vehicle: ${vehicleId}`);
@@ -348,6 +394,8 @@ serve(async (req) => {
             bat_buyer_user_id: buyerUser.id,
             bat_buyer_profile_url: buyerUser.profile_url,
             bat_seller_type: sellerType || null,
+            seller_business_id: sellerOrganizationId,
+            seller_business_linked: shouldLinkSellerOrg,
             imported_at: new Date().toISOString(),
           }
         })
@@ -361,12 +409,12 @@ serve(async (req) => {
       vehicleId = newVehicle.id;
       createdVehicle = true;
 
-      // Only link org when seller is a dealer/broker and an orgId is explicitly provided.
-      if (organizationId && sellerType === 'dealer') {
+      // Only link seller org when we are confident this listing belongs to a seller business.
+      if (sellerOrganizationId && shouldLinkSellerOrg) {
         await supabase
           .from('organization_vehicles')
           .insert({
-            organization_id: organizationId,
+            organization_id: sellerOrganizationId,
             vehicle_id: vehicleId,
             relationship_type: 'sold_by',
             listing_status: 'sold',
@@ -386,7 +434,7 @@ serve(async (req) => {
         .upsert(
           {
             vehicle_id: vehicleId,
-            organization_id: (organizationId && sellerType === 'dealer') ? organizationId : null,
+            organization_id: shouldLinkSellerOrg ? sellerOrganizationId : null,
             bat_listing_url: batUrl,
             bat_lot_number: lotNumber || null,
             bat_listing_title: title || null,
@@ -402,6 +450,9 @@ serve(async (req) => {
               source: 'bat_import',
               bat_url: batUrl,
               seller_type: sellerType || null,
+              seller_business_id: sellerOrganizationId,
+              seller_business_linked: shouldLinkSellerOrg,
+              seller_org_discovered_via: sellerOrgDiscoveredViaLocalPartners ? 'bat_local_partners' : null,
             },
           },
           { onConflict: 'bat_listing_url' },
@@ -569,7 +620,9 @@ serve(async (req) => {
           bat_username: sellerUser.username,
           bat_user_id: sellerUser.id,
           bat_profile_url: sellerUser.profile_url,
-          seller_type: sellerType || null
+          seller_type: sellerType || null,
+          seller_business_id: sellerOrganizationId,
+          seller_business_linked: shouldLinkSellerOrg
         },
         buyer_identity: {
           bat_username: buyerUser.username,

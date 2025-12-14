@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactDOM from 'react-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, SUPABASE_URL } from '../lib/supabase';
 import TradePanel from '../components/trading/TradePanel';
 import AddOrganizationData from '../components/organization/AddOrganizationData';
 import OrganizationInventory from '../components/organization/OrganizationInventory';
@@ -886,7 +886,7 @@ export default function OrganizationProfile() {
 
       // Call AI scanning edge function
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scan-organization-image`,
+        `${SUPABASE_URL}/functions/v1/scan-organization-image`,
         {
           method: 'POST',
           headers: {

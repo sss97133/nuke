@@ -4,6 +4,8 @@
  * Easy to add new providers without changing core logic
  */
 
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from '../lib/supabase';
+
 export interface PaymentProvider {
   id: string;
   name: string;
@@ -213,7 +215,7 @@ export class X402Provider implements PaymentProvider {
     
     try {
       // Call the x402-payment edge function to create a payment challenge
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseUrl = SUPABASE_URL;
       if (!supabaseUrl) {
         throw new Error('Supabase URL not configured');
       }
@@ -222,7 +224,7 @@ export class X402Provider implements PaymentProvider {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           amount: params.amount,
@@ -273,7 +275,7 @@ export class X402Provider implements PaymentProvider {
       const challenge = JSON.parse(challengeData);
 
       // Call the x402-payment edge function to verify payment
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseUrl = SUPABASE_URL;
       if (!supabaseUrl) {
         throw new Error('Supabase URL not configured');
       }
@@ -301,7 +303,7 @@ export class X402Provider implements PaymentProvider {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           transaction_hash: transactionHash,

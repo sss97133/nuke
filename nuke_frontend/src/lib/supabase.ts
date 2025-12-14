@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_ANON_KEY as ENV_SUPABASE_ANON_KEY, SUPABASE_URL as ENV_SUPABASE_URL } from './env';
 
 // Define basic types for the database
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
-// Get environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+// Get environment variables (supports both VITE_* and legacy SUPABASE_* names)
+const supabaseUrl = ENV_SUPABASE_URL?.trim();
+const supabaseAnonKey = ENV_SUPABASE_ANON_KEY?.trim();
 
 export const SUPABASE_URL = supabaseUrl;
 export const SUPABASE_ANON_KEY = supabaseAnonKey;
@@ -30,8 +31,8 @@ if (ENABLE_DEBUG) {
 // Validate required environment variables (fail fast if missing)
 if (!supabaseUrl || !supabaseAnonKey) {
   const missingVars: string[] = [];
-  if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
-  if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
+  if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL (or SUPABASE_URL)');
+  if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY (or SUPABASE_ANON_KEY)');
   const message = `Missing required Supabase configuration: ${missingVars.join(', ')}`;
   console.error(message);
   throw new Error(`${message}. Configure these environment variables before running the app.`);

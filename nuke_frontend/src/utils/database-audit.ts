@@ -1,18 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-// Get environment variables with fallbacks
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-// Validate environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing Supabase environment variables:');
-  console.error('VITE_SUPABASE_URL:', supabaseUrl ? '✅ Set' : '❌ Missing');
-  console.error('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '✅ Set' : '❌ Missing');
-  throw new Error('Supabase environment variables are required');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from '../lib/supabase';
 
 export interface TableInfo {
   table_name: string;
@@ -455,8 +441,8 @@ function generateSummaryReport(audits: TableAudit[]): void {
 export async function testConnection(): Promise<boolean> {
   try {
     console.log('🔌 Testing Supabase connection...');
-    console.log('URL:', import.meta.env.VITE_SUPABASE_URL);
-    console.log('Key length:', import.meta.env.VITE_SUPABASE_ANON_KEY?.length || 0);
+    console.log('URL:', SUPABASE_URL);
+    console.log('Key length:', SUPABASE_ANON_KEY?.length || 0);
     
     // Try to access common tables to test connection
     const commonTables = ['profiles', 'users', 'vehicles', 'cars'];

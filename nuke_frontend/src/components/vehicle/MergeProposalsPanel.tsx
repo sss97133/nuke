@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, SUPABASE_URL } from '../../lib/supabase';
 
 interface MergeProposal {
   id: string;
@@ -137,7 +137,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
       const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/merge-vehicles`,
+        `${SUPABASE_URL}/functions/v1/merge-vehicles`,
         {
           method: 'POST',
           headers: {
