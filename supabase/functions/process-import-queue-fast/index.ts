@@ -32,9 +32,11 @@ function safeString(v: unknown): string | null {
 
 async function getDefaultImportUserId(supabase: any): Promise<string | null> {
   try {
+    // Note: `auth.users` is not reliably exposed via PostgREST. Use `profiles` (public) as the
+    // canonical place to find a stable user id for attribution when running automated imports.
+    // `profiles.id` is the auth user id in this project.
     const { data, error } = await supabase
-      .schema("auth")
-      .from("users")
+      .from("profiles")
       .select("id,created_at")
       .order("created_at", { ascending: true })
       .limit(1)

@@ -214,6 +214,24 @@ interface FilterState {
   showPending: boolean;
 }
 
+const DEFAULT_FILTERS: FilterState = {
+  yearMin: null,
+  yearMax: null,
+  makes: [],
+  priceMin: null,
+  priceMax: null,
+  // Hide “F-tier” no-image profiles by default (still discoverable via search / toggles).
+  hasImages: true,
+  forSale: false,
+  // Homepage should focus on active listings; sold inventory can be toggled back on.
+  hideSold: true,
+  zipCode: '',
+  radiusMiles: 50,
+  showPrices: true,
+  showDetailOverlay: true,
+  showPending: false
+};
+
 const CursorHomepage: React.FC = () => {
   const [feedVehicles, setFeedVehicles] = useState<HypeVehicle[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<HypeVehicle[]>([]);
@@ -225,23 +243,10 @@ const CursorHomepage: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showFilters, setShowFilters] = useState(true);
   const [timePeriodCollapsed, setTimePeriodCollapsed] = useState(false);
-  const [filters, setFilters] = useState<FilterState>({
-    yearMin: null,
-    yearMax: null,
-    makes: [],
-    priceMin: null,
-    priceMax: null,
-    // Hide “F-tier” no-image profiles by default (still discoverable via search / toggles).
-    hasImages: true,
-    forSale: false,
-    // Homepage should focus on active listings; sold inventory can be toggled back on.
-    hideSold: true,
-    zipCode: '',
-    radiusMiles: 50,
-    showPrices: true,
-    showDetailOverlay: true,
-    showPending: false
-  });
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [searchText, setSearchText] = useState<string>('');
+  const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [stats, setStats] = useState({
     totalBuilds: 0,
     totalValue: 0,
@@ -287,6 +292,26 @@ const CursorHomepage: React.FC = () => {
     };
   }, [showFilters]);
 
+  // Debounce search to avoid clanky re-filtering on every keystroke.
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearchText(searchText.trim()), 150);
+    return () => window.clearTimeout(t);
+  }, [searchText]);
+
+  // Keyboard shortcut: "/" focuses search when not typing in an input already.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== '/') return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase() || '';
+      const isTypingContext = tag === 'input' || tag === 'textarea' || (target as any)?.isContentEditable;
+      if (isTypingContext) return;
+      e.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
   useEffect(() => {
     // Load accurate stats from database
     loadAccurateStats();
@@ -311,7 +336,25 @@ const CursorHomepage: React.FC = () => {
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
     applyFiltersAndSort();
-  }, [feedVehicles, filters, sortBy, sortDirection]);
+  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText]);
+
+  const activeFilterCount = useMemo(() => {
+    // Count only "filtering" fields; exclude purely visual toggles.
+    let n = 0;
+    if (debouncedSearchText) n++;
+    if (filters.yearMin !== DEFAULT_FILTERS.yearMin) n++;
+    if (filters.yearMax !== DEFAULT_FILTERS.yearMax) n++;
+    if ((filters.makes?.length || 0) > 0) n++;
+    if (filters.priceMin !== DEFAULT_FILTERS.priceMin) n++;
+    if (filters.priceMax !== DEFAULT_FILTERS.priceMax) n++;
+    if (filters.hasImages !== DEFAULT_FILTERS.hasImages) n++;
+    if (filters.forSale !== DEFAULT_FILTERS.forSale) n++;
+    if (filters.hideSold !== DEFAULT_FILTERS.hideSold) n++;
+    if (filters.zipCode !== DEFAULT_FILTERS.zipCode) n++;
+    if (filters.zipCode && filters.radiusMiles !== DEFAULT_FILTERS.radiusMiles) n++;
+    if (filters.showPending !== DEFAULT_FILTERS.showPending) n++;
+    return n;
+  }, [filters, debouncedSearchText]);
 
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -567,6 +610,27 @@ const CursorHomepage: React.FC = () => {
   const applyFiltersAndSort = () => {
     let result = [...feedVehicles];
     
+    // Global search (year/make/model/title/vin). Space-separated terms must all match.
+    if (debouncedSearchText) {
+      const terms = debouncedSearchText
+        .toLowerCase()
+        .split(/\s+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+
+      result = result.filter((v: any) => {
+        const hay = [
+          v.year,
+          v.make,
+          v.model,
+          v.title,
+          v.vin,
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        return terms.every((t) => hay.includes(t));
+      });
+    }
+
     // Apply filters
     if (filters.yearMin) {
       result = result.filter(v => (v.year || 0) >= filters.yearMin!);
@@ -909,6 +973,40 @@ const CursorHomepage: React.FC = () => {
               ))}
             </div>
 
+            {/* Global Search */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 260px', minWidth: 220 }}>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Search year, make, model, VIN (press /)"
+                style={{
+                  width: '100%',
+                  padding: '4px 8px',
+                  border: '1px solid var(--border)',
+                  fontSize: '8pt',
+                  background: 'var(--white)'
+                }}
+              />
+              {searchText.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSearchText('')}
+                  style={{
+                    border: '1px solid var(--border)',
+                    background: 'var(--white)',
+                    padding: '4px 8px',
+                    fontSize: '8pt',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
             {/* Filters Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -923,7 +1021,7 @@ const CursorHomepage: React.FC = () => {
                 transition: 'background 0.12s, color 0.12s'
               }}
             >
-              Filters {(filters.yearMin || filters.yearMax || filters.makes.length > 0 || filters.hasImages || filters.forSale) && '●'}
+              Filters {activeFilterCount > 0 && '●'}
             </button>
           </div>
         </div>
@@ -958,7 +1056,7 @@ const CursorHomepage: React.FC = () => {
                 borderBottom: filterBarMinimized ? 'none' : '1px solid var(--border)'
               }}
             >
-              <span>Filters {filterBarMinimized && `Active (${Object.values(filters).filter(v => v && v !== '' && v !== false && (Array.isArray(v) ? v.length > 0 : true)).length})`}</span>
+              <span>Filters {filterBarMinimized && `Active (${activeFilterCount})`}</span>
               <span style={{ fontSize: '10pt' }}>{filterBarMinimized ? '▲' : '▼'}</span>
             </div>
             
@@ -1179,21 +1277,10 @@ const CursorHomepage: React.FC = () => {
               {/* Clear Filters */}
               <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                 <button
-                    onClick={() => setFilters({
-                    yearMin: null,
-                    yearMax: null,
-                    makes: [],
-                    priceMin: null,
-                    priceMax: null,
-                    hasImages: false,
-                    forSale: false,
-                    hideSold: true,
-                    zipCode: '',
-                    radiusMiles: 50,
-                    showPrices: true,
-                    showDetailOverlay: true,
-                    showPending: false
-                  })}
+                    onClick={() => {
+                    setFilters(DEFAULT_FILTERS);
+                    setSearchText('');
+                  }}
                   style={{
                     padding: '4px 12px',
                     background: 'var(--white)',
@@ -1203,7 +1290,7 @@ const CursorHomepage: React.FC = () => {
                     fontWeight: 'bold'
                   }}
                 >
-                  Clear All
+                  Reset
                 </button>
               </div>
             </div>
