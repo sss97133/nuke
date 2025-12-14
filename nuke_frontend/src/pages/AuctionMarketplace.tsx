@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaviconIcon } from '../components/common/FaviconIcon';
 import '../design-system.css';
 
 // Add pulse animation for LIVE badge
@@ -540,11 +539,22 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
 
   const imageUrl = listing.lead_image_url || vehicle.primary_image_url || null;
   const isBat = listing.platform === 'bat';
-  const platformFaviconUrl = isBat ? 'https://bringatrailer.com' : (listing.listing_url || null);
   const platformBadgeContent = isBat ? (
-    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Bring a Trailer">
-      <FaviconIcon url={platformFaviconUrl || 'https://bringatrailer.com'} size={12} style={{ marginRight: 0 }} />
-    </span>
+    <img
+      src="https://bringatrailer.com/favicon.ico"
+      alt="BaT"
+      style={{
+        width: 12,
+        height: 12,
+        display: 'block',
+        imageRendering: 'auto',
+      }}
+      onError={(e) => {
+        // Fallback to label if the icon is blocked/unreachable
+        const img = e.currentTarget;
+        img.style.display = 'none';
+      }}
+    />
   ) : (
     platformName
   );
