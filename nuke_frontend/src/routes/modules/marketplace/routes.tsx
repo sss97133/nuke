@@ -8,6 +8,8 @@ import CreditsSuccess from '../../../pages/CreditsSuccess';
 import BuilderDashboard from '../../../pages/BuilderDashboard';
 import MarketExchange from '../../../pages/MarketExchange';
 import MarketFundDetail from '../../../pages/MarketFundDetail';
+import MarketSegments from '../../../pages/MarketSegments';
+import MarketSegmentDetail from '../../../pages/MarketSegmentDetail';
 
 const MarketplaceModuleRoutes = () => {
   return (
@@ -16,6 +18,8 @@ const MarketplaceModuleRoutes = () => {
       <Route path="/browse" element={<BrowseInvestments />} />
       <Route path="/exchange" element={<MarketExchange />} />
       <Route path="/exchange/:symbol" element={<MarketFundDetail />} />
+      <Route path="/segments" element={<MarketSegments />} />
+      <Route path="/segments/:slug" element={<MarketSegmentDetail />} />
       <Route path="/investor/dashboard" element={<InvestorDashboardPage />} />
       <Route path="/portfolio" element={<Portfolio />} />
       <Route path="/portfolio/success" element={<CreditsSuccess />} />

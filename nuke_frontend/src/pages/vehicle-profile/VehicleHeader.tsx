@@ -11,6 +11,7 @@ import { VehicleDeduplicationService } from '../../services/vehicleDeduplication
 import { ValueProvenancePopup } from '../../components/ValueProvenancePopup';
 import DataValidationPopup from '../../components/vehicle/DataValidationPopup';
 import { useVINProofs } from '../../hooks/useVINProofs';
+import { FaviconIcon } from '../../components/common/FaviconIcon';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -1003,25 +1004,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   // Show favicon for known sources with URLs
                   if (discoveryUrl) {
                     try {
-                      const domain = new URL(discoveryUrl).hostname;
-                      const host = domain.replace(/^www\./i, '');
-                      const base = host.split('.')[0] || host;
-                      const baseLabel = base.length > 10 ? `${base.slice(0, 10).toUpperCase()}…` : base.toUpperCase();
                       return (
                         <>
-                          <img 
-                            src={`https://www.google.com/s2/favicons?domain=${host}&sz=16`}
-                            alt=""
-                            style={{ width: '10px', height: '10px' }}
-                            onError={(e) => {
-                              // Fallback to text if favicon fails
-                              e.currentTarget.style.display = 'none';
-                            }}
+                          <FaviconIcon
+                            url={discoveryUrl}
+                            size={10}
+                            preserveAspectRatio={true}
+                            maxWidth={20}
+                            style={{ marginRight: 0 }}
                           />
-                          {origin === 'bat_import' ? 'BaT' : 
-                           origin === 'ksl_import' ? 'KSL' :
-                           origin === 'craigslist_scrape' ? 'CL' :
-                           baseLabel}
                         </>
                       );
                     } catch {
