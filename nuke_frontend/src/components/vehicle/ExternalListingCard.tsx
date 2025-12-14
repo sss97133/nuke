@@ -51,7 +51,8 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
     try {
       // Use RPC data if available (eliminates duplicate query)
       const rpcData = (window as any).__vehicleProfileRpcData;
-      if (rpcData?.external_listings) {
+      const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicleId;
+      if (rpcMatchesThisVehicle && rpcData?.external_listings) {
         setListings(rpcData.external_listings);
         setLoading(false);
         return; // Skip fetch if provided
@@ -97,7 +98,7 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
         {listings.map(listing => {
           const platformName = platformNames[listing.platform] || listing.platform;
           const platformColor = platformColors[listing.platform] || 'var(--accent)';
-          const isActive = listing.listing_status === 'active';
+          const isActive = listing.listing_status === 'active' || listing.listing_status === 'live';
           const isSold = listing.listing_status === 'sold';
           const reserveNotMet = listing.metadata?.reserve_not_met === true;
 

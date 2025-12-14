@@ -25,6 +25,7 @@ interface AuctionListing {
   source: 'native' | 'external' | 'bat';
   platform?: string;
   listing_url?: string;
+  lead_image_url?: string | null;
   current_high_bid_cents: number | null;
   reserve_price_cents: number | null;
   bid_count: number;
@@ -82,6 +83,11 @@ export default function AuctionMarketplace() {
     const allListings: AuctionListing[] = [];
 
     try {
+      const hasBids = (bidCount: any) => {
+        const n = typeof bidCount === 'number' ? bidCount : Number(bidCount || 0);
+        return Number.isFinite(n) && n > 0;
+      };
+
       // 1. Load native vehicle_listings (N-Zero auctions)
       let nativeQuery = supabase
         .from('vehicle_listings')
@@ -98,20 +104,24 @@ export default function AuctionMarketplace() {
           )
         `)
         .eq('status', 'active')
-        .in('sale_type', ['auction', 'live_auction'])
-        .gt('auction_end_time', now);
+        .in('sale_type', ['auction', 'live_auction']);
 
       const { data: nativeListings, error: nativeError } = await nativeQuery;
 
       if (!nativeError && nativeListings) {
         for (const listing of nativeListings) {
-          if (listing.auction_end_time && new Date(listing.auction_end_time) > new Date()) {
+          // Marketplace rule: don't show auctions with no bids.
+          if (!hasBids(listing.bid_count)) continue;
+
+          // Keep auctions even if end time is missing (some sources backfill it later).
+          if (!listing.auction_end_time || new Date(listing.auction_end_time) > new Date()) {
             allListings.push({
               id: listing.id,
               vehicle_id: listing.vehicle_id,
               seller_id: listing.seller_id,
               sale_type: listing.sale_type,
               source: 'native',
+              lead_image_url: listing.vehicle?.primary_image_url || null,
               current_high_bid_cents: listing.current_high_bid_cents,
               reserve_price_cents: listing.reserve_price_cents,
               bid_count: listing.bid_count || 0,
@@ -141,20 +151,29 @@ export default function AuctionMarketplace() {
           )
         `)
         // Some scrapers use 'live' instead of 'active'
-        .in('listing_status', ['active', 'live'])
-        .gt('end_date', now);
+        .in('listing_status', ['active', 'live']);
 
       const { data: externalListings, error: externalError } = await externalQuery;
 
       if (!externalError && externalListings) {
         for (const listing of externalListings) {
-          if (listing.end_date && new Date(listing.end_date) > new Date() && listing.vehicle) {
+          // Marketplace rule: don't show auctions with no bids.
+          if (!hasBids(listing.bid_count)) continue;
+
+          // Keep listings even if end_date is missing (some sources backfill it later).
+          if ((!listing.end_date || new Date(listing.end_date) > new Date()) && listing.vehicle) {
+            const metaImage =
+              listing?.metadata?.image_url ||
+              listing?.metadata?.primary_image_url ||
+              (Array.isArray(listing?.metadata?.images) ? listing.metadata.images[0] : null);
+
             allListings.push({
               id: listing.id,
               vehicle_id: listing.vehicle_id,
               source: 'external',
               platform: listing.platform,
               listing_url: listing.listing_url,
+              lead_image_url: listing.vehicle?.primary_image_url || metaImage || null,
               current_high_bid_cents: listing.current_bid ? Math.round(Number(listing.current_bid) * 100) : null,
               reserve_price_cents: listing.reserve_price ? Math.round(Number(listing.reserve_price) * 100) : null,
               bid_count: listing.bid_count || 0,
@@ -192,6 +211,9 @@ export default function AuctionMarketplace() {
 
       if (!batError && batListings) {
         for (const listing of batListings) {
+          // Marketplace rule: don't show auctions with no bids.
+          if (!hasBids(listing.bid_count)) continue;
+
           if (listing.auction_end_date && listing.vehicle) {
             // Convert DATE to TIMESTAMPTZ for end of day
             const endDate = new Date(listing.auction_end_date);
@@ -205,6 +227,7 @@ export default function AuctionMarketplace() {
                 source: 'bat',
                 platform: 'bat',
                 listing_url: listing.bat_listing_url,
+                lead_image_url: listing.vehicle?.primary_image_url || listing?.image_url || listing?.primary_image_url || null,
                 current_high_bid_cents: listing.final_bid ? listing.final_bid * 100 : null,
                 reserve_price_cents: listing.reserve_price ? listing.reserve_price * 100 : null,
                 bid_count: listing.bid_count || 0,
@@ -213,6 +236,45 @@ export default function AuctionMarketplace() {
                 created_at: listing.created_at,
                 vehicle: listing.vehicle
               });
+            }
+          }
+        }
+      }
+
+      // Improve "No Image" cases using vehicle_images for vehicles without a primary image.
+      const missingImageVehicleIds = Array.from(
+        new Set(
+          allListings
+            .filter((l) => !l.lead_image_url && !l.vehicle?.primary_image_url)
+            .map((l) => l.vehicle_id)
+            .filter(Boolean)
+        )
+      );
+
+      if (missingImageVehicleIds.length > 0) {
+        const { data: imageRows, error: imageErr } = await supabase
+          .from('vehicle_images')
+          .select('vehicle_id, image_url, is_primary, created_at')
+          .in('vehicle_id', missingImageVehicleIds)
+          .eq('is_document', false)
+          .or('is_duplicate.is.null,is_duplicate.eq.false')
+          .order('is_primary', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(5000);
+
+        if (!imageErr && imageRows && imageRows.length > 0) {
+          const bestByVehicle = new Map<string, string>();
+          for (const row of imageRows as any[]) {
+            const vid = String(row?.vehicle_id || '');
+            const url = String(row?.image_url || '');
+            if (!vid || !url) continue;
+            if (bestByVehicle.has(vid)) continue;
+            bestByVehicle.set(vid, url);
+          }
+
+          for (const l of allListings) {
+            if (!l.lead_image_url && bestByVehicle.has(l.vehicle_id)) {
+              l.lead_image_url = bestByVehicle.get(l.vehicle_id) || null;
             }
           }
         }
@@ -321,7 +383,7 @@ export default function AuctionMarketplace() {
               <div>
                 <h1 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>Auction Marketplace</h1>
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Browse live and upcoming auctions across the network. Live BaT auctions are automatically imported and displayed here.
+                  Live auctions across the network. This marketplace only shows auctions that already have bids.
                 </div>
               </div>
               {user && (
@@ -421,14 +483,14 @@ export default function AuctionMarketplace() {
                 </div>
               ) : filteredListings.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                  <div style={{ fontSize: '10pt', marginBottom: '8px' }}>No active auctions found</div>
+                  <div style={{ fontSize: '10pt', marginBottom: '8px' }}>No auctions with bids found</div>
                   {user && (
                     <button
                       onClick={() => navigate('/list-vehicle')}
                       className="button button-primary"
                       style={{ fontSize: '9pt' }}
                     >
-                      List the First Vehicle
+                      List a Vehicle
                     </button>
                   )}
                 </div>
@@ -474,18 +536,11 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
                        listing.platform === 'ebay_motors' ? 'eBay Motors' :
                        listing.platform ? listing.platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : null;
 
-  const handleClick = (e: React.MouseEvent) => {
-    // If external listing, open in new tab
-    if (listing.source !== 'native' && listing.listing_url) {
-      e.preventDefault();
-      window.open(listing.listing_url, '_blank');
-    }
-  };
+  const imageUrl = listing.lead_image_url || vehicle.primary_image_url || null;
 
   return (
     <Link
-      to={listing.source === 'native' ? `/vehicle/${vehicle.id}` : '#'}
-      onClick={handleClick}
+      to={`/vehicle/${vehicle.id}`}
       style={{
         display: 'block',
         background: 'var(--white)',
@@ -515,9 +570,9 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           overflow: 'hidden',
         }}
       >
-        {vehicle.primary_image_url ? (
+        {imageUrl ? (
           <img
-            src={vehicle.primary_image_url}
+            src={imageUrl}
             alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
             style={{
               position: 'absolute',
@@ -598,25 +653,6 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             }}
           >
             {platformName}
-          </div>
-        )}
-
-        {/* NEW badge (only for native listings without platform badge) */}
-        {!platformName && listing.bid_count === 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '6px',
-              right: '6px',
-              background: '#16a34a',
-              color: '#fff',
-              padding: '3px 8px',
-              borderRadius: '3px',
-              fontSize: '7pt',
-              fontWeight: 700,
-            }}
-          >
-            NEW
           </div>
         )}
 
@@ -734,6 +770,21 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           </span>
           {hasReserve && <span>Reserve</span>}
         </div>
+
+        {listing.listing_url && (
+          <button
+            type="button"
+            className="button button-small"
+            style={{ marginTop: '8px', width: '100%', fontSize: '8pt' }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.open(listing.listing_url!, '_blank');
+            }}
+          >
+            View on {platformName || 'source'}
+          </button>
+        )}
       </div>
     </Link>
   );
