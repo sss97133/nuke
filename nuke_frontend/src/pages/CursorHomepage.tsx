@@ -437,22 +437,39 @@ const CursorHomepage: React.FC = () => {
       const vehicleIds = filteredVehicles.map(v => v.id);
       const { data: images } = await supabase
         .from('vehicle_images')
-        .select('vehicle_id, image_url, medium_url, large_url, thumbnail_url, is_primary, storage_path, variants')
+        .select('id, vehicle_id, image_url, medium_url, large_url, thumbnail_url, is_primary, storage_path, variants, created_at')
         .in('vehicle_id', vehicleIds)
         .not('vehicle_id', 'is', null)
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: false });
 
-      // Create image lookup map - prefer primary images
-      const imageMap = new Map();
-      (images || []).forEach(img => {
-        if (!img?.vehicle_id) return;
-        if (imageMap.has(img.vehicle_id)) return;
+      // Build per-vehicle image lists (deduped) while preserving ordering (primary first, newest first).
+      const imagesByVehicle = new Map<string, Array<{ id: string; url: string; is_primary: boolean }>>();
+      const seenUrlByVehicle = new Map<string, Set<string>>();
+
+      (images || []).forEach((img: any) => {
+        const vehicleId = img?.vehicle_id;
+        if (!vehicleId) return;
         const resolved = resolveVehicleImageUrl(img);
-        if (resolved) imageMap.set(img.vehicle_id, resolved);
+        if (!resolved) return;
+
+        if (!imagesByVehicle.has(vehicleId)) {
+          imagesByVehicle.set(vehicleId, []);
+          seenUrlByVehicle.set(vehicleId, new Set());
+        }
+
+        const seen = seenUrlByVehicle.get(vehicleId)!;
+        if (seen.has(resolved)) return;
+        seen.add(resolved);
+
+        imagesByVehicle.get(vehicleId)!.push({
+          id: String(img?.id || `${vehicleId}-${seen.size}`),
+          url: resolved,
+          is_primary: Boolean(img?.is_primary),
+        });
       });
 
-      console.log(`Found ${images?.length || 0} total images, mapped to ${imageMap.size} unique vehicles`);
+      console.log(`Found ${images?.length || 0} total images, mapped to ${imagesByVehicle.size} unique vehicles`);
 
       // Process vehicles with image data (database + origin metadata fallback)
       const processed = filteredVehicles.map((v: any) => {
@@ -463,26 +480,41 @@ const CursorHomepage: React.FC = () => {
         const displayPrice = salePrice > 0 ? salePrice : askingPrice > 0 ? askingPrice : currentValue;
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
 
-        // Get image from database first, then fallback to vehicle row fields / origin metadata.
-        let primaryImageUrl = imageMap.get(v.id) || null;
+        // Get images from database first (full list), then fallback to vehicle row fields / origin metadata.
+        const dbImages = imagesByVehicle.get(v.id) || [];
+        let allImages: Array<{ id: string; url: string; is_primary: boolean }> = dbImages;
 
+        // Prefer explicitly primary image, otherwise first in list (which should already be primary-first).
+        let primaryImageUrl =
+          dbImages.find((img) => img.is_primary)?.url ||
+          dbImages[0]?.url ||
+          null;
+
+        // If no DB images, fallback to vehicle row fields and/or origin metadata images.
         if (!primaryImageUrl) {
-          primaryImageUrl =
-            normalizeSupabaseStorageUrl(v.primary_image_url) ||
-            normalizeSupabaseStorageUrl(v.image_url) ||
-            null;
-        }
+          const fallbackRowUrls = [
+            normalizeSupabaseStorageUrl(v.primary_image_url),
+            normalizeSupabaseStorageUrl(v.image_url),
+          ].filter((u: any) => isUsableImageSrc(u));
 
-        // Fallback to origin_metadata images if no database image
-        if (!primaryImageUrl && v.origin_metadata?.images) {
-          const originImages = getOriginImages(v);
-          primaryImageUrl = originImages[0] || null;
-        }
+          const originUrls = getOriginImages(v)
+            .map((u: string) => normalizeSupabaseStorageUrl(u))
+            .filter((u: any) => isUsableImageSrc(u));
 
-        // Fix: origin scrapes also commonly store `origin_metadata.image_urls` (not `images`).
-        if (!primaryImageUrl) {
-          const originImages = getOriginImages(v);
-          primaryImageUrl = originImages[0] || null;
+          const combined: string[] = [];
+          const seen = new Set<string>();
+          for (const u of [...fallbackRowUrls, ...originUrls]) {
+            if (!u || seen.has(u)) continue;
+            seen.add(u);
+            combined.push(u);
+          }
+
+          primaryImageUrl = combined[0] || null;
+          allImages = combined.map((url, idx) => ({
+            id: `fallback-${v.id}-${idx}`,
+            url,
+            is_primary: idx === 0,
+          }));
         }
 
         // Clean display fields to avoid showing raw listing junk on the homepage.
@@ -502,7 +534,7 @@ const CursorHomepage: React.FC = () => {
           make: displayMake || v.make,
           model: displayModel || v.model,
           display_price: displayPrice,
-          image_count: primaryImageUrl ? 1 : 0,
+          image_count: allImages?.length || (primaryImageUrl ? 1 : 0),
           view_count: 0,
           event_count: 0,
           activity_7d: 0,
@@ -510,7 +542,7 @@ const CursorHomepage: React.FC = () => {
           hype_reason: hypeReason,
           primary_image_url: primaryImageUrl,
           image_url: primaryImageUrl,
-          all_images: primaryImageUrl ? [{ id: '1', url: primaryImageUrl, is_primary: true }] : [],
+          all_images: allImages || (primaryImageUrl ? [{ id: `fallback-${v.id}-0`, url: primaryImageUrl, is_primary: true }] : []),
           tier: 'C',
           tier_label: 'Tier C'
         };
@@ -672,11 +704,11 @@ const CursorHomepage: React.FC = () => {
         <div
           role="button"
           tabIndex={0}
-          onClick={() => navigate('/market/exchange')}
+          onClick={() => navigate('/market/segments')}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') navigate('/market/exchange');
+            if (e.key === 'Enter' || e.key === ' ') navigate('/market/segments');
           }}
-          title="Open Market Exchange"
+          title="Open Market Segments"
           style={{
           background: 'var(--white)',
           borderBottom: '2px solid var(--border)',

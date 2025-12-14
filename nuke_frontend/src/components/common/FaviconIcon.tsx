@@ -15,6 +15,16 @@ interface FaviconIconProps {
   // For text-adjacent icons (matches font size)
   matchTextSize?: boolean;
   textSize?: number; // Font size in pt (e.g., 8pt)
+  /**
+   * Render at a fixed height (size) while allowing the image to keep its natural aspect ratio.
+   * Useful for rectangular favicons/logos so they don't look cropped or collide with text.
+   */
+  preserveAspectRatio?: boolean;
+  /**
+   * Only used when preserveAspectRatio is true. Caps how wide the image can be.
+   * Defaults to 2x the computed icon size.
+   */
+  maxWidth?: number;
 }
 
 export const FaviconIcon: React.FC<FaviconIconProps> = ({
@@ -23,10 +33,13 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
   className = '',
   style = {},
   matchTextSize = false,
-  textSize = 8
+  textSize = 8,
+  preserveAspectRatio = false,
+  maxWidth
 }) => {
   // If matching text size, calculate icon size from font size
   const iconSize = matchTextSize ? Math.round(textSize * 1.2) : size; // Slightly larger than text for visibility
+  const effectiveMaxWidth = maxWidth ?? iconSize * 2;
   const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -111,9 +124,11 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
         alt=""
         className={className}
         style={{
-          width: `${iconSize}px`,
+          width: preserveAspectRatio ? 'auto' : `${iconSize}px`,
           height: `${iconSize}px`,
-          display: 'inline-block',
+          maxWidth: preserveAspectRatio ? `${effectiveMaxWidth}px` : undefined,
+          objectFit: preserveAspectRatio ? 'contain' : undefined,
+          display: 'block',
           verticalAlign: 'middle',
           marginRight: matchTextSize ? '3px' : '4px',
           ...style
