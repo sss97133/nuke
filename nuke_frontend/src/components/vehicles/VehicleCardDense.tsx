@@ -62,6 +62,17 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 }) => {
 const [displayPrice, setDisplayPrice] = useState<string>('—');
   const [priceLabel, setPriceLabel] = useState<string>('');
+  const priceBadge = React.useMemo(() => {
+    const raw = String(priceLabel || '').trim();
+    const l = raw.toLowerCase();
+    if (!raw) return '';
+    if (l.includes('sold')) return 'SOLD';
+    if (l.includes('asking')) return 'ASKING';
+    if (l.includes('estimated')) return 'EST';
+    if (l.includes('purchased')) return 'PURCHASE';
+    if (l.includes('msrp')) return 'MSRP';
+    return raw.toUpperCase();
+  }, [priceLabel]);
 // Load unified price on component mount
   useEffect(() => {
     const loadPrice = async () => {
@@ -259,7 +270,7 @@ const [displayPrice, setDisplayPrice] = useState<string>('—');
           justifyContent: 'center',
           fontSize: '20px',
         }}>
-          {!(imageUrl || vehicle.primary_image_url) && '🚗'}
+          {!(imageUrl || vehicle.primary_image_url) && 'CAR'}
         </div>
         
         {/* Vehicle - single line */}
@@ -366,11 +377,20 @@ const [displayPrice, setDisplayPrice] = useState<string>('—');
                 color: 'white',
                 padding: '6px 12px',
                 borderRadius: '6px',
-                fontSize: '9pt',
-                fontWeight: 700,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                alignItems: 'flex-end',
               }}
             >
-              {displayPrice}
+              {priceBadge && (
+                <div style={{ fontSize: '7pt', fontWeight: 800, letterSpacing: '0.6px', opacity: 0.85 }}>
+                  {priceBadge}
+                </div>
+              )}
+              <div style={{ fontSize: '9pt', fontWeight: 800 }}>
+                {displayPrice}
+              </div>
             </div>
           )}
 
@@ -645,10 +665,19 @@ const [displayPrice, setDisplayPrice] = useState<string>('—');
             color: 'white',
             padding: '4px 8px',
             borderRadius: '4px',
-            fontSize: '8pt',
-            fontWeight: 700,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+            alignItems: 'flex-end',
           }}>
-            {displayPrice}
+            {priceBadge && (
+              <div style={{ fontSize: '6pt', fontWeight: 800, letterSpacing: '0.6px', opacity: 0.85 }}>
+                {priceBadge}
+              </div>
+            )}
+            <div style={{ fontSize: '8pt', fontWeight: 800 }}>
+              {displayPrice}
+            </div>
           </div>
         )}
         

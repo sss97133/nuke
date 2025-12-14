@@ -12,6 +12,7 @@ import { ValueProvenancePopup } from '../../components/ValueProvenancePopup';
 import DataValidationPopup from '../../components/vehicle/DataValidationPopup';
 import { useVINProofs } from '../../hooks/useVINProofs';
 import { FaviconIcon } from '../../components/common/FaviconIcon';
+import { AuctionPlatformBadge, AuctionStatusBadge } from '../../components/auction/AuctionBadges';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -42,7 +43,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   organizationLinks = [],
   onClaimClick,
   userOwnershipClaim,
-  suppressExternalListing = false
+  suppressExternalListing = false,
+  auctionPulse = null
 }) => {
   const navigate = useNavigate();
   const { isVerifiedOwner, contributorRole } = permissions || {};
@@ -610,6 +612,79 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return typeof value === 'number' ? value : undefined;
   };
 
+  const formatAge = (iso?: string | null) => {
+    if (!iso) return null;
+    const t = new Date(iso).getTime();
+    if (!Number.isFinite(t)) return null;
+    const diff = Date.now() - t;
+    if (diff < 0) return '0s';
+    const s = Math.floor(diff / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 48) return `${h}h`;
+    const d = Math.floor(h / 24);
+    return `${d}d`;
+  };
+
+  const formatRemaining = (iso?: string | null) => {
+    if (!iso) return null;
+    const end = new Date(iso).getTime();
+    if (!Number.isFinite(end)) return null;
+    const diff = end - Date.now();
+    if (diff <= 0) return 'Ended';
+    const s = Math.floor(diff / 1000);
+    const d = Math.floor(s / (60 * 60 * 24));
+    const h = Math.floor((s % (60 * 60 * 24)) / (60 * 60));
+    const m = Math.floor((s % (60 * 60)) / 60);
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  };
+
+  // Live auction timer (header should feel alive)
+  const [auctionNow, setAuctionNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (!auctionPulse?.end_date) return;
+    const tick = () => setAuctionNow(Date.now());
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') tick();
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [auctionPulse?.end_date]);
+
+  const isAuctionLive = useMemo(() => {
+    if (!auctionPulse?.listing_url) return false;
+    const status = String(auctionPulse.listing_status || '').toLowerCase();
+    if (status !== 'active') return false;
+    if (!auctionPulse.end_date) return true;
+    const end = new Date(auctionPulse.end_date).getTime();
+    if (!Number.isFinite(end)) return true;
+    return end > auctionNow;
+  }, [auctionPulse, auctionNow]);
+
+  const auctionStatusForBadge = useMemo(() => {
+    const status = String(auctionPulse?.listing_status || '').toLowerCase();
+    if (!auctionPulse?.listing_url) return null;
+    if (status === 'sold') return 'sold' as const;
+    if (status === 'reserve_not_met') return 'reserve_not_met' as const;
+    if (status === 'active') {
+      // "Ending soon" when under 1h
+      if (auctionPulse?.end_date) {
+        const end = new Date(auctionPulse.end_date).getTime();
+        if (Number.isFinite(end)) {
+          const mins = Math.floor((end - auctionNow) / 60000);
+          if (mins <= 60 && mins > 0) return 'ending_soon' as const;
+        }
+      }
+      return 'active' as const;
+    }
+    if (status === 'pending') return 'pending' as const;
+    if (status === 'ended') return 'ended' as const;
+    return 'ended' as const;
+  }, [auctionPulse, auctionNow]);
+
   // Header org pills are tiny; if the same org is linked multiple times (e.g. legacy `consigner` + `sold_by`),
   // we should display a single pill with the "best" relationship to avoid duplicates.
   const { visibleOrganizations, extraOrgCount } = useMemo(() => {
@@ -950,6 +1025,65 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {identityLabel}
           </span>
+          {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
+          {auctionPulse?.listing_url && auctionStatusForBadge && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <AuctionPlatformBadge
+                platform={auctionPulse.platform}
+                urlForFavicon={auctionPulse.listing_url}
+                label={auctionPulse.platform === 'bat' ? 'BaT' : undefined}
+              />
+              <AuctionStatusBadge
+                status={auctionStatusForBadge as any}
+                title={isAuctionLive ? 'Live auction telemetry' : 'Auction status'}
+              />
+              {auctionPulse.end_date ? (
+                <span
+                  className="badge badge-secondary"
+                  style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  title="Time remaining"
+                >
+                  <span
+                    className={isAuctionLive ? 'auction-live-dot' : undefined}
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 999,
+                      background: isAuctionLive ? '#dc2626' : '#94a3b8',
+                      display: 'inline-block',
+                      flexShrink: 0
+                    }}
+                  />
+                  {formatRemaining(auctionPulse.end_date) || '—'}
+                </span>
+              ) : null}
+              {typeof auctionPulse.bid_count === 'number' ? (
+                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Bid count">
+                  {auctionPulse.bid_count} bids
+                </span>
+              ) : null}
+              {typeof auctionPulse.watcher_count === 'number' && auctionPulse.watcher_count > 0 ? (
+                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Watchers">
+                  {auctionPulse.watcher_count.toLocaleString()} watching
+                </span>
+              ) : null}
+              {typeof auctionPulse.view_count === 'number' && auctionPulse.view_count > 0 ? (
+                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Views">
+                  {auctionPulse.view_count.toLocaleString()} views
+                </span>
+              ) : null}
+              {typeof auctionPulse.comment_count === 'number' ? (
+                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Comments">
+                  {auctionPulse.comment_count.toLocaleString()} comments
+                </span>
+              ) : null}
+              {auctionPulse.last_bid_at ? (
+                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Time since last bid">
+                  last bid {formatAge(auctionPulse.last_bid_at) || '—'} ago
+                </span>
+              ) : null}
+            </span>
+          )}
           {/* Hide external import/source badge once the profile is claimed/verified to avoid contaminating context */}
           {!isVerifiedOwner && vehicle && (vehicle as any).profile_origin && (() => {
             // Don't show origin badge if we're showing organization name (avoid duplication)
@@ -1001,18 +1135,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   const origin = (vehicle as any).profile_origin;
                   const discoveryUrl = (vehicle as any).discovery_url;
                   
-                  // Show favicon for known sources with URLs
+                  // Show favicon for known sources with URLs (and ALWAYS show text label)
                   if (discoveryUrl) {
                     try {
+                      const domain = new URL(discoveryUrl).hostname;
                       return (
                         <>
-                          <FaviconIcon
-                            url={discoveryUrl}
-                            size={10}
-                            preserveAspectRatio={true}
-                            maxWidth={20}
-                            style={{ marginRight: 0 }}
+                          <img 
+                            src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
+                            alt=""
+                            style={{ width: '10px', height: '10px' }}
+                            onError={(e) => {
+                              // Fallback to text if favicon fails
+                              e.currentTarget.style.display = 'none';
+                            }}
                           />
+                          {origin === 'bat_import' ? 'BaT' : 
+                           origin === 'ksl_import' ? 'KSL' :
+                           origin === 'craigslist_scrape' ? 'CL' :
+                           domain.split('.')[0].toUpperCase()}
                         </>
                       );
                     } catch {
@@ -1240,6 +1381,64 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   ['craigslist_scrape', 'ksl_import', 'bat_import', 'url_scraper'].includes((vehicle as any)?.profile_origin)
                 );
                 
+                // During a live auction, deprioritize claim CTA and foreground auction telemetry + BID.
+                if (isAuctionLive && auctionPulse?.listing_url) {
+                  return (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <a
+                        href={auctionPulse.listing_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          border: '2px solid var(--border)',
+                          background: 'var(--white)',
+                          color: 'var(--text)',
+                          fontWeight: 700,
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          fontSize: '8pt',
+                          borderRadius: '3px',
+                          transition: 'all 0.12s ease',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
+                          (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
+                          (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
+                        }}
+                        title="Open live auction (place bids on the auction platform)"
+                      >
+                        BID
+                      </a>
+                      <a
+                        href={claimHref}
+                        style={{
+                          border: '1px solid var(--border)',
+                          background: 'transparent',
+                          color: mutedTextColor,
+                          fontWeight: 700,
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          fontSize: '8pt',
+                          borderRadius: '3px',
+                          transition: 'all 0.12s ease',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                        title="Claim ownership (title-based). We prioritize the vehicle, not the auction."
+                      >
+                        Claim
+                      </a>
+                    </span>
+                  );
+                }
+
                 if (isDiscoveredVehicle) {
                   return (
                     <a

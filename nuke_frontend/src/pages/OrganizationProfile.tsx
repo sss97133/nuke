@@ -1567,160 +1567,178 @@ export default function OrganizationProfile() {
                   
                   // Sort by value (highest first) or date
                   const sorted = [...productsForSale].sort((a, b) => {
-                    const aValue = a.vehicle_current_value || 0;
-                    const bValue = b.vehicle_current_value || 0;
+                    const aAsk = Number((a as any).vehicle_asking_price || 0) || 0;
+                    const bAsk = Number((b as any).vehicle_asking_price || 0) || 0;
+                    const aEst = Number((a as any).vehicle_current_value || 0) || 0;
+                    const bEst = Number((b as any).vehicle_current_value || 0) || 0;
+                    // Prefer asking price when present; otherwise fall back to estimate.
+                    const aValue = aAsk > 0 ? aAsk : aEst;
+                    const bValue = bAsk > 0 ? bAsk : bEst;
                     if (aValue !== bValue) return bValue - aValue;
                     return 0;
                   });
                   
                   return (
-                    <div>
-                      {sorted.slice(0, 10).map((vehicle) => (
-                        <div
-                          key={vehicle.id}
-                          style={{
-                            padding: '12px',
-                            marginBottom: '8px',
-                            border: '1px solid var(--border-light)',
-                            borderRadius: '4px',
-                            background: 'var(--white)',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <div style={{ flex: 1 }}>
-                              <a 
-                                href={`/vehicle/${vehicle.vehicle_id}`}
-                                onClick={(e) => e.stopPropagation()}
-                                style={{ 
-                                  fontSize: '10pt', 
-                                  fontWeight: 600, 
-                                  color: 'var(--accent)', 
-                                  marginBottom: '2px',
-                                  display: 'block',
-                                  textDecoration: 'none'
-                                }}
-                                className="hover:underline"
-                              >
-                                {vehicle.vehicle_year} {vehicle.vehicle_make} {vehicle.vehicle_model}
-                              </a>
-                              {vehicle.vehicle_vin && (
-                                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                                  VIN: {vehicle.vehicle_vin}
-                                </div>
-                              )}
-                            </div>
-                            {vehicle.vehicle_current_value && (
-                              <div style={{ fontSize: '10pt', fontWeight: 600, color: 'var(--success)', whiteSpace: 'nowrap', marginLeft: '12px' }}>
-                                ${vehicle.vehicle_current_value.toLocaleString()}
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                              {(() => {
-                                // Show "LIVE AUCTION" badge first if vehicle has active auction
-                                if (vehicle.has_active_auction) {
-                                  return (
-                                    <div style={{
-                                      fontSize: '7pt',
-                                      padding: '2px 6px',
-                                      borderRadius: '2px',
-                                      background: '#dc2626',
-                                      color: 'white',
-                                      fontWeight: 700
-                                    }}>
-                                      {vehicle.auction_platform === 'bat' ? 'LIVE AUCTION (BaT)' :
-                                       vehicle.auction_platform ? `LIVE AUCTION (${vehicle.auction_platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())})` :
-                                       'LIVE AUCTION'}
-                                    </div>
-                                  );
-                                }
-                                
-                                // Determine actual sale status - check all indicators
-                                const isSold = 
-                                  vehicle.sale_date || 
-                                  vehicle.sale_price || 
-                                  vehicle.vehicle_sale_status === 'sold' ||
-                                  (vehicle.vehicles && ((vehicle.vehicles as any).sale_price || (vehicle.vehicles as any).sale_date));
-                                
-                                if (isSold) {
-                                  return (
-                                    <div style={{
-                                      fontSize: '7pt',
-                                      padding: '2px 6px',
-                                      borderRadius: '2px',
-                                      background: 'var(--grey-200)',
-                                      color: 'var(--text-muted)'
-                                    }}>
-                                      Sold
-                                    </div>
-                                  );
-                                }
-                                
-                                // Show listing status only if not sold
-                                if (vehicle.listing_status && vehicle.listing_status !== 'sold') {
-                                  return (
-                                    <div style={{
-                                      fontSize: '7pt',
-                                      padding: '2px 6px',
-                                      borderRadius: '2px',
-                                      background: vehicle.listing_status === 'for_sale' ? 'var(--success-dim)' : 'var(--accent-dim)',
-                                      color: vehicle.listing_status === 'for_sale' ? 'var(--success)' : 'var(--accent)'
-                                    }}>
-                                      {vehicle.listing_status === 'for_sale' ? 'For Sale' : vehicle.listing_status === 'reserved' ? 'Reserved' : vehicle.listing_status || 'Active'}
-                                    </div>
-                                  );
-                                }
-                                
-                                return null;
-                              })()}
-                              {vehicle.relationship_type && (
-                                <div style={{
-                                  fontSize: '7pt',
-                                  padding: '2px 6px',
-                                  borderRadius: '2px',
-                                  background: 'var(--surface)',
-                                  color: 'var(--text-secondary)',
-                                  border: '1px solid var(--border)'
-                                }}>
-                                  {vehicle.relationship_type.replace(/_/g, ' ')}
-                                </div>
-                              )}
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              {vehicle.vehicle_image_url && (
-                                <img 
-                                  src={vehicle.vehicle_image_url} 
-                                  alt={`${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+                        gap: '10px'
+                      }}
+                    >
+                      {sorted.slice(0, 12).map((vehicle) => {
+                        const title = `${vehicle.vehicle_year || ''} ${vehicle.vehicle_make || ''} ${vehicle.vehicle_model || ''}`.trim() || 'Vehicle';
+                        const relationshipLabel = vehicle.relationship_type
+                          ? String(vehicle.relationship_type).replace(/_/g, ' ')
+                          : null;
+
+                        // This section already represents inventory; avoid repeating "For Sale" on every tile.
+                        const listingStatus = String(vehicle.listing_status || '').toLowerCase();
+                        const showListingPill = Boolean(listingStatus) && listingStatus !== 'for_sale' && listingStatus !== 'sold';
+                        const listingLabel =
+                          listingStatus === 'reserved' ? 'Reserved' :
+                          listingStatus ? (vehicle.listing_status || 'Active') :
+                          null;
+
+                        const asking = Number((vehicle as any).vehicle_asking_price || 0) || 0;
+                        const est = Number((vehicle as any).vehicle_current_value || 0) || 0;
+                        const priceValue = asking > 0 ? asking : est;
+                        const priceLabel = asking > 0 ? 'ASKING' : (est > 0 ? 'EST' : '');
+
+                        return (
+                          <div
+                            key={vehicle.id}
+                            style={{
+                              border: '1px solid var(--border)',
+                              background: 'var(--surface)',
+                              padding: '10px',
+                              cursor: 'pointer'
+                            }}
+                            onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
+                          >
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: '72px 1fr auto',
+                                gap: '10px',
+                                alignItems: 'start'
+                              }}
+                            >
+                              {/* Thumbnail */}
+                              {vehicle.vehicle_image_url ? (
+                                <img
+                                  src={vehicle.vehicle_image_url}
+                                  alt={title}
                                   style={{
-                                    width: '60px',
-                                    height: '40px',
+                                    width: '72px',
+                                    height: '54px',
                                     objectFit: 'cover',
-                                    borderRadius: '4px'
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--grey-100)'
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: '72px',
+                                    height: '54px',
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--grey-100)'
                                   }}
                                 />
                               )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedInquiryVehicle({
-                                    id: vehicle.vehicle_id,
-                                    name: `${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`
-                                  });
-                                  setShowVehicleInquiry(true);
-                                }}
-                                className="button button-primary button-small"
-                                style={{ fontSize: '8pt', padding: '4px 8px', whiteSpace: 'nowrap' }}
-                              >
-                                Inquire
-                              </button>
+
+                              {/* Main */}
+                              <div style={{ minWidth: 0 }}>
+                                <a
+                                  href={`/vehicle/${vehicle.vehicle_id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    fontSize: '10pt',
+                                    fontWeight: 700,
+                                    color: 'var(--text)',
+                                    display: 'block',
+                                    textDecoration: 'none',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}
+                                  className="hover:underline"
+                                >
+                                  {title}
+                                </a>
+
+                                <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                  {showListingPill && listingLabel && (
+                                    <span
+                                      style={{
+                                        fontSize: '7pt',
+                                        padding: '2px 6px',
+                                        border: '1px solid var(--border)',
+                                        background: 'var(--grey-100)',
+                                        color: 'var(--text)',
+                                        fontWeight: 700
+                                      }}
+                                    >
+                                      {listingLabel}
+                                    </span>
+                                  )}
+                                  {relationshipLabel && (
+                                    <span
+                                      style={{
+                                        fontSize: '7pt',
+                                        padding: '2px 6px',
+                                        border: '1px solid var(--border)',
+                                        background: 'var(--surface)',
+                                        color: 'var(--text-secondary)'
+                                      }}
+                                    >
+                                      {relationshipLabel}
+                                    </span>
+                                  )}
+                                  {vehicle.vehicle_vin && (
+                                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                                      VIN {String(vehicle.vehicle_vin)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Actions / Price */}
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                                {priceValue > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.1 }}>
+                                    {priceLabel && (
+                                      <div style={{ fontSize: '7pt', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.6px' }}>
+                                        {priceLabel}
+                                      </div>
+                                    )}
+                                    <div style={{ fontSize: '10pt', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                                      ${Number(priceValue).toLocaleString()}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>—</div>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedInquiryVehicle({
+                                      id: vehicle.vehicle_id,
+                                      name: title
+                                    });
+                                    setShowVehicleInquiry(true);
+                                  }}
+                                  className="button button-primary button-small"
+                                  style={{ fontSize: '8pt', padding: '4px 10px', whiteSpace: 'nowrap' }}
+                                >
+                                  Inquire
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}

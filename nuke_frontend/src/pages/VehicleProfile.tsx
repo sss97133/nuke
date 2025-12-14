@@ -115,6 +115,7 @@ const VehicleProfile: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
+  const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
 
 
   // MOBILE DETECTION
@@ -431,6 +432,103 @@ const VehicleProfile: React.FC = () => {
     if (!vehicle?.id) return;
     loadLinkedOrgs(vehicle.id);
   }, [vehicle?.id]); // Removed loadLinkedOrgs from deps - it's useCallback with [] deps so never changes
+
+  // Lightweight auction pulse polling (external listings + last bid/comment timestamps).
+  // This makes live auction vehicles feel bustling without needing a full realtime channel.
+  useEffect(() => {
+    if (!vehicle?.id) return;
+    if (!auctionPulse?.listing_url) return;
+
+    let cancelled = false;
+
+    const refreshAuctionPulse = async () => {
+      try {
+        // Re-read the listing record (best-effort; if multiple, prefer the exact URL)
+        const { data: listing } = await supabase
+          .from('external_listings')
+          .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
+          .eq('vehicle_id', vehicle.id)
+          .eq('listing_url', auctionPulse.listing_url)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const platform = String(listing?.platform || auctionPulse.platform || '');
+        const listingUrl = String(listing?.listing_url || auctionPulse.listing_url || '');
+
+        let commentCount: number | null =
+          typeof (listing as any)?.metadata?.comment_count === 'number'
+            ? (listing as any).metadata.comment_count
+            : (typeof auctionPulse.comment_count === 'number' ? auctionPulse.comment_count : null);
+        let lastBidAt: string | null = auctionPulse.last_bid_at || null;
+        let lastCommentAt: string | null = auctionPulse.last_comment_at || null;
+
+        try {
+          const [cCount, lastBid, lastComment] = await Promise.all([
+            commentCount === null
+              ? supabase
+                  .from('auction_comments')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('vehicle_id', vehicle.id)
+              : Promise.resolve({ count: commentCount } as any),
+            supabase
+              .from('auction_comments')
+              .select('posted_at')
+              .eq('vehicle_id', vehicle.id)
+              .not('bid_amount', 'is', null)
+              .order('posted_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            supabase
+              .from('auction_comments')
+              .select('posted_at')
+              .eq('vehicle_id', vehicle.id)
+              .order('posted_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+          ]);
+
+          if (commentCount === null) commentCount = typeof (cCount as any)?.count === 'number' ? (cCount as any).count : null;
+          lastBidAt = (lastBid as any)?.data?.posted_at || lastBidAt;
+          lastCommentAt = (lastComment as any)?.data?.posted_at || lastCommentAt;
+        } catch {
+          // ignore telemetry failures
+        }
+
+        if (!cancelled) {
+          setAuctionPulse({
+            platform,
+            listing_url: listingUrl,
+            listing_status: String(listing?.listing_status || auctionPulse.listing_status || ''),
+            end_date: (listing as any)?.end_date ?? auctionPulse.end_date ?? null,
+            current_bid: typeof (listing as any)?.current_bid === 'number' ? (listing as any).current_bid : (auctionPulse.current_bid ?? null),
+            bid_count: typeof (listing as any)?.bid_count === 'number' ? (listing as any).bid_count : (auctionPulse.bid_count ?? null),
+            watcher_count: typeof (listing as any)?.watcher_count === 'number' ? (listing as any).watcher_count : (auctionPulse.watcher_count ?? null),
+            view_count: typeof (listing as any)?.view_count === 'number' ? (listing as any).view_count : (auctionPulse.view_count ?? null),
+            comment_count: commentCount,
+            last_bid_at: lastBidAt,
+            last_comment_at: lastCommentAt,
+            updated_at: (listing as any)?.updated_at ?? auctionPulse.updated_at ?? null,
+          });
+        }
+      } catch {
+        // ignore refresh failures
+      }
+    };
+
+    // Initial refresh (so we don't rely purely on the RPC snapshot)
+    refreshAuctionPulse();
+
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      refreshAuctionPulse();
+    }, 60000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [vehicle?.id, auctionPulse?.listing_url]);
 
   // Refresh hero/gallery when images update elsewhere
   useEffect(() => {
@@ -853,6 +951,90 @@ const VehicleProfile: React.FC = () => {
       const processedVehicle = { ...vehicleData, isPublic: vehicleData.is_public ?? vehicleData.isPublic };
       setVehicle(processedVehicle);
       setIsPublic(vehicleData.is_public ?? true);
+
+      // Derive auction pulse for header (prefer external_listings over stale vehicles.* fields)
+      try {
+        const listings = (window as any).__vehicleProfileRpcData?.external_listings;
+        const arr = Array.isArray(listings) ? listings : [];
+        // Prefer active, ending in the future; fallback to most recent
+        const now = Date.now();
+        const active = arr
+          .filter((l: any) => String(l?.listing_status || '').toLowerCase() === 'active')
+          .sort((a: any, b: any) => {
+            const ae = a?.end_date ? new Date(a.end_date).getTime() : 0;
+            const be = b?.end_date ? new Date(b.end_date).getTime() : 0;
+            // Prefer listings with end dates in the future, then sooner-ending first
+            const aFuture = ae > now;
+            const bFuture = be > now;
+            if (aFuture !== bFuture) return aFuture ? -1 : 1;
+            if (ae !== be) return ae - be;
+            const au = a?.updated_at ? new Date(a.updated_at).getTime() : 0;
+            const bu = b?.updated_at ? new Date(b.updated_at).getTime() : 0;
+            return bu - au;
+          })[0];
+
+        if (active?.listing_url && active?.platform) {
+          // Lightweight comment telemetry (best-effort; table may not exist in some envs)
+          let commentCount: number | null = typeof active?.metadata?.comment_count === 'number' ? active.metadata.comment_count : null;
+          let lastBidAt: string | null = null;
+          let lastCommentAt: string | null = null;
+
+          try {
+            const [
+              cCount,
+              lastBid,
+              lastComment
+            ] = await Promise.all([
+              commentCount === null
+                ? supabase
+                    .from('auction_comments')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('vehicle_id', vehicleData.id)
+                : Promise.resolve({ count: commentCount } as any),
+              supabase
+                .from('auction_comments')
+                .select('posted_at')
+                .eq('vehicle_id', vehicleData.id)
+                .not('bid_amount', 'is', null)
+                .order('posted_at', { ascending: false })
+                .limit(1)
+                .maybeSingle(),
+              supabase
+                .from('auction_comments')
+                .select('posted_at')
+                .eq('vehicle_id', vehicleData.id)
+                .order('posted_at', { ascending: false })
+                .limit(1)
+                .maybeSingle(),
+            ]);
+
+            if (commentCount === null) commentCount = typeof (cCount as any)?.count === 'number' ? (cCount as any).count : null;
+            lastBidAt = (lastBid as any)?.data?.posted_at || null;
+            lastCommentAt = (lastComment as any)?.data?.posted_at || null;
+          } catch {
+            // ignore telemetry failures
+          }
+
+          setAuctionPulse({
+            platform: String(active.platform),
+            listing_url: String(active.listing_url),
+            listing_status: String(active.listing_status || ''),
+            end_date: active.end_date || null,
+            current_bid: typeof active.current_bid === 'number' ? active.current_bid : null,
+            bid_count: typeof active.bid_count === 'number' ? active.bid_count : null,
+            watcher_count: typeof active.watcher_count === 'number' ? active.watcher_count : null,
+            view_count: typeof active.view_count === 'number' ? active.view_count : null,
+            comment_count: commentCount,
+            last_bid_at: lastBidAt,
+            last_comment_at: lastCommentAt,
+            updated_at: active.updated_at || null,
+          });
+        } else {
+          setAuctionPulse(null);
+        }
+      } catch {
+        setAuctionPulse(null);
+      }
       
     } catch (error) {
       console.error('Error loading vehicle:', error);
@@ -1214,17 +1396,34 @@ const VehicleProfile: React.FC = () => {
         // Using direct public URLs instead which work fine
       } else {
         // No DB rows: try origin_metadata images first (from scraping)
-        if (vehicle.origin_metadata?.images && Array.isArray(vehicle.origin_metadata.images)) {
-          const originImages = vehicle.origin_metadata.images
-            .filter((url: string) => 
-              url && 
-              typeof url === 'string' && 
+        try {
+          const originRaw: unknown =
+            (vehicle as any)?.origin_metadata?.images ??
+            (vehicle as any)?.origin_metadata?.image_urls ??
+            (vehicle as any)?.origin_metadata?.imageUrls ??
+            null;
+
+          const originCountRaw: unknown =
+            (vehicle as any)?.origin_metadata?.image_count ??
+            (vehicle as any)?.origin_metadata?.imageCount ??
+            null;
+
+          const originLimit = typeof originCountRaw === 'number' && Number.isFinite(originCountRaw) ? originCountRaw : null;
+
+          const originList = Array.isArray(originRaw) ? originRaw : [];
+          const originImages = originList
+            .filter((url: any) =>
+              url &&
+              typeof url === 'string' &&
               url.startsWith('http') &&
               !url.includes('94x63') && // Filter out thumbnails
               !url.includes('youtube.com') && // Filter out YouTube thumbnails
               !url.includes('thumbnail')
-            );
-          
+            )
+            // IMPORTANT: some scrapes may accidentally include site-wide images;
+            // trust image_count if present to keep the listing gallery tight.
+            .slice(0, originLimit ?? 120);
+
           if (originImages.length > 0) {
             images = originImages;
             setVehicleImages(images);
@@ -1233,6 +1432,8 @@ const VehicleProfile: React.FC = () => {
             }
             console.log(`✅ Using ${originImages.length} images from origin_metadata`);
           }
+        } catch {
+          // ignore
         }
         
         // If still no images, attempt storage fallback (canonical + legacy) to avoid empty hero/gallery
@@ -1523,6 +1724,14 @@ const VehicleProfile: React.FC = () => {
                 <ImageGallery
                   vehicleId={vehicle.id}
                   showUpload={true}
+                  fallbackImageUrls={vehicleImages}
+                  fallbackLabel={(vehicle as any)?.profile_origin === 'bat_import' ? 'BaT listing' : 'Listing'}
+                  fallbackSourceUrl={
+                    (vehicle as any)?.discovery_url ||
+                    (vehicle as any)?.bat_auction_url ||
+                    (vehicle as any)?.listing_url ||
+                    undefined
+                  }
                   onImagesUpdated={() => {
                     loadVehicle();
                     loadTimelineEvents();
@@ -1555,6 +1764,7 @@ const VehicleProfile: React.FC = () => {
             onClaimClick={() => setShowOwnershipClaim(true)}
             userOwnershipClaim={userOwnershipClaim as any}
             suppressExternalListing={!!userOwnershipClaim}
+            auctionPulse={auctionPulse}
           />
         </React.Suspense>
 

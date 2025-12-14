@@ -110,11 +110,11 @@ const SpatialTagMarker: React.FC<SpatialTagMarkerProps> = ({ tag, isShoppable, o
           <div>{tag.tag_text || tag.tag_name}</div>
           {isAutoTag && (
             <div style={{ fontSize: '9px', color: '#888', marginTop: '2px' }}>
-              {isVerified ? '✓ Verified' : `AI ${confidence}%`}
+              {isVerified ? 'VERIFIED' : `AI ${confidence}%`}
               {isLinkedVehicle && ' • Click to view'}
             </div>
           )}
-          {isShoppable && <span> 🛒</span>}
+          {isShoppable && <span> SHOP</span>}
         </div>
       )}
     </div>

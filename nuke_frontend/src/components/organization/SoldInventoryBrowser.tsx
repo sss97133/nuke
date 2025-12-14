@@ -62,13 +62,17 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
   const loadSoldVehicles = async () => {
     setLoading(true);
     try {
-      // Fetch vehicles and organization_vehicles separately to avoid PostgREST ordering issues
+      const isServiceArchive = String(title || '').toLowerCase().includes('service');
+
+      // Fetch organization_vehicles first (we'll filter "sold" using multiple indicators after enrichment).
+      // IMPORTANT: many orgs do NOT consistently set `listing_status = 'sold'` on organization_vehicles,
+      // but do set sale fields on the vehicle record or via external listings/proof.
       const { data: orgVehicles, error: orgError } = await supabase
         .from('organization_vehicles')
-        .select('id, vehicle_id, sale_price, sale_date, listing_status')
+        .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_price, sale_date, listing_status')
         .eq('organization_id', organizationId)
-        .eq('listing_status', 'sold')
-        .order('sale_date', { ascending: false, nullsFirst: false });
+        .or('status.eq.active,status.eq.sold,status.eq.archived')
+        .order('created_at', { ascending: false });
 
       if (orgError) throw orgError;
 
@@ -78,7 +82,13 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
         return;
       }
 
-      const vehicleIds = orgVehicles.map(ov => ov.vehicle_id);
+      const vehicleIds = orgVehicles.map((ov: any) => ov.vehicle_id).filter(Boolean);
+      if (vehicleIds.length === 0) {
+        setSoldVehicles([]);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('vehicles')
         .select(`
@@ -91,7 +101,11 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           displacement,
           transmission,
           drivetrain,
-          mileage
+          mileage,
+          sale_status,
+          sale_price,
+          sale_date,
+          listing_status
         `)
         .in('id', vehicleIds);
 
@@ -108,49 +122,79 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
 
       const proofMap = new Map((proofData || []).map((p: any) => [p.vehicle_id, p]));
 
-      // Fetch external listing data (BaT, etc)
-      const enriched = await Promise.all(
-        (data || []).map(async (v: any) => {
+      // Fetch external listing data (BaT, etc) in one shot
+      const { data: externalListings } = await supabase
+        .from('external_listings')
+        .select('vehicle_id, platform, listing_url, final_price, sold_at, listing_status')
+        .in('vehicle_id', vehicleIds);
+      const externalMap = new Map((externalListings || []).map((l: any) => [l.vehicle_id, l]));
+
+      // Fetch images in one shot and build:
+      // - primary image per vehicle (primary first, newest first)
+      // - image count per vehicle
+      const { data: images } = await supabase
+        .from('vehicle_images')
+        .select('vehicle_id, image_url, thumbnail_url, medium_url, is_primary, created_at, taken_at')
+        .in('vehicle_id', vehicleIds)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      const imageCountByVehicle = new Map<string, number>();
+      const primaryImageByVehicle = new Map<string, string>();
+      (images || []).forEach((img: any) => {
+        const vid = img?.vehicle_id;
+        if (!vid) return;
+        imageCountByVehicle.set(vid, (imageCountByVehicle.get(vid) || 0) + 1);
+        if (!primaryImageByVehicle.has(vid)) {
+          const url = img.thumbnail_url || img.medium_url || img.image_url;
+          if (url) primaryImageByVehicle.set(vid, url);
+        }
+      });
+
+      // Enrich and filter
+      const enriched = (data || [])
+        .map((v: any) => {
           const orgVehicle = orgVehicleMap.get(v.id);
           if (!orgVehicle) return null;
 
           const proof = proofMap.get(v.id);
+          const externalListing = externalMap.get(v.id);
 
-          // Get primary image
-          const { data: img } = await supabase
-            .from('vehicle_images')
-            .select('image_url, thumbnail_url, medium_url')
-            .eq('vehicle_id', v.id)
-            .eq('is_primary', true)
-            .maybeSingle();
+          const saleStatus = String(v.sale_status || '').toLowerCase();
+          const listingStatus = String(orgVehicle.listing_status || v.listing_status || '').toLowerCase();
 
-          if (!img) {
-          const { data: firstImg } = await supabase
-              .from('vehicle_images')
-              .select('image_url, thumbnail_url, medium_url, created_at, taken_at')
-              .eq('vehicle_id', v.id)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            
-            if (firstImg) {
-              Object.assign(img || {}, firstImg);
-            }
+          const ovSalePriceNum = orgVehicle.sale_price ? Number(orgVehicle.sale_price) : 0;
+          const vSalePriceNum = v.sale_price ? Number(v.sale_price) : 0;
+          const extFinalPriceNum = externalListing?.final_price ? Number(externalListing.final_price) : 0;
+
+          const isSold =
+            listingStatus === 'sold' ||
+            saleStatus === 'sold' ||
+            Boolean(orgVehicle.sale_date) ||
+            Boolean(v.sale_date) ||
+            ovSalePriceNum > 0 ||
+            vSalePriceNum > 0 ||
+            Boolean(externalListing?.sold_at) ||
+            extFinalPriceNum > 0;
+
+          const isCompletedService =
+            ['service_provider', 'work_location'].includes(String(orgVehicle.relationship_type || '').toLowerCase()) &&
+            (Boolean(orgVehicle.end_date) || String(orgVehicle.status || '').toLowerCase() === 'archived' || String(orgVehicle.status || '').toLowerCase() === 'sold');
+
+          // For service orgs, this component acts as a service archive.
+          // For inventory orgs, it is a sold inventory archive.
+          if (isServiceArchive) {
+            if (!isCompletedService) return null;
+          } else {
+            if (!isSold) return null;
           }
 
-          // Get image count
-          const { count: imageCount } = await supabase
-            .from('vehicle_images')
-            .select('id', { count: 'exact', head: true })
-            .eq('vehicle_id', v.id);
+          const saleDate = orgVehicle.sale_date || v.sale_date || externalListing?.sold_at || null;
+          const salePrice =
+            (orgVehicle.sale_price ? Number(orgVehicle.sale_price) : null) ||
+            (v.sale_price ? Number(v.sale_price) : null) ||
+            null;
 
-          // Get external listing data (fallback if proof doesn't have it)
-          const { data: externalListing } = await supabase
-            .from('external_listings')
-            .select('platform, listing_url, final_price, sold_at')
-            .eq('vehicle_id', v.id)
-            .maybeSingle();
-          
           return {
             id: orgVehicle.id,
             vehicle_id: v.id,
@@ -163,14 +207,14 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
             transmission: v.transmission,
             drivetrain: v.drivetrain,
             mileage: v.mileage,
-            sale_price: orgVehicle.sale_price ? parseFloat(orgVehicle.sale_price) : null,
-            sale_date: orgVehicle.sale_date,
+            sale_price: salePrice,
+            sale_date: saleDate,
             platform: proof?.proof_platform || externalListing?.platform,
             listing_url: proof?.proof_url || externalListing?.listing_url,
             final_price: externalListing?.final_price,
             sold_at: externalListing?.sold_at,
-            primary_image: img?.thumbnail_url || img?.medium_url || img?.image_url,
-            image_count: imageCount || 0,
+            primary_image: primaryImageByVehicle.get(v.id) || null,
+            image_count: imageCountByVehicle.get(v.id) || 0,
             // Proof data
             proof_url: proof?.proof_url,
             proof_platform: proof?.proof_platform,
@@ -180,19 +224,18 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
             external_listing_id: proof?.external_listing_id,
             timeline_event_id: proof?.timeline_event_id,
             timeline_bat_url: proof?.timeline_bat_url
-          };
+          } as SoldVehicle;
         })
-      );
+        .filter(Boolean) as SoldVehicle[];
 
       // Filter out nulls and sort by sale_date
-      const validEnriched = enriched.filter(v => v !== null) as SoldVehicle[];
-      validEnriched.sort((a, b) => {
+      enriched.sort((a, b) => {
         const dateA = a.sale_date ? new Date(a.sale_date).getTime() : 0;
         const dateB = b.sale_date ? new Date(b.sale_date).getTime() : 0;
         return dateB - dateA; // Descending
       });
 
-      setSoldVehicles(validEnriched);
+      setSoldVehicles(enriched);
     } catch (error) {
       console.error('Failed to load sold vehicles:', error);
     } finally {

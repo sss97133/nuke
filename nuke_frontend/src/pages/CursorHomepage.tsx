@@ -206,6 +206,7 @@ interface FilterState {
   priceMax: number | null;
   hasImages: boolean;
   forSale: boolean;
+  hideSold: boolean;
   zipCode: string;
   radiusMiles: number;
   showPrices: boolean;
@@ -233,6 +234,8 @@ const CursorHomepage: React.FC = () => {
     // Hide “F-tier” no-image profiles by default (still discoverable via search / toggles).
     hasImages: true,
     forSale: false,
+    // Homepage should focus on active listings; sold inventory can be toggled back on.
+    hideSold: true,
     zipCode: '',
     radiusMiles: 50,
     showPrices: true,
@@ -400,6 +403,7 @@ const CursorHomepage: React.FC = () => {
         .select(`
           id, year, make, model, title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
+          sale_date, sale_status, listing_status,
           is_for_sale, mileage, status, is_public, origin_metadata, primary_image_url, image_url
         `)
         .eq('is_public', true)
@@ -586,6 +590,16 @@ const CursorHomepage: React.FC = () => {
     }
     if (filters.forSale) {
       result = result.filter(v => v.is_for_sale);
+    }
+    if (filters.hideSold) {
+      result = result.filter(v => {
+        const salePrice = Number((v as any).sale_price || 0) || 0;
+        const saleDate = (v as any).sale_date;
+        const saleStatus = String((v as any).sale_status || '').toLowerCase();
+        const listingStatus = String((v as any).listing_status || '').toLowerCase();
+        const isSold = salePrice > 0 || Boolean(saleDate) || saleStatus === 'sold' || listingStatus === 'sold';
+        return !isSold;
+      });
     }
     
     // Location filter (ZIP code + radius)
@@ -1091,6 +1105,14 @@ const CursorHomepage: React.FC = () => {
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
                   <input
                     type="checkbox"
+                    checked={filters.hideSold}
+                    onChange={(e) => setFilters({ ...filters, hideSold: e.target.checked })}
+                  />
+                  <span>Hide Sold</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                  <input
+                    type="checkbox"
                     checked={filters.showPending}
                     onChange={(e) => {
                       setFilters({...filters, showPending: e.target.checked});
@@ -1166,6 +1188,7 @@ const CursorHomepage: React.FC = () => {
                     priceMax: null,
                     hasImages: false,
                     forSale: false,
+                    hideSold: true,
                     zipCode: '',
                     radiusMiles: 50,
                     showPrices: true,
