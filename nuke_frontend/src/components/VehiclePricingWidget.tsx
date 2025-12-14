@@ -33,6 +33,21 @@ interface PricingStatus {
   message: string;
 }
 
+type AuctionPulse = {
+  platform: string;
+  listing_url: string;
+  listing_status: string;
+  end_date?: string | null;
+  current_bid?: number | null;
+  bid_count?: number | null;
+  watcher_count?: number | null;
+  view_count?: number | null;
+  comment_count?: number | null;
+  last_bid_at?: string | null;
+  last_comment_at?: string | null;
+  updated_at?: string | null;
+};
+
 export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   vehicleId,
   vehicleInfo,
@@ -50,6 +65,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
   const [toast, setToast] = useState<{message: string, type: 'success' | 'info' | 'error'} | null>(null);
   const [analysisConfig, setAnalysisConfig] = useState<any>(null);
   const [showConfigSelector, setShowConfigSelector] = useState(false);
+  const [auctionPulse, setAuctionPulse] = useState<AuctionPulse | null>(null);
+  const [auctionNow, setAuctionNow] = useState<number>(() => Date.now());
 
   // Use initialValuation if provided (eliminates duplicate query)
   useEffect(() => {
@@ -88,6 +105,132 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
       window.removeEventListener('timeline_updated', handler as any);
     };
   }, [vehicleId]);
+
+  // Auction pulse (external_listings + last bid/comment timestamps) to make the price card actionable during live auctions.
+  useEffect(() => {
+    if (!vehicleId) return;
+    let cancelled = false;
+
+    const pickBestListing = (arr: any[]): any | null => {
+      const now = Date.now();
+      const sorted = (arr || []).slice().sort((a: any, b: any) => {
+        const aStatus = String(a?.listing_status || '').toLowerCase();
+        const bStatus = String(b?.listing_status || '').toLowerCase();
+        const aActive = aStatus === 'active';
+        const bActive = bStatus === 'active';
+        if (aActive !== bActive) return aActive ? -1 : 1;
+        const ae = a?.end_date ? new Date(a.end_date).getTime() : 0;
+        const be = b?.end_date ? new Date(b.end_date).getTime() : 0;
+        const aFuture = ae > now;
+        const bFuture = be > now;
+        if (aFuture !== bFuture) return aFuture ? -1 : 1;
+        if (ae !== be) return ae - be;
+        const au = a?.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const bu = b?.updated_at ? new Date(b.updated_at).getTime() : 0;
+        return bu - au;
+      });
+      return sorted[0] || null;
+    };
+
+    const loadAuctionPulse = async () => {
+      try {
+        // Prefer RPC snapshot if present to avoid duplicate reads
+        const rpcListings = (window as any).__vehicleProfileRpcData?.external_listings;
+        const fromRpc = Array.isArray(rpcListings) ? pickBestListing(rpcListings) : null;
+
+        // Always try to refresh from DB for live accuracy (best-effort)
+        const { data: listings } = await supabase
+          .from('external_listings')
+          .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
+          .eq('vehicle_id', vehicleId)
+          .order('updated_at', { ascending: false })
+          .limit(10);
+
+        const best = pickBestListing((listings && listings.length > 0) ? listings : (fromRpc ? [fromRpc] : []));
+        if (!best?.listing_url || !best?.platform) {
+          if (!cancelled) setAuctionPulse(null);
+          return;
+        }
+
+        let commentCount: number | null =
+          typeof best?.metadata?.comment_count === 'number'
+            ? best.metadata.comment_count
+            : null;
+        let lastBidAt: string | null = null;
+        let lastCommentAt: string | null = null;
+
+        try {
+          const [cCount, lastBid, lastComment] = await Promise.all([
+            commentCount === null
+              ? supabase
+                  .from('auction_comments')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('vehicle_id', vehicleId)
+              : Promise.resolve({ count: commentCount } as any),
+            supabase
+              .from('auction_comments')
+              .select('posted_at')
+              .eq('vehicle_id', vehicleId)
+              .not('bid_amount', 'is', null)
+              .order('posted_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            supabase
+              .from('auction_comments')
+              .select('posted_at')
+              .eq('vehicle_id', vehicleId)
+              .order('posted_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+          ]);
+          if (commentCount === null) commentCount = typeof (cCount as any)?.count === 'number' ? (cCount as any).count : null;
+          lastBidAt = (lastBid as any)?.data?.posted_at || null;
+          lastCommentAt = (lastComment as any)?.data?.posted_at || null;
+        } catch {
+          // ignore if table doesn't exist
+        }
+
+        if (!cancelled) {
+          setAuctionPulse({
+            platform: String(best.platform),
+            listing_url: String(best.listing_url),
+            listing_status: String(best.listing_status || ''),
+            end_date: best.end_date || null,
+            current_bid: typeof best.current_bid === 'number' ? best.current_bid : null,
+            bid_count: typeof best.bid_count === 'number' ? best.bid_count : null,
+            watcher_count: typeof best.watcher_count === 'number' ? best.watcher_count : null,
+            view_count: typeof best.view_count === 'number' ? best.view_count : null,
+            comment_count: commentCount,
+            last_bid_at: lastBidAt,
+            last_comment_at: lastCommentAt,
+            updated_at: best.updated_at || null,
+          });
+        }
+      } catch {
+        if (!cancelled) setAuctionPulse(null);
+      }
+    };
+
+    loadAuctionPulse();
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      loadAuctionPulse();
+    }, 60000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [vehicleId]);
+
+  // Timer tick for countdown + "last bid age" (keep the card alive)
+  useEffect(() => {
+    if (!auctionPulse?.end_date && !auctionPulse?.last_bid_at && !auctionPulse?.last_comment_at) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setAuctionNow(Date.now());
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [auctionPulse?.end_date, auctionPulse?.last_bid_at, auctionPulse?.last_comment_at]);
 
   const loadPricingStatus = async () => {
     try {
@@ -375,23 +518,6 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
     }
   };
 
-  const getStatusIcon = (status?: string) => {
-    switch (status) {
-      case 'high_confidence':
-        return <span className="text-green-500">✅</span>;
-      case 'medium_confidence':
-        return <span className="text-yellow-500">⚠️</span>;
-      case 'low_confidence':
-        return <span className="text-orange-500">❓</span>;
-      case 'needs_review':
-        return <span className="text-red-500">🚨</span>;
-      case 'analyzing':
-        return <span className="animate-spin text-blue-500">⚡</span>;
-      default:
-        return <span className="text-gray-500">💰</span>;
-    }
-  };
-
   const formatCurrency = (value?: number) => {
     if (!value) return 'N/A';
     return new Intl.NumberFormat('en-US', {
@@ -414,6 +540,37 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     return date.toLocaleDateString();
+  };
+
+  const formatAge = (iso?: string | null) => {
+    if (!iso) return null;
+    const t = new Date(iso).getTime();
+    if (!Number.isFinite(t)) return null;
+    const diff = Date.now() - t;
+    if (diff < 0) return '0s';
+    const s = Math.floor(diff / 1000);
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m`;
+    const h = Math.floor(m / 60);
+    if (h < 48) return `${h}h`;
+    const d = Math.floor(h / 24);
+    return `${d}d`;
+  };
+
+  const formatRemaining = (iso?: string | null) => {
+    if (!iso) return null;
+    const end = new Date(iso).getTime();
+    if (!Number.isFinite(end)) return null;
+    const diff = end - Date.now();
+    if (diff <= 0) return 'Ended';
+    const s = Math.floor(diff / 1000);
+    const d = Math.floor(s / (60 * 60 * 24));
+    const h = Math.floor((s % (60 * 60 * 24)) / (60 * 60));
+    const m = Math.floor((s % (60 * 60)) / 60);
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
   };
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
@@ -495,6 +652,82 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
               </div>
             )}
           </div>
+
+          {/* Decision instrument: connect live auction telemetry to the valuation */}
+          {auctionPulse?.listing_url && pricingStatus?.estimated_value ? (
+            <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }}>
+                {auctionPulse.platform === 'bat' ? 'BAT' : String(auctionPulse.platform).toUpperCase()}
+              </span>
+              {String(auctionPulse.listing_status || '').toLowerCase() === 'active' ? (
+                <span className="badge" style={{ fontSize: '8pt', fontWeight: 800, background: '#dbeafe', color: '#1d4ed8', border: '1px solid #60a5fa' }}>
+                  LIVE
+                </span>
+              ) : (
+                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }}>
+                  {String(auctionPulse.listing_status || 'status').toUpperCase()}
+                </span>
+              )}
+              {auctionPulse.end_date ? (
+                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Time remaining">
+                  ENDS {formatRemaining(auctionPulse.end_date) || '—'}
+                </span>
+              ) : null}
+
+              {typeof auctionPulse.current_bid === 'number' ? (
+                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Current bid">
+                  BID {formatCurrency(auctionPulse.current_bid)}
+                </span>
+              ) : null}
+
+              {(() => {
+                const bid = typeof auctionPulse.current_bid === 'number' ? auctionPulse.current_bid : null;
+                const est = pricingStatus.estimated_value || null;
+                if (bid === null || est === null || est <= 0) return null;
+                const delta = bid - est;
+                const pct = (delta / est) * 100;
+                const under = delta < 0;
+                const label = under ? 'UNDER' : 'OVER';
+                const color = under ? '#15803d' : '#b91c1c';
+                const bg = under ? '#dcfce7' : '#fee2e2';
+                return (
+                  <span className="badge" style={{ fontSize: '8pt', fontWeight: 900, background: bg, color, border: `1px solid ${color}` }} title="Bid vs estimate">
+                    {label} {formatCurrency(Math.abs(delta))} ({pct.toFixed(1)}%)
+                  </span>
+                );
+              })()}
+
+              {typeof auctionPulse.bid_count === 'number' ? (
+                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Bids">
+                  {auctionPulse.bid_count} BIDS
+                </span>
+              ) : null}
+              {typeof auctionPulse.watcher_count === 'number' && auctionPulse.watcher_count > 0 ? (
+                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Watchers">
+                  {auctionPulse.watcher_count.toLocaleString()} WATCHING
+                </span>
+              ) : null}
+              {typeof auctionPulse.comment_count === 'number' ? (
+                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Comments">
+                  {auctionPulse.comment_count.toLocaleString()} COMMENTS
+                </span>
+              ) : null}
+              {auctionPulse.last_bid_at ? (
+                <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }} title="Time since last bid">
+                  LAST BID {formatAge(auctionPulse.last_bid_at) || '—'} AGO
+                </span>
+              ) : null}
+
+              <button
+                className="button button-small"
+                style={{ fontSize: '8pt', fontWeight: 800, marginLeft: 'auto' }}
+                onClick={() => window.open(auctionPulse.listing_url, '_blank')}
+                title="Open the auction listing in a new tab"
+              >
+                OPEN AUCTION
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {/* Value Breakdown - ONLY REAL DATA */}
@@ -672,7 +905,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                   style={{ position: 'relative' }}
                   onClick={() => setShowDataSources(!showDataSources)}
                 >
-                  Data Sources {showDataSources ? '▲' : '▼'}
+                  Update Data Sources {showDataSources ? '▲' : '▼'}
                 </button>
               </div>
               {pricingStatus.last_analyzed && (
@@ -818,7 +1051,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                       }}
                       title={`View ${source} data`}
                     >
-                      <span style={{ color: '#008000' }}>✓</span>
+                      <span style={{ color: '#008000' }}>OK</span>
                       <span style={{ textTransform: 'capitalize' }}>
                         {source}
                       </span>
@@ -860,7 +1093,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             <div className="p-4 max-h-[calc(90vh-120px)] overflow-y-auto">
               {/* This would be the full PricingIntelligence component */}
               <div className="text-center py-8">
-                <div className="animate-spin text-4xl mb-4">⚡</div>
+                <div className="text" style={{ fontSize: '10pt', fontWeight: 800, marginBottom: 8 }}>LOADING</div>
                 <p className="text-gray-600">Loading comprehensive analysis...</p>
                 <p className="text-sm text-gray-500 mt-2">
                   AI is analyzing market data, modifications, and generating detailed report
@@ -892,8 +1125,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
               color: toast.type === 'success' ? '#008000' :
                      toast.type === 'error' ? '#800000' : '#000080'
             }}>
-              {toast.type === 'success' ? '✓' :
-               toast.type === 'error' ? '✗' : 'ℹ'}
+              {toast.type === 'success' ? 'OK' :
+               toast.type === 'error' ? 'ERR' : 'INFO'}
             </span>
             <span className="text">{toast.message}</span>
           </div>

@@ -119,6 +119,24 @@ export interface VehicleHeaderProps {
     updated_at?: string | null;
   } | null;
   suppressExternalListing?: boolean;
+  /**
+   * Optional, derived "bustling auction" snapshot for the header.
+   * When present, the header can deprioritize claim CTAs and instead show live auction telemetry.
+   */
+  auctionPulse?: {
+    platform: string;
+    listing_url: string;
+    listing_status: string;
+    end_date?: string | null;
+    current_bid?: number | null;
+    bid_count?: number | null;
+    watcher_count?: number | null;
+    view_count?: number | null;
+    comment_count?: number | null;
+    last_bid_at?: string | null;
+    last_comment_at?: string | null;
+    updated_at?: string | null;
+  } | null;
 }
 
 export interface VehicleHeroImageProps {

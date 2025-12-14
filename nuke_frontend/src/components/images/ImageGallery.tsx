@@ -13,6 +13,17 @@ interface ImageGalleryProps {
   vehicleId: string;
   onImagesUpdated?: () => void;
   showUpload?: boolean;
+  /**
+   * Optional fallback URLs (e.g., scraped listing images) to prevent "empty" profiles
+   * when `vehicle_images` has not been backfilled yet.
+   */
+  fallbackImageUrls?: string[];
+  fallbackLabel?: string;
+  /**
+   * Optional source URL for fallback images (e.g. BaT listing URL) so imported rows
+   * preserve provenance.
+   */
+  fallbackSourceUrl?: string;
   // NEW: Image Set features (optional - defaults maintain existing behavior)
   selectMode?: boolean;
   selectedImages?: Set<string>;
@@ -96,6 +107,9 @@ const ImageGallery = ({
   vehicleId, 
   onImagesUpdated, 
   showUpload = true,
+  fallbackImageUrls = [],
+  fallbackLabel = 'Listing images',
+  fallbackSourceUrl,
   // NEW: Optional image set props
   selectMode = false,
   selectedImages,
@@ -129,6 +143,99 @@ const ImageGallery = ({
   const [imageAttributions, setImageAttributions] = useState<Record<string, any>>({});
   const [showDropZone, setShowDropZone] = useState(false);
   const sentinelRef = React.useRef<HTMLDivElement>(null);
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [importingFallback, setImportingFallback] = useState(false);
+
+  const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  const normalizeFallbackUrls = (urls: string[]) => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const u of urls || []) {
+      const s = typeof u === 'string' ? u.trim() : '';
+      if (!s) continue;
+      if (!s.startsWith('http')) continue;
+      // drop common low-res thumbs
+      if (s.includes('94x63') || s.includes('thumbnail')) continue;
+      if (seen.has(s)) continue;
+      seen.add(s);
+      out.push(s);
+    }
+    return out.slice(0, 120); // hard cap to keep UI performant
+  };
+
+  const importFallbackImages = useCallback(async () => {
+    if (!session?.user?.id) return;
+    if (!vehicleId) return;
+    if (importingFallback) return;
+
+    const fallback = normalizeFallbackUrls(fallbackImageUrls);
+    if (fallback.length === 0) return;
+
+    setImportingFallback(true);
+    try {
+      // Avoid duplicates: fetch existing urls for this vehicle
+      const { data: existingRows, error: existingErr } = await supabase
+        .from('vehicle_images')
+        .select('image_url')
+        .eq('vehicle_id', vehicleId)
+        .eq('is_document', false)
+        .limit(5000);
+      if (existingErr) throw existingErr;
+
+      const existing = new Set<string>((existingRows || []).map((r: any) => String(r?.image_url || '')).filter(Boolean));
+      const toInsert = fallback.filter((u) => !existing.has(u));
+
+      if (toInsert.length === 0) {
+        // Nothing new to import; just refresh
+      } else {
+        const nowIso = new Date().toISOString();
+        const rows = toInsert.map((url, idx) => ({
+          vehicle_id: vehicleId,
+          user_id: session.user.id,
+          image_url: url,
+          thumbnail_url: url,
+          medium_url: url,
+          large_url: url,
+          variants: { full: url, large: url, medium: url, thumbnail: url },
+          is_primary: idx === 0 && existing.size === 0,
+          caption: fallbackLabel,
+          category: 'general',
+          is_external: true,
+          source: 'bat_import',
+          source_url: typeof fallbackSourceUrl === 'string' && fallbackSourceUrl.startsWith('http') ? fallbackSourceUrl : null,
+          created_at: nowIso,
+          updated_at: nowIso
+        }));
+
+        const { error: insertErr } = await supabase
+          .from('vehicle_images')
+          .insert(rows);
+        if (insertErr) throw insertErr;
+      }
+
+      // Refresh DB-backed gallery view immediately
+      const { data: refreshed, error: refreshErr } = await supabase
+        .from('vehicle_images')
+        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
+        .eq('vehicle_id', vehicleId)
+        .eq('is_document', false)
+        .or('is_duplicate.is.null,is_duplicate.eq.false')
+        .order('is_primary', { ascending: false });
+      if (refreshErr) throw refreshErr;
+
+      const images = dedupeFetchedImages(refreshed || []);
+      setUsingFallback(false);
+      setAllImages(images);
+      setDisplayedImages(images.slice(0, Math.min(50, images.length)));
+      setShowImages(true);
+      onImagesUpdated?.();
+    } catch (err) {
+      console.error('Failed to import listing images:', err);
+      alert('Failed to import listing images. Please try again.');
+    } finally {
+      setImportingFallback(false);
+    }
+  }, [fallbackImageUrls, fallbackLabel, fallbackSourceUrl, importingFallback, onImagesUpdated, session?.user?.id, vehicleId]);
   
   // NEW: Image set related state
   const [imageSetCounts, setImageSetCounts] = useState<Record<string, number>>({});
@@ -310,12 +417,14 @@ const ImageGallery = ({
         setTimeout(() => loadImageTagCounts(), 100);
         // Also load comment counts, uploader names, and tag texts for new batch
         setTimeout(() => {
-          loadImageCommentCounts(newImages.map(img => img.id));
-          loadUploaderNames(newImages.map(img => img.user_id).filter(Boolean));
-          loadImageTagTexts(newImages.map(img => img.id));
-          loadImageViewCounts(newImages.map(img => img.id));
-          loadUploaderOrgNames(newImages.map(img => img.user_id).filter(Boolean));
-          loadImageAttributions(newImages.map(img => img.id));
+          const ids = newImages.map(img => String(img.id || '')).filter((id) => isUuid(id));
+          const uids = newImages.map(img => String(img.user_id || '')).filter((id) => isUuid(id));
+          loadImageCommentCounts(ids);
+          loadUploaderNames(uids);
+          loadImageTagTexts(ids);
+          loadImageViewCounts(ids);
+          loadUploaderOrgNames(uids);
+          loadImageAttributions(ids);
         }, 120);
         return newImages;
       });
@@ -437,16 +546,37 @@ const ImageGallery = ({
 
         if (error) throw error;
         const images = dedupeFetchedImages(rawImages || []);
-        setAllImages(images);
-        // Load an initial batch (50 or fewer) immediately
-        const sorted = [...images].sort((a: any, b: any) => {
-          const da = new Date(a.taken_at || a.created_at).getTime();
-          const db = new Date(b.taken_at || b.created_at).getTime();
-          return sortBy === 'date_desc' ? db - da : da - db;
-        });
-        const initialBatch = Math.min(50, sorted.length);
-        setDisplayedImages(sorted.slice(0, initialBatch));
-        setShowImages(true);
+
+        // If DB is empty, show fallback URLs (scraped listing images) to avoid empty profiles.
+        const fallback = normalizeFallbackUrls(fallbackImageUrls);
+        if (images.length === 0 && fallback.length > 0) {
+          const synthetic = fallback.map((url, idx) => ({
+            id: `ext_${idx}`,
+            image_url: url,
+            created_at: new Date().toISOString(),
+            taken_at: null,
+            is_primary: idx === 0,
+            caption: `${fallbackLabel}`,
+            category: 'general',
+            __external: true
+          }));
+          setUsingFallback(true);
+          setAllImages(synthetic);
+          setDisplayedImages(synthetic.slice(0, Math.min(50, synthetic.length)));
+          setShowImages(true);
+        } else {
+          setUsingFallback(false);
+          setAllImages(images);
+          // Load an initial batch (50 or fewer) immediately
+          const sorted = [...images].sort((a: any, b: any) => {
+            const da = new Date(a.taken_at || a.created_at).getTime();
+            const db = new Date(b.taken_at || b.created_at).getTime();
+            return sortBy === 'date_desc' ? db - da : da - db;
+          });
+          const initialBatch = Math.min(50, sorted.length);
+          setDisplayedImages(sorted.slice(0, initialBatch));
+          setShowImages(true);
+        }
         
         // Check for pending uploads in queue
         const stats = await uploadQueueService.getQueueStats(vehicleId);
@@ -462,7 +592,7 @@ const ImageGallery = ({
     };
 
     fetchImages();
-  }, [vehicleId]);
+  }, [vehicleId, fallbackLabel, JSON.stringify((fallbackImageUrls || []).slice(0, 50))]);
 
   // Listen for image processing completion events to refresh gallery
   useEffect(() => {
@@ -1064,6 +1194,23 @@ const ImageGallery = ({
           >
             Upload Images
           </button>
+          {normalizeFallbackUrls(fallbackImageUrls).length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div className="text-small text-muted" style={{ fontSize: '8pt', marginBottom: 8 }}>
+                We found listing images for this vehicle, but the database has not been backfilled yet.
+              </div>
+              <button
+                className="button button-secondary"
+                style={{ fontSize: '9pt', padding: '10px 20px' }}
+                onClick={() => {
+                  // Trigger a refetch via state: simplest is to just reload the page section
+                  window.location.reload();
+                }}
+              >
+                Show Listing Images
+              </button>
+            </div>
+          )}
           <div className="text-small text-muted" style={{ marginTop: '10px', fontSize: '8pt' }}>
             Ownership/title documents should be submitted via the Ownership panel (not the gallery).
           </div>
@@ -1079,9 +1226,37 @@ const ImageGallery = ({
   }
 
   const currentImage = displayedImages[currentImageIndex];
+  const lightboxImageId = currentImage && String((currentImage as any).__external) === 'true' ? undefined : (isUuid(String(currentImage?.id || '')) ? String(currentImage.id) : undefined);
 
   return (
     <div>
+      {usingFallback && (
+        <div className="card" style={{ marginBottom: 'var(--space-3)' }}>
+          <div className="card-body" style={{ fontSize: '8pt', lineHeight: 1.4 }}>
+            <div style={{ fontWeight: 800, marginBottom: 6 }}>
+              Showing listing images (read-only)
+            </div>
+            <div className="text-muted">
+              These images were discovered from external listings and may not be fully attributed yet. Upload your own photos to add verified evidence.
+            </div>
+            {session?.user?.id && normalizeFallbackUrls(fallbackImageUrls).length > 0 && (
+              <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  className="button button-secondary"
+                  style={{ fontSize: '8pt', padding: '6px 10px', cursor: importingFallback ? 'not-allowed' : 'pointer', opacity: importingFallback ? 0.7 : 1 }}
+                  onClick={importFallbackImages}
+                  disabled={importingFallback}
+                >
+                  {importingFallback ? 'Importing...' : `Import ${Math.min(normalizeFallbackUrls(fallbackImageUrls).length, 120)} Images`}
+                </button>
+                <span className="text-muted" style={{ fontSize: '8pt' }}>
+                  Imports these into the vehicle gallery for dedupe, tagging, and AI analysis.
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {/* Upload Progress Bar */}
       {uploadProgress.uploading && (
         <div className="card" style={{ marginBottom: 'var(--space-4)' }}>
@@ -1256,7 +1431,7 @@ const ImageGallery = ({
                   onClick={(e) => handleImageSelect(image.id, e)}
                 >
                   {isSelected && (
-                    <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '10pt' }}>✓</span>
+                    <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '10pt' }}>X</span>
                   )}
                 </div>
               )}
@@ -1597,13 +1772,13 @@ const ImageGallery = ({
       {lightboxOpen && currentImage && (
         <ImageLightbox
           imageUrl={getOptimalImageUrl(currentImage, 'full')}
-          imageId={currentImage.id}
+          imageId={lightboxImageId}
           vehicleId={vehicleId}
           isOpen={lightboxOpen}
           onClose={() => setLightboxOpen(false)}
           onNext={displayedImages.length > 1 ? nextImage : undefined}
           onPrev={displayedImages.length > 1 ? previousImage : undefined}
-          canEdit={canCreateTags}
+          canEdit={canCreateTags && !usingFallback}
           title={`${currentImageIndex + 1} of ${displayedImages.length}`}
           description={getDisplayDate(currentImage)}
         />

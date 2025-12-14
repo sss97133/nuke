@@ -3484,6 +3484,7 @@ body {
   .vehicle-price-header [style*="fontSize: '7pt'"] {
     font-size: 6.5pt !important;
   }
+
   
   /* Price button - keep horizontal */
   .vehicle-price-header .vehicle-price-button {
@@ -3507,6 +3508,39 @@ body {
     width: 16px !important;
     height: 16px !important;
   }
+
+/* Auction pulse dot (live/ending) */
+@keyframes auctionPulseDot {
+  0% { transform: scale(1); opacity: 0.65; }
+  50% { transform: scale(1.35); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.65; }
+}
+
+.auction-live-dot {
+  animation: auctionPulseDot 1.1s ease-in-out infinite;
+}
+
+/* Receipt "open" dots (no emoji; intended for live auction day receipts) */
+@keyframes receiptDotBlink {
+  0% { opacity: 0.25; }
+  30% { opacity: 0.25; }
+  60% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+
+.receipt-open-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 2px;
+}
+
+.receipt-open-dot {
+  animation: receiptDotBlink 1.2s linear infinite;
+}
+
+.receipt-open-dot:nth-child(2) { animation-delay: 0.15s; }
+.receipt-open-dot:nth-child(3) { animation-delay: 0.3s; }
   
   /* REMOVED - header-wrapper now defined in header-fix.css with proper z-index: 1000 */
   /* Old conflicting rule removed - was forcing z-index: 100 !important */

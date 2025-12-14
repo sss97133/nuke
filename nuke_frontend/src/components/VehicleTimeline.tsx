@@ -111,6 +111,7 @@ const VehicleTimeline: React.FC<{
   const [lastScrollTime, setLastScrollTime] = useState<number>(0);
   const [vehicleValueMeta, setVehicleValueMeta] = useState<{ current_value?: number|null; asking_price?: number|null; purchase_price?: number|null; msrp?: number|null } | null>(null);
   const [readyTargetHours, setReadyTargetHours] = useState<number>(100);
+  const autoOpenedTodayRef = React.useRef<boolean>(false);
 
   useEffect(() => {
     loadTimelineEvents();
@@ -369,6 +370,61 @@ const VehicleTimeline: React.FC<{
 
       setPhotoDates(activityDateMap);
       console.log(`Loaded ${activityDateMap.size} days with activity (photos + auction)`);
+
+      // If today's auction is live, auto-open a "daily auction receipt" once per session.
+      try {
+        const todayYmd = new Date().toISOString().slice(0, 10);
+        const todayActivity = activityDateMap.get(todayYmd) || 0;
+        if (!autoOpenedTodayRef.current && todayActivity > 0 && Array.isArray(auctionData) && auctionData.length > 0) {
+          // Determine if the auction is still live using any linked auction_end_date.
+          const now = Date.now();
+          const anyEnd = auctionData
+            .map((c: any) => c?.auction_events?.auction_end_date)
+            .find((v: any) => typeof v === 'string' && v);
+          const endMs = anyEnd ? new Date(anyEnd).getTime() : NaN;
+          const isLiveAuction = Number.isFinite(endMs) ? endMs > now : false;
+
+          if (isLiveAuction) {
+            const alreadyOpenedKey = `nzero_open_receipt_${vehicleId}_${todayYmd}`;
+            const alreadyOpened = (() => {
+              try { return window.localStorage.getItem(alreadyOpenedKey) === '1'; } catch { return false; }
+            })();
+
+            if (!alreadyOpened) {
+              // Filter auction activity for today
+              const dayAuction = auctionData.filter((c: any) => {
+                const at = c?.posted_at ? new Date(c.posted_at).toISOString().slice(0, 10) : null;
+                return at === todayYmd;
+              });
+
+              if (dayAuction.length > 0) {
+                autoOpenedTodayRef.current = true;
+                try { window.localStorage.setItem(alreadyOpenedKey, '1'); } catch {}
+
+                const activityEvent = {
+                  id: `activity-${todayYmd}`,
+                  vehicle_id: vehicleId,
+                  event_type: 'documentation' as any,
+                  event_date: todayYmd,
+                  title: `${dayAuction.length} auction comment${dayAuction.length === 1 ? '' : 's'}`,
+                  description: 'Bring a Trailer auction activity (live)',
+                  image_urls: [],
+                  metadata: {
+                    auction_activity: true,
+                    auction_count: dayAuction.length,
+                    auction_data: dayAuction,
+                    receipt_open: true,
+                  }
+                };
+                setSelectedDayEvents([activityEvent as any]);
+                setShowDayPopup(true);
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore auto-open failures
+      }
 
       if (timelineError) {
         console.error('Error loading timeline events:', timelineError);
@@ -1083,6 +1139,42 @@ const VehicleTimeline: React.FC<{
                       year: 'numeric'
                     })}
                   </h4>
+                  {(() => {
+                    const ev = selectedDayEvents[0] as any;
+                    const md = (ev?.metadata || {}) as any;
+                    const isAuctionReceipt = md?.auction_activity === true;
+                    const isToday = ev?.event_date === new Date().toISOString().slice(0, 10);
+                    const isOpen = Boolean(md?.receipt_open) || (isAuctionReceipt && isToday);
+                    if (!isAuctionReceipt) return null;
+                    return (
+                      <span
+                        className="badge"
+                        style={{
+                          background: isOpen ? '#dcfce7' : '#f3f4f6',
+                          color: isOpen ? '#15803d' : '#6b7280',
+                          border: `1px solid ${isOpen ? '#22c55e' : '#d1d5db'}`,
+                          fontWeight: 700,
+                          fontSize: '10px',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                        }}
+                        title={isOpen ? 'Receipt is open (live auction day)' : 'Auction day receipt'}
+                      >
+                        {isOpen ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                            OPEN
+                            <span className="receipt-open-dots" aria-hidden="true">
+                              <span className="receipt-open-dot">.</span>
+                              <span className="receipt-open-dot">.</span>
+                              <span className="receipt-open-dot">.</span>
+                            </span>
+                          </span>
+                        ) : (
+                          'AUCTION'
+                        )}
+                      </span>
+                    );
+                  })()}
                   <button
                     className="button button-secondary button-small"
                     onClick={(e) => {
@@ -1171,6 +1263,43 @@ const VehicleTimeline: React.FC<{
               
               <div className="card-body">
               <div className="space-y-2">
+                {(() => {
+                  const ev = selectedDayEvents[0] as any;
+                  const md = (ev?.metadata || {}) as any;
+                  if (!md?.auction_activity || !Array.isArray(md?.auction_data)) return null;
+                  const rows = md.auction_data as any[];
+                  const bidRows = rows.filter(r => typeof r?.bid_amount === 'number' && r.bid_amount > 0);
+                  const bidCount = bidRows.length;
+                  const commentCount = rows.length;
+                  const highBid = bidRows.reduce((max: number, r: any) => Math.max(max, Number(r.bid_amount) || 0), 0);
+                  const leadingChanges = bidRows.filter(r => r?.is_leading_bid === true).length;
+                  const summaryParts: string[] = [];
+                  summaryParts.push(`${commentCount} comment${commentCount === 1 ? '' : 's'}`);
+                  if (bidCount > 0) summaryParts.push(`${bidCount} bid${bidCount === 1 ? '' : 's'}`);
+                  if (highBid > 0) summaryParts.push(`high bid $${Math.round(highBid).toLocaleString()}`);
+                  if (leadingChanges > 0) summaryParts.push(`${leadingChanges} lead change${leadingChanges === 1 ? '' : 's'}`);
+
+                  return (
+                    <div
+                      style={{
+                        background: 'var(--grey-50)',
+                        border: '2px solid var(--border)',
+                        padding: '12px 16px',
+                        marginBottom: 12,
+                      }}
+                    >
+                      <div style={{ fontSize: '9pt', fontWeight: 800, letterSpacing: '0.5px' }}>
+                        Daily Auction Receipt
+                      </div>
+                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.35 }}>
+                        {summaryParts.join(' • ')}
+                      </div>
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 6 }}>
+                        Vehicle-first note: we log auction activity as evidence about the vehicle and the market, not as an endorsement of the auction platform.
+                      </div>
+                    </div>
+                  );
+                })()}
                 {(() => {
                   // Remove duplicates - same event ID or same title+date
                   const uniqueEvents = (selectedDayEvents || []).filter((ev, idx, arr) => 
