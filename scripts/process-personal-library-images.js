@@ -30,7 +30,11 @@ async function analyzeImageLightweight(imageUrl) {
     throw new Error('OPENAI_API_KEY not configured');
   }
 
-  const prompt = `Analyze this image quickly and return ONLY a JSON object (no markdown, no explanation):
+  const prompt = `Analyze this image quickly and return ONLY a JSON object (no markdown, no explanation).
+
+IMPORTANT: Do NOT "default" to a three-quarter angle. Only use three-quarter if the FULL vehicle is visible AND both (front+side) or (rear+side) are clearly visible.
+If the vehicle is not fully in frame (cropped/close-up), choose "detail" unless it's clearly interior/engine/undercarriage.
+
 {
   "is_vehicle": boolean,
   "vehicle": {
@@ -38,6 +42,16 @@ async function analyzeImageLightweight(imageUrl) {
     "make": string or null,
     "model": string or null,
     "confidence": 0.0-1.0
+  },
+  "evidence": {
+    "full_vehicle_in_frame": boolean,
+    "front_end_visible": boolean,
+    "rear_end_visible": boolean,
+    "side_profile_visible": boolean,
+    "interior_visible": boolean,
+    "engine_bay_visible": boolean,
+    "undercarriage_visible": boolean,
+    "document_visible": boolean
   },
   "angle": "front" | "front_three_quarter" | "rear" | "rear_three_quarter" | "side" | "interior" | "engine_bay" | "undercarriage" | "detail" | "unknown",
   "angle_confidence": 0.0-1.0,
@@ -70,7 +84,64 @@ async function analyzeImageLightweight(imageUrl) {
   const content = data.choices[0].message.content;
   
   // Parse JSON response
-  return JSON.parse(content);
+  const parsed = JSON.parse(content);
+
+  // Deterministic guardrails to prevent "three-quarter everywhere"
+  try {
+    const ev = parsed?.evidence || {};
+    const full = !!ev.full_vehicle_in_frame;
+    const front = !!ev.front_end_visible;
+    const rear = !!ev.rear_end_visible;
+    const side = !!ev.side_profile_visible;
+    const interior = !!ev.interior_visible;
+    const engine = !!ev.engine_bay_visible;
+    const under = !!ev.undercarriage_visible;
+    const doc = !!ev.document_visible;
+
+    let normalized = parsed.angle;
+
+    if (!parsed.is_vehicle) {
+      normalized = 'unknown';
+    } else if (doc) {
+      normalized = 'detail';
+    } else if (interior) {
+      normalized = 'interior';
+    } else if (engine) {
+      normalized = 'engine_bay';
+    } else if (under) {
+      normalized = 'undercarriage';
+    } else if (full) {
+      // Exterior full-vehicle mapping
+      if (front && side && !rear) normalized = 'front_three_quarter';
+      else if (rear && side && !front) normalized = 'rear_three_quarter';
+      else if (front && !rear && !side) normalized = 'front';
+      else if (rear && !front && !side) normalized = 'rear';
+      else if (side && !front && !rear) normalized = 'side';
+      else if ((front && side) || (rear && side)) {
+        // If both ends are visible, still allow 3/4 but lower confidence
+        normalized = front ? 'front_three_quarter' : 'rear_three_quarter';
+        parsed.angle_confidence = Math.min(Number(parsed.angle_confidence ?? 0.6), 0.6);
+      } else {
+        normalized = 'detail';
+      }
+    } else {
+      // Cropped exterior (close-ups) should not become 3/4
+      normalized = 'detail';
+      parsed.angle_confidence = Math.min(Number(parsed.angle_confidence ?? 0.5), 0.5);
+    }
+
+    // If the model claimed 3/4 but evidence doesn't support it, override + reduce confidence
+    if ((parsed.angle === 'front_three_quarter' || parsed.angle === 'rear_three_quarter') && !(full && side && (front || rear))) {
+      normalized = full ? (side ? 'side' : 'detail') : 'detail';
+      parsed.angle_confidence = Math.min(Number(parsed.angle_confidence ?? 0.5), 0.5);
+    }
+
+    parsed.angle = normalized;
+  } catch (e) {
+    // If parsing/guardrails fail, fall back to model output
+  }
+
+  return parsed;
 }
 
 // Group photos by vehicle

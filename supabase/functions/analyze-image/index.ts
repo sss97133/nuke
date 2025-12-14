@@ -729,10 +729,11 @@ function generateAutomatedTags(rekognitionData: any): AutomatedTag[] {
               tag_name: mapping.mappedName,
               tag_type: mapping.type as any,
               confidence: Math.round(instance.Confidence),
-              x_position: instance.BoundingBox.Left * 100,
-              y_position: instance.BoundingBox.Top * 100,
-              width: instance.BoundingBox.Width * 100,
-              height: instance.BoundingBox.Height * 100,
+              // Store as integers (percent) so dedupe/unique keys are stable.
+              x_position: Math.round(instance.BoundingBox.Left * 100),
+              y_position: Math.round(instance.BoundingBox.Top * 100),
+              width: Math.round(instance.BoundingBox.Width * 100),
+              height: Math.round(instance.BoundingBox.Height * 100),
               ai_detection_data: {
                 rekognition_label: label.Name,
                 rekognition_confidence: label.Confidence,

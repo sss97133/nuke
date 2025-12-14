@@ -34,7 +34,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [orgNavPath, setOrgNavPath] = useState<string>('/organizations');
+  const [orgNavPath, setOrgNavPath] = useState<string>('/org');
   const [nZeroMenuOpen, setNZeroMenuOpen] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -87,7 +87,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
 
   // Compute destination for Organizations nav
   useEffect(() => {
-    setOrgNavPath('/organizations');
+    setOrgNavPath('/org');
   }, [session]);
 
   useEffect(() => {
@@ -226,7 +226,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                   </Link>
                   <Link
                     to={orgNavPath}
-                    className={`nav-link ${isActivePage('/shops') ? 'active' : ''}`}
+                    className={`nav-link ${isActivePage('/org') ? 'active' : ''}`}
                     style={{
                       display: 'block',
                       padding: '8px 12px',

@@ -609,6 +609,11 @@ async function insertContextualTags(supabase: any, tags: any[], imageUrl: string
     tag_name: tag.name,
     tag_type: tag.category,
     confidence: tag.confidence,
+    // Normalize to same shape as other taggers so we can use a single unique key.
+    x_position: 50,
+    y_position: 50,
+    width: 20,
+    height: 20,
     verified: false,
     ai_detection_data: { source: tag.source },
     created_by: '00000000-0000-0000-0000-000000000000'
@@ -617,7 +622,7 @@ async function insertContextualTags(supabase: any, tags: any[], imageUrl: string
   await supabase
     .from('image_tags')
     .upsert(tagData, {
-      onConflict: 'image_url,tag_name',
+      onConflict: 'image_url,tag_name,x_position,y_position',
       ignoreDuplicates: true
     })
 }

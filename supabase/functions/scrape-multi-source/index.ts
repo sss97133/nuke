@@ -144,6 +144,7 @@ interface ScrapeRequest {
   use_llm_extraction?: boolean;
   max_listings?: number;
   max_results?: number; // Alias for max_listings
+  start_offset?: number; // For large inventories: process a stable slice of discovered URLs
   organization_id?: string; // Optional: link inventory directly to existing organization
 }
 
@@ -175,12 +176,18 @@ serve(async (req) => {
       use_llm_extraction = true,
       max_listings = 100,
       max_results,
-      organization_id
+      organization_id,
+      start_offset = 0
     } = body;
     
     const maxListingsToProcess = max_results || max_listings || 100;
+    const startOffset = Number.isFinite(start_offset) ? Math.max(0, Math.floor(start_offset)) : 0;
 
     console.log(`Scraping ${source_url} (${source_type})`);
+
+    const isLartIndex =
+      source_url.includes('lartdelautomobile.com/voitures-a-vendre') ||
+      source_url.includes('lartdelautomobile.com/voitures-vendues');
 
     // Step 1: Scrape with Firecrawl STRUCTURED EXTRACTION (AGGRESSIVE)
     console.log('🔥 Using Firecrawl structured extraction for inventory...');
@@ -234,35 +241,82 @@ serve(async (req) => {
       }
     };
 
-    const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
-      },
-      body: JSON.stringify({
-        url: source_url,
-        formats: ['markdown', 'html', 'extract'],
-        extract: {
-          schema: extractionSchema
+    // Firecrawl first, but fall back to direct fetch if Firecrawl times out (common on huge pages).
+    let markdown: string | null = null;
+    let html: string | null = null;
+    let metadata: any = null;
+    let extract: any = null;
+
+    if (isLartIndex) {
+      // L'Art pages are static HTML and include all /fiche/ links. Firecrawl+LLM is slow here and can
+      // exceed Edge runtime limits, so fetch HTML directly and enumerate deterministically.
+      console.log(`⚡ Lart index detected; skipping Firecrawl/LLM and using direct HTML fetch`);
+      const resp = await fetch(source_url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
         },
-        onlyMainContent: false,
-        waitFor: 4000 // More time for JS-heavy dealer sites
-      })
-    });
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!resp.ok) {
+        throw new Error(`Direct fetch failed: ${resp.status} ${resp.statusText}`);
+      }
+      html = await resp.text();
+    } else {
+      try {
+        const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
+          },
+          body: JSON.stringify({
+            url: source_url,
+            formats: ['markdown', 'html', 'extract'],
+            extract: {
+              schema: extractionSchema
+            },
+            onlyMainContent: false,
+            waitFor: 4000 // More time for JS-heavy dealer sites
+          }),
+          signal: AbortSignal.timeout(30000),
+        });
 
-    if (!firecrawlResponse.ok) {
-      const errorText = await firecrawlResponse.text();
-      throw new Error(`Firecrawl error: ${firecrawlResponse.status} - ${errorText}`);
+        if (firecrawlResponse.ok) {
+          const firecrawlData = await firecrawlResponse.json();
+          if (firecrawlData.success) {
+            markdown = firecrawlData.data?.markdown ?? null;
+            html = firecrawlData.data?.html ?? null;
+            metadata = firecrawlData.data?.metadata ?? null;
+            extract = firecrawlData.data?.extract ?? null;
+          } else {
+            console.warn(`⚠️ Firecrawl returned success=false: ${JSON.stringify(firecrawlData.error || firecrawlData).slice(0, 300)}`);
+          }
+        } else {
+          const errorText = await firecrawlResponse.text();
+          console.warn(`⚠️ Firecrawl error ${firecrawlResponse.status}: ${errorText.slice(0, 200)}`);
+        }
+      } catch (e: any) {
+        console.warn(`⚠️ Firecrawl request failed: ${e?.message || e}`);
+      }
     }
 
-    const firecrawlData = await firecrawlResponse.json();
-    
-    if (!firecrawlData.success) {
-      throw new Error(`Firecrawl failed: ${JSON.stringify(firecrawlData)}`);
+    if (!html) {
+      console.log('📡 Falling back to direct fetch for HTML...');
+      const resp = await fetch(source_url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (!resp.ok) {
+        throw new Error(`Direct fetch failed: ${resp.status} ${resp.statusText}`);
+      }
+      html = await resp.text();
     }
 
-    const { markdown, html, metadata, extract } = firecrawlData.data;
     console.log(`Scraped ${markdown?.length || 0} chars markdown, ${html?.length || 0} chars html`);
 
     let dealerInfo = null;
@@ -283,7 +337,8 @@ serve(async (req) => {
     }
 
     // Step 3: LLM Extraction fallback if Firecrawl extract failed
-    if (listings.length === 0 && use_llm_extraction && OPENAI_API_KEY) {
+    const allowLlmExtraction = !isLartIndex && use_llm_extraction && OPENAI_API_KEY;
+    if (listings.length === 0 && allowLlmExtraction) {
       console.log('Running LLM extraction...');
 
       const extractionPrompt = `You are a data extraction expert for automotive listings. Analyze this webpage and extract structured data.
@@ -402,6 +457,8 @@ Return ONLY valid JSON in this format:
       const listingPatterns = [
         /href="([^"]*\/listing\/[^"]+)"/gi,
         /href="([^"]*\/vehicle\/[^"]+)"/gi,
+        // L'Art de L'Automobile (and similar) uses /fiche/<slug> for vehicle detail pages.
+        /href="([^"]*\/fiche\/[^"]+)"/gi,
         /href="([^"]*\/inventory\/[^"]+)"/gi,
         /href="([^"]*\/cars\/[^"]+)"/gi,
         /href="([^"]*\/trucks\/[^"]+)"/gi,
@@ -420,13 +477,13 @@ Return ONLY valid JSON in this format:
             url = `${baseUrl.origin}${url.startsWith('/') ? '' : '/'}${url}`;
           }
           // Filter out non-vehicle URLs
-          if (url.match(/\/(vehicle|listing|inventory|cars|trucks|detail|detail\.aspx)/i)) {
+          if (url.match(/\/(vehicle|listing|inventory|cars|trucks|detail|detail\.aspx|fiche)\b/i)) {
             foundUrls.add(url);
           }
         }
       }
       
-      listings = Array.from(foundUrls).slice(0, max_listings).map(url => ({
+      listings = Array.from(foundUrls).slice(0, maxListingsToProcess).map(url => ({
         url,
         title: null,
         price: null,
@@ -438,8 +495,60 @@ Return ONLY valid JSON in this format:
       console.log(`Fallback extracted ${listings.length} listing URLs`);
     }
 
+    // Step 4b: Deterministic URL enumeration (preferred for large dealer inventories)
+    // Firecrawl "extract" and LLM extraction can under-count when there are many listing cards.
+    // If the raw HTML contains many vehicle detail links, prefer enumerating them and let downstream
+    // `process-import-queue` + `scrape-vehicle` extract the full details.
+    if (html) {
+      try {
+        const baseUrl = new URL(source_url);
+        const found = new Set<string>();
+
+        // Prefer explicit card anchors first (common pattern on dealer sites).
+        const carCardHref = /<a[^>]+class="[^"]*carCard[^"]*"[^>]*href="([^"]+)"/gi;
+        let m: RegExpExecArray | null;
+        while ((m = carCardHref.exec(html)) !== null) {
+          const raw = (m[1] || '').trim();
+          if (!raw) continue;
+          const abs = raw.startsWith('http') ? raw : `${baseUrl.origin}${raw.startsWith('/') ? '' : '/'}${raw}`;
+          // L'Art de L'Automobile uses /fiche/<slug> for vehicle detail pages.
+          if (abs.includes('/fiche/')) found.add(abs);
+        }
+
+        // Also catch any other /fiche/ hrefs.
+        const anyFicheHref = /href="([^"]*\/fiche\/[^"]+)"/gi;
+        while ((m = anyFicheHref.exec(html)) !== null) {
+          const raw = (m[1] || '').trim();
+          if (!raw) continue;
+          const abs = raw.startsWith('http') ? raw : `${baseUrl.origin}${raw.startsWith('/') ? '' : '/'}${raw}`;
+          if (abs.includes('/fiche/')) found.add(abs);
+        }
+
+        const enumeratedUrls = Array.from(found);
+        if (enumeratedUrls.length > listings.length) {
+          console.log(`✅ URL enumeration found ${enumeratedUrls.length} /fiche/ links (overriding prior listings=${listings.length})`);
+          listings = enumeratedUrls.map((url) => ({
+            url,
+            title: null,
+            price: null,
+            year: null,
+            make: null,
+            model: null,
+          }));
+        }
+      } catch (e: any) {
+        console.warn(`⚠️ URL enumeration failed: ${e?.message || e}`);
+      }
+    }
+
     // Step 4: Create/update source in database
     let sourceId: string | null = null;
+    const totalListingsFound = listings.length;
+    // `scrape_sources.source_type` is constrained; normalize newer request types to legacy enum values.
+    const scrapeSourceTypeForDb =
+      source_type === 'dealer_website'
+        ? 'dealer'
+        : source_type;
     
     const { data: existingSource } = await supabase
       .from('scrape_sources')
@@ -454,7 +563,7 @@ Return ONLY valid JSON in this format:
         .update({
           last_scraped_at: new Date().toISOString(),
           last_successful_scrape: new Date().toISOString(),
-          total_listings_found: listings.length,
+          total_listings_found: totalListingsFound,
           squarebody_count: listings.filter((l: any) => l.is_squarebody).length,
           updated_at: new Date().toISOString()
         })
@@ -465,7 +574,7 @@ Return ONLY valid JSON in this format:
         .insert({
           name: dealerInfo?.name || metadata?.title || new URL(source_url).hostname,
           url: source_url,
-          source_type,
+          source_type: scrapeSourceTypeForDb,
           inventory_url: source_url,
           contact_info: dealerInfo ? {
             phone: dealerInfo.phone,
@@ -479,7 +588,7 @@ Return ONLY valid JSON in this format:
           } : {},
           last_scraped_at: new Date().toISOString(),
           last_successful_scrape: new Date().toISOString(),
-          total_listings_found: listings.length,
+          total_listings_found: totalListingsFound,
           squarebody_count: listings.filter((l: any) => l.is_squarebody).length
         })
         .select('id')
@@ -628,6 +737,17 @@ Return ONLY valid JSON in this format:
     let queuedCount = 0;
     let duplicateCount = 0;
     let inventoryCreatedCount = 0;
+    const inferredListingStatus =
+      source_url.includes('/voitures-vendues') || source_url.includes('voitures-vendues')
+        ? 'sold'
+        : 'in_stock';
+
+    // Stable paging for very large inventories (e.g., sold archives).
+    // Sort by URL so `start_offset` is deterministic across runs.
+    const sortedListings = [...listings]
+      .filter((l: any) => !!l?.url)
+      .sort((a: any, b: any) => (a.url || '').localeCompare(b.url || ''));
+    const listingsToProcess = sortedListings.slice(startOffset, startOffset + maxListingsToProcess);
 
     // If we have an organization_id and this is dealer inventory, we can create dealer_inventory records
     // For auction houses, we'll still queue since they need auction_events/auction_lots structure
@@ -636,40 +756,35 @@ Return ONLY valid JSON in this format:
     if (shouldCreateInventoryDirectly) {
       console.log(`📦 Creating dealer_inventory records directly for organization ${organizationId}...`);
       
-      // First, queue listings to create vehicles
-      // Then we'll link them to dealer_inventory
-      for (const listing of listings.slice(0, maxListingsToProcess)) {
-        if (!listing.url) continue;
+      // Bulk upsert listings to import_queue (critical for large inventories)
+      const rows = listingsToProcess.map((listing: any) => ({
+        source_id: sourceId,
+        listing_url: listing.url,
+        listing_title: listing.title || null,
+        listing_price: typeof listing.price === 'number' ? listing.price : null,
+        listing_year: typeof listing.year === 'number' ? listing.year : null,
+        listing_make: listing.make || null,
+        listing_model: listing.model || null,
+        thumbnail_url: listing.thumbnail_url || null,
+        raw_data: {
+          ...listing,
+          organization_id: organizationId, // Tag with org ID for processing
+          inventory_extraction: true,
+          listing_status: inferredListingStatus,
+        },
+        priority: listing.is_squarebody ? 10 : 0,
+      }));
 
-        const { data: queuedItem, error: queueError } = await supabase
+      const chunkSize = 100;
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        const { error: upsertErr } = await supabase
           .from('import_queue')
-          .insert({
-            source_id: sourceId,
-            listing_url: listing.url,
-            listing_title: listing.title,
-            listing_price: listing.price,
-            listing_year: listing.year,
-            listing_make: listing.make,
-            listing_model: listing.model,
-            thumbnail_url: listing.thumbnail_url,
-            raw_data: {
-              ...listing,
-              organization_id: organizationId, // Tag with org ID for processing
-              inventory_extraction: true
-            },
-            priority: listing.is_squarebody ? 10 : 0
-          })
-          .select('id')
-          .single();
-
-        if (queueError) {
-          if (queueError.code === '23505') { // Unique violation
-            duplicateCount++;
-          } else {
-            console.error('Queue error:', queueError);
-          }
+          .upsert(chunk, { onConflict: 'listing_url' });
+        if (upsertErr) {
+          console.error('Queue upsert error:', upsertErr);
         } else {
-          queuedCount++;
+          queuedCount += chunk.length;
         }
       }
       
@@ -679,71 +794,66 @@ Return ONLY valid JSON in this format:
       // This will be handled separately since auction structure is more complex
       console.log(`🏛️  Auction house detected - listings will be processed as auction events/lots`);
       
-      for (const listing of listings.slice(0, maxListingsToProcess)) {
-        if (!listing.url) continue;
+      const rows = listingsToProcess.map((listing: any) => ({
+        source_id: sourceId,
+        listing_url: listing.url,
+        listing_title: listing.title || null,
+        listing_price: typeof listing.price === 'number' ? listing.price : null,
+        listing_year: typeof listing.year === 'number' ? listing.year : null,
+        listing_make: listing.make || null,
+        listing_model: listing.model || null,
+        thumbnail_url: listing.thumbnail_url || null,
+        raw_data: {
+          ...listing,
+          organization_id: organizationId,
+          business_type: 'auction_house',
+          auction_extraction: true,
+          listing_status: inferredListingStatus,
+        },
+        priority: listing.is_squarebody ? 10 : 0,
+      }));
 
-        const { error: queueError } = await supabase
+      const chunkSize = 100;
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        const { error: upsertErr } = await supabase
           .from('import_queue')
-          .insert({
-            source_id: sourceId,
-            listing_url: listing.url,
-            listing_title: listing.title,
-            listing_price: listing.price,
-            listing_year: listing.year,
-            listing_make: listing.make,
-            listing_model: listing.model,
-            thumbnail_url: listing.thumbnail_url,
-            raw_data: {
-              ...listing,
-              organization_id: organizationId,
-              business_type: 'auction_house',
-              auction_extraction: true
-            },
-            priority: listing.is_squarebody ? 10 : 0
-          });
-
-        if (queueError) {
-          if (queueError.code === '23505') {
-            duplicateCount++;
-          } else {
-            console.error('Queue error:', queueError);
-          }
+          .upsert(chunk, { onConflict: 'listing_url' });
+        if (upsertErr) {
+          console.error('Queue upsert error:', upsertErr);
         } else {
-          queuedCount++;
+          queuedCount += chunk.length;
         }
       }
     } else {
       // Standard queue process (when no org_id provided)
-      for (const listing of listings.slice(0, maxListingsToProcess)) {
-        if (!listing.url) continue;
+      const rows = listingsToProcess.map((listing: any) => ({
+        source_id: sourceId,
+        listing_url: listing.url,
+        listing_title: listing.title || null,
+        listing_price: typeof listing.price === 'number' ? listing.price : null,
+        listing_year: typeof listing.year === 'number' ? listing.year : null,
+        listing_make: listing.make || null,
+        listing_model: listing.model || null,
+        thumbnail_url: listing.thumbnail_url || null,
+        raw_data: listing,
+        priority: listing.is_squarebody ? 10 : 0,
+      }));
 
-        const { error: queueError } = await supabase
+      const chunkSize = 100;
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        const { error: upsertErr } = await supabase
           .from('import_queue')
-          .insert({
-            source_id: sourceId,
-            listing_url: listing.url,
-            listing_title: listing.title,
-            listing_price: listing.price,
-            listing_year: listing.year,
-            listing_make: listing.make,
-            listing_model: listing.model,
-            thumbnail_url: listing.thumbnail_url,
-            raw_data: listing,
-            priority: listing.is_squarebody ? 10 : 0
-          });
-
-        if (queueError) {
-          if (queueError.code === '23505') { // Unique violation
-            duplicateCount++;
-          } else {
-            console.error('Queue error:', queueError);
-          }
+          .upsert(chunk, { onConflict: 'listing_url' });
+        if (upsertErr) {
+          console.error('Queue upsert error:', upsertErr);
         } else {
-          queuedCount++;
+          queuedCount += chunk.length;
         }
       }
 
-      console.log(`Queued ${queuedCount} new listings, ${duplicateCount} duplicates skipped`);
+      console.log(`Queued ${queuedCount} listings (upserted by listing_url)`);
     }
 
     return new Response(JSON.stringify({
@@ -751,11 +861,13 @@ Return ONLY valid JSON in this format:
       source_id: sourceId,
       organization_id: organizationId,
       dealer_info: dealerInfo,
-      listings_found: listings.length,
+      listings_found: totalListingsFound,
       listings_queued: queuedCount,
       duplicates_skipped: duplicateCount,
       squarebody_count: listings.filter((l: any) => l.is_squarebody).length,
-      sample_listings: listings.slice(0, 5)
+      start_offset: startOffset,
+      max_results: maxListingsToProcess,
+      sample_listings: listingsToProcess.slice(0, 5)
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

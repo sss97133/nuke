@@ -9,6 +9,7 @@ import BulkActionsToolbar from '../components/vehicles/BulkActionsToolbar';
 import VehicleOrganizationToolbar from '../components/vehicles/VehicleOrganizationToolbar';
 import VehicleConfirmationQuestions from '../components/vehicles/VehicleConfirmationQuestions';
 import TitleTransferApproval from '../components/ownership/TitleTransferApproval';
+import { MyOrganizationsService, type MyOrganization } from '../services/myOrganizationsService';
 import '../design-system.css';
 
 interface Vehicle {
@@ -96,6 +97,9 @@ const VehiclesInner: React.FC = () => {
     is_hidden: boolean;
     collection_name: string | null;
   }>>(new Map());
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [myOrganizations, setMyOrganizations] = useState<MyOrganization[]>([]);
+  const [orgDropRelationshipType, setOrgDropRelationshipType] = useState<'work_location' | 'service_provider' | 'storage' | 'consigner' | 'sold_by' | 'owner'>('work_location');
   // Default collapsed: users shouldn't have to constantly manage sidebar real estate.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -164,6 +168,14 @@ const VehiclesInner: React.FC = () => {
       loadVehiclePreferences();
     }
   }, [session, selectedOrganizationId]); // Reload vehicle relationships when session or organization changes
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    (async () => {
+      const orgs = await MyOrganizationsService.getMyOrganizations({ status: 'active', sortBy: 'name' });
+      setMyOrganizations(orgs || []);
+    })();
+  }, [session?.user?.id]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -241,6 +253,15 @@ const VehiclesInner: React.FC = () => {
             vehicle_images: item.images || []
           }
         }));
+
+        const permissionOwnerships = (rpcData.permission_ownerships || []).map((item: any) => ({
+          vehicle_id: item.vehicle_id,
+          role: item.role,
+          vehicles: {
+            ...item.vehicle,
+            vehicle_images: item.images || []
+          }
+        }));
         
         // Process relationships (same logic as before)
         const owned: VehicleRelationship[] = [];
@@ -274,6 +295,34 @@ const VehiclesInner: React.FC = () => {
             },
             relationshipType: 'owned',
             role: 'Verified Owner',
+            lastActivity: vehicle.created_at
+          });
+        });
+
+        // Process permission-based owned vehicles (owner/co_owner)
+        permissionOwnerships.forEach((ownership: any) => {
+          const vehicle = ownership.vehicles;
+          if (!vehicle) return;
+
+          const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
+          const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
+
+          const roleLabel = ownership.role === 'co_owner' ? 'Co-owner' : 'Owner';
+          owned.push({
+            vehicle: {
+              id: vehicle.id,
+              year: vehicle.year,
+              make: vehicle.make,
+              model: vehicle.model,
+              vin: vehicle.vin,
+              color: vehicle.color,
+              mileage: vehicle.mileage,
+              primaryImageUrl: imageUrl,
+              isAnonymous: false,
+              created_at: vehicle.created_at
+            },
+            relationshipType: 'owned',
+            role: roleLabel,
             lastActivity: vehicle.created_at
           });
         });
@@ -337,6 +386,7 @@ const VehiclesInner: React.FC = () => {
         // Process vehicles uploaded/added by user that don't have explicit relationships
         const explicitVehicleIds = new Set([
           ...verifiedOwnerships.map((o: any) => o.vehicle_id),
+          ...permissionOwnerships.map((o: any) => o.vehicle_id),
           ...discoveredVehicles.map((d: any) => d.vehicles?.id).filter(Boolean)
         ]);
 
@@ -345,32 +395,6 @@ const VehiclesInner: React.FC = () => {
 
           const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
           const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
-
-          // IMPORTANT: Legacy data used vehicles.user_id as "uploaded by" before uploaded_by existed.
-          // To avoid classifying legacy uploader rows as "Owned", only treat vehicles.user_id as ownership
-          // when uploaded_by is present (newer schema shape).
-          // "Verified Owner" is reserved for ownership_verifications.status = approved.
-          if (vehicle.user_id === session.user.id && !!vehicle.uploaded_by) {
-            owned.push({
-              vehicle: {
-                id: vehicle.id,
-                year: vehicle.year,
-                make: vehicle.make,
-                model: vehicle.model,
-                vin: vehicle.vin,
-                color: vehicle.color,
-                mileage: vehicle.mileage,
-                primaryImageUrl: imageUrl,
-                isAnonymous: false,
-                created_at: vehicle.created_at
-              },
-              relationshipType: 'owned',
-              role: 'Owner',
-              lastActivity: vehicle.created_at
-            });
-            explicitVehicleIds.add(vehicle.id);
-            return;
-          }
 
           contributing.push({
             vehicle: {
@@ -557,6 +581,14 @@ const VehiclesInner: React.FC = () => {
         .select('vehicle_id')
         .eq('user_id', session.user.id)
         .eq('status', 'approved');
+
+      // Get permission-based ownership (OWNER/CO_OWNER roles)
+      const { data: permissionOwnershipsData, error: permissionOwnershipsError } = await supabase
+        .from('vehicle_user_permissions')
+        .select('vehicle_id, role')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .in('role', ['owner', 'co_owner']);
       
       let verifiedOwnerships: any[] = [];
       if (verifiedOwnershipsData && verifiedOwnershipsData.length > 0) {
@@ -589,8 +621,40 @@ const VehiclesInner: React.FC = () => {
           } : null
         }));
       }
+
+      let permissionOwnerships: any[] = [];
+      if (permissionOwnershipsData && permissionOwnershipsData.length > 0) {
+        const vehicleIds = permissionOwnershipsData.map((ov: any) => ov.vehicle_id).filter(Boolean);
+        const { data: vehicles } = await supabase
+          .from('vehicles')
+          .select('*')
+          .in('id', vehicleIds);
+
+        const { data: images } = await supabase
+          .from('vehicle_images')
+          .select('vehicle_id, image_url, is_primary, variants')
+          .in('vehicle_id', vehicleIds);
+
+        const vehiclesMap = new Map((vehicles || []).map(v => [v.id, v]));
+        const imagesByVehicle = new Map();
+        (images || []).forEach(img => {
+          if (!imagesByVehicle.has(img.vehicle_id)) {
+            imagesByVehicle.set(img.vehicle_id, []);
+          }
+          imagesByVehicle.get(img.vehicle_id).push(img);
+        });
+
+        permissionOwnerships = (permissionOwnershipsData || []).map((ov: any) => ({
+          ...ov,
+          vehicles: vehiclesMap.get(ov.vehicle_id) ? {
+            ...vehiclesMap.get(ov.vehicle_id),
+            vehicle_images: imagesByVehicle.get(ov.vehicle_id) || []
+          } : null
+        }));
+      }
       
       console.log('[Vehicles] Verified ownerships:', verifiedOwnerships?.length || 0);
+      console.log('[Vehicles] Permission ownerships:', permissionOwnerships?.length || 0);
       console.log('[Vehicles] Uploaded vehicles:', userAddedVehicles?.length || 0);
       console.log('[Vehicles] Discovered vehicles:', discoveredVehicles?.length || 0);
 
@@ -617,6 +681,10 @@ const VehiclesInner: React.FC = () => {
         console.error('[Vehicles] Error code:', verifiedError.code);
         console.error('[Vehicles] Error details:', verifiedError.details);
         console.error('[Vehicles] Error hint:', verifiedError.hint);
+      }
+      if (permissionOwnershipsError) {
+        console.error('[Vehicles] Error loading permission ownerships:', permissionOwnershipsError);
+        console.error('[Vehicles] Error details:', JSON.stringify(permissionOwnershipsError, null, 2));
       }
 
       // Only log full data in development
@@ -657,6 +725,34 @@ const VehiclesInner: React.FC = () => {
           },
           relationshipType: 'owned',
           role: 'Verified Owner',
+          lastActivity: vehicle.created_at
+        });
+      });
+
+      // Process permission-based owned vehicles
+      (permissionOwnerships || []).forEach((ownership: any) => {
+        const vehicle = ownership.vehicles;
+        if (!vehicle) return;
+
+        const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
+        const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
+        const roleLabel = ownership.role === 'co_owner' ? 'Co-owner' : 'Owner';
+
+        owned.push({
+          vehicle: {
+            id: vehicle.id,
+            year: vehicle.year,
+            make: vehicle.make,
+            model: vehicle.model,
+            vin: vehicle.vin,
+            color: vehicle.color,
+            mileage: vehicle.mileage,
+            primaryImageUrl: imageUrl,
+            isAnonymous: false,
+            created_at: vehicle.created_at
+          },
+          relationshipType: 'owned',
+          role: roleLabel,
           lastActivity: vehicle.created_at
         });
       });
@@ -725,6 +821,7 @@ const VehiclesInner: React.FC = () => {
       // IMPORTANT: uploaded_by is NOT automatically the owner. However, vehicles.user_id indicates direct ownership.
       const explicitVehicleIds = new Set([
         ...(verifiedOwnerships || []).map((o: any) => o.vehicle_id),
+        ...(permissionOwnerships || []).map((o: any) => o.vehicle_id),
         ...(discoveredVehicles || []).map((d: any) => d.vehicles?.id).filter(Boolean)
       ]);
 
@@ -749,30 +846,6 @@ const VehiclesInner: React.FC = () => {
 
         const primaryImage = vehicle.vehicle_images?.find((img: any) => img.is_primary) || vehicle.vehicle_images?.[0];
         const imageUrl = primaryImage?.variants?.large || primaryImage?.variants?.medium || primaryImage?.image_url;
-
-        // Direct owner should show as Owned (even without title verification) for newer rows.
-        // For legacy rows (uploaded_by is null), user_id historically meant uploader.
-        if (vehicle.user_id === session.user.id && !!vehicle.uploaded_by) {
-          owned.push({
-            vehicle: {
-              id: vehicle.id,
-              year: vehicle.year,
-              make: vehicle.make,
-              model: vehicle.model,
-              vin: vehicle.vin,
-              color: vehicle.color,
-              mileage: vehicle.mileage,
-              primaryImageUrl: imageUrl,
-              isAnonymous: false,
-              created_at: vehicle.created_at
-            },
-            relationshipType: 'owned',
-            role: 'Owner',
-            lastActivity: vehicle.created_at
-          });
-          explicitVehicleIds.add(vehicle.id);
-          return;
-        }
 
         // Place in contributing section - uploaders are contributors, not automatic owners
         // Only for manually uploaded vehicles (not URL finds)
@@ -1195,6 +1268,98 @@ const VehiclesInner: React.FC = () => {
 
   const groupedRelationships = activeTab === 'associated' ? groupByRelationship(filteredRelationships) : [];
 
+  const collectionCounts = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const rel of allRelationships) {
+      const prefs = vehiclePreferences.get(rel.vehicle.id);
+      const name = (prefs?.collection_name || '').trim();
+      if (!name) continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    return counts;
+  }, [allRelationships, vehiclePreferences]);
+
+  const collectionNames = React.useMemo(() => {
+    return Array.from(collectionCounts.keys()).sort((a, b) => a.localeCompare(b));
+  }, [collectionCounts]);
+
+  const assignCollectionToVehicles = async (vehicleIds: string[], collectionName: string | null) => {
+    if (!session?.user?.id) return;
+    if (!vehicleIds.length) return;
+    try {
+      const rows = vehicleIds.map((vehicleId) => ({
+        user_id: session.user.id,
+        vehicle_id: vehicleId,
+        collection_name: collectionName
+      }));
+
+      const { error } = await supabase
+        .from('user_vehicle_preferences')
+        .upsert(rows, { onConflict: 'user_id,vehicle_id' });
+      if (error) throw error;
+
+      setVehiclePreferences((prev) => {
+        const next = new Map(prev);
+        for (const vehicleId of vehicleIds) {
+          const existing = next.get(vehicleId) || { is_favorite: false, is_hidden: false, collection_name: null };
+          next.set(vehicleId, { ...existing, collection_name: collectionName });
+        }
+        return next;
+      });
+    } catch (error) {
+      console.error('Failed to assign collection:', error);
+    }
+  };
+
+  const getDraggedVehicleIds = (dragVehicleId: string) => {
+    if (selectedVehicleIds.size > 0 && selectedVehicleIds.has(dragVehicleId)) {
+      return Array.from(selectedVehicleIds);
+    }
+    return [dragVehicleId];
+  };
+
+  const handleCardDragStart = (e: React.DragEvent, vehicleId: string) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/n-zero.vehicle', JSON.stringify({ vehicleId }));
+    e.dataTransfer.setData('text/plain', vehicleId);
+  };
+
+  const extractVehicleIdFromDrop = (e: React.DragEvent): string | null => {
+    try {
+      const json = e.dataTransfer.getData('application/n-zero.vehicle');
+      if (json) {
+        const parsed = JSON.parse(json);
+        if (parsed?.vehicleId && typeof parsed.vehicleId === 'string') return parsed.vehicleId;
+      }
+    } catch {
+      // ignore
+    }
+    const raw = e.dataTransfer.getData('text/plain');
+    return raw && typeof raw === 'string' ? raw : null;
+  };
+
+  const linkVehiclesToOrganization = async (vehicleIds: string[], organizationId: string, relationshipType: typeof orgDropRelationshipType) => {
+    if (!session?.user?.id) return;
+    if (!vehicleIds.length) return;
+    if (!organizationId) return;
+    try {
+      const rows = vehicleIds.map((vehicleId) => ({
+        organization_id: organizationId,
+        vehicle_id: vehicleId,
+        relationship_type: relationshipType,
+        status: 'active',
+        linked_by_user_id: session.user.id
+      }));
+
+      const { error } = await supabase
+        .from('organization_vehicles')
+        .upsert(rows as any, { onConflict: 'organization_id,vehicle_id,relationship_type' });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Failed to link vehicles to organization:', error);
+    }
+  };
+
 
   const tabMeta: Array<{ key: VehiclesTab; label: string; count: number }> = [
     { key: 'associated', label: 'All', count: allRelationships.length },
@@ -1332,6 +1497,97 @@ const VehiclesInner: React.FC = () => {
                     }}
                     showPersonalView={true}
                   />
+
+                  {/* Drag-and-drop organization assignment */}
+                  <div
+                    style={{
+                      marginTop: '10px',
+                      border: '1px solid var(--border-light)',
+                      background: 'var(--surface)',
+                      padding: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px'
+                    }}
+                    onDragOver={(e) => {
+                      if (!session?.user?.id) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }}
+                  >
+                    <div className="vehicle-sidebar-mini" style={{ fontWeight: 700 }}>
+                      Drop vehicles onto an organization
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <span className="vehicle-sidebar-mini">Link as</span>
+                      <select
+                        className="select"
+                        value={orgDropRelationshipType}
+                        onChange={(e) => setOrgDropRelationshipType(e.target.value as any)}
+                        style={{ flex: 1 }}
+                      >
+                        <option value="work_location">Work location</option>
+                        <option value="service_provider">Service provider</option>
+                        <option value="storage">Storage</option>
+                        <option value="consigner">Consigner</option>
+                        <option value="sold_by">Sold by</option>
+                        <option value="owner">Owner</option>
+                      </select>
+                    </div>
+
+                    {myOrganizations.length === 0 ? (
+                      <div className="vehicle-sidebar-mini">
+                        No organizations found for your account.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {myOrganizations.slice(0, 12).map((org) => {
+                          const orgId = org.organization_id;
+                          const name = org.organization?.business_name || 'Organization';
+                          const active = selectedOrganizationId === orgId;
+                          return (
+                            <button
+                              key={orgId}
+                              type="button"
+                              className={`vehicle-sidebar-item ${active ? 'vehicle-sidebar-item-active' : ''}`}
+                              style={{ justifyContent: 'space-between' }}
+                              onClick={() => {
+                                setSelectedOrganizationId(orgId);
+                                setSelectedVehicleIds(new Set());
+                              }}
+                              onDragOver={(e) => {
+                                if (!session?.user?.id) return;
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                              }}
+                              onDrop={async (e) => {
+                                e.preventDefault();
+                                const dragged = extractVehicleIdFromDrop(e);
+                                if (!dragged) return;
+                                const ids = getDraggedVehicleIds(dragged);
+                                await linkVehiclesToOrganization(ids, orgId, orgDropRelationshipType);
+                                // Keep UI snappy: refresh relationship lists (org filter relies on org links)
+                                await loadVehicleRelationships();
+                              }}
+                            >
+                              <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {name}
+                              </span>
+                              <span className="vehicle-sidebar-mini">{org.role}</span>
+                            </button>
+                          );
+                        })}
+                        {myOrganizations.length > 12 && (
+                          <div className="vehicle-sidebar-mini">Showing first 12. Pin/sort orgs later.</div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="vehicle-sidebar-mini">
+                      Tip: select multiple vehicles, then drag one of the selected vehicles to batch-link.
+                    </div>
+                  </div>
                 </SidebarSection>
 
                 <SidebarSection title="Library" sectionKey="library" hidden={!session?.user?.id || !!selectedOrganizationId}>
@@ -1363,28 +1619,127 @@ const VehiclesInner: React.FC = () => {
                     <SidebarItem
                       active={preferenceFilter === 'collection'}
                       onClick={() => setPreferenceFilter('collection')}
-                      label="Collection"
+                      label="Collections"
                     />
-                    {preferenceFilter === 'collection' && (
-                      <select
-                        value={collectionFilter || ''}
-                        onChange={(e) => setCollectionFilter(e.target.value || null)}
-                        className="select"
+
+                    {/* Drag-and-drop collections (fast sorting) */}
+                    <div
+                      style={{
+                        border: '1px solid var(--border-light)',
+                        background: 'var(--surface)',
+                        padding: '10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
+                      }}
+                      onDragOver={(e) => {
+                        if (!session?.user?.id) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                    >
+                      <div className="vehicle-sidebar-mini" style={{ fontWeight: 700 }}>
+                        Drop vehicles onto a collection
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          className="input"
+                          value={newCollectionName}
+                          placeholder="New collection name"
+                          onChange={(e) => setNewCollectionName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key !== 'Enter') return;
+                            const next = newCollectionName.trim();
+                            if (!next) return;
+                            setPreferenceFilter('collection');
+                            setCollectionFilter(next);
+                            setNewCollectionName('');
+                          }}
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          type="button"
+                          className="button button-secondary button-small"
+                          onClick={() => {
+                            const next = newCollectionName.trim();
+                            if (!next) return;
+                            setPreferenceFilter('collection');
+                            setCollectionFilter(next);
+                            setNewCollectionName('');
+                          }}
+                        >
+                          CREATE
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="vehicle-sidebar-item"
+                        style={{ justifyContent: 'space-between' }}
+                        onClick={() => {
+                          setPreferenceFilter('collection');
+                          setCollectionFilter(null);
+                        }}
+                        onDragOver={(e) => {
+                          if (!session?.user?.id) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                        }}
+                        onDrop={async (e) => {
+                          e.preventDefault();
+                          const dragged = extractVehicleIdFromDrop(e);
+                          if (!dragged) return;
+                          const ids = getDraggedVehicleIds(dragged);
+                          await assignCollectionToVehicles(ids, null);
+                        }}
                       >
-                        <option value="">Select collection...</option>
-                        {Array.from(
-                          new Set(
-                            Array.from(vehiclePreferences.values())
-                              .map(p => p.collection_name)
-                              .filter(Boolean)
-                          )
-                        ).map((collection) => (
-                          <option key={collection} value={collection}>
-                            {collection}
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                        <span style={{ textAlign: 'left' }}>Unassigned</span>
+                        <span className="vehicle-sidebar-mini">
+                          {Array.from(vehiclePreferences.values()).filter((p) => !p.collection_name).length}
+                        </span>
+                      </button>
+
+                      {collectionNames.length === 0 && (
+                        <div className="vehicle-sidebar-mini">
+                          No collections yet. Create one, then drag vehicles onto it.
+                        </div>
+                      )}
+
+                      {collectionNames.map((name) => {
+                        const isActive = preferenceFilter === 'collection' && collectionFilter === name;
+                        const count = collectionCounts.get(name) || 0;
+                        return (
+                          <button
+                            key={name}
+                            type="button"
+                            className={`vehicle-sidebar-item ${isActive ? 'vehicle-sidebar-item-active' : ''}`}
+                            style={{ justifyContent: 'space-between' }}
+                            onClick={() => {
+                              setPreferenceFilter('collection');
+                              setCollectionFilter(name);
+                            }}
+                            onDragOver={(e) => {
+                              if (!session?.user?.id) return;
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                            }}
+                            onDrop={async (e) => {
+                              e.preventDefault();
+                              const dragged = extractVehicleIdFromDrop(e);
+                              if (!dragged) return;
+                              const ids = getDraggedVehicleIds(dragged);
+                              await assignCollectionToVehicles(ids, name);
+                              setPreferenceFilter('collection');
+                              setCollectionFilter(name);
+                            }}
+                          >
+                            <span style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
+                            <span className="vehicle-sidebar-mini">{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </SidebarSection>
 
@@ -1573,30 +1928,54 @@ const VehiclesInner: React.FC = () => {
                               return (
                                 <div key={vehicle.id} style={{ position: 'relative' }}>
                                   {session?.user?.id && (
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        top: '8px',
-                                        left: '8px',
-                                        zIndex: 10,
-                                        background: 'white',
-                                        border: '1px solid var(--border-light)',
-                                        padding: '4px'
-                                      }}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={(e) => {
-                                          const newSelection = new Set(selectedVehicleIds);
-                                          if (e.target.checked) newSelection.add(vehicle.id);
-                                          else newSelection.delete(vehicle.id);
-                                          setSelectedVehicleIds(newSelection);
+                                    <>
+                                      {/* Keep selection/drag controls away from card's own top badges */}
+                                      <div
+                                        draggable
+                                        onDragStart={(e) => handleCardDragStart(e, vehicle.id)}
+                                        style={{
+                                          position: 'absolute',
+                                          bottom: '38px',
+                                          right: '8px',
+                                          zIndex: 10,
+                                          background: 'rgba(255,255,255,0.9)',
+                                          border: '1px solid var(--border-light)',
+                                          padding: '3px 6px',
+                                          fontSize: '8px',
+                                          fontWeight: 700,
+                                          cursor: 'grab',
+                                          userSelect: 'none'
                                         }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                                      />
-                                    </div>
+                                        title="Drag to a collection or organization in the sidebar"
+                                      >
+                                        DRAG
+                                      </div>
+
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          bottom: '8px',
+                                          right: '8px',
+                                          zIndex: 10,
+                                          background: 'rgba(255,255,255,0.9)',
+                                          border: '1px solid var(--border-light)',
+                                          padding: '3px'
+                                        }}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={(e) => {
+                                            const newSelection = new Set(selectedVehicleIds);
+                                            if (e.target.checked) newSelection.add(vehicle.id);
+                                            else newSelection.delete(vehicle.id);
+                                            setSelectedVehicleIds(newSelection);
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                          style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                        />
+                                      </div>
+                                    </>
                                   )}
 
                                   <GarageVehicleCard
@@ -1648,30 +2027,54 @@ const VehiclesInner: React.FC = () => {
                         return (
                           <div key={vehicle.id} style={{ position: 'relative' }}>
                             {session?.user?.id && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: '8px',
-                                  left: '8px',
-                                  zIndex: 10,
-                                  background: 'white',
-                                  border: '1px solid var(--border-light)',
-                                  padding: '4px'
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={(e) => {
-                                    const newSelection = new Set(selectedVehicleIds);
-                                    if (e.target.checked) newSelection.add(vehicle.id);
-                                    else newSelection.delete(vehicle.id);
-                                    setSelectedVehicleIds(newSelection);
+                              <>
+                                {/* Keep selection/drag controls away from card's own top badges */}
+                                <div
+                                  draggable
+                                  onDragStart={(e) => handleCardDragStart(e, vehicle.id)}
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: '38px',
+                                    right: '8px',
+                                    zIndex: 10,
+                                    background: 'rgba(255,255,255,0.9)',
+                                    border: '1px solid var(--border-light)',
+                                    padding: '3px 6px',
+                                    fontSize: '8px',
+                                    fontWeight: 700,
+                                    cursor: 'grab',
+                                    userSelect: 'none'
                                   }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                                />
-                              </div>
+                                  title="Drag to a collection or organization in the sidebar"
+                                >
+                                  DRAG
+                                </div>
+
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: '8px',
+                                    right: '8px',
+                                    zIndex: 10,
+                                    background: 'rgba(255,255,255,0.9)',
+                                    border: '1px solid var(--border-light)',
+                                    padding: '3px'
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      const newSelection = new Set(selectedVehicleIds);
+                                      if (e.target.checked) newSelection.add(vehicle.id);
+                                      else newSelection.delete(vehicle.id);
+                                      setSelectedVehicleIds(newSelection);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                                  />
+                                </div>
+                              </>
                             )}
 
                             <GarageVehicleCard

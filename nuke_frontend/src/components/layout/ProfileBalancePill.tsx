@@ -297,9 +297,9 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
               {[
                 { label: 'Capsule', action: '/capsule' },
                 { label: 'Profile', action: `/profile/${session?.user?.id || ''}` },
-                { label: 'Vehicles', action: '/vehicles' },
+                { label: 'Vehicles', action: '/vehicle/list' },
                 { label: 'Auctions', action: '/auctions' },
-                { label: 'Organizations', action: '/organizations' },
+                { label: 'Organizations', action: '/org' },
                 { label: 'Photos', action: '/capsule?tab=photos' },
                 { label: 'Settings', action: '/capsule?tab=settings' },
                 ...(isAdmin ? [{ label: 'Admin', action: '/admin' }] : [])

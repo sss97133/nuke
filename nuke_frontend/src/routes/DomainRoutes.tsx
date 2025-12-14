@@ -15,6 +15,13 @@ const DealerRoutes = React.lazy(() => import('./modules/dealer/routes'));
 const AdminRoutes = React.lazy(() => import('./modules/admin/routes'));
 const MarketplaceRoutes = React.lazy(() => import('./modules/marketplace/routes'));
 
+// Legacy pages (still used by navigation components)
+const Profile = React.lazy(() => import('../pages/Profile'));
+const Capsule = React.lazy(() => import('../pages/Capsule'));
+const Library = React.lazy(() => import('../pages/Library'));
+const AuctionMarketplace = React.lazy(() => import('../pages/AuctionMarketplace'));
+const Notifications = React.lazy(() => import('../pages/Notifications'));
+
 export const DomainRoutes = () => {
   return (
     <Suspense fallback={<div className="p-4 text-center">Loading module...</div>}>
@@ -36,6 +43,18 @@ export const DomainRoutes = () => {
         <Route path="/vehicles" element={<Navigate to="/vehicle/list" replace />} />
         <Route path="/add-vehicle" element={<Navigate to="/vehicle/add" replace />} />
         <Route path="/dashboard" element={<Navigate to="/org/dashboard" replace />} />
+        <Route path="/organizations" element={<Navigate to="/org" replace />} />
+        <Route path="/shops" element={<Navigate to="/org" replace />} />
+        <Route path="/shops/onboarding" element={<Navigate to="/org/create" replace />} />
+        <Route path="/shops/new" element={<Navigate to="/org/create" replace />} />
+
+        {/* Legacy user pages (used by header nav / profile capsule) */}
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/:userId" element={<Profile />} />
+        <Route path="/capsule" element={<Capsule />} />
+        <Route path="/library" element={<Library />} />
+        <Route path="/auctions" element={<AuctionMarketplace />} />
+        <Route path="/notifications" element={<Notifications />} />
       </Routes>
     </Suspense>
   );

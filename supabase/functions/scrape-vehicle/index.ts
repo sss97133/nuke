@@ -45,8 +45,12 @@ function normalizeImageUrls(urls: any[]): string[] {
   const seen = new Set<string>()
   for (const raw of urls) {
     if (typeof raw !== 'string') continue
-    const s = raw.trim()
+    let s = raw.trim()
     if (!s.startsWith('http')) continue
+    // Prefer https (Cloudinary commonly returns http on older sites).
+    if (s.startsWith('http://res.cloudinary.com/')) {
+      s = 'https://' + s.slice('http://'.length)
+    }
     const lower = s.toLowerCase()
     if (lower.includes('youtube.com')) continue
     if (lower.includes('logo') || lower.includes('icon') || lower.includes('avatar')) continue
@@ -61,6 +65,126 @@ function normalizeImageUrls(urls: any[]): string[] {
     }
   }
   return out
+}
+
+function parseNumberLoose(raw: string): number | null {
+  const s = (raw || '').replace(/\u00a0/g, ' ').trim()
+  if (!s) return null
+  // Remove currency/units and keep digits.
+  const digits = s.replace(/[^\d]/g, '')
+  if (!digits) return null
+  const n = parseInt(digits, 10)
+  return Number.isFinite(n) ? n : null
+}
+
+function splitLinesFromHtml(html: string): string[] {
+  return (html || '')
+    .replace(/\r/g, '')
+    .split(/<br\s*\/?>/i)
+    .map((x) => x.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+}
+
+function parseLartFiche(html: string, url: string): any {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const brand = doc?.querySelector('.carDetails-brand')?.textContent?.trim() || ''
+  const modelRaw = doc?.querySelector('.carDetails-model')?.textContent?.trim() || ''
+  const title = [brand, modelRaw].filter(Boolean).join(' ').trim()
+
+  // Hi-res images are in data-big/href; thumbnails are in src with Cloudinary transforms.
+  const hiRes: string[] = []
+  const thumbs: string[] = []
+  const seenHi = new Set<string>()
+  const seenTh = new Set<string>()
+  const imgs = Array.from(doc?.querySelectorAll('img.carouselPicture') || [])
+  for (const img of imgs as any[]) {
+    const big = (img.getAttribute('data-big') || img.getAttribute('href') || '').trim()
+    const src = (img.getAttribute('src') || '').trim()
+    if (big && big.startsWith('http') && !seenHi.has(big)) {
+      hiRes.push(big)
+      seenHi.add(big)
+    }
+    if (src && src.startsWith('http') && !seenTh.has(src)) {
+      thumbs.push(src)
+      seenTh.add(src)
+    }
+  }
+
+  // Parse label/value pairs
+  const dl = doc?.querySelector('dl.dataList')
+  const dts = Array.from(dl?.querySelectorAll('dt') || [])
+  const ddByLabel = new Map<string, any>()
+  for (const dt of dts as any[]) {
+    const label = (dt.textContent || '').replace(/\s+/g, ' ').trim()
+    let dd = dt.nextElementSibling
+    while (dd && dd.tagName !== 'DD') dd = dd.nextElementSibling
+    if (label && dd) ddByLabel.set(label.toLowerCase(), dd)
+  }
+
+  const priceText = ddByLabel.get('prix')?.textContent || ''
+  const mileageText = ddByLabel.get('km')?.textContent || ''
+  const colorsText = ddByLabel.get('couleurs')?.textContent || ''
+  const fuelText = ddByLabel.get('energie')?.textContent || ''
+  const transmissionText = ddByLabel.get('boîte de vitesse')?.textContent || ddByLabel.get('boite de vitesse')?.textContent || ''
+  const regDateText = ddByLabel.get('date de mise en circulation')?.textContent || ''
+
+  const optionsDd = ddByLabel.get('options')
+  const optionsHtml = optionsDd?.innerHTML || ''
+  const options = splitLinesFromHtml(optionsHtml)
+
+  const infoDd = ddByLabel.get('informations')
+  const infoHtml = infoDd?.innerHTML || ''
+  const infoParts = infoHtml.split(/<hr\s*\/?>/i)
+  const frHtml = infoParts[0] || ''
+  const enHtml = infoParts.slice(1).join('<hr>') || ''
+
+  // Pull paragraphs in order from FR section
+  const frDoc = new DOMParser().parseFromString(`<div>${frHtml}</div>`, 'text/html')
+  const frParas = Array.from(frDoc?.querySelectorAll('p') || []).map((p: any) => (p.textContent || '').trim()).filter(Boolean)
+
+  // First paragraph is typically bullet-ish (br-delimited in source); use HTML splitter for fidelity.
+  const frBullets = splitLinesFromHtml(frHtml).slice(0, 20) // bounded
+
+  // Service history: find the paragraph after "Suivi et entretien"
+  let serviceHistory: string[] = []
+  const followIdx = frParas.findIndex((p) => p.toLowerCase().includes('suivi') && p.toLowerCase().includes('entretien'))
+  if (followIdx >= 0 && frParas[followIdx + 1]) {
+    serviceHistory = frParas[followIdx + 1]
+      .split(/\n|<br\s*\/?>/i)
+      .map((x) => x.replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+  }
+
+  // Narrative description: take paragraphs after service history block.
+  const narrativeStart = followIdx >= 0 ? Math.min(frParas.length, followIdx + 2) : 0
+  const descriptionFr = frParas.slice(narrativeStart).join('\n\n').trim()
+
+  const enDoc = new DOMParser().parseFromString(`<div>${enHtml}</div>`, 'text/html')
+  const enParas = Array.from(enDoc?.querySelectorAll('p') || []).map((p: any) => (p.textContent || '').trim()).filter(Boolean)
+  const descriptionEn = enParas.join('\n\n').trim()
+
+  return {
+    source: "lartdelautomobile",
+    title,
+    make: cleanMakeName(brand) || brand || null,
+    model: cleanModelName(modelRaw) || modelRaw || null,
+    asking_price: parseNumberLoose(priceText),
+    mileage: parseNumberLoose(mileageText),
+    // Also map into canonical vehicle fields used elsewhere (best-effort).
+    fuel_type: fuelText ? fuelText.replace(/\s+/g, ' ').trim() : null,
+    color: colorsText ? colorsText.replace(/\s+/g, ' ').trim() : null,
+    colors: colorsText ? colorsText.replace(/\s+/g, ' ').trim() : null,
+    fuel: fuelText ? fuelText.replace(/\s+/g, ' ').trim() : null,
+    transmission: transmissionText ? transmissionText.replace(/\s+/g, ' ').trim() : null,
+    registration_date: regDateText ? regDateText.replace(/\s+/g, ' ').trim() : null,
+    options,
+    info_bullets: frBullets,
+    service_history: serviceHistory,
+    description_fr: descriptionFr || null,
+    description_en: descriptionEn || null,
+    images_hi_res: hiRes,
+    image_thumbnails: thumbs,
+  }
 }
 
 async function tryFirecrawl(url: string): Promise<any | null> {
@@ -151,7 +275,10 @@ serve(async (req) => {
     let doc: any = null
 
     // Fallback path: fetch and parse HTML
-    if (!firecrawlExtract) {
+    // NOTE: Some sites (like lartdelautomobile.com) require HTML parsing even when Firecrawl returns extract,
+    // because the page contains hi-res image URLs in data attributes.
+    const needsHtmlParse = url.includes('lartdelautomobile.com')
+    if (!firecrawlExtract || needsHtmlParse) {
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -214,6 +341,36 @@ serve(async (req) => {
     // If Firecrawl didn’t yield images (or it wasn’t used), use HTML extraction.
     if ((!data.images || data.images.length === 0) && html) {
       data.images = normalizeImageUrls(extractImageURLs(html))
+    }
+
+    // Site-specific: L'Art de l'Automobile (/fiche/*) has structured spec blocks + explicit hi-res image URLs.
+    if (url.includes('lartdelautomobile.com/fiche/') && html) {
+      const parsed = parseLartFiche(html, url)
+      data.source = parsed.source
+      data.title = parsed.title || data.title
+      data.make = parsed.make || data.make
+      data.model = parsed.model || data.model
+      data.asking_price = parsed.asking_price ?? data.asking_price
+      data.mileage = parsed.mileage ?? data.mileage
+      // Prefer French narrative as canonical description, but keep structured fields for repackaging.
+      data.description = (parsed.description_fr || '').trim() || data.description || ''
+      data.description_fr = parsed.description_fr
+      data.description_en = parsed.description_en
+      data.options = parsed.options
+      data.info_bullets = parsed.info_bullets
+      data.service_history = parsed.service_history
+      data.colors = parsed.colors
+      data.fuel_type = parsed.fuel
+      data.transmission = parsed.transmission
+      data.registration_date = parsed.registration_date
+
+      const hires = normalizeImageUrls(parsed.images_hi_res || [])
+      const thumbs = normalizeImageUrls(parsed.image_thumbnails || [])
+      if (hires.length > 0) {
+        data.images = hires
+        data.thumbnail_url = thumbs[0] || hires[0] || data.thumbnail_url
+      }
+      data.image_thumbnails = thumbs
     }
 
     // Extract VIN from HTML - works for multiple sites

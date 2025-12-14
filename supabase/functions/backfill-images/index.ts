@@ -155,9 +155,9 @@ serve(async (req) => {
         };
         
         // Add Referer for specific sites
-        if (imageUrl.includes('craigslist')) {
+        if (rawUrl.includes('craigslist')) {
           headers['Referer'] = 'https://craigslist.org/';
-        } else if (imageUrl.includes('bringatrailer')) {
+        } else if (rawUrl.includes('bringatrailer')) {
           headers['Referer'] = 'https://bringatrailer.com/';
         }
         
@@ -210,7 +210,7 @@ serve(async (req) => {
 
         const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
         if (!contentType.startsWith('image/')) {
-          console.log(`Not an image: ${contentType} for ${imageUrl}`);
+          console.log(`Not an image: ${contentType} for ${rawUrl}`);
           results.failed++;
           continue;
         }
@@ -223,21 +223,21 @@ serve(async (req) => {
           const arrayBuffer = await imageBlob.arrayBuffer();
           imageBytes = new Uint8Array(arrayBuffer);
         } catch (conversionError: any) {
-          console.log(`Conversion error for ${imageUrl}: ${conversionError.message || conversionError}`);
+          console.log(`Conversion error for ${rawUrl}: ${conversionError.message || conversionError}`);
           results.failed++;
           continue;
         }
         
         // Verify it's actually an image
         if (imageBytes.length === 0) {
-          console.log(`Empty bytes for ${imageUrl}`);
+          console.log(`Empty bytes for ${rawUrl}`);
           results.failed++;
           continue;
         }
         
         // Check size (should be > 0 and < 50MB)
         if (imageBytes.length > 52428800) {
-          console.log(`Image too large: ${(imageBytes.length / 1024 / 1024).toFixed(1)}MB for ${imageUrl}`);
+          console.log(`Image too large: ${(imageBytes.length / 1024 / 1024).toFixed(1)}MB for ${rawUrl}`);
           results.failed++;
           continue;
         }
@@ -348,7 +348,7 @@ serve(async (req) => {
         await new Promise(r => setTimeout(r, 500));
 
       } catch (error) {
-        console.log(`Error processing ${imageUrl}: ${error.message}`);
+        console.log(`Error processing ${rawUrl}: ${error.message}`);
         results.failed++;
       }
     }
