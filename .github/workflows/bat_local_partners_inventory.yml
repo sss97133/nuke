@@ -1,0 +1,68 @@
+name: BaT Local Partners - Inventory + Org Media
+
+on:
+  schedule:
+    # Daily (GitHub Actions cron is UTC). Default: 07:00 UTC (~11:00pm Pacific).
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: bat-local-partners-inventory
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Run BaT Local Partners cloud pipeline
+        env:
+          # Prefer repo secret SUPABASE_URL; fall back to common variants.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.SUPABASE_PROJECT_URL || secrets.SUPABASEPROJECTURL }}
+          # Must be a JWT (legacy anon key), not an sb_publishable_* key.
+          # Prefer explicit SUPABASE_ANON_JWT; fall back to existing repo secrets.
+          SUPABASE_ANON_JWT: ${{ secrets.SUPABASE_ANON_JWT || secrets.SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "Missing secret SUPABASE_URL"
+            exit 2
+          fi
+          if [ -z "${SUPABASE_ANON_JWT:-}" ]; then
+            echo "Missing secret SUPABASE_ANON_JWT"
+            exit 2
+          fi
+          if echo "${SUPABASE_ANON_JWT}" | grep -q '^sb_'; then
+            echo "SUPABASE_ANON_JWT must be a legacy JWT (starts with eyJ...), not an sb_* key"
+            exit 2
+          fi
+
+          post() {
+            local path="$1"
+            local body="$2"
+            curl -sS "${SUPABASE_URL%/}/functions/v1/${path}" \
+              -H "Authorization: Bearer ${SUPABASE_ANON_JWT}" \
+              -H "Content-Type: application/json" \
+              --data-binary "${body}"
+          }
+
+          echo "1) enqueue-bat-local-partner-inventory"
+          post "enqueue-bat-local-partner-inventory" '{"run_mode":"current","limit":5000,"only_with_website":true,"requeue_failed":true}' | jq -c .
+
+          echo "2) process-inventory-sync-queue (3 batches)"
+          for i in 1 2 3; do
+            post "process-inventory-sync-queue" '{"batch_size":5,"max_results":200,"max_results_sold":200}' | jq -c "{i:$i,processed:.processed,completed:.completed,failed:.failed}"
+            sleep 2
+          done
+
+          echo "3) process-import-queue-fast (6 batches)"
+          for i in 1 2 3 4 5 6; do
+            post "process-import-queue-fast" '{"batch_size":10,"external_images_only":true,"max_external_images":18}' | jq -c "{i:$i,processed:.processed,created:.created,updated:.updated,errors:.errors}"
+            sleep 2
+          done
+
+          echo "4) backfill-org-primary-images"
+          post "backfill-org-primary-images" '{"batch_size":50,"max_sites":25,"dry_run":false}' | jq -c "{updated:.updated,failed:.failed,processed:.processed}"
+
+

@@ -129,5 +129,16 @@ This repo supports **Supabase pg_cron** calling Edge Functions directly (so it r
 
 The new cron migration uses `COALESCE()` across both keys so you don’t get silent auth failures.
 
+### Recommended: GitHub Actions scheduler (most reliable)
+
+Because this project’s DB role cannot set `ALTER DATABASE ... SET app.settings.service_role_key` (blocked by permissions),
+the most reliable “runs forever” setup is a GitHub Actions cron that calls the Edge Functions directly.
+
+- Workflow file: `.github/workflows/bat_local_partners_inventory.yml`
+- Required repo secrets:
+  - `SUPABASE_URL` (example: `https://<ref>.supabase.co`)
+  - `SUPABASE_ANON_JWT` (**legacy anon JWT**, not `sb_publishable_*`)
+
+
 
 
