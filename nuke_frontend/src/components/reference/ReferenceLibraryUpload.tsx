@@ -103,8 +103,9 @@ export const ReferenceLibraryUpload: React.FC<ReferenceLibraryUploadProps> = ({
         .select('id')
         .eq('year', year)
         .eq('make', make)
-        .eq('series', series || '')
-        .eq('body_style', bodyStyle || '')
+        // Keep null semantics consistent with the viewer query
+        .eq('series', series || null)
+        .eq('body_style', bodyStyle || null)
         .maybeSingle();
 
       let libraryId = existingLibrary?.id;
@@ -115,9 +116,9 @@ export const ReferenceLibraryUpload: React.FC<ReferenceLibraryUploadProps> = ({
           .insert({
             year,
             make,
-            series,
-            model,
-            body_style: bodyStyle,
+            series: series || null,
+            model: model || null,
+            body_style: bodyStyle || null,
             description: `Reference library for ${year} ${make} ${series || model}`
           })
           .select('id')

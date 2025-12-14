@@ -895,9 +895,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
   const responsibleLabel = computeResponsibleLabel();
 
-  // Check if vehicle is pending - either by status or by missing VIN
+  // Pending should reflect workflow state, not data completeness.
+  // Data gaps like missing VIN are common for scraped listings and should not mark the profile "Pending"
+  // if the vehicle is otherwise active/public.
   const hasVIN = vehicle?.vin && vehicle.vin.trim() !== '' && !vehicle.vin.startsWith('VIVA-');
-  const isPending = vehicle && ((vehicle as any).status === 'pending' || !hasVIN);
+  const vehicleStatus = String((vehicle as any)?.status || '').toLowerCase();
+  const isPending = vehicle && (vehicleStatus === 'pending' || vehicleStatus === 'draft');
   const needsVIN = isPending && !hasVIN;
   const needsImages = isPending && imageCount === 0;
   const pendingReasons: string[] = [];
@@ -1001,10 +1004,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   if (discoveryUrl) {
                     try {
                       const domain = new URL(discoveryUrl).hostname;
+                      const host = domain.replace(/^www\./i, '');
+                      const base = host.split('.')[0] || host;
+                      const baseLabel = base.length > 10 ? `${base.slice(0, 10).toUpperCase()}…` : base.toUpperCase();
                       return (
                         <>
                           <img 
-                            src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
+                            src={`https://www.google.com/s2/favicons?domain=${host}&sz=16`}
                             alt=""
                             style={{ width: '10px', height: '10px' }}
                             onError={(e) => {
@@ -1015,7 +1021,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           {origin === 'bat_import' ? 'BaT' : 
                            origin === 'ksl_import' ? 'KSL' :
                            origin === 'craigslist_scrape' ? 'CL' :
-                           domain.split('.')[0].toUpperCase()}
+                           baseLabel}
                         </>
                       );
                     } catch {

@@ -281,6 +281,27 @@ export class ReferenceDocumentService {
   }
 
   /**
+   * Unlink a reference document from a vehicle
+   */
+  static async unlinkFromVehicle(
+    documentId: string,
+    vehicleId: string
+  ): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('vehicle_documents')
+        .delete()
+        .eq('vehicle_id', vehicleId)
+        .eq('document_id', documentId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error unlinking document from vehicle:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Delete a reference document
    */
   static async deleteDocument(documentId: string, userId: string): Promise<void> {

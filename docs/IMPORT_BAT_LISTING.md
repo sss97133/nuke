@@ -24,7 +24,7 @@ chmod +x scripts/import-bat-listing.sh
 
 ## Optional flags
 
-- **`ORGANIZATION_ID`**: link the imported vehicle to an organization (optional)
+- **`ORGANIZATION_ID`**: link the imported vehicle to an organization **only when the BaT listing indicates a dealer/broker seller** (optional; recommended to leave unset for private-party listings)
 - **`ALLOW_FUZZY_MATCH=true`**: allows year/make/model fuzzy match when VIN is missing (off by default)
 - **`IMAGE_BATCH_SIZE=50`**: batch size for image backfill (10..100)
 

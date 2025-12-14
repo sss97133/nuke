@@ -72,6 +72,8 @@ export const PersonalPhotoLibrary: React.FC = () => {
     anglesDetail: 0
   });
 
+  const isAiCompleted = (status?: string | null) => status === 'complete' || status === 'completed';
+
   useEffect(() => {
     loadData();
   }, []);
@@ -118,7 +120,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
         total: statsResult.total_photos || photosData.length,
         organized: statsResult.organized_photos || photosData.filter(p => p.organization_status === 'organized').length,
         unorganized: statsResult.unorganized_photos || photosData.filter(p => p.organization_status === 'unorganized').length,
-        aiComplete: statsResult.ai_status_breakdown?.complete || photosData.filter(p => p.ai_processing_status === 'complete').length,
+        aiComplete: statsResult.ai_status_breakdown?.complete || photosData.filter(p => isAiCompleted(p.ai_processing_status)).length,
         aiPending: statsResult.ai_status_breakdown?.pending || photosData.filter(p => p.ai_processing_status === 'pending').length,
         aiProcessing: statsResult.ai_status_breakdown?.processing || photosData.filter(p => p.ai_processing_status === 'processing').length,
         aiFailed: statsResult.ai_status_breakdown?.failed || photosData.filter(p => p.ai_processing_status === 'failed').length,
@@ -152,7 +154,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
     // Active filter
     if (activeFilter) {
       if (activeFilter === 'ai_complete') {
-        filtered = filtered.filter(p => p.ai_processing_status === 'complete');
+        filtered = filtered.filter(p => isAiCompleted(p.ai_processing_status));
       } else if (activeFilter === 'ai_pending') {
         filtered = filtered.filter(p => p.ai_processing_status === 'pending');
       } else if (activeFilter === 'ai_processing') {

@@ -267,6 +267,15 @@ function buildLartRepackagedDescription(scrape: any): string {
   return blocks.join('\n\n').trim();
 }
 
+function coerceDateOnly(input: any): string | null {
+  if (input === null || typeof input === 'undefined') return null;
+  const s = String(input).trim();
+  if (!s) return null;
+  // Accept ISO-like dates; keep only YYYY-MM-DD to avoid polluting canon timestamps.
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m?.[1] ? m[1] : null;
+}
+
 // Helper function to extract price from text, avoiding monthly payments
 function extractVehiclePrice(text: string): number | null {
   if (!text) return null;
@@ -1345,6 +1354,27 @@ serve(async (req) => {
           message: 'Scraped + normalized vehicle identity fields',
           data: { queue_id: item.id, source: scrapeData?.data?.source, title: (scrapeData?.data?.title || '').slice(0, 120), year, make, model, vin_present: !!scrapeData?.data?.vin, asking_price: scrapeData?.data?.asking_price || null, keys: Object.keys(scrapeData?.data || {}).slice(0, 40) },
         });
+
+        const isLartFiche = item.listing_url.includes('lartdelautomobile.com/fiche/');
+
+        // Listing status: for L'Art, trust the section-derived status we queued (inventory vs sold),
+        // since the fiche pages are not reliably explicit. For other sources, prefer live scrape.
+        const listingStatusRaw =
+          isLartFiche && (rawData.inventory_extraction === true || rawData.inventory_extraction === 'true')
+            ? (rawData.listing_status || rawData.status || null)
+            : (scrapeData?.data?.listing_status || scrapeData?.data?.status || rawData.listing_status || rawData.status || null);
+
+        const isSoldListing =
+          listingStatusRaw === 'sold' ||
+          listingStatusRaw === 'sold_out' ||
+          listingStatusRaw === 'sold_vehicle' ||
+          // Some scrapers encode sold/inactive as French/English flags.
+          listingStatusRaw === 'inactif' ||
+          listingStatusRaw === 'inactive' ||
+          rawData.sold === true ||
+          rawData.is_sold === true ||
+          scrapeData?.data?.sold === true ||
+          scrapeData?.data?.is_sold === true;
         
         // Validate make
         if (make && !isValidMake(make)) {
@@ -1405,18 +1435,19 @@ serve(async (req) => {
               console.log(`🔒 Skipped discovery_url overwrite for ownership-locked vehicle ${existingVehicle.id} (VIN ${listingVIN})`);
             }
             
-            // Link to organization if not already linked
-            if (organizationId && (!existingVehicle.origin_organization_id || existingVehicle.origin_organization_id !== organizationId)) {
-              await supabase
-                .from('vehicles')
-                .update({ 
-                  origin_organization_id: organizationId,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', existingVehicle.id);
-              console.log(`🔗 Linked existing vehicle to organization ${organizationId}`);
-              
-              // Also ensure organization_vehicles link exists
+            // Link / repair org relationship + dealer_inventory even if already linked.
+            if (organizationId) {
+              if (!existingVehicle.origin_organization_id || existingVehicle.origin_organization_id !== organizationId) {
+                await supabase
+                  .from('vehicles')
+                  .update({
+                    origin_organization_id: organizationId,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', existingVehicle.id);
+                console.log(`🔗 Linked existing vehicle to organization ${organizationId}`);
+              }
+
               const relationshipType =
                 businessType === 'dealer'
                   ? (isSoldListing ? 'sold_by' : 'seller')
@@ -1434,15 +1465,73 @@ serve(async (req) => {
                   onConflict: 'organization_id,vehicle_id,relationship_type'
                 });
 
-              // Dealers should never have both "seller" and "sold_by" (or legacy "consigner") at the same time.
-              if (businessType === 'dealer') {
+              // Always clean up conflicting legacy relationship types for this org+vehicle.
+              await supabase
+                .from('organization_vehicles')
+                .delete()
+                .eq('organization_id', organizationId)
+                .eq('vehicle_id', existingVehicle.id)
+                .in('relationship_type', ['seller', 'sold_by', 'consigner'])
+                .neq('relationship_type', relationshipType);
+
+              // If this was a dealer inventory import, ensure dealer_inventory matches listing status.
+              const isInventoryExtraction = rawData.inventory_extraction === true || rawData.inventory_extraction === 'true';
+              if (isInventoryExtraction && businessType === 'dealer') {
+                const inventoryStatus = isSoldListing ? 'sold' : 'in_stock';
+                const salePrice = isSoldListing ? (scrapeData.data.asking_price || scrapeData.data.price || null) : null;
+                const saleDate =
+                  isSoldListing
+                    ? coerceDateOnly(rawData.sale_date || rawData.sold_at || scrapeData?.data?.sold_at || scrapeData?.data?.sale_date)
+                    : null;
+
+                await supabase
+                  .from('dealer_inventory')
+                  .upsert({
+                    dealer_id: organizationId,
+                    vehicle_id: existingVehicle.id,
+                    status: inventoryStatus,
+                    asking_price: scrapeData.data.asking_price || scrapeData.data.price || null,
+                    sale_price: salePrice,
+                    sale_date: saleDate,
+                    acquisition_type: 'purchase',
+                    notes: `Auto-imported from ${new URL(item.listing_url).hostname}`,
+                    updated_at: new Date().toISOString()
+                  }, {
+                    onConflict: 'dealer_id,vehicle_id'
+                  });
+
+                // IMPORTANT: relationship_type has a DB constraint (owner/consigner/service_provider/work_location/sold_by/storage).
+                // For dealer inventory imports, use:
+                // - consigner => for-sale inventory
+                // - sold_by => sold inventory
+                const invRelationshipType = isSoldListing ? 'sold_by' : 'consigner';
+                const invStatus = isSoldListing ? 'sold' : 'active';
+                const invListingStatus = isSoldListing ? 'sold' : 'for_sale';
+
+                await supabase
+                  .from('organization_vehicles')
+                  .upsert({
+                    organization_id: organizationId,
+                    vehicle_id: existingVehicle.id,
+                    relationship_type: invRelationshipType,
+                    status: invStatus,
+                    listing_status: invListingStatus,
+                    asking_price: scrapeData.data.asking_price || scrapeData.data.price || null,
+                    sale_price: salePrice,
+                    sale_date: saleDate,
+                    auto_tagged: true
+                  }, {
+                    onConflict: 'organization_id,vehicle_id,relationship_type'
+                  });
+
+                // Clean up legacy relationship types that can poison the org UI.
                 await supabase
                   .from('organization_vehicles')
                   .delete()
                   .eq('organization_id', organizationId)
                   .eq('vehicle_id', existingVehicle.id)
-                  .in('relationship_type', ['seller', 'sold_by', 'consigner'])
-                  .neq('relationship_type', relationshipType);
+                  .in('relationship_type', ['sold_by', 'consigner'])
+                  .neq('relationship_type', invRelationshipType);
               }
             }
             
@@ -1450,7 +1539,7 @@ serve(async (req) => {
             await supabase
               .from('import_queue')
               .update({
-                status: 'completed',
+                status: 'complete',
                 processed_at: new Date().toISOString(),
                 vehicle_id: existingVehicle.id
               })
@@ -1463,21 +1552,6 @@ serve(async (req) => {
           }
         }
         
-        // Prefer the live scrape result for listing status; queue raw_data can be stale/incomplete.
-        const listingStatusRaw =
-          (scrapeData?.data?.listing_status || scrapeData?.data?.status || rawData.listing_status || rawData.status || null);
-        const isSoldListing =
-          listingStatusRaw === 'sold' ||
-          listingStatusRaw === 'sold_out' ||
-          listingStatusRaw === 'sold_vehicle' ||
-          listingStatusRaw === 'inactif' ||
-          listingStatusRaw === 'inactive' ||
-          rawData.sold === true ||
-          rawData.is_sold === true ||
-          scrapeData?.data?.sold === true ||
-          scrapeData?.data?.is_sold === true;
-
-        const isLartFiche = item.listing_url.includes('lartdelautomobile.com/fiche/');
         if (isLartFiche) {
           // Prefer our structured, paginated description for lart.
           const repackaged = buildLartRepackagedDescription(scrapeData.data);
@@ -1596,7 +1670,7 @@ serve(async (req) => {
                 const salePrice = isSoldListing ? (scrapeData.data.asking_price || scrapeData.data.price || null) : null;
                 const saleDate =
                   isSoldListing
-                    ? (rawData.sale_date || rawData.sold_at || new Date().toISOString().slice(0, 10))
+                    ? coerceDateOnly(rawData.sale_date || rawData.sold_at || scrapeData?.data?.sold_at || scrapeData?.data?.sale_date)
                     : null;
 
                 await supabase
@@ -1615,25 +1689,33 @@ serve(async (req) => {
                     onConflict: 'dealer_id,vehicle_id'
                   });
 
-                const relationshipType = isSoldListing ? 'sold_by' : 'seller';
+                const invRelationshipType = isSoldListing ? 'sold_by' : 'consigner';
+                const invStatus = isSoldListing ? 'sold' : 'active';
+                const invListingStatus = isSoldListing ? 'sold' : 'for_sale';
+
                 await supabase
                   .from('organization_vehicles')
                   .upsert({
                     organization_id: organizationId,
                     vehicle_id: existingByUrlId,
-                    relationship_type: relationshipType,
-                    status: 'active',
+                    relationship_type: invRelationshipType,
+                    status: invStatus,
+                    listing_status: invListingStatus,
+                    asking_price: scrapeData.data.asking_price || scrapeData.data.price || null,
+                    sale_price: salePrice,
+                    sale_date: saleDate,
                     auto_tagged: true
                   }, {
                     onConflict: 'organization_id,vehicle_id,relationship_type'
                   });
+
                 await supabase
                   .from('organization_vehicles')
                   .delete()
                   .eq('organization_id', organizationId)
                   .eq('vehicle_id', existingByUrlId)
-                  .in('relationship_type', ['seller', 'sold_by', 'consigner'])
-                  .neq('relationship_type', relationshipType);
+                  .in('relationship_type', ['sold_by', 'consigner'])
+                  .neq('relationship_type', invRelationshipType);
               }
             } catch (invRepairErr: any) {
               console.warn(`⚠️ dealer_inventory/org relationship repair failed (continuing): ${invRepairErr.message}`);
@@ -1863,13 +1945,15 @@ serve(async (req) => {
         });
 
         // CRITICAL FIX: Immediately download and upload images (don't wait for backfill)
-        const imageUrls = scrapeData.data.images || [];
+        const imageUrls = Array.isArray(scrapeData.data.images) ? scrapeData.data.images : [];
         if (imageUrls.length > 0) {
           // Keep import-queue processing within Edge runtime limits.
           // Upload a capped number immediately; defer the rest to background backfill.
-          const MAX_IMAGES_IMMEDIATE = 12;
+          const isLartFiche = item.listing_url.includes('lartdelautomobile.com/fiche/');
+          const MAX_IMAGES_IMMEDIATE = isLartFiche ? 24 : 12;
           const immediateImageUrls = imageUrls.slice(0, MAX_IMAGES_IMMEDIATE);
-          const deferredImageUrls = imageUrls.slice(MAX_IMAGES_IMMEDIATE);
+          const deferredImageUrlsBase = imageUrls.slice(MAX_IMAGES_IMMEDIATE);
+          const failedImmediateUrls: string[] = [];
 
           console.log(`  📸 Processing ${immediateImageUrls.length}/${imageUrls.length} images immediately...`);
           let imagesUploaded = 0;
@@ -1911,6 +1995,7 @@ serve(async (req) => {
               
               if (!imageResponse.ok) {
                 console.warn(`    ⚠️ Failed to download image ${i + 1}: HTTP ${imageResponse.status}`);
+                failedImmediateUrls.push(imageUrl);
                 continue;
               }
               
@@ -1934,6 +2019,7 @@ serve(async (req) => {
               
               if (uploadError) {
                 console.warn(`    ⚠️ Upload error for image ${i + 1}: ${uploadError.message}`);
+                failedImmediateUrls.push(imageUrl);
                 continue;
               }
               
@@ -1976,6 +2062,7 @@ serve(async (req) => {
               
               if (imageInsertError) {
                 console.warn(`    ⚠️ Failed to create image record ${i + 1}: ${imageInsertError.message}`);
+                failedImmediateUrls.push(imageUrl);
                 continue;
               }
 
@@ -2063,13 +2150,22 @@ serve(async (req) => {
             console.warn(`⚠️ VIN OCR step failed (non-blocking): ${vinOcrErr.message}`);
           }
 
+          const deferredImageUrls = [...failedImmediateUrls, ...deferredImageUrlsBase].filter(Boolean);
+
           // Defer remaining images to background backfill (best-effort).
           if (deferredImageUrls.length > 0) {
             try {
               await supabase.functions.invoke('backfill-images', {
                 body: {
                   vehicle_id: newVehicle.id,
-                  image_urls: deferredImageUrls
+                  image_urls: deferredImageUrls,
+                  source: 'organization_import',
+                  run_analysis: false,
+                  // Dealer galleries can be large; backfill-images can chunk/chain now.
+                  max_images: isLartFiche ? 500 : 50,
+                  continue: isLartFiche ? true : false,
+                  sleep_ms: isLartFiche ? 150 : 200,
+                  max_runtime_ms: 25000,
                 }
               });
               console.log(`  🧩 Deferred ${deferredImageUrls.length} images to backfill`);
@@ -2089,7 +2185,7 @@ serve(async (req) => {
             const salePrice = isSoldListing ? (scrapeData.data.asking_price || scrapeData.data.price || null) : null;
             const saleDate =
               isSoldListing
-                ? (rawData.sale_date || rawData.sold_at || new Date().toISOString().slice(0, 10))
+                ? coerceDateOnly(rawData.sale_date || rawData.sold_at || scrapeData?.data?.sold_at || scrapeData?.data?.sale_date)
                 : null;
 
             const { error: inventoryError } = await supabase
@@ -2121,10 +2217,32 @@ serve(async (req) => {
         
         // Also ensure organization_vehicles link exists for new vehicles with organization
         if (organizationId) {
+          const isInventoryExtraction = rawData.inventory_extraction === true || rawData.inventory_extraction === 'true';
           const relationshipType =
-            businessType === 'dealer'
-              ? (isSoldListing ? 'sold_by' : 'seller')
-              : (businessType === 'auction_house' ? 'consigner' : 'service_provider');
+            (businessType === 'dealer' && isInventoryExtraction)
+              ? (isSoldListing ? 'sold_by' : 'consigner')
+              : (
+                  businessType === 'dealer'
+                    ? (isSoldListing ? 'sold_by' : 'seller')
+                    : (businessType === 'auction_house' ? 'consigner' : 'service_provider')
+                );
+
+          const invListingStatus =
+            (businessType === 'dealer' && isInventoryExtraction)
+              ? (isSoldListing ? 'sold' : 'for_sale')
+              : null;
+          const invStatus =
+            (businessType === 'dealer' && isInventoryExtraction)
+              ? (isSoldListing ? 'sold' : 'active')
+              : 'active';
+          const invSalePrice =
+            (businessType === 'dealer' && isInventoryExtraction && isSoldListing)
+              ? (scrapeData.data.asking_price || scrapeData.data.price || null)
+              : null;
+          const invSaleDate =
+            (businessType === 'dealer' && isInventoryExtraction && isSoldListing)
+              ? coerceDateOnly(rawData.sale_date || rawData.sold_at || scrapeData?.data?.sold_at || scrapeData?.data?.sale_date)
+              : null;
 
           await supabase
             .from('organization_vehicles')
@@ -2132,8 +2250,12 @@ serve(async (req) => {
               organization_id: organizationId,
               vehicle_id: newVehicle.id,
               relationship_type: relationshipType,
-              status: 'active',
-              auto_tagged: true
+              status: invStatus,
+              listing_status: invListingStatus,
+              asking_price: scrapeData.data.asking_price || scrapeData.data.price || null,
+              sale_price: invSalePrice,
+              sale_date: invSaleDate,
+              auto_tagged: true,
             }, {
               onConflict: 'organization_id,vehicle_id,relationship_type'
             });

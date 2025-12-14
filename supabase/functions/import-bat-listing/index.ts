@@ -18,6 +18,7 @@ interface BaTListing {
   saleDate: string;
   description: string;
   seller: string;
+  sellerType?: string; // 'dealer' | 'private_party' | 'unknown' (best-effort)
   buyer: string;
   lotNumber: string;
 }
@@ -36,6 +37,58 @@ function normalizeUrl(raw: string): string {
   }
 }
 
+function coalesceString(...vals: any[]): string | null {
+  for (const v of vals) {
+    if (typeof v === 'string' && v.trim().length > 0) return v.trim();
+  }
+  return null;
+}
+
+function extractSellerTypeFromHtml(html: string): string | undefined {
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  // BaT essentials sometimes include "Seller: Dealer" / "Seller: Private Party"
+  const m =
+    text.match(/\bSeller\s*:\s*(Dealer|Private\s*Party|Individual|Dealer\/Broker|Broker)\b/i) ||
+    text.match(/\bSeller\s+Type\s*:\s*(Dealer|Private\s*Party|Individual|Dealer\/Broker|Broker)\b/i);
+  if (!m) return undefined;
+  const v = m[1].toLowerCase().replace(/\s+/g, ' ').trim();
+  if (v.includes('dealer') || v.includes('broker')) return 'dealer';
+  if (v.includes('private') || v.includes('individual')) return 'private_party';
+  return 'unknown';
+}
+
+async function upsertBatUser(
+  supabase: any,
+  username: string | null,
+): Promise<{ id: string | null; username: string | null; profile_url: string | null }> {
+  const u = username ? username.trim() : '';
+  if (!u) return { id: null, username: null, profile_url: null };
+  const profileUrl = `https://bringatrailer.com/member/${encodeURIComponent(u)}/`;
+
+  // `bat_users.bat_username` is UNIQUE (see migrations). This creates a stable UUID identity
+  // that can later be linked to a real N-Zero user via `n_zero_user_id` (claim flow).
+  const { data, error } = await supabase
+    .from('bat_users')
+    .upsert(
+      {
+        bat_username: u,
+        bat_profile_url: profileUrl,
+        last_seen_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'bat_username' },
+    )
+    .select('id, bat_username, bat_profile_url')
+    .single();
+
+  if (error) {
+    console.log('bat_users upsert failed (non-fatal):', error.message);
+    return { id: null, username: u, profile_url: profileUrl };
+  }
+
+  return { id: data?.id || null, username: data?.bat_username || u, profile_url: data?.bat_profile_url || profileUrl };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -43,9 +96,10 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    // Backwards/compat: accept {url} (process-url-drop) or {batUrl}
-    const batUrlRaw = payload?.batUrl || payload?.url;
-    const organizationId = payload?.organizationId || null;
+    // Backwards/compat: accept {listingUrl}, {batUrl}, {bat_url}, {url}
+    const batUrlRaw = coalesceString(payload?.listingUrl, payload?.batUrl, payload?.bat_url, payload?.url);
+    // Optional: only set when listing indicates a dealer/org is actually involved.
+    const organizationId = coalesceString(payload?.organizationId, payload?.organization_id);
     // Safety: fuzzy match is a major contamination source; default off.
     const allowFuzzyMatch = payload?.allowFuzzyMatch === true;
     const imageBatchSize = Math.max(10, Math.min(100, Number(payload?.imageBatchSize || 50)));
@@ -93,6 +147,7 @@ serve(async (req) => {
     const buyerMatch = html.match(/to\s+([A-Za-z0-9_]+)\s+for/i);
     const seller = sellerMatch ? sellerMatch[1] : 'VivaLasVegasAutos';
     const buyer = buyerMatch ? buyerMatch[1] : '';
+    const sellerType = extractSellerTypeFromHtml(html);
 
     // Extract lot number
     const lotMatch = html.match(/Lot.*?#(\d+)/);
@@ -115,6 +170,7 @@ serve(async (req) => {
       saleDate,
       description,
       seller,
+      sellerType,
       buyer,
       lotNumber
     };
@@ -125,6 +181,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Create stable claimable identities for seller/buyer as BaT users (UUIDs in bat_users)
+    const [sellerUser, buyerUser] = await Promise.all([
+      upsertBatUser(supabase, seller || null),
+      upsertBatUser(supabase, buyer || null),
+    ]);
 
     let vehicleId: string | null = null;
     let createdVehicle = false;
@@ -205,7 +267,22 @@ serve(async (req) => {
         auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met',
         bat_auction_url: batUrl,
         listing_url: batUrl,
-        discovery_url: batUrl
+        discovery_url: batUrl,
+        // Keep the human-readable seller (legacy fields)
+        bat_seller: seller || null,
+        // Store the claimable BaT identity IDs in origin_metadata (no schema change required)
+        origin_metadata: {
+          source: 'bat_import',
+          bat_url: batUrl,
+          bat_seller_username: sellerUser.username,
+          bat_seller_user_id: sellerUser.id,
+          bat_seller_profile_url: sellerUser.profile_url,
+          bat_buyer_username: buyerUser.username,
+          bat_buyer_user_id: buyerUser.id,
+          bat_buyer_profile_url: buyerUser.profile_url,
+          bat_seller_type: sellerType || null,
+          imported_at: new Date().toISOString(),
+        }
       };
       
       // Update VIN if we found one and vehicle doesn't have one
@@ -227,8 +304,8 @@ serve(async (req) => {
         .update(updateData)
         .eq('id', vehicleId);
 
-      // Optional org update if organizationId provided
-      if (organizationId) {
+      // Optional org update ONLY when seller is a dealer/broker and an orgId is explicitly provided.
+      if (organizationId && sellerType === 'dealer') {
         await supabase
           .from('organization_vehicles')
           .update({
@@ -259,7 +336,20 @@ serve(async (req) => {
           listing_url: batUrl,
           discovery_url: batUrl,
           profile_origin: 'bat_import',
-          discovery_source: 'bat_import'
+          discovery_source: 'bat_import',
+          bat_seller: seller || null,
+          origin_metadata: {
+            source: 'bat_import',
+            bat_url: batUrl,
+            bat_seller_username: sellerUser.username,
+            bat_seller_user_id: sellerUser.id,
+            bat_seller_profile_url: sellerUser.profile_url,
+            bat_buyer_username: buyerUser.username,
+            bat_buyer_user_id: buyerUser.id,
+            bat_buyer_profile_url: buyerUser.profile_url,
+            bat_seller_type: sellerType || null,
+            imported_at: new Date().toISOString(),
+          }
         })
         .select()
         .single();
@@ -271,7 +361,8 @@ serve(async (req) => {
       vehicleId = newVehicle.id;
       createdVehicle = true;
 
-      if (organizationId) {
+      // Only link org when seller is a dealer/broker and an orgId is explicitly provided.
+      if (organizationId && sellerType === 'dealer') {
         await supabase
           .from('organization_vehicles')
           .insert({
@@ -285,6 +376,38 @@ serve(async (req) => {
       }
 
       console.log(`Created new vehicle: ${vehicleId}`);
+    }
+
+    // Write/refresh bat_listings (if table exists in this project).
+    // This keeps auction identity separate from vehicles and lets comments/bids later attach cleanly.
+    try {
+      await supabase
+        .from('bat_listings')
+        .upsert(
+          {
+            vehicle_id: vehicleId,
+            organization_id: (organizationId && sellerType === 'dealer') ? organizationId : null,
+            bat_listing_url: batUrl,
+            bat_lot_number: lotNumber || null,
+            bat_listing_title: title || null,
+            sale_date: saleDate || null,
+            sale_price: salePrice || null,
+            seller_username: sellerUser.username,
+            buyer_username: buyerUser.username,
+            seller_bat_user_id: sellerUser.id,
+            buyer_bat_user_id: buyerUser.id,
+            listing_status: salePrice > 0 ? 'sold' : 'ended',
+            last_updated_at: new Date().toISOString(),
+            raw_data: {
+              source: 'bat_import',
+              bat_url: batUrl,
+              seller_type: sellerType || null,
+            },
+          },
+          { onConflict: 'bat_listing_url' },
+        );
+    } catch (e: any) {
+      console.log('bat_listings upsert failed (non-fatal):', e?.message || String(e));
     }
 
     const validations = [
@@ -442,6 +565,17 @@ serve(async (req) => {
         vehicleId,
         vehicle: listing,
         action: createdVehicle ? 'created' : 'updated',
+        seller_identity: {
+          bat_username: sellerUser.username,
+          bat_user_id: sellerUser.id,
+          bat_profile_url: sellerUser.profile_url,
+          seller_type: sellerType || null
+        },
+        buyer_identity: {
+          bat_username: buyerUser.username,
+          bat_user_id: buyerUser.id,
+          bat_profile_url: buyerUser.profile_url
+        },
         images: imageImport
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

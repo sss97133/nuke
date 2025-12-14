@@ -108,7 +108,7 @@ export class AIProcessingAuditor {
         await supabase
           .from('vehicle_images')
           .update({
-            ai_processing_status: 'complete',
+            ai_processing_status: 'completed',
             ai_processing_completed_at: new Date().toISOString()
           })
           .eq('id', image.id);

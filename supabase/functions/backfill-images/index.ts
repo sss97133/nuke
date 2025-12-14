@@ -13,6 +13,11 @@ interface BackfillRequest {
   run_analysis?: boolean;
   listed_date?: string;
   max_images?: number;
+  // Optional: chunking / chaining for large galleries (dealer sites like L'Art).
+  continue?: boolean;
+  chain_depth?: number;
+  sleep_ms?: number;
+  max_runtime_ms?: number;
 }
 
 const CRAIGSLIST_HIRES_SIZE = '1200x900';
@@ -37,6 +42,11 @@ function normalizeSourceUrl(raw: string): string {
     .replace(/&quot;/g, '"')
     .trim();
 
+  // Prefer https (Cloudinary commonly returns http on older sites).
+  if (imageUrl.startsWith('http://res.cloudinary.com/')) {
+    imageUrl = 'https://' + imageUrl.slice('http://'.length);
+  }
+
   // Remove resize parameters for BaT
   if (imageUrl.includes('bringatrailer.com')) {
     imageUrl = imageUrl
@@ -53,6 +63,19 @@ function normalizeSourceUrl(raw: string): string {
 }
 
 function candidateUrlsForSourceUrl(imageUrl: string): string[] {
+  // Prefer Cloudinary originals when we only have transformed thumbs.
+  // Example:
+  //   .../image/upload/c_fill,g_center,h_467,w_624/v172.../file.jpg
+  // ->.../image/upload/v172.../file.jpg
+  if (imageUrl.includes('res.cloudinary.com') && imageUrl.includes('/image/upload/')) {
+    // Remove transform segment between /upload/ and /v####... if present.
+    const m = imageUrl.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)([^/]+\/)?(v\d+\/.+)$/i);
+    if (m && m[1] && m[3]) {
+      const candidate = `${m[1]}${m[3]}`;
+      if (candidate !== imageUrl) return [candidate, imageUrl];
+    }
+  }
+
   // Prefer higher-res on Craigslist when possible, but keep fallback to original.
   // Example: ..._600x450.jpg -> ..._1200x900.jpg
   if (imageUrl.includes('images.craigslist.org') && /_\d+x\d+\.(jpg|jpeg|png|webp)(\?|$)/i.test(imageUrl)) {
@@ -81,13 +104,24 @@ serve(async (req) => {
     );
 
     const body: BackfillRequest = await req.json();
-    const { vehicle_id, image_urls, source = 'backfill', run_analysis = true, listed_date, max_images = 50 } = body;
+    const {
+      vehicle_id,
+      image_urls,
+      source = 'backfill',
+      run_analysis = true,
+      listed_date,
+      max_images = 50,
+      continue: shouldContinue = false,
+      chain_depth = 0,
+      sleep_ms = 200,
+      max_runtime_ms = 25000,
+    } = body;
 
     if (!vehicle_id || !image_urls || image_urls.length === 0) {
       throw new Error('vehicle_id and image_urls required');
     }
 
-    console.log(`Backfilling ${image_urls.length} images for vehicle ${vehicle_id} (max_images=${max_images})`);
+    console.log(`Backfilling ${image_urls.length} images for vehicle ${vehicle_id} (max_images=${max_images}, continue=${shouldContinue}, chain_depth=${chain_depth})`);
 
     // Get vehicle info for context
     const { data: vehicle } = await supabase
@@ -122,11 +156,12 @@ serve(async (req) => {
     // Dedupe: skip images already linked by source_url for this vehicle
     const { data: existingRows } = await supabase
       .from('vehicle_images')
-      .select('source_url')
+      .select('source_url, is_primary')
       .eq('vehicle_id', vehicle_id)
       .not('source_url', 'is', null)
       .limit(5000);
     const existingSourceUrls = new Set((existingRows || []).map((r: any) => String(r.source_url)));
+    const hasPrimaryAlready = (existingRows || []).some((r: any) => r?.is_primary === true);
 
     const normalizedInput = image_urls
       .map((u) => normalizeSourceUrl(String(u)))
@@ -142,7 +177,12 @@ serve(async (req) => {
       uniqueUrls.push(u);
     }
 
+    const startedAt = Date.now();
     for (let i = 0; i < uniqueUrls.length && results.uploaded < max_images; i++) {
+      if (Date.now() - startedAt > max_runtime_ms) {
+        console.log(`⏱️  Stopping early due to max_runtime_ms=${max_runtime_ms}`);
+        break;
+      }
       const rawUrl = uniqueUrls[i];
       if (existingSourceUrls.has(rawUrl)) {
         results.skipped++;
@@ -303,7 +343,8 @@ serve(async (req) => {
             storage_path: storagePath,
             source: effectiveSource,
             source_url: rawUrl,
-            is_primary: i === 0,
+            // Only set primary if there isn't one already (prevents later chunks from overwriting primary).
+            is_primary: !hasPrimaryAlready && results.uploaded === 0,
             taken_at: imageDate,
             // `vehicle_images` does NOT have a generic `metadata` column in production.
             // Store import provenance in `exif_data` (jsonb) and `source_url` (text).
@@ -357,7 +398,9 @@ serve(async (req) => {
         }
 
         // Rate limit
-        await new Promise(r => setTimeout(r, 500));
+        if (sleep_ms > 0) {
+          await new Promise(r => setTimeout(r, sleep_ms));
+        }
 
       } catch (error) {
         console.log(`Error processing ${rawUrl}: ${error.message}`);
@@ -369,6 +412,42 @@ serve(async (req) => {
     
     if (results.errors.length > 0) {
       console.log(`Errors encountered: ${results.errors.slice(0, 5).join('; ')}`);
+    }
+
+    // If requested, chain another backfill call to continue processing remaining images.
+    // This is critical for dealer galleries with > max_images or when max_runtime_ms is hit.
+    if (shouldContinue && chain_depth < 20) {
+      try {
+        // Determine remaining candidates (skip URLs already present to reduce payload).
+        const remaining = uniqueUrls.filter((u) => !existingSourceUrls.has(u));
+        if (remaining.length > results.uploaded) {
+          // Fire-and-forget next chunk.
+          const nextUrls = remaining.slice(results.uploaded);
+          if (nextUrls.length > 0) {
+            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/backfill-images`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({
+                vehicle_id,
+                image_urls: nextUrls,
+                source,
+                run_analysis,
+                listed_date: imageDate,
+                max_images,
+                continue: true,
+                chain_depth: chain_depth + 1,
+                sleep_ms,
+                max_runtime_ms,
+              } satisfies BackfillRequest)
+            }).catch(() => {});
+          }
+        }
+      } catch {
+        // non-blocking
+      }
     }
 
     return new Response(JSON.stringify({
