@@ -61,9 +61,10 @@ serve(async (req) => {
 
     // Fetch orgs missing a banner image (primary image).
     // NOTE: We don't use ilike/null filters heavily here; keep query simple and filter in code.
+    // Some deployments may not have `cover_image_url` yet. Keep this query compatible.
     const { data: orgs, error } = await supabase
       .from("businesses")
-      .select("id, business_name, website, logo_url, banner_url, cover_image_url, favicon_url, metadata")
+      .select("id, business_name, website, logo_url, banner_url, favicon_url, metadata")
       .order("updated_at", { ascending: true })
       .limit(batchSize);
 
@@ -92,11 +93,11 @@ serve(async (req) => {
 
         let bannerUrl: string | null =
           safeString(org.banner_url) ||
-          safeString(org.cover_image_url) ||
           safeString(org.logo_url) ||
           null;
 
-        let coverUrl: string | null = safeString(org.cover_image_url) || null;
+        // Not all schemas have cover_image_url; keep this best-effort only.
+        let coverUrl: string | null = null;
         let metaUpdate: any = null;
 
         if (!bannerUrl && origin) {
@@ -154,7 +155,6 @@ serve(async (req) => {
         if (!dryRun) {
           const updates: any = {};
           if (!safeString(org.banner_url)) updates.banner_url = bannerUrl;
-          if (!safeString(org.cover_image_url) && coverUrl) updates.cover_image_url = coverUrl;
           // Persist favicon_url on the business row (UI uses it directly).
           if (!safeString(org.favicon_url) && safeString(faviconUrl)) updates.favicon_url = faviconUrl;
           if (metaUpdate) updates.metadata = metaUpdate;

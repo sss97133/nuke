@@ -148,6 +148,68 @@ const ImageGallery = ({
   // NOTE: Must be declared before any hooks/callbacks reference it (avoids TDZ crashes in production builds).
   const [session, setSession] = useState<any>(null);
 
+  // Vehicle meta (used to suppress "BaT homepage noise" images that were mistakenly attached to some vehicles)
+  const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!vehicleId) { setVehicleMeta(null); return; }
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select('id, year, make, model, profile_origin, discovery_url')
+          .eq('id', vehicleId)
+          .maybeSingle();
+        if (!error) setVehicleMeta(data || null);
+      } catch {
+        setVehicleMeta(null);
+      }
+    })();
+  }, [vehicleId]);
+
+  const buildBatImageNeedle = (v: any): string | null => {
+    try {
+      const discoveryUrl = String(v?.discovery_url || '');
+      const origin = String(v?.profile_origin || '');
+      const isBat = origin === 'bat_import' || discoveryUrl.includes('bringatrailer.com/listing/');
+      if (!isBat) return null;
+      const year = v?.year ? String(v.year) : '';
+      const makeRaw = String(v?.make || '').trim().toLowerCase();
+      const modelRaw = String(v?.model || '').trim().toLowerCase();
+      if (!year || !makeRaw || !modelRaw) return null;
+      const makeSlug = makeRaw.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const modelSlug = modelRaw.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      if (!makeSlug || !modelSlug) return null;
+      return `${year}_${makeSlug}_${modelSlug}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const filterBatNoiseRows = (rows: any[], meta: any = vehicleMeta): any[] => {
+    const needle = buildBatImageNeedle(meta);
+    if (!needle) return rows;
+    const keep = (rows || []).filter((img: any) => {
+      const url = String(img?.image_url || '');
+      if (!url) return false;
+      // Never filter out non-BaT URLs (user uploads, Supabase storage, etc.)
+      if (!url.includes('bringatrailer.com/wp-content/uploads/')) return true;
+      return url.toLowerCase().includes(needle.toLowerCase());
+    });
+    return keep.length > 0 ? keep : rows;
+  };
+
+  // When vehicle meta arrives, re-filter any already-loaded images so the UI doesn't briefly show
+  // unrelated BaT homepage / other-lot images for bat_import vehicles.
+  useEffect(() => {
+    if (!vehicleMeta) return;
+    if (!allImages || allImages.length === 0) return;
+    const nextAll = filterBatNoiseRows(allImages);
+    if (nextAll.length === allImages.length) return;
+    setAllImages(nextAll);
+    setDisplayedImages(nextAll.slice(0, Math.min(50, nextAll.length)));
+    // Do not toggle usingFallback here; we only filter the current view.
+  }, [vehicleMeta]); // intentionally not depending on allImages to avoid loops
+
   const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
   const normalizeFallbackUrls = (urls: string[]) => {
     const out: string[] = [];
@@ -225,7 +287,7 @@ const ImageGallery = ({
         .order('is_primary', { ascending: false });
       if (refreshErr) throw refreshErr;
 
-      const images = dedupeFetchedImages(refreshed || []);
+      const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
       setUsingFallback(false);
       setAllImages(images);
       setDisplayedImages(images.slice(0, Math.min(50, images.length)));
@@ -536,6 +598,21 @@ const ImageGallery = ({
     const fetchImages = async () => {
       try {
         setLoading(true);
+
+        // Ensure we have vehicle meta before setting images so BaT imports don't briefly render wrong images.
+        let meta = vehicleMeta;
+        if (!meta) {
+          const { data: vm, error: vmErr } = await supabase
+            .from('vehicles')
+            .select('id, year, make, model, profile_origin, discovery_url')
+            .eq('id', vehicleId)
+            .maybeSingle();
+          if (!vmErr) {
+            meta = vm || null;
+            setVehicleMeta(meta);
+          }
+        }
+
         const { data: rawImages, error } = await supabase
           .from('vehicle_images')
           .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
@@ -546,7 +623,7 @@ const ImageGallery = ({
           .order('is_primary', { ascending: false });
 
         if (error) throw error;
-        const images = dedupeFetchedImages(rawImages || []);
+        const images = filterBatNoiseRows(dedupeFetchedImages(rawImages || []), meta);
 
         // If DB is empty, show fallback URLs (scraped listing images) to avoid empty profiles.
         const fallback = normalizeFallbackUrls(fallbackImageUrls);
@@ -623,8 +700,9 @@ const ImageGallery = ({
             
             if (!error && refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
+              const refreshedFiltered = filterBatNoiseRows(refreshedDeduped);
               // Check if the specific image was updated
-              const updatedImage = refreshedDeduped.find(img => img.id === imageId) || (refreshedImages || []).find((img: any) => img.id === imageId);
+              const updatedImage = refreshedFiltered.find(img => img.id === imageId) || (refreshedImages || []).find((img: any) => img.id === imageId);
               if (updatedImage) {
                 const hasNewAnalysis = updatedImage.ai_scan_metadata?.tier_1_analysis || 
                                       updatedImage.angle || 
@@ -632,7 +710,7 @@ const ImageGallery = ({
                 
                 if (hasNewAnalysis || index === refreshAttempts.length - 1) {
                   // Analysis is complete or this is the last attempt
-                  setAllImages(refreshedDeduped);
+                  setAllImages(refreshedFiltered);
                   const sorted = getSortedImages();
                   setDisplayedImages(sorted.slice(0, Math.max(displayedImages.length, 50)));
                   onImagesUpdated?.();
@@ -825,13 +903,14 @@ const ImageGallery = ({
         .order('is_primary', { ascending: false });
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
-      setAllImages(refreshedDeduped);
+      const refreshedFiltered = filterBatNoiseRows(refreshedDeduped);
+      setAllImages(refreshedFiltered);
       
       // Always show images after upload and refresh the display
       setShowImages(true);
       
       // Refresh displayed images with the new uploads
-      const sortedImages = (refreshedDeduped || []).sort((a: any, b: any) => {
+      const sortedImages = (refreshedFiltered || []).sort((a: any, b: any) => {
         if (sortBy === 'primary') {
           if (a.is_primary && !b.is_primary) return -1;
           if (!a.is_primary && b.is_primary) return 1;

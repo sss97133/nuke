@@ -116,8 +116,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
       const sorted = (arr || []).slice().sort((a: any, b: any) => {
         const aStatus = String(a?.listing_status || '').toLowerCase();
         const bStatus = String(b?.listing_status || '').toLowerCase();
-        const aActive = aStatus === 'active';
-        const bActive = bStatus === 'active';
+        const aActive = aStatus === 'active' || aStatus === 'live';
+        const bActive = bStatus === 'active' || bStatus === 'live';
         if (aActive !== bActive) return aActive ? -1 : 1;
         const ae = a?.end_date ? new Date(a.end_date).getTime() : 0;
         const be = b?.end_date ? new Date(b.end_date).getTime() : 0;
@@ -135,7 +135,9 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
     const loadAuctionPulse = async () => {
       try {
         // Prefer RPC snapshot if present to avoid duplicate reads
-        const rpcListings = (window as any).__vehicleProfileRpcData?.external_listings;
+        const rpcCache = (window as any).__vehicleProfileRpcData;
+        const rpcListings =
+          rpcCache && rpcCache.vehicle_id === vehicleId ? rpcCache.external_listings : null;
         const fromRpc = Array.isArray(rpcListings) ? pickBestListing(rpcListings) : null;
 
         // Always try to refresh from DB for live accuracy (best-effort)

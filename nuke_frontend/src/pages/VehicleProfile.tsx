@@ -987,7 +987,7 @@ const VehicleProfile: React.FC = () => {
           const end = l?.end_date ? new Date(l.end_date).getTime() : NaN;
           const endFuture = Number.isFinite(end) ? end > now : false;
           const hasTelemetry = typeof l?.current_bid === 'number' || typeof l?.bid_count === 'number' || typeof l?.watcher_count === 'number' || typeof l?.view_count === 'number';
-          if (status === 'active') return 3;
+          if (status === 'active' || status === 'live') return 3;
           if (endFuture) return 2;
           if (hasTelemetry) return 1;
           return 0;
@@ -1378,15 +1378,54 @@ const VehicleProfile: React.FC = () => {
   const loadVehicleImages = async () => {
     if (!vehicle) return;
 
+    const buildBatImageNeedle = (v: any): string | null => {
+      try {
+        const discoveryUrl = String(v?.discovery_url || '');
+        const origin = String(v?.profile_origin || '');
+        const isBat = origin === 'bat_import' || discoveryUrl.includes('bringatrailer.com/listing/');
+        if (!isBat) return null;
+        const year = v?.year ? String(v.year) : '';
+        const makeRaw = String(v?.make || '').trim().toLowerCase();
+        const modelRaw = String(v?.model || '').trim().toLowerCase();
+        if (!year || !makeRaw || !modelRaw) return null;
+        const makeSlug = makeRaw.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        const modelSlug = modelRaw.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        if (!makeSlug || !modelSlug) return null;
+        // BaT WordPress image paths typically include `${year}_${make}_${model}` with `_` between year+make and `-` in model tokens.
+        return `${year}_${makeSlug}_${modelSlug}`;
+      } catch {
+        return null;
+      }
+    };
+
+    const filterBatNoise = (urls: string[], v: any): string[] => {
+      const needle = buildBatImageNeedle(v);
+      if (!needle) return urls;
+      const keep = (urls || []).filter((u) => {
+        const s = String(u || '');
+        if (!s) return false;
+        // Never filter out non-BaT URLs (user uploads, Supabase storage, etc.)
+        if (!s.includes('bringatrailer.com/wp-content/uploads/')) return true;
+        return s.toLowerCase().includes(needle.toLowerCase());
+      });
+      // Safety: if we filtered everything out, keep the originals rather than showing nothing.
+      return keep.length > 0 ? keep : urls;
+    };
+
     // Check if RPC data is available (avoid duplicate query)
     const rpcData = (window as any).__vehicleProfileRpcData;
     const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicle.id;
     if (rpcMatchesThisVehicle && rpcData?.images && Array.isArray(rpcData.images) && rpcData.images.length > 0) {
-      const images = rpcData.images.map((img: any) => img.image_url);
+      const imagesRaw = rpcData.images.map((img: any) => img.image_url).filter(Boolean);
+      const images = filterBatNoise(imagesRaw, vehicle);
       setVehicleImages(images);
-      const leadImage = rpcData.images.find((img: any) => img.is_primary) || rpcData.images[0];
-      if (leadImage) {
-        setLeadImageUrl(leadImage.large_url || leadImage.image_url);
+      // Pick lead image from the filtered list to avoid BaT homepage noise becoming the hero.
+      const leadFromRpc = rpcData.images.find((img: any) => img.is_primary) || rpcData.images[0];
+      const leadCandidate = leadFromRpc?.large_url || leadFromRpc?.image_url;
+      const leadOk = leadCandidate && filterBatNoise([leadCandidate], vehicle).length > 0;
+      const lead = leadOk ? leadCandidate : (images[0] || null);
+      if (lead) {
+        setLeadImageUrl(lead as any);
       }
       return;
     }
@@ -1409,11 +1448,13 @@ const VehicleProfile: React.FC = () => {
       } else if (imageRecords && imageRecords.length > 0) {
         // PERFORMANCE FIX: Load lead image immediately, don't wait for all signed URLs
         const leadImage = imageRecords.find((r: any) => r.is_primary === true) || imageRecords[0];
+        const leadCandidate = leadImage?.large_url || leadImage?.image_url || null;
 
         // Set lead image URL immediately using public URL (fast)
         if (leadImage) {
           // Prefer large_url for hero image, fallback to image_url
-          setLeadImageUrl(leadImage.large_url || leadImage.image_url);
+          const leadOk = leadCandidate && filterBatNoise([leadCandidate], vehicle).length > 0;
+          setLeadImageUrl((leadOk ? leadCandidate : null) as any);
 
           // Signed URL upgrade disabled due to storage configuration issues
           // Would generate 400 errors - using direct public URL instead
@@ -1428,8 +1469,15 @@ const VehicleProfile: React.FC = () => {
         }
 
         // Load all images using public URLs (fast) and de-dupe (storage/variants can create repeats)
-        images = Array.from(new Set((imageRecords || []).map((r: any) => r?.image_url).filter(Boolean)));
+        const raw = Array.from(new Set((imageRecords || []).map((r: any) => r?.image_url).filter(Boolean)));
+        images = filterBatNoise(raw, vehicle);
         setVehicleImages(images);
+
+        // If we filtered out a noisy lead image, ensure we still have a hero.
+        const leadStillOk = leadCandidate && filterBatNoise([leadCandidate], vehicle).length > 0;
+        if (!leadStillOk && images.length > 0) {
+          setLeadImageUrl(images[0]);
+        }
 
         // Signed URL generation disabled due to storage configuration issues
         // Would generate 400 errors: createSignedUrl calls failing

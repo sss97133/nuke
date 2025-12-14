@@ -659,7 +659,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const status = String(auctionPulse.listing_status || '').toLowerCase();
     // Some environments may backfill listings with status='unknown' initially. If we have a future end_date,
     // treat it as live so the header shows the auction pulse instead of hiding it.
-    if (status !== 'active') {
+    if (status !== 'active' && status !== 'live') {
       if (!auctionPulse?.end_date) return false;
       const end = new Date(auctionPulse.end_date).getTime();
       if (!Number.isFinite(end)) return false;
@@ -676,7 +676,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (!auctionPulse?.listing_url) return null;
     if (status === 'sold') return 'sold' as const;
     if (status === 'reserve_not_met') return 'reserve_not_met' as const;
-    if (status === 'active') {
+    if (status === 'active' || status === 'live') {
       // "Ending soon" when under 1h
       if (auctionPulse?.end_date) {
         const end = new Date(auctionPulse.end_date).getTime();
