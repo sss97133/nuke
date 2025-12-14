@@ -235,11 +235,32 @@ export class ReferenceDocumentService {
    */
   static async getVehicleDocuments(vehicleId: string): Promise<ReferenceDocument[]> {
     try {
+      // Preferred (fast): RPC if present
       const { data, error } = await supabase
         .rpc('get_vehicle_documents', { p_vehicle_id: vehicleId });
 
-      if (error) throw error;
-      return data || [];
+      if (!error) return data || [];
+
+      // Fallback: some envs don't have this RPC deployed (404). In that case, query directly.
+      const errMsg = String((error as any)?.message || '');
+      const httpStatus = (error as any)?.status;
+      const isMissingRpc = httpStatus === 404 || errMsg.toLowerCase().includes('not found');
+      if (!isMissingRpc) throw error;
+
+      const { data: rows, error: linkErr } = await supabase
+        .from('vehicle_documents')
+        .select('document_id, reference_documents(*)')
+        .eq('vehicle_id', vehicleId)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (linkErr) throw linkErr;
+
+      const docs = (rows || [])
+        .map((r: any) => r?.reference_documents)
+        .filter(Boolean);
+
+      return docs;
     } catch (error) {
       console.error('Error loading vehicle documents:', error);
       return [];

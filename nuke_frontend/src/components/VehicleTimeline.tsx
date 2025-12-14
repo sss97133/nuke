@@ -320,30 +320,19 @@ const VehicleTimeline: React.FC<{
         .limit(200);
 
       // Load auction activity dates (comments and events)
-      const { data: auctionData } = await supabase
+      const { data: auctionDataRaw, error: auctionErr } = await supabase
         .from('auction_comments')
-        .select(`
-          posted_at,
-          comment_text,
-          comment_type,
-          bid_amount,
-          is_leading_bid,
-          auction_events (
-            source_url,
-            auction_start_date,
-            auction_end_date,
-            winning_bid,
-            outcome
-          )
-        `)
-        .eq('vehicle_id', vehicleId);
+        .select('posted_at, comment_type, bid_amount, is_leading_bid')
+        .eq('vehicle_id', vehicleId)
+        .order('posted_at', { ascending: false })
+        .limit(5000);
+      const auctionData = auctionErr ? [] : (auctionDataRaw || []);
 
       // Load photo dates for calendar heatmap (photos ARE activity even if not events)
       const { data: imageData } = await supabase
         .from('vehicle_images')
-        .select('taken_at')
-        .eq('vehicle_id', vehicleId)
-        .not('taken_at', 'is', null);
+        .select('taken_at, created_at')
+        .eq('vehicle_id', vehicleId);
 
       // Build activity date map for calendar (photos + auction activity)
       const activityDateMap = new Map<string, number>();
@@ -351,8 +340,9 @@ const VehicleTimeline: React.FC<{
       // Add photo dates
       if (imageData) {
         for (const img of imageData) {
-          if (img.taken_at) {
-            const dateKey = new Date(img.taken_at).toISOString().split('T')[0];
+          const dt = (img as any)?.taken_at || (img as any)?.created_at;
+          if (dt) {
+            const dateKey = new Date(dt).toISOString().split('T')[0];
             activityDateMap.set(dateKey, (activityDateMap.get(dateKey) || 0) + 1);
           }
         }
@@ -376,13 +366,24 @@ const VehicleTimeline: React.FC<{
         const todayYmd = new Date().toISOString().slice(0, 10);
         const todayActivity = activityDateMap.get(todayYmd) || 0;
         if (!autoOpenedTodayRef.current && todayActivity > 0 && Array.isArray(auctionData) && auctionData.length > 0) {
-          // Determine if the auction is still live using any linked auction_end_date.
-          const now = Date.now();
-          const anyEnd = auctionData
-            .map((c: any) => c?.auction_events?.auction_end_date)
-            .find((v: any) => typeof v === 'string' && v);
-          const endMs = anyEnd ? new Date(anyEnd).getTime() : NaN;
-          const isLiveAuction = Number.isFinite(endMs) ? endMs > now : false;
+          // Determine if auction is live using external_listings end_date when available (more reliable than joins).
+          let isLiveAuction = true;
+          try {
+            const { data: listing } = await supabase
+              .from('external_listings')
+              .select('end_date, listing_status, updated_at')
+              .eq('vehicle_id', vehicleId)
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            const status = String((listing as any)?.listing_status || '').toLowerCase();
+            const end = (listing as any)?.end_date ? new Date((listing as any).end_date).getTime() : NaN;
+            if (status === 'ended' || status === 'sold') isLiveAuction = false;
+            if (Number.isFinite(end)) isLiveAuction = end > Date.now();
+          } catch {
+            // If we can't determine, prefer showing the open receipt (vehicle-first UX).
+            isLiveAuction = true;
+          }
 
           if (isLiveAuction) {
             const alreadyOpenedKey = `nzero_open_receipt_${vehicleId}_${todayYmd}`;

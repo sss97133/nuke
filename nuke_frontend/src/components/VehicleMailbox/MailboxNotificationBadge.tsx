@@ -64,8 +64,24 @@ const MailboxNotificationBadge: React.FC<MailboxNotificationBadgeProps> = ({
         }
       })
 
+      const isJson = (res: Response) => {
+        const ct = res.headers.get('content-type') || ''
+        return ct.toLowerCase().includes('application/json')
+      }
+
+      // If this app is deployed without server routes for /api/*, Vercel will often return index.html (200)
+      // which will crash response.json() with "Unexpected token '<'".
+      if (response.ok && !isJson(response)) {
+        setHasAccess(false)
+        return
+      }
+
       if (response.ok) {
-        const result = await response.json()
+        const result = await response.json().catch(() => null as any)
+        if (!result?.data?.mailbox) {
+          setHasAccess(false)
+          return
+        }
         const mailbox = result.data.mailbox
 
         // Get message counts
@@ -76,9 +92,14 @@ const MailboxNotificationBadge: React.FC<MailboxNotificationBadgeProps> = ({
           }
         })
 
+        if (messagesResponse.ok && !isJson(messagesResponse)) {
+          setHasAccess(false)
+          return
+        }
+
         if (messagesResponse.ok) {
-          const messagesResult = await messagesResponse.json()
-          const messages = messagesResult.data
+          const messagesResult = await messagesResponse.json().catch(() => null as any)
+          const messages = Array.isArray(messagesResult?.data) ? messagesResult.data : []
 
           const summary: MailboxSummary = {
             total_messages: messages.length,
@@ -100,7 +121,7 @@ const MailboxNotificationBadge: React.FC<MailboxNotificationBadgeProps> = ({
           setSummary(summary)
           setHasAccess(true)
         }
-      } else if (response.status === 403) {
+      } else if (response.status === 403 || response.status === 404) {
         // User doesn't have access to this mailbox
         setHasAccess(false)
       }

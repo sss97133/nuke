@@ -74,8 +74,27 @@ export const useVehicleMailbox = (vehicleId: string | undefined): UseVehicleMail
         }
       })
 
+      const isJson = (res: Response) => {
+        const ct = res.headers.get('content-type') || ''
+        return ct.toLowerCase().includes('application/json')
+      }
+
       if (response.ok) {
-        const result = await response.json()
+        if (!isJson(response)) {
+          // When /api/* is not deployed, Vercel may serve index.html (200). Avoid JSON parse crash.
+          setMailbox(null)
+          setMessages([])
+          setHasAccess(false)
+          return
+        }
+
+        const result = await response.json().catch(() => null as any)
+        if (!result?.data?.mailbox) {
+          setMailbox(null)
+          setMessages([])
+          setHasAccess(false)
+          return
+        }
         setMailbox(result.data.mailbox)
         setHasAccess(true)
 
@@ -88,10 +107,14 @@ export const useVehicleMailbox = (vehicleId: string | undefined): UseVehicleMail
         })
 
         if (messagesResponse.ok) {
-          const messagesResult = await messagesResponse.json()
-          setMessages(messagesResult.data)
+          if (!isJson(messagesResponse)) {
+            setMessages([])
+            return
+          }
+          const messagesResult = await messagesResponse.json().catch(() => null as any)
+          setMessages(Array.isArray(messagesResult?.data) ? messagesResult.data : [])
         }
-      } else if (response.status === 403) {
+      } else if (response.status === 403 || response.status === 404) {
         setHasAccess(false)
         setError('Access denied to this mailbox')
       } else {
