@@ -609,11 +609,62 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return typeof value === 'number' ? value : undefined;
   };
 
-  const visibleOrganizations = useMemo(() => {
-    return (organizationLinks || []).slice(0, 3);
-  }, [organizationLinks]);
+  // Header org pills are tiny; if the same org is linked multiple times (e.g. legacy `consigner` + `sold_by`),
+  // we should display a single pill with the "best" relationship to avoid duplicates.
+  const { visibleOrganizations, extraOrgCount } = useMemo(() => {
+    const links = (organizationLinks || []) as any[];
+    if (links.length === 0) return { visibleOrganizations: [], extraOrgCount: 0 };
 
-  const extraOrgCount = Math.max(0, (organizationLinks?.length || 0) - visibleOrganizations.length);
+    const relPriority = (rel?: string | null) => {
+      const r = String(rel || '').toLowerCase();
+      // Higher-signal dealer relationships first
+      const order = [
+        'sold_by',
+        'seller',
+        'consigner',
+        // common non-dealer relationships
+        'owner',
+        'service_provider',
+        'work_location',
+        'parts_supplier',
+        'fabricator',
+        'painter',
+        'upholstery',
+        'transport',
+        'storage',
+        'inspector',
+        'collaborator',
+      ];
+      const idx = order.indexOf(r);
+      return idx >= 0 ? idx : 999;
+    };
+
+    const byOrg = new Map<string, any>();
+    for (const link of links) {
+      const orgId = String(link?.organization_id || link?.id || '');
+      if (!orgId) continue;
+      const existing = byOrg.get(orgId);
+      if (!existing) {
+        byOrg.set(orgId, link);
+        continue;
+      }
+
+      const nextRank = relPriority(link?.relationship_type);
+      const prevRank = relPriority(existing?.relationship_type);
+
+      // Prefer higher-priority relationship; if equal, prefer non-auto-tagged (manually curated).
+      const nextAuto = Boolean(link?.auto_tagged);
+      const prevAuto = Boolean(existing?.auto_tagged);
+      if (nextRank < prevRank || (nextRank === prevRank && prevAuto && !nextAuto)) {
+        byOrg.set(orgId, link);
+      }
+    }
+
+    const unique = Array.from(byOrg.values());
+    const visible = unique.slice(0, 3);
+    const extra = Math.max(0, unique.length - visible.length);
+    return { visibleOrganizations: visible, extraOrgCount: extra };
+  }, [organizationLinks]);
 
   const formatRelationship = (relationship?: string | null) => {
     if (!relationship) return 'Partner';

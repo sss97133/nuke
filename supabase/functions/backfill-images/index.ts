@@ -96,8 +96,11 @@ serve(async (req) => {
       .eq('id', vehicle_id)
       .single();
 
-    // Get admin user ID for attribution
-    const adminUserId = '4e6849be-21dc-4dcf-bc0d-f0b2aad4f8c0';
+    // NOTE: vehicle_images has an attribution CHECK constraint + FK to auth.users.
+    // Edge Functions frequently have no auth user context; rather than hardcoding a user_id that might not exist,
+    // rely on a whitelisted `source` and leave user_id null.
+    const ALLOWED_SOURCES = new Set(['bat_import', 'external_import', 'organization_import']);
+    const effectiveSource = ALLOWED_SOURCES.has(source) ? source : 'external_import';
 
     // Determine image date from listed_date or origin_metadata
     let imageDate = listed_date;
@@ -190,16 +193,19 @@ serve(async (req) => {
         } catch (fetchError: any) {
           if (fetchError.name === 'AbortError') console.log(`Timeout fetching ${rawUrl}`);
           else console.log(`Fetch error for ${rawUrl}: ${fetchError.message || fetchError}`);
+          results.errors.push(`fetch_error: ${rawUrl} :: ${fetchError?.name || 'Error'} :: ${fetchError?.message || String(fetchError)}`);
           results.failed++;
           continue;
         }
         
         if (!imageResponse.ok) {
           console.log(`Failed to download ${rawUrl}: ${imageResponse.status} ${imageResponse.statusText}`);
+          results.errors.push(`download_failed: ${rawUrl} :: ${imageResponse.status} ${imageResponse.statusText}`);
           try {
             const errorText = await imageResponse.text();
             if (errorText && errorText.length < 500) {
               console.log(`Error response: ${errorText}`);
+              results.errors.push(`download_body: ${rawUrl} :: ${errorText}`);
             }
           } catch (e) {
             // Ignore error reading response
@@ -211,6 +217,7 @@ serve(async (req) => {
         const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
         if (!contentType.startsWith('image/')) {
           console.log(`Not an image: ${contentType} for ${rawUrl}`);
+          results.errors.push(`not_image: ${rawUrl} :: ${contentType}`);
           results.failed++;
           continue;
         }
@@ -224,6 +231,7 @@ serve(async (req) => {
           imageBytes = new Uint8Array(arrayBuffer);
         } catch (conversionError: any) {
           console.log(`Conversion error for ${rawUrl}: ${conversionError.message || conversionError}`);
+          results.errors.push(`convert_error: ${rawUrl} :: ${conversionError?.message || String(conversionError)}`);
           results.failed++;
           continue;
         }
@@ -231,6 +239,7 @@ serve(async (req) => {
         // Verify it's actually an image
         if (imageBytes.length === 0) {
           console.log(`Empty bytes for ${rawUrl}`);
+          results.errors.push(`empty_bytes: ${rawUrl}`);
           results.failed++;
           continue;
         }
@@ -238,6 +247,7 @@ serve(async (req) => {
         // Check size (should be > 0 and < 50MB)
         if (imageBytes.length > 52428800) {
           console.log(`Image too large: ${(imageBytes.length / 1024 / 1024).toFixed(1)}MB for ${rawUrl}`);
+          results.errors.push(`too_large: ${rawUrl} :: ${(imageBytes.length / 1024 / 1024).toFixed(1)}MB`);
           results.failed++;
           continue;
         }
@@ -248,8 +258,8 @@ serve(async (req) => {
 
         // Deterministic storage path prevents re-upload storms during re-runs.
         const urlHash = await sha1Hex(`${rawUrl}|${extension}`);
-        const filename = `${source}_${urlHash}.${extension}`;
-        const storagePath = `${vehicle_id}/${source}/${filename}`;
+        const filename = `${effectiveSource}_${urlHash}.${extension}`;
+        const storagePath = `${vehicle_id}/${effectiveSource}/${filename}`;
         
         console.log(`Uploading to storage: ${storagePath}`);
         
@@ -288,10 +298,10 @@ serve(async (req) => {
           .from('vehicle_images')
           .insert({
             vehicle_id,
-            user_id: adminUserId,
+            user_id: null,
             image_url: publicUrl,
             storage_path: storagePath,
-            source: source,
+            source: effectiveSource,
             source_url: rawUrl,
             is_primary: i === 0,
             taken_at: imageDate,
@@ -300,6 +310,7 @@ serve(async (req) => {
             exif_data: {
               original_url: rawUrl,
               import_source: source,
+              effective_source: effectiveSource,
               import_index: i,
               imported_at: new Date().toISOString()
             }
@@ -309,6 +320,7 @@ serve(async (req) => {
 
         if (dbError) {
           console.log(`DB insert failed: ${dbError.message}`);
+          results.errors.push(`db_insert_failed: ${rawUrl} :: ${dbError.message}`);
           results.failed++;
           continue;
         }
@@ -331,7 +343,7 @@ serve(async (req) => {
                   image_url: publicUrl,
                   vehicle_id,
                   image_id: imageRecord.id,
-                  user_id: adminUserId
+                  user_id: null
                 })
               }
             );

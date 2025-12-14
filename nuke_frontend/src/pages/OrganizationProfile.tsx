@@ -1037,6 +1037,9 @@ export default function OrganizationProfile() {
 
   const primaryImage = images.find(i => i.category === 'logo') || images[0];
   const displayName = organization.business_name || organization.legal_name || 'Unnamed Organization';
+  const headerLogoUrl =
+    (organization as any)?.logo_url ||
+    (primaryImage?.image_url ?? null);
 
   return (
     <div style={{ background: '#f5f5f5', minHeight: '100vh' }}>
@@ -1052,7 +1055,25 @@ export default function OrganizationProfile() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           {/* Organization name - PRIMARY FOCUS */}
-          <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+          <div style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+            {headerLogoUrl && (
+              <img
+                src={String(headerLogoUrl).startsWith('//') ? `https:${headerLogoUrl}` : headerLogoUrl}
+                alt=""
+                width={89}
+                height={37}
+                style={{
+                  display: 'block',
+                  maxWidth: 120,
+                  height: 'auto',
+                  imageRendering: 'auto'
+                }}
+                onError={(e) => {
+                  // Hide broken external logos silently
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            )}
             <h1 style={{ 
               fontSize: '20pt', 
               fontWeight: 700, 
