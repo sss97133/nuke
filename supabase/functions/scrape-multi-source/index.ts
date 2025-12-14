@@ -276,6 +276,9 @@ interface ScrapeRequest {
   use_llm_extraction?: boolean;
   // Some dealer sites expose a deterministic "sold inventory" feed. BHCC supports this.
   include_sold?: boolean;
+  // Force a listing status label for the queued items (helps when scraping "sold archive" URLs).
+  // This does NOT directly change any DB rows; it only tags items in import_queue raw_data.
+  force_listing_status?: 'sold' | 'in_stock';
   // Cheapest run mode:
   // - Skip OpenAI fallback extraction entirely
   // - Skip Firecrawl when possible (use direct HTML fetch + deterministic URL enumeration)
@@ -309,6 +312,7 @@ serve(async (req) => {
       extract_dealer_info = true,
       use_llm_extraction = true,
       include_sold = false,
+      force_listing_status,
       cheap_mode = false,
       max_listings = 100,
       max_results,
@@ -337,9 +341,9 @@ serve(async (req) => {
 
     // Step 1: Scrape with Firecrawl STRUCTURED EXTRACTION (AGGRESSIVE)
     if (cheap_mode) {
-      console.log('🪙 Cheap mode enabled: skipping OpenAI and minimizing Firecrawl usage');
+      console.log('Cheap mode enabled: skipping OpenAI and minimizing Firecrawl usage');
     } else {
-      console.log('🔥 Using Firecrawl structured extraction for inventory...');
+      console.log('Using Firecrawl structured extraction for inventory...');
     }
     
     const isAuctionHouse = source_type === 'auction' || source_type === 'auction_house';
@@ -380,6 +384,9 @@ serve(async (req) => {
               mileage: { type: 'number' },
               location: { type: 'string' },
               thumbnail_url: { type: 'string' },
+              // Inventory grids often expose small image URLs. These are valuable as a fallback
+              // when per-listing pages block scraping (downstream image analysis depends on this).
+              image_urls: { type: 'array', items: { type: 'string' } },
               description_snippet: { type: 'string' },
               vin: { type: 'string' },
               is_squarebody: { type: 'boolean' }
@@ -504,11 +511,11 @@ serve(async (req) => {
               metadata = firecrawlData.data?.metadata ?? null;
               extract = firecrawlData.data?.extract ?? null;
             } else {
-              console.warn(`⚠️ Firecrawl returned success=false: ${JSON.stringify(firecrawlData.error || firecrawlData).slice(0, 300)}`);
+              console.warn(`Firecrawl returned success=false: ${JSON.stringify(firecrawlData.error || firecrawlData).slice(0, 300)}`);
             }
           } else {
             const errorText = await firecrawlResponse.text();
-            console.warn(`⚠️ Firecrawl error ${firecrawlResponse.status}: ${errorText.slice(0, 200)}`);
+            console.warn(`Firecrawl error ${firecrawlResponse.status}: ${errorText.slice(0, 200)}`);
           }
         } else {
           // Cheap/general fallback: pull HTML directly so our deterministic URL enumeration (Step 4/4b) can run.
@@ -523,16 +530,16 @@ serve(async (req) => {
           if (resp.ok) {
             html = await resp.text();
           } else {
-            console.warn(`⚠️ Direct fetch failed: ${resp.status} ${resp.statusText}`);
+            console.warn(`Direct fetch failed: ${resp.status} ${resp.statusText}`);
           }
         }
       } catch (e: any) {
-        console.warn(`⚠️ Firecrawl request failed: ${e?.message || e}`);
+        console.warn(`Firecrawl request failed: ${e?.message || e}`);
       }
     }
 
     if (!html) {
-      console.log('📡 Falling back to direct fetch for HTML...');
+      console.log('Falling back to direct fetch for HTML...');
       const resp = await fetch(source_url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -553,14 +560,14 @@ serve(async (req) => {
 
     // Step 2: Use Firecrawl structured extraction results
     if (extract) {
-      console.log('✅ Firecrawl structured extraction successful');
+      console.log('Firecrawl structured extraction successful');
       dealerInfo = extract.dealer_info || null;
       listings = extract.listings || [];
       console.log(`Firecrawl extracted: dealer=${!!dealerInfo}, listings=${listings.length}`);
       
       // Handle pagination if next_page_url exists
       if (extract.next_page_url && listings.length > 0) {
-        console.log(`📄 Pagination detected: ${extract.next_page_url}`);
+        console.log(`Pagination detected: ${extract.next_page_url}`);
         // Note: Could recursively scrape next pages here if needed
       }
     }
@@ -679,13 +686,15 @@ Return ONLY valid JSON in this format:
 
     // Step 4: Last resort - try Firecrawl again with different approach (sitemap or deeper crawl)
     if (listings.length === 0 && html) {
-      console.log('⚠️ No listings found, attempting Firecrawl with deeper extraction...');
+      console.log('No listings found, attempting deeper extraction...');
       
       // Try scraping with actions to interact with page (if needed)
       // For now, fallback to basic URL extraction
       const listingPatterns = [
         /href="([^"]*\/listing\/[^"]+)"/gi,
         /href="([^"]*\/vehicle\/[^"]+)"/gi,
+        // Classic.com listing detail pages often use /l/<id-or-slug>/
+        /href="([^"]*\/l\/[^"]+)"/gi,
         // L'Art de L'Automobile (and similar) uses /fiche/<slug> for vehicle detail pages.
         /href="([^"]*\/fiche\/[^"]+)"/gi,
         // Beverly Hills Car Club: listing detail pages end with -c-<id>.htm (no /inventory/ segment)
@@ -758,9 +767,32 @@ Return ONLY valid JSON in this format:
           if (abs.includes('/fiche/')) found.add(abs);
         }
 
+        // Classic.com: enumerate listing detail URLs from seller pages.
+        // We keep this conservative: only pick /l/ links and normalize to the current origin.
+        const baseHost = baseUrl.hostname.replace(/^www\./, '').toLowerCase();
+        if (baseHost === 'classic.com') {
+          const anyClassicListingHref = /href="([^"]*\/l\/[^"]+)"/gi;
+          while ((m = anyClassicListingHref.exec(html)) !== null) {
+            const raw = (m[1] || '').trim();
+            if (!raw) continue;
+            // Make absolute, but keep within the same origin to avoid pulling external links.
+            const abs = raw.startsWith('http') ? raw : `${baseUrl.origin}${raw.startsWith('/') ? '' : '/'}${raw}`;
+            try {
+              const u = new URL(abs);
+              if (u.hostname.replace(/^www\./, '').toLowerCase() !== 'classic.com') continue;
+              if (!u.pathname.toLowerCase().startsWith('/l/')) continue;
+              // Normalize trailing slash
+              const normalized = u.pathname.endsWith('/') ? `${u.origin}${u.pathname}` : `${u.origin}${u.pathname}/`;
+              found.add(normalized);
+            } catch {
+              // ignore
+            }
+          }
+        }
+
         const enumeratedUrls = Array.from(found);
         if (enumeratedUrls.length > listings.length) {
-          console.log(`✅ URL enumeration found ${enumeratedUrls.length} /fiche/ links (overriding prior listings=${listings.length})`);
+          console.log(`URL enumeration found ${enumeratedUrls.length} listing links (overriding prior listings=${listings.length})`);
           listings = enumeratedUrls.map((url) => ({
             url,
             title: null,
@@ -771,7 +803,7 @@ Return ONLY valid JSON in this format:
           }));
         }
       } catch (e: any) {
-        console.warn(`⚠️ URL enumeration failed: ${e?.message || e}`);
+        console.warn(`URL enumeration failed: ${e?.message || e}`);
       }
     }
 
@@ -846,18 +878,18 @@ Return ONLY valid JSON in this format:
         .maybeSingle();
       
       if (!existingOrg) {
-        console.warn(`⚠️  Provided organization_id ${organizationId} not found, will create new organization`);
+        console.warn(`Provided organization_id ${organizationId} not found, will create new organization`);
         organizationId = null;
       } else {
         businessType = (existingOrg.type === 'auction_house' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
-        console.log(`✅ Using provided organization: ${existingOrg.business_name} (${businessType})`);
+        console.log(`Using provided organization: ${existingOrg.business_name} (${businessType})`);
       }
     }
     
     // Normalize/sanitize dealer info before writing to the businesses table.
     const normalizedDealer = normalizeDealerInfo(dealerInfo);
     if (!normalizedDealer && dealerInfo && dealerInfo.name) {
-      console.warn('⚠️  Dealer info extracted but failed validation; skipping business create/update to protect DB quality.');
+      console.warn('Dealer info extracted but failed validation; skipping business create/update to protect DB quality.');
     }
 
     if (!organizationId && normalizedDealer && normalizedDealer.name) {
@@ -893,7 +925,7 @@ Return ONLY valid JSON in this format:
       if (existingOrg) {
         organizationId = existingOrg.id;
         businessType = (existingOrg.type === 'auction_house' || source_type === 'auction_house') ? 'auction_house' : 'dealer';
-        console.log(`✅ Found existing business: ${existingOrg.business_name} (${organizationId})`);
+        console.log(`Found existing business: ${existingOrg.business_name} (${organizationId})`);
         
         // Update inventory counts if we have them
         const updates: any = {
@@ -960,7 +992,7 @@ Return ONLY valid JSON in this format:
 
         if (newOrg) {
           organizationId = newOrg.id;
-          console.log(`✅ Created new business: ${newOrg.business_name} (${organizationId})`);
+          console.log(`Created new business: ${newOrg.business_name} (${organizationId})`);
         } else if (orgError) {
           console.error('Error creating business:', orgError);
         }
@@ -1045,7 +1077,7 @@ Return ONLY valid JSON in this format:
           }
         }
       } catch (err: any) {
-        console.warn(`⚠️ Brand DNA extraction failed (non-blocking): ${err?.message || String(err)}`);
+        console.warn(`Brand DNA extraction failed (non-blocking): ${err?.message || String(err)}`);
       }
     }
 
@@ -1054,9 +1086,18 @@ Return ONLY valid JSON in this format:
     let duplicateCount = 0;
     let inventoryCreatedCount = 0;
     const inferredListingStatus =
-      source_url.includes('/voitures-vendues') || source_url.includes('voitures-vendues')
-        ? 'sold'
-        : 'in_stock';
+      force_listing_status
+        ? force_listing_status
+        : (
+          source_url.includes('/voitures-vendues') ||
+          source_url.includes('voitures-vendues') ||
+          /\/sold\b/i.test(source_url) ||
+          /sold-?inventory/i.test(source_url) ||
+          /sold-?vehicles/i.test(source_url) ||
+          /\/archive\b/i.test(source_url)
+            ? 'sold'
+            : 'in_stock'
+        );
 
     // Stable paging for very large inventories (e.g., sold archives).
     // Sort by URL so `start_offset` is deterministic across runs.
@@ -1073,7 +1114,7 @@ Return ONLY valid JSON in this format:
     const shouldCreateInventoryDirectly = organizationId && businessType === 'dealer' && listings.length > 0;
     
     if (shouldCreateInventoryDirectly) {
-      console.log(`📦 Creating dealer_inventory records directly for organization ${organizationId}...`);
+      console.log(`Creating dealer inventory records for organization ${organizationId}...`);
       
       // Bulk upsert listings to import_queue (critical for large inventories)
       const rows = listingsToProcess.map((listing: any) => ({
@@ -1105,13 +1146,36 @@ Return ONLY valid JSON in this format:
         } else {
           queuedCount += chunk.length;
         }
+
+        // Update "seen" tracker so we can detect disappearance later.
+        // Best-effort; do NOT fail scrape on tracker issues.
+        try {
+          const seenRows = chunk
+            .filter((r: any) => typeof r?.listing_url === 'string' && r.listing_url.startsWith('http'))
+            .map((r: any) => ({
+              dealer_id: organizationId,
+              listing_url: r.listing_url,
+              last_seen_at: new Date().toISOString(),
+              last_seen_status: (r?.raw_data?.listing_status === 'sold' || inferredListingStatus === 'sold') ? 'sold' : 'in_stock',
+              last_seen_source_url: source_url,
+              seen_count: 1,
+            }));
+
+          if (seenRows.length > 0) {
+            await supabase
+              .from('dealer_inventory_seen')
+              .upsert(seenRows, { onConflict: 'dealer_id,listing_url' } as any);
+          }
+        } catch (seenErr: any) {
+          console.warn(`dealer_inventory_seen upsert failed (non-blocking): ${seenErr?.message || String(seenErr)}`);
+        }
       }
       
-      console.log(`✅ Queued ${queuedCount} listings for vehicle creation (will auto-link to dealer_inventory via process-import-queue)`);
+      console.log(`Queued ${queuedCount} listings for vehicle creation (will auto-link to dealer inventory via process-import-queue)`);
     } else if (organizationId && businessType === 'auction_house') {
       // For auction houses, we need to structure as auction events/lots
       // This will be handled separately since auction structure is more complex
-      console.log(`🏛️  Auction house detected - listings will be processed as auction events/lots`);
+      console.log('Auction house detected - listings will be processed as auction events/lots');
       
       const rows = listingsToProcess.map((listing: any) => ({
         source_id: sourceId,
