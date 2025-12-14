@@ -624,13 +624,11 @@ const CursorHomepage: React.FC = () => {
   };
 
   const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `$${(value / 1000).toFixed(0)}k`;
-    }
-    return `$${value.toLocaleString()}`;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0
+    }).format(value);
   };
 
   const handleTimePeriodChange = async (period: TimePeriod) => {
@@ -671,7 +669,15 @@ const CursorHomepage: React.FC = () => {
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {/* Stats Bar */}
       {stats.totalBuilds > 0 && (
-        <div style={{
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => navigate('/market/exchange')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') navigate('/market/exchange');
+          }}
+          title="Open Market Exchange"
+          style={{
           background: 'var(--white)',
           borderBottom: '2px solid var(--border)',
           padding: '12px var(--space-4)',
@@ -679,11 +685,12 @@ const CursorHomepage: React.FC = () => {
           gap: '32px',
           justifyContent: 'center',
           fontSize: '9pt',
-          color: 'var(--text-muted)'
+          color: 'var(--text-muted)',
+          cursor: 'pointer'
         }}>
-          <span><strong>{stats.totalBuilds}</strong> active builds</span>
+          <span><strong>{stats.totalBuilds.toLocaleString()}</strong> active builds</span>
           <span><strong>{formatCurrency(stats.totalValue)}</strong> in play</span>
-          {stats.activeToday > 0 && <span><strong>{stats.activeToday}</strong> updated today</span>}
+          {stats.activeToday > 0 && <span><strong>{stats.activeToday.toLocaleString()}</strong> updated today</span>}
         </div>
       )}
 

@@ -25,6 +25,10 @@ type SPIDResult = {
   };
   raw_text: string;
   provider?: string;
+  // Cost/usage (best-effort). Only populated when provider supports it (OpenAI).
+  _usage?: any;
+  _cost_usd?: number | null;
+  _model?: string | null;
 } | null;
 
 const SPID_PROMPT = `You are a GM SPID (Service Parts Identification) sheet expert. Analyze images to detect and extract data from SPID sheets.
@@ -149,13 +153,10 @@ async function extractWithOpenAI(
   apiKey: string,
   model: string
 ): Promise<Omit<SPIDResult, 'provider'>> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  const { callOpenAiChatCompletions } = await import('./openaiChat.ts');
+  const res = await callOpenAiChatCompletions({
+    apiKey,
+    body: {
       model,
       messages: [
         { role: 'system', content: SPID_PROMPT },
@@ -169,20 +170,31 @@ async function extractWithOpenAI(
       ],
       max_tokens: 2000,
       response_format: { type: 'json_object' }
-    })
+    },
+    timeoutMs: 20000,
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+  if (!res.ok) {
+    throw new Error(`OpenAI API error: ${res.status} - ${JSON.stringify(res.raw?.error || res.raw)?.slice(0, 300)}`);
   }
 
-  const data = await response.json();
-  if (data.error) {
-    throw new Error(`OpenAI error: ${data.error.message}`);
+  const parsed = (() => {
+    try {
+      return JSON.parse(res.content_text || '{}');
+    } catch {
+      return null;
+    }
+  })();
+  if (!parsed) {
+    throw new Error('OpenAI returned invalid JSON for SPID');
   }
 
-  return JSON.parse(data.choices[0].message.content);
+  return {
+    ...parsed,
+    _usage: res.usage || null,
+    _cost_usd: res.cost_usd ?? null,
+    _model: res.model || model || null,
+  };
 }
 
 async function extractWithAnthropic(

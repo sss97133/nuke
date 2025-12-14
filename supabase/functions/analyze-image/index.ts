@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { RekognitionClient, DetectLabelsCommand } from "npm:@aws-sdk/client-rekognition"
+import { callOpenAiChatCompletions } from "../_shared/openaiChat.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +39,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
+    const startedAt = Date.now()
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SERVICE_ROLE_KEY') ?? '',
@@ -50,8 +52,8 @@ serve(async (req) => {
     // Idempotency / caching: if we already completed a scan and caller didn't force reprocess,
     // return early so we don't burn tokens again.
     const existingLookup = image_id
-      ? supabase.from('vehicle_images').select('id, ai_processing_status, ai_scan_metadata').eq('id', image_id)
-      : supabase.from('vehicle_images').select('id, ai_processing_status, ai_scan_metadata').eq('image_url', image_url)
+      ? supabase.from('vehicle_images').select('id, ai_processing_status, ai_scan_metadata, total_processing_cost, processing_models_used, analysis_history').eq('id', image_id)
+      : supabase.from('vehicle_images').select('id, ai_processing_status, ai_scan_metadata, total_processing_cost, processing_models_used, analysis_history').eq('image_url', image_url)
     const { data: existingRow } = await existingLookup.maybeSingle()
     const existingMeta = (existingRow?.ai_scan_metadata || {}) as any
     const existingStatus = String(existingRow?.ai_processing_status || '')
@@ -325,12 +327,55 @@ serve(async (req) => {
     
     if (imageRecord) {
       const existing = imageRecord.ai_scan_metadata || {}
+
+      // Cost + usage aggregation (OpenAI only; Rekognition isn't accounted here).
+      const costBreakdown: any[] = []
+      const modelsUsed = new Set<string>()
+      let totalTokens = 0
+      let totalCostUsd = 0
+
+      const addCost = (label: string, obj: any) => {
+        const usage = obj?._usage || obj?.usage || null
+        const cost = Number(obj?._cost_usd ?? 0)
+        const model = obj?._model || obj?.model || null
+        if (model) modelsUsed.add(String(model))
+        if (usage?.total_tokens) totalTokens += Number(usage.total_tokens) || 0
+        if (Number.isFinite(cost) && cost > 0) totalCostUsd += cost
+        if (usage || model || (Number.isFinite(cost) && cost >= 0)) {
+          costBreakdown.push({ step: label, model, usage, cost_usd: Number.isFinite(cost) ? cost : null })
+        }
+      }
+
+      addCost('appraiser', appraiserResult)
+      addCost('spid', spidResponse)
+      addCost('vin_tag', vinTagResponse)
+
+      const prevCost = Number(existingRow?.total_processing_cost || 0)
+      const nextCost = prevCost + (Number.isFinite(totalCostUsd) ? totalCostUsd : 0)
+      const prevModels: string[] = Array.isArray(existingRow?.processing_models_used) ? existingRow!.processing_models_used : []
+      const nextModels = Array.from(new Set([...prevModels, ...Array.from(modelsUsed)])).slice(0, 25)
+      const prevHistory = (existingRow?.analysis_history && typeof existingRow.analysis_history === 'object') ? existingRow.analysis_history : {}
+      const runId = `run_${Date.now()}`
+      const nextHistory = {
+        ...prevHistory,
+        [runId]: {
+          at: new Date().toISOString(),
+          function: 'analyze-image',
+          total_tokens: totalTokens,
+          cost_usd: totalCostUsd,
+          breakdown: costBreakdown,
+        }
+      }
+
       await supabase
         .from('vehicle_images')
         .update({
           ai_scan_metadata: { ...existing, ...metadataUpdate },
           ai_processing_status: 'completed',
-          ai_processing_completed_at: new Date().toISOString()
+          ai_processing_completed_at: new Date().toISOString(),
+          total_processing_cost: nextCost,
+          processing_models_used: nextModels,
+          analysis_history: nextHistory,
         })
         .eq('id', imageRecord.id)
 
@@ -338,7 +383,7 @@ serve(async (req) => {
       // This makes it possible to backfill/re-extract later and track accuracy/cost over time.
       try {
         if (vehicle_id) {
-          const modelsUsed = [
+          const modelsUsedArr = [
             // Rekognition may be missing if not configured
             (metadataUpdate?.rekognition ? 'aws-rekognition-detect-labels' : null),
             (appraiserResult ? 'gpt-4o-mini' : null),
@@ -353,8 +398,10 @@ serve(async (req) => {
               event_id: timeline_event_id || null,
               image_ids: [imageRecord.id],
               ai_model_version: `analyze-image@2025-12-14`,
-              ai_model_cost: 0,
+              ai_model_cost: totalCostUsd || 0,
               total_images_analyzed: 1,
+              scan_duration_seconds: Math.round((Date.now() - startedAt) / 10) / 100,
+              total_tokens_used: totalTokens || null,
               fields_extracted: [
                 (appraiserResult ? 'tier1' : null),
                 (spidData ? 'spid' : null),
@@ -367,7 +414,9 @@ serve(async (req) => {
                 rekognition: Boolean(metadataUpdate?.rekognition),
                 vehicle_id: Boolean(vehicle_id),
                 timeline_event_id: Boolean(timeline_event_id),
-                models_used: modelsUsed,
+                models_used: modelsUsedArr,
+                openai_cost_usd: totalCostUsd || 0,
+                openai_tokens: totalTokens || 0,
               },
               created_by: user_id || null,
             })
@@ -534,13 +583,9 @@ async function detectAndExtractVINTag(imageUrl: string, vehicleId?: string, supa
   
   if (!openAiKey) return null
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  const res = await callOpenAiChatCompletions({
+    apiKey: openAiKey,
+    body: {
       model: 'gpt-4o',
       messages: [
         {
@@ -596,16 +641,20 @@ Be very careful to extract the EXACT VIN - check each character carefully. VINs 
       ],
       max_tokens: 1000,
       response_format: { type: 'json_object' }
-    })
+    },
+    timeoutMs: 20000,
   })
 
-  if (!response.ok) return null
-
-  const data = await response.json()
-  if (data.error) return null
+  if (!res.ok) return null
 
   try {
-    return JSON.parse(data.choices[0].message.content)
+    const parsed = JSON.parse(res.content_text || '{}')
+    return {
+      ...parsed,
+      _usage: res.usage || null,
+      _cost_usd: res.cost_usd ?? null,
+      _model: res.model || 'gpt-4o',
+    }
   } catch {
     return null
   }
@@ -686,13 +735,9 @@ async function runAppraiserBrain(imageUrl: string, context: string, supabaseClie
 
   const prompt = prompts[context as keyof typeof prompts] || prompts.exterior
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openAiKey}`
-    },
-    body: JSON.stringify({
+  const res = await callOpenAiChatCompletions({
+    apiKey: openAiKey,
+    body: {
       model: "gpt-4o-mini",
       messages: [
         {
@@ -705,20 +750,30 @@ async function runAppraiserBrain(imageUrl: string, context: string, supabaseClie
       ],
       max_tokens: 500,
       response_format: { type: "json_object" }
-    })
+    },
+    timeoutMs: 20000,
   })
 
-  if (!response.ok) return null
+  if (!res.ok) return null
 
-  const data = await response.json()
-  const content = data.choices[0].message?.content
-  
+  const content = res.content_text
   try {
     // extract JSON from markdown block if present
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    return JSON.parse(jsonMatch ? jsonMatch[0] : content)
+    const jsonMatch = (content || '').match(/\{[\s\S]*\}/)
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : (content || '{}'))
+    return {
+      ...parsed,
+      _usage: res.usage || null,
+      _cost_usd: res.cost_usd ?? null,
+      _model: res.model || 'gpt-4o-mini',
+    }
   } catch {
-    return { raw_analysis: content }
+    return {
+      raw_analysis: content,
+      _usage: res.usage || null,
+      _cost_usd: res.cost_usd ?? null,
+      _model: res.model || 'gpt-4o-mini',
+    }
   }
 }
 

@@ -17,6 +17,7 @@ export interface LinkedOrg {
   relationship_type: string;
   auto_tagged: boolean;
   gps_match_confidence?: number;
+  status?: string;
   business_name: string;
   business_type?: string;
   city?: string;
@@ -88,6 +89,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
           relationship_type,
           auto_tagged,
           gps_match_confidence,
+          status,
           businesses!inner (
             id,
             business_name,
@@ -98,7 +100,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
           )
         `)
         .eq('vehicle_id', vehicleId)
-        .eq('status', 'active');
+        .in('status', ['active', 'sold', 'pending', 'past', 'archived']);
 
       if (error) {
         console.error('[LinkedOrganizations] Query error:', error);
@@ -113,6 +115,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
         relationship_type: ov.relationship_type,
         auto_tagged: ov.auto_tagged,
         gps_match_confidence: ov.gps_match_confidence,
+        status: ov.status,
         business_name: ov.businesses.business_name,
         business_type: ov.businesses.business_type,
         city: ov.businesses.city,
