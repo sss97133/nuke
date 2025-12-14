@@ -11,7 +11,8 @@
     "index:bat-local-partners": "tsx scripts/index-bat-local-partners.ts",
     "enrich:bat-local-partners": "tsx scripts/enrich-bat-local-partners.ts",
     "ingest:bat": "tsx scripts/bat-seed-and-import.ts",
-    "import:bat-results": "tsx scripts/bat-import-results.ts"
+    "import:bat-results": "tsx scripts/bat-import-results.ts",
+    "import:bat-local-partner-vehicles": "tsx scripts/bat-import-local-partner-vehicles.ts"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.8.2",

@@ -49,6 +49,22 @@ Then run:
 npm run index:bat-local-partners -- --upsert
 ```
 
+#### If your service role key is only stored in Edge Function secrets
+
+If you **do not** have `SUPABASE_SERVICE_ROLE_KEY` locally (and it only exists as an Edge secret), use the Edge-based upsert path instead.
+
+1) Deploy the Edge Function (one-time):
+
+```bash
+supabase functions deploy upsert-bat-local-partners --no-verify-jwt
+```
+
+2) Run the indexer using Edge upsert (requires only anon key for invocation):
+
+```bash
+npm run index:bat-local-partners -- --upsert-via-edge
+```
+
 Optional flags:
 
 - `--limit 50` (process only first N parsed entries)

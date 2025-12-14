@@ -1,0 +1,10 @@
+{
+  "scraped_at": "2025-12-14T19:42:06.306Z",
+  "source_snapshot": "/Users/skylar/nuke/data/bat/bat_local_partners.json",
+  "partners_processed": 2,
+  "partners_ok": 0,
+  "partners_failed": 2,
+  "listings_ok": 0,
+  "listings_failed": 0,
+  "partners": []
+}

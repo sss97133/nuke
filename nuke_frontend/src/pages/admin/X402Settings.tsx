@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 
 interface X402Config {
@@ -33,8 +33,8 @@ const X402Settings: React.FC = () => {
       setLoading(true);
       
       // Check x402-payment edge function health to see current config
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const supabaseUrl = SUPABASE_URL;
+      const anonKey = SUPABASE_ANON_KEY;
       
       if (supabaseUrl && anonKey) {
         try {
@@ -131,8 +131,8 @@ Or use Supabase CLI:
 
   const handleTestConnection = async () => {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const supabaseUrl = SUPABASE_URL;
+      const anonKey = SUPABASE_ANON_KEY;
       
       if (!supabaseUrl || !anonKey) {
         toast.error('Supabase URL or key not configured');

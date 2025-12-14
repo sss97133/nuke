@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase, SUPABASE_URL } from '../../lib/supabase';
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -95,7 +95,7 @@ const AutoBuyExecutionList: React.FC<AutoBuyExecutionListProps> = ({ userId }) =
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/execute-auto-buy`,
+          `${SUPABASE_URL}/functions/v1/execute-auto-buy`,
           {
             method: 'POST',
             headers: {
