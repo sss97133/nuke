@@ -580,22 +580,23 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
 
   const imageUrl = listing.lead_image_url || vehicle.primary_image_url || null;
   const isBat = listing.platform === 'bat';
+  const [batIconOk, setBatIconOk] = useState(true);
   const platformBadgeContent = isBat ? (
-    <img
-      src="https://bringatrailer.com/favicon.ico"
-      alt="BaT"
-      style={{
-        width: 12,
-        height: 12,
-        display: 'block',
-        imageRendering: 'auto',
-      }}
-      onError={(e) => {
-        // Fallback to label if the icon is blocked/unreachable
-        const img = e.currentTarget;
-        img.style.display = 'none';
-      }}
-    />
+    batIconOk ? (
+      <img
+        src="/vendor/bat/favicon.ico"
+        alt="BaT"
+        style={{
+          width: 12,
+          height: 12,
+          display: 'block',
+          imageRendering: 'auto',
+        }}
+        onError={() => setBatIconOk(false)}
+      />
+    ) : (
+      'BaT'
+    )
   ) : (
     platformName
   );

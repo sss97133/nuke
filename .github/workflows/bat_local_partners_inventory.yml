@@ -41,28 +41,55 @@ jobs:
           post() {
             local path="$1"
             local body="$2"
-            curl -sS "${SUPABASE_URL%/}/functions/v1/${path}" \
+            curl -sS -w "\nHTTP:%{http_code}\n" "${SUPABASE_URL%/}/functions/v1/${path}" \
               -H "Authorization: Bearer ${SUPABASE_ANON_JWT}" \
               -H "Content-Type: application/json" \
               --data-binary "${body}"
           }
 
+          # Parse "body + HTTP:xxx" output format safely
+          run_call() {
+            local name="$1"
+            local path="$2"
+            local body="$3"
+            echo "$name"
+            OUT="$(post "$path" "$body")"
+            HTTP="$(echo "$OUT" | tail -n 1 | sed 's/^HTTP://')"
+            RESP="$(echo "$OUT" | sed '$d')"
+            echo "HTTP $HTTP"
+            # Always print a snippet for debugging
+            echo "$RESP" | head -c 800
+            echo ""
+            # Fail fast on non-2xx
+            if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
+              echo "Non-2xx response from $path"
+              exit 1
+            fi
+            # Also ensure JSON is valid
+            echo "$RESP" | jq -c . >/dev/null
+            # Return JSON to caller via stdout
+            echo "$RESP"
+          }
+
           echo "1) enqueue-bat-local-partner-inventory"
-          post "enqueue-bat-local-partner-inventory" '{"run_mode":"current","limit":5000,"only_with_website":true,"requeue_failed":true}' | jq -c .
+          run_call "enqueue" "enqueue-bat-local-partner-inventory" '{"run_mode":"current","limit":5000,"only_with_website":true,"requeue_failed":true}' | jq -c .
 
           echo "2) process-inventory-sync-queue (3 batches)"
           for i in 1 2 3; do
-            post "process-inventory-sync-queue" '{"batch_size":5,"max_results":200,"max_results_sold":200}' | jq -c "{i:$i,processed:.processed,completed:.completed,failed:.failed}"
+            run_call "inventory batch $i" "process-inventory-sync-queue" '{"batch_size":5,"max_results":200,"max_results_sold":200}' \
+              | jq -c "{i:$i,processed:.processed,completed:.completed,failed:.failed}"
             sleep 2
           done
 
           echo "3) process-import-queue-fast (6 batches)"
           for i in 1 2 3 4 5 6; do
-            post "process-import-queue-fast" '{"batch_size":10,"external_images_only":true,"max_external_images":18}' | jq -c "{i:$i,processed:.processed,created:.created,updated:.updated,errors:.errors}"
+            run_call "import-fast batch $i" "process-import-queue-fast" '{"batch_size":10,"external_images_only":true,"max_external_images":18}' \
+              | jq -c "{i:$i,processed:.processed,created:.created,updated:.updated,errors:.errors}"
             sleep 2
           done
 
           echo "4) backfill-org-primary-images"
-          post "backfill-org-primary-images" '{"batch_size":50,"max_sites":25,"dry_run":false}' | jq -c "{updated:.updated,failed:.failed,processed:.processed}"
+          run_call "backfill-org-primary-images" "backfill-org-primary-images" '{"batch_size":50,"max_sites":25,"dry_run":false}' \
+            | jq -c "{updated:.updated,failed:.failed,processed:.processed}"
 
 
