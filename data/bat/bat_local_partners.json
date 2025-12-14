@@ -1,0 +1,1417 @@
+{
+  "source_url": "https://bringatrailer.com/local-partners/",
+  "scraped_at": "2025-12-14T19:14:09.492Z",
+  "facilities": [
+    {
+      "partner_name": "Exclusive Motor Club",
+      "city": "Chandler",
+      "state": "AZ",
+      "country": "US",
+      "website_origin": "https://www.exclusivemotorclub.com",
+      "partner_referral_url": "https://www.exclusivemotorclub.com/bringatrailer",
+      "bat_username": "exclusivemotorclub",
+      "bat_profile_url": "https://bringatrailer.com/member/exclusivemotorclub/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "exclusive-motor-club|chandler|AZ|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "ARIZONA"
+      }
+    },
+    {
+      "partner_name": "Avant Garde Collection",
+      "city": "Scottsdale",
+      "state": "AZ",
+      "country": "US",
+      "website_origin": "https://www.a-gc.com",
+      "partner_referral_url": "https://www.a-gc.com/bring-a-trailer",
+      "bat_username": "911r",
+      "bat_profile_url": "https://bringatrailer.com/member/911r/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "avant-garde-collection|scottsdale|AZ|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "ARIZONA"
+      }
+    },
+    {
+      "partner_name": "OTTO Car Club",
+      "city": "Scottsdale",
+      "state": "AZ",
+      "country": "US",
+      "website_origin": "https://www.ottocarclub.com",
+      "partner_referral_url": "https://www.ottocarclub.com/bat",
+      "bat_username": "ottocarclub",
+      "bat_profile_url": "https://bringatrailer.com/member/ottocarclub/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "otto-car-club|scottsdale|AZ|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "ARIZONA"
+      }
+    },
+    {
+      "partner_name": "Crown Concepts",
+      "city": "Tucson",
+      "state": "AZ",
+      "country": "US",
+      "website_origin": "https://crownconceptsusa.com",
+      "partner_referral_url": "https://crownconceptsusa.com/bring-a-trailer/",
+      "bat_username": "crownconcepts",
+      "bat_profile_url": "https://bringatrailer.com/member/crownconcepts/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "crown-concepts|tucson|AZ|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "ARIZONA"
+      }
+    },
+    {
+      "partner_name": "Gasoline Alley Garage",
+      "city": "Azusa",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.gasolinealleygarage.com",
+      "partner_referral_url": "https://www.gasolinealleygarage.com/list-on-bat.html",
+      "bat_username": "gasolinealleygarage",
+      "bat_profile_url": "https://bringatrailer.com/member/gasolinealleygarage/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "gasoline-alley-garage|azusa|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "I Am Detailing",
+      "city": "Costa Mesa",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://iamdetailing.com",
+      "partner_referral_url": "https://iamdetailing.com/bring-a-trailer/",
+      "bat_username": "amclassic",
+      "bat_profile_url": "https://bringatrailer.com/member/amclassic/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "i-am-detailing|costa-mesa|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Retro Sporting",
+      "city": "Livermore",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.retrosporting.com",
+      "partner_referral_url": "https://www.retrosporting.com/bat",
+      "bat_username": "retrosporting",
+      "bat_profile_url": "https://bringatrailer.com/member/retrosporting/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "retro-sporting|livermore|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Wob Cars",
+      "city": "Los Angeles",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://wobcars.com",
+      "partner_referral_url": "https://wobcars.com/bring-a-trailer/",
+      "bat_username": "wob",
+      "bat_profile_url": "https://bringatrailer.com/member/wob/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "wob-cars|los-angeles|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Genau Autowerks",
+      "city": "Marin",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.genauautowerks.com",
+      "partner_referral_url": "https://www.genauautowerks.com/bringatrailer",
+      "bat_username": "genauautowerks",
+      "bat_profile_url": "https://bringatrailer.com/member/genauautowerks/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "genau-autowerks|marin|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Mohr Imports",
+      "city": "Monterey",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.mohrimports.com",
+      "partner_referral_url": "https://www.mohrimports.com/bat-local-partner",
+      "bat_username": "mohrimports",
+      "bat_profile_url": "https://bringatrailer.com/member/mohrimports/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "mohr-imports|monterey|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Sierra Classic Sportscar",
+      "city": "Placer County",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.sierraclassicsportscar.com",
+      "partner_referral_url": "https://www.sierraclassicsportscar.com/bring-a-trailer",
+      "bat_username": "sierra_classic_sportscar",
+      "bat_profile_url": "https://bringatrailer.com/member/sierra_classic_sportscar/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "sierra-classic-sportscar|placer-county|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "KarPark",
+      "city": "Pleasanton",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.karparkauto.com",
+      "partner_referral_url": "https://www.karparkauto.com/bat-local-partner",
+      "bat_username": "karpark",
+      "bat_profile_url": "https://bringatrailer.com/member/karpark/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "karpark|pleasanton|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "GT Auto Lounge",
+      "city": "Sacramento",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.gtautolounge.com",
+      "partner_referral_url": "https://www.gtautolounge.com/bringatrailer",
+      "bat_username": "gtautolounge",
+      "bat_profile_url": "https://bringatrailer.com/member/gtautolounge/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "gt-auto-lounge|sacramento|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Compass Racing",
+      "city": "San Diego",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://compassracing.com",
+      "partner_referral_url": "https://compassracing.com/",
+      "bat_username": "compassracing",
+      "bat_profile_url": "https://bringatrailer.com/member/compassracing/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "compass-racing|san-diego|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Genau Autowerks",
+      "city": "San Francisco – East Bay",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.genauautowerks.com",
+      "partner_referral_url": "https://www.genauautowerks.com/bringatrailer",
+      "bat_username": "genauautowerks",
+      "bat_profile_url": "https://bringatrailer.com/member/genauautowerks/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "genau-autowerks|san-francisco-east-bay|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Collector Car Vault",
+      "city": "Santa Paula",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.collectorcarvault.com",
+      "partner_referral_url": "https://www.collectorcarvault.com/bring-a-trailer",
+      "bat_username": "collectorcarvault",
+      "bat_profile_url": "https://bringatrailer.com/member/collectorcarvault/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "collector-car-vault|santa-paula|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Arctic Auto Werks",
+      "city": "Santa Rosa",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://www.arcticautowerks.com",
+      "partner_referral_url": "https://www.arcticautowerks.com/bringatrailer-local-partner",
+      "bat_username": "asdspeed",
+      "bat_profile_url": "https://bringatrailer.com/member/asdspeed/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "arctic-auto-werks|santa-rosa|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Westside Collector",
+      "city": "West LA",
+      "state": "CA",
+      "country": "US",
+      "website_origin": "https://wccs.com",
+      "partner_referral_url": "https://wccs.com/bringatrailer-seller-assistance",
+      "bat_username": "westsideccs",
+      "bat_profile_url": "https://bringatrailer.com/member/westsideccs/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "westside-collector|west-la|CA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CALIFORNIA"
+      }
+    },
+    {
+      "partner_name": "Blue Chip",
+      "city": "Denver",
+      "state": "CO",
+      "country": "US",
+      "website_origin": "https://www.bluechipfleet.com",
+      "partner_referral_url": "https://www.bluechipfleet.com/bring-a-trailer",
+      "bat_username": "bluechipservices",
+      "bat_profile_url": "https://bringatrailer.com/member/bluechipservices/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "blue-chip|denver|CO|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "COLORADO"
+      }
+    },
+    {
+      "partner_name": "Black Mountain Motorworks",
+      "city": "Denver",
+      "state": "CO",
+      "country": "US",
+      "website_origin": "https://www.blackmountainmotorworks.com",
+      "partner_referral_url": "https://www.blackmountainmotorworks.com/denver-bring-a-trailer-partner/",
+      "bat_username": "blackmountainmotorworks",
+      "bat_profile_url": "https://bringatrailer.com/member/blackmountainmotorworks/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "black-mountain-motorworks|denver|CO|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "COLORADO"
+      }
+    },
+    {
+      "partner_name": "Conquest Classic Cars",
+      "city": "Greeley",
+      "state": "CO",
+      "country": "US",
+      "website_origin": "https://conquestclassiccars.com",
+      "partner_referral_url": "https://conquestclassiccars.com/bring-a-trailer",
+      "bat_username": "conquestclassiccars",
+      "bat_profile_url": "https://bringatrailer.com/member/conquestclassiccars/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "conquest-classic-cars|greeley|CO|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "COLORADO"
+      }
+    },
+    {
+      "partner_name": "Automotive Restorations",
+      "city": "Stratford",
+      "state": "CT",
+      "country": "US",
+      "website_origin": "https://www.automotiverestorations.com",
+      "partner_referral_url": "https://www.automotiverestorations.com/vehicle-marketing-services",
+      "bat_username": "automotiverestorations",
+      "bat_profile_url": "https://bringatrailer.com/member/automotiverestorations/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "automotive-restorations|stratford|CT|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "CONNECTICUT"
+      }
+    },
+    {
+      "partner_name": "McQueen Classics",
+      "city": "Lewes",
+      "state": "DE",
+      "country": "US",
+      "website_origin": "https://www.mcqueenclassics.com",
+      "partner_referral_url": "https://www.mcqueenclassics.com/bring-a-trailer",
+      "bat_username": "mcqueens",
+      "bat_profile_url": "https://bringatrailer.com/member/mcqueens/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "mcqueen-classics|lewes|DE|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "DELAWARE"
+      }
+    },
+    {
+      "partner_name": "Bullet Motorsports",
+      "city": "Ford Lauderdale",
+      "state": "FL",
+      "country": "US",
+      "website_origin": "https://www.bulletmotorsports.com",
+      "partner_referral_url": "https://www.bulletmotorsports.com/bring-a-trailer",
+      "bat_username": "bulletmotorsportsinc",
+      "bat_profile_url": "https://bringatrailer.com/member/bulletmotorsportsinc/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "bullet-motorsports|ford-lauderdale|FL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "FLORIDA"
+      }
+    },
+    {
+      "partner_name": "K2 Motorcars",
+      "city": "Jupiter",
+      "state": "FL",
+      "country": "US",
+      "website_origin": "https://www.k2motorcars.com",
+      "partner_referral_url": "https://www.k2motorcars.com/bring-a-trailer/",
+      "bat_username": "k2motorcars",
+      "bat_profile_url": "https://bringatrailer.com/member/k2motorcars/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "k2-motorcars|jupiter|FL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "FLORIDA"
+      }
+    },
+    {
+      "partner_name": "Collective Auto Group",
+      "city": "Longwood",
+      "state": "FL",
+      "country": "US",
+      "website_origin": "https://www.collectiveauto.com",
+      "partner_referral_url": "https://www.collectiveauto.com/bring-a-trailer",
+      "bat_username": "collectiveauto",
+      "bat_profile_url": "https://bringatrailer.com/member/collectiveauto/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "collective-auto-group|longwood|FL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "FLORIDA"
+      }
+    },
+    {
+      "partner_name": "The Barn Miami",
+      "city": "Miami",
+      "state": "FL",
+      "country": "US",
+      "website_origin": "https://www.thebarnmiami.com",
+      "partner_referral_url": "https://www.thebarnmiami.com/bring-a-trailer",
+      "bat_username": "thebarnmiami",
+      "bat_profile_url": "https://bringatrailer.com/member/thebarnmiami/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "the-barn-miami|miami|FL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "FLORIDA"
+      }
+    },
+    {
+      "partner_name": "P1 Miami",
+      "city": "Miami",
+      "state": "FL",
+      "country": "US",
+      "website_origin": "https://www.p1miami.com",
+      "partner_referral_url": "https://www.p1miami.com/services/bring-a-trailer",
+      "bat_username": "p1miami",
+      "bat_profile_url": "https://bringatrailer.com/member/p1miami/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "p1-miami|miami|FL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "FLORIDA"
+      }
+    },
+    {
+      "partner_name": "Car Cave SRQ",
+      "city": "Sarasota",
+      "state": "FL",
+      "country": "US",
+      "website_origin": "https://www.carcavesrq.com",
+      "partner_referral_url": "https://www.carcavesrq.com/bring-a-trailer-partner",
+      "bat_username": "carcavesrq",
+      "bat_profile_url": "https://bringatrailer.com/member/carcavesrq/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "car-cave-srq|sarasota|FL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "FLORIDA"
+      }
+    },
+    {
+      "partner_name": "VB Autosports",
+      "city": "Vero Beach",
+      "state": "FL",
+      "country": "US",
+      "website_origin": "https://www.vbautosports.net",
+      "partner_referral_url": "https://www.vbautosports.net/bring-a-trailer/",
+      "bat_username": "vbautosport",
+      "bat_profile_url": "https://bringatrailer.com/member/vbautosport/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "vb-autosports|vero-beach|FL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "FLORIDA"
+      }
+    },
+    {
+      "partner_name": "Specialty Cars Trucks and Classics",
+      "city": "Hayden",
+      "state": "ID",
+      "country": "US",
+      "website_origin": "https://www.specialtycarscda.com",
+      "partner_referral_url": "https://www.specialtycarscda.com/bring-a-trailer-partner",
+      "bat_username": "htsmith",
+      "bat_profile_url": "https://bringatrailer.com/member/htsmith/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "specialty-cars-trucks-and-classics|hayden|ID|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "IDAHO"
+      }
+    },
+    {
+      "partner_name": "Motive Archive",
+      "city": "Batavia",
+      "state": "IL",
+      "country": "US",
+      "website_origin": "https://www.motivearchive.com",
+      "partner_referral_url": "https://www.motivearchive.com/bat",
+      "bat_username": "motivearchive",
+      "bat_profile_url": "https://bringatrailer.com/member/motivearchive/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "motive-archive|batavia|IL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "ILLINOIS"
+      }
+    },
+    {
+      "partner_name": "Midwest Performance Cars",
+      "city": "Chicago",
+      "state": "IL",
+      "country": "US",
+      "website_origin": "https://www.midwestperformancecars.com",
+      "partner_referral_url": "https://www.midwestperformancecars.com/bring-a-trailer-partner/",
+      "bat_username": "mpc_concierge",
+      "bat_profile_url": "https://bringatrailer.com/member/mpc_concierge/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "midwest-performance-cars|chicago|IL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "ILLINOIS"
+      }
+    },
+    {
+      "partner_name": "Autobarn Collection",
+      "city": "Evanston",
+      "state": "IL",
+      "country": "US",
+      "website_origin": "https://www.theautobarncollection.com",
+      "partner_referral_url": "https://www.theautobarncollection.com/bat",
+      "bat_username": "autobarncollection",
+      "bat_profile_url": "https://bringatrailer.com/member/autobarncollection/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "autobarn-collection|evanston|IL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "ILLINOIS"
+      }
+    },
+    {
+      "partner_name": "Carneed",
+      "city": "Northbrook",
+      "state": "IL",
+      "country": "US",
+      "website_origin": "https://www.carneed.com",
+      "partner_referral_url": "https://www.carneed.com/bring-a-trailer-local-partner-program/",
+      "bat_username": "carneed",
+      "bat_profile_url": "https://bringatrailer.com/member/carneed/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "carneed|northbrook|IL|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "ILLINOIS"
+      }
+    },
+    {
+      "partner_name": "SweetCars",
+      "city": "Fort Wayne",
+      "state": "IN",
+      "country": "US",
+      "website_origin": "https://www.sweetcars.com",
+      "partner_referral_url": "https://www.sweetcars.com/bring-a-trailer/",
+      "bat_username": "sweetcars",
+      "bat_profile_url": "https://bringatrailer.com/member/sweetcars/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "sweetcars|fort-wayne|IN|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "INDIANA"
+      }
+    },
+    {
+      "partner_name": "Graham Rahal Performance",
+      "city": "Indianapolis",
+      "state": "IN",
+      "country": "US",
+      "website_origin": "https://www.grahamrahalperformance.com",
+      "partner_referral_url": "https://www.grahamrahalperformance.com/--bring-a-trailer",
+      "bat_username": "grahamrahalperformance",
+      "bat_profile_url": "https://bringatrailer.com/member/grahamrahalperformance/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "graham-rahal-performance|indianapolis|IN|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "INDIANA"
+      }
+    },
+    {
+      "partner_name": "MOTORVAULT",
+      "city": null,
+      "state": null,
+      "country": "US",
+      "website_origin": "https://www.motorvault.com",
+      "partner_referral_url": "https://www.motorvault.com/mv-bat",
+      "bat_username": "motorvault",
+      "bat_profile_url": "https://bringatrailer.com/member/motorvault/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "motorvault|na|na|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "INDIANA"
+      }
+    },
+    {
+      "partner_name": "HARTek",
+      "city": "Iowa City / Davenport",
+      "state": "IA",
+      "country": "US",
+      "website_origin": "https://hartek.org",
+      "partner_referral_url": "https://hartek.org/bring-a-trailer",
+      "bat_username": "khart",
+      "bat_profile_url": "https://bringatrailer.com/member/khart/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "hartek|iowa-city-davenport|IA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "IOWA"
+      }
+    },
+    {
+      "partner_name": "NOLA Motorcars",
+      "city": "New Orleans",
+      "state": "LA",
+      "country": "US",
+      "website_origin": "https://www.nolamotorcars.com",
+      "partner_referral_url": "https://www.nolamotorcars.com/bring-a-trailer",
+      "bat_username": "nolamotorcars",
+      "bat_profile_url": "https://bringatrailer.com/member/nolamotorcars/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "nola-motorcars|new-orleans|LA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "LOUISIANA"
+      }
+    },
+    {
+      "partner_name": "Bond Group",
+      "city": "Boston",
+      "state": "MA",
+      "country": "US",
+      "website_origin": "https://www.bondgroupusa.com",
+      "partner_referral_url": "https://www.bondgroupusa.com/bring-a-trailer",
+      "bat_username": "fiminod",
+      "bat_profile_url": "https://bringatrailer.com/member/fiminod/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "bond-group|boston|MA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "MASSACHUSETTS"
+      }
+    },
+    {
+      "partner_name": "Garage Kept Motors",
+      "city": "Grand Rapids",
+      "state": "MI",
+      "country": "US",
+      "website_origin": "https://www.garagekeptmotors.com",
+      "partner_referral_url": "https://www.garagekeptmotors.com/bring-a-trailer/",
+      "bat_username": "garagekeptmotors",
+      "bat_profile_url": "https://bringatrailer.com/member/garagekeptmotors/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "garage-kept-motors|grand-rapids|MI|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "MICHIGAN"
+      }
+    },
+    {
+      "partner_name": "City of Cars",
+      "city": "Troy",
+      "state": "MI",
+      "country": "US",
+      "website_origin": "https://www.cityofcars.com",
+      "partner_referral_url": "https://www.cityofcars.com/bring-a-trailer-in-troy-mi",
+      "bat_username": "city_of_cars",
+      "bat_profile_url": "https://bringatrailer.com/member/city_of_cars/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "city-of-cars|troy|MI|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "MICHIGAN"
+      }
+    },
+    {
+      "partner_name": "Turn Key Classics",
+      "city": "Minneapolis",
+      "state": "MN",
+      "country": "US",
+      "website_origin": "https://www.turnkey-classics.com",
+      "partner_referral_url": "https://www.turnkey-classics.com/turnkey-bring-a-trailer",
+      "bat_username": "tkc_mn",
+      "bat_profile_url": "https://bringatrailer.com/member/tkc_mn/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "turn-key-classics|minneapolis|MN|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "MINNESOTA"
+      }
+    },
+    {
+      "partner_name": "Gulf Coast Exotic Auto",
+      "city": "Gulfport",
+      "state": "MS",
+      "country": "US",
+      "website_origin": "https://www.gcexoticauto.com",
+      "partner_referral_url": "https://www.gcexoticauto.com/bring-a-trailer",
+      "bat_username": "gcea",
+      "bat_profile_url": "https://bringatrailer.com/member/gcea/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "gulf-coast-exotic-auto|gulfport|MS|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "MISSISSIPPI"
+      }
+    },
+    {
+      "partner_name": "MotorCars International",
+      "city": "Springfield",
+      "state": "MO",
+      "country": "US",
+      "website_origin": "https://www.motorcars-intl.com",
+      "partner_referral_url": "https://www.motorcars-intl.com/bat-local-partner",
+      "bat_username": "motorcarsintl",
+      "bat_profile_url": "https://bringatrailer.com/member/motorcarsintl/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "motorcars-international|springfield|MO|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "MISSOURI"
+      }
+    },
+    {
+      "partner_name": "Premier Sports Cars",
+      "city": "Springfield",
+      "state": "MO",
+      "country": "US",
+      "website_origin": "https://premiercars.com",
+      "partner_referral_url": "https://premiercars.com/bring-a-trailer-local-partner/",
+      "bat_username": "pscc",
+      "bat_profile_url": "https://bringatrailer.com/member/pscc/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "premier-sports-cars|springfield|MO|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "MISSOURI"
+      }
+    },
+    {
+      "partner_name": "Motorcar Market",
+      "city": "Ramsey",
+      "state": "NJ",
+      "country": "US",
+      "website_origin": "https://www.motorcarmarketusa.com",
+      "partner_referral_url": "https://www.motorcarmarketusa.com/bat-local-partner/",
+      "bat_username": "motorcarmarketusa",
+      "bat_profile_url": "https://bringatrailer.com/member/motorcarmarketusa/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "motorcar-market|ramsey|NJ|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "NEW JERSEY"
+      }
+    },
+    {
+      "partner_name": "Autosport Designs",
+      "city": "Long Island",
+      "state": "NY",
+      "country": "US",
+      "website_origin": "https://www.autosportdesigns.com",
+      "partner_referral_url": "https://www.autosportdesigns.com/bat",
+      "bat_username": "racer355",
+      "bat_profile_url": "https://bringatrailer.com/member/racer355/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "autosport-designs|long-island|NY|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "NEW YORK"
+      }
+    },
+    {
+      "partner_name": "Cantech Automotive",
+      "city": "Syracuse",
+      "state": "NY",
+      "country": "US",
+      "website_origin": "https://cantechautomotive.com",
+      "partner_referral_url": "https://cantechautomotive.com/bring-a-trailer-2/",
+      "bat_username": "cantech",
+      "bat_profile_url": "https://bringatrailer.com/member/cantech/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "cantech-automotive|syracuse|NY|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "NEW YORK"
+      }
+    },
+    {
+      "partner_name": "1600Veloce",
+      "city": "Westchester County",
+      "state": "NY",
+      "country": "US",
+      "website_origin": "https://www.1600veloce.com",
+      "partner_referral_url": "https://www.1600veloce.com/bringatrailer",
+      "bat_username": "1600Veloce",
+      "bat_profile_url": "https://bringatrailer.com/member/1600Veloce/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "1600veloce|westchester-county|NY|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "NEW YORK"
+      }
+    },
+    {
+      "partner_name": "Carolina Muscle Cars",
+      "city": "Benson",
+      "state": "NC",
+      "country": "US",
+      "website_origin": "https://www.carolinamusclecarsinc.com",
+      "partner_referral_url": "https://www.carolinamusclecarsinc.com/bring-a-trailer",
+      "bat_username": "carolinamusclecars",
+      "bat_profile_url": "https://bringatrailer.com/member/carolinamusclecars/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "carolina-muscle-cars|benson|NC|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "NORTH CAROLINA"
+      }
+    },
+    {
+      "partner_name": "RK Motors",
+      "city": "Charlotte",
+      "state": "NC",
+      "country": "US",
+      "website_origin": "https://www.rkmotors.com",
+      "partner_referral_url": "https://www.rkmotors.com/bring-a-trailer",
+      "bat_username": "rkmotors",
+      "bat_profile_url": "https://bringatrailer.com/member/rkmotors/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "rk-motors|charlotte|NC|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "NORTH CAROLINA"
+      }
+    },
+    {
+      "partner_name": "Automotive International",
+      "city": "Charlotte",
+      "state": "NC",
+      "country": "US",
+      "website_origin": "https://automotive-international.com",
+      "partner_referral_url": "https://automotive-international.com/local-partner/",
+      "bat_username": "246dinoguy",
+      "bat_profile_url": "https://bringatrailer.com/member/246dinoguy/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "automotive-international|charlotte|NC|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "NORTH CAROLINA"
+      }
+    },
+    {
+      "partner_name": "Firehouse Vintage Vehicles",
+      "city": "Statesville",
+      "state": "NC",
+      "country": "US",
+      "website_origin": "https://firehousevintage.com",
+      "partner_referral_url": "https://firehousevintage.com/bring-a-trailer-partner/",
+      "bat_username": "firehousevintage",
+      "bat_profile_url": "https://bringatrailer.com/member/firehousevintage/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "firehouse-vintage-vehicles|statesville|NC|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "NORTH CAROLINA"
+      }
+    },
+    {
+      "partner_name": "Patina Group‘s",
+      "city": "Statesville",
+      "state": "NC",
+      "country": "US",
+      "website_origin": "https://www.sellwithtpg.com",
+      "partner_referral_url": "https://www.sellwithtpg.com/local-partner",
+      "bat_username": "the_patina_group",
+      "bat_profile_url": "https://bringatrailer.com/member/the_patina_group/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "patina-group-s|statesville|NC|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "NORTH CAROLINA"
+      }
+    },
+    {
+      "partner_name": "Across the Pond Restoration",
+      "city": "Cleveland",
+      "state": "OH",
+      "country": "US",
+      "website_origin": "https://atprestoration.com",
+      "partner_referral_url": "https://atprestoration.com/bring-a-trailer",
+      "bat_username": "atpnolan",
+      "bat_profile_url": "https://bringatrailer.com/member/atpnolan/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "across-the-pond-restoration|cleveland|OH|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "OHIO"
+      }
+    },
+    {
+      "partner_name": "Euro Classics",
+      "city": "Dayton",
+      "state": "OH",
+      "country": "US",
+      "website_origin": "https://www.euroclassix.com",
+      "partner_referral_url": "https://www.euroclassix.com/bring-a-trailer",
+      "bat_username": "euroclassics",
+      "bat_profile_url": "https://bringatrailer.com/member/euroclassics/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "euro-classics|dayton|OH|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "OHIO"
+      }
+    },
+    {
+      "partner_name": "Avant Garde Collection",
+      "city": "Portland",
+      "state": "OR",
+      "country": "US",
+      "website_origin": "https://www.a-gc.com",
+      "partner_referral_url": "https://www.a-gc.com/bring-a-trailer",
+      "bat_username": "911r",
+      "bat_profile_url": "https://bringatrailer.com/member/911r/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "avant-garde-collection|portland|OR|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "OREGON"
+      }
+    },
+    {
+      "partner_name": "Highline Classics",
+      "city": "Portland",
+      "state": "OR",
+      "country": "US",
+      "website_origin": "https://www.highlineclassics.com",
+      "partner_referral_url": "https://www.highlineclassics.com/bat",
+      "bat_username": "highlineclassics",
+      "bat_profile_url": "https://bringatrailer.com/member/highlineclassics/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "highline-classics|portland|OR|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "OREGON"
+      }
+    },
+    {
+      "partner_name": "Michael’s Motor Cars",
+      "city": "Lancaster",
+      "state": "PA",
+      "country": "US",
+      "website_origin": "https://michaelsmotorcars.com",
+      "partner_referral_url": "https://michaelsmotorcars.com/bring-a-trailer/",
+      "bat_username": "michaelsmotorcarspa",
+      "bat_profile_url": "https://bringatrailer.com/member/michaelsmotorcarspa/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "michael-s-motor-cars|lancaster|PA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "PENNSYLVANIA"
+      }
+    },
+    {
+      "partner_name": "Reimel Motor Cars",
+      "city": "Wayne",
+      "state": "PA",
+      "country": "US",
+      "website_origin": "https://www.reimelmotorcars.com",
+      "partner_referral_url": "https://www.reimelmotorcars.com/Bring%20a%20Trailer%20local%20partner",
+      "bat_username": "reimelmc",
+      "bat_profile_url": "https://bringatrailer.com/member/reimelmc/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "reimel-motor-cars|wayne|PA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "PENNSYLVANIA"
+      }
+    },
+    {
+      "partner_name": "Leading Edge Autosport",
+      "city": "West Chester",
+      "state": "PA",
+      "country": "US",
+      "website_origin": "https://leadingedgeautosport.com",
+      "partner_referral_url": "https://leadingedgeautosport.com/bring-a-trailer/",
+      "bat_username": "leadingedge",
+      "bat_profile_url": "https://bringatrailer.com/member/leadingedge/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "leading-edge-autosport|west-chester|PA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "PENNSYLVANIA"
+      }
+    },
+    {
+      "partner_name": "Quonset Motor Sport",
+      "city": "North Kingstown",
+      "state": "RI",
+      "country": "US",
+      "website_origin": "https://qmsri.com",
+      "partner_referral_url": "https://qmsri.com/bring-a-trailer/",
+      "bat_username": "qms",
+      "bat_profile_url": "https://bringatrailer.com/member/qms/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "quonset-motor-sport|north-kingstown|RI|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "RHODE ISLAND"
+      }
+    },
+    {
+      "partner_name": "Petrol Lounge",
+      "city": "Austin",
+      "state": "TX",
+      "country": "US",
+      "website_origin": "https://petrollounge.com",
+      "partner_referral_url": "https://petrollounge.com/bat/",
+      "bat_username": "petrollounge",
+      "bat_profile_url": "https://bringatrailer.com/member/petrollounge/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "petrol-lounge|austin|TX|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "TEXAS"
+      }
+    },
+    {
+      "partner_name": "Shop‘s",
+      "city": "Dallas",
+      "state": "TX",
+      "country": "US",
+      "website_origin": "https://theshopclubs.com",
+      "partner_referral_url": "https://theshopclubs.com/dallas/bring-a-trailer-tx/",
+      "bat_username": "shopclubsautogroup",
+      "bat_profile_url": "https://bringatrailer.com/member/shopclubsautogroup/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "shop-s|dallas|TX|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "TEXAS"
+      }
+    },
+    {
+      "partner_name": "Alara Garage",
+      "city": "Houston",
+      "state": "TX",
+      "country": "US",
+      "website_origin": "https://alaragarage.com",
+      "partner_referral_url": "https://alaragarage.com/bat/",
+      "bat_username": "mbrandonmotorcars",
+      "bat_profile_url": "https://bringatrailer.com/member/mbrandonmotorcars/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "alara-garage|houston|TX|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "TEXAS"
+      }
+    },
+    {
+      "partner_name": "Shop‘s",
+      "city": "Houston",
+      "state": "TX",
+      "country": "US",
+      "website_origin": "https://theshopclubs.com",
+      "partner_referral_url": "https://theshopclubs.com/dallas/bring-a-trailer-tx/",
+      "bat_username": "shopclubsautogroup",
+      "bat_profile_url": "https://bringatrailer.com/member/shopclubsautogroup/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "shop-s|houston|TX|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "TEXAS"
+      }
+    },
+    {
+      "partner_name": "DNA Autohaus",
+      "city": "Round Rock",
+      "state": "TX",
+      "country": "US",
+      "website_origin": "https://www.dnaautohaus.com",
+      "partner_referral_url": "https://www.dnaautohaus.com/bring-a-trailer",
+      "bat_username": "dnaautohaus",
+      "bat_profile_url": "https://bringatrailer.com/member/dnaautohaus/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "dna-autohaus|round-rock|TX|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "TEXAS"
+      }
+    },
+    {
+      "partner_name": "Renu Auto",
+      "city": "St. George",
+      "state": "UT",
+      "country": "US",
+      "website_origin": "https://renuauto.com",
+      "partner_referral_url": "https://renuauto.com/bring-a-trailer-local-partner/",
+      "bat_username": "renuauto",
+      "bat_profile_url": "https://bringatrailer.com/member/renuauto/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "renu-auto|st-george|UT|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "UTAH"
+      }
+    },
+    {
+      "partner_name": "Shop‘s",
+      "city": "Seattle",
+      "state": "WA",
+      "country": "US",
+      "website_origin": "https://theshopclubs.com",
+      "partner_referral_url": "https://theshopclubs.com/bring-a-trailer-wa/",
+      "bat_username": "shopclubsautogroup",
+      "bat_profile_url": "https://bringatrailer.com/member/shopclubsautogroup/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "shop-s|seattle|WA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "WASHINGTON"
+      }
+    },
+    {
+      "partner_name": "Griot’s Motors",
+      "city": "Tacoma",
+      "state": "WA",
+      "country": "US",
+      "website_origin": "https://griotsmotors.com",
+      "partner_referral_url": "https://griotsmotors.com/pages/bat",
+      "bat_username": "griotsmotors",
+      "bat_profile_url": "https://bringatrailer.com/member/griotsmotors/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "griot-s-motors|tacoma|WA|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "WASHINGTON"
+      }
+    },
+    {
+      "partner_name": "Geneva Motorcars",
+      "city": "Darien",
+      "state": "WI",
+      "country": "US",
+      "website_origin": "https://www.genevamotorcars.com",
+      "partner_referral_url": "https://www.genevamotorcars.com/Dealer-Websites/Geneva-Motor-Cars-WI/bringatrailerpartner.aspx",
+      "bat_username": "genevamotorcars",
+      "bat_profile_url": "https://bringatrailer.com/member/genevamotorcars/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "geneva-motorcars|darien|WI|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "WISCONSIN"
+      }
+    },
+    {
+      "partner_name": "Throttlestop",
+      "city": "Elkhart Lake",
+      "state": "WI",
+      "country": "US",
+      "website_origin": "https://www.throttlestop.com",
+      "partner_referral_url": "https://www.throttlestop.com/bring-a-trailer",
+      "bat_username": "thethrottlestop",
+      "bat_profile_url": "https://bringatrailer.com/member/thethrottlestop/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "throttlestop|elkhart-lake|WI|US",
+      "detected_section_labels": {
+        "group": "UNITED STATES",
+        "region": "WISCONSIN"
+      }
+    },
+    {
+      "partner_name": "Romanosky Automotive",
+      "city": "Calgary",
+      "state": "AB",
+      "country": "CA",
+      "website_origin": "https://lawrence-romanoskys-automotive-blog.ghost.io",
+      "partner_referral_url": "https://lawrence-romanoskys-automotive-blog.ghost.io/bring-a-trailer-local-partner/",
+      "bat_username": "lromanosky",
+      "bat_profile_url": "https://bringatrailer.com/member/lromanosky/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "romanosky-automotive|calgary|AB|CA",
+      "detected_section_labels": {
+        "group": "CANADA",
+        "region": "CANADA"
+      }
+    },
+    {
+      "partner_name": "Pfaff Reserve",
+      "city": "Toronto",
+      "state": "ON",
+      "country": "CA",
+      "website_origin": "https://www.pfaffreserve.com",
+      "partner_referral_url": "https://www.pfaffreserve.com/bring-a-trailer-local-partner/",
+      "bat_username": "reserve416",
+      "bat_profile_url": "https://bringatrailer.com/member/reserve416/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "pfaff-reserve|toronto|ON|CA",
+      "detected_section_labels": {
+        "group": "CANADA",
+        "region": "CANADA"
+      }
+    },
+    {
+      "partner_name": "Pfaff Reserve",
+      "city": "Vancouver",
+      "state": "BC",
+      "country": "CA",
+      "website_origin": "https://www.pfaffreserve.com",
+      "partner_referral_url": "https://www.pfaffreserve.com/bring-a-trailer-local-partner/",
+      "bat_username": "reserve416",
+      "bat_profile_url": "https://bringatrailer.com/member/reserve416/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "pfaff-reserve|vancouver|BC|CA",
+      "detected_section_labels": {
+        "group": "CANADA",
+        "region": "CANADA"
+      }
+    },
+    {
+      "partner_name": "P1 Motor Cars",
+      "city": "Vancouver",
+      "state": "BC",
+      "country": "CA",
+      "website_origin": "https://www.p1motorcarsltd.com",
+      "partner_referral_url": "https://www.p1motorcarsltd.com/bring-a-trailer",
+      "bat_username": "p1_motorcars_ltd",
+      "bat_profile_url": "https://bringatrailer.com/member/p1_motorcars_ltd/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "p1-motor-cars|vancouver|BC|CA",
+      "detected_section_labels": {
+        "group": "CANADA",
+        "region": "CANADA"
+      }
+    },
+    {
+      "partner_name": "Colombo & Co",
+      "city": "Kortrijk",
+      "state": null,
+      "country": "Belgium",
+      "website_origin": "https://www.colomboandco.com",
+      "partner_referral_url": "https://www.colomboandco.com/services/auction",
+      "bat_username": "colomboandcompany",
+      "bat_profile_url": "https://bringatrailer.com/member/colomboandcompany/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "colombo-and-co|kortrijk|na|BELGIUM",
+      "detected_section_labels": {
+        "group": "EUROPE",
+        "region": "BELGIUM"
+      }
+    },
+    {
+      "partner_name": "Gem Classic Cars",
+      "city": "Pietrebais",
+      "state": null,
+      "country": "Belgium",
+      "website_origin": "https://gemclassiccars.com",
+      "partner_referral_url": "https://gemclassiccars.com/bring-a-trailer/",
+      "bat_username": "gemclassiccars",
+      "bat_profile_url": "https://bringatrailer.com/member/gemclassiccars/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "gem-classic-cars|pietrebais|na|BELGIUM",
+      "detected_section_labels": {
+        "group": "EUROPE",
+        "region": "BELGIUM"
+      }
+    },
+    {
+      "partner_name": "1600Veloce",
+      "city": "Göttingen",
+      "state": null,
+      "country": "Germany",
+      "website_origin": "https://www.1600veloce.com",
+      "partner_referral_url": "https://www.1600veloce.com/bringatrailer-international",
+      "bat_username": "1600veloce",
+      "bat_profile_url": "https://bringatrailer.com/member/1600veloce/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "1600veloce|g-ttingen|na|GERMANY",
+      "detected_section_labels": {
+        "group": "EUROPE",
+        "region": "GERMANY"
+      }
+    },
+    {
+      "partner_name": "ImageStreetClassics",
+      "city": "Santpoort-Noord",
+      "state": null,
+      "country": "The Netherlands",
+      "website_origin": "https://www.imagestreetclassics.com",
+      "partner_referral_url": "https://www.imagestreetclassics.com/",
+      "bat_username": "imagestreetclassics",
+      "bat_profile_url": "https://bringatrailer.com/member/imagestreetclassics/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "imagestreetclassics|santpoort-noord|na|THE NETHERLANDS",
+      "detected_section_labels": {
+        "group": "EUROPE",
+        "region": "THE NETHERLANDS"
+      }
+    },
+    {
+      "partner_name": "Chase Classics",
+      "city": "Dorset",
+      "state": null,
+      "country": "GB",
+      "website_origin": "https://www.chaseclassics.co.uk",
+      "partner_referral_url": "https://www.chaseclassics.co.uk/bring-a-trailer-partner/",
+      "bat_username": "chaseclassics",
+      "bat_profile_url": "https://bringatrailer.com/member/chaseclassics/",
+      "discovered_via": "bat_local_partners",
+      "source_url": "https://bringatrailer.com/local-partners/",
+      "geographic_key": "chase-classics|dorset|na|GB",
+      "detected_section_labels": {
+        "group": "UNITED KINGDOM",
+        "region": "ENGLAND"
+      }
+    }
+  ]
+}

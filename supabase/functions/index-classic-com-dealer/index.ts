@@ -114,9 +114,10 @@ function sanitizeDealerProfileData(raw: DealerProfileData): DealerProfileData | 
   const description = safeString(raw.description);
   const specialties = normalizeTextArray(raw.specialties);
 
-  // Greenlight: require name + logo, and at least one strong signal.
+  // Greenlight: require name, and at least one strong signal.
+  // Do NOT require logo_url: many Classic.com sellers do not have a usable logo on their profile.
   const hasStrongSignal = !!(website || phone || email || (city && state) || dealerLicense);
-  if (!name || !logoUrl || !hasStrongSignal) return null;
+  if (!name || !hasStrongSignal) return null;
 
   return {
     ...raw,
@@ -158,13 +159,14 @@ serve(async (req) => {
 
     const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
 
-    console.log(`🔥 Indexing Classic.com dealer profile: ${profile_url}`);
+    console.log(`Indexing Classic.com seller profile: ${profile_url}`);
 
-    // Step 1: Scrape Classic.com profile with Firecrawl STRUCTURED EXTRACTION
+    // Step 1: Scrape Classic.com profile with Firecrawl structured extraction (preferred),
+    // with a direct HTML fetch fallback when Firecrawl is not configured.
     let dealerData: DealerProfileData | null = null;
 
     if (firecrawlApiKey) {
-      console.log('🔥 Using Firecrawl structured extraction...');
+      console.log('Using Firecrawl structured extraction...');
       const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
         method: 'POST',
         headers: {
@@ -226,9 +228,9 @@ serve(async (req) => {
             inventory_url: extracted.inventory_url || null,
             auctions_url: extracted.auctions_url || null
           };
-          console.log('✅ Firecrawl structured extraction successful');
+          console.log('Firecrawl structured extraction successful');
         } else {
-          console.warn('⚠️ Firecrawl extract empty, falling back to HTML parsing');
+          console.warn('Firecrawl extract empty, falling back to HTML parsing');
           // Fallback to HTML parsing
           const html = firecrawlData.data?.html || '';
           const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -238,7 +240,20 @@ serve(async (req) => {
         throw new Error(`Firecrawl failed: ${firecrawlResponse.status}`);
       }
     } else {
-      throw new Error('FIRECRAWL_API_KEY is required');
+      // Fallback: direct fetch Classic.com profile HTML and parse it.
+      const html = await fetch(profile_url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: AbortSignal.timeout(20000),
+      }).then((r) => (r.ok ? r.text() : ''));
+
+      if (!html) throw new Error('Failed to fetch Classic.com profile HTML');
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      dealerData = extractDealerProfileData(doc, html);
     }
 
     if (!dealerData) {
@@ -331,11 +346,11 @@ serve(async (req) => {
               0.8 // Confidence score
             );
             teamDataStored = result.stored;
-            console.log(`✅ Stored ${teamDataStored} team members for ${organization.name}`);
+            console.log(`Stored ${teamDataStored} team members for ${organization.name}`);
           }
         }
       } catch (err: any) {
-        console.warn('⚠️  Failed to extract/store team data:', err.message);
+        console.warn('Failed to extract/store team data:', err.message);
         // Don't fail the whole operation if team extraction fails
       }
     }
@@ -764,17 +779,28 @@ async function findOrCreateOrganizationWithGeographicLogic(
   if (dealerData.dealer_license) {
     const { data: existingByLicense } = await supabase
       .from('businesses')
-      .select('id, business_name, city, state, dealer_license, logo_url')
+      .select('id, business_name, city, state, dealer_license, logo_url, banner_url, metadata')
       .eq('dealer_license', dealerData.dealer_license)
       .maybeSingle();
 
     if (existingByLicense) {
-      // Update logo if missing
-      if (logoUrl && !existingByLicense.logo_url) {
-        await supabase
-          .from('businesses')
-          .update({ logo_url: logoUrl })
-          .eq('id', existingByLicense.id);
+      // Update missing fields + always attach Classic.com profile metadata for future inventory sync.
+      const updates: any = {};
+      if (logoUrl && !existingByLicense.logo_url) updates.logo_url = logoUrl;
+      if (primaryImageUrl && !existingByLicense.banner_url) updates.banner_url = primaryImageUrl;
+
+      const existingMeta =
+        existingByLicense.metadata && typeof existingByLicense.metadata === 'object'
+          ? existingByLicense.metadata
+          : {};
+      const mergedMeta: any = { ...existingMeta };
+      if (!mergedMeta.classic_com_profile) mergedMeta.classic_com_profile = sourceUrl;
+      if (dealerData.inventory_url && !mergedMeta.inventory_url) mergedMeta.inventory_url = dealerData.inventory_url;
+      if (dealerData.auctions_url && !mergedMeta.auctions_url) mergedMeta.auctions_url = dealerData.auctions_url;
+      updates.metadata = mergedMeta;
+
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('businesses').update(updates).eq('id', existingByLicense.id);
       }
       return { id: existingByLicense.id, name: existingByLicense.business_name };
     }
@@ -784,20 +810,30 @@ async function findOrCreateOrganizationWithGeographicLogic(
   if (dealerData.website) {
     const { data: existingByWebsite } = await supabase
       .from('businesses')
-      .select('id, business_name, city, state, dealer_license, logo_url')
+      .select('id, business_name, city, state, dealer_license, logo_url, banner_url, metadata')
       .eq('website', dealerData.website)
       .maybeSingle();
 
     if (existingByWebsite) {
-      // Update license if missing
+      const updates: any = {};
       if (dealerData.dealer_license && !existingByWebsite.dealer_license) {
-        await supabase
-          .from('businesses')
-          .update({ 
-            dealer_license: dealerData.dealer_license,
-            logo_url: logoUrl || existingByWebsite.logo_url
-          })
-          .eq('id', existingByWebsite.id);
+        updates.dealer_license = dealerData.dealer_license;
+      }
+      if (logoUrl && !existingByWebsite.logo_url) updates.logo_url = logoUrl;
+      if (primaryImageUrl && !existingByWebsite.banner_url) updates.banner_url = primaryImageUrl;
+
+      const existingMeta =
+        existingByWebsite.metadata && typeof existingByWebsite.metadata === 'object'
+          ? existingByWebsite.metadata
+          : {};
+      const mergedMeta: any = { ...existingMeta };
+      if (!mergedMeta.classic_com_profile) mergedMeta.classic_com_profile = sourceUrl;
+      if (dealerData.inventory_url && !mergedMeta.inventory_url) mergedMeta.inventory_url = dealerData.inventory_url;
+      if (dealerData.auctions_url && !mergedMeta.auctions_url) mergedMeta.auctions_url = dealerData.auctions_url;
+      updates.metadata = mergedMeta;
+
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('businesses').update(updates).eq('id', existingByWebsite.id);
       }
       return { id: existingByWebsite.id, name: existingByWebsite.business_name };
     }
@@ -807,7 +843,7 @@ async function findOrCreateOrganizationWithGeographicLogic(
   if (dealerData.name && dealerData.city && dealerData.state) {
     const { data: existingByLocation } = await supabase
       .from('businesses')
-      .select('id, business_name, city, state, dealer_license, logo_url, website')
+      .select('id, business_name, city, state, dealer_license, logo_url, banner_url, website, metadata')
       .ilike('business_name', `%${dealerData.name}%`)
       .ilike('city', `%${dealerData.city}%`)
       .eq('state', dealerData.state.toUpperCase())
@@ -820,6 +856,16 @@ async function findOrCreateOrganizationWithGeographicLogic(
       if (primaryImageUrl) updates.banner_url = primaryImageUrl;
       if (dealerData.dealer_license) updates.dealer_license = dealerData.dealer_license;
       if (dealerData.website) updates.website = dealerData.website;
+
+      const existingMeta =
+        existingByLocation.metadata && typeof existingByLocation.metadata === 'object'
+          ? existingByLocation.metadata
+          : {};
+      const mergedMeta: any = { ...existingMeta };
+      if (!mergedMeta.classic_com_profile) mergedMeta.classic_com_profile = sourceUrl;
+      if (dealerData.inventory_url && !mergedMeta.inventory_url) mergedMeta.inventory_url = dealerData.inventory_url;
+      if (dealerData.auctions_url && !mergedMeta.auctions_url) mergedMeta.auctions_url = dealerData.auctions_url;
+      updates.metadata = mergedMeta;
 
       if (Object.keys(updates).length > 0) {
         await supabase

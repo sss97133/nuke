@@ -2023,7 +2023,31 @@ serve(async (req) => {
         }
 
         // CRITICAL FIX: Immediately download and upload images (don't wait for backfill)
-        const imageUrls = Array.isArray(scrapeData.data.images) ? scrapeData.data.images : [];
+        // Fallback logic:
+        // - Some dealer sites block per-listing scraping, causing scrape-vehicle to return no images.
+        // - In those cases, use image URLs discovered on the inventory grid (import_queue raw_data).
+        const rawFallbackImages: string[] = (() => {
+          try {
+            const raw = rawData || {};
+            const fromRawArray = Array.isArray((raw as any).image_urls) ? (raw as any).image_urls : [];
+            const fromRawImages = Array.isArray((raw as any).images) ? (raw as any).images : [];
+            const thumb = typeof (raw as any).thumbnail_url === 'string' ? (raw as any).thumbnail_url : null;
+            const topThumb = typeof (item as any)?.thumbnail_url === 'string' ? (item as any).thumbnail_url : null;
+            const merged = [...fromRawArray, ...fromRawImages, ...(thumb ? [thumb] : []), ...(topThumb ? [topThumb] : [])];
+            return merged
+              .map((u) => (typeof u === 'string' ? u.trim() : ''))
+              .filter((u) => u.startsWith('http'));
+          } catch {
+            return [];
+          }
+        })();
+
+        const imageUrls = (() => {
+          const primary = Array.isArray(scrapeData.data.images) ? scrapeData.data.images : [];
+          if (primary.length > 0) return primary;
+          if (rawFallbackImages.length > 0) return rawFallbackImages;
+          return [];
+        })();
         if (imageUrls.length > 0) {
           // Keep import-queue processing within Edge runtime limits.
           // Upload a capped number immediately; defer the rest to background backfill.
