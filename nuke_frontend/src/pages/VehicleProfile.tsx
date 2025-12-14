@@ -40,6 +40,7 @@ import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
 import { BATListingManager } from '../components/vehicle/BATListingManager';
 import VehicleDescriptionCard from '../components/vehicle/VehicleDescriptionCard';
 import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
+import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
 // Lazy load heavy components to avoid circular dependencies
 const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/MergeProposalsPanel'));
 const ImageGallery = React.lazy(() => import('../components/images/ImageGallery'));
@@ -1402,6 +1403,9 @@ const VehicleProfile: React.FC = () => {
                 isEditable={canEdit}
                 onUpdate={() => loadVehicle()}
               />
+
+                  {/* 2b. Structured listing data (Options / Service records / etc.) */}
+                  <VehicleStructuredListingDataCard vehicle={vehicle} />
                   
                   {/* 3. Comments */}
               <VehicleCommentsCard

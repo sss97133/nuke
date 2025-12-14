@@ -16,7 +16,16 @@ serve(async (req) => {
     )
 
     const geminiKey = Deno.env.get('GEMINI_API_KEY')
-    if (!geminiKey) throw new Error('GEMINI_API_KEY required')
+    // Avoid spamming 500s in production if Gemini isn't configured.
+    if (!geminiKey) {
+      return new Response(JSON.stringify({
+        success: false,
+        disabled: true,
+        message: 'GEMINI_API_KEY not configured; catalog extraction is disabled'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // Get next pending chunk
     const { data: chunk } = await supabase

@@ -22,6 +22,20 @@ interface BaTListing {
   lotNumber: string;
 }
 
+function normalizeUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    u.hash = '';
+    u.search = '';
+    // Normalize path for BaT listings to end with a trailing slash
+    if (!u.pathname.endsWith('/')) u.pathname = `${u.pathname}/`;
+    return u.toString();
+  } catch {
+    // Fallback: best-effort strip fragments/query
+    return String(raw).split('#')[0].split('?')[0];
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -30,18 +44,20 @@ serve(async (req) => {
   try {
     const payload = await req.json();
     // Backwards/compat: accept {url} (process-url-drop) or {batUrl}
-    const batUrl = payload?.batUrl || payload?.url;
+    const batUrlRaw = payload?.batUrl || payload?.url;
     const organizationId = payload?.organizationId || null;
     // Safety: fuzzy match is a major contamination source; default off.
     const allowFuzzyMatch = payload?.allowFuzzyMatch === true;
+    const imageBatchSize = Math.max(10, Math.min(100, Number(payload?.imageBatchSize || 50)));
 
-    if (!batUrl) {
+    if (!batUrlRaw) {
       return new Response(
         JSON.stringify({ error: 'batUrl (or url) required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const batUrl = normalizeUrl(batUrlRaw);
     console.log(`Fetching BaT listing: ${batUrl}`);
     
     const response = await fetch(batUrl);
@@ -111,7 +127,47 @@ serve(async (req) => {
     );
 
     let vehicleId: string | null = null;
+    let createdVehicle = false;
     
+    // First: idempotent match by BaT URL (best signal when VIN is absent/unreliable).
+    {
+      const { data: existingByBatUrl, error: byBatErr } = await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('bat_auction_url', batUrl)
+        .maybeSingle();
+      if (byBatErr) {
+        console.log('BaT URL match query failed (continuing):', byBatErr.message);
+      } else if (existingByBatUrl?.id) {
+        vehicleId = existingByBatUrl.id;
+        console.log(`Found existing vehicle by bat_auction_url: ${vehicleId}`);
+      }
+    }
+
+    // Fallback: match by discovery_url or listing_url (some older imports only set those)
+    if (!vehicleId) {
+      const { data: existingByDiscoveryUrl, error: discErr } = await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('discovery_url', batUrl)
+        .maybeSingle();
+      if (!discErr && existingByDiscoveryUrl?.id) {
+        vehicleId = existingByDiscoveryUrl.id;
+        console.log(`Found existing vehicle by discovery_url: ${vehicleId}`);
+      }
+    }
+    if (!vehicleId) {
+      const { data: existingByListingUrl, error: listErr } = await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('listing_url', batUrl)
+        .maybeSingle();
+      if (!listErr && existingByListingUrl?.id) {
+        vehicleId = existingByListingUrl.id;
+        console.log(`Found existing vehicle by listing_url: ${vehicleId}`);
+      }
+    }
+
     if (vin) {
       const { data: existingVehicle } = await supabase
         .from('vehicles')
@@ -147,7 +203,9 @@ serve(async (req) => {
         trim: trim || undefined,
         description: description,
         auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met',
-        bat_auction_url: batUrl
+        bat_auction_url: batUrl,
+        listing_url: batUrl,
+        discovery_url: batUrl
       };
       
       // Update VIN if we found one and vehicle doesn't have one
@@ -211,6 +269,7 @@ serve(async (req) => {
       }
 
       vehicleId = newVehicle.id;
+      createdVehicle = true;
 
       if (organizationId) {
         await supabase
@@ -268,25 +327,42 @@ serve(async (req) => {
       .from('data_validations')
       .insert(validations);
 
-    // Create timeline event for the sale with the actual sale date (not upload date)
-    await supabase
-      .from('timeline_events')
-      .insert({
-        vehicle_id: vehicleId,
-        event_type: 'sale',
-        event_date: saleDate, // Use actual BaT sale date
-        title: `Sold on Bring a Trailer for $${salePrice.toLocaleString()}`,
-        description: `${year} ${make} ${model} sold on BaT auction #${lotNumber}. Seller: ${seller}${buyer ? `, Buyer: ${buyer}` : ''}`,
-        cost_amount: salePrice,
-        metadata: {
-          source: 'bat_import',
-          bat_url: batUrl,
-          lot_number: lotNumber,
-          seller,
-          buyer
-        },
-        user_id: null // System-generated event
-      });
+    // Create timeline event for the sale with the actual sale date (deduped by bat_url + event_date).
+    try {
+      const { data: existingSaleEvent } = await supabase
+        .from('timeline_events')
+        .select('id')
+        .eq('vehicle_id', vehicleId)
+        .eq('event_type', 'sale')
+        .eq('event_date', saleDate)
+        .contains('metadata', { bat_url: batUrl })
+        .limit(1);
+
+      if (!existingSaleEvent || existingSaleEvent.length === 0) {
+        await supabase
+          .from('timeline_events')
+          .insert({
+            vehicle_id: vehicleId,
+            event_type: 'sale',
+            event_date: saleDate, // Use actual BaT sale date
+            title: `Sold on Bring a Trailer for $${salePrice.toLocaleString()}`,
+            description: `${year} ${make} ${model} sold on BaT auction #${lotNumber}. Seller: ${seller}${buyer ? `, Buyer: ${buyer}` : ''}`,
+            cost_amount: salePrice,
+            metadata: {
+              source: 'bat_import',
+              bat_url: batUrl,
+              lot_number: lotNumber,
+              seller,
+              buyer
+            },
+            user_id: null // System-generated event
+          });
+      } else {
+        console.log('Sale timeline event already exists for this bat_url + event_date; skipping insert');
+      }
+    } catch (e: any) {
+      console.log('Timeline sale event insert failed (non-fatal):', e?.message || String(e));
+    }
     
     // Call comprehensive extraction to get full auction data and create timeline events
     try {
@@ -312,12 +388,61 @@ serve(async (req) => {
       console.log('Comprehensive extraction not available, using basic extraction only');
     }
 
+    // Import ALL BaT listing images by scraping URLs then calling backfill-images in batches.
+    const imageImport = {
+      found: 0,
+      uploaded: 0,
+      skipped: 0,
+      failed: 0,
+      batches: 0,
+      batch_size: imageBatchSize
+    };
+    try {
+      const { data: simpleData, error: simpleError } = await supabase.functions.invoke('simple-scraper', {
+        body: { url: batUrl }
+      });
+      const images: string[] = (simpleData?.success && Array.isArray(simpleData?.data?.images)) ? simpleData.data.images : [];
+      imageImport.found = images.length;
+
+      if (simpleError) {
+        console.log('simple-scraper failed (non-fatal):', simpleError.message);
+      } else if (images.length > 0) {
+        for (let start = 0; start < images.length; start += imageBatchSize) {
+          const slice = images.slice(start, start + imageBatchSize);
+          imageImport.batches++;
+          const { data: backfillData, error: backfillError } = await supabase.functions.invoke('backfill-images', {
+            body: {
+              vehicle_id: vehicleId,
+              image_urls: slice,
+              source: 'bat_import',
+              run_analysis: false,
+              listed_date: saleDate,
+              max_images: slice.length
+            }
+          });
+          if (backfillError) {
+            console.log(`backfill-images batch failed (non-fatal):`, backfillError.message);
+            imageImport.failed += slice.length;
+            continue;
+          }
+          imageImport.uploaded += Number(backfillData?.uploaded || 0);
+          imageImport.skipped += Number(backfillData?.skipped || 0);
+          imageImport.failed += Number(backfillData?.failed || 0);
+        }
+      } else {
+        console.log('No images found by simple-scraper');
+      }
+    } catch (e: any) {
+      console.log('Image import failed (non-fatal):', e?.message || String(e));
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         vehicleId,
         vehicle: listing,
-        action: vehicleId ? 'updated' : 'created'
+        action: createdVehicle ? 'created' : 'updated',
+        images: imageImport
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

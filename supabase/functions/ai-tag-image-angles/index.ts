@@ -30,6 +30,7 @@ serve(async (req) => {
 
     // Call OpenAI Vision API
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    const MIN_INSERT_CONFIDENCE = 80;
     
     const visionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -45,6 +46,12 @@ serve(async (req) => {
             content: `You are a vehicle photography expert analyzing angles and perspectives.
 
 Categorize this image into ONE primary angle from this taxonomy:
+
+CRITICAL GUARDRAILS:
+- Do NOT default to a "quarter" or "three-quarter" exterior angle.
+- Only choose exterior full-vehicle angles (front_quarter_*, rear_quarter_*, profile_*, front_straight, rear_straight, roof_view) if the FULL vehicle is visible in frame.
+- If the image is cropped/close-up, prefer a specific DETAIL angle (wheels_closeup, badges, lights_*, etc.) or the closest non-exterior category.
+- If uncertain, lower confidence. It's better to be conservative than wrong.
 
 EXTERIOR:
 - front_quarter_driver: Front 3/4 view from driver side
@@ -103,6 +110,12 @@ Return JSON:
   "angle": "front_quarter_driver",
   "category": "exterior",
   "confidence": 95,
+  "evidence": {
+    "full_vehicle_in_frame": true,
+    "front_end_visible": true,
+    "rear_end_visible": false,
+    "side_profile_visible": true
+  },
   "perspective": "wide_angle",
   "focal_length": 24,
   "sensor_type": "phone",
@@ -134,6 +147,40 @@ Return JSON:
     const parsed = JSON.parse(aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, ''));
     
     console.log('AI tagged angle:', parsed);
+    
+    // Confidence gating + deterministic guardrails
+    const ev = parsed?.evidence || {};
+    const full = !!ev.full_vehicle_in_frame;
+    const angleName = String(parsed?.angle || '');
+    let confidence = typeof parsed?.confidence === 'number' ? parsed.confidence : 80;
+    
+    const fullVehicleAngles = new Set([
+      'front_quarter_driver',
+      'front_quarter_passenger',
+      'rear_quarter_driver',
+      'rear_quarter_passenger',
+      'profile_driver',
+      'profile_passenger',
+      'front_straight',
+      'rear_straight',
+      'roof_view'
+    ]);
+    
+    if (fullVehicleAngles.has(angleName) && !full) {
+      confidence = Math.min(confidence, 60);
+    }
+    
+    if (confidence < MIN_INSERT_CONFIDENCE) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          skipped: true,
+          reason: `Low confidence (${confidence}) or insufficient evidence for angle`,
+          tagging: { ...parsed, confidence }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -156,7 +203,7 @@ Return JSON:
           image_id: imageId,
           vehicle_id: vehicleId,
           angle_id: angle.id,
-          confidence_score: parsed.confidence || 80,
+          confidence_score: confidence,
           tagged_by: 'ai',
           perspective_type: parsed.perspective,
           focal_length_mm: parsed.focal_length,

@@ -36,6 +36,10 @@ mix phx.server
 npm run db:run -- path/to/script.sql
 ```
 
+### Bring a Trailer import
+
+To import a Bring a Trailer listing (data + all images) into a vehicle profile, see `docs/IMPORT_BAT_LISTING.md`.
+
 ## Deployment
 
 The frontend deploys automatically to Vercel on push to main branch.

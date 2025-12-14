@@ -193,10 +193,11 @@ async function generateAITags(rekognitionData: any, imageUrl: string, vehicleId:
                 source_type: 'ai',
                 confidence: Math.round(adjustedConfidence),
                 automated_confidence: Math.round(instance.Confidence),
-                x_position: instance.BoundingBox.Left * 100,
-                y_position: instance.BoundingBox.Top * 100,
-                width: instance.BoundingBox.Width * 100,
-                height: instance.BoundingBox.Height * 100,
+                // Store as integers (percent) so dedupe/unique keys are stable.
+                x_position: Math.round(instance.BoundingBox.Left * 100),
+                y_position: Math.round(instance.BoundingBox.Top * 100),
+                width: Math.round(instance.BoundingBox.Width * 100),
+                height: Math.round(instance.BoundingBox.Height * 100),
                 verified: false,
                 validation_status: 'pending',
                 ai_detection_data: {

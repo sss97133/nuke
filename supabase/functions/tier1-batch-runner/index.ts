@@ -21,10 +21,30 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const envServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
-      ?? Deno.env.get("SERVICE_ROLE_KEY");
-    const envAnonKey = Deno.env.get("SUPABASE_ANON_KEY")
-      ?? Deno.env.get("ANON_KEY");
+    // Some projects store service-role keys under multiple names (including VITE_*).
+    // We'll probe all known names and pick the first that looks like a JWT.
+    const envServiceRoleKeyCandidates = [
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+      Deno.env.get("SERVICE_ROLE_KEY"),
+      Deno.env.get("VITE_SUPABASE_SERVICE_ROLE_KEY"),
+      Deno.env.get("SUPABASE_SERVICE_KEY"),
+    ].filter(Boolean) as string[];
+
+    const envAnonKeyCandidates = [
+      Deno.env.get("SUPABASE_ANON_KEY"),
+      Deno.env.get("ANON_KEY"),
+      Deno.env.get("VITE_SUPABASE_ANON_KEY"),
+    ].filter(Boolean) as string[];
+
+    // Pick the LONGEST candidate to avoid platform placeholders like "[REDACTED]"
+    const pickLongest = (arr: string[]) =>
+      arr.reduce<string | undefined>((best, cur) => {
+        if (!best) return cur;
+        return cur.length > best.length ? cur : best;
+      }, undefined);
+
+    const envServiceRoleKey = pickLongest(envServiceRoleKeyCandidates);
+    const envAnonKey = pickLongest(envAnonKeyCandidates);
 
     const serviceRoleKey = (envServiceRoleKey && envServiceRoleKey.length > 60)
       ? envServiceRoleKey
@@ -35,9 +55,51 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")
       ?? Deno.env.get("PROJECT_URL")
       ?? Deno.env.get("URL");
-    if (!serviceRoleKey || !supabaseUrl) {
-      return new Response(JSON.stringify({ error: "Missing service role key or SUPABASE_URL" }), {
-        status: 500,
+    if (!supabaseUrl) {
+      return new Response(JSON.stringify({
+        success: false,
+        disabled: true,
+        error: "Missing SUPABASE_URL in function environment",
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // If service role isn't configured, avoid 500 spam. This runner needs elevated DB read access
+    // to pull pending images. We intentionally no-op with a clear message.
+    if (!serviceRoleKey) {
+      return new Response(JSON.stringify({
+        success: false,
+        disabled: true,
+        error: "Missing SUPABASE_SERVICE_ROLE_KEY/SERVICE_ROLE_KEY secret for tier1-batch-runner",
+        hint: "Set SUPABASE_SERVICE_ROLE_KEY (or SERVICE_ROLE_KEY) as an Edge Function secret, then rerun.",
+        envDebug: {
+          hasServiceRoleKey: false,
+          hasAnonKey: Boolean(anonKey),
+          hasSupabaseUrl: true,
+          // Safe probes (booleans only; never return secret values)
+          sources: {
+            SUPABASE_SERVICE_ROLE_KEY: Boolean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")),
+            SERVICE_ROLE_KEY: Boolean(Deno.env.get("SERVICE_ROLE_KEY")),
+            VITE_SUPABASE_SERVICE_ROLE_KEY: Boolean(Deno.env.get("VITE_SUPABASE_SERVICE_ROLE_KEY")),
+            SUPABASE_SERVICE_KEY: Boolean(Deno.env.get("SUPABASE_SERVICE_KEY")),
+            SUPABASE_ANON_KEY: Boolean(Deno.env.get("SUPABASE_ANON_KEY")),
+            ANON_KEY: Boolean(Deno.env.get("ANON_KEY")),
+            VITE_SUPABASE_ANON_KEY: Boolean(Deno.env.get("VITE_SUPABASE_ANON_KEY")),
+          },
+          // Safe lengths (no values)
+          lengths: {
+            SUPABASE_SERVICE_ROLE_KEY: (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "").length,
+            SERVICE_ROLE_KEY: (Deno.env.get("SERVICE_ROLE_KEY") || "").length,
+            VITE_SUPABASE_SERVICE_ROLE_KEY: (Deno.env.get("VITE_SUPABASE_SERVICE_ROLE_KEY") || "").length,
+            SUPABASE_ANON_KEY: (Deno.env.get("SUPABASE_ANON_KEY") || "").length,
+            ANON_KEY: (Deno.env.get("ANON_KEY") || "").length,
+            VITE_SUPABASE_ANON_KEY: (Deno.env.get("VITE_SUPABASE_ANON_KEY") || "").length,
+          },
+        }
+      }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -55,14 +117,21 @@ serve(async (req) => {
     const { data: rows, error: listError } = await supabase
       .from("vehicle_images")
       .select("id,image_url,vehicle_id,user_id")
-      .or("ai_processing_status.is.null,ai_processing_status.not.in.(complete,duplicate_skipped)")
+      // NOTE: our pipeline uses ai_processing_status = 'completed' (not 'complete')
+      .or("ai_processing_status.is.null,ai_processing_status.not.in.(completed,duplicate_skipped)")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(BATCH_SIZE);
 
     if (listError) {
-      return new Response(JSON.stringify({ error: "List failed", message: listError.message }), {
-        status: 500,
+      // Avoid hard failing the runner; surface full error for debugging.
+      return new Response(JSON.stringify({
+        error: "List failed",
+        message: listError.message,
+        details: (listError as any).details ?? null,
+        hint: (listError as any).hint ?? null,
+      }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -78,7 +147,8 @@ serve(async (req) => {
         user_id: row.user_id,
       };
 
-      const fnKey = anonKey || serviceRoleKey;
+      // Always call downstream analysis with service role for consistent access + writes.
+      const fnKey = serviceRoleKey;
       const callOnce = async () =>
         await fetch(`${supabaseUrl}/functions/v1/analyze-image`, {
           method: "POST",

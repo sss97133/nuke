@@ -589,7 +589,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (contributorRole === 'restorer') return 'Restorer';
     
     // Fallback: if they are just the uploader without a specific role
-    if (session?.user?.id === vehicle?.uploaded_by) return 'Uploader';
+    if (session?.user?.id === vehicle?.uploaded_by) return ''; // Don't spam self-attribution in header
     
     return 'Listed by';
   };
