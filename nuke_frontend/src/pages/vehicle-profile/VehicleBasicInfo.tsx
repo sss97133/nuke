@@ -356,7 +356,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              {vehicle.model}
+              {sanitizeInlineValue(vehicle.model) || 'Not specified'}
             </span>
           </div>
           {vehicle.engine && (

@@ -15,6 +15,14 @@ function cleanModelName(raw: any): string | null {
   if (!raw) return null
   let s = String(raw).replace(/\s+/g, ' ').trim()
   if (!s) return null
+  // L'Art de l'Automobile sometimes appends marketing/location fragments with asterisks:
+  // "GTC4 Lusso V8 T *Available on the..." or "*Available in Geneva*".
+  // Model should be just the model name; keep badges in metadata elsewhere.
+  // Remove any balanced *...* segments (bounded) and any trailing unmatched "*..." segment.
+  s = s.replace(/\s*\*[^*]{1,120}\*\s*/g, ' ').replace(/\s+/g, ' ').trim()
+  s = s.replace(/\s*\*[^*]{1,200}$/g, '').trim()
+  // Remove common trailing "Available ..." fragments even when not wrapped in asterisks.
+  s = s.replace(/\s+(available|available in|available on|disponible|available in switzerland|available in geneva)\b[\s\S]*$/i, '').trim()
   // Remove common “listing title junk”
   s = s.replace(/\s*-\s*\$[\d,]+(?:\.\d{2})?.*$/i, '').trim()
   s = s.replace(/\s*\(\s*Est\.\s*payment.*$/i, '').trim()
@@ -90,6 +98,19 @@ function parseLartFiche(html: string, url: string): any {
   const brand = doc?.querySelector('.carDetails-brand')?.textContent?.trim() || ''
   const modelRaw = doc?.querySelector('.carDetails-model')?.textContent?.trim() || ''
   const title = [brand, modelRaw].filter(Boolean).join(' ').trim()
+
+  // Listing status: on sold listings, L'Art renders a badge (e.g. "Sold" / "Vendu")
+  // inside the price block. This is more reliable than URL patterns.
+  const soldBadgeText =
+    (doc?.querySelector('.carDetail.-price .dataList-value--special')?.textContent ||
+      doc?.querySelector('.dataList-value--special')?.textContent ||
+      '').replace(/\s+/g, ' ').trim()
+  const soldBadgeLower = soldBadgeText.toLowerCase()
+  const isSold =
+    soldBadgeLower === 'sold' ||
+    soldBadgeLower === 'vendu' ||
+    soldBadgeLower.includes('sold') ||
+    soldBadgeLower.includes('vendu')
 
   // Hi-res images are in data-big/href; thumbnails are in src with Cloudinary transforms.
   const hiRes: string[] = []
@@ -168,6 +189,12 @@ function parseLartFiche(html: string, url: string): any {
     title,
     make: cleanMakeName(brand) || brand || null,
     model: cleanModelName(modelRaw) || modelRaw || null,
+    // Status flags used by import queue to correctly tag dealer_inventory + org relationships
+    listing_status: isSold ? 'sold' : 'in_stock',
+    status: isSold ? 'sold' : null,
+    sold: isSold,
+    is_sold: isSold,
+    sold_badge: soldBadgeText || null,
     asking_price: parseNumberLoose(priceText),
     mileage: parseNumberLoose(mileageText),
     // Also map into canonical vehicle fields used elsewhere (best-effort).
@@ -352,6 +379,11 @@ serve(async (req) => {
       data.model = parsed.model || data.model
       data.asking_price = parsed.asking_price ?? data.asking_price
       data.mileage = parsed.mileage ?? data.mileage
+      data.listing_status = parsed.listing_status ?? data.listing_status
+      data.status = parsed.status ?? data.status
+      data.sold = parsed.sold ?? data.sold
+      data.is_sold = parsed.is_sold ?? data.is_sold
+      data.sold_badge = parsed.sold_badge ?? data.sold_badge
       // Prefer French narrative as canonical description, but keep structured fields for repackaging.
       data.description = (parsed.description_fr || '').trim() || data.description || ''
       data.description_fr = parsed.description_fr
@@ -360,7 +392,7 @@ serve(async (req) => {
       data.info_bullets = parsed.info_bullets
       data.service_history = parsed.service_history
       data.colors = parsed.colors
-      data.fuel_type = parsed.fuel
+      data.fuel_type = parsed.fuel_type || parsed.fuel
       data.transmission = parsed.transmission
       data.registration_date = parsed.registration_date
 

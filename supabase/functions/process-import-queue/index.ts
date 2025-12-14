@@ -182,6 +182,57 @@ function looksLikeSiteBrandNotMake(make: string): boolean {
   return false;
 }
 
+function extractGeneralColors(raw: any): { primary: string | null; secondary: string | null; interior: string | null; raw: string | null } {
+  const text = (raw ?? '').toString().replace(/\s+/g, ' ').trim();
+  if (!text) return { primary: null, secondary: null, interior: null, raw: null };
+
+  const lower = text.toLowerCase();
+
+  const mapTokenToColor = (t: string): string | null => {
+    const s = (t || '').toLowerCase();
+    // Common FR/IT/EN color stems seen on dealer listings
+    if (/(nero|noir|black)/.test(s)) return 'Black';
+    if (/(bianco|blanc|white)/.test(s)) return 'White';
+    if (/(rosso|rouge|red)/.test(s)) return 'Red';
+    if (/(blu|bleu|blue)/.test(s)) return 'Blue';
+    if (/(verde|vert|green)/.test(s)) return 'Green';
+    if (/(grigio|gris|grey|gray)/.test(s)) return 'Grey';
+    if (/(giallo|jaune|yellow)/.test(s)) return 'Yellow';
+    if (/(argento|argent|silver)/.test(s)) return 'Silver';
+    if (/(beige)/.test(s)) return 'Beige';
+    if (/(marron|brun|brown)/.test(s)) return 'Brown';
+    if (/(orange)/.test(s)) return 'Orange';
+    if (/(violet|purple)/.test(s)) return 'Purple';
+    return null;
+  };
+
+  // Try to isolate interior segment
+  let exteriorPart = text;
+  let interiorPart: string | null = null;
+  const interiorIdx = lower.search(/\b(int(é|e)rieur|interior|habitacle)\b/);
+  if (interiorIdx >= 0) {
+    exteriorPart = text.slice(0, interiorIdx).replace(/[,\-–]+$/, '').trim();
+    interiorPart = text.slice(interiorIdx).trim();
+  }
+
+  const tokens = exteriorPart
+    .split(/[,;]+/g)
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  const found: string[] = [];
+  for (const tok of tokens) {
+    const c = mapTokenToColor(tok);
+    if (c && !found.includes(c)) found.push(c);
+  }
+
+  const primary = found[0] || mapTokenToColor(exteriorPart) || null;
+  const secondary = found.length > 1 ? found[1] : null;
+  const interior = interiorPart ? (mapTokenToColor(interiorPart) || null) : null;
+
+  return { primary, secondary, interior, raw: text };
+}
+
 function buildLartRepackagedDescription(scrape: any): string {
   const descFr = typeof scrape?.description_fr === 'string' ? scrape.description_fr.trim() : '';
   const descEn = typeof scrape?.description_en === 'string' ? scrape.description_en.trim() : '';
@@ -415,26 +466,21 @@ serve(async (req) => {
           })
           .eq('id', item.id);
 
-        // Check for duplicate by URL
-        const { data: existingVehicle } = await supabase
+        // Discovery URL dedupe:
+        // If a vehicle already exists for this listing URL, DO NOT early-exit as "duplicate".
+        // We still want to scrape and backfill fields (repair pass).
+        let existingVehicleByUrlId: string | null = null;
+        let existingVehicleByUrlLocked = false;
+        const { data: existingVehicleByUrl } = await supabase
           .from('vehicles')
-          .select('id')
+          .select('id, ownership_verified, ownership_verification_id')
           .eq('discovery_url', item.listing_url)
-          .single();
+          .maybeSingle();
 
-        if (existingVehicle) {
-          await supabase
-            .from('import_queue')
-            .update({
-              status: 'duplicate',
-              vehicle_id: existingVehicle.id,
-              processed_at: new Date().toISOString()
-            })
-            .eq('id', item.id);
-          
-          results.duplicates++;
-          results.processed++;
-          continue;
+        if (existingVehicleByUrl?.id) {
+          existingVehicleByUrlId = existingVehicleByUrl.id;
+          existingVehicleByUrlLocked =
+            existingVehicleByUrl.ownership_verified === true || !!existingVehicleByUrl.ownership_verification_id;
         }
 
         // Scrape vehicle data - try Firecrawl first, then direct fetch
@@ -1371,17 +1417,33 @@ serve(async (req) => {
               console.log(`🔗 Linked existing vehicle to organization ${organizationId}`);
               
               // Also ensure organization_vehicles link exists
+              const relationshipType =
+                businessType === 'dealer'
+                  ? (isSoldListing ? 'sold_by' : 'seller')
+                  : (businessType === 'auction_house' ? 'consigner' : 'service_provider');
+
               await supabase
                 .from('organization_vehicles')
                 .upsert({
                   organization_id: organizationId,
                   vehicle_id: existingVehicle.id,
-                  relationship_type: 'consigner',
+                  relationship_type: relationshipType,
                   status: 'active',
                   auto_tagged: true
                 }, {
                   onConflict: 'organization_id,vehicle_id,relationship_type'
                 });
+
+              // Dealers should never have both "seller" and "sold_by" (or legacy "consigner") at the same time.
+              if (businessType === 'dealer') {
+                await supabase
+                  .from('organization_vehicles')
+                  .delete()
+                  .eq('organization_id', organizationId)
+                  .eq('vehicle_id', existingVehicle.id)
+                  .in('relationship_type', ['seller', 'sold_by', 'consigner'])
+                  .neq('relationship_type', relationshipType);
+              }
             }
             
             // Mark queue item as processed (merged with existing)
@@ -1401,13 +1463,19 @@ serve(async (req) => {
           }
         }
         
-        const listingStatusRaw = rawData.listing_status || rawData.status || null;
+        // Prefer the live scrape result for listing status; queue raw_data can be stale/incomplete.
+        const listingStatusRaw =
+          (scrapeData?.data?.listing_status || scrapeData?.data?.status || rawData.listing_status || rawData.status || null);
         const isSoldListing =
           listingStatusRaw === 'sold' ||
           listingStatusRaw === 'sold_out' ||
           listingStatusRaw === 'sold_vehicle' ||
+          listingStatusRaw === 'inactif' ||
+          listingStatusRaw === 'inactive' ||
           rawData.sold === true ||
-          rawData.is_sold === true;
+          rawData.is_sold === true ||
+          scrapeData?.data?.sold === true ||
+          scrapeData?.data?.is_sold === true;
 
         const isLartFiche = item.listing_url.includes('lartdelautomobile.com/fiche/');
         if (isLartFiche) {
@@ -1422,29 +1490,25 @@ serve(async (req) => {
         // update it rather than creating duplicates. This is essential for "repair passes" where
         // we improve extraction and want to backfill fields (price/mileage/options/service/etc).
         try {
-          const { data: existingByUrl } = await supabase
-            .from('vehicles')
-            .select('id, ownership_verified, ownership_verification_id')
-            .eq('discovery_url', item.listing_url)
-            .maybeSingle();
+          const existingByUrlId = existingVehicleByUrlId;
+          const isLocked = existingVehicleByUrlLocked;
 
-          if (existingByUrl?.id) {
-            const isLocked = existingByUrl.ownership_verified === true || !!existingByUrl.ownership_verification_id;
+          if (existingByUrlId) {
             if (isLocked) {
-              console.log(`🔒 Existing vehicle is ownership-locked; skipping listing overwrite (vehicle ${existingByUrl.id})`);
+              console.log(`🔒 Existing vehicle is ownership-locked; skipping listing overwrite (vehicle ${existingByUrlId})`);
               results.duplicates++;
               results.processed++;
               continue;
             }
 
-            console.log(`♻️ Updating existing vehicle by discovery_url: ${existingByUrl.id}`);
+            console.log(`♻️ Updating existing vehicle by discovery_url: ${existingByUrlId}`);
 
             // Update structured lart payload in origin_metadata (best-effort).
             if (isLartFiche) {
               const { data: vrow } = await supabase
                 .from('vehicles')
                 .select('origin_metadata')
-                .eq('id', existingByUrl.id)
+                .eq('id', existingByUrlId)
                 .maybeSingle();
               const om = (vrow?.origin_metadata && typeof vrow.origin_metadata === 'object') ? vrow.origin_metadata : {};
               const nextOm = {
@@ -1465,24 +1529,28 @@ serve(async (req) => {
               await supabase
                 .from('vehicles')
                 .update({ origin_metadata: nextOm, updated_at: new Date().toISOString() } as any)
-                .eq('id', existingByUrl.id);
+                .eq('id', existingByUrlId);
             }
 
             // Push listing fields through forensic updater (now allowed for non-user sources).
+            const colorSignal = extractGeneralColors(
+              scrapeData.data.color ?? scrapeData.data.colors ?? scrapeData.data.origin_metadata?.lart?.colors ?? null
+            );
             const listingFields: Array<{ key: string; value: any }> = [
               { key: 'asking_price', value: scrapeData.data.asking_price ?? scrapeData.data.price ?? null },
               { key: 'mileage', value: scrapeData.data.mileage ?? null },
               { key: 'transmission', value: scrapeData.data.transmission ?? null },
               { key: 'drivetrain', value: scrapeData.data.drivetrain ?? null },
               { key: 'fuel_type', value: scrapeData.data.fuel_type ?? scrapeData.data.fuel ?? null },
-              { key: 'color', value: scrapeData.data.color ?? scrapeData.data.colors ?? null },
+              // Prefer general (primary/secondary) color label for canonical `vehicles.color`
+              { key: 'color', value: (colorSignal.primary && colorSignal.secondary) ? `${colorSignal.primary} / ${colorSignal.secondary}` : (colorSignal.primary || null) },
             ];
             for (const f of listingFields) {
               if (f.value === null || typeof f.value === 'undefined') continue;
               const v = String(f.value).trim();
               if (!v) continue;
               await supabase.rpc('update_vehicle_field_forensically', {
-                p_vehicle_id: existingByUrl.id,
+                p_vehicle_id: existingByUrlId,
                 p_field_name: f.key,
                 p_new_value: v,
                 p_source: 'scraped_listing',
@@ -1491,11 +1559,245 @@ serve(async (req) => {
               });
             }
 
+            // Store detailed/secondary colors into origin_metadata for UI (best-effort; do not overwrite if already present)
+            try {
+              if (isLartFiche && colorSignal.raw) {
+                const { data: vrow2 } = await supabase
+                  .from('vehicles')
+                  .select('origin_metadata')
+                  .eq('id', existingByUrlId)
+                  .maybeSingle();
+                const om2 = (vrow2?.origin_metadata && typeof vrow2.origin_metadata === 'object') ? vrow2.origin_metadata : {};
+                const lart2 = (om2 as any).lart && typeof (om2 as any).lart === 'object' ? (om2 as any).lart : {};
+                const nextOm2 = {
+                  ...om2,
+                  lart: {
+                    ...lart2,
+                    colors: (lart2 as any).colors ?? colorSignal.raw,
+                    color_primary: (lart2 as any).color_primary ?? colorSignal.primary,
+                    color_secondary: (lart2 as any).color_secondary ?? colorSignal.secondary,
+                    interior_color: (lart2 as any).interior_color ?? colorSignal.interior,
+                  }
+                };
+                await supabase
+                  .from('vehicles')
+                  .update({ origin_metadata: nextOm2, updated_at: new Date().toISOString() } as any)
+                  .eq('id', existingByUrlId);
+              }
+            } catch {
+              // non-blocking
+            }
+
+            // Repair-pass: for dealer inventory imports, make sure status + org relationship match sold/in_stock.
+            try {
+              const isInventoryExtraction = rawData.inventory_extraction === true || rawData.inventory_extraction === 'true';
+              if (organizationId && isInventoryExtraction && businessType === 'dealer') {
+                const inventoryStatus = isSoldListing ? 'sold' : 'in_stock';
+                const salePrice = isSoldListing ? (scrapeData.data.asking_price || scrapeData.data.price || null) : null;
+                const saleDate =
+                  isSoldListing
+                    ? (rawData.sale_date || rawData.sold_at || new Date().toISOString().slice(0, 10))
+                    : null;
+
+                await supabase
+                  .from('dealer_inventory')
+                  .upsert({
+                    dealer_id: organizationId,
+                    vehicle_id: existingByUrlId,
+                    status: inventoryStatus,
+                    asking_price: scrapeData.data.asking_price || scrapeData.data.price || null,
+                    sale_price: salePrice,
+                    sale_date: saleDate,
+                    acquisition_type: 'purchase',
+                    notes: `Auto-imported from ${new URL(item.listing_url).hostname}`,
+                    updated_at: new Date().toISOString()
+                  }, {
+                    onConflict: 'dealer_id,vehicle_id'
+                  });
+
+                const relationshipType = isSoldListing ? 'sold_by' : 'seller';
+                await supabase
+                  .from('organization_vehicles')
+                  .upsert({
+                    organization_id: organizationId,
+                    vehicle_id: existingByUrlId,
+                    relationship_type: relationshipType,
+                    status: 'active',
+                    auto_tagged: true
+                  }, {
+                    onConflict: 'organization_id,vehicle_id,relationship_type'
+                  });
+                await supabase
+                  .from('organization_vehicles')
+                  .delete()
+                  .eq('organization_id', organizationId)
+                  .eq('vehicle_id', existingByUrlId)
+                  .in('relationship_type', ['seller', 'sold_by', 'consigner'])
+                  .neq('relationship_type', relationshipType);
+              }
+            } catch (invRepairErr: any) {
+              console.warn(`⚠️ dealer_inventory/org relationship repair failed (continuing): ${invRepairErr.message}`);
+            }
+
+            // Repair-pass image upgrade for L'Art:
+            // Older imports often stored only Cloudinary transformed thumbs (c_fill/h_467/w_624).
+            // If we now have hi-res originals from scrape-vehicle, upload a capped set and set as primary.
+            try {
+              if (isLartFiche) {
+                const candidateImages: string[] = Array.isArray(scrapeData?.data?.images) ? scrapeData.data.images : [];
+                const hiResCandidates = candidateImages
+                  .filter((u: any) => typeof u === 'string')
+                  .map((u: string) => u.trim())
+                  .filter(Boolean)
+                  .filter((u: string) => u.startsWith('http'))
+                  // Prefer true Cloudinary originals (no transform segment)
+                  .filter((u: string) => u.includes('/image/upload/v') || !u.includes('/image/upload/c_'));
+
+                // Check if current images are likely thumbnails
+                const { data: existingImgRows } = await supabase
+                  .from('vehicle_images')
+                  .select('id, source_url, is_primary, created_at')
+                  .eq('vehicle_id', existingByUrlId)
+                  .order('created_at', { ascending: true })
+                  .limit(200);
+
+                const existingSource = new Set((existingImgRows || []).map((r: any) => String(r.source_url || '')));
+                const hasAnyHiResAlready = (existingImgRows || []).some((r: any) =>
+                  typeof r?.source_url === 'string' && r.source_url.includes('/image/upload/v')
+                );
+                const thumbRatio =
+                  (existingImgRows || []).length > 0
+                    ? (existingImgRows || []).filter((r: any) =>
+                        typeof r?.source_url === 'string' && r.source_url.includes('/image/upload/c_fill,g_center,h_467,w_624/')
+                      ).length / (existingImgRows || []).length
+                    : 1;
+
+                if (!hasAnyHiResAlready && hiResCandidates.length > 0 && thumbRatio >= 0.75) {
+                  const MAX_IMAGES_REPAIR = 12;
+                  const toUpload = hiResCandidates.filter((u) => !existingSource.has(u)).slice(0, MAX_IMAGES_REPAIR);
+                  if (toUpload.length > 0) {
+                    console.log(`🧪 L'Art hi-res repair: uploading ${toUpload.length} hi-res images for ${existingByUrlId}`);
+
+                    // Best-effort attribution user
+                    let importUserId: string | null = null;
+                    if (organizationId) {
+                      try {
+                        const { data: biz, error: bizErr } = await supabase
+                          .from('businesses')
+                          .select('uploaded_by, discovered_by')
+                          .eq('id', organizationId)
+                          .maybeSingle();
+                        if (!bizErr && biz) {
+                          importUserId = (biz.discovered_by || biz.uploaded_by || null);
+                        }
+                      } catch {
+                        // ignore
+                      }
+                    }
+                    if (!importUserId) {
+                      const { data: { user } } = await supabase.auth.getUser();
+                      importUserId = user?.id || null;
+                    }
+
+                    for (let i = 0; i < toUpload.length; i++) {
+                      let sourceUrl = toUpload[i];
+                      if (sourceUrl.startsWith('http://res.cloudinary.com/')) {
+                        sourceUrl = 'https://' + sourceUrl.slice('http://'.length);
+                      }
+
+                      try {
+                        const imageResponse = await fetch(sourceUrl, { signal: AbortSignal.timeout(20000) });
+                        if (!imageResponse.ok) {
+                          console.warn(`    ⚠️ Hi-res download failed ${i + 1}/${toUpload.length}: HTTP ${imageResponse.status}`);
+                          continue;
+                        }
+                        const imageBlob = await imageResponse.blob();
+                        const arrayBuffer = await imageBlob.arrayBuffer();
+                        const uint8Array = new Uint8Array(arrayBuffer);
+
+                        const ext = sourceUrl.match(/\.(jpg|jpeg|png|webp)$/i)?.[1] || 'jpg';
+                        const fileName = `repair_hires_${Date.now()}_${i}.${ext}`;
+                        const storagePath = `${existingByUrlId}/${fileName}`;
+
+                        const { error: uploadError } = await supabase.storage
+                          .from('vehicle-images')
+                          .upload(storagePath, uint8Array, {
+                            contentType: `image/${ext}`,
+                            cacheControl: '3600',
+                            upsert: false
+                          });
+                        if (uploadError) {
+                          console.warn(`    ⚠️ Hi-res upload error ${i + 1}: ${uploadError.message}`);
+                          continue;
+                        }
+
+                        const { data: { publicUrl } } = supabase.storage
+                          .from('vehicle-images')
+                          .getPublicUrl(storagePath);
+
+                        const { error: imgInsertErr } = await supabase
+                          .from('vehicle_images')
+                          .insert({
+                            vehicle_id: existingByUrlId,
+                            image_url: publicUrl,
+                            user_id: importUserId,
+                            is_primary: i === 0,
+                            source: organizationId ? 'organization_import' : 'external_import',
+                            source_url: sourceUrl,
+                            storage_path: storagePath,
+                            taken_at: new Date().toISOString(),
+                            exif_data: {
+                              source_url: sourceUrl,
+                              discovery_url: item.listing_url,
+                              imported_by_user_id: importUserId,
+                              imported_at: new Date().toISOString(),
+                              queue_id: item.id,
+                              repair_pass: true,
+                              listing_status: isSoldListing ? 'sold' : 'in_stock',
+                              dealer_inventory_status: isSoldListing ? 'sold' : 'in_stock',
+                              organization_id: organizationId || null
+                            }
+                          } as any);
+
+                        if (imgInsertErr) {
+                          console.warn(`    ⚠️ Hi-res image record insert failed ${i + 1}: ${imgInsertErr.message}`);
+                          continue;
+                        }
+                      } catch (e: any) {
+                        console.warn(`    ⚠️ Hi-res repair image error ${i + 1}: ${e?.message || String(e)}`);
+                      }
+                    }
+
+                    // Ensure only the newest hi-res primary remains primary (avoid multiple primaries)
+                    const { data: newestPrimary } = await supabase
+                      .from('vehicle_images')
+                      .select('id')
+                      .eq('vehicle_id', existingByUrlId)
+                      .eq('is_primary', true)
+                      .order('created_at', { ascending: false })
+                      .limit(1)
+                      .maybeSingle();
+                    if (newestPrimary?.id) {
+                      await supabase
+                        .from('vehicle_images')
+                        .update({ is_primary: false })
+                        .eq('vehicle_id', existingByUrlId)
+                        .neq('id', newestPrimary.id)
+                        .eq('is_primary', true);
+                    }
+                  }
+                }
+              }
+            } catch (imgRepairErr: any) {
+              console.warn(`⚠️ L'Art hi-res repair pass failed (continuing): ${imgRepairErr.message}`);
+            }
+
             // Mark queue as complete/duplicate and move on.
             await supabase
               .from('import_queue')
               .update({
                 status: 'complete',
+                vehicle_id: existingByUrlId,
                 processed_at: new Date().toISOString(),
                 error_message: null,
               })
@@ -1821,7 +2123,7 @@ serve(async (req) => {
         if (organizationId) {
           const relationshipType =
             businessType === 'dealer'
-              ? (isSoldListing ? 'sold_by' : 'consigner')
+              ? (isSoldListing ? 'sold_by' : 'seller')
               : (businessType === 'auction_house' ? 'consigner' : 'service_provider');
 
           await supabase
@@ -1836,6 +2138,17 @@ serve(async (req) => {
               onConflict: 'organization_id,vehicle_id,relationship_type'
             });
           console.log(`🔗 Linked vehicle to organization ${organizationId}`);
+
+          // Dealers should never have both "seller" and "sold_by" (or legacy "consigner") at the same time.
+          if (businessType === 'dealer') {
+            await supabase
+              .from('organization_vehicles')
+              .delete()
+              .eq('organization_id', organizationId)
+              .eq('vehicle_id', newVehicle.id)
+              .in('relationship_type', ['seller', 'sold_by', 'consigner'])
+              .neq('relationship_type', relationshipType);
+          }
         }
 
         // Process scraped data through forensic system (REPLACES manual field assignment)
