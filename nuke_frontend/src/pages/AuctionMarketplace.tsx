@@ -55,6 +55,8 @@ export default function AuctionMarketplace() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('ending_soon');
   const [searchQuery, setSearchQuery] = useState('');
+  const [includeNoBidAuctions, setIncludeNoBidAuctions] = useState(false);
+  const [hiddenNoBidCount, setHiddenNoBidCount] = useState(0);
 
   useEffect(() => {
     loadListings();
@@ -75,12 +77,13 @@ export default function AuctionMarketplace() {
     return () => {
       channel.unsubscribe();
     };
-  }, [filter, sort]);
+  }, [filter, sort, includeNoBidAuctions]);
 
   const loadListings = async () => {
     setLoading(true);
     const now = new Date().toISOString();
     const allListings: AuctionListing[] = [];
+    let hiddenNoBids = 0;
 
     try {
       const hasBids = (bidCount: any) => {
@@ -111,7 +114,10 @@ export default function AuctionMarketplace() {
       if (!nativeError && nativeListings) {
         for (const listing of nativeListings) {
           // Marketplace rule: don't show auctions with no bids.
-          if (!hasBids(listing.bid_count)) continue;
+          if (!includeNoBidAuctions && !hasBids(listing.bid_count)) {
+            hiddenNoBids += 1;
+            continue;
+          }
 
           // Keep auctions even if end time is missing (some sources backfill it later).
           if (!listing.auction_end_time || new Date(listing.auction_end_time) > new Date()) {
@@ -158,7 +164,10 @@ export default function AuctionMarketplace() {
       if (!externalError && externalListings) {
         for (const listing of externalListings) {
           // Marketplace rule: don't show auctions with no bids.
-          if (!hasBids(listing.bid_count)) continue;
+          if (!includeNoBidAuctions && !hasBids(listing.bid_count)) {
+            hiddenNoBids += 1;
+            continue;
+          }
 
           // Keep listings even if end_date is missing (some sources backfill it later).
           if ((!listing.end_date || new Date(listing.end_date) > new Date()) && listing.vehicle) {
@@ -212,7 +221,10 @@ export default function AuctionMarketplace() {
       if (!batError && batListings) {
         for (const listing of batListings) {
           // Marketplace rule: don't show auctions with no bids.
-          if (!hasBids(listing.bid_count)) continue;
+          if (!includeNoBidAuctions && !hasBids(listing.bid_count)) {
+            hiddenNoBids += 1;
+            continue;
+          }
 
           if (listing.auction_end_date && listing.vehicle) {
             // Convert DATE to TIMESTAMPTZ for end of day
@@ -318,10 +330,12 @@ export default function AuctionMarketplace() {
 
       // Show all live auctions on the page (do not truncate to 50).
       setListings(filtered);
+      setHiddenNoBidCount(hiddenNoBids);
       console.log(`Loaded ${filtered.length} active auction listings (${nativeListings?.length || 0} native, ${externalListings?.length || 0} external, ${batListings?.length || 0} BaT)`);
     } catch (error) {
       console.error('Error loading listings:', error);
       setListings([]);
+      setHiddenNoBidCount(0);
     }
 
     setLoading(false);
@@ -384,8 +398,13 @@ export default function AuctionMarketplace() {
               <div>
                 <h1 style={{ margin: 0, fontSize: '14pt', fontWeight: 700 }}>Auction Marketplace</h1>
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                  Live auctions across the network. This marketplace only shows auctions that already have bids.
+                  Live auctions across the network.
                 </div>
+                {!loading && hiddenNoBidCount > 0 && !includeNoBidAuctions && (
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {hiddenNoBidCount} live auctions hidden (0 bids). Enable "Include 0-bid" to show them.
+                  </div>
+                )}
               </div>
               {user && (
                 <button
@@ -423,6 +442,26 @@ export default function AuctionMarketplace() {
                   alignItems: 'center'
                 }}
               >
+                {/* Include 0-bid toggle */}
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '8pt',
+                    color: 'var(--text-secondary)',
+                    userSelect: 'none',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeNoBidAuctions}
+                    onChange={(e) => setIncludeNoBidAuctions(e.target.checked)}
+                    style={{ transform: 'translateY(0.5px)' }}
+                  />
+                  Include 0-bid auctions
+                </label>
+
                 {/* Filter buttons */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {[
@@ -484,7 +523,9 @@ export default function AuctionMarketplace() {
                 </div>
               ) : filteredListings.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                  <div style={{ fontSize: '10pt', marginBottom: '8px' }}>No auctions with bids found</div>
+                  <div style={{ fontSize: '10pt', marginBottom: '8px' }}>
+                    {includeNoBidAuctions ? 'No live auctions found' : 'No auctions with bids found'}
+                  </div>
                   {user && (
                     <button
                       onClick={() => navigate('/list-vehicle')}
