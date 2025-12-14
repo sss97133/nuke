@@ -145,6 +145,8 @@ const ImageGallery = ({
   const sentinelRef = React.useRef<HTMLDivElement>(null);
   const [usingFallback, setUsingFallback] = useState(false);
   const [importingFallback, setImportingFallback] = useState(false);
+  // NOTE: Must be declared before any hooks/callbacks reference it (avoids TDZ crashes in production builds).
+  const [session, setSession] = useState<any>(null);
 
   const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
   const normalizeFallbackUrls = (urls: string[]) => {
@@ -249,7 +251,6 @@ const ImageGallery = ({
   const [selectedTagType, setSelectedTagType] = useState('part');
   const [tagText, setTagText] = useState('');
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
-  const [session, setSession] = useState<any>(null);
   const [canCreateTags, setCanCreateTags] = useState(false);
   const [imageTagCounts, setImageTagCounts] = useState<Record<string, number>>({});
   

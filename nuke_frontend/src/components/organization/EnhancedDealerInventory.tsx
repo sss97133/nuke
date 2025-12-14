@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleRelationshipVerification from './VehicleRelationshipVerification';
@@ -62,13 +62,15 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
   const [editingVehicle, setEditingVehicle] = useState<DealerVehicle | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [showAddVehiclesModal, setShowAddVehiclesModal] = useState(false);
+  const reloadTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    loadVehicles();
+    loadVehicles({ silent: false });
   }, [organizationId]);
 
-  const loadVehicles = async () => {
-    setLoading(true);
+  const loadVehicles = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!silent) setLoading(true);
     try {
       // Load ALL vehicles (active, sold, archived) - smart display will categorize them
       const { data, error } = await supabase
@@ -142,9 +144,55 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
       console.error('Failed to load vehicles:', error);
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  // Live updates:
+  // - Subscribe to organization_vehicles changes for this org (new imports land here)
+  // - Also do a low-cost polling fallback every ~3s while the page is open.
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const scheduleReload = () => {
+      if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = window.setTimeout(() => {
+        loadVehicles({ silent: true });
+      }, 500);
+    };
+
+    const channel = supabase
+      .channel(`org-inventory-live:${organizationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'organization_vehicles',
+          filter: `organization_id=eq.${organizationId}`,
+        },
+        () => {
+          scheduleReload();
+        }
+      )
+      .subscribe();
+
+    const poll = window.setInterval(() => {
+      // Poll is a safety net if realtime is unavailable / RLS blocks broadcasts.
+      loadVehicles({ silent: true });
+    }, 3000);
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch {
+        // ignore
+      }
+      window.clearInterval(poll);
+      if (reloadTimerRef.current) window.clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = null;
+    };
+  }, [organizationId]);
 
   // Smart categorization: Map relationship_type + status to display categories
   // IMPORTANT: Only mark as "sold" if there's proof (BAT URL, sale_date, approved verification, etc.)
