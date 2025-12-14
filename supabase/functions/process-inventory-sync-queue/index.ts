@@ -48,6 +48,14 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    // IMPORTANT:
+    // - Some projects use non-JWT API keys (sb_...) for anon/service_role, which fail JWT verification on Edge invocations.
+    // - For function-to-function calls, use a real JWT (legacy anon key) provided via secrets.
+    //   Set: supabase secrets set INTERNAL_INVOKE_JWT="<legacy anon JWT>" --project-ref <ref>
+    const invokeJwt =
+      Deno.env.get("INTERNAL_INVOKE_JWT") ??
+      Deno.env.get("SUPABASE_ANON_KEY") ??
+      supabaseServiceKey;
     const supabase = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 
     const body: ProcessRequest = await req.json().catch(() => ({} as any));
@@ -113,142 +121,50 @@ serve(async (req) => {
         const auctionsUrl = origin ? (safeString((meta as any).auctions_url) || `${origin}/auctions`) : null;
 
         const runMode = String(item.run_mode || "both");
+        let hardFail = false;
+        let hardFailReason: string | null = null;
+
+        async function callScrape(kind: string, body: any, hard: boolean) {
+          const resp = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${invokeJwt}` },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(120000),
+          });
+          const txt = await resp.text();
+          let data: any = {};
+          try { data = JSON.parse(txt); } catch { /* ignore */ }
+          out.calls.push({
+            organization_id: org.id,
+            kind,
+            ok: resp.ok,
+            listings_queued: data?.listings_queued || 0,
+            error: resp.ok ? null : (data?.error || txt.slice(0, 240) || `HTTP ${resp.status}`),
+          });
+          if (!resp.ok && hard) {
+            hardFail = true;
+            hardFailReason = `${kind} failed: HTTP ${resp.status} ${(data?.error || txt.slice(0, 180) || "").trim()}`;
+          }
+        }
 
         if (orgType === "dealer") {
           // Classic.com seller inventory (in addition to dealer website inventory)
           if (classicProfileUrl && (runMode === "both" || runMode === "current")) {
-            const resp = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-              body: JSON.stringify({
-                source_url: classicProfileUrl,
-                source_type: "dealer",
-                organization_id: org.id,
-                max_results: maxResults,
-                use_llm_extraction: false,
-                extract_dealer_info: false,
-                include_sold: false,
-              }),
-              signal: AbortSignal.timeout(120000),
-            });
-            const data = await resp.json().catch(() => ({}));
-            out.calls.push({ organization_id: org.id, kind: "classic_com_current", ok: resp.ok, listings_queued: data?.listings_queued || 0 });
+            await callScrape("classic_com_current", {
+              source_url: classicProfileUrl,
+              source_type: "dealer",
+              organization_id: org.id,
+              max_results: maxResults,
+              use_llm_extraction: false,
+              extract_dealer_info: false,
+              include_sold: false,
+            }, false);
           }
 
           // Current inventory
           if (runMode === "both" || runMode === "current") {
             if (inventoryUrl) {
-              const resp = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-                body: JSON.stringify({
-                  source_url: inventoryUrl,
-                  source_type: "dealer_website",
-                  organization_id: org.id,
-                  max_results: maxResults,
-                  use_llm_extraction: true,
-                  extract_dealer_info: true,
-                  // Many sites don't have deterministic sold feeds; keep false by default.
-                  include_sold: false,
-                  force_listing_status: "in_stock",
-                }),
-                signal: AbortSignal.timeout(120000),
-              });
-              const data = await resp.json().catch(() => ({}));
-              out.calls.push({ organization_id: org.id, kind: "dealer_current", ok: resp.ok, listings_queued: data?.listings_queued || 0 });
-            } else {
-              out.calls.push({ organization_id: org.id, kind: "dealer_current_skipped_no_website", ok: true, listings_queued: 0 });
-            }
-          }
-
-          // Sold inventory (only if explicitly known; precision > guessing)
-          if ((runMode === "both" || runMode === "sold") && soldInventoryUrl) {
-            const resp = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-              body: JSON.stringify({
-                source_url: soldInventoryUrl,
-                source_type: "dealer_website",
-                organization_id: org.id,
-                max_results: maxResultsSold,
-                use_llm_extraction: true,
-                extract_dealer_info: false,
-                include_sold: false,
-                force_listing_status: "sold",
-              }),
-              signal: AbortSignal.timeout(120000),
-            });
-            const data = await resp.json().catch(() => ({}));
-            out.calls.push({ organization_id: org.id, kind: "dealer_sold", ok: resp.ok, listings_queued: data?.listings_queued || 0 });
-          }
-
-          out.dealers_synced++;
-        } else if (orgType === "auction_house") {
-          // Classic.com auction house pages (in addition to auction-house website)
-          if (classicProfileUrl) {
-            const resp = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-              body: JSON.stringify({
-                source_url: classicProfileUrl,
-                source_type: "auction_house",
-                organization_id: org.id,
-                max_results: maxResults,
-                use_llm_extraction: false,
-                extract_dealer_info: false,
-              }),
-              signal: AbortSignal.timeout(120000),
-            });
-            const data = await resp.json().catch(() => ({}));
-            out.calls.push({ organization_id: org.id, kind: "classic_com_auction", ok: resp.ok, listings_queued: data?.listings_queued || 0 });
-          }
-
-          if (auctionsUrl) {
-            const resp = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-              body: JSON.stringify({
-                source_url: auctionsUrl,
-                source_type: "auction_house",
-                organization_id: org.id,
-                max_results: maxResults,
-                use_llm_extraction: true,
-                extract_dealer_info: true,
-              }),
-              signal: AbortSignal.timeout(120000),
-            });
-            const data = await resp.json().catch(() => ({}));
-            out.calls.push({ organization_id: org.id, kind: "auction", ok: resp.ok, listings_queued: data?.listings_queued || 0 });
-          } else {
-            out.calls.push({ organization_id: org.id, kind: "auction_skipped_no_website", ok: true, listings_queued: 0 });
-          }
-          out.auctions_synced++;
-        } else {
-          // Unknown type: still try dealer inventory (most sellers are dealers)
-          if (classicProfileUrl && (runMode === "both" || runMode === "current")) {
-            const resp = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-              body: JSON.stringify({
-                source_url: classicProfileUrl,
-                source_type: "dealer",
-                organization_id: org.id,
-                max_results: maxResults,
-                use_llm_extraction: false,
-                extract_dealer_info: false,
-                include_sold: false,
-              }),
-              signal: AbortSignal.timeout(120000),
-            });
-            const data = await resp.json().catch(() => ({}));
-            out.calls.push({ organization_id: org.id, kind: "classic_com_unknown_as_dealer", ok: resp.ok, listings_queued: data?.listings_queued || 0 });
-          }
-
-          if (inventoryUrl) {
-            const resp = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseServiceKey}` },
-              body: JSON.stringify({
+              await callScrape("dealer_current", {
                 source_url: inventoryUrl,
                 source_type: "dealer_website",
                 organization_id: org.id,
@@ -257,15 +173,86 @@ serve(async (req) => {
                 extract_dealer_info: true,
                 include_sold: false,
                 force_listing_status: "in_stock",
-              }),
-              signal: AbortSignal.timeout(120000),
-            });
-            const data = await resp.json().catch(() => ({}));
-            out.calls.push({ organization_id: org.id, kind: "unknown_as_dealer", ok: resp.ok, listings_queued: data?.listings_queued || 0 });
+              }, true);
+            } else {
+              out.calls.push({ organization_id: org.id, kind: "dealer_current_skipped_no_website", ok: true, listings_queued: 0 });
+            }
+          }
+
+          // Sold inventory (only if explicitly known; precision > guessing)
+          if ((runMode === "both" || runMode === "sold") && soldInventoryUrl) {
+            await callScrape("dealer_sold", {
+              source_url: soldInventoryUrl,
+              source_type: "dealer_website",
+              organization_id: org.id,
+              max_results: maxResultsSold,
+              use_llm_extraction: true,
+              extract_dealer_info: false,
+              include_sold: false,
+              force_listing_status: "sold",
+            }, true);
+          }
+
+          out.dealers_synced++;
+        } else if (orgType === "auction_house") {
+          // Classic.com auction house pages (in addition to auction-house website)
+          if (classicProfileUrl) {
+            await callScrape("classic_com_auction", {
+              source_url: classicProfileUrl,
+              source_type: "auction_house",
+              organization_id: org.id,
+              max_results: maxResults,
+              use_llm_extraction: false,
+              extract_dealer_info: false,
+            }, false);
+          }
+
+          if (auctionsUrl) {
+            await callScrape("auction", {
+              source_url: auctionsUrl,
+              source_type: "auction_house",
+              organization_id: org.id,
+              max_results: maxResults,
+              use_llm_extraction: true,
+              extract_dealer_info: true,
+            }, true);
+          } else {
+            out.calls.push({ organization_id: org.id, kind: "auction_skipped_no_website", ok: true, listings_queued: 0 });
+          }
+          out.auctions_synced++;
+        } else {
+          // Unknown type: still try dealer inventory (most sellers are dealers)
+          if (classicProfileUrl && (runMode === "both" || runMode === "current")) {
+            await callScrape("classic_com_unknown_as_dealer", {
+              source_url: classicProfileUrl,
+              source_type: "dealer",
+              organization_id: org.id,
+              max_results: maxResults,
+              use_llm_extraction: false,
+              extract_dealer_info: false,
+              include_sold: false,
+            }, false);
+          }
+
+          if (inventoryUrl) {
+            await callScrape("unknown_as_dealer", {
+              source_url: inventoryUrl,
+              source_type: "dealer_website",
+              organization_id: org.id,
+              max_results: maxResults,
+              use_llm_extraction: true,
+              extract_dealer_info: true,
+              include_sold: false,
+              force_listing_status: "in_stock",
+            }, true);
           } else {
             out.calls.push({ organization_id: org.id, kind: "unknown_as_dealer_skipped_no_website", ok: true, listings_queued: 0 });
           }
           out.dealers_synced++;
+        }
+
+        if (hardFail) {
+          throw new Error(hardFailReason || "inventory sync failed");
         }
 
         // Success: schedule the next run (inventory changes frequently, but don't hammer).

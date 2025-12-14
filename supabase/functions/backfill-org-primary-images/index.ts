@@ -64,7 +64,7 @@ serve(async (req) => {
     // Some deployments may not have `cover_image_url` yet. Keep this query compatible.
     const { data: orgs, error } = await supabase
       .from("businesses")
-      .select("id, business_name, website, logo_url, banner_url, favicon_url, metadata")
+      .select("id, business_name, website, logo_url, banner_url, metadata")
       .order("updated_at", { ascending: true })
       .limit(batchSize);
 
@@ -89,7 +89,7 @@ serve(async (req) => {
       try {
         const website = safeString(org.website);
         const origin = website ? normalizeOrigin(website) : null;
-        let faviconUrl: string | null = safeString(org.favicon_url) || null;
+        let faviconUrl: string | null = safeString((org.metadata as any)?.brand_assets?.favicon_url) || null;
 
         let bannerUrl: string | null =
           safeString(org.banner_url) ||
@@ -155,9 +155,21 @@ serve(async (req) => {
         if (!dryRun) {
           const updates: any = {};
           if (!safeString(org.banner_url)) updates.banner_url = bannerUrl;
-          // Persist favicon_url on the business row (UI uses it directly).
-          if (!safeString(org.favicon_url) && safeString(faviconUrl)) updates.favicon_url = faviconUrl;
-          if (metaUpdate) updates.metadata = metaUpdate;
+          // Persist favicon in metadata for schema compatibility.
+          if (safeString(faviconUrl)) {
+            const existingMeta = (org.metadata && typeof org.metadata === "object") ? org.metadata : {};
+            updates.metadata = {
+              ...existingMeta,
+              brand_assets: {
+                ...((existingMeta as any)?.brand_assets || {}),
+                favicon_url: faviconUrl,
+                extracted_at: new Date().toISOString(),
+                source_url: origin,
+              }
+            };
+          } else if (metaUpdate) {
+            updates.metadata = metaUpdate;
+          }
 
           if (Object.keys(updates).length > 0) {
             const { error: upErr } = await supabase.from("businesses").update(updates).eq("id", org.id);
