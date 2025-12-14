@@ -71,6 +71,7 @@ const VehicleProfile: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [viewCount, setViewCount] = useState<number>(0);
+  const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
   // Tabs disabled until backend processing is ready
   // const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<WorkspaceTabId>('evidence');
 
@@ -1087,7 +1088,9 @@ const VehicleProfile: React.FC = () => {
           )
         `)
         .eq('vehicle_id', vehId)
-        .eq('status', 'active');
+        // Include sold/pending relationships so the header can still show the org "emblem"
+        // even after inventory status changes.
+        .in('status', ['active', 'sold', 'pending']);
 
       if (error) {
         console.warn('Unable to load linked orgs:', error.message);
@@ -1424,18 +1427,23 @@ const VehicleProfile: React.FC = () => {
                       series={(vehicle as any).series}
                       model={vehicle.model}
                       bodyStyle={(vehicle as any).body_style}
-                      onUploadComplete={() => loadVehicle()}
+                      onUploadComplete={() => {
+                        loadVehicle();
+                        setReferenceLibraryRefreshKey((v) => v + 1);
+                      }}
                     />
                   )}
                   
                   {/* 4. Reference Documents - Display */}
                   <VehicleReferenceLibrary
                     vehicleId={vehicle.id}
+                    userId={session?.user?.id}
                     year={vehicle.year}
                     make={vehicle.make}
                     series={(vehicle as any).series}
                     model={vehicle.model}
                     bodyStyle={(vehicle as any).body_style}
+                    refreshKey={referenceLibraryRefreshKey}
                   />
                   
                   {/* 5. Coverage Map */}

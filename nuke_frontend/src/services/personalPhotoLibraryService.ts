@@ -24,7 +24,8 @@ export interface PersonalPhoto {
   album_count: number;
   
   // AI Analysis
-  ai_processing_status: 'pending' | 'processing' | 'complete' | 'failed';
+  // Backwards compatible: older pipelines used 'complete', newer ones use 'completed'
+  ai_processing_status: 'pending' | 'processing' | 'complete' | 'completed' | 'failed' | 'duplicate_skipped';
   ai_processing_started_at?: string;
   ai_processing_completed_at?: string;
   ai_suggestions: any;

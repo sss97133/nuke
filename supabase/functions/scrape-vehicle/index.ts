@@ -75,6 +75,102 @@ function normalizeImageUrls(urls: any[]): string[] {
   return out
 }
 
+function promoteBeverlyHillsCarClubImageUrl(raw: string): string {
+  let s = (raw || '').trim()
+  if (!s) return s
+  // Their gallery commonly uses suffixes like _s/_m/_l on jpgs; prefer large when possible.
+  // Examples:
+  // - .../1660/1660_main_l.jpg
+  // - .../1660/1660_1_s.jpg  -> ..._l.jpg
+  s = s.replace(/_(s|m)\.(jpg|jpeg|png)$/i, '_l.$2')
+  return s
+}
+
+function parseBeverlyHillsCarClubListing(html: string, url: string): any {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+
+  const title =
+    (doc?.querySelector('h1.listing-title')?.textContent || doc?.querySelector('h1')?.textContent || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const priceText =
+    (doc?.querySelector('.price')?.textContent || doc?.querySelector('[class*="price"]')?.textContent || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const specs: Record<string, string> = {}
+  const rows = Array.from(doc?.querySelectorAll('.listing-details-wrapper .detail-row') || [])
+  for (const row of rows as any[]) {
+    const label = (row.querySelector('.detail-label')?.textContent || '').replace(/\s+/g, ' ').replace(/:$/, '').trim()
+    const value = (row.querySelector('.detail-value')?.textContent || '').replace(/\s+/g, ' ').trim()
+    if (label && value) specs[label] = value
+  }
+
+  const year = parseNumberLoose(specs['Year'] || '') || null
+  const make = cleanMakeName(specs['Make']) || null
+  const model = cleanModelName(specs['Model']) || null
+
+  // VIN might be incomplete on some classic listings; still pass through if present.
+  const vinRaw = (specs['VIN'] || specs['Vin'] || '').trim()
+  const vin = vinRaw ? vinRaw.toUpperCase() : null
+
+  const mileage = parseNumberLoose(specs['Mileage'] || specs['Miles'] || specs['Odometer'] || '') || null
+
+  // Pull best-available images.
+  const imageCandidates: string[] = []
+  const galleryImgs = Array.from(doc?.querySelectorAll('.gallery-item img, .gallery img, img') || [])
+  for (const img of galleryImgs as any[]) {
+    const src = (img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy') || '').trim()
+    if (!src) continue
+    if (!src.includes('galleria_images')) continue
+    imageCandidates.push(promoteBeverlyHillsCarClubImageUrl(src))
+  }
+
+  // Some BHCC pages include hi-res URLs in anchors.
+  const galleryLinks = Array.from(doc?.querySelectorAll('a[href*="galleria_images"]') || [])
+  for (const a of galleryLinks as any[]) {
+    const href = (a.getAttribute('href') || '').trim()
+    if (!href) continue
+    imageCandidates.push(promoteBeverlyHillsCarClubImageUrl(href))
+  }
+
+  const images = normalizeImageUrls(imageCandidates)
+
+  const description =
+    (doc?.querySelector('.listing-description')?.textContent || '')
+      .replace(/\s+/g, ' ')
+      .trim() || null
+
+  // If the structured table didn't provide Y/M/M, attempt a conservative parse from title.
+  let titleYear = year
+  let titleMake = make
+  let titleModel = model
+  if ((!titleYear || !titleMake || !titleModel) && title) {
+    const m = title.match(/^(\d{4})\s+([A-Za-z][A-Za-z0-9-]+)\s+(.+)$/)
+    if (m) {
+      titleYear = titleYear || parseInt(m[1], 10)
+      titleMake = titleMake || cleanMakeName(m[2])
+      titleModel = titleModel || cleanModelName(m[3])
+    }
+  }
+
+  return {
+    source: 'beverlyhillscarclub',
+    title,
+    year: titleYear || null,
+    make: titleMake || null,
+    model: titleModel || null,
+    vin,
+    asking_price: parseNumberLoose(priceText),
+    mileage,
+    images,
+    thumbnail_url: images[0] || null,
+    specs,
+    description,
+  }
+}
+
 function parseNumberLoose(raw: string): number | null {
   const s = (raw || '').replace(/\u00a0/g, ' ').trim()
   if (!s) return null
@@ -128,6 +224,22 @@ function parseLartFiche(html: string, url: string): any {
     if (src && src.startsWith('http') && !seenTh.has(src)) {
       thumbs.push(src)
       seenTh.add(src)
+    }
+
+    // Fallback: derive original Cloudinary URL from transformed thumbnail src.
+    // Example:
+    //   .../image/upload/c_fill,g_center,h_467,w_624/v172.../file.jpg
+    // ->.../image/upload/v172.../file.jpg
+    if (src && src.includes('res.cloudinary.com') && src.includes('/image/upload/')) {
+      const httpsSrc = src.startsWith('http://res.cloudinary.com/') ? ('https://' + src.slice('http://'.length)) : src
+      const m = httpsSrc.match(/^(https?:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)([^/]+\/)?(v\d+\/.+)$/i)
+      if (m && m[1] && m[3]) {
+        const candidate = `${m[1]}${m[3]}`
+        if (candidate.startsWith('http') && !seenHi.has(candidate)) {
+          hiRes.push(candidate)
+          seenHi.add(candidate)
+        }
+      }
     }
   }
 
@@ -304,7 +416,7 @@ serve(async (req) => {
     // Fallback path: fetch and parse HTML
     // NOTE: Some sites (like lartdelautomobile.com) require HTML parsing even when Firecrawl returns extract,
     // because the page contains hi-res image URLs in data attributes.
-    const needsHtmlParse = url.includes('lartdelautomobile.com')
+    const needsHtmlParse = url.includes('lartdelautomobile.com') || url.includes('beverlyhillscarclub.com')
     if (!firecrawlExtract || needsHtmlParse) {
       const response = await fetch(url, {
         headers: {
@@ -403,6 +515,26 @@ serve(async (req) => {
         data.thumbnail_url = thumbs[0] || hires[0] || data.thumbnail_url
       }
       data.image_thumbnails = thumbs
+    }
+
+    // Site-specific: Beverly Hills Car Club uses explicit galleria_images URLs and a structured details panel.
+    // Firecrawl often under-returns hi-res images here, so prefer HTML parsing when available.
+    if (url.includes('beverlyhillscarclub.com') && html) {
+      const parsed = parseBeverlyHillsCarClubListing(html, url)
+      data.source = parsed.source
+      data.title = parsed.title || data.title
+      data.year = parsed.year ?? data.year
+      data.make = parsed.make || data.make
+      data.model = parsed.model || data.model
+      data.vin = parsed.vin || data.vin
+      data.asking_price = parsed.asking_price ?? data.asking_price
+      data.mileage = parsed.mileage ?? data.mileage
+      data.description = parsed.description || data.description || ''
+      data.specs = parsed.specs
+      if (Array.isArray(parsed.images) && parsed.images.length > 0) {
+        data.images = parsed.images
+        data.thumbnail_url = parsed.thumbnail_url || parsed.images[0] || data.thumbnail_url
+      }
     }
 
     // Extract VIN from HTML - works for multiple sites

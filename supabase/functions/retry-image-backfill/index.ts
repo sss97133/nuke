@@ -52,13 +52,21 @@ serve(async (req) => {
     const batch_size = Number(body?.batch_size || 50);
     const max_images_per_vehicle = Number(body?.max_images_per_vehicle || 50);
     const only_missing = body?.only_missing !== false; // default true
+    const vehicle_ids: string[] = Array.isArray(body?.vehicle_ids) ? body.vehicle_ids : [];
 
     // Find vehicles with image URLs (origin_metadata.image_urls) and optionally missing/partial images
-    const { data: vehicles, error } = await supabase
+    let vq = supabase
       .from('vehicles')
       .select('id, origin_metadata, discovery_url, profile_origin')
-      .not('origin_metadata->image_urls', 'is', null)
-      .limit(batch_size);
+      .not('origin_metadata->image_urls', 'is', null);
+
+    if (vehicle_ids.length > 0) {
+      vq = vq.in('id', vehicle_ids);
+    } else {
+      vq = vq.limit(batch_size);
+    }
+
+    const { data: vehicles, error } = await vq;
 
     if (error) throw error;
 

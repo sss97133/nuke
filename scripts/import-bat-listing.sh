@@ -50,6 +50,11 @@ if [ -z "$SERVICE_KEY" ]; then
   exit 1
 fi
 
+#
+# IMPORTANT:
+# - Newer versions of the edge function do NOT require organizationId.
+# - Older deployed versions may require it. In that case, you must explicitly set ORGANIZATION_ID.
+#
 ORG_ID="${ORGANIZATION_ID:-}"
 ALLOW_FUZZY="${ALLOW_FUZZY_MATCH:-false}"
 IMAGE_BATCH_SIZE="${IMAGE_BATCH_SIZE:-50}"
@@ -59,13 +64,22 @@ BODY=$(jq -n \
   --arg organizationId "$ORG_ID" \
   --argjson allowFuzzyMatch "$( [ "$ALLOW_FUZZY" = "true" ] && echo true || echo false )" \
   --argjson imageBatchSize "$(echo "$IMAGE_BATCH_SIZE" | awk '{print ($1+0)}')" \
-  '{
-    batUrl: $batUrl,
-    allowFuzzyMatch: $allowFuzzyMatch,
-    imageBatchSize: $imageBatchSize
-  }
-  + (if ($organizationId | length) > 0 then { organizationId: $organizationId } else {} end)
-  ')
+  '(
+    {
+      // Send both camelCase + snake_case keys for backward compatibility
+      batUrl: $batUrl,
+      url: $batUrl,
+      listingUrl: $batUrl,
+      bat_url: $batUrl,
+      allowFuzzyMatch: $allowFuzzyMatch,
+      imageBatchSize: $imageBatchSize
+    }
+    + (if ($organizationId | length) > 0 then
+        { organizationId: $organizationId, organization_id: $organizationId }
+      else
+        {}
+      end)
+  )')
 
 echo "Calling import-bat-listing..."
 

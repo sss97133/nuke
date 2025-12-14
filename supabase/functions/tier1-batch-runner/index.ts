@@ -118,7 +118,8 @@ serve(async (req) => {
       .from("vehicle_images")
       .select("id,image_url,vehicle_id,user_id")
       // NOTE: our pipeline uses ai_processing_status = 'completed' (not 'complete')
-      .or("ai_processing_status.is.null,ai_processing_status.not.in.(completed,duplicate_skipped)")
+      // Backwards compatible: exclude both legacy 'complete' and current 'completed'
+      .or("ai_processing_status.is.null,ai_processing_status.not.in.(completed,complete,duplicate_skipped)")
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(BATCH_SIZE);

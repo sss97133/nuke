@@ -317,7 +317,7 @@ async function queueListings(params: {
   listings: ExtractListing[];
   discoveredUrlsFallback: string[];
   maxListings: number;
-}): Promise<{ queued: number; duplicates: number }> {
+}): Promise<{ queued: number; updated: number; duplicates: number }> {
   const allUrls = new Map<string, ExtractListing>();
   for (const l of params.listings) {
     if (!l.url) continue;
@@ -330,6 +330,7 @@ async function queueListings(params: {
 
   const urls = Array.from(allUrls.values()).slice(0, params.maxListings);
   let queued = 0;
+  let updated = 0;
   let duplicates = 0;
 
   const rows: any[] = [];
@@ -360,11 +361,13 @@ async function queueListings(params: {
   const BATCH_SIZE = 75;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
-    const { error } = await params.supabase
+    // Step 1: insert new rows only (ignore duplicates)
+    const { error: insErr } = await params.supabase
       .from('import_queue')
       .upsert(batch, { onConflict: 'listing_url', ignoreDuplicates: true });
-    if (error) {
-      // If a batch fails for a non-duplicate reason, fall back to per-row inserts to salvage progress.
+
+    if (insErr) {
+      // If a batch fails (network, etc), fall back to per-row inserts to salvage progress.
       for (const row of batch) {
         const { error: rowErr } = await params.supabase.from('import_queue').insert(row);
         if (rowErr) {
@@ -374,11 +377,62 @@ async function queueListings(params: {
         }
       }
     } else {
+      // NOTE: ignoreDuplicates makes it impossible to know exact inserts; we’ll compute updates below.
+      // Count "attempted inserts" as queued best-effort (legacy behavior).
       queued += batch.length;
+    }
+
+    // Step 2: backfill existing rows (raw_data is missing in many legacy L'Art queues).
+    try {
+      const listingUrls = batch.map((r: any) => r.listing_url).filter(Boolean);
+      if (listingUrls.length > 0) {
+        const { data: existingRows, error: selErr } = await params.supabase
+          .from('import_queue')
+          .select('id, listing_url, raw_data')
+          .in('listing_url', listingUrls);
+        if (!selErr && existingRows && Array.isArray(existingRows)) {
+          const byUrl = new Map<string, any>();
+          for (const r of batch) byUrl.set(r.listing_url, r);
+
+          const updates: any[] = [];
+          for (const ex of existingRows) {
+            const desired = byUrl.get(ex.listing_url);
+            if (!desired) continue;
+            const existingRaw = (ex.raw_data && typeof ex.raw_data === 'object') ? ex.raw_data : {};
+            const desiredRaw = (desired.raw_data && typeof desired.raw_data === 'object') ? desired.raw_data : {};
+            const nextRaw = { ...existingRaw, ...desiredRaw };
+
+            // Only update if we are actually adding signal.
+            const hasInv = (existingRaw as any).inventory_extraction === true || (existingRaw as any).inventory_extraction === 'true';
+            const hasStatus = typeof (existingRaw as any).listing_status === 'string' && (existingRaw as any).listing_status.length > 0;
+            if (hasInv && hasStatus) continue;
+
+            updates.push({ id: ex.id, raw_data: nextRaw, source_id: desired.source_id || null });
+          }
+
+          // Apply updates sequentially in small batches to avoid rate limiting.
+          const U_BATCH = 25;
+          for (let j = 0; j < updates.length; j += U_BATCH) {
+            const chunk = updates.slice(j, j + U_BATCH);
+            await Promise.all(
+              chunk.map((u) =>
+                params.supabase
+                  .from('import_queue')
+                  .update({ raw_data: u.raw_data, source_id: u.source_id })
+                  .eq('id', u.id)
+              )
+            );
+          }
+
+          updated += updates.length;
+        }
+      }
+    } catch {
+      // non-blocking; listing ingestion should proceed even if backfill fails
     }
   }
 
-  return { queued, duplicates };
+  return { queued, updated, duplicates };
 }
 
 interface IndexRequest {

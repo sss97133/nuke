@@ -15,6 +15,12 @@ const DealerRoutes = React.lazy(() => import('./modules/dealer/routes'));
 const AdminRoutes = React.lazy(() => import('./modules/admin/routes'));
 const MarketplaceRoutes = React.lazy(() => import('./modules/marketplace/routes'));
 
+// Auth / callbacks (still referenced by many pages/components)
+const Login = React.lazy(() => import('../components/auth/Login'));
+const OAuthCallback = React.lazy(() => import('../components/auth/OAuthCallback'));
+const ResetPassword = React.lazy(() => import('../pages/ResetPassword'));
+const DropboxCallback = React.lazy(() => import('../pages/DropboxCallback'));
+
 // Legacy pages (still used by navigation components)
 const Profile = React.lazy(() => import('../pages/Profile'));
 const Capsule = React.lazy(() => import('../pages/Capsule'));
@@ -26,6 +32,12 @@ export const DomainRoutes = () => {
   return (
     <Suspense fallback={<div className="p-4 text-center">Loading module...</div>}>
       <Routes>
+        {/* Auth */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<OAuthCallback />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/dropbox-callback" element={<DropboxCallback />} />
+
         {/* Static / legal pages */}
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -55,6 +67,9 @@ export const DomainRoutes = () => {
         <Route path="/library" element={<Library />} />
         <Route path="/auctions" element={<AuctionMarketplace />} />
         <Route path="/notifications" element={<Notifications />} />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
   );

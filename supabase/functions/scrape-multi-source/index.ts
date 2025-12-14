@@ -459,6 +459,8 @@ Return ONLY valid JSON in this format:
         /href="([^"]*\/vehicle\/[^"]+)"/gi,
         // L'Art de L'Automobile (and similar) uses /fiche/<slug> for vehicle detail pages.
         /href="([^"]*\/fiche\/[^"]+)"/gi,
+        // Beverly Hills Car Club: listing detail pages end with -c-<id>.htm (no /inventory/ segment)
+        /href="([^"]*-c-\d+\.htm)"/gi,
         /href="([^"]*\/inventory\/[^"]+)"/gi,
         /href="([^"]*\/cars\/[^"]+)"/gi,
         /href="([^"]*\/trucks\/[^"]+)"/gi,
@@ -477,7 +479,10 @@ Return ONLY valid JSON in this format:
             url = `${baseUrl.origin}${url.startsWith('/') ? '' : '/'}${url}`;
           }
           // Filter out non-vehicle URLs
-          if (url.match(/\/(vehicle|listing|inventory|cars|trucks|detail|detail\.aspx|fiche)\b/i)) {
+          if (
+            url.match(/\/(vehicle|listing|inventory|cars|trucks|detail|detail\.aspx|fiche)\b/i) ||
+            url.match(/-c-\d+\.htm$/i)
+          ) {
             foundUrls.add(url);
           }
         }

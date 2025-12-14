@@ -44,8 +44,34 @@ serve(async (req) => {
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
-    const { image_url, image_id, timeline_event_id, vehicle_id, user_id } = await req.json()
+    const { image_url, image_id, timeline_event_id, vehicle_id, user_id, force_reprocess = false } = await req.json()
     if (!image_url) throw new Error('Missing image_url')
+
+    // Idempotency / caching: if we already completed a scan and caller didn't force reprocess,
+    // return early so we don't burn tokens again.
+    const existingLookup = image_id
+      ? supabase.from('vehicle_images').select('id, ai_processing_status, ai_scan_metadata').eq('id', image_id)
+      : supabase.from('vehicle_images').select('id, ai_processing_status, ai_scan_metadata').eq('image_url', image_url)
+    const { data: existingRow } = await existingLookup.maybeSingle()
+    const existingMeta = (existingRow?.ai_scan_metadata || {}) as any
+    const existingStatus = String(existingRow?.ai_processing_status || '')
+    const alreadyCompleted =
+      existingRow?.id &&
+      (existingStatus === 'completed' || existingStatus === 'complete') &&
+      (existingMeta?.scanned_at || existingMeta?.appraiser?.analyzed_at || existingMeta?.tier_1_analysis)
+
+    if (!force_reprocess && alreadyCompleted) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          cached: true,
+          image_id: existingRow?.id,
+          ai_processing_status: existingStatus,
+          ai_scan_metadata: existingMeta,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Best-effort: mark as processing early to avoid stuck "pending" jobs
     try {
@@ -72,16 +98,37 @@ serve(async (req) => {
     }
 
     // 1. Run Rekognition (Label Detection)
-    let rekognitionData: any = {}
-    try {
-      rekognitionData = await analyzeImageWithRekognition(image_url)
-    } catch (rekError) {
-      console.warn('Rekognition failed, continuing without labels:', rekError)
-      // Continue without Rekognition data - not critical
+    // Cache: reuse prior labels if present so we don't re-download/re-scan the same image.
+    let rekognitionData: any = existingMeta?.rekognition || {}
+    if (!rekognitionData || Object.keys(rekognitionData).length === 0) {
+      try {
+        rekognitionData = await analyzeImageWithRekognition(image_url)
+      } catch (rekError) {
+        console.warn('Rekognition failed, continuing without labels:', rekError)
+        // Continue without Rekognition data - not critical
+        rekognitionData = {}
+      }
     }
 
     // 2. Determine "Appraiser Context" from labels
     const context = determineAppraiserContext(rekognitionData)
+
+    // Cheap triage gate: only run expensive OCR-style extractors (SPID/VIN tag)
+    // when the image is likely to contain meaningful text (documents, labels, plates).
+    const labelNames: string[] = (rekognitionData?.Labels || []).map((l: any) =>
+      String(l?.Name || '').toLowerCase()
+    )
+    const likelyTextImage =
+      labelNames.some((n) =>
+        n.includes('text') ||
+        n.includes('document') ||
+        n.includes('label') ||
+        n.includes('paper') ||
+        n.includes('poster') ||
+        n.includes('license plate') ||
+        n.includes('number plate') ||
+        n.includes('sign')
+      )
     
     // 3. Run OpenAI Vision "Appraiser Brain" if context is found
     let appraiserResult = null
@@ -92,142 +139,148 @@ serve(async (req) => {
     // 3.5. Check for SPID sheet and extract data if found
     let spidData = null
     let spidResponse = null
-    try {
-      spidResponse = await detectSPIDSheet(image_url, vehicle_id, supabase, user_id)
-      if (spidResponse?.is_spid_sheet && spidResponse.confidence > 70) {
-        spidData = spidResponse.extracted_data
-        console.log('SPID sheet detected:', spidData)
+    const hasSpidAlready = Boolean(existingMeta?.spid) || existingMeta?.scan_type === 'spid_sheet'
+    if (likelyTextImage && !hasSpidAlready) {
+      try {
+        spidResponse = await detectSPIDSheet(image_url, vehicle_id, supabase, user_id)
+        if (spidResponse?.is_spid_sheet && spidResponse.confidence > 70) {
+          spidData = spidResponse.extracted_data
+          console.log('SPID sheet detected:', spidData)
+        }
+      } catch (err) {
+        console.warn('SPID detection failed:', err)
+        // Don't fail the whole analysis if SPID detection fails
       }
-    } catch (err) {
-      console.warn('SPID detection failed:', err)
-      // Don't fail the whole analysis if SPID detection fails
     }
 
     // 3.6. Check for VIN tag/plate and extract VIN for verification
     let vinTagData = null
     let vinTagResponse = null
-    try {
-      vinTagResponse = await detectAndExtractVINTag(image_url, vehicle_id, supabase, user_id)
-      if (vinTagResponse?.is_vin_tag && vinTagResponse.confidence > 70) {
-        vinTagData = vinTagResponse.extracted_data
-        console.log('VIN tag detected:', vinTagData)
-        
-        // Verify extracted VIN against vehicle's VIN if available
-        if (vinTagData.vin && vehicle_id) {
-          const { data: vehicle } = await supabase
-            .from('vehicles')
-            .select('vin')
-            .eq('id', vehicle_id)
-            .maybeSingle()
+    const hasVinTagAlready = Boolean(existingMeta?.vin_tag)
+    if (likelyTextImage && !hasVinTagAlready) {
+      try {
+        vinTagResponse = await detectAndExtractVINTag(image_url, vehicle_id, supabase, user_id)
+        if (vinTagResponse?.is_vin_tag && vinTagResponse.confidence > 70) {
+          vinTagData = vinTagResponse.extracted_data
+          console.log('VIN tag detected:', vinTagData)
           
-          if (vehicle) {
-            if (vehicle.vin && vehicle.vin.toUpperCase() === vinTagData.vin.toUpperCase()) {
-              vinTagData.verification_status = 'verified'
-              vinTagData.verification_confidence = 1.0
-              console.log('✅ VIN verified: matches vehicle record')
-            } else if (vehicle.vin) {
-              vinTagData.verification_status = 'mismatch'
-              vinTagData.verification_confidence = 0.0
-              console.warn('⚠️ VIN mismatch: extracted VIN does not match vehicle record')
-            } else {
-              vinTagData.verification_status = 'new'
-              vinTagData.verification_confidence = vinTagResponse.confidence / 100
-              console.log('📝 New VIN extracted from tag')
-              
-              // Auto-update vehicle VIN if vehicle doesn't have one
-              await supabase
-                .from('vehicles')
-                .update({ 
-                  vin: vinTagData.vin,
-                  vin_source: 'Photo OCR'
-                })
-                .eq('id', vehicle_id)
-              
-              // Create field source attribution for the VIN
-              await supabase
-                .from('vehicle_field_sources')
-                .insert({
-                  vehicle_id: vehicle_id,
-                  field_name: 'vin',
-                  field_value: vinTagData.vin,
-                  source_type: 'ai_scraped',
-                  source_url: image_url,
-                  confidence_score: Math.round(vinTagResponse.confidence),
-                  user_id: user_id,
-                  extraction_method: 'ocr',
-                  metadata: { 
-                    extracted_via: 'vin_plate_ocr',
-                    detection_confidence: vinTagResponse.confidence,
-                    vin_condition: vinTagData.condition || 'unknown'
-                  }
-                })
-                .then(() => console.log('✅ VIN field source created'))
-                .catch(err => console.warn('Failed to create VIN field source:', err))
-              
-              // Create timeline event for VIN extraction
-              await supabase
-                .from('timeline_events')
-                .insert({
-                  vehicle_id: vehicle_id,
-                  user_id: user_id,
-                  event_type: 'auction_listed',
-                  event_date: new Date().toISOString(),
-                  title: 'VIN Extracted from Photo',
-                  description: `VIN ${vinTagData.vin} was extracted from a VIN plate photo via AI vision.`,
-                  source: 'AI Vision OCR',
-                  source_type: 'user_input',
-                  confidence_score: Math.round(vinTagResponse.confidence),
-                  image_urls: [image_url],
-                  metadata: {
+          // Verify extracted VIN against vehicle's VIN if available
+          if (vinTagData.vin && vehicle_id) {
+            const { data: vehicle } = await supabase
+              .from('vehicles')
+              .select('vin')
+              .eq('id', vehicle_id)
+              .maybeSingle()
+            
+            if (vehicle) {
+              if (vehicle.vin && vehicle.vin.toUpperCase() === vinTagData.vin.toUpperCase()) {
+                vinTagData.verification_status = 'verified'
+                vinTagData.verification_confidence = 1.0
+                console.log('✅ VIN verified: matches vehicle record')
+              } else if (vehicle.vin) {
+                vinTagData.verification_status = 'mismatch'
+                vinTagData.verification_confidence = 0.0
+                console.warn('⚠️ VIN mismatch: extracted VIN does not match vehicle record')
+              } else {
+                vinTagData.verification_status = 'new'
+                vinTagData.verification_confidence = vinTagResponse.confidence / 100
+                console.log('📝 New VIN extracted from tag')
+                
+                // Auto-update vehicle VIN if vehicle doesn't have one
+                await supabase
+                  .from('vehicles')
+                  .update({ 
                     vin: vinTagData.vin,
+                    vin_source: 'Photo OCR'
+                  })
+                  .eq('id', vehicle_id)
+                
+                // Create field source attribution for the VIN
+                await supabase
+                  .from('vehicle_field_sources')
+                  .insert({
+                    vehicle_id: vehicle_id,
+                    field_name: 'vin',
+                    field_value: vinTagData.vin,
+                    source_type: 'ai_scraped',
+                    source_url: image_url,
+                    confidence_score: Math.round(vinTagResponse.confidence),
+                    user_id: user_id,
                     extraction_method: 'ocr',
-                    vin_condition: vinTagData.condition || 'unknown'
-                  }
+                    metadata: { 
+                      extracted_via: 'vin_plate_ocr',
+                      detection_confidence: vinTagResponse.confidence,
+                      vin_condition: vinTagData.condition || 'unknown'
+                    }
+                  })
+                  .then(() => console.log('✅ VIN field source created'))
+                  .catch(err => console.warn('Failed to create VIN field source:', err))
+                
+                // Create timeline event for VIN extraction
+                await supabase
+                  .from('timeline_events')
+                  .insert({
+                    vehicle_id: vehicle_id,
+                    user_id: user_id,
+                    event_type: 'auction_listed',
+                    event_date: new Date().toISOString(),
+                    title: 'VIN Extracted from Photo',
+                    description: `VIN ${vinTagData.vin} was extracted from a VIN plate photo via AI vision.`,
+                    source: 'AI Vision OCR',
+                    source_type: 'user_input',
+                    confidence_score: Math.round(vinTagResponse.confidence),
+                    image_urls: [image_url],
+                    metadata: {
+                      vin: vinTagData.vin,
+                      extraction_method: 'ocr',
+                      vin_condition: vinTagData.condition || 'unknown'
+                    }
+                  })
+                  .then(() => console.log('✅ VIN timeline event created'))
+                  .catch(err => console.warn('Failed to create VIN timeline event:', err))
+                
+                // Create VIN validation record (multi-proof system)
+                // Use existing vin_validations table structure
+                await supabase
+                  .from('vin_validations')
+                  .insert({
+                    vehicle_id: vehicle_id,
+                    user_id: user_id,
+                    vin_photo_url: image_url,
+                    extracted_vin: vinTagData.vin,
+                    submitted_vin: vinTagData.vin,
+                    validation_status: vinTagResponse.confidence >= 85 ? 'approved' : 'pending',
+                    confidence_score: vinTagResponse.confidence / 100, // Decimal format
+                    validation_method: 'ai_vision'
+                  })
+                  .then(() => console.log('✅ VIN validation created'))
+                  .catch(err => {
+                    // Might already exist - that's ok, multiple proofs are good
+                    console.log('VIN validation insert note:', err?.message || 'duplicate ok');
+                  })
+                
+                // Trigger NHTSA VIN decode to auto-fill specs (non-blocking)
+                fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/decode-vin-and-update`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                  },
+                  body: JSON.stringify({
+                    vehicle_id: vehicle_id,
+                    vin: vinTagData.vin
+                  })
                 })
-                .then(() => console.log('✅ VIN timeline event created'))
-                .catch(err => console.warn('Failed to create VIN timeline event:', err))
-              
-              // Create VIN validation record (multi-proof system)
-              // Use existing vin_validations table structure
-              await supabase
-                .from('vin_validations')
-                .insert({
-                  vehicle_id: vehicle_id,
-                  user_id: user_id,
-                  vin_photo_url: image_url,
-                  extracted_vin: vinTagData.vin,
-                  submitted_vin: vinTagData.vin,
-                  validation_status: vinTagResponse.confidence >= 85 ? 'approved' : 'pending',
-                  confidence_score: vinTagResponse.confidence / 100, // Decimal format
-                  validation_method: 'ai_vision'
-                })
-                .then(() => console.log('✅ VIN validation created'))
-                .catch(err => {
-                  // Might already exist - that's ok, multiple proofs are good
-                  console.log('VIN validation insert note:', err?.message || 'duplicate ok');
-                })
-              
-              // Trigger NHTSA VIN decode to auto-fill specs (non-blocking)
-              fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/decode-vin-and-update`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-                },
-                body: JSON.stringify({
-                  vehicle_id: vehicle_id,
-                  vin: vinTagData.vin
-                })
-              })
-                .then(() => console.log('✅ VIN decode triggered'))
-                .catch(err => console.warn('VIN decode trigger failed:', err))
+                  .then(() => console.log('✅ VIN decode triggered'))
+                  .catch(err => console.warn('VIN decode trigger failed:', err))
+              }
             }
           }
         }
+      } catch (err) {
+        console.warn('VIN tag detection failed:', err)
+        // Don't fail the whole analysis if VIN tag detection fails
       }
-    } catch (err) {
-      console.warn('VIN tag detection failed:', err)
-      // Don't fail the whole analysis if VIN tag detection fails
     }
 
     // 4. Generate Tags
@@ -276,10 +329,52 @@ serve(async (req) => {
         .from('vehicle_images')
         .update({
           ai_scan_metadata: { ...existing, ...metadataUpdate },
-          ai_processing_status: 'complete',
+          ai_processing_status: 'completed',
           ai_processing_completed_at: new Date().toISOString()
         })
         .eq('id', imageRecord.id)
+
+      // Best-effort audit trail: save a scan session snapshot (does not replace older runs).
+      // This makes it possible to backfill/re-extract later and track accuracy/cost over time.
+      try {
+        if (vehicle_id) {
+          const modelsUsed = [
+            // Rekognition may be missing if not configured
+            (metadataUpdate?.rekognition ? 'aws-rekognition-detect-labels' : null),
+            (appraiserResult ? 'gpt-4o-mini' : null),
+            (spidData ? 'gpt-4o' : null),
+            (vinTagData ? 'gpt-4o' : null),
+          ].filter(Boolean)
+
+          await supabase
+            .from('ai_scan_sessions')
+            .insert({
+              vehicle_id,
+              event_id: timeline_event_id || null,
+              image_ids: [imageRecord.id],
+              ai_model_version: `analyze-image@2025-12-14`,
+              ai_model_cost: 0,
+              total_images_analyzed: 1,
+              fields_extracted: [
+                (appraiserResult ? 'tier1' : null),
+                (spidData ? 'spid' : null),
+                (vinTagData ? 'vin' : null),
+                (metadataUpdate?.rekognition ? 'tags' : null),
+              ].filter(Boolean),
+              concerns_flagged: [],
+              overall_confidence: null,
+              context_available: {
+                rekognition: Boolean(metadataUpdate?.rekognition),
+                vehicle_id: Boolean(vehicle_id),
+                timeline_event_id: Boolean(timeline_event_id),
+                models_used: modelsUsed,
+              },
+              created_by: user_id || null,
+            })
+        }
+      } catch (err) {
+        console.warn('Failed to write ai_scan_sessions (non-blocking):', err)
+      }
       
       // If SPID data was extracted, also save to dedicated table
       if (spidData && spidResponse && vehicle_id) {

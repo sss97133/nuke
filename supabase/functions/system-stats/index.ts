@@ -23,7 +23,8 @@ serve(async (req) => {
     const { count: analyzedImages } = await supabase
       .from('vehicle_images')
       .select('*', { count: 'exact', head: true })
-      .eq('ai_processing_status', 'completed');
+      // Backwards compatible: some older pipelines used 'complete'
+      .in('ai_processing_status', ['completed', 'complete']);
 
     const { count: pendingImages } = await supabase
       .from('vehicle_images')
