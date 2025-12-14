@@ -140,7 +140,8 @@ export default function AuctionMarketplace() {
             primary_image_url
           )
         `)
-        .eq('listing_status', 'active')
+        // Some scrapers use 'live' instead of 'active'
+        .in('listing_status', ['active', 'live'])
         .gt('end_date', now);
 
       const { data: externalListings, error: externalError } = await externalQuery;
@@ -167,6 +168,7 @@ export default function AuctionMarketplace() {
       }
 
       // 3. Load bat_listings (BaT-specific listings)
+      const today = now.split('T')[0];
       let batQuery = supabase
         .from('bat_listings')
         .select(`
@@ -181,8 +183,10 @@ export default function AuctionMarketplace() {
             primary_image_url
           )
         `)
-        .eq('listing_status', 'active')
-        .gt('auction_end_date', now.split('T')[0]); // BaT uses DATE, not TIMESTAMPTZ
+        // Some BaT ingests use 'live' for active auctions
+        .in('listing_status', ['active', 'live'])
+        // BaT uses DATE, not TIMESTAMPTZ. Include auctions ending today.
+        .gte('auction_end_date', today);
 
       const { data: batListings, error: batError } = await batQuery;
 
@@ -250,7 +254,8 @@ export default function AuctionMarketplace() {
         }
       });
 
-      setListings(filtered.slice(0, 50));
+      // Show all live auctions on the page (do not truncate to 50).
+      setListings(filtered);
       console.log(`Loaded ${filtered.length} active auction listings (${nativeListings?.length || 0} native, ${externalListings?.length || 0} external, ${batListings?.length || 0} BaT)`);
     } catch (error) {
       console.error('Error loading listings:', error);

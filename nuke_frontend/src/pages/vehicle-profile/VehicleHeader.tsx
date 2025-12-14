@@ -657,7 +657,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const isAuctionLive = useMemo(() => {
     if (!auctionPulse?.listing_url) return false;
     const status = String(auctionPulse.listing_status || '').toLowerCase();
-    if (status !== 'active') return false;
+    // Some environments may backfill listings with status='unknown' initially. If we have a future end_date,
+    // treat it as live so the header shows the auction pulse instead of hiding it.
+    if (status !== 'active') {
+      if (!auctionPulse?.end_date) return false;
+      const end = new Date(auctionPulse.end_date).getTime();
+      if (!Number.isFinite(end)) return false;
+      return end > auctionNow;
+    }
     if (!auctionPulse.end_date) return true;
     const end = new Date(auctionPulse.end_date).getTime();
     if (!Number.isFinite(end)) return true;
@@ -682,6 +689,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
     if (status === 'pending') return 'pending' as const;
     if (status === 'ended') return 'ended' as const;
+    // Unknown status: infer from end_date if available (common right after backfill).
+    if (auctionPulse?.end_date) {
+      const end = new Date(auctionPulse.end_date).getTime();
+      if (Number.isFinite(end)) {
+        const mins = Math.floor((end - auctionNow) / 60000);
+        if (mins > 0 && mins <= 60) return 'ending_soon' as const;
+        if (mins > 0) return 'active' as const;
+        return 'ended' as const;
+      }
+    }
     return 'ended' as const;
   }, [auctionPulse, auctionNow]);
 

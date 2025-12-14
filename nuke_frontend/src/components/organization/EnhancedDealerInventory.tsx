@@ -23,6 +23,8 @@ interface DealerVehicle {
   end_date?: string | null;
   notes?: string | null;
   created_at: string;
+  // PostgREST relationship typing can sometimes surface this as an array depending on schema metadata.
+  // We normalize this at runtime to a single object.
   vehicles: {
     id: string;
     year: number;
@@ -117,29 +119,56 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
       console.log('Sample vehicle data:', data?.[0]);
 
       // Filter out vehicles where the join failed (vehicles is null)
-      const validVehicles = (data || []).filter(v => v.vehicles !== null);
+      const validVehicles = (data || []).filter((v: any) => v && v.vehicles !== null);
       console.log('Valid vehicles after filtering null joins:', validVehicles.length);
 
-      // Fetch thumbnails
-      const enriched = await Promise.all(
-        validVehicles.map(async (v) => {
-          const { data: img } = await supabase
-            .from('vehicle_images')
-            .select('thumbnail_url, medium_url, image_url')
-            .eq('vehicle_id', v.vehicle_id)
-            .order('is_primary', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          return {
-            ...v,
-            thumbnail_url: img?.thumbnail_url || img?.medium_url || img?.image_url || null
-          };
-        })
+      // Fetch thumbnails in chunks (avoid hundreds of parallel requests that can trigger rate-limits / CORS failures).
+      const uniqueVehicleIds = Array.from(
+        new Set(
+          validVehicles
+            .map((v: any) => v?.vehicle_id)
+            .filter((x: any) => typeof x === 'string' && x.length > 0)
+        )
       );
 
-      console.log('Enriched vehicles count:', enriched.length);
-      setVehicles(enriched as DealerVehicle[]);
+      const thumbByVehicleId = new Map<string, string | null>();
+      const chunkSize = 75; // keep URL size + concurrency low
+      for (let i = 0; i < uniqueVehicleIds.length; i += chunkSize) {
+        const chunk = uniqueVehicleIds.slice(i, i + chunkSize);
+        const { data: imgs, error: imgErr } = await supabase
+          .from('vehicle_images')
+          .select('vehicle_id, thumbnail_url, medium_url, image_url')
+          .in('vehicle_id', chunk)
+          .eq('is_primary', true);
+        if (imgErr) {
+          // Non-fatal: we can still render without thumbnails.
+          console.warn('Failed to fetch thumbnail chunk:', imgErr);
+          continue;
+        }
+        for (const r of (imgs || []) as any[]) {
+          const vid = r?.vehicle_id;
+          if (typeof vid !== 'string' || !vid) continue;
+          const best = r?.thumbnail_url || r?.medium_url || r?.image_url || null;
+          if (!thumbByVehicleId.has(vid)) thumbByVehicleId.set(vid, best);
+        }
+      }
+
+      const enriched = validVehicles.map((v: any) => {
+        // Normalize embedded vehicles relationship to a single object.
+        // In some generated Supabase types, `vehicles` is typed as an array even though it's a many-to-one.
+        const vehicleObj = Array.isArray(v.vehicles) ? (v.vehicles[0] ?? null) : v.vehicles;
+        if (!vehicleObj) return null;
+
+        return {
+          ...v,
+          vehicles: vehicleObj,
+          thumbnail_url: thumbByVehicleId.get(v.vehicle_id) || null,
+        };
+      });
+
+      const finalList = enriched.filter(Boolean) as DealerVehicle[];
+      console.log('Enriched vehicles count:', finalList.length);
+      setVehicles(finalList);
     } catch (error) {
       console.error('Failed to load vehicles:', error);
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');

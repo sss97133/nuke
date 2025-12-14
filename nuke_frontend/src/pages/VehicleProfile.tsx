@@ -819,7 +819,10 @@ const VehicleProfile: React.FC = () => {
     
     // Check if RPC data is available (avoid duplicate query)
     const rpcData = (window as any).__vehicleProfileRpcData;
-    if (rpcData?.timeline_events) {
+    const rpcMatchesThisVehicle =
+      rpcData &&
+      (rpcData.vehicle_id === vehicleId || (vehicle?.id && rpcData.vehicle_id === vehicle.id));
+    if (rpcMatchesThisVehicle && rpcData?.timeline_events) {
       setTimelineEvents(rpcData.timeline_events);
       return;
     }
@@ -846,6 +849,9 @@ const VehicleProfile: React.FC = () => {
   const loadVehicle = async () => {
     try {
       setLoading(true);
+      // Prevent cross-vehicle cache bleed when navigating between profiles.
+      // We only trust RPC caches when they explicitly match the current vehicle.
+      (window as any).__vehicleProfileRpcData = null;
 
       // Accept both UUID format (with hyphens) and VIN format (17 chars alphanumeric)
       const isUUID = vehicleId && vehicleId.length >= 20 && vehicleId.includes('-');
@@ -930,6 +936,7 @@ const VehicleProfile: React.FC = () => {
         
         // Store RPC data for passing to children (eliminates duplicate queries)
         (window as any).__vehicleProfileRpcData = {
+          vehicle_id: vehicleData.id,
           images: rpcData.images,
           timeline_events: rpcData.timeline_events,
           latest_valuation: rpcData.latest_valuation,
@@ -954,28 +961,60 @@ const VehicleProfile: React.FC = () => {
 
       // Derive auction pulse for header (prefer external_listings over stale vehicles.* fields)
       try {
-        const listings = (window as any).__vehicleProfileRpcData?.external_listings;
-        const arr = Array.isArray(listings) ? listings : [];
-        // Prefer active, ending in the future; fallback to most recent
+        const rpcCache = (window as any).__vehicleProfileRpcData;
+        const listings =
+          rpcCache && rpcCache.vehicle_id === vehicleData.id ? rpcCache.external_listings : null;
+        let arr = Array.isArray(listings) ? listings : [];
+
+        // If RPC didn't include listings (or returned empty due to env/RLS quirks), do a direct fetch.
+        if (arr.length === 0) {
+          try {
+            const { data } = await supabase
+              .from('external_listings')
+              .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
+              .eq('vehicle_id', vehicleData.id)
+              .order('updated_at', { ascending: false })
+              .limit(10);
+            arr = Array.isArray(data) ? data : [];
+          } catch {
+            // ignore
+          }
+        }
+        // Prefer "active" or future-ending listings; fallback to most recently updated.
         const now = Date.now();
-        const active = arr
-          .filter((l: any) => String(l?.listing_status || '').toLowerCase() === 'active')
+        const scoreListing = (l: any) => {
+          const status = String(l?.listing_status || '').toLowerCase();
+          const end = l?.end_date ? new Date(l.end_date).getTime() : NaN;
+          const endFuture = Number.isFinite(end) ? end > now : false;
+          const hasTelemetry = typeof l?.current_bid === 'number' || typeof l?.bid_count === 'number' || typeof l?.watcher_count === 'number' || typeof l?.view_count === 'number';
+          if (status === 'active') return 3;
+          if (endFuture) return 2;
+          if (hasTelemetry) return 1;
+          return 0;
+        };
+
+        const best = arr
+          .filter((l: any) => Boolean(l?.listing_url) && Boolean(l?.platform))
           .sort((a: any, b: any) => {
+            const as = scoreListing(a);
+            const bs = scoreListing(b);
+            if (as !== bs) return bs - as;
+
             const ae = a?.end_date ? new Date(a.end_date).getTime() : 0;
             const be = b?.end_date ? new Date(b.end_date).getTime() : 0;
-            // Prefer listings with end dates in the future, then sooner-ending first
             const aFuture = ae > now;
             const bFuture = be > now;
             if (aFuture !== bFuture) return aFuture ? -1 : 1;
-            if (ae !== be) return ae - be;
+            if (aFuture && bFuture && ae !== be) return ae - be; // sooner-ending first
+
             const au = a?.updated_at ? new Date(a.updated_at).getTime() : 0;
             const bu = b?.updated_at ? new Date(b.updated_at).getTime() : 0;
             return bu - au;
           })[0];
 
-        if (active?.listing_url && active?.platform) {
+        if (best?.listing_url && best?.platform) {
           // Lightweight comment telemetry (best-effort; table may not exist in some envs)
-          let commentCount: number | null = typeof active?.metadata?.comment_count === 'number' ? active.metadata.comment_count : null;
+          let commentCount: number | null = typeof best?.metadata?.comment_count === 'number' ? best.metadata.comment_count : null;
           let lastBidAt: string | null = null;
           let lastCommentAt: string | null = null;
 
@@ -1016,18 +1055,18 @@ const VehicleProfile: React.FC = () => {
           }
 
           setAuctionPulse({
-            platform: String(active.platform),
-            listing_url: String(active.listing_url),
-            listing_status: String(active.listing_status || ''),
-            end_date: active.end_date || null,
-            current_bid: typeof active.current_bid === 'number' ? active.current_bid : null,
-            bid_count: typeof active.bid_count === 'number' ? active.bid_count : null,
-            watcher_count: typeof active.watcher_count === 'number' ? active.watcher_count : null,
-            view_count: typeof active.view_count === 'number' ? active.view_count : null,
+            platform: String(best.platform),
+            listing_url: String(best.listing_url),
+            listing_status: String(best.listing_status || ''),
+            end_date: best.end_date || null,
+            current_bid: typeof best.current_bid === 'number' ? best.current_bid : null,
+            bid_count: typeof best.bid_count === 'number' ? best.bid_count : null,
+            watcher_count: typeof best.watcher_count === 'number' ? best.watcher_count : null,
+            view_count: typeof best.view_count === 'number' ? best.view_count : null,
             comment_count: commentCount,
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
-            updated_at: active.updated_at || null,
+            updated_at: best.updated_at || null,
           });
         } else {
           setAuctionPulse(null);
@@ -1341,7 +1380,8 @@ const VehicleProfile: React.FC = () => {
 
     // Check if RPC data is available (avoid duplicate query)
     const rpcData = (window as any).__vehicleProfileRpcData;
-    if (rpcData?.images && Array.isArray(rpcData.images) && rpcData.images.length > 0) {
+    const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicle.id;
+    if (rpcMatchesThisVehicle && rpcData?.images && Array.isArray(rpcData.images) && rpcData.images.length > 0) {
       const images = rpcData.images.map((img: any) => img.image_url);
       setVehicleImages(images);
       const leadImage = rpcData.images.find((img: any) => img.is_primary) || rpcData.images[0];

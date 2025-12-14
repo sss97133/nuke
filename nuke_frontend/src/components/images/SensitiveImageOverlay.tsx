@@ -29,8 +29,22 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
   const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
+    // Only do access checks for sensitive content. (Fallback/external images use synthetic ids like "ext_0"
+    // which are not UUIDs and will 400 if we query `vehicle_images.id`.)
+    if (!isSensitive) {
+      setHasAccess(true);
+      setLoading(false);
+      return;
+    }
+    if (!isUuid(String(imageId || ''))) {
+      setHasAccess(false);
+      setLoading(false);
+      return;
+    }
     checkAccess();
-  }, [imageId, vehicleId]);
+  }, [imageId, vehicleId, isSensitive]);
+
+  const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
   const checkAccess = async () => {
     setLoading(true);

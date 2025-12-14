@@ -125,11 +125,34 @@ export class OrganizationIntelligenceService {
   ): TabConfig[] {
     const tabs: TabConfig[] = [];
 
+    const pushUnique = (t: TabConfig) => {
+      if (!tabs.some((x) => x.id === t.id)) tabs.push(t);
+    };
+
+    const totalVehicles =
+      (typeof dataSignals?.vehicles?.total === 'number' ? dataSignals.vehicles.total : null) ??
+      (() => {
+        const inv = typeof dataSignals?.vehicles?.inventory === 'number' ? dataSignals.vehicles.inventory : 0;
+        const svc = typeof dataSignals?.vehicles?.service === 'number' ? dataSignals.vehicles.service : 0;
+        const sold = typeof dataSignals?.vehicles?.sold === 'number' ? dataSignals.vehicles.sold : 0;
+        const sum = inv + svc + sold;
+        return sum > 0 ? sum : null;
+      })();
+
     // ALWAYS show Overview first
-    tabs.push({ id: 'overview', priority: 100, label: 'Overview' });
+    pushUnique({ id: 'overview', priority: 100, label: 'Overview' });
 
     const primaryFocus = intelligence.effectivePrimaryFocus;
     const source = intelligence.source;
+
+    // Always offer Vehicles (this is the canonical org-wide “what cars are linked here” view).
+    // Data-driven tabs like Inventory/Sold/Service can sit above it depending on focus.
+    pushUnique({
+      id: 'vehicles',
+      priority: 80,
+      label: typeof totalVehicles === 'number' && totalVehicles > 0 ? `Vehicles (${totalVehicles})` : 'Vehicles',
+      badge: typeof totalVehicles === 'number' && totalVehicles > 0 ? totalVehicles : undefined,
+    });
 
     // If explicit settings exist, respect them
     if (source === 'explicit_ui_config' || source === 'explicit_business_type') {
@@ -142,7 +165,7 @@ export class OrganizationIntelligenceService {
           effectiveType === 'performance_shop') {
         // Explicitly a service org - always show service tab
         const serviceCount = dataSignals?.vehicles?.service || 0;
-        tabs.push({
+        pushUnique({
           id: 'service',
           priority: 90,
           label: serviceCount > 0 ? `Service (${serviceCount})` : 'Service',
@@ -150,7 +173,7 @@ export class OrganizationIntelligenceService {
         });
 
         if (dataSignals?.receipts?.total > 0) {
-          tabs.push({
+          pushUnique({
             id: 'receipts',
             priority: 85,
             label: `Work Orders (${dataSignals.receipts.total})`,
@@ -160,7 +183,7 @@ export class OrganizationIntelligenceService {
 
         // Inventory is lower priority for service orgs
         if (dataSignals?.vehicles?.inventory > 0) {
-          tabs.push({
+          pushUnique({
             id: 'inventory',
             priority: 60,
             label: `Inventory (${dataSignals.vehicles.inventory})`,
@@ -170,7 +193,7 @@ export class OrganizationIntelligenceService {
 
         // Sold is very low priority
         if (dataSignals?.vehicles?.sold > 5) {
-          tabs.push({
+          pushUnique({
             id: 'sold',
             priority: 30,
             label: `Sold (${dataSignals.vehicles.sold})`,
@@ -180,7 +203,7 @@ export class OrganizationIntelligenceService {
       } else if (effectiveType === 'dealership') {
         // Explicitly a dealer
         if (dataSignals?.vehicles?.inventory > 0) {
-          tabs.push({
+          pushUnique({
             id: 'inventory',
             priority: 95,
             label: `Inventory (${dataSignals.vehicles.inventory})`,
@@ -189,7 +212,7 @@ export class OrganizationIntelligenceService {
         }
 
         if (dataSignals?.vehicles?.sold > 0) {
-          tabs.push({
+          pushUnique({
             id: 'sold',
             priority: 80,
             label: `Sold (${dataSignals.vehicles.sold})`,
@@ -199,7 +222,7 @@ export class OrganizationIntelligenceService {
 
         // Service is lower priority for dealers
         if (dataSignals?.vehicles?.service > 3) {
-          tabs.push({
+          pushUnique({
             id: 'service',
             priority: 40,
             label: `Service (${dataSignals.vehicles.service})`,
@@ -212,7 +235,7 @@ export class OrganizationIntelligenceService {
       if (primaryFocus === 'service') {
         // Always show service tab for service-focused orgs
         const serviceCount = dataSignals?.vehicles?.service || 0;
-        tabs.push({
+        pushUnique({
           id: 'service',
           priority: 90,
           label: serviceCount > 0 ? `Service (${serviceCount})` : 'Service',
@@ -220,7 +243,7 @@ export class OrganizationIntelligenceService {
         });
 
         if (dataSignals?.receipts?.total > 0) {
-          tabs.push({
+          pushUnique({
             id: 'receipts',
             priority: 85,
             label: `Work Orders (${dataSignals.receipts.total})`,
@@ -229,7 +252,7 @@ export class OrganizationIntelligenceService {
         }
 
         if (dataSignals?.vehicles?.inventory > 0) {
-          tabs.push({
+          pushUnique({
             id: 'inventory',
             priority: 60,
             label: `Inventory (${dataSignals.vehicles.inventory})`,
@@ -238,7 +261,7 @@ export class OrganizationIntelligenceService {
         }
       } else if (primaryFocus === 'inventory') {
         if (dataSignals?.vehicles?.inventory > 0) {
-          tabs.push({
+          pushUnique({
             id: 'inventory',
             priority: 95,
             label: `Inventory (${dataSignals.vehicles.inventory})`,
@@ -247,7 +270,7 @@ export class OrganizationIntelligenceService {
         }
 
         if (dataSignals?.vehicles?.sold > 0) {
-          tabs.push({
+          pushUnique({
             id: 'sold',
             priority: 80,
             label: `Sold (${dataSignals.vehicles.sold})`,
@@ -258,10 +281,10 @@ export class OrganizationIntelligenceService {
     }
 
     // Always available but lower priority
-    tabs.push({ id: 'images', priority: 70, label: 'Images' });
-    tabs.push({ id: 'contributors', priority: 50, label: 'Contributors' });
-    tabs.push({ id: 'marketplace', priority: 40, label: 'Marketplace' });
-    tabs.push({ id: 'notifications', priority: 20, label: 'Notifications' });
+    pushUnique({ id: 'images', priority: 70, label: 'Images' });
+    pushUnique({ id: 'contributors', priority: 50, label: 'Contributors' });
+    pushUnique({ id: 'marketplace', priority: 40, label: 'Marketplace' });
+    pushUnique({ id: 'notifications', priority: 20, label: 'Notifications' });
 
     // Sort by priority (highest first)
     return tabs.sort((a, b) => b.priority - a.priority);
