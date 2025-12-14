@@ -403,7 +403,7 @@ const CursorHomepage: React.FC = () => {
         .select(`
           id, year, make, model, title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
-          sale_date, sale_status, listing_status,
+          sale_date, sale_status,
           is_for_sale, mileage, status, is_public, origin_metadata, primary_image_url, image_url
         `)
         .eq('is_public', true)
@@ -596,8 +596,7 @@ const CursorHomepage: React.FC = () => {
         const salePrice = Number((v as any).sale_price || 0) || 0;
         const saleDate = (v as any).sale_date;
         const saleStatus = String((v as any).sale_status || '').toLowerCase();
-        const listingStatus = String((v as any).listing_status || '').toLowerCase();
-        const isSold = salePrice > 0 || Boolean(saleDate) || saleStatus === 'sold' || listingStatus === 'sold';
+        const isSold = salePrice > 0 || Boolean(saleDate) || saleStatus === 'sold';
         return !isSold;
       });
     }
@@ -1666,7 +1665,7 @@ const CursorHomepage: React.FC = () => {
             textAlign: 'left'
           }}>
             <div style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '8px', color: '#c00' }}>
-              ⚠️ Error Loading Content
+              Error Loading Content
             </div>
             <div style={{ fontSize: '9pt', color: '#800', marginBottom: '8px' }}>
               {error}
