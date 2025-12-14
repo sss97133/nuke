@@ -1193,9 +1193,6 @@ const ImageGallery = ({
           >
             Upload
           </button>
-          <span className="text-small text-muted" style={{ fontSize: '8pt' }}>
-            Ownership/title documents should be submitted via the Ownership panel.
-          </span>
         </div>
       </div>
 

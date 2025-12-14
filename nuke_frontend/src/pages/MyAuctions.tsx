@@ -8,34 +8,30 @@ const MyAuctions: React.FC = () => {
   const navigate = useNavigate();
   const [listings, setListings] = useState<UnifiedListing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<AuctionStats>({
-    total_listings: 0,
-    active_listings: 0,
-    sold_listings: 0,
-    total_value: 0,
-    total_views: 0,
-    total_bids: 0,
-    by_platform: {},
-  });
   const [filters, setFilters] = useState<{
     status?: string;
     platform?: string;
+    scope?: 'all' | 'personal' | 'organization';
     sortBy: 'ending_soon' | 'newest' | 'highest_bid' | 'most_views' | 'most_bids';
   }>({
     sortBy: 'ending_soon',
+    scope: 'all',
   });
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     loadListings();
-    loadStats();
   }, [filters]);
 
   const loadListings = async () => {
     try {
       setLoading(true);
       const data = await MyAuctionsService.getMyListings(filters);
-      setListings(data);
+      // Apply scope filter client-side (supabase OR conditions vary by schema)
+      const scoped = (filters.scope && filters.scope !== 'all')
+        ? data.filter(l => (l.scope || 'personal') === filters.scope)
+        : data;
+      setListings(scoped);
     } catch (error) {
       console.error('Error loading listings:', error);
     } finally {
@@ -43,10 +39,91 @@ const MyAuctions: React.FC = () => {
     }
   };
 
-  const loadStats = async () => {
-    const data = await MyAuctionsService.getAuctionStats();
-    setStats(data);
+  const computeStats = (rows: UnifiedListing[]): AuctionStats & {
+    sold_this_month_count: number;
+    sold_this_month_value: number;
+    personal: AuctionStats;
+    organizations: AuctionStats & { by_org: Record<string, AuctionStats & { org_name?: string; org_role?: string }> };
+  } => {
+    const empty: AuctionStats = {
+      total_listings: 0,
+      active_listings: 0,
+      sold_listings: 0,
+      total_value: 0,
+      total_views: 0,
+      total_bids: 0,
+      by_platform: {},
+    };
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const isSold = (l: UnifiedListing) => l.listing_status === 'sold' || (l.listing_status === 'ended' && !!l.sold_at);
+    const isActive = (l: UnifiedListing) => l.listing_status === 'active';
+
+    const addTo = (agg: AuctionStats, l: UnifiedListing) => {
+      agg.total_listings += 1;
+      if (isActive(l)) agg.active_listings += 1;
+      if (isSold(l)) {
+        agg.sold_listings += 1;
+        agg.total_value += l.final_price || 0;
+      }
+      agg.total_views += l.view_count || 0;
+      agg.total_bids += l.bid_count || 0;
+
+      const platform = l.platform || 'unknown';
+      if (!agg.by_platform[platform]) agg.by_platform[platform] = { count: 0, sold: 0, value: 0 };
+      agg.by_platform[platform].count += 1;
+      if (isSold(l)) {
+        agg.by_platform[platform].sold += 1;
+        agg.by_platform[platform].value += l.final_price || 0;
+      }
+    };
+
+    const total: AuctionStats = { ...empty, by_platform: {} };
+    const personal: AuctionStats = { ...empty, by_platform: {} };
+    const organizations: AuctionStats & { by_org: Record<string, AuctionStats & { org_name?: string; org_role?: string }> } = {
+      ...empty,
+      by_platform: {},
+      by_org: {},
+    };
+
+    let soldThisMonthCount = 0;
+    let soldThisMonthValue = 0;
+
+    for (const l of rows) {
+      addTo(total, l);
+
+      const scope = l.scope || 'personal';
+      if (scope === 'organization') {
+        addTo(organizations, l);
+        const orgKey = l.organization_id || 'unknown_org';
+        if (!organizations.by_org[orgKey]) {
+          organizations.by_org[orgKey] = { ...empty, by_platform: {}, org_name: l.organization_name, org_role: l.access_role };
+        }
+        addTo(organizations.by_org[orgKey], l);
+      } else {
+        addTo(personal, l);
+      }
+
+      if (isSold(l)) {
+        const soldAt = l.sold_at ? new Date(l.sold_at) : (l.end_date ? new Date(l.end_date) : null);
+        if (soldAt && !Number.isNaN(soldAt.getTime()) && soldAt >= monthStart) {
+          soldThisMonthCount += 1;
+          soldThisMonthValue += l.final_price || 0;
+        }
+      }
+    }
+
+    return {
+      ...total,
+      sold_this_month_count: soldThisMonthCount,
+      sold_this_month_value: soldThisMonthValue,
+      personal,
+      organizations,
+    };
   };
+
+  const stats = React.useMemo(() => computeStats(listings), [listings]);
 
   const handleSync = async (listingId: string, listingSource: 'native' | 'external' | 'export', platform: string) => {
     setSyncing(true);
@@ -118,6 +195,25 @@ const MyAuctions: React.FC = () => {
       <div
         className="card"
         style={{
+          marginBottom: 'var(--space-3)',
+          padding: 'var(--space-3)',
+          background: 'rgba(59, 130, 246, 0.05)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          fontSize: '12px',
+          color: '#555',
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: '4px', color: '#333' }}>Attribution & Permissions</div>
+        <div>
+          This dashboard separates <strong>Personal</strong> auctions from <strong>Organization-access</strong> auctions.
+          Organization auctions may be visible because you are an active org contributor (e.g. board member) and <strong>do not imply personal profit</strong>.
+          Margin/payouts are intentionally not shown here.
+        </div>
+      </div>
+
+      <div
+        className="card"
+        style={{
           marginBottom: 'var(--space-4)',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
@@ -147,7 +243,7 @@ const MyAuctions: React.FC = () => {
         </div>
         <div>
           <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
-            Total Value
+            Gross Sold Value
           </div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
             {formatCurrency(stats.total_value)}
@@ -158,7 +254,40 @@ const MyAuctions: React.FC = () => {
             Sold This Month
           </div>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-            {stats.sold_listings} ({formatCurrency(stats.total_value)})
+            {stats.sold_this_month_count} ({formatCurrency(stats.sold_this_month_value)})
+          </div>
+        </div>
+      </div>
+
+      {/* Scope Breakdown */}
+      <div
+        className="card"
+        style={{
+          marginBottom: 'var(--space-4)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 'var(--space-3)',
+          padding: 'var(--space-4)',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', fontWeight: 700 }}>
+            Personal (Your vehicles / your exports)
+          </div>
+          <div style={{ fontSize: '12px', color: '#666' }}>
+            Sold: <strong style={{ color: '#111' }}>{stats.personal.sold_listings}</strong>{' '}
+            · Gross: <strong style={{ color: '#111' }}>{formatCurrency(stats.personal.total_value)}</strong>{' '}
+            · Views: <strong style={{ color: '#111' }}>{stats.personal.total_views.toLocaleString()}</strong>
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', fontWeight: 700 }}>
+            Organization-access (based on your org role)
+          </div>
+          <div style={{ fontSize: '12px', color: '#666' }}>
+            Sold: <strong style={{ color: '#111' }}>{stats.organizations.sold_listings}</strong>{' '}
+            · Gross: <strong style={{ color: '#111' }}>{formatCurrency(stats.organizations.total_value)}</strong>{' '}
+            · Views: <strong style={{ color: '#111' }}>{stats.organizations.total_views.toLocaleString()}</strong>
           </div>
         </div>
       </div>
@@ -173,6 +302,23 @@ const MyAuctions: React.FC = () => {
           alignItems: 'center',
         }}
       >
+        <select
+          value={filters.scope || 'all'}
+          onChange={(e) =>
+            setFilters({ ...filters, scope: (e.target.value as any) === 'all' ? 'all' : (e.target.value as any) })
+          }
+          style={{
+            padding: '6px 12px',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+            fontSize: '12px',
+          }}
+        >
+          <option value="all">All (Accessible)</option>
+          <option value="personal">Personal</option>
+          <option value="organization">Organization-access</option>
+        </select>
+
         <select
           value={filters.status || 'all'}
           onChange={(e) =>

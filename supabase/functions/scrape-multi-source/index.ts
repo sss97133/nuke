@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractAndCacheFavicon } from "../_shared/extractFavicon.ts";
+import { extractBrandAssetsFromHtml } from "../_shared/extractBrandAssets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -135,6 +137,136 @@ function normalizeDealerInfo(raw: any): DealerInfo | null {
   };
 }
 
+async function fetchHtmlBestEffort(url: string): Promise<string | null> {
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) return null;
+    return await resp.text();
+  } catch {
+    return null;
+  }
+}
+
+async function tryBhccInventoryExtract(
+  sourceUrl: string,
+  limit: number,
+  offset: number,
+  mode: 'available' | 'sold' = 'available'
+) {
+  try {
+    const base = new URL(sourceUrl);
+    const safeLimit = Math.max(1, Math.min(Math.floor(limit || 0) || 50, 500));
+    const safeOffset = Math.max(0, Math.floor(offset || 0));
+    const soldParam = mode === 'sold' ? '&sold=Sold' : '';
+    const apiUrl = `${base.origin}/isapi_xml.php?module=inventory${soldParam}&limit=${safeLimit}&offset=${safeOffset}`;
+
+    let txt: string | null = null;
+    try {
+      const resp = await fetch(apiUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/plain,text/html,*/*',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (resp.ok) {
+        txt = await resp.text();
+      }
+    } catch {
+      // swallow; try Firecrawl fallback below
+    }
+
+    // If direct fetch fails (some dealer sites block Supabase outbound IPs), fall back to Firecrawl.
+    if (!txt) {
+      const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+      if (FIRECRAWL_API_KEY) {
+        try {
+          const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
+            },
+            body: JSON.stringify({
+              url: apiUrl,
+              formats: ['html', 'markdown'],
+              onlyMainContent: false,
+              waitFor: 0
+            }),
+            signal: AbortSignal.timeout(30000),
+          });
+          if (firecrawlResponse.ok) {
+            const firecrawlData = await firecrawlResponse.json();
+            if (firecrawlData?.success) {
+              // Prefer raw-ish body; for non-HTML responses Firecrawl may surface it in markdown.
+              txt = (firecrawlData?.data?.html || firecrawlData?.data?.markdown || null);
+            }
+          }
+        } catch {
+          // swallow
+        }
+      }
+    }
+
+    if (!txt) return null;
+
+    const lines = txt.split('\n');
+    const total = parseInt((lines[0] || '').trim(), 10);
+
+    // Listing URLs are embedded in JSON-LD snippets.
+    const urlRe = /"url"\s*:\s*"(https:\/\/www\.beverlyhillscarclub\.com\/[^"]+-c-\d+\.htm)"/gi;
+    const found = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = urlRe.exec(txt)) !== null) {
+      if (m[1]) found.add(m[1]);
+    }
+    const urls = Array.from(found);
+    if (urls.length === 0) return null;
+
+    return {
+      api_url: apiUrl,
+      total_listings_reported: Number.isFinite(total) ? total : null,
+      listing_urls: urls,
+      mode,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function tryBhccDealerPhone(sourceUrl: string): Promise<string | null> {
+  try {
+    const url = new URL(sourceUrl);
+    const resp = await fetch(sourceUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) return null;
+    const html = await resp.text();
+
+    // AIOSEO JSON-LD contains `"telephone":"+13109750272"` for BHCC.
+    const telMatch = html.match(/"telephone"\s*:\s*"([^"]{7,30})"/i);
+    const raw = (telMatch?.[1] || '').trim();
+    if (!raw) return null;
+    // Normalize a little (keep digits). normalizePhone() will format US numbers later.
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
 interface ScrapeRequest {
   source_url: string;
   source_type: 'dealer' | 'auction' | 'auction_house' | 'dealer_website' | 'marketplace' | 'classifieds';
@@ -142,6 +274,12 @@ interface ScrapeRequest {
   extract_listings?: boolean;
   extract_dealer_info?: boolean;
   use_llm_extraction?: boolean;
+  // Some dealer sites expose a deterministic "sold inventory" feed. BHCC supports this.
+  include_sold?: boolean;
+  // Cheapest run mode:
+  // - Skip OpenAI fallback extraction entirely
+  // - Skip Firecrawl when possible (use direct HTML fetch + deterministic URL enumeration)
+  cheap_mode?: boolean;
   max_listings?: number;
   max_results?: number; // Alias for max_listings
   start_offset?: number; // For large inventories: process a stable slice of discovered URLs
@@ -162,10 +300,6 @@ serve(async (req) => {
     const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
-    if (!FIRECRAWL_API_KEY) {
-      throw new Error('FIRECRAWL_API_KEY not configured');
-    }
-
     const body: ScrapeRequest = await req.json();
     const { 
       source_url, 
@@ -174,6 +308,8 @@ serve(async (req) => {
       extract_listings = true,
       extract_dealer_info = true,
       use_llm_extraction = true,
+      include_sold = false,
+      cheap_mode = false,
       max_listings = 100,
       max_results,
       organization_id,
@@ -189,8 +325,22 @@ serve(async (req) => {
       source_url.includes('lartdelautomobile.com/voitures-a-vendre') ||
       source_url.includes('lartdelautomobile.com/voitures-vendues');
 
+    const isBhccInventory = (() => {
+      try {
+        const u = new URL(source_url);
+        const host = u.hostname.replace(/^www\./, '');
+        return host === 'beverlyhillscarclub.com' && /(sold-)?inventory\.htm$/i.test(u.pathname);
+      } catch {
+        return false;
+      }
+    })();
+
     // Step 1: Scrape with Firecrawl STRUCTURED EXTRACTION (AGGRESSIVE)
-    console.log('🔥 Using Firecrawl structured extraction for inventory...');
+    if (cheap_mode) {
+      console.log('🪙 Cheap mode enabled: skipping OpenAI and minimizing Firecrawl usage');
+    } else {
+      console.log('🔥 Using Firecrawl structured extraction for inventory...');
+    }
     
     const isAuctionHouse = source_type === 'auction' || source_type === 'auction_house';
     const extractionSchema = {
@@ -247,7 +397,65 @@ serve(async (req) => {
     let metadata: any = null;
     let extract: any = null;
 
-    if (isLartIndex) {
+    if (isBhccInventory) {
+      console.log(`⚡ BHCC inventory detected; using /isapi_xml.php?module=inventory for deterministic listing URLs`);
+      const u = new URL(source_url);
+      const wantsSoldOnly = /sold-inventory\.htm$/i.test(u.pathname);
+      const modes: Array<'available' | 'sold'> = wantsSoldOnly ? ['sold'] : (include_sold ? ['available', 'sold'] : ['available']);
+
+      const bhccPhone = await tryBhccDealerPhone(source_url);
+      const allListings: any[] = [];
+      const apiUrls: string[] = [];
+      let totalReported: number | null = null;
+
+      for (const mode of modes) {
+        const bhcc = await tryBhccInventoryExtract(source_url, maxListingsToProcess, startOffset, mode);
+        if (!bhcc?.listing_urls?.length) continue;
+        if (bhcc.api_url) apiUrls.push(bhcc.api_url);
+        if (typeof bhcc.total_listings_reported === 'number') totalReported = bhcc.total_listings_reported;
+        for (const url of bhcc.listing_urls) {
+          allListings.push({
+            title: null,
+            url,
+            price: null,
+            year: null,
+            make: null,
+            model: null,
+            thumbnail_url: null,
+            listing_status: mode === 'sold' ? 'sold' : 'in_stock',
+            raw: {
+              source: 'bhcc_isapi_xml',
+              mode,
+              api_url: bhcc.api_url,
+              total_listings_reported: bhcc.total_listings_reported,
+            }
+          });
+        }
+      }
+
+      if (allListings.length) {
+        // Deduplicate by URL; if any URL appears in sold + available, prefer sold.
+        const byUrl = new Map<string, any>();
+        for (const l of allListings) {
+          const prev = byUrl.get(l.url);
+          if (!prev) byUrl.set(l.url, l);
+          else if (prev.listing_status !== 'sold' && l.listing_status === 'sold') byUrl.set(l.url, l);
+        }
+        const deduped = Array.from(byUrl.values());
+
+        extract = {
+          dealer_info: {
+            name: 'Beverly Hills Car Club',
+            website: normalizeWebsiteUrl(source_url),
+            phone: bhccPhone,
+          },
+          listings: deduped,
+          next_page_url: null,
+          total_listings_on_page: deduped.length,
+        };
+        metadata = { source: 'bhcc_isapi_xml', api_urls: apiUrls, total_listings_reported: totalReported };
+      }
+    } else if (isLartIndex) {
       // L'Art pages are static HTML and include all /fiche/ links. Firecrawl+LLM is slow here and can
       // exceed Edge runtime limits, so fetch HTML directly and enumerate deterministically.
       console.log(`⚡ Lart index detected; skipping Firecrawl/LLM and using direct HTML fetch`);
@@ -264,38 +472,59 @@ serve(async (req) => {
       }
       html = await resp.text();
     } else {
-      try {
-        const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
-          },
-          body: JSON.stringify({
-            url: source_url,
-            formats: ['markdown', 'html', 'extract'],
-            extract: {
-              schema: extractionSchema
-            },
-            onlyMainContent: false,
-            waitFor: 4000 // More time for JS-heavy dealer sites
-          }),
-          signal: AbortSignal.timeout(30000),
-        });
+      const shouldUseFirecrawl =
+        !cheap_mode &&
+        !!FIRECRAWL_API_KEY;
 
-        if (firecrawlResponse.ok) {
-          const firecrawlData = await firecrawlResponse.json();
-          if (firecrawlData.success) {
-            markdown = firecrawlData.data?.markdown ?? null;
-            html = firecrawlData.data?.html ?? null;
-            metadata = firecrawlData.data?.metadata ?? null;
-            extract = firecrawlData.data?.extract ?? null;
+      try {
+        if (shouldUseFirecrawl) {
+          const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
+            },
+            body: JSON.stringify({
+              url: source_url,
+              formats: ['markdown', 'html', 'extract'],
+              extract: {
+                schema: extractionSchema
+              },
+              onlyMainContent: false,
+              waitFor: 4000 // More time for JS-heavy dealer sites
+            }),
+            signal: AbortSignal.timeout(30000),
+          });
+
+          if (firecrawlResponse.ok) {
+            const firecrawlData = await firecrawlResponse.json();
+            if (firecrawlData.success) {
+              markdown = firecrawlData.data?.markdown ?? null;
+              html = firecrawlData.data?.html ?? null;
+              metadata = firecrawlData.data?.metadata ?? null;
+              extract = firecrawlData.data?.extract ?? null;
+            } else {
+              console.warn(`⚠️ Firecrawl returned success=false: ${JSON.stringify(firecrawlData.error || firecrawlData).slice(0, 300)}`);
+            }
           } else {
-            console.warn(`⚠️ Firecrawl returned success=false: ${JSON.stringify(firecrawlData.error || firecrawlData).slice(0, 300)}`);
+            const errorText = await firecrawlResponse.text();
+            console.warn(`⚠️ Firecrawl error ${firecrawlResponse.status}: ${errorText.slice(0, 200)}`);
           }
         } else {
-          const errorText = await firecrawlResponse.text();
-          console.warn(`⚠️ Firecrawl error ${firecrawlResponse.status}: ${errorText.slice(0, 200)}`);
+          // Cheap/general fallback: pull HTML directly so our deterministic URL enumeration (Step 4/4b) can run.
+          const resp = await fetch(source_url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+            signal: AbortSignal.timeout(15000),
+          });
+          if (resp.ok) {
+            html = await resp.text();
+          } else {
+            console.warn(`⚠️ Direct fetch failed: ${resp.status} ${resp.statusText}`);
+          }
         }
       } catch (e: any) {
         console.warn(`⚠️ Firecrawl request failed: ${e?.message || e}`);
@@ -337,7 +566,7 @@ serve(async (req) => {
     }
 
     // Step 3: LLM Extraction fallback if Firecrawl extract failed
-    const allowLlmExtraction = !isLartIndex && use_llm_extraction && OPENAI_API_KEY;
+    const allowLlmExtraction = !cheap_mode && !isLartIndex && use_llm_extraction && OPENAI_API_KEY;
     if (listings.length === 0 && allowLlmExtraction) {
       console.log('Running LLM extraction...');
 
@@ -738,6 +967,88 @@ Return ONLY valid JSON in this format:
       }
     }
 
+    // Step 5b: Brand DNA extraction (favicon/logo/svg/banner/primary images)
+    // Keep this scoped to the org profile only; do not mix with vehicle extraction.
+    if (organizationId) {
+      try {
+        // Determine best URL to represent the org brand.
+        const orgWebsite =
+          normalizedDealer?.website ||
+          (dealerInfo?.website ? normalizeWebsiteUrl(dealerInfo.website) : null) ||
+          (() => {
+            try {
+              return new URL(source_url).origin;
+            } catch {
+              return null;
+            }
+          })();
+
+        if (orgWebsite) {
+          // Favicon: cache via source_favicons (Google s2). This powers UI continuity across the app.
+          const faviconUrl = await extractAndCacheFavicon(
+            supabase,
+            orgWebsite,
+            businessType,
+            normalizedDealer?.name || dealerInfo?.name || null
+          );
+
+          // Brand images: prefer homepage HTML when possible (inventory pages are often JS shells).
+          const brandHtml =
+            (isBhccInventory ? await fetchHtmlBestEffort(orgWebsite) : null) ||
+            (source_url === orgWebsite ? html : null) ||
+            (await fetchHtmlBestEffort(orgWebsite));
+
+          if (brandHtml) {
+            const assets = extractBrandAssetsFromHtml(brandHtml, orgWebsite);
+
+            // Only fill missing media fields; never overwrite existing brand assets.
+            const { data: existingBiz } = await supabase
+              .from('businesses')
+              .select('logo_url, banner_url, cover_image_url, portfolio_images, metadata')
+              .eq('id', organizationId)
+              .maybeSingle();
+
+            const updates: any = { updated_at: new Date().toISOString() };
+            if (assets.logo_url && !existingBiz?.logo_url) updates.logo_url = assets.logo_url;
+            if (assets.banner_url && !existingBiz?.banner_url) updates.banner_url = assets.banner_url;
+            if (assets.banner_url && !existingBiz?.cover_image_url) updates.cover_image_url = assets.banner_url;
+
+            const existingPortfolio: string[] = Array.isArray(existingBiz?.portfolio_images) ? existingBiz!.portfolio_images : [];
+            const mergedPortfolio = Array.from(new Set([...(existingPortfolio || []), ...(assets.primary_image_urls || [])])).slice(0, 12);
+            if (mergedPortfolio.length > existingPortfolio.length) updates.portfolio_images = mergedPortfolio;
+
+            // Persist extra assets in metadata for continuity (svg logo, favicon url, raw candidates).
+            const meta = existingBiz?.metadata || {};
+            updates.metadata = {
+              ...meta,
+              brand_assets: {
+                ...(meta?.brand_assets || {}),
+                favicon_url: faviconUrl || meta?.brand_assets?.favicon_url || null,
+                logo_svg_url: assets.logo_svg_url || meta?.brand_assets?.logo_svg_url || null,
+                extracted_at: new Date().toISOString(),
+                source_url: orgWebsite,
+                raw: assets.raw || null,
+              }
+            };
+
+            // Only write if we have anything meaningful.
+            const hasMediaUpdate =
+              updates.logo_url ||
+              updates.banner_url ||
+              updates.cover_image_url ||
+              updates.portfolio_images ||
+              updates.metadata;
+
+            if (hasMediaUpdate) {
+              await supabase.from('businesses').update(updates).eq('id', organizationId);
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn(`⚠️ Brand DNA extraction failed (non-blocking): ${err?.message || String(err)}`);
+      }
+    }
+
     // Step 6: Process listings - queue for import OR directly create dealer_inventory/auction records
     let queuedCount = 0;
     let duplicateCount = 0;
@@ -752,7 +1063,10 @@ Return ONLY valid JSON in this format:
     const sortedListings = [...listings]
       .filter((l: any) => !!l?.url)
       .sort((a: any, b: any) => (a.url || '').localeCompare(b.url || ''));
-    const listingsToProcess = sortedListings.slice(startOffset, startOffset + maxListingsToProcess);
+    // BHCC already applies offset at the upstream API level (isapi_xml.php?offset=...).
+    // Do NOT double-apply `start_offset` locally or we will skip chunks when scaling.
+    const effectiveLocalOffset = isBhccInventory ? 0 : startOffset;
+    const listingsToProcess = sortedListings.slice(effectiveLocalOffset, effectiveLocalOffset + maxListingsToProcess);
 
     // If we have an organization_id and this is dealer inventory, we can create dealer_inventory records
     // For auction houses, we'll still queue since they need auction_events/auction_lots structure
@@ -775,7 +1089,7 @@ Return ONLY valid JSON in this format:
           ...listing,
           organization_id: organizationId, // Tag with org ID for processing
           inventory_extraction: true,
-          listing_status: inferredListingStatus,
+          listing_status: listing?.listing_status || inferredListingStatus,
         },
         priority: listing.is_squarebody ? 10 : 0,
       }));
@@ -813,7 +1127,7 @@ Return ONLY valid JSON in this format:
           organization_id: organizationId,
           business_type: 'auction_house',
           auction_extraction: true,
-          listing_status: inferredListingStatus,
+          listing_status: listing?.listing_status || inferredListingStatus,
         },
         priority: listing.is_squarebody ? 10 : 0,
       }));

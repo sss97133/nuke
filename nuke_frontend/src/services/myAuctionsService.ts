@@ -12,6 +12,20 @@ export interface UnifiedListing {
   user_id: string;
   platform: string;
   listing_status: string;
+  // Attribution / access context (prevents false "I profited from this" assumptions)
+  scope?: 'personal' | 'organization';
+  organization_id?: string;
+  organization_name?: string;
+  access_role?: string; // user's role in org (e.g. board_member)
+  // Platform-specific metadata (public data, used for UI enrichment)
+  metadata?: any;
+  // Participants (best-effort; may be missing depending on scrape coverage)
+  seller_username?: string;
+  buyer_username?: string;
+  seller_bat_user_id?: string;
+  buyer_bat_user_id?: string;
+  seller_nzero_user_id?: string;
+  buyer_nzero_user_id?: string;
   current_bid?: number;
   reserve_price?: number;
   bid_count?: number;
@@ -47,6 +61,33 @@ export interface AuctionStats {
 }
 
 export class MyAuctionsService {
+  private static async getUserOrgMemberships(userId: string): Promise<Array<{ organization_id: string; role: string; organization_name?: string }>> {
+    const { data, error } = await supabase
+      .from('organization_contributors')
+      .select('organization_id, role, businesses:businesses(business_name)')
+      .eq('user_id', userId)
+      .eq('status', 'active');
+
+    if (error) {
+      // Fallback: try without join (some schemas might not have the FK name wired)
+      const { data: fallbackData } = await supabase
+        .from('organization_contributors')
+        .select('organization_id, role')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+      return (fallbackData || []).map((row: any) => ({
+        organization_id: row.organization_id,
+        role: row.role,
+      }));
+    }
+
+    return (data || []).map((row: any) => ({
+      organization_id: row.organization_id,
+      role: row.role,
+      organization_name: row.businesses?.business_name,
+    }));
+  }
+
   /**
    * Get all listings for current user from all sources
    */
@@ -61,6 +102,9 @@ export class MyAuctionsService {
       if (!user) return [];
 
       const listings: UnifiedListing[] = [];
+      const orgMemberships = await this.getUserOrgMemberships(user.id);
+      const orgRoleById = new Map(orgMemberships.map(m => [m.organization_id, m.role]));
+      const orgNameById = new Map(orgMemberships.map(m => [m.organization_id, m.organization_name].filter(Boolean) as [string, string]));
 
       // 1. Native n-zero listings
       const { data: nativeListings, error: nativeError } = await supabase
@@ -96,6 +140,7 @@ export class MyAuctionsService {
             user_id: listing.seller_id,
             platform: 'nzero',
             listing_status: listing.status,
+            scope: 'personal',
             current_bid: listing.current_high_bid_cents ? listing.current_high_bid_cents / 100 : undefined,
             reserve_price: listing.reserve_price_cents ? listing.reserve_price_cents / 100 : undefined,
             bid_count: listing.bid_count || 0,
@@ -114,45 +159,54 @@ export class MyAuctionsService {
       }
 
       // 2. External listings (from external_listings table)
-      const { data: externalListings, error: externalError } = await supabase
-        .from('external_listings')
-        .select(`
-          id,
-          vehicle_id,
-          platform,
-          listing_status,
-          current_bid,
-          reserve_price,
-          bid_count,
-          view_count,
-          watcher_count,
-          end_date,
-          sold_at,
-          final_price,
-          listing_url,
-          created_at,
-          updated_at,
-          vehicles!inner(
-            year,
-            make,
-            model,
-            trim,
-            primary_image_url
-          )
-        `)
-        .in('listing_status', ['active', 'ended', 'sold']);
+      // IMPORTANT: Do not infer "personal profit" just because user is affiliated with an org.
+      // We split external listings into:
+      // - personal: listings tied to vehicles the user owns in-app
+      // - organization: listings tied to orgs the user is an active contributor in (board/admin/etc.)
+      const { data: userVehicles, error: userVehiclesError } = await supabase
+        .from('vehicles')
+        .select('id')
+        .eq('user_id', user.id);
 
-      if (!externalError && externalListings) {
-        // Filter by user's vehicles
-        const { data: userVehicles } = await supabase
-          .from('vehicles')
-          .select('id')
-          .eq('user_id', user.id);
+      const userVehicleIds = new Set((userVehiclesError ? [] : (userVehicles || [])).map((v: any) => v.id));
 
-        const userVehicleIds = new Set(userVehicles?.map(v => v.id) || []);
+      const externalSelect = `
+        id,
+        vehicle_id,
+        organization_id,
+        platform,
+        listing_status,
+        current_bid,
+        reserve_price,
+        bid_count,
+        view_count,
+        watcher_count,
+        end_date,
+        sold_at,
+        final_price,
+        listing_url,
+        metadata,
+        created_at,
+        updated_at,
+        vehicles!inner(
+          year,
+          make,
+          model,
+          trim,
+          primary_image_url
+        )
+      `;
 
-        for (const listing of externalListings) {
-          if (userVehicleIds.has(listing.vehicle_id)) {
+      // 2a) Personal external listings (vehicle belongs to user)
+      if (userVehicleIds.size > 0) {
+        const { data: personalExternal, error: personalExternalError } = await supabase
+          .from('external_listings')
+          .select(externalSelect)
+          .in('vehicle_id', Array.from(userVehicleIds))
+          .in('listing_status', ['active', 'ended', 'sold']);
+
+        if (!personalExternalError && personalExternal) {
+          for (const listing of personalExternal as any[]) {
             listings.push({
               listing_source: 'external',
               listing_id: listing.id,
@@ -160,6 +214,11 @@ export class MyAuctionsService {
               user_id: user.id,
               platform: listing.platform,
               listing_status: listing.listing_status,
+              scope: 'personal',
+              organization_id: listing.organization_id || undefined,
+              organization_name: listing.organization_id ? orgNameById.get(listing.organization_id) : undefined,
+              access_role: listing.organization_id ? orgRoleById.get(listing.organization_id) : undefined,
+              metadata: listing.metadata || {},
               current_bid: listing.current_bid ? Number(listing.current_bid) : undefined,
               reserve_price: listing.reserve_price ? Number(listing.reserve_price) : undefined,
               bid_count: listing.bid_count || 0,
@@ -181,6 +240,141 @@ export class MyAuctionsService {
             });
           }
         }
+      }
+
+      // 2b) Organization external listings (org membership grants access)
+      const orgIds = orgMemberships.map(m => m.organization_id).filter(Boolean);
+      if (orgIds.length > 0) {
+        const { data: orgExternal, error: orgExternalError } = await supabase
+          .from('external_listings')
+          .select(externalSelect)
+          .in('organization_id', orgIds)
+          .in('listing_status', ['active', 'ended', 'sold']);
+
+        if (!orgExternalError && orgExternal) {
+          for (const listing of orgExternal as any[]) {
+            // Avoid duplicates if the same listing is already included via personal vehicle ownership
+            const alreadyIncluded = listings.some(l => l.listing_source === 'external' && l.listing_id === listing.id);
+            if (alreadyIncluded) continue;
+
+            listings.push({
+              listing_source: 'external',
+              listing_id: listing.id,
+              vehicle_id: listing.vehicle_id,
+              user_id: user.id,
+              platform: listing.platform,
+              listing_status: listing.listing_status,
+              scope: 'organization',
+              organization_id: listing.organization_id || undefined,
+              organization_name: listing.organization_id ? orgNameById.get(listing.organization_id) : undefined,
+              access_role: listing.organization_id ? orgRoleById.get(listing.organization_id) : undefined,
+              metadata: listing.metadata || {},
+              current_bid: listing.current_bid ? Number(listing.current_bid) : undefined,
+              reserve_price: listing.reserve_price ? Number(listing.reserve_price) : undefined,
+              bid_count: listing.bid_count || 0,
+              view_count: listing.view_count || 0,
+              watcher_count: listing.watcher_count || 0,
+              end_date: listing.end_date,
+              sold_at: listing.sold_at,
+              final_price: listing.final_price ? Number(listing.final_price) : undefined,
+              external_url: listing.listing_url,
+              listed_at: listing.created_at,
+              last_updated: listing.updated_at,
+              vehicle: listing.vehicles ? {
+                year: listing.vehicles.year,
+                make: listing.vehicles.make,
+                model: listing.vehicles.model,
+                trim: listing.vehicles.trim,
+                primary_image_url: listing.vehicles.primary_image_url,
+              } : undefined,
+            });
+          }
+        }
+      }
+
+      // 2c) Best-effort enrichment for BaT participants and corrected metrics
+      // We prefer `bat_listings` + `bat_users` when available, because it provides usernames and mapping to N-Zero users.
+      try {
+        const batVehicleIds = Array.from(
+          new Set(
+            listings
+              .filter((l) => l.listing_source === 'external' && l.platform === 'bat')
+              .map((l) => l.vehicle_id)
+              .filter(Boolean),
+          ),
+        );
+
+        if (batVehicleIds.length > 0) {
+          const { data: batListings, error: batListingsError } = await supabase
+            .from('bat_listings')
+            .select('vehicle_id, bat_listing_url, seller_username, buyer_username, seller_bat_user_id, buyer_bat_user_id, bid_count, view_count, final_bid, sale_date, sale_price, listing_status')
+            .in('vehicle_id', batVehicleIds);
+
+          if (!batListingsError && batListings) {
+            const byVehicle = new Map<string, any>();
+            for (const row of batListings as any[]) {
+              // Prefer rows with the most data
+              const prev = byVehicle.get(row.vehicle_id);
+              if (!prev) {
+                byVehicle.set(row.vehicle_id, row);
+              } else {
+                const prevScore = (prev?.sale_price ? 2 : 0) + (prev?.buyer_username ? 1 : 0) + (prev?.view_count ? 1 : 0);
+                const rowScore = (row?.sale_price ? 2 : 0) + (row?.buyer_username ? 1 : 0) + (row?.view_count ? 1 : 0);
+                if (rowScore >= prevScore) byVehicle.set(row.vehicle_id, row);
+              }
+            }
+
+            const batUserIds = Array.from(
+              new Set(
+                (batListings as any[])
+                  .flatMap((r) => [r.seller_bat_user_id, r.buyer_bat_user_id])
+                  .filter(Boolean),
+              ),
+            );
+
+            const batUserById = new Map<string, any>();
+            if (batUserIds.length > 0) {
+              const { data: batUsers, error: batUsersError } = await supabase
+                .from('bat_users')
+                .select('id, bat_username, bat_profile_url, n_zero_user_id')
+                .in('id', batUserIds);
+
+              if (!batUsersError && batUsers) {
+                for (const u of batUsers as any[]) batUserById.set(u.id, u);
+              }
+            }
+
+            for (const l of listings) {
+              if (!(l.listing_source === 'external' && l.platform === 'bat')) continue;
+              const b = byVehicle.get(l.vehicle_id);
+              if (!b) continue;
+
+              l.seller_username = l.seller_username || b.seller_username || l.metadata?.seller || undefined;
+              l.buyer_username = l.buyer_username || b.buyer_username || l.metadata?.buyer || undefined;
+              l.seller_bat_user_id = l.seller_bat_user_id || b.seller_bat_user_id || undefined;
+              l.buyer_bat_user_id = l.buyer_bat_user_id || b.buyer_bat_user_id || undefined;
+
+              const sellerUser = l.seller_bat_user_id ? batUserById.get(l.seller_bat_user_id) : null;
+              const buyerUser = l.buyer_bat_user_id ? batUserById.get(l.buyer_bat_user_id) : null;
+              l.seller_nzero_user_id = l.seller_nzero_user_id || sellerUser?.n_zero_user_id || undefined;
+              l.buyer_nzero_user_id = l.buyer_nzero_user_id || buyerUser?.n_zero_user_id || undefined;
+
+              // Prefer canonical listing URL
+              l.external_url = l.external_url || b.bat_listing_url || undefined;
+
+              // Prefer bat_listings metrics when external_listings didn't have them yet
+              if ((l.bid_count || 0) === 0 && typeof b.bid_count === 'number') l.bid_count = b.bid_count;
+              if ((l.view_count || 0) === 0 && typeof b.view_count === 'number') l.view_count = b.view_count;
+
+              // If sold, prefer sale_price/final_bid when missing
+              if (!l.final_price && (typeof b.sale_price === 'number' || typeof b.final_bid === 'number')) {
+                l.final_price = typeof b.sale_price === 'number' ? Number(b.sale_price) : Number(b.final_bid);
+              }
+            }
+          }
+        }
+      } catch {
+        // non-fatal; some environments may not have bat_listings/bat_users deployed
       }
 
       // 3. Export listings (from listing_exports table)
@@ -219,6 +413,7 @@ export class MyAuctionsService {
             user_id: listing.user_id,
             platform: listing.platform,
             listing_status: listing.status,
+            scope: 'personal',
             reserve_price: listing.reserve_price_cents ? listing.reserve_price_cents / 100 : undefined,
             end_date: listing.ended_at,
             sold_at: listing.sold_at,

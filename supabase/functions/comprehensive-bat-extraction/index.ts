@@ -1127,6 +1127,73 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Ensure BaT participant identities exist (seller/buyer/bidders) so we can map actions over time.
+    // This does NOT create N-Zero auth users; it populates `bat_users` (public auction identities).
+    const ensureBatUser = async (usernameRaw: string | null | undefined): Promise<{ id: string; bat_username: string; profile_url: string | null; external_identity_id?: string } | null> => {
+      const username = (usernameRaw || '').trim();
+      if (!username) return null;
+      // Best-effort profile URL (BaT uses member pages; if wrong, we still store username)
+      const profileUrl = `https://bringatrailer.com/member/${encodeURIComponent(username)}`;
+      try {
+        const { data, error } = await supabase
+          .from('bat_users')
+          .upsert(
+            {
+              bat_username: username,
+              bat_profile_url: profileUrl,
+              last_seen_at: new Date().toISOString(),
+            },
+            { onConflict: 'bat_username' },
+          )
+          .select('id, bat_username, bat_profile_url')
+          .single();
+        if (error) {
+          console.log('bat_users upsert failed (non-fatal):', error.message);
+          return null;
+        }
+        // Best-effort: also upsert the generic external identity row (if table exists).
+        let externalIdentityId: string | undefined = undefined;
+        try {
+          const { data: ext, error: extErr } = await supabase
+            .from('external_identities')
+            .upsert(
+              {
+                platform: 'bat',
+                handle: username,
+                profile_url: profileUrl,
+                last_seen_at: new Date().toISOString(),
+              },
+              { onConflict: 'platform,handle' },
+            )
+            .select('id')
+            .single();
+          if (!extErr && ext?.id) externalIdentityId = ext.id;
+        } catch {
+          // ignore if table missing
+        }
+
+        return { id: data.id, bat_username: data.bat_username, profile_url: data.bat_profile_url, external_identity_id: externalIdentityId };
+      } catch (e) {
+        console.log('bat_users upsert exception (non-fatal):', e);
+        return null;
+      }
+    };
+
+    const participantUsernames = new Set<string>();
+    if (extractedData.seller) participantUsernames.add(String(extractedData.seller).trim());
+    if (extractedData.buyer) participantUsernames.add(String(extractedData.buyer).trim());
+    if (Array.isArray(extractedData.bid_history)) {
+      for (const b of extractedData.bid_history) {
+        if (b?.bidder) participantUsernames.add(String(b.bidder).trim());
+      }
+    }
+
+    const batIdentityByUsername = new Map<string, { id: string; bat_username: string; profile_url: string | null; external_identity_id?: string }>();
+    for (const u of participantUsernames) {
+      const rec = await ensureBatUser(u);
+      if (rec) batIdentityByUsername.set(rec.bat_username, rec);
+    }
+
     // If vehicleId provided, update vehicle and create timeline events
     if (vehicleId) {
       // Update vehicle with extracted data
@@ -1272,12 +1339,17 @@ serve(async (req) => {
       // Check if external_listing exists
       const { data: existingListing } = await supabase
         .from('external_listings')
-        .select('id')
+        .select('id, metadata')
         .eq('listing_url', batUrl)
         .maybeSingle();
       
       if (existingListing) {
         listingId = existingListing.id;
+
+        const highestBid = Array.isArray(extractedData.bid_history) && extractedData.bid_history.length > 0
+          ? [...extractedData.bid_history].sort((a, b) => (b.amount || 0) - (a.amount || 0))[0]
+          : null;
+        const highBidder = highestBid?.bidder ? String(highestBid.bidder).trim() : null;
         
         // Update existing listing
         await supabase
@@ -1294,16 +1366,24 @@ serve(async (req) => {
             sold_at: extractedData.sale_date ? new Date(extractedData.sale_date).toISOString() : null,
             listing_status: extractedData.sale_price ? 'sold' : 'ended',
             metadata: {
+              ...(existingListing as any)?.metadata,
               lot_number: extractedData.lot_number,
               seller: extractedData.seller,
               buyer: extractedData.buyer,
+              seller_username: extractedData.seller,
+              buyer_username: extractedData.buyer,
+              high_bidder: highBidder,
+              seller_bat_user_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.id || null) : null,
+              buyer_bat_user_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.id || null) : null,
+              seller_external_identity_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.external_identity_id || null) : null,
+              buyer_external_identity_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.external_identity_id || null) : null,
               location: extractedData.location,
               technical_specs: {
                 engine: extractedData.engine,
                 transmission: extractedData.transmission,
                 drivetrain: extractedData.drivetrain,
                 displacement: extractedData.displacement,
-              }
+              },
             },
             last_synced_at: new Date().toISOString(),
           })
@@ -1340,6 +1420,15 @@ serve(async (req) => {
               lot_number: extractedData.lot_number,
               seller: extractedData.seller,
               buyer: extractedData.buyer,
+              seller_username: extractedData.seller,
+              buyer_username: extractedData.buyer,
+              high_bidder: Array.isArray(extractedData.bid_history) && extractedData.bid_history.length > 0
+                ? ([...extractedData.bid_history].sort((a, b) => (b.amount || 0) - (a.amount || 0))[0]?.bidder || null)
+                : null,
+              seller_bat_user_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.id || null) : null,
+              buyer_bat_user_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.id || null) : null,
+              seller_external_identity_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.external_identity_id || null) : null,
+              buyer_external_identity_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.external_identity_id || null) : null,
               location: extractedData.location,
               technical_specs: {
                 engine: extractedData.engine,

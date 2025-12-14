@@ -86,8 +86,23 @@ function promoteBeverlyHillsCarClubImageUrl(raw: string): string {
   return s
 }
 
+function extractBhccStockNoFromHtml(html: string): number | null {
+  // BHCC exposes the numeric stock number reliably in the meta description:
+  // "Used 1963 Alfa Romeo ... Stock # 17692 in Los Angeles, CA ..."
+  const m = html.match(/Stock\s*#\s*(\d{1,10})/i)
+  if (!m?.[1]) return null
+  const n = parseInt(m[1], 10)
+  return Number.isFinite(n) ? n : null
+}
+
 function parseBeverlyHillsCarClubListing(html: string, url: string): any {
   const doc = new DOMParser().parseFromString(html, 'text/html')
+
+  // Prefer the on-page H1 and meta description; BHCC pages are consistent here.
+  const metaDesc =
+    (doc?.querySelector('meta[name="description"]')?.getAttribute('content') || '')
+      .replace(/\s+/g, ' ')
+      .trim()
 
   const title =
     (doc?.querySelector('h1.listing-title')?.textContent || doc?.querySelector('h1')?.textContent || '')
@@ -107,9 +122,10 @@ function parseBeverlyHillsCarClubListing(html: string, url: string): any {
     if (label && value) specs[label] = value
   }
 
-  const year = parseNumberLoose(specs['Year'] || '') || null
-  const make = cleanMakeName(specs['Make']) || null
-  const model = cleanModelName(specs['Model']) || null
+  // Y/M/M: prefer explicit spec table; if missing, fall back to meta description and H1.
+  let year = parseNumberLoose(specs['Year'] || '') || null
+  let make = cleanMakeName(specs['Make']) || null
+  let model = cleanModelName(specs['Model']) || null
 
   // VIN might be incomplete on some classic listings; still pass through if present.
   const vinRaw = (specs['VIN'] || specs['Vin'] || '').trim()
@@ -142,30 +158,84 @@ function parseBeverlyHillsCarClubListing(html: string, url: string): any {
       .replace(/\s+/g, ' ')
       .trim() || null
 
-  // If the structured table didn't provide Y/M/M, attempt a conservative parse from title.
-  let titleYear = year
-  let titleMake = make
-  let titleModel = model
-  if ((!titleYear || !titleMake || !titleModel) && title) {
-    const m = title.match(/^(\d{4})\s+([A-Za-z][A-Za-z0-9-]+)\s+(.+)$/)
-    if (m) {
-      titleYear = titleYear || parseInt(m[1], 10)
-      titleMake = titleMake || cleanMakeName(m[2])
-      titleModel = titleModel || cleanModelName(m[3])
+  // Multi-word makes are common on BHCC. Prefer matching known multiword makes first.
+  // (This is a pragmatic bridge until the OEM reference library is in place.)
+  const MULTIWORD_MAKES = [
+    'Mercedes-Benz',
+    'Alfa Romeo',
+    'Aston Martin',
+    'Rolls-Royce',
+    'Land Rover',
+    'Range Rover',
+    'Austin Healey',
+    'Auto Union',
+    'De Tomaso',
+    'Willys Jeep',
+  ]
+
+  function parseYmmFromTitleLike(s: string): { year: number | null; make: string | null; model: string | null } {
+    const cleaned = (s || '').replace(/\s+/g, ' ').trim()
+    const m = cleaned.match(/^(\d{4})\s+(.+)$/)
+    if (!m) return { year: null, make: null, model: null }
+    const y = parseInt(m[1], 10)
+    const rest = (m[2] || '').trim()
+    if (!rest) return { year: Number.isFinite(y) ? y : null, make: null, model: null }
+
+    for (const candidate of MULTIWORD_MAKES) {
+      if (rest.toLowerCase().startsWith(candidate.toLowerCase() + ' ')) {
+        const mm = rest.slice(candidate.length).trim()
+        return {
+          year: Number.isFinite(y) ? y : null,
+          make: cleanMakeName(candidate),
+          model: cleanModelName(mm),
+        }
+      }
+    }
+
+    const parts = rest.split(/\s+/).filter(Boolean)
+    if (parts.length < 2) return { year: Number.isFinite(y) ? y : null, make: cleanMakeName(rest), model: null }
+    const mk = parts[0]
+    const mdl = parts.slice(1).join(' ')
+    return {
+      year: Number.isFinite(y) ? y : null,
+      make: cleanMakeName(mk),
+      model: cleanModelName(mdl),
     }
   }
+
+  // Meta description is very reliable: "Used 1955 Mercedes-Benz 190SL Stock # 1068 ..."
+  if ((!year || !make || !model) && metaDesc) {
+    const md = metaDesc.match(/Used\s+(\d{4})\s+(.+?)\s+Stock\s*#\s*\d+/i)
+    if (md?.[1] && md?.[2]) {
+      const parsed = parseYmmFromTitleLike(`${md[1]} ${md[2]}`)
+      year = year || parsed.year
+      make = make || parsed.make
+      model = model || parsed.model
+    }
+  }
+
+  // If still missing, parse from H1 text.
+  if ((!year || !make || !model) && title) {
+    const parsed = parseYmmFromTitleLike(title)
+    year = year || parsed.year
+    make = make || parsed.make
+    model = model || parsed.model
+  }
+
+  const bhcc_stockno = extractBhccStockNoFromHtml(html)
 
   return {
     source: 'beverlyhillscarclub',
     title,
-    year: titleYear || null,
-    make: titleMake || null,
-    model: titleModel || null,
+    year: year || null,
+    make: make || null,
+    model: model || null,
     vin,
     asking_price: parseNumberLoose(priceText),
     mileage,
     images,
     thumbnail_url: images[0] || null,
+    bhcc_stockno,
     specs,
     description,
   }
@@ -531,10 +601,15 @@ serve(async (req) => {
       data.mileage = parsed.mileage ?? data.mileage
       data.description = parsed.description || data.description || ''
       data.specs = parsed.specs
+      data.bhcc_stockno = parsed.bhcc_stockno ?? data.bhcc_stockno
       if (Array.isArray(parsed.images) && parsed.images.length > 0) {
         data.images = parsed.images
         data.thumbnail_url = parsed.thumbnail_url || parsed.images[0] || data.thumbnail_url
       }
+
+      // Dealer identity (critical for org extraction in process-import-queue when ingesting single listings).
+      data.dealer_name = 'Beverly Hills Car Club'
+      data.dealer_website = 'https://www.beverlyhillscarclub.com'
     }
 
     // Extract VIN from HTML - works for multiple sites

@@ -1078,6 +1078,7 @@ const VehicleProfile: React.FC = () => {
           relationship_type,
           auto_tagged,
           gps_match_confidence,
+          status,
           businesses!inner (
             id,
             business_name,
@@ -1090,7 +1091,7 @@ const VehicleProfile: React.FC = () => {
         .eq('vehicle_id', vehId)
         // Include sold/pending relationships so the header can still show the org "emblem"
         // even after inventory status changes.
-        .in('status', ['active', 'sold', 'pending']);
+        .in('status', ['active', 'sold', 'pending', 'past', 'archived']);
 
       if (error) {
         console.warn('Unable to load linked orgs:', error.message);
@@ -1104,6 +1105,7 @@ const VehicleProfile: React.FC = () => {
         relationship_type: ov.relationship_type,
         auto_tagged: ov.auto_tagged,
         gps_match_confidence: ov.gps_match_confidence,
+        status: ov.status,
         business_name: ov.businesses?.business_name || 'Unknown org',
         business_type: ov.businesses?.business_type,
         city: ov.businesses?.city,
@@ -1111,7 +1113,41 @@ const VehicleProfile: React.FC = () => {
         logo_url: ov.businesses?.logo_url
       })) as LinkedOrg[];
 
-      setLinkedOrganizations(enriched);
+      // De-dupe by org and keep the most relevant link for header display.
+      // Priority: active > sold > pending > past > archived
+      const statusRank = (s: any) => {
+        const v = String(s || '').toLowerCase();
+        if (v === 'active') return 0;
+        if (v === 'sold') return 1;
+        if (v === 'pending') return 2;
+        if (v === 'past') return 3;
+        if (v === 'archived') return 4;
+        return 5;
+      };
+      const byOrg = new Map<string, LinkedOrg>();
+      for (const link of enriched) {
+        const orgId = String((link as any).organization_id || '');
+        if (!orgId) continue;
+        const existing = byOrg.get(orgId);
+        if (!existing) {
+          byOrg.set(orgId, link);
+          continue;
+        }
+        const nextRank = statusRank((link as any).status);
+        const prevRank = statusRank((existing as any).status);
+        if (nextRank < prevRank) {
+          byOrg.set(orgId, link);
+          continue;
+        }
+        if (nextRank === prevRank) {
+          // Prefer non-auto-tagged when status is the same.
+          const nextAuto = Boolean((link as any).auto_tagged);
+          const prevAuto = Boolean((existing as any).auto_tagged);
+          if (prevAuto && !nextAuto) byOrg.set(orgId, link);
+        }
+      }
+
+      setLinkedOrganizations(Array.from(byOrg.values()));
     } catch (err) {
       console.warn('Linked org load failed:', err);
       setLinkedOrganizations([]);

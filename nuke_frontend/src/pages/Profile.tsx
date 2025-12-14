@@ -43,6 +43,7 @@ import LivePlayer from '../components/profile/LivePlayer';
 import OrganizationAffiliations from '../components/profile/OrganizationAffiliations';
 import MyOrganizations from './MyOrganizations';
 import MyAuctions from './MyAuctions';
+import PublicAuctionTrackRecord from '../components/profile/PublicAuctionTrackRecord';
 import VehicleMergeInterface from '../components/vehicle/VehicleMergeInterface';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
@@ -433,6 +434,15 @@ const Profile: React.FC = () => {
 
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              {currentUserId && (
+                <button
+                  className="button button-small"
+                  onClick={() => navigate('/claim-identity')}
+                  title="Claim external activity sources (handles) and merge them into your activity repo"
+                >
+                  CLAIM
+                </button>
+              )}
               {isOwnProfile && (
                 <button
                   className="button button-small"
@@ -603,9 +613,9 @@ const Profile: React.FC = () => {
               </div>
             )}
 
-            {activeTab === 'auctions' && isOwnProfile && (
+            {activeTab === 'auctions' && (
               <div>
-                <MyAuctions />
+                {isOwnProfile ? <MyAuctions /> : <PublicAuctionTrackRecord profileUserId={profile.id} />}
               </div>
             )}
 

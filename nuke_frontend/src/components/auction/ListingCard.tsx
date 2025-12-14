@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { UnifiedListing } from '../../services/myAuctionsService';
 import '../../design-system.css';
+import { AuctionPlatformBadge, AuctionStatusBadge, ParticipantBadge } from './AuctionBadges';
 
 interface ListingCardProps {
   listing: UnifiedListing;
@@ -23,35 +24,21 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
     carscom: 'Cars.com',
   };
 
-  const platformColors: Record<string, string> = {
-    nzero: '#000000',
-    bat: '#1e40af',
-    ebay: '#e53e3e',
-    cars_and_bids: '#dc2626',
-    hemmings: '#059669',
-    autotrader: '#7c3aed',
-    facebook_marketplace: '#1877f2',
-    craigslist: '#800020',
-    carscom: '#0066cc',
-  };
-
-  const getStatusBadge = (status: string, soldAt?: string, endDate?: string) => {
-    if (status === 'sold' || soldAt) {
-      return { text: 'SOLD', color: '#00aaff' };
-    }
-    if (status === 'expired' || (status === 'ended' && !soldAt)) {
-      return { text: 'EXPIRED', color: '#666' };
-    }
+  const getStatus = (status: string, soldAt?: string, endDate?: string, meta?: any): { status: any; title?: string } => {
+    const reserveNotMet = meta?.reserve_not_met === true || String(meta?.outcome || '').toLowerCase() === 'reserve_not_met';
+    if (reserveNotMet) return { status: 'reserve_not_met', title: 'Reserve not met' };
+    if (status === 'sold' || soldAt) return { status: 'sold' };
+    if (status === 'cancelled') return { status: 'cancelled' };
+    if (status === 'pending') return { status: 'pending' };
+    if (status === 'expired' || (status === 'ended' && !soldAt)) return { status: 'expired' };
     if (status === 'active') {
       if (endDate) {
         const timeRemaining = new Date(endDate).getTime() - Date.now();
-        if (timeRemaining < 24 * 60 * 60 * 1000) {
-          return { text: 'ENDING SOON', color: '#ffff00' };
-        }
+        if (timeRemaining < 24 * 60 * 60 * 1000) return { status: 'ending_soon', title: 'Ending within 24 hours' };
       }
-      return { text: 'ACTIVE', color: '#00ff00' };
+      return { status: 'active' };
     }
-    return { text: status.toUpperCase(), color: '#666' };
+    return { status: 'ended' };
   };
 
   const formatTimeRemaining = (endDate?: string) => {
@@ -81,10 +68,84 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
     return `$${value.toLocaleString()}`;
   };
 
-  const statusBadge = getStatusBadge(listing.listing_status, listing.sold_at, listing.end_date);
+  const statusBadge = getStatus(listing.listing_status, listing.sold_at, listing.end_date, listing.metadata);
   const timeRemaining = formatTimeRemaining(listing.end_date);
   const platformName = platformNames[listing.platform] || listing.platform;
-  const platformColor = platformColors[listing.platform] || '#666';
+  const externalFaviconUrl = listing.external_url || (listing.platform === 'bat' ? 'https://bringatrailer.com' : undefined);
+
+  const seller = (() => {
+    // Prefer explicit seller usernames (BaT), then org context, then personal context.
+    if (listing.seller_nzero_user_id) {
+      return {
+        label: listing.seller_username || 'Seller',
+        href: `/profile/${listing.seller_nzero_user_id}`,
+        iconUrl: externalFaviconUrl,
+        kind: 'user' as const,
+      };
+    }
+    if (listing.seller_username) {
+      return {
+        label: listing.seller_username,
+        href: listing.platform === 'bat' ? undefined : undefined,
+        iconUrl: externalFaviconUrl,
+        kind: 'bat_user' as const,
+      };
+    }
+    if (listing.scope === 'organization' && listing.organization_id) {
+      return {
+        label: listing.organization_name || 'Organization',
+        href: `/organizations/${listing.organization_id}`,
+        iconUrl: undefined,
+        kind: 'organization' as const,
+      };
+    }
+    return {
+      label: 'You',
+      href: `/profile/${listing.user_id}`,
+      iconUrl: undefined,
+      kind: 'user' as const,
+    };
+  })();
+
+  const buyer = (() => {
+    if (listing.buyer_nzero_user_id) {
+      return {
+        label: listing.buyer_username || 'Buyer',
+        href: `/profile/${listing.buyer_nzero_user_id}`,
+        iconUrl: externalFaviconUrl,
+        kind: 'user' as const,
+      };
+    }
+    if (listing.buyer_username) {
+      return {
+        label: listing.buyer_username,
+        href: undefined,
+        iconUrl: externalFaviconUrl,
+        kind: 'bat_user' as const,
+      };
+    }
+    // Some ingests use `metadata.buyer`
+    if (listing.metadata?.buyer) {
+      return {
+        label: String(listing.metadata.buyer),
+        href: undefined,
+        iconUrl: externalFaviconUrl,
+        kind: 'bat_user' as const,
+      };
+    }
+    return null;
+  })();
+
+  const highBidder = (() => {
+    const bidder = listing.metadata?.high_bidder || listing.metadata?.bidder || null;
+    if (!bidder) return null;
+    return {
+      label: String(bidder),
+      href: undefined,
+      iconUrl: externalFaviconUrl,
+      kind: 'bat_user' as const,
+    };
+  })();
 
   return (
     <div
@@ -111,30 +172,8 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
     >
       <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span
-            style={{
-              fontSize: '10px',
-              fontWeight: 'bold',
-              padding: '3px 8px',
-              borderRadius: '3px',
-              backgroundColor: platformColor,
-              color: '#fff',
-            }}
-          >
-            {platformName.toUpperCase()}
-          </span>
-          <span
-            style={{
-              fontSize: '10px',
-              fontWeight: 'bold',
-              padding: '3px 8px',
-              borderRadius: '3px',
-              backgroundColor: statusBadge.color,
-              color: statusBadge.color === '#ffff00' ? '#000' : '#fff',
-            }}
-          >
-            {statusBadge.text}
-          </span>
+          <AuctionPlatformBadge platform={listing.platform} urlForFavicon={externalFaviconUrl} label={platformName} />
+          <AuctionStatusBadge status={statusBadge.status} title={statusBadge.title} />
         </div>
         {onSync && listing.platform === 'bat' && listing.listing_source === 'external' && (
           <button
@@ -196,6 +235,10 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
                 {listing.vehicle.trim}
               </div>
             )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+              <span style={{ fontSize: '10px', color: '#666' }}>Seller:</span>
+              <ParticipantBadge kind={seller.kind} label={seller.label} href={seller.href} leadingIconUrl={seller.iconUrl} />
+            </div>
           </div>
         </div>
 
@@ -210,17 +253,31 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
         >
           {listing.current_bid ? (
             <div style={{ marginBottom: '4px' }}>
-              <div style={{ fontSize: '10px', color: '#666' }}>Current Bid</div>
+              <div style={{ fontSize: '10px', color: '#666' }}>
+                Current Bid{highBidder ? ' by' : ''}
+              </div>
               <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
                 {formatCurrency(listing.current_bid)}
               </div>
+              {highBidder ? (
+                <div style={{ marginTop: '6px' }}>
+                  <ParticipantBadge kind={highBidder.kind} label={highBidder.label} href={highBidder.href} leadingIconUrl={highBidder.iconUrl} />
+                </div>
+              ) : null}
             </div>
           ) : listing.final_price ? (
             <div style={{ marginBottom: '4px' }}>
-              <div style={{ fontSize: '10px', color: '#666' }}>Sold For</div>
+              <div style={{ fontSize: '10px', color: '#666' }}>
+                Sold For{buyer ? ' to' : ''}
+              </div>
               <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
                 {formatCurrency(listing.final_price)}
               </div>
+              {buyer ? (
+                <div style={{ marginTop: '6px' }}>
+                  <ParticipantBadge kind={buyer.kind} label={buyer.label} href={buyer.href} leadingIconUrl={buyer.iconUrl} />
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -229,7 +286,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
               Reserve: {formatCurrency(listing.reserve_price)}
             </div>
           ) : (
-            <div style={{ fontSize: '11px', color: '#00ff00', marginBottom: '4px' }}>
+            <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
               No Reserve
             </div>
           )}

@@ -35,12 +35,13 @@ function extractListingUrlsFromInventoryHtml(html) {
   // BHCC detail pages commonly look like:
   // /1967-porsche-911s-c-1660.htm
   // https://www.beverlyhillscarclub.com/1967-porsche-911s-c-1660.htm
-  const re = /href="([^"]+-c-\d+\.htm)"/gi;
+  const re = /(https:\/\/www\.beverlyhillscarclub\.com\/[^"'\\\s]+-c-\d+\.htm)|(?:href="([^"]+-c-\d+\.htm)")/gi;
   const urls = [];
   for (const m of html.matchAll(re)) {
-    const raw = m[1];
+    const raw = m[1] || m[2];
+    if (!raw) continue;
     const abs = raw.startsWith('http') ? raw : `${BASE}${raw.startsWith('/') ? '' : '/'}${raw}`;
-    urls.push(abs);
+    urls.push(abs.replace(/\\u0026/g, '&'));
   }
   return uniq(urls);
 }

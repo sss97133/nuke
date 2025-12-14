@@ -329,6 +329,13 @@ interface ProcessRequest {
   batch_size?: number;
   priority_only?: boolean;
   source_id?: string;
+  // Keep edge runtimes safe when ingesting heavy dealer listings.
+  // - fast_mode: reduce immediate image downloads
+  // - max_images_immediate: explicit override (0 = skip immediate image uploads)
+  // - skip_image_upload: alias for max_images_immediate=0
+  fast_mode?: boolean;
+  max_images_immediate?: number;
+  skip_image_upload?: boolean;
 }
 
 /**
@@ -391,14 +398,21 @@ serve(async (req) => {
     );
 
     const body: ProcessRequest = await req.json().catch(() => ({}));
-    const { batch_size = 20, priority_only = false, source_id } = body;
+    const {
+      batch_size = 20,
+      priority_only = false,
+      source_id,
+      fast_mode = false,
+      max_images_immediate,
+      skip_image_upload = false,
+    } = body;
     debugLog({
       sessionId: 'debug-session',
       runId: 'pre-fix',
       hypothesisId: 'H5',
       location: 'supabase/functions/process-import-queue/index.ts:parsed_body',
       message: 'Parsed request body',
-      data: { batch_size, priority_only, source_id },
+      data: { batch_size, priority_only, source_id, fast_mode, max_images_immediate, skip_image_upload },
     });
 
     // Get pending items from queue - prioritize items with more data
@@ -1606,6 +1620,36 @@ serve(async (req) => {
                 .eq('id', existingByUrlId);
             }
 
+            // Best-effort: persist BHCC numeric stock number into origin_metadata for future sold monitoring.
+            // (BHCC exposes Stock # in meta description; our scraper returns it as bhcc_stockno.)
+            try {
+              const bhccStockNo =
+                (typeof (scrapeData as any)?.data?.bhcc_stockno === 'number' && Number.isFinite((scrapeData as any).data.bhcc_stockno))
+                  ? (scrapeData as any).data.bhcc_stockno
+                  : null;
+              if (bhccStockNo && item.listing_url.includes('beverlyhillscarclub.com')) {
+                const { data: vrowBhcc } = await supabase
+                  .from('vehicles')
+                  .select('origin_metadata')
+                  .eq('id', existingByUrlId)
+                  .maybeSingle();
+                const omBhcc = (vrowBhcc?.origin_metadata && typeof vrowBhcc.origin_metadata === 'object') ? vrowBhcc.origin_metadata : {};
+                const nextOmBhcc = {
+                  ...omBhcc,
+                  bhcc: {
+                    ...(omBhcc as any)?.bhcc,
+                    stockno: bhccStockNo,
+                  }
+                };
+                await supabase
+                  .from('vehicles')
+                  .update({ origin_metadata: nextOmBhcc, updated_at: new Date().toISOString() } as any)
+                  .eq('id', existingByUrlId);
+              }
+            } catch {
+              // swallow
+            }
+
             // Push listing fields through forensic updater (now allowed for non-user sources).
             const colorSignal = extractGeneralColors(
               scrapeData.data.color ?? scrapeData.data.colors ?? scrapeData.data.origin_metadata?.lart?.colors ?? null
@@ -1894,6 +1938,11 @@ serve(async (req) => {
         }
 
         // Create vehicle - START AS PENDING until validated
+        const bhccStockNo =
+          (typeof (scrapeData as any)?.data?.bhcc_stockno === 'number' && Number.isFinite((scrapeData as any).data.bhcc_stockno))
+            ? (scrapeData as any).data.bhcc_stockno
+            : null;
+
         const { data: newVehicle, error: vehicleError} = await supabase
           .from('vehicles')
           .insert({
@@ -1909,6 +1958,7 @@ serve(async (req) => {
               imported_at: new Date().toISOString(),
               image_urls: scrapeData.data.images || [], // Store for reference
               image_count: scrapeData.data.images?.length || 0,
+              ...(bhccStockNo ? { bhcc: { stockno: bhccStockNo } } : {}),
               ...(isLartFiche ? {
                 lart: {
                   description_fr: scrapeData.data.description_fr || null,
@@ -1944,13 +1994,50 @@ serve(async (req) => {
           data: { queue_id: item.id, vehicle_id: newVehicle.id, year, make, model, status: 'pending', is_public: false, org_id: organizationId || null },
         });
 
+        // Best-effort: persist BHCC numeric stock number into origin_metadata for future sold monitoring.
+        // Do not fail queue processing if this write fails.
+        if (bhccStockNo) {
+          try {
+            const { data: vrow, error: vrowErr } = await supabase
+              .from('vehicles')
+              .select('origin_metadata')
+              .eq('id', newVehicle.id)
+              .maybeSingle();
+            if (!vrowErr) {
+              const om = (vrow?.origin_metadata && typeof vrow.origin_metadata === 'object') ? vrow.origin_metadata : {};
+              const nextOm = {
+                ...om,
+                bhcc: {
+                  ...(om as any)?.bhcc,
+                  stockno: bhccStockNo,
+                }
+              };
+              await supabase
+                .from('vehicles')
+                .update({ origin_metadata: nextOm, updated_at: new Date().toISOString() } as any)
+                .eq('id', newVehicle.id);
+            }
+          } catch {
+            // swallow
+          }
+        }
+
         // CRITICAL FIX: Immediately download and upload images (don't wait for backfill)
         const imageUrls = Array.isArray(scrapeData.data.images) ? scrapeData.data.images : [];
         if (imageUrls.length > 0) {
           // Keep import-queue processing within Edge runtime limits.
           // Upload a capped number immediately; defer the rest to background backfill.
           const isLartFiche = item.listing_url.includes('lartdelautomobile.com/fiche/');
-          const MAX_IMAGES_IMMEDIATE = isLartFiche ? 24 : 12;
+          const defaultMaxImmediate = isLartFiche ? 24 : 12;
+          let MAX_IMAGES_IMMEDIATE = defaultMaxImmediate;
+          if (skip_image_upload) {
+            MAX_IMAGES_IMMEDIATE = 0;
+          } else if (typeof max_images_immediate === 'number' && Number.isFinite(max_images_immediate)) {
+            MAX_IMAGES_IMMEDIATE = Math.max(0, Math.min(Math.floor(max_images_immediate), defaultMaxImmediate));
+          } else if (fast_mode) {
+            // Keep very small by default for non-lart to avoid 504s.
+            MAX_IMAGES_IMMEDIATE = isLartFiche ? 6 : 2;
+          }
           const immediateImageUrls = imageUrls.slice(0, MAX_IMAGES_IMMEDIATE);
           const deferredImageUrlsBase = imageUrls.slice(MAX_IMAGES_IMMEDIATE);
           const failedImmediateUrls: string[] = [];

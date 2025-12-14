@@ -8,9 +8,37 @@ import TimelineEventEditor from './TimelineEventEditor';
 import { TechnicianWorkTimeline } from './TechnicianWorkTimeline';
 import { TimelineEventService } from '../services/timelineEventService';
 import { ComprehensiveWorkOrderReceipt } from './ComprehensiveWorkOrderReceipt';
+import { ParticipantBadge } from './auction/AuctionBadges';
 
 // Types
-type EventType = 'maintenance' | 'repair' | 'modification' | 'inspection' | 'purchase' | 'sale' | 'accident' | 'registration' | 'insurance' | 'transport' | 'evaluation' | 'general' | 'custom' | 'life';
+// Note: DB supports auction_* event types via timeline_events constraint migration.
+// Keep this list in sync so auction timeline events render cleanly.
+type EventType =
+  | 'maintenance'
+  | 'repair'
+  | 'modification'
+  | 'inspection'
+  | 'purchase'
+  | 'sale'
+  | 'accident'
+  | 'registration'
+  | 'insurance'
+  | 'transport'
+  | 'evaluation'
+  | 'general'
+  | 'custom'
+  | 'life'
+  | 'documentation'
+  | 'pending_analysis'
+  | 'auction_listed'
+  | 'auction_started'
+  | 'auction_bid_placed'
+  | 'auction_reserve_met'
+  | 'auction_extended'
+  | 'auction_ending_soon'
+  | 'auction_ended'
+  | 'auction_sold'
+  | 'auction_reserve_not_met';
 
 interface TimelineEvent {
   id: string;
@@ -1168,6 +1196,7 @@ const VehicleTimeline: React.FC<{
                   const typeBadge = getEventTypeColor(ev.event_type);
                   const isCreator = ev.metadata?.who?.user_id === currentUser?.id;
                   const isEditing = editingEvent === ev.id;
+                  const isAuctionEvent = String(ev.event_type || '').toLowerCase().startsWith('auction_');
                   
                   return (
                     <div key={ev.id} className="alert alert-default" style={{ cursor: 'pointer' }} onClick={() => {
@@ -1238,6 +1267,34 @@ const VehicleTimeline: React.FC<{
                                 <span className="badge badge-secondary">
                                   {String(ev.event_type || 'event').replace('_', ' ')}
                                 </span>
+                                {isAuctionEvent && (ev.metadata?.bidder || ev.metadata?.buyer || ev.metadata?.seller || ev.metadata?.bat_username) ? (
+                                  <>
+                                    {ev.metadata?.bidder ? (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                        <span className="badge">Bid by</span>
+                                        <ParticipantBadge kind="bat_user" label={String(ev.metadata.bidder)} leadingIconUrl="https://bringatrailer.com" />
+                                      </span>
+                                    ) : null}
+                                    {ev.metadata?.buyer ? (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                        <span className="badge">Buyer</span>
+                                        <ParticipantBadge kind="bat_user" label={String(ev.metadata.buyer)} leadingIconUrl="https://bringatrailer.com" />
+                                      </span>
+                                    ) : null}
+                                    {ev.metadata?.seller ? (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                        <span className="badge">Seller</span>
+                                        <ParticipantBadge kind="bat_user" label={String(ev.metadata.seller)} leadingIconUrl="https://bringatrailer.com" />
+                                      </span>
+                                    ) : null}
+                                    {!ev.metadata?.bidder && !ev.metadata?.buyer && !ev.metadata?.seller && ev.metadata?.bat_username ? (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                        <span className="badge">User</span>
+                                        <ParticipantBadge kind="bat_user" label={String(ev.metadata.bat_username)} leadingIconUrl="https://bringatrailer.com" />
+                                      </span>
+                                    ) : null}
+                                  </>
+                                ) : null}
                                 {(() => {
                                   const met = calcEventImpact(ev);
                                   const tags: React.ReactNode[] = [];
