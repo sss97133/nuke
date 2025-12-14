@@ -71,4 +71,10 @@ Optional flags:
 - `--no-json` (skip writing `data/bat/bat_local_partners.json`)
 - `--url <custom>` (override source URL)
 
+#### Runbook
+
+For the full end-to-end flow (index → enrich → import) and production guidance, see:
+
+- `docs/imports/BAT_LOCAL_PARTNERS_RUNBOOK.md`
+
 

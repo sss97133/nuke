@@ -33,6 +33,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 type Facility = {
   partner_name: string;
@@ -62,6 +63,8 @@ type Options = {
   listingLimit: number | null;
   imageBatchSize: number;
   maxPages: number;
+  skipExistingLinked: boolean;
+  requireBusinessMatch: boolean;
   dryRun: boolean;
   writeJson: boolean;
 };
@@ -93,6 +96,10 @@ function parseArgs(argv: string[]): Options {
     listingLimit: null,
     imageBatchSize: 25,
     maxPages: 10,
+    // Default on: makes re-runs cheap + safer.
+    skipExistingLinked: true,
+    // Default off: still works without DB read permissions (Edge importer can auto-link by seller username).
+    requireBusinessMatch: false,
     dryRun: false,
     writeJson: true,
   };
@@ -131,6 +138,18 @@ function parseArgs(argv: string[]): Options {
     if (a === '--max-pages' && argv[i + 1]) {
       const n = Number(argv[++i]);
       opts.maxPages = Number.isFinite(n) ? Math.max(1, Math.min(50, Math.floor(n))) : 10;
+      continue;
+    }
+    if (a === '--skip-existing') {
+      opts.skipExistingLinked = true;
+      continue;
+    }
+    if (a === '--no-skip-existing') {
+      opts.skipExistingLinked = false;
+      continue;
+    }
+    if (a === '--require-business-match') {
+      opts.requireBusinessMatch = true;
       continue;
     }
     if (a === '--dry-run') {
@@ -247,6 +266,71 @@ function memberUrlForUsername(username: string): string {
   return `https://bringatrailer.com/member/${encodeURIComponent(username)}/`;
 }
 
+async function resolveBusinessIdByGeographicKey(supabase: any, geographicKey: string): Promise<string | null> {
+  const gk = String(geographicKey || '').trim();
+  if (!gk) return null;
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('geographic_key', gk)
+    .limit(1);
+  if (error) return null;
+  const id = Array.isArray(data) && data[0]?.id ? String(data[0].id) : null;
+  return id;
+}
+
+async function findLinkedListingUrls(
+  supabase: any,
+  organizationId: string,
+  listingUrls: string[],
+): Promise<Set<string>> {
+  const linkedUrls = new Set<string>();
+  const uniq = Array.from(new Set(listingUrls));
+  if (!uniq.length) return linkedUrls;
+
+  // Step 1: find existing vehicles by bat_auction_url
+  const urlToVehicleId = new Map<string, string>();
+  const chunkSize = 80;
+  for (let i = 0; i < uniq.length; i += chunkSize) {
+    const chunk = uniq.slice(i, i + chunkSize);
+    const { data, error } = await supabase
+      .from('vehicles')
+      .select('id, bat_auction_url')
+      .in('bat_auction_url', chunk);
+    if (error || !Array.isArray(data)) continue;
+    for (const row of data) {
+      if (row?.id && row?.bat_auction_url) {
+        urlToVehicleId.set(String(row.bat_auction_url), String(row.id));
+      }
+    }
+  }
+
+  const vehicleIds = Array.from(new Set(Array.from(urlToVehicleId.values())));
+  if (!vehicleIds.length) return linkedUrls;
+
+  // Step 2: find which of those vehicles are already linked to this org
+  const linkedVehicleIds = new Set<string>();
+  for (let i = 0; i < vehicleIds.length; i += 200) {
+    const chunk = vehicleIds.slice(i, i + 200);
+    const { data, error } = await supabase
+      .from('organization_vehicles')
+      .select('vehicle_id')
+      .eq('organization_id', organizationId)
+      .in('vehicle_id', chunk);
+    if (error || !Array.isArray(data)) continue;
+    for (const row of data) {
+      if (row?.vehicle_id) linkedVehicleIds.add(String(row.vehicle_id));
+    }
+  }
+
+  // Map back to URLs
+  for (const [url, vid] of urlToVehicleId.entries()) {
+    if (linkedVehicleIds.has(vid)) linkedUrls.add(url);
+  }
+
+  return linkedUrls;
+}
+
 async function main() {
   loadEnv();
   const opts = parseArgs(process.argv.slice(2));
@@ -285,6 +369,8 @@ async function main() {
   console.log(`Concurrency (listing imports): ${opts.concurrency}`);
   console.log(`imageBatchSize: ${opts.imageBatchSize}`);
   console.log(`maxPages: ${opts.maxPages}`);
+  console.log(`skipExistingLinked: ${opts.skipExistingLinked}`);
+  console.log(`requireBusinessMatch: ${opts.requireBusinessMatch}`);
   console.log(`Mode: ${opts.dryRun ? 'dry-run' : 'execute'}`);
 
   const endpoint = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/import-bat-listing`;
@@ -295,6 +381,14 @@ async function main() {
   let partnersFail = 0;
   let listingsOk = 0;
   let listingsFail = 0;
+
+  const supabaseReadKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    null;
+  const supabase = supabaseReadKey ? createClient(SUPABASE_URL, supabaseReadKey) : null;
 
   for (let i = 0; i < facilities.length; i++) {
       const f = facilities[i];
@@ -313,19 +407,52 @@ async function main() {
       const memberUrl = memberUrlForUsername(username);
       process.stdout.write(`  member: ${memberUrl}\n`);
 
-      const { urls: listingUrlsAll, pagesFetched } = await enumerateMemberListingUrls(memberUrl, opts.maxPages);
-      const listingUrls = typeof opts.listingLimit === 'number' ? listingUrlsAll.slice(0, opts.listingLimit) : listingUrlsAll;
+      let organizationId: string | null = null;
+      if (supabase) {
+        organizationId = await resolveBusinessIdByGeographicKey(supabase, f.geographic_key);
+      }
+      if (!organizationId) {
+        process.stdout.write(`  org: (not resolved by geographic_key; proceeding without organizationId)\n`);
+        if (opts.requireBusinessMatch) {
+          partnersFail++;
+          process.stdout.write(`  skipped: requireBusinessMatch=true and no org id found\n`);
+          continue;
+        }
+      } else {
+        process.stdout.write(`  org: ${organizationId}\n`);
+      }
 
-      process.stdout.write(`  listings: ${listingUrls.length} (pages-fetched=${pagesFetched})\n`);
+      const { urls: listingUrlsAll, pagesFetched } = await enumerateMemberListingUrls(memberUrl, opts.maxPages);
+      const listingUrlsRaw = typeof opts.listingLimit === 'number' ? listingUrlsAll.slice(0, opts.listingLimit) : listingUrlsAll;
+
+      let listingUrls = listingUrlsRaw;
+      let skippedAlreadyLinked = 0;
+      if (supabase && organizationId && opts.skipExistingLinked && listingUrls.length) {
+        try {
+          const linked = await findLinkedListingUrls(supabase, organizationId, listingUrls);
+          if (linked.size) {
+            listingUrls = listingUrls.filter((u) => !linked.has(u));
+            skippedAlreadyLinked = linked.size;
+          }
+        } catch {
+          // If the DB query fails (RLS, etc), just proceed; Edge importer is idempotent.
+        }
+      }
+
+      process.stdout.write(
+        `  listings: ${listingUrls.length} (pages-fetched=${pagesFetched}${skippedAlreadyLinked ? `, skipped_already_linked=${skippedAlreadyLinked}` : ''})\n`
+      );
 
       partnerSummaries.push({
         geographic_key: f.geographic_key,
         partner_name: f.partner_name,
         bat_username: username,
         member_url: memberUrl,
+        organization_id: organizationId,
         pages_fetched: pagesFetched,
         listings_found: listingUrlsAll.length,
         listings_to_process: listingUrls.length,
+        listings_skipped_already_linked: skippedAlreadyLinked,
       });
 
       if (opts.dryRun) {
@@ -344,7 +471,12 @@ async function main() {
               'Authorization': `Bearer ${INVOKE_KEY}`,
             },
             body: JSON.stringify({
+              // Backwards/compat across deployed versions:
+              // - some versions expect listingUrl + organizationId
+              // - newer versions accept batUrl/url and organizationId optional
+              listingUrl: batUrl,
               batUrl,
+              organizationId,
               forceDealerLink: true,
               allowFuzzyMatch: false,
               imageBatchSize: opts.imageBatchSize,

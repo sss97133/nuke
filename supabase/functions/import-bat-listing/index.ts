@@ -57,6 +57,38 @@ function extractSellerTypeFromHtml(html: string): string | undefined {
   return 'unknown';
 }
 
+function extractSellerUsernameFromHtml(html: string): string | null {
+  // Common patterns:
+  // - "Sold by username"
+  // - "Sold by <a href=\"/member/username/\">..."
+  const m1 = html.match(/Sold by\s+([A-Za-z0-9_]+)/i);
+  if (m1?.[1]) return m1[1];
+  const m2 = html.match(/Sold by[\s\S]{0,250}?\/member\/([^\/"'?]+)\//i);
+  if (m2?.[1]) {
+    try {
+      return decodeURIComponent(m2[1]);
+    } catch {
+      return m2[1];
+    }
+  }
+  return null;
+}
+
+function extractBuyerUsernameFromHtml(html: string): string | null {
+  // Best-effort; buyer is less consistently linked.
+  const m1 = html.match(/to\s+([A-Za-z0-9_]+)\s+for/i);
+  if (m1?.[1]) return m1[1];
+  const m2 = html.match(/to[\s\S]{0,250}?\/member\/([^\/"'?]+)\//i);
+  if (m2?.[1]) {
+    try {
+      return decodeURIComponent(m2[1]);
+    } catch {
+      return m2[1];
+    }
+  }
+  return null;
+}
+
 async function findLocalPartnerBusinessIdByBatUsername(
   supabase: any,
   batUsername: string | null,
@@ -174,10 +206,8 @@ serve(async (req) => {
     const description = descMatch ? descMatch[1].trim() : '';
 
     // Extract seller/buyer
-    const sellerMatch = html.match(/Sold by\s+([A-Za-z0-9_]+)/i);
-    const buyerMatch = html.match(/to\s+([A-Za-z0-9_]+)\s+for/i);
-    const seller = sellerMatch ? sellerMatch[1] : 'VivaLasVegasAutos';
-    const buyer = buyerMatch ? buyerMatch[1] : '';
+    const seller = extractSellerUsernameFromHtml(html);
+    const buyer = extractBuyerUsernameFromHtml(html);
     const sellerType = extractSellerTypeFromHtml(html);
 
     // Extract lot number

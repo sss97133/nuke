@@ -36,6 +36,8 @@ npm run import:bat-local-partner-vehicles -- --concurrency 1
 - `--listing-limit 50`: cap listings per partner (useful for staged rollouts)
 - `--max-pages 10`: cap pagination pages for BaT member pages (follows `rel="next"` / page-numbers)
 - `--image-batch-size 25`: controls `import-bat-listing` image backfill batching
+- `--no-skip-existing`: do not skip BaT URLs that are already linked to the org (default skips already-linked URLs)
+- `--require-business-match`: fail/skip partners when `businesses.id` cannot be resolved by `geographic_key`
 - `--no-json`: skip writing `data/bat/bat_local_partner_vehicle_import_summary.json`
 
 ## Output
@@ -45,5 +47,11 @@ When JSON output is enabled (default), the script writes:
 - `data/bat/bat_local_partner_vehicle_import_summary.json`
 
 This includes per-partner counts and overall import stats for resumability and auditing.
+
+## Runbook
+
+For the full end-to-end flow (index → enrich → import) and production guidance, see:
+
+- `docs/imports/BAT_LOCAL_PARTNERS_RUNBOOK.md`
 
 

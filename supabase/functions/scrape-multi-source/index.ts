@@ -1036,7 +1036,7 @@ Return ONLY valid JSON in this format:
             // Only fill missing media fields; never overwrite existing brand assets.
             const { data: existingBiz } = await supabase
               .from('businesses')
-              .select('logo_url, banner_url, cover_image_url, portfolio_images, metadata')
+              .select('logo_url, banner_url, cover_image_url, favicon_url, portfolio_images, metadata')
               .eq('id', organizationId)
               .maybeSingle();
 
@@ -1044,6 +1044,8 @@ Return ONLY valid JSON in this format:
             if (assets.logo_url && !existingBiz?.logo_url) updates.logo_url = assets.logo_url;
             if (assets.banner_url && !existingBiz?.banner_url) updates.banner_url = assets.banner_url;
             if (assets.banner_url && !existingBiz?.cover_image_url) updates.cover_image_url = assets.banner_url;
+            // Persist favicon_url on the business row so the UI can render it without joining source_favicons.
+            if (faviconUrl && !existingBiz?.favicon_url) updates.favicon_url = faviconUrl;
 
             const existingPortfolio: string[] = Array.isArray(existingBiz?.portfolio_images) ? existingBiz!.portfolio_images : [];
             const mergedPortfolio = Array.from(new Set([...(existingPortfolio || []), ...(assets.primary_image_urls || [])])).slice(0, 12);
