@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
+import { FaviconIcon } from '../components/common/FaviconIcon';
 import '../design-system.css';
 
 // Add pulse animation for LIVE badge
@@ -228,7 +229,7 @@ export default function AuctionMarketplace() {
                 platform: 'bat',
                 listing_url: listing.bat_listing_url,
                 lead_image_url: listing.vehicle?.primary_image_url || listing?.image_url || listing?.primary_image_url || null,
-                current_high_bid_cents: listing.final_bid ? listing.final_bid * 100 : null,
+                current_high_bid_cents: (listing.current_bid ?? listing.final_bid) ? Math.round(Number(listing.current_bid ?? listing.final_bid) * 100) : null,
                 reserve_price_cents: listing.reserve_price ? listing.reserve_price * 100 : null,
                 bid_count: listing.bid_count || 0,
                 auction_end_time: endDateTime,
@@ -328,8 +329,9 @@ export default function AuctionMarketplace() {
   };
 
   const formatCurrency = (cents: number | null) => {
-    if (!cents) return 'No bids yet';
-    return `$${(cents / 100).toLocaleString()}`;
+    const v = typeof cents === 'number' ? cents : 0;
+    const safe = Number.isFinite(v) ? v : 0;
+    return `$${(safe / 100).toLocaleString()}`;
   };
 
   const formatTimeRemaining = (endTime: string | null) => {
@@ -537,6 +539,15 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
                        listing.platform ? listing.platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : null;
 
   const imageUrl = listing.lead_image_url || vehicle.primary_image_url || null;
+  const isBat = listing.platform === 'bat';
+  const platformFaviconUrl = isBat ? 'https://bringatrailer.com' : (listing.listing_url || null);
+  const platformBadgeContent = isBat ? (
+    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Bring a Trailer">
+      <FaviconIcon url={platformFaviconUrl || 'https://bringatrailer.com'} size={12} style={{ marginRight: 0 }} />
+    </span>
+  ) : (
+    platformName
+  );
 
   return (
     <Link
@@ -627,13 +638,17 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               right: '6px',
               background: listing.platform === 'bat' ? '#1e40af' : '#dc2626',
               color: '#fff',
-              padding: '3px 8px',
+              padding: isBat ? '2px 8px' : '3px 8px',
               borderRadius: '3px',
               fontSize: '7pt',
               fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
+            title={platformName || undefined}
           >
-            {platformName}
+            {platformBadgeContent}
           </div>
         )}
 
@@ -646,13 +661,17 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               right: '6px',
               background: listing.platform === 'bat' ? '#1e40af' : '#dc2626',
               color: '#fff',
-              padding: '3px 8px',
+              padding: isBat ? '2px 8px' : '3px 8px',
               borderRadius: '3px',
               fontSize: '7pt',
               fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
+            title={platformName || undefined}
           >
-            {platformName}
+            {platformBadgeContent}
           </div>
         )}
 
@@ -713,23 +732,8 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           }}
         >
           <div>
-            <div
-              style={{
-                fontSize: '7pt',
-                color: 'var(--text-muted)',
-                marginBottom: '2px',
-              }}
-            >
-              Current Bid
-            </div>
-            <div
-              style={{
-                fontSize: '11pt',
-                fontWeight: 700,
-                color: '#1d4ed8',
-              }}
-            >
-              {formatCurrency(listing.current_high_bid_cents)}
+            <div style={{ fontSize: '10pt', fontWeight: 700, color: '#1d4ed8' }}>
+              Bid: {formatCurrency(listing.current_high_bid_cents)}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
