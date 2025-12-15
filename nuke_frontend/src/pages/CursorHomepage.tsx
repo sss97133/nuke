@@ -509,7 +509,7 @@ const CursorHomepage: React.FC = () => {
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
-          discovery_url, discovery_source, profile_origin,
+          discovery_url, discovery_source, profile_origin
         `)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
