@@ -1,6 +1,4 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -8,12 +6,11 @@ const corsHeaders = {
 
 type GrinderRequest = {
   chain_depth?: number; // how many times to self-invoke
-  do_seed?: boolean; // whether to run BaT /auctions seeding this iteration
-  seed_every?: number; // run seed every N iterations
+  do_seed?: boolean; // whether to run BaT /auctions fetch this iteration
+  seed_every?: number; // run seed every N iterations (default)
   iteration?: number;
-  bat_import_batch?: number; // how many BaT listing pages to deep-import per iteration
-  process_import_queue_batch?: number; // batch_size for process-import-queue
-  backfill_images_batch?: number; // how many vehicles to backfill images per iteration
+  bat_import_batch?: number; // how many BaT listing pages to deep-import per iteration (from discovered URLs)
+  max_listings?: number; // how many listing URLs to request from the BaT index
 };
 
 function toInt(v: unknown, fallback: number) {
@@ -42,6 +39,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const startedAt = Date.now();
+  const HARD_BUDGET_MS = 55_000; // keep well under Edge timeout; this function self-invokes to continue grinding
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
@@ -55,117 +53,84 @@ Deno.serve(async (req: Request) => {
   const iteration = Math.max(0, toInt(body.iteration, 0));
   const seedEvery = Math.max(1, Math.min(toInt(body.seed_every, 5), 60));
 
-  const batImportBatch = Math.max(0, Math.min(toInt(body.bat_import_batch, 2), 10));
-  const processBatch = Math.max(0, Math.min(toInt(body.process_import_queue_batch, 25), 50));
-  const backfillBatch = Math.max(0, Math.min(toInt(body.backfill_images_batch, 2), 10));
+  const batImportBatch = Math.max(0, Math.min(toInt(body.bat_import_batch, 1), 5));
+  const maxListings = Math.max(50, Math.min(toInt(body.max_listings, 250), 1200));
 
   const shouldSeed = body.do_seed === true || (iteration % seedEvery === 0);
 
-  const supabase = createClient(supabaseUrl, serviceRole, { auth: { persistSession: false } });
   const fnBase = `${supabaseUrl.replace(/\/$/, "")}/functions/v1`;
+
+  const remainingMs = () => Math.max(0, HARD_BUDGET_MS - (Date.now() - startedAt));
+  const canRun = (minMs: number) => remainingMs() > minMs;
 
   const out: any = {
     success: true,
     iteration,
     chain_depth_remaining: chainDepth,
     did_seed: false,
+    max_listings: maxListings,
     bat_import_attempted: 0,
     bat_import_ok: 0,
-    process_import_queue_ok: false,
-    backfill_images_ok: 0,
+    discovered_listing_urls: 0,
     elapsed_ms: 0,
     notes: [],
   };
 
-  // 1) Seed BaT live auction index -> import_queue
-  if (shouldSeed) {
-    const seed = await postJson(
-      `${fnBase}/scrape-multi-source`,
-      invokeHeaders,
-      {
-        source_url: "https://bringatrailer.com/auctions/",
-        source_type: "auction",
-        extract_listings: true,
-        use_llm_extraction: false,
-        cheap_mode: false, // JS rendered
-        max_listings: 1200,
-      },
-      120_000,
-    );
-    out.did_seed = seed.ok;
-    out.seed_status = seed.status;
-    out.seed_result = seed.json || seed.text.slice(0, 300);
-    if (!seed.ok) out.notes.push("seed_failed");
-  }
-
-  // 2) Deep-import a few BaT listing pages (keeps live auction truth fresh)
-  if (batImportBatch > 0) {
-    const { data: batRows, error: batErr } = await supabase
-      .from("import_queue")
-      .select("id, listing_url, status")
-      .ilike("listing_url", "%bringatrailer.com/listing/%")
-      .in("status", ["pending", "failed"] as any)
-      .order("created_at", { ascending: true })
-      .limit(batImportBatch);
-
-    if (batErr) {
-      out.notes.push(`bat_queue_select_failed:${batErr.message}`);
-    } else {
-      for (const row of batRows || []) {
-        const url = String((row as any).listing_url || "");
-        if (!url) continue;
-        out.bat_import_attempted++;
-        const r = await postJson(`${fnBase}/import-bat-listing`, invokeHeaders, { url }, 120_000);
-        if (r.ok && (r.json?.success === true || r.json?.vehicleId || r.json?.vehicle_id)) {
-          out.bat_import_ok++;
-          const vehicleId = r.json?.vehicleId || r.json?.vehicle_id || null;
-          if (vehicleId) {
-            await supabase
-              .from("import_queue")
-              .update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString(), error_message: null } as any)
-              .eq("id", (row as any).id);
-          }
-        } else {
-          out.notes.push(`bat_import_failed:${r.status}`);
-        }
-      }
+  // 1) Fetch BaT live auctions index (JS rendered) via scrape-multi-source
+  let listingUrls: string[] = [];
+  if (shouldSeed && canRun(18_000)) {
+    try {
+      const seed = await postJson(
+        `${fnBase}/scrape-multi-source`,
+        invokeHeaders,
+        {
+          source_url: "https://bringatrailer.com/auctions/",
+          source_type: "auction",
+          extract_listings: true,
+          use_llm_extraction: false,
+          cheap_mode: false, // JS rendered
+          max_listings: maxListings,
+        },
+        Math.min(52_000, Math.max(12_000, remainingMs() - 2_000)),
+      );
+      out.did_seed = seed.ok;
+      out.seed_status = seed.status;
+      out.seed_result = seed.json || seed.text.slice(0, 220);
+      if (!seed.ok) out.notes.push("seed_failed");
+      const sample = Array.isArray(seed.json?.sample_listings) ? seed.json.sample_listings : [];
+      listingUrls = sample.map((x: any) => String(x?.url || "")).filter((u: string) => u.includes("bringatrailer.com/listing/"));
+      // de-dupe
+      listingUrls = Array.from(new Set(listingUrls)).slice(0, maxListings);
+      out.discovered_listing_urls = listingUrls.length;
+    } catch (e: any) {
+      out.notes.push(`seed_error:${e?.message || String(e)}`);
     }
+  } else if (shouldSeed) {
+    out.notes.push("seed_skipped_budget");
   }
 
-  // 3) Process general import queue (fills DB fields)
-  if (processBatch > 0) {
-    const proc = await postJson(
-      `${fnBase}/process-import-queue`,
-      invokeHeaders,
-      { batch_size: processBatch, priority_only: false },
-      120_000,
-    );
-    out.process_import_queue_ok = proc.ok;
-    out.process_status = proc.status;
-    out.process_result = proc.json || proc.text.slice(0, 300);
-  }
-
-  // 4) Backfill missing images for a few vehicles
-  if (backfillBatch > 0) {
-    const { data: candidates, error: candErr } = await supabase.rpc("get_vehicle_image_backfill_candidates", {
-      p_limit: backfillBatch,
-    } as any);
-    if (candErr) {
-      out.notes.push(`image_candidates_failed:${candErr.message}`);
-    } else {
-      for (const c of (candidates || []) as any[]) {
-        const vehicleId = c.vehicle_id;
-        const imageUrls = Array.isArray(c.image_urls) ? c.image_urls.filter(Boolean) : [];
-        if (!vehicleId || imageUrls.length === 0) continue;
-        const bf = await postJson(
-          `${fnBase}/backfill-images`,
-          invokeHeaders,
-          { vehicle_id: vehicleId, image_urls: imageUrls, source: "missing_images_backfill", run_analysis: false, max_images: 0, continue: true, sleep_ms: 150, max_runtime_ms: 25000 },
-          120_000,
-        );
-        if (bf.ok && bf.json?.success) out.backfill_images_ok++;
+  // 2) Deep-import a few discovered BaT listings
+  if (batImportBatch > 0 && listingUrls.length > 0) {
+    const take = Math.min(batImportBatch, listingUrls.length, 2); // keep tiny per invocation
+    for (let i = 0; i < take; i++) {
+      if (!canRun(12_000)) {
+        out.notes.push("bat_import_skipped_budget");
+        break;
       }
+      const url = listingUrls[i];
+      if (!url) continue;
+      out.bat_import_attempted++;
+      const r = await postJson(
+        `${fnBase}/import-bat-listing`,
+        invokeHeaders,
+        { url },
+        Math.min(45_000, Math.max(10_000, remainingMs() - 2_000)),
+      );
+      if (r.ok && (r.json?.success === true || r.json?.vehicleId || r.json?.vehicle_id)) out.bat_import_ok++;
+      else out.notes.push(`bat_import_failed:${r.status}`);
     }
+  } else if (batImportBatch > 0 && listingUrls.length === 0) {
+    out.notes.push("no_bat_urls_discovered");
   }
 
   out.elapsed_ms = Date.now() - startedAt;
@@ -177,8 +142,7 @@ Deno.serve(async (req: Request) => {
       iteration: iteration + 1,
       seed_every: seedEvery,
       bat_import_batch: batImportBatch,
-      process_import_queue_batch: processBatch,
-      backfill_images_batch: backfillBatch,
+      max_listings: maxListings,
     };
     // Fire-and-forget; don't block response on it.
     fetch(`${fnBase}/go-grinder`, {
