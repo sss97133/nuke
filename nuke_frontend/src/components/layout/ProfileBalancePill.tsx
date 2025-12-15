@@ -168,21 +168,6 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
         }}
         onClick={() => setExpanded(!expanded)}
       >
-        {/* Notification badge on capsule */}
-        {unreadCount > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              width: '10px',
-              height: '10px',
-              borderRadius: '999px',
-              background: 'var(--error)',
-              boxShadow: '0 0 0 2px var(--bg)'
-            }}
-          />
-        )}
         {/* Balance (left side) - Always show when expanded */}
         {expanded && (
           <div
@@ -211,6 +196,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
         {/* Profile circle (right side) */}
         <div
           style={{
+            position: 'relative',
             width: `${circleSize}px`,
             height: `${circleSize}px`,
             minWidth: `${circleSize}px`,
@@ -224,6 +210,21 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
             justifyContent: 'center'
           }}
         >
+          {/* Notification badge on profile circle (bottom-right) */}
+          {unreadCount > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                right: '-2px',
+                bottom: '-2px',
+                width: '10px',
+                height: '10px',
+                borderRadius: '999px',
+                background: 'var(--error)',
+                boxShadow: '0 0 0 2px var(--bg)'
+              }}
+            />
+          )}
           {userProfile?.avatar_url ? (
             <img
               src={userProfile.avatar_url}
