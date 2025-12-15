@@ -351,9 +351,9 @@ const Profile: React.FC = () => {
             gap: 'var(--space-3)',
             padding: 'var(--space-3)',
             marginBottom: 'var(--space-4)',
-            background: 'var(--white)',
+            background: 'var(--surface)',
             borderRadius: '4px',
-            border: '1px solid var(--border-light)'
+            border: '1px solid var(--border)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flex: 1 }}>
               {/* Avatar - Circular - Larger */}
@@ -385,9 +385,9 @@ const Profile: React.FC = () => {
                   width: '100%',
                   height: '100%',
                   borderRadius: '50%',
-                  border: '2px solid var(--border-medium)',
+                  border: '2px solid var(--border)',
                   cursor: isOwnProfile ? 'pointer' : 'default',
-                  background: 'var(--white)',
+                  background: 'var(--surface)',
                   overflow: 'hidden'
                 }}
                 onClick={() => {
@@ -414,7 +414,7 @@ const Profile: React.FC = () => {
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    background: 'var(--grey-200)',
+                    background: 'var(--surface-hover)',
                     fontSize: '8pt',
                     fontWeight: 'bold'
                   }}>
@@ -472,8 +472,8 @@ const Profile: React.FC = () => {
           {showProfileDetails && isOwnProfile && (
             <div className="card" style={{ 
               marginBottom: 'var(--space-4)',
-              border: '1px inset var(--border-medium)',
-              background: 'var(--grey-50)'
+              border: '2px solid var(--border)',
+              background: 'var(--surface)'
             }}>
               <div className="card-body">
                 <EditableField
@@ -526,7 +526,7 @@ const Profile: React.FC = () => {
           display: 'flex',
           gap: '0',
           marginBottom: 'var(--space-2)',
-          borderBottom: '2px solid var(--border-dark)'
+          borderBottom: '2px solid var(--border)'
         }}>
           {[
             { key: 'overview', label: 'Overview' },
@@ -541,11 +541,11 @@ const Profile: React.FC = () => {
               className="text-small"
               style={{
                 padding: 'var(--space-2) var(--space-4)',
-                background: activeTab === tab.key ? 'var(--white)' : 'var(--grey-200)',
+                background: activeTab === tab.key ? 'var(--surface)' : 'var(--surface-hover)',
                 border: activeTab === tab.key 
-                  ? '2px outset var(--border-medium)' 
-                  : '1px outset var(--border-light)',
-                borderBottom: activeTab === tab.key ? 'none' : '2px solid var(--border-dark)',
+                  ? '2px solid var(--border)' 
+                  : '1px solid var(--border)',
+                borderBottom: activeTab === tab.key ? 'none' : '2px solid var(--border)',
                 borderTopLeftRadius: '4px',
                 borderTopRightRadius: '4px',
                 marginBottom: activeTab === tab.key ? -2 : 0,
