@@ -41,6 +41,9 @@ import { BATListingManager } from '../components/vehicle/BATListingManager';
 import VehicleDescriptionCard from '../components/vehicle/VehicleDescriptionCard';
 import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
 import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
+import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
+import VehicleMemePanel from '../components/vehicle/VehicleMemePanel';
+import type { ContentActionEvent } from '../services/streamActionsService';
 // Lazy load heavy components to avoid circular dependencies
 const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/MergeProposalsPanel'));
 const ImageGallery = React.lazy(() => import('../components/images/ImageGallery'));
@@ -118,6 +121,7 @@ const VehicleProfile: React.FC = () => {
   const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
   const ranBatSyncRef = React.useRef<string | null>(null);
   const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
+  const [lastMemeDrop, setLastMemeDrop] = useState<ContentActionEvent | null>(null);
 
   // Build a stable "auction pulse" for the header from *all* external listing rows.
   // We intentionally merge duplicate rows that share the same `listing_url` (multiple import pipelines)
@@ -706,6 +710,40 @@ const VehicleProfile: React.FC = () => {
       }
     };
   }, [vehicle?.id, auctionPulse?.listing_url, auctionPulse?.platform]);
+
+  // Realtime meme drops on this vehicle
+  useEffect(() => {
+    if (!vehicle?.id) return;
+
+    const targetKey = `vehicle:${vehicle.id}`;
+    const channel = supabase
+      .channel(`meme-drops:${vehicle.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'content_action_events',
+          filter: `target_key=eq.${targetKey}`,
+        },
+        (payload) => {
+          const row = (payload as any)?.new as any;
+          if (!row) return;
+          setLastMemeDrop(row as any);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch {
+        try {
+          channel.unsubscribe();
+        } catch {}
+      }
+    };
+  }, [vehicle?.id]);
 
   // Lightweight auction pulse polling (external listings + last bid/comment timestamps).
   // This makes live auction vehicles feel bustling without needing a full realtime channel.
@@ -2298,8 +2336,18 @@ const VehicleProfile: React.FC = () => {
 
         {/* Hero Image Section */}
         <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
-          <VehicleHeroImage leadImageUrl={leadImageUrl} />
+          <VehicleHeroImage
+            leadImageUrl={leadImageUrl}
+            overlayNode={<VehicleMemeOverlay lastEvent={lastMemeDrop} />}
+          />
         </React.Suspense>
+
+        {/* Meme Drops (paid reactions) */}
+        {vehicle?.id && (
+          <section className="section">
+            <VehicleMemePanel vehicleId={vehicle.id} disabled={!vehicle?.isPublic && !session?.user?.id} />
+          </section>
+        )}
 
         {/* Add Organization Relationship Modal */}
         {showAddOrgRelationship && vehicle && session?.user?.id && (

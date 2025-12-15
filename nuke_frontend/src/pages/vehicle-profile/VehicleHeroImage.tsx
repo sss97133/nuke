@@ -3,7 +3,7 @@ import type { VehicleHeroImageProps } from './types';
 import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
-const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl }) => {
+const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode }) => {
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
   
@@ -29,7 +29,9 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl }) => 
               position: 'relative',
               cursor: isMobile ? 'pointer' : 'default'
           }}
-        />
+        >
+          {overlayNode}
+        </div>
       </div>
     </section>
       

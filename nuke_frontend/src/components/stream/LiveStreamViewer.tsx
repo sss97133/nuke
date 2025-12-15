@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import StreamActionOverlay from './StreamActionOverlay';
+import StreamActionPanel from './StreamActionPanel';
+import type { StreamActionEvent } from '../../services/streamActionsService';
 import '../../design-system.css';
 
 interface LiveStream {
@@ -42,6 +45,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [viewerSessionId, setViewerSessionId] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [lastActionEvent, setLastActionEvent] = useState<StreamActionEvent | null>(null);
 
   useEffect(() => {
     loadStream();
@@ -60,6 +64,18 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
         },
         (payload) => {
           addChatMessage(payload.new as any);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'stream_action_events',
+          filter: `stream_id=eq.${streamId}`
+        },
+        (payload) => {
+          setLastActionEvent(payload.new as any);
         }
       )
       .subscribe();
@@ -252,7 +268,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
     }}>
       <div style={{ display: 'flex', height: '600px' }}>
         {/* Video Player */}
-        <div style={{ flex: '2', background: 'black' }}>
+        <div style={{ flex: '2', background: 'black', position: 'relative' }}>
           {stream.status === 'live' && stream.hls_url ? (
             <video
               ref={videoRef}
@@ -274,9 +290,12 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               color: 'white',
               fontSize: '8pt'
             }}>
-              {stream.status === 'scheduled' ? '📅 Stream Scheduled' : '📴 Stream Offline'}
+              {stream.status === 'scheduled' ? 'Stream scheduled' : 'Stream offline'}
             </div>
           )}
+
+          {/* Action Overlay */}
+          <StreamActionOverlay lastEvent={lastActionEvent} />
 
           {/* Stream Info Overlay */}
           <div style={{
@@ -305,7 +324,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                 />
               )}
               <span>{stream.streamer_name}</span>
-              <span>👁️ {stream.viewer_count}</span>
+              <span>VIEWERS: {stream.viewer_count}</span>
             </div>
             <div style={{ fontSize: '7pt', color: '#ccc' }}>
               {stream.tags.map(tag => `#${tag}`).join(' ')}
@@ -331,7 +350,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
               fontSize: '8pt',
               fontWeight: 'bold'
             }}>
-              💬 Live Chat
+              LIVE CHAT
             </div>
 
             {/* Chat Messages */}
@@ -428,6 +447,9 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                 Login to participate in chat
               </div>
             )}
+
+            {/* Stream Actions (paid overlays) */}
+            <StreamActionPanel streamId={streamId} disabled={stream.status !== 'live'} />
           </div>
         )}
       </div>

@@ -437,10 +437,92 @@ Redirecting to vehicle profile...`);
         // Map ALL scraped data to form fields
         const updates: Partial<VehicleFormData> = {};
 
-        // Basic vehicle info
+        const normalizeTitle = (t: string): string => {
+          const s = String(t || '').replace(/\s+/g, ' ').trim();
+          return s.replace(/\s*-\s*\$[\d,]+(?:\.\d{2})?.*$/i, '').trim();
+        };
+
+        const looksLikeContaminatedModel = (s: string): boolean => {
+          const v = String(s || '').trim();
+          if (!v) return false;
+          if (v.length > 70) return true;
+          if (/\$[\d,]+/.test(v)) return true;
+          if (/https?:\/\//i.test(v)) return true;
+          if (/\b(19|20)\d{2}\b/.test(v) && v.split(/\s+/).length >= 3) return true;
+          if (/craigslist|facebook|marketplace|bringatrailer|classic\.com/i.test(v)) return true;
+          return false;
+        };
+
+        const parseTitleIntoFields = (titleRaw: string) => {
+          const title = normalizeTitle(titleRaw);
+          const out: { year?: number; make?: string; model?: string; series?: string; trim?: string; mileage?: number } = {};
+          const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+          if (yearMatch?.[0]) out.year = parseInt(yearMatch[0], 10);
+
+          const afterYear = yearMatch ? title.replace(new RegExp(`\\b${yearMatch[0]}\\b\\s*`, 'i'), '').trim() : title;
+
+          const multiwordMakes = ['Mercedes-Benz', 'Alfa Romeo', 'Aston Martin', 'Rolls-Royce', 'Land Rover', 'Range Rover'];
+          const makes = [
+            ...multiwordMakes,
+            'Ford','Chevrolet','Chevy','GMC','Toyota','Honda','Nissan','Dodge','Jeep','BMW','Mercedes','Audi','Volkswagen','VW','Lexus','Acura','Infiniti','Mazda','Subaru','Mitsubishi','Hyundai','Kia','Volvo','Porsche','Jaguar','Tesla','Genesis','Fiat','Mini','Cadillac','Buick','Pontiac','Oldsmobile','Lincoln','Chrysler'
+          ];
+
+          let make: string | null = null;
+          let rest = afterYear;
+
+          for (const m of makes.sort((a, b) => b.length - a.length)) {
+            const re = new RegExp(`^${m.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b\\s*`, 'i');
+            if (re.test(rest)) {
+              make = m;
+              rest = rest.replace(re, '').trim();
+              break;
+            }
+          }
+
+          if (make) {
+            const lower = make.toLowerCase();
+            out.make = lower === 'chevy' ? 'Chevrolet' : lower === 'vw' ? 'Volkswagen' : make;
+          }
+
+          // Mileage hints like "42k mile" in title
+          const km = title.match(/\b(\d{1,3}(?:,\d{3})?)\s*[kK]\s*[-\s]*mile\b/);
+          if (km?.[1]) out.mileage = parseInt(km[1].replace(/,/g, ''), 10) * 1000;
+
+          const tokens = rest.split(/\s+/).filter(Boolean);
+          if (tokens.length > 0) {
+            const twoWordModels = new Set(['Range Rover', 'Grand Cherokee', 'Silverado 1500', 'Sierra 1500', 'F 150']);
+            const candidate2 = tokens.length >= 2 ? `${tokens[0]} ${tokens[1]}` : null;
+            const candidate3 = tokens.length >= 3 ? `${tokens[0]} ${tokens[1]} ${tokens[2]}` : null;
+
+            const model =
+              (candidate3 && twoWordModels.has(candidate3)) ? candidate3 :
+              (candidate2 && twoWordModels.has(candidate2)) ? candidate2 :
+              tokens[0];
+
+            out.model = model;
+
+            const remainder = rest.slice(model.length).trim();
+            if (remainder) out.trim = remainder.length > 80 ? remainder.slice(0, 80) : remainder;
+          }
+
+          return out;
+        };
+
+        const parsedTitle = parseTitleIntoFields(scrapedData.title || '');
+
+        // Basic vehicle info (prefer clean extracted fields, fall back to title parsing)
         if (scrapedData.make) updates.make = scrapedData.make;
-        if (scrapedData.model) updates.model = scrapedData.model;
+        else if (parsedTitle.make) updates.make = parsedTitle.make;
+
+        if (scrapedData.model && !looksLikeContaminatedModel(scrapedData.model)) {
+          updates.model = scrapedData.model;
+        } else if (parsedTitle.model) {
+          updates.model = parsedTitle.model;
+        }
+
         if (scrapedData.year) updates.year = parseInt(scrapedData.year);
+        else if (parsedTitle.year) updates.year = parsedTitle.year;
+
         if (scrapedData.vin) updates.vin = scrapedData.vin;
         
         // Mileage (handle both string and number)
@@ -449,6 +531,8 @@ Redirecting to vehicle profile...`);
             ? scrapedData.mileage 
             : String(scrapedData.mileage);
           updates.mileage = parseInt(mileageStr.replace(/,/g, ''));
+        } else if (typeof parsedTitle.mileage === 'number') {
+          updates.mileage = parsedTitle.mileage;
         }
         
         // Appearance
@@ -473,7 +557,13 @@ Redirecting to vehicle profile...`);
         if (scrapedData.title_status) updates.title_status = scrapedData.title_status;
         
         // Location & Listing Metadata
-        if (scrapedData.location) updates.location = scrapedData.location;
+        if (scrapedData.location) {
+          updates.location = scrapedData.location;
+          updates.listing_location = scrapedData.location;
+        }
+        if (scrapedData.title) {
+          updates.listing_title = scrapedData.title;
+        }
         if (scrapedData.listing_url) {
           updates.listing_url = scrapedData.listing_url;
         } else if (!updates.listing_url) {
@@ -530,6 +620,9 @@ Redirecting to vehicle profile...`);
         
         // Advanced fields from description parsing
         if (scrapedData.trim) updates.trim = scrapedData.trim;
+        else if (parsedTitle.trim && !updates.trim) updates.trim = parsedTitle.trim;
+        if ((scrapedData as any).series) updates.series = (scrapedData as any).series;
+        else if (parsedTitle.series) updates.series = parsedTitle.series;
         if (scrapedData.transmission_subtype) updates.transmission = scrapedData.transmission_subtype;
         
         // Build comprehensive notes with ALL extracted data

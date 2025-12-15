@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { UserInteractionService } from '../services/userInteractionService';
-import VehicleSearch from '../components/VehicleSearch';
 
 interface HypeVehicle {
   id: string;
@@ -31,6 +30,11 @@ interface HypeVehicle {
   is_for_sale?: boolean;
   all_images?: Array<{ id: string; url: string; is_primary: boolean }>;
   origin_metadata?: any;
+  discovery_url?: string | null;
+  discovery_source?: string | null;
+  profile_origin?: string | null;
+  origin_organization_id?: string | null;
+  listing_start_date?: string | null;
 }
 
 type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
@@ -209,8 +213,6 @@ interface FilterState {
   hideSold: boolean;
   zipCode: string;
   radiusMiles: number;
-  showPrices: boolean;
-  showDetailOverlay: boolean;
   showPending: boolean;
 }
 
@@ -228,8 +230,6 @@ const DEFAULT_FILTERS: FilterState = {
   hideSold: true,
   zipCode: '',
   radiusMiles: 50,
-  showPrices: true,
-  showDetailOverlay: true,
   showPending: false
 };
 
@@ -243,11 +243,12 @@ const CursorHomepage: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortBy>('newest');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showFilters, setShowFilters] = useState(true);
-  const [timePeriodCollapsed, setTimePeriodCollapsed] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [infoDense, setInfoDense] = useState<boolean>(false);
+  const [cardMinWidth, setCardMinWidth] = useState<number>(200); // grid density control
   const [stats, setStats] = useState({
     totalBuilds: 0,
     totalValue: 0,
@@ -258,6 +259,7 @@ const CursorHomepage: React.FC = () => {
   const [filterBarMinimized, setFilterBarMinimized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [orgWebsitesById, setOrgWebsitesById] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
 
@@ -482,7 +484,9 @@ const CursorHomepage: React.FC = () => {
           id, year, make, model, title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
-          is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id
+          is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
+          discovery_url, discovery_source, profile_origin,
+          listing_start_date
         `)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
@@ -564,6 +568,34 @@ const CursorHomepage: React.FC = () => {
 
       const sorted = processed.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
       setFeedVehicles(sorted);
+
+      // Batch-load organization websites for favicon stamps (no per-card calls).
+      try {
+        const orgIds = Array.from(
+          new Set(
+            (processed || [])
+              .map((x: any) => x?.origin_organization_id)
+              .filter((id: any) => typeof id === 'string' && id.length > 0)
+          )
+        );
+        if (orgIds.length > 0) {
+          const { data: orgs, error: orgErr } = await supabase
+            .from('businesses')
+            .select('id, website')
+            .in('id', orgIds);
+          if (!orgErr && Array.isArray(orgs)) {
+            const next: Record<string, string> = {};
+            for (const o of orgs as any[]) {
+              if (o?.id && typeof o?.website === 'string' && o.website.trim()) {
+                next[o.id] = o.website.trim();
+              }
+            }
+            setOrgWebsitesById(next);
+          }
+        }
+      } catch {
+        // ignore - favicon stamps can fall back to discovery_url / source mapping
+      }
 
     } catch (error: any) {
       console.error('❌ Unexpected error loading feed:', error);
@@ -776,18 +808,13 @@ const CursorHomepage: React.FC = () => {
         margin: '0 auto',
         padding: 'var(--space-4)'
       }}>
-        {/* Unified Header with global search */}
+        {/* Unified Header */}
         <div style={{
           background: 'var(--white)',
           border: '2px solid var(--border)',
           padding: 'var(--space-3)',
           marginBottom: 'var(--space-4)'
         }}>
-          {/* Search Bar */}
-          <div style={{ marginBottom: 'var(--space-3)' }}>
-            <VehicleSearch />
-          </div>
-
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -824,40 +851,23 @@ const CursorHomepage: React.FC = () => {
                 const totalValue = filteredVehicles.reduce((sum, v) => sum + (v.display_price || 0), 0);
                 const avgValue = filteredVehicles.length > 0 ? totalValue / filteredVehicles.length : 0;
                 const forSaleCount = filteredVehicles.filter(v => v.is_for_sale).length;
-                const totalImages = filteredVehicles.reduce((sum, v) => sum + (v.image_count || 0), 0);
-                const totalEvents = filteredVehicles.reduce((sum, v) => sum + (v.event_count || 0), 0);
-                const totalViews = filteredVehicles.reduce((sum, v) => sum + (v.view_count || 0), 0);
                 
                 return (
                   <>
-                    {totalValue > 0 && (
+                    {/* Only show these in Info-dense view so the default header stays clean. */}
+                    {infoDense && totalValue > 0 && (
                       <span>
                         <strong style={{ color: 'var(--text)' }}>{formatCurrency(totalValue)}</strong> total value
                       </span>
                     )}
-                    {avgValue > 0 && filteredVehicles.length > 1 && (
+                    {infoDense && avgValue > 0 && filteredVehicles.length > 1 && (
                       <span>
                         <strong style={{ color: 'var(--text)' }}>{formatCurrency(avgValue)}</strong> avg
                       </span>
                     )}
-                    {forSaleCount > 0 && (
+                    {infoDense && forSaleCount > 0 && (
                       <span>
                         <strong style={{ color: 'var(--text)' }}>{forSaleCount}</strong> for sale
-                      </span>
-                    )}
-                    {totalImages > 0 && (
-                      <span>
-                        <strong style={{ color: 'var(--text)' }}>{totalImages.toLocaleString()}</strong> images
-                      </span>
-                    )}
-                    {totalEvents > 0 && (
-                      <span>
-                        <strong style={{ color: 'var(--text)' }}>{totalEvents.toLocaleString()}</strong> events
-                      </span>
-                    )}
-                    {totalViews > 0 && (
-                      <span>
-                        <strong style={{ color: 'var(--text)' }}>{totalViews.toLocaleString()}</strong> views
                       </span>
                     )}
                   </>
@@ -875,49 +885,6 @@ const CursorHomepage: React.FC = () => {
             borderTop: '1px solid var(--border)',
             paddingTop: 'var(--space-2)'
           }}>
-            {/* Time Period Selector - Collapsible */}
-            <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-              {[
-                { id: 'ALL', label: 'All Time' },
-                { id: 'AT', label: 'Active' },
-                { id: '1Y', label: 'Yr' },
-                { id: 'Q', label: 'Qtr' },
-                { id: 'W', label: 'Wk' },
-                { id: 'D', label: 'Day' },
-                { id: 'RT', label: 'Live' }
-              ].map(period => {
-                const isSelected = timePeriod === period.id;
-                const shouldShow = !timePeriodCollapsed || isSelected;
-                
-                return (
-                  <button
-                    key={period.id}
-                    onClick={() => {
-                      if (isSelected) {
-                        setTimePeriodCollapsed(!timePeriodCollapsed);
-                      } else {
-                        handleTimePeriodChange(period.id as TimePeriod);
-                        setTimePeriodCollapsed(false);
-                      }
-                    }}
-                    style={{
-                      background: isSelected ? 'var(--grey-600)' : 'var(--white)',
-                      color: isSelected ? 'var(--white)' : 'var(--text)',
-                      border: '1px solid var(--border)',
-                      padding: '3px 6px',
-                      fontSize: '7pt',
-                      cursor: 'pointer',
-                      fontWeight: isSelected ? 'bold' : 'normal',
-                      transition: 'all 0.12s',
-                      display: shouldShow ? 'inline-block' : 'none'
-                    }}
-                  >
-                    {period.label}
-                  </button>
-                );
-              })}
-            </div>
-
             {/* View Mode Switcher */}
             <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
               {(['gallery', 'grid', 'technical'] as ViewMode[]).map(mode => (
@@ -938,6 +905,21 @@ const CursorHomepage: React.FC = () => {
                   {mode.charAt(0).toUpperCase() + mode.slice(1)}
                 </button>
               ))}
+            </div>
+
+            {/* Card Density Slider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '8pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Card size</span>
+              <input
+                type="range"
+                min={140}
+                max={260}
+                step={10}
+                value={cardMinWidth}
+                onChange={(e) => setCardMinWidth(parseInt(e.target.value, 10))}
+                style={{ width: '160px' }}
+                aria-label="Card size"
+              />
             </div>
 
             {/* Global Search */}
@@ -1034,12 +1016,37 @@ const CursorHomepage: React.FC = () => {
               gap: '12px', 
               fontSize: '8pt' 
             }}>
+              {/* Updated / Recency */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Updated</label>
+                <select
+                  value={timePeriod}
+                  onChange={(e) => handleTimePeriodChange(e.target.value as TimePeriod)}
+                  style={{
+                    width: '100%',
+                    padding: '4px 6px',
+                    border: '1px solid var(--border)',
+                    fontSize: '8pt'
+                  }}
+                >
+                  <option value="AT">Active</option>
+                  <option value="ALL">All Time</option>
+                  <option value="1Y">Last Year</option>
+                  <option value="Q">Last Quarter</option>
+                  <option value="W">Last Week</option>
+                  <option value="D">Last Day</option>
+                  <option value="RT">Live (Last Hour)</option>
+                </select>
+              </div>
+
               {/* Year Range */}
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Year Range</label>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     placeholder="Min"
                     value={filters.yearMin || ''}
                     onChange={(e) => setFilters({...filters, yearMin: e.target.value ? parseInt(e.target.value) : null})}
@@ -1052,7 +1059,9 @@ const CursorHomepage: React.FC = () => {
                   />
                   <span>–</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     placeholder="Max"
                     value={filters.yearMax || ''}
                     onChange={(e) => setFilters({...filters, yearMax: e.target.value ? parseInt(e.target.value) : null})}
@@ -1071,7 +1080,9 @@ const CursorHomepage: React.FC = () => {
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Price Range</label>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     placeholder="Min"
                     value={filters.priceMin || ''}
                     onChange={(e) => setFilters({...filters, priceMin: e.target.value ? parseInt(e.target.value) : null})}
@@ -1084,7 +1095,9 @@ const CursorHomepage: React.FC = () => {
                   />
                   <span>–</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     placeholder="Max"
                     value={filters.priceMax || ''}
                     onChange={(e) => setFilters({...filters, priceMax: e.target.value ? parseInt(e.target.value) : null})}
@@ -1184,22 +1197,15 @@ const CursorHomepage: React.FC = () => {
                   />
                   <span>Show Pending Vehicles</span>
                 </label>
-                <div style={{ marginTop: '6px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '2px' }}>
-                    <input
-                      type="checkbox"
-                      checked={filters.showPrices}
-                      onChange={(e) => setFilters({ ...filters, showPrices: e.target.checked })}
-                    />
-                    <span>Show Prices</span>
-                  </label>
+
+                <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={filters.showDetailOverlay}
-                      onChange={(e) => setFilters({ ...filters, showDetailOverlay: e.target.checked })}
+                      checked={infoDense}
+                      onChange={(e) => setInfoDense(e.target.checked)}
                     />
-                    <span>Show Detail Card</span>
+                    <span>Info-dense</span>
                   </label>
                 </div>
               </div>
@@ -1683,8 +1689,11 @@ const CursorHomepage: React.FC = () => {
                   key={vehicle.id}
                   vehicle={vehicle}
                   viewMode="gallery"
-                  showPriceOverlay={filters.showPrices}
-                  showDetailOverlay={filters.showDetailOverlay}
+                  infoDense={infoDense}
+                  sourceStampUrl={
+                    (vehicle as any)?.discovery_url ||
+                    ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
+                  }
                 />
             ))}
           </div>
@@ -1694,7 +1703,7 @@ const CursorHomepage: React.FC = () => {
         {viewMode === 'grid' && (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinWidth}px, 1fr))`,
             gap: '0'
         }}>
             {filteredVehicles.map((vehicle) => (
@@ -1702,8 +1711,11 @@ const CursorHomepage: React.FC = () => {
                 key={vehicle.id}
                 vehicle={vehicle}
                 viewMode="grid"
-                showPriceOverlay={filters.showPrices}
-                showDetailOverlay={filters.showDetailOverlay}
+                infoDense={infoDense}
+                sourceStampUrl={
+                  (vehicle as any)?.discovery_url ||
+                  ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
+                }
               />
           ))}
         </div>

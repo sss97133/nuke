@@ -54,6 +54,8 @@ export interface VehicleFormData {
   listing_updated_at?: string;
   listing_source?: string;
   listing_url?: string;
+  listing_title?: string;
+  listing_location?: string;
 
   // Ownership & History
   mileage?: number;
@@ -79,6 +81,7 @@ export interface VehicleFormData {
   notes?: string;
   description?: string;
   trim?: string;
+  series?: string;
   status?: 'draft' | 'active' | 'archived';
 
   // Form-specific fields

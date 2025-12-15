@@ -80,6 +80,111 @@ serve(async (req) => {
     console.log('🔄 Processing Craigslist queue...')
     console.log(`Using user_id: ${importUserId}`)
 
+    const coalesceString = (...vals: any[]) => {
+      for (const v of vals) {
+        if (typeof v === 'string' && v.trim()) return v.trim()
+      }
+      return null
+    }
+
+    const safeIso = (v: any): string | null => {
+      if (!v) return null
+      try {
+        const d = new Date(String(v))
+        if (Number.isNaN(d.getTime())) return null
+        return d.toISOString()
+      } catch {
+        return null
+      }
+    }
+
+    const extractVinFromText = (text: string | null | undefined): string | null => {
+      const s = (text || '').toUpperCase()
+      // Strict VIN charset (no I/O/Q)
+      const m = s.match(/\b([A-HJ-NPR-Z0-9]{17})\b/)
+      return m?.[1] || null
+    }
+
+    const extractProvenanceSnippets = (text: string | null | undefined): string[] => {
+      const s = (text || '').replace(/\s+/g, ' ').trim()
+      if (!s) return []
+      const out: string[] = []
+      const patterns: RegExp[] = [
+        /\bsecond owner\b[^.]{0,180}\./i,
+        /\bthird owner\b[^.]{0,180}\./i,
+        /\bowned\b[^.]{0,180}\b(since|for)\b[^.]{0,80}\./i,
+        /\b(purchased|bought)\b[^.]{0,80}\bnew\b[^.]{0,80}\./i,
+        /\buncle\b[^.]{0,180}\./i,
+      ]
+      for (const re of patterns) {
+        const m = s.match(re)
+        if (m?.[0]) out.push(m[0].trim())
+      }
+      return Array.from(new Set(out.map((x) => x.trim()))).filter(Boolean).slice(0, 5)
+    }
+
+    const writeExtractionMetadata = async (args: {
+      vehicle_id: string
+      source_url: string
+      extraction_method: string
+      scraper_version: string
+      scraped_data: any
+      fields: Array<{ field_name: string; field_value: string | null; confidence?: number }>
+    }) => {
+      const rows = (args.fields || [])
+        .filter((f) => f.field_name && (f.field_value ?? '') !== '')
+        .map((f) => ({
+          vehicle_id: args.vehicle_id,
+          field_name: f.field_name,
+          field_value: f.field_value,
+          extraction_method: args.extraction_method,
+          scraper_version: args.scraper_version,
+          source_url: args.source_url,
+          confidence_score: typeof f.confidence === 'number' ? f.confidence : 0.8,
+          raw_extraction_data: args.scraped_data ?? null,
+        }))
+      if (rows.length === 0) return
+      try {
+        await supabase.from('extraction_metadata').insert(rows)
+      } catch (e) {
+        console.warn('extraction_metadata insert failed (non-fatal):', (e as any)?.message || e)
+      }
+    }
+
+    const upsertExternalListing = async (args: {
+      vehicle_id: string
+      listing_url: string
+      listing_status: string
+      metadata: any
+    }) => {
+      if (!args.listing_url) return
+      try {
+        const url = String(args.listing_url)
+        const listingId =
+          url.match(/\/(\d+)\.html(?:$|\?)/)?.[1] ||
+          url.match(/[?&]postingID=(\d+)/i)?.[1] ||
+          null
+
+        await supabase
+          .from('external_listings')
+          .upsert(
+            {
+              vehicle_id: args.vehicle_id,
+              organization_id: null,
+              platform: 'craigslist',
+              listing_url: args.listing_url,
+              listing_id: listingId,
+              listing_status: args.listing_status,
+              metadata: args.metadata ?? {},
+              updated_at: new Date().toISOString(),
+            } as any,
+            { onConflict: 'vehicle_id,platform,listing_id' }
+          )
+      } catch (e) {
+        console.warn('external_listings upsert failed (non-fatal):', (e as any)?.message || e)
+      }
+    }
+
     // Get pending listings from queue
     const { data: queueItems, error: queueError } = await supabase
       .from('craigslist_listing_queue')
@@ -210,6 +315,20 @@ serve(async (req) => {
         // Extract and validate vehicle data
         const data = scrapeData.data
         console.log(`[DEBUG] Raw extracted data:`, JSON.stringify(data, null, 2))
+
+        // Canonical listing timestamps (for accurate listing age in UI).
+        // Keep legacy `posted_date` for downstream code, but also populate `listing_posted_at` / `listing_updated_at`.
+        const postedIso = safeIso((data as any)?.listing_posted_at || (data as any)?.posted_date)
+        const updatedIso = safeIso((data as any)?.listing_updated_at || (data as any)?.updated_date)
+        ;(data as any).listing_posted_at = postedIso
+        ;(data as any).listing_updated_at = updatedIso
+
+        // Normalize raw description text + fallback VIN/provenance extraction.
+        const rawDesc = coalesceString((data as any)?.description, (data as any)?.raw_description, (data as any)?.posting_body)
+        if (!(data as any)?.vin) {
+          const vinFromText = extractVinFromText(rawDesc)
+          if (vinFromText) (data as any).vin = vinFromText
+        }
         
         let make = (data.make || '').toLowerCase()
         let model = (data.model || '').toLowerCase() || ''
@@ -350,12 +469,24 @@ serve(async (req) => {
               model: finalModel,
               discovery_source: 'craigslist_scrape',
               discovery_url: queueItem.listing_url,
+              listing_source: 'craigslist',
+              listing_url: queueItem.listing_url,
+              listing_posted_at: (data as any)?.listing_posted_at || null,
+              listing_updated_at: (data as any)?.listing_updated_at || null,
+              listing_title: (data as any)?.title || null,
+              listing_location: (data as any)?.location || null,
               profile_origin: 'craigslist_scrape',
               origin_metadata: {
                 listing_url: queueItem.listing_url,
-                imported_at: new Date().toISOString()
+                imported_at: new Date().toISOString(),
+                listing_title: (data as any)?.title || null,
+                listing_location: (data as any)?.location || null,
+                listing_posted_at: (data as any)?.listing_posted_at || null,
+                listing_updated_at: (data as any)?.listing_updated_at || null,
+                raw_description: rawDesc || null,
+                scraper: 'craigslist-queue',
+                scraper_version: 'v1'
               },
-              notes: data.description || null,
               is_public: true,
               status: 'active',
               uploaded_by: importUserId
@@ -383,6 +514,53 @@ serve(async (req) => {
             vehicleId = newVehicle.id
             isNew = true
             stats.created++
+
+            // Persist extraction provenance for the listing (raw + parsed fields).
+            const provenanceSnippets = extractProvenanceSnippets(rawDesc)
+            await writeExtractionMetadata({
+              vehicle_id: vehicleId,
+              source_url: queueItem.listing_url,
+              extraction_method: 'craigslist_scraper',
+              scraper_version: 'v1',
+              scraped_data: data,
+              fields: [
+                { field_name: 'listing_title', field_value: (data as any)?.title || null, confidence: 0.9 },
+                { field_name: 'listing_location', field_value: (data as any)?.location || null, confidence: 0.7 },
+                { field_name: 'listing_posted_at', field_value: (data as any)?.listing_posted_at || null, confidence: (data as any)?.listing_posted_at ? 0.9 : 0.4 },
+                { field_name: 'listing_updated_at', field_value: (data as any)?.listing_updated_at || null, confidence: (data as any)?.listing_updated_at ? 0.8 : 0.4 },
+                { field_name: 'year', field_value: yearNum ? String(yearNum) : null, confidence: yearNum ? 0.9 : 0.4 },
+                { field_name: 'make', field_value: finalMake ? String(finalMake) : null, confidence: finalMake ? 0.8 : 0.4 },
+                { field_name: 'model', field_value: finalModel ? String(finalModel) : null, confidence: finalModel ? 0.7 : 0.4 },
+                { field_name: 'mileage', field_value: typeof (data as any)?.mileage === 'number' ? String((data as any).mileage) : null, confidence: typeof (data as any)?.mileage === 'number' ? 0.7 : 0.4 },
+                { field_name: 'vin', field_value: (data as any)?.vin ? String((data as any).vin) : null, confidence: (data as any)?.vin ? 0.6 : 0.3 },
+                { field_name: 'asking_price', field_value: (data as any)?.asking_price ? String((data as any).asking_price) : null, confidence: (data as any)?.asking_price ? 0.7 : 0.4 },
+                { field_name: 'raw_listing_description', field_value: rawDesc || null, confidence: rawDesc ? 0.85 : 0.2 },
+                ...provenanceSnippets.map((p) => ({ field_name: 'provenance_snippet', field_value: p, confidence: 0.7 })),
+              ],
+            })
+
+            // Store a queryable external listing row (enables recrawl/sync tooling).
+            await upsertExternalListing({
+              vehicle_id: vehicleId,
+              listing_url: queueItem.listing_url,
+              listing_status: 'active',
+              metadata: {
+                source: 'craigslist',
+                listing_url: queueItem.listing_url,
+                title: (data as any)?.title || null,
+                location: (data as any)?.location || null,
+                listing_posted_at: (data as any)?.listing_posted_at || null,
+                listing_updated_at: (data as any)?.listing_updated_at || null,
+                asking_price: (data as any)?.asking_price || (data as any)?.price || null,
+                mileage: (data as any)?.mileage || null,
+                vin: (data as any)?.vin || null,
+                raw_description: rawDesc || null,
+                provenance_snippets: provenanceSnippets,
+                scraped_at: new Date().toISOString(),
+                scraper: 'craigslist-queue',
+                scraper_version: 'v1',
+              }
+            })
 
             // FORENSIC ENRICHMENT (replaces manual field assignment)
             console.log(`[DEBUG] Before forensic enrichment, vehicle data:`, { vehicleId, make: data.make, model: data.model, posted_date: data.posted_date })
@@ -442,23 +620,39 @@ if (data.posted_date) {
                     eventDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
                   }
                 }
-await supabase
+
+                // Idempotency: avoid duplicate "Listed on Craigslist" events for the same listing URL.
+                const { data: existingEvent } = await supabase
                   .from('timeline_events')
-                  .insert({
-                    vehicle_id: vehicleId,
-                    user_id: importUserId,
-                    event_type: 'discovery',
-                    source: 'craigslist',
-                    title: `Listed on Craigslist`,
-                    event_date: eventDate,
-                    description: `Vehicle listed for sale on Craigslist${data.asking_price ? ` for $${data.asking_price.toLocaleString()}` : ''}`,
-                    metadata: {
-                      listing_url: queueItem.listing_url,
-                      asking_price: data.asking_price || data.price,
-                      location: data.location,
-                      posted_date: data.posted_date
-                    }
-                  })
+                  .select('id')
+                  .eq('vehicle_id', vehicleId)
+                  .eq('event_type', 'discovery')
+                  .eq('source', 'craigslist')
+                  .eq('metadata->>listing_url', queueItem.listing_url)
+                  .limit(1)
+                  .maybeSingle()
+
+                if (!existingEvent?.id) {
+                  await supabase
+                    .from('timeline_events')
+                    .insert({
+                      vehicle_id: vehicleId,
+                      user_id: importUserId,
+                      event_type: 'discovery',
+                      source: 'craigslist',
+                      title: `Listed on Craigslist`,
+                      event_date: eventDate,
+                      description: `Vehicle listed for sale on Craigslist${data.asking_price ? ` for $${data.asking_price.toLocaleString()}` : ''}`,
+                      metadata: {
+                        listing_url: queueItem.listing_url,
+                        asking_price: data.asking_price || data.price,
+                        location: data.location,
+                        posted_date: data.posted_date,
+                        listing_posted_at: (data as any)?.listing_posted_at || null,
+                        listing_updated_at: (data as any)?.listing_updated_at || null,
+                      }
+                    })
+                }
 } catch (timelineErr) {
                 console.warn(`  ⚠️ Timeline event creation error:`, timelineErr)
 }
@@ -589,9 +783,54 @@ await supabase
             .from('vehicles')
             .update({
               asking_price: data.asking_price || data.price || null,
-              mileage: data.mileage || null
+              mileage: data.mileage || null,
+              listing_source: 'craigslist',
+              listing_url: queueItem.listing_url,
+              listing_posted_at: (data as any)?.listing_posted_at || null,
+              listing_updated_at: (data as any)?.listing_updated_at || null,
+              listing_title: (data as any)?.title || null,
+              listing_location: (data as any)?.location || null,
             })
             .eq('id', vehicleId)
+
+          await writeExtractionMetadata({
+            vehicle_id: vehicleId,
+            source_url: queueItem.listing_url,
+            extraction_method: 'craigslist_scraper',
+            scraper_version: 'v1',
+            scraped_data: data,
+            fields: [
+              { field_name: 'listing_title', field_value: (data as any)?.title || null, confidence: 0.8 },
+              { field_name: 'listing_location', field_value: (data as any)?.location || null, confidence: 0.6 },
+              { field_name: 'listing_posted_at', field_value: (data as any)?.listing_posted_at || null, confidence: (data as any)?.listing_posted_at ? 0.8 : 0.4 },
+              { field_name: 'listing_updated_at', field_value: (data as any)?.listing_updated_at || null, confidence: (data as any)?.listing_updated_at ? 0.7 : 0.4 },
+              { field_name: 'vin', field_value: (data as any)?.vin ? String((data as any).vin) : null, confidence: (data as any)?.vin ? 0.6 : 0.3 },
+              { field_name: 'mileage', field_value: typeof (data as any)?.mileage === 'number' ? String((data as any).mileage) : null, confidence: typeof (data as any)?.mileage === 'number' ? 0.7 : 0.4 },
+              { field_name: 'asking_price', field_value: (data as any)?.asking_price ? String((data as any).asking_price) : null, confidence: (data as any)?.asking_price ? 0.7 : 0.4 },
+              { field_name: 'raw_listing_description', field_value: rawDesc || null, confidence: rawDesc ? 0.8 : 0.2 },
+            ],
+          })
+
+          await upsertExternalListing({
+            vehicle_id: vehicleId,
+            listing_url: queueItem.listing_url,
+            listing_status: 'active',
+            metadata: {
+              source: 'craigslist',
+              listing_url: queueItem.listing_url,
+              title: (data as any)?.title || null,
+              location: (data as any)?.location || null,
+              listing_posted_at: (data as any)?.listing_posted_at || null,
+              listing_updated_at: (data as any)?.listing_updated_at || null,
+              asking_price: (data as any)?.asking_price || (data as any)?.price || null,
+              mileage: (data as any)?.mileage || null,
+              vin: (data as any)?.vin || null,
+              raw_description: rawDesc || null,
+              scraped_at: new Date().toISOString(),
+              scraper: 'craigslist-queue',
+              scraper_version: 'v1',
+            }
+          })
 
           stats.updated++
         }
@@ -725,6 +964,13 @@ const priceMatch = data.title.match(/\$\s*([\d,]+)/)
     if (locationMatch) data.location = locationMatch[1].trim()
   }
 
+  // Prefer Craigslist's map address/location when present (more precise than title parentheses).
+  const mapAddr =
+    (doc.querySelector('#mapaddress')?.textContent || doc.querySelector('.mapaddress')?.textContent || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  if (mapAddr) data.location = mapAddr
+
   const fullText = doc.body?.textContent || ''
 // Extract posted date from HTML
   // Craigslist shows "Posted 2025-11-27 15:00" in the HTML
@@ -742,23 +988,28 @@ const priceMatch = data.title.match(/\$\s*([\d,]+)/)
   
   let postedDateFound = false
   
-  // First try: Look for time elements with datetime attribute (prioritize the "Posted" one)
+  // First try: Look for time elements with datetime attribute (prioritize the "posted" one, not "updated")
   // The HTML has: <time class="date timeago" datetime="2025-11-27T15:00:37-0800">
   const timeElements = doc.querySelectorAll('time.date, time[datetime]')
+  let firstAny: string | null = null
+  let firstPosted: string | null = null
   for (const dateElement of timeElements) {
     const datetime = dateElement.getAttribute('datetime')
-    if (datetime) {
-      try {
-        // Parse datetime which may include timezone like "2025-11-27T15:00:37-0800"
-        const parsedDate = new Date(datetime)
-        if (!isNaN(parsedDate.getTime())) {
-          data.posted_date = parsedDate.toISOString()
-          postedDateFound = true
-break
-        }
-      } catch (e) {
-        // Continue to next element
+    if (!datetime) continue
+    const parentText = (dateElement?.parentElement?.textContent || '').toLowerCase()
+    if (!firstAny) firstAny = datetime
+    if (!firstPosted && parentText.includes('posted')) firstPosted = datetime
+  }
+  const chosen = firstPosted || firstAny
+  if (chosen) {
+    try {
+      const parsedDate = new Date(chosen)
+      if (!isNaN(parsedDate.getTime())) {
+        data.posted_date = parsedDate.toISOString()
+        postedDateFound = true
       }
+    } catch (e) {
+      // Continue to fallbacks
     }
   }
   
@@ -867,7 +1118,16 @@ const attrGroups = doc.querySelectorAll('.attrgroup')
   
   const descElement = doc.querySelector('#postingbody')
   if (descElement) {
-    data.description = descElement.textContent.trim().substring(0, 5000)
+    data.description = descElement.textContent.replace(/QR Code Link to This Post\s*/i, '').trim().substring(0, 5000)
+  }
+
+  // Canonical keys for UI: listing_posted_at mirrors posted_date for Craigslist.
+  if (data.posted_date && !data.listing_posted_at) data.listing_posted_at = data.posted_date
+
+  // Best-effort VIN extraction from description if present.
+  if (!data.vin && typeof data.description === 'string') {
+    const vinMatch = data.description.toUpperCase().match(/\b([A-HJ-NPR-Z0-9]{17})\b/)
+    if (vinMatch?.[1]) data.vin = vinMatch[1]
   }
 // Comprehensive image extraction - multiple methods
   const images: string[] = []

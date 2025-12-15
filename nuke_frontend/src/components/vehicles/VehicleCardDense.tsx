@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { FaviconIcon } from '../common/FaviconIcon';
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -36,13 +37,15 @@ interface VehicleCardDenseProps {
     all_images?: Array<{ id: string; url: string; is_primary: boolean }>;
     tier?: string;
     tier_label?: string;
-    profile_origin?: string; // 'bat_import', 'url_scraper', 'user_upload', etc.
+    profile_origin?: string | null; // 'bat_import', 'url_scraper', 'user_upload', etc.
     activity_7d?: number; // Recent activity (timeline events in last 7 days)
     receipt_count?: number; // Number of receipts (build documentation)
     ownership_verified?: boolean; // Has verified ownership records
     listing_start_date?: string; // When listing went live (for auctions, especially BAT)
     // Optional: precomputed display price (avoid per-card pricing RPCs on feed)
     display_price?: number;
+    discovery_url?: string | null;
+    discovery_source?: string | null;
   };
   viewMode?: 'list' | 'gallery' | 'grid';
   showSocial?: boolean;
@@ -51,6 +54,10 @@ interface VehicleCardDenseProps {
   showPriceOverlay?: boolean;
   /** Controls whether the semi-transparent detail overlay is shown on image */
   showDetailOverlay?: boolean;
+  /** Home feed: compact vs info-dense card details */
+  infoDense?: boolean;
+  /** Optional URL to use for favicon/source stamp (listing source or org website). */
+  sourceStampUrl?: string;
 }
 
 const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
@@ -59,11 +66,41 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showSocial = false,
   showPriceChange = false,
   showPriceOverlay = true,
-  showDetailOverlay = true
+  showDetailOverlay = true,
+  infoDense = false,
+  sourceStampUrl
 }) => {
+  // Local CSS for badge animations. We scope keyframes to avoid collisions
+  // (the design system defines multiple `@keyframes pulse` variations).
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const id = 'nuke-vehicle-card-dense-animations-v1';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.textContent = `
+      @keyframes nuke-auction-pulse {
+        0%, 100% { transform: scale(1); filter: saturate(1); }
+        50% { transform: scale(1.05); filter: saturate(1.15); }
+      }
+      @keyframes nuke-badge-pop {
+        0% { transform: scale(1); }
+        35% { transform: scale(1.22); }
+        65% { transform: scale(0.96); }
+        100% { transform: scale(1); }
+      }
+      @keyframes nuke-badge-ticker {
+        0%, 40% { transform: translateX(0%); }
+        50%, 90% { transform: translateX(-50%); }
+        100% { transform: translateX(0%); }
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
+
   // PERF: Never do per-card network calls on the feed.
   // Use the already-available vehicle fields (or precomputed display_price) to render pricing synchronously.
-  const { displayPrice, priceLabel, priceBadge } = React.useMemo(() => {
+  const { displayPrice } = React.useMemo(() => {
     const v: any = vehicle as any;
     const priceValue =
       (typeof v.display_price === 'number' && Number.isFinite(v.display_price) && v.display_price > 0) ? v.display_price :
@@ -73,13 +110,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       (typeof v.purchase_price === 'number' && v.purchase_price > 0) ? v.purchase_price :
       null;
 
-    const label =
-      (typeof v.sale_price === 'number' && v.sale_price > 0) ? 'Sold' :
-      (typeof v.asking_price === 'number' && v.asking_price > 0) ? 'Asking' :
-      (typeof v.current_value === 'number' && v.current_value > 0) ? 'Estimated' :
-      (typeof v.purchase_price === 'number' && v.purchase_price > 0) ? 'Purchased' :
-      '';
-
     const formatted = priceValue ? new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -87,19 +117,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       maximumFractionDigits: 0,
     }).format(priceValue) : '—';
 
-    const badge = (() => {
-      const raw = String(label || '').trim();
-      const l = raw.toLowerCase();
-      if (!raw) return '';
-      if (l.includes('sold')) return 'SOLD';
-      if (l.includes('asking')) return 'ASKING';
-      if (l.includes('estimated')) return 'EST';
-      if (l.includes('purchased')) return 'PURCHASE';
-      if (l.includes('msrp')) return 'MSRP';
-      return raw.toUpperCase();
-    })();
-
-    return { displayPrice: formatted, priceLabel: label, priceBadge: badge };
+    return { displayPrice: formatted };
   }, [vehicle]);
 
   const formatPrice = (price?: number) => {
@@ -110,22 +128,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(price);
-  };
-
-  const formatTimeAgo = (dateString?: string) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMs = now.getTime() - date.getTime();
-    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-
-    // Show minutes for anything less than 1 hour
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
-    return `${Math.floor(diffInHours / 168)}w ago`;
   };
 
   // Calculate alphabet-based tier (F, E, D, C, B, A, S, SSS)
@@ -232,15 +234,127 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return 'E';
   };
 
+  const normalizeTierLabel = (raw: any): string | null => {
+    const s = typeof raw === 'string' ? raw.trim() : '';
+    if (!s) return null;
+    // Normalize legacy labels like "Tier C" -> "C"
+    const m = s.match(/^tier\s+([a-z]{1,3})$/i);
+    if (m?.[1]) return m[1].toUpperCase();
+    return s.toUpperCase();
+  };
+
   // Simple image fallback - no complex logic
   const getImageUrl = () => {
     return vehicle.primary_image_url || vehicle.image_url || null;
   };
 
   const imageUrl = getImageUrl();
-  // Use listing_start_date (when listing went live) if available, otherwise created_at (upload time)
-  // This is especially important for BAT auctions where we want to show when the auction started, not when we scraped it
-  const timeAgo = formatTimeAgo(vehicle.listing_start_date || vehicle.created_at);
+  const effectiveSourceStampUrl =
+    sourceStampUrl ||
+    (vehicle.discovery_url ? String(vehicle.discovery_url) : '') ||
+    '';
+
+  const isAuctionSource = React.useMemo(() => {
+    const url = effectiveSourceStampUrl.toLowerCase();
+    const origin = String((vehicle as any)?.profile_origin || '').toLowerCase();
+    const source = String((vehicle as any)?.discovery_source || '').toLowerCase();
+    if (origin.includes('bat')) return true;
+    if (source.includes('auction')) return true;
+    if (url.includes('bringatrailer.com') || url.includes('carsandbids.com') || url.includes('ebay.com')) return true;
+    return false;
+  }, [effectiveSourceStampUrl, vehicle]);
+
+  const auctionProgress01 = React.useMemo(() => {
+    if (!isAuctionSource) return 0;
+    const startRaw = (vehicle as any)?.listing_start_date || vehicle.created_at;
+    const start = startRaw ? new Date(startRaw).getTime() : NaN;
+    if (!Number.isFinite(start)) return 0;
+    const elapsedMs = Date.now() - start;
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const p = elapsedMs / sevenDaysMs;
+    return Math.max(0, Math.min(1, p));
+  }, [isAuctionSource, vehicle.created_at, (vehicle as any)?.listing_start_date]);
+
+  const badgePulseSeconds = React.useMemo(() => {
+    // Slow -> fast as the auction progresses.
+    // 0%: 6.0s, 100%: 1.2s
+    if (!isAuctionSource) return null;
+    const min = 1.2;
+    const max = 6.0;
+    return max - (max - min) * auctionProgress01;
+  }, [isAuctionSource, auctionProgress01]);
+
+  const auctionHighBidText = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const cents =
+      (typeof v.current_high_bid_cents === 'number' ? v.current_high_bid_cents : null) ??
+      (typeof v.latest_bid_cents === 'number' ? v.latest_bid_cents : null);
+    if (typeof cents === 'number' && Number.isFinite(cents) && cents > 0) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(cents / 100);
+    }
+    const bid = typeof v.latest_bid === 'number' ? v.latest_bid : null;
+    if (typeof bid === 'number' && Number.isFinite(bid) && bid > 0) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(bid);
+    }
+    return null;
+  }, [vehicle]);
+
+  const auctionBidderDisplay = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const masked = !!v.latest_bidder_masked;
+    const raw =
+      typeof v.latest_bidder_display_name === 'string' ? v.latest_bidder_display_name :
+      typeof v.latest_bidder_name === 'string' ? v.latest_bidder_name :
+      null;
+    if (masked) return '***';
+    if (raw && raw.trim()) return raw.trim();
+    return null;
+  }, [vehicle]);
+
+  const badgeExplode = React.useMemo(() => {
+    // Hook: set `bid_broke_record=true` on vehicle payload to trigger the pop.
+    return !!(vehicle as any)?.bid_broke_record;
+  }, [vehicle]);
+
+  const badgeStyle = React.useMemo((): React.CSSProperties => {
+    const base: React.CSSProperties = {
+      position: 'absolute',
+      top: '6px',
+      right: '6px',
+      background: 'rgba(0, 0, 0, 0.75)',
+      backdropFilter: 'blur(6px)',
+      color: 'white',
+      padding: '4px 8px',
+      borderRadius: '6px',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      maxWidth: '85%',
+      border: '1px solid rgba(255,255,255,0.18)',
+      transformOrigin: 'center',
+    };
+
+    if (!isAuctionSource) return base;
+
+    // Heat: subtle border shift (cold -> hot) as listing ages.
+    const border =
+      auctionProgress01 > 0.9 ? 'rgba(239,68,68,0.55)' :
+      auctionProgress01 > 0.7 ? 'rgba(245,158,11,0.45)' :
+      'rgba(59,130,246,0.35)';
+
+    const pulse = badgePulseSeconds ? `nuke-auction-pulse ${badgePulseSeconds.toFixed(2)}s ease-in-out infinite` : '';
+    const pop = badgeExplode ? 'nuke-badge-pop 650ms cubic-bezier(0.2, 1.2, 0.2, 1) 1' : '';
+    const anim = [pop, pulse].filter(Boolean).join(', ');
+
+    return {
+      ...base,
+      border,
+      animation: anim || undefined,
+    };
+  }, [isAuctionSource, auctionProgress01, badgePulseSeconds, badgeExplode]);
+
+  // Auctions should never show asking/estimated labels. If we don't have bid data yet, show a compact "BID".
+  const badgeMainText = isAuctionSource ? (auctionHighBidText || 'BID') : displayPrice;
 
   // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {
@@ -358,7 +472,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             position: 'relative',
           }}
         >
-          {/* LIVE badge - top left */}
+          {/* LIVE badge (kept separate) */}
           {vehicle.is_streaming && (
             <div
               style={{
@@ -379,32 +493,32 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             </div>
           )}
 
-          {/* Price - top right (toggleable) */}
-          {showPriceOverlay && displayPrice !== '—' && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                background: 'rgba(0, 0, 0, 0.8)',
-                backdropFilter: 'blur(8px)',
-                color: 'white',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 2,
-                alignItems: 'flex-end',
-              }}
-            >
-              {priceBadge && (
-                <div style={{ fontSize: '7pt', fontWeight: 800, letterSpacing: '0.6px', opacity: 0.85 }}>
-                  {priceBadge}
+          {/* Combined Source + Price/Bid badge */}
+          {showPriceOverlay && badgeMainText !== '—' && (
+            <div style={{ ...badgeStyle, top: '8px', right: '8px' }}>
+              {effectiveSourceStampUrl ? <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} /> : null}
+              {isAuctionSource && auctionBidderDisplay ? (
+                <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '220px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      width: '200%',
+                      animation: 'nuke-badge-ticker 6s ease-in-out infinite',
+                    }}
+                  >
+                    <div style={{ width: '50%', paddingRight: '10px', fontSize: '9pt', fontWeight: 800 }}>
+                      {badgeMainText}
+                    </div>
+                    <div style={{ width: '50%', paddingRight: '10px', fontSize: '8pt', fontWeight: 700, opacity: 0.95 }}>
+                      {auctionBidderDisplay}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: '9pt', fontWeight: 800 }}>
+                  {badgeMainText}
                 </div>
               )}
-              <div style={{ fontSize: '9pt', fontWeight: 800 }}>
-                {displayPrice}
-              </div>
             </div>
           )}
 
@@ -433,86 +547,65 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 {vehicle.year} {vehicle.make} {vehicle.model}
               </div>
 
-              {/* Metadata row - uploader, views, images, ROI, rating, updated */}
+              {/* Metadata row - clean by default; infoDense adds extras */}
               <div
                 style={{
                   fontSize: '7pt',
                   display: 'flex',
-                  gap: '6px',
+                  gap: '10px',
                   flexWrap: 'wrap',
                   alignItems: 'center',
                   opacity: 0.9,
                 }}
               >
-                {vehicle.uploader_name && (
-                  <span style={{ fontWeight: 600 }}>{vehicle.uploader_name}</span>
-                )}
-                {vehicle.uploader_name && <span>•</span>}
-
-                {/* Accurate view count - use actual count from database */}
-                {vehicle.view_count !== undefined && vehicle.view_count > 0 && (
-                  <>
-                    <span>{vehicle.view_count} {vehicle.view_count === 1 ? 'view' : 'views'}</span>
-                    <span>•</span>
-                  </>
-                )}
-
-                {/* Accurate image count - use all_images length or image_count */}
-                {(() => {
-                  const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
-                  if (imageCount > 0) {
-                    return (
-                      <>
-                        <span>{imageCount} {imageCount === 1 ? 'image' : 'images'}</span>
-                        <span>•</span>
-                      </>
-                    );
-                  }
-                  return null;
-                })()}
-
                 {/* Vehicle Tier - alphabet-based (F, E, D, C, B, A, S, SSS) */}
                 {(() => {
-                  const tierLabel = vehicle.tier_label || calculateVehicleTier(vehicle);
+                  const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
                   
                   // Color mapping for alphabet tiers
                   const getTierColor = (tier: string) => {
                     switch (tier) {
-                      case 'SSS': return '#9333ea'; // Purple - highest
-                      case 'SS': return '#7c3aed';
-                      case 'S': return '#8b5cf6';
-                      case 'A': return '#10b981'; // Green - excellent
-                      case 'B': return '#3b82f6'; // Blue - good
-                      case 'C': return '#f59e0b'; // Orange - fair
-                      case 'D': return '#f97316'; // Dark orange - minimal
-                      case 'E': return '#ef4444'; // Red - poor
-                      case 'F': return '#6b7280'; // Gray - pending/no data
+                      // User-defined core mapping: C=green, F=purple, S=red.
+                      case 'SSS': return '#7c3aed'; // purple variant
+                      case 'SS': return '#8b5cf6';
+                      case 'S': return '#ef4444'; // red
+                      case 'A': return '#f59e0b'; // warm
+                      case 'B': return '#3b82f6'; // blue
+                      case 'C': return '#10b981'; // green
+                      case 'D': return '#6b7280'; // gray
+                      case 'E': return '#9ca3af'; // light gray
+                      case 'F': return '#a855f7'; // purple
                       default: return '#6b7280';
                     }
                   };
                   
                   if (tierLabel) {
                     return (
-                      <>
-                        <span
-                          style={{
-                            fontWeight: 600,
-                            color: getTierColor(tierLabel)
-                          }}
-                        >
+                      <span style={{ fontWeight: 700 }}>
+                        <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>
                           {tierLabel}
-                        </span>
-                        <span>•</span>
-                      </>
+                        </span>{' '}
+                        tier
+                      </span>
                     );
                   }
                   return null;
                 })()}
 
-                {vehicle.condition_rating && (
-                  <>
-                    <span>•</span>
-                    <span
+                {infoDense && vehicle.uploader_name && (
+                  <span style={{ fontWeight: 600 }}>{vehicle.uploader_name}</span>
+                )}
+
+                {infoDense && vehicle.view_count !== undefined && vehicle.view_count > 0 && (
+                  <span>{vehicle.view_count.toLocaleString()} {vehicle.view_count === 1 ? 'view' : 'views'}</span>
+                )}
+
+                {infoDense && vehicle.active_viewers > 0 && (
+                  <span>{vehicle.active_viewers.toLocaleString()} watching</span>
+                )}
+
+                {infoDense && vehicle.condition_rating && (
+                  <span
                       style={{
                         fontWeight: 700,
                         color:
@@ -523,7 +616,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                             : '#ef4444',
                       }}
                     >
-                      Grade:{' '}
+                      Grade{' '}
                       {vehicle.condition_rating >= 9
                         ? 'A+'
                         : vehicle.condition_rating >= 8
@@ -535,18 +628,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         : vehicle.condition_rating >= 5
                         ? 'C'
                         : 'D'}
-                    </span>
-                  </>
+                  </span>
                 )}
 
-                {vehicle.hype_reason && (
-                  <>
-                    <span>•</span>
-                    <span>{vehicle.hype_reason}</span>
-                  </>
-                )}
-
-                {timeAgo && <span style={{ marginLeft: 'auto' }}>{timeAgo}</span>}
+                {infoDense && vehicle.hype_reason && <span>{vehicle.hype_reason}</span>}
               </div>
             </div>
           )}
@@ -685,34 +770,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Price overlay - top right */}
-        {showPriceOverlay && displayPrice !== '—' && (
-          <div style={{
-            position: 'absolute',
-            top: '6px',
-            right: '6px',
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(5px)',
-            color: 'white',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1,
-            alignItems: 'flex-end',
-          }}>
-            {priceBadge && (
-              <div style={{ fontSize: '6pt', fontWeight: 800, letterSpacing: '0.6px', opacity: 0.85 }}>
-                {priceBadge}
-              </div>
-            )}
-            <div style={{ fontSize: '8pt', fontWeight: 800 }}>
-              {displayPrice}
-            </div>
-          </div>
-        )}
-        
-        {/* LIVE badge - top left */}
+        {/* LIVE badge (kept separate) */}
         {vehicle.is_streaming && (
           <div style={{
             position: 'absolute',
@@ -730,6 +788,30 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             LIVE
           </div>
         )}
+
+        {/* Combined Source + Price/Bid badge */}
+        {showPriceOverlay && badgeMainText !== '—' && (
+          <div style={badgeStyle}>
+            {effectiveSourceStampUrl ? <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} /> : null}
+            {isAuctionSource && auctionBidderDisplay ? (
+              <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '160px' }}>
+                <div style={{ display: 'flex', width: '200%', animation: 'nuke-badge-ticker 6s ease-in-out infinite' }}>
+                  <div style={{ width: '50%', paddingRight: '10px', fontSize: '8pt', fontWeight: 800 }}>
+                    {badgeMainText}
+                  </div>
+                  <div style={{ width: '50%', paddingRight: '10px', fontSize: '8pt', fontWeight: 700, opacity: 0.95 }}>
+                    {auctionBidderDisplay}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: '8pt', fontWeight: 800 }}>
+                {badgeMainText}
+              </div>
+            )}
+          </div>
+        )}
+        
       </div>
       
       {/* Detail overlay on image instead of separate panel */}
@@ -757,90 +839,58 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             {vehicle.year} {vehicle.make} {vehicle.model}
           </div>
 
-          {/* Metadata row - uploader, views, images, ROI, rating, time */}
+          {/* Metadata row - clean by default; infoDense adds extras */}
           <div
             style={{
               fontSize: '7pt',
               display: 'flex',
-              gap: '6px',
+              gap: '10px',
               flexWrap: 'wrap',
               alignItems: 'center',
               opacity: 0.9,
             }}
           >
-            {vehicle.uploader_name && (
-              <span style={{ fontWeight: 500 }}>{vehicle.uploader_name}</span>
-            )}
-            {vehicle.uploader_name && <span>•</span>}
-
-            {/* Accurate view count */}
-            {vehicle.view_count !== undefined && vehicle.view_count > 0 && (
-              <>
-                <span>{vehicle.view_count} {vehicle.view_count === 1 ? 'view' : 'views'}</span>
-                <span>•</span>
-              </>
-            )}
-
-            {vehicle.active_viewers > 0 && (
-              <>
-                <span>({vehicle.active_viewers} watching)</span>
-                <span>•</span>
-              </>
-            )}
-
-            {/* Accurate image count */}
-            {(() => {
-              const imageCount = vehicle.all_images?.length || vehicle.image_count || 0;
-              if (imageCount > 0) {
-                return (
-                  <>
-                    <span>{imageCount} {imageCount === 1 ? 'image' : 'images'}</span>
-                    <span>•</span>
-                  </>
-                );
-              }
-              return null;
-            })()}
-
             {/* Vehicle Tier - alphabet-based (F, E, D, C, B, A, S, SSS) */}
             {(() => {
-              const tierLabel = vehicle.tier_label || calculateVehicleTier(vehicle);
+              const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
               
               // Color mapping for alphabet tiers
               const getTierColor = (tier: string) => {
                 switch (tier) {
-                  case 'SSS': return '#9333ea'; // Purple - highest
-                  case 'SS': return '#7c3aed';
-                  case 'S': return '#8b5cf6';
-                  case 'A': return '#10b981'; // Green - excellent
-                  case 'B': return '#3b82f6'; // Blue - good
-                  case 'C': return '#f59e0b'; // Orange - fair
-                  case 'D': return '#f97316'; // Dark orange - minimal
-                  case 'E': return '#ef4444'; // Red - poor
-                  case 'F': return '#6b7280'; // Gray - pending/no data
+                  case 'SSS': return '#7c3aed';
+                  case 'SS': return '#8b5cf6';
+                  case 'S': return '#ef4444';
+                  case 'A': return '#f59e0b';
+                  case 'B': return '#3b82f6';
+                  case 'C': return '#10b981';
+                  case 'D': return '#6b7280';
+                  case 'E': return '#9ca3af';
+                  case 'F': return '#a855f7';
                   default: return '#6b7280';
                 }
               };
               
               if (tierLabel) {
                 return (
-                  <>
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        color: getTierColor(tierLabel)
-                      }}
-                    >
-                      {tierLabel}
-                    </span>
-                    <span>•</span>
-                  </>
+                  <span style={{ fontWeight: 700 }}>
+                    <span style={{ color: getTierColor(tierLabel), fontWeight: 800 }}>{tierLabel}</span> tier
+                  </span>
                 );
               }
               return null;
             })()}
 
-            {vehicle.condition_rating && (
+            {infoDense && vehicle.uploader_name && <span style={{ fontWeight: 500 }}>{vehicle.uploader_name}</span>}
+
+            {infoDense && vehicle.view_count !== undefined && vehicle.view_count > 0 && (
+              <span>{vehicle.view_count.toLocaleString()} {vehicle.view_count === 1 ? 'view' : 'views'}</span>
+            )}
+
+            {infoDense && vehicle.active_viewers > 0 && (
+              <span>{vehicle.active_viewers.toLocaleString()} watching</span>
+            )}
+
+            {infoDense && vehicle.condition_rating && (
               <span
                 style={{
                   fontWeight: 700,
@@ -865,8 +915,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   : 'D'}
               </span>
             )}
-
-            {timeAgo && <span style={{ marginLeft: 'auto' }}>{timeAgo}</span>}
           </div>
         </div>
       )}

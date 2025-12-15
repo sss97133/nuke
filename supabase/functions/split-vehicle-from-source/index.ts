@@ -213,21 +213,35 @@ serve(async (req) => {
 
     // Add a timeline note to the original vehicle for auditability (best-effort).
     try {
-      await admin.from("timeline_events").insert({
-        vehicle_id: vehicleId,
-        user_id: user.id,
-        event_type: "other",
-        source: "split_from_source",
-        event_date: new Date().toISOString().split("T")[0],
-        title: "Split created from external listing",
-        description: `Created a new vehicle profile from Source URL to prevent cross-contamination.\n\nSource: ${sourceUrl}\nNew vehicle: ${newVehicle.id}`,
-        metadata: {
-          action: "split",
-          source_url: sourceUrl,
-          new_vehicle_id: newVehicle.id,
-          reason: reason ?? null,
-        },
-      });
+      const { data: existing } = await admin
+        .from("timeline_events")
+        .select("id")
+        .eq("vehicle_id", vehicleId)
+        .eq("source", "split_from_source")
+        .eq("event_type", "other")
+        .eq("metadata->>action", "split")
+        .eq("metadata->>source_url", sourceUrl)
+        .eq("metadata->>new_vehicle_id", newVehicle.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!existing?.id) {
+        await admin.from("timeline_events").insert({
+          vehicle_id: vehicleId,
+          user_id: user.id,
+          event_type: "other",
+          source: "split_from_source",
+          event_date: new Date().toISOString().split("T")[0],
+          title: "Split created from external listing",
+          description: `Created a new vehicle profile from Source URL to prevent cross-contamination.\n\nSource: ${sourceUrl}\nNew vehicle: ${newVehicle.id}`,
+          metadata: {
+            action: "split",
+            source_url: sourceUrl,
+            new_vehicle_id: newVehicle.id,
+            reason: reason ?? null,
+          },
+        });
+      }
     } catch {
       // ignore
     }
