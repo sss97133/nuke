@@ -34,6 +34,14 @@ export class AIPaymentService {
         .eq('is_active', true)
         .maybeSingle();
 
+      // If the table/API isn't available on this deployment, fail gracefully without spamming.
+      if ((keysError as any)?.status === 404 || (keysError as any)?.statusCode === 404 || (keysError as any)?.code === 'PGRST205') {
+        return {
+          success: false,
+          error: 'Stripe keys are not enabled on this deployment yet.'
+        };
+      }
+
       if (keysError || !stripeKeys) {
         return {
           success: false,
