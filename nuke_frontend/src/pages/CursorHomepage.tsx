@@ -220,8 +220,9 @@ const DEFAULT_FILTERS: FilterState = {
   makes: [],
   priceMin: null,
   priceMax: null,
-  // Hide “F-tier” no-image profiles by default (still discoverable via search / toggles).
-  hasImages: true,
+  // PERF/UX: Default to showing the feed even if images are missing.
+  // Many imported vehicles may not have `primary_image_url` populated yet; users can toggle "Has Images" on.
+  hasImages: false,
   forSale: false,
   // Homepage should focus on active listings; sold inventory can be toggled back on.
   hideSold: true,
