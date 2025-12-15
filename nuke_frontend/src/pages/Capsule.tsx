@@ -124,8 +124,8 @@ const Capsule: React.FC = () => {
                   style={{
                     padding: 'var(--space-2) var(--space-3)',
                     textAlign: 'left',
-                    background: activeTab === tab.key ? 'var(--grey-200)' : 'transparent',
-                    border: activeTab === tab.key ? '2px outset var(--border-medium)' : '1px solid transparent',
+                    background: activeTab === tab.key ? 'var(--surface-hover)' : 'transparent',
+                    border: activeTab === tab.key ? '2px solid var(--border)' : '1px solid transparent',
                     cursor: 'pointer',
                     fontSize: '9pt',
                     fontWeight: activeTab === tab.key ? 'bold' : 'normal'
@@ -165,6 +165,24 @@ const Capsule: React.FC = () => {
 
           {activeTab === 'settings' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <div className="card">
+                <div className="card-header">
+                  <h3 className="heading-3">Appearance</h3>
+                </div>
+                <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div className="text text-small text-muted" style={{ maxWidth: 520 }}>
+                    Theme (Auto/Dark/Light), contrast profiles, and automotive colorways — previewed live.
+                  </div>
+                  <button
+                    className="button button-secondary"
+                    style={{ fontSize: '9pt', whiteSpace: 'nowrap' }}
+                    onClick={() => handleTabChange('appearance')}
+                  >
+                    Open Appearance →
+                  </button>
+                </div>
+              </div>
+
               <div className="card">
                 <div className="card-header">
                   <h3 className="heading-3">Profile Settings</h3>

@@ -491,16 +491,50 @@ serve(async (req) => {
         baseHostForMode === 'classic.com' &&
         (baseForMode.pathname === '/auctions/' || baseForMode.pathname === '/auctions');
 
-      const shouldUseFirecrawl =
+      // Firecrawl is expensive and can be rate-limited/busy. Strategy:
+      // - Prefer direct HTML fetch first.
+      // - Only use Firecrawl when we need JS rendering (e.g., BaT /auctions/) OR when direct fetch yields too few links.
+      const shouldUseFirecrawlBase =
         !!FIRECRAWL_API_KEY &&
         (
           // Standard behavior: only use Firecrawl when not cheap_mode.
           (!cheap_mode) ||
-          // Exception: allow Firecrawl for known JS index pages so we can actually discover listing URLs.
+          // Exception: allow Firecrawl for known JS index pages, but only as a fallback.
           (cheap_mode && (isBatAuctionsIndex || isClassicAuctionsIndex))
         );
 
       try {
+        // For index pages, try direct fetch first and see if we already have enough listing links.
+        if (shouldUseFirecrawlBase && cheap_mode && (isBatAuctionsIndex || isClassicAuctionsIndex)) {
+          try {
+            const resp = await fetch(source_url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+              },
+              signal: AbortSignal.timeout(15000),
+            });
+            if (resp.ok) {
+              const candidate = await resp.text();
+              const minLinkCount = 50;
+              const n =
+                isBatAuctionsIndex
+                  ? (candidate.match(/href="[^"]*\/listing\/[^"]+/gi) || []).length
+                  : (candidate.match(/href="[^"]*\/l\/[^"]+/gi) || []).length;
+              if (n >= minLinkCount) {
+                console.log(`✅ Index direct-fetch already contains ${n} listing links; skipping Firecrawl`);
+                html = candidate;
+              } else {
+                console.log(`ℹ️ Index direct-fetch contains only ${n} listing links; will try Firecrawl fallback`);
+              }
+            }
+          } catch {
+            // ignore; Firecrawl fallback below
+          }
+        }
+
+        const shouldUseFirecrawl = shouldUseFirecrawlBase && !html;
         if (shouldUseFirecrawl) {
           // For cheap_mode “index” pages, don't request `extract` to keep the Firecrawl job light.
           const formats =

@@ -155,6 +155,9 @@ serve(async (req) => {
               source_type: "dealer",
               organization_id: org.id,
               max_results: maxResults,
+              // Classic.com seller pages and /data directory are crawlable without JS rendering.
+              // Keep this cheap to avoid Firecrawl load; scrape-multi-source will still enumerate URLs.
+              cheap_mode: true,
               use_llm_extraction: false,
               extract_dealer_info: false,
               include_sold: false,
@@ -202,6 +205,7 @@ serve(async (req) => {
               source_type: "auction_house",
               organization_id: org.id,
               max_results: maxResults,
+              cheap_mode: true,
               use_llm_extraction: false,
               extract_dealer_info: false,
             }, false);
@@ -228,6 +232,7 @@ serve(async (req) => {
               source_type: "dealer",
               organization_id: org.id,
               max_results: maxResults,
+              cheap_mode: true,
               use_llm_extraction: false,
               extract_dealer_info: false,
               include_sold: false,
