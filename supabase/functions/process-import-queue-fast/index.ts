@@ -289,13 +289,15 @@ serve(async (req: Request) => {
         // Upsert vehicle by discovery_url (canonical for listing-origin profiles)
         const { data: existingVehicle, error: findErr } = await supabase
           .from("vehicles")
-          .select("id, origin_metadata, year, make, model")
+          .select("id, origin_metadata, year, make, model, status, is_public, is_for_sale, primary_image_url, image_url")
           .eq("discovery_url", listingUrl)
           .maybeSingle();
         if (findErr) throw new Error(`vehicles lookup failed: ${findErr.message}`);
 
         let vehicleId: string;
         if (!existingVehicle?.id) {
+          const primaryImage = safeString(parsed.images?.[0] || null);
+          const shouldPublish = Boolean(orgId);
           const originMetadata = {
             source_id: item.source_id,
             queue_id: item.id,
@@ -313,8 +315,13 @@ serve(async (req: Request) => {
               make,
               model,
               asking_price: askingPrice,
-              status: "pending",
-              is_public: false,
+              // Dealer inventory imports should be visible in the feed immediately.
+              // If we don't have an org link, keep it private/pending.
+              status: shouldPublish ? "active" : "pending",
+              is_public: shouldPublish,
+              is_for_sale: shouldPublish ? !isSold : null,
+              primary_image_url: shouldPublish ? primaryImage : null,
+              image_url: shouldPublish ? primaryImage : null,
               discovery_url: listingUrl,
               profile_origin: "url_scraper",
               origin_organization_id: orgId,
@@ -323,9 +330,26 @@ serve(async (req: Request) => {
             } as any)
             .select("id")
             .single();
-          if (insErr) throw new Error(`vehicles insert failed: ${insErr.message}`);
-          vehicleId = inserted.id;
-          out.created++;
+
+          if (insErr) {
+            // Race-safe: if another worker inserted the same discovery_url, re-fetch and continue.
+            const msg = (insErr as any)?.message || "";
+            const code = (insErr as any)?.code || "";
+            if (code === "23505" || msg.includes("vehicles_discovery_url_unique") || msg.toLowerCase().includes("duplicate key")) {
+              const { data: v2, error: v2Err } = await supabase
+                .from("vehicles")
+                .select("id")
+                .eq("discovery_url", listingUrl)
+                .maybeSingle();
+              if (v2Err || !v2?.id) throw new Error(`vehicles insert conflicted but lookup failed: ${(v2Err as any)?.message || "no row"}`);
+              vehicleId = v2.id;
+            } else {
+              throw new Error(`vehicles insert failed: ${msg}`);
+            }
+          } else {
+            vehicleId = inserted.id;
+            out.created++;
+          }
         } else {
           vehicleId = existingVehicle.id;
           const om = (existingVehicle.origin_metadata && typeof existingVehicle.origin_metadata === "object") ? existingVehicle.origin_metadata : {};
@@ -358,6 +382,17 @@ serve(async (req: Request) => {
           }
           if (!existingVehicle.year && year) updates.year = year;
           if (askingPrice) updates.asking_price = askingPrice;
+
+          // If this item is tied to a dealer org, ensure the vehicle is visible in the public feed.
+          // (Homepage feed filters on is_public=true and hides status='pending'.)
+          if (orgId) {
+            const primaryImage = safeString(parsed.images?.[0] || null);
+            if (!existingVehicle.is_public) updates.is_public = true;
+            if (safeString(existingVehicle.status) === "pending") updates.status = "active";
+            if (existingVehicle.is_for_sale === null || typeof existingVehicle.is_for_sale === "undefined") updates.is_for_sale = !isSold;
+            if (!safeString((existingVehicle as any).primary_image_url) && primaryImage) updates.primary_image_url = primaryImage;
+            if (!safeString((existingVehicle as any).image_url) && primaryImage) updates.image_url = primaryImage;
+          }
 
           const { error: updErr } = await supabase
             .from("vehicles")
