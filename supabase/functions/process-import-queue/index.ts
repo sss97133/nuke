@@ -1545,7 +1545,11 @@ serve(async (req) => {
               .update({
                 status: 'complete',
                 processed_at: new Date().toISOString(),
-                vehicle_id: existingVehicle.id
+                vehicle_id: existingVehicle.id,
+                error_message: null,
+                locked_at: null,
+                locked_by: null,
+                next_attempt_at: null,
               })
               .eq('id', item.id);
             
@@ -1916,6 +1920,9 @@ serve(async (req) => {
                 vehicle_id: existingByUrlId,
                 processed_at: new Date().toISOString(),
                 error_message: null,
+                locked_at: null,
+                locked_by: null,
+                next_attempt_at: null,
               })
               .eq('id', item.id);
 
@@ -2650,7 +2657,11 @@ serve(async (req) => {
           .update({
             status: 'complete',
             vehicle_id: newVehicle.id,
-            processed_at: new Date().toISOString()
+            processed_at: new Date().toISOString(),
+            error_message: null,
+            locked_at: null,
+            locked_by: null,
+            next_attempt_at: null,
           })
           .eq('id', item.id);
 

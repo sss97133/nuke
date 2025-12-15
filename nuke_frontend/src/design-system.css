@@ -307,6 +307,39 @@
   --border-focus: var(--accent);
 }
 
+/* Americana colorways */
+:root[data-accent="americana"] {
+  --primary: #0a2342;
+  --accent: #0a2342; /* Pantone example: 282 C */
+  --accent-alt: #c8102e; /* Pantone example: 186 C */
+  --accent-dim: rgba(10, 35, 66, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="route-66"] {
+  --primary: #005f73;
+  --accent: #005f73; /* Pantone example: 3035 C */
+  --accent-alt: #d4a373; /* Pantone example: 4655 C */
+  --accent-dim: rgba(0, 95, 115, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="denim"] {
+  --primary: #1b2a41;
+  --accent: #1b2a41; /* Pantone example: 2965 C */
+  --accent-alt: #d6c9b4; /* Pantone example: 7534 C */
+  --accent-dim: rgba(27, 42, 65, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="desert"] {
+  --primary: #c95a00;
+  --accent: #c95a00; /* Pantone example: 7576 C */
+  --accent-alt: #7b4b2a; /* Pantone example: 7554 C */
+  --accent-dim: rgba(201, 90, 0, 0.12);
+  --border-focus: var(--accent);
+}
+
 /* Windows 95 theme override */
 .win95 {
   --radius: 0;
