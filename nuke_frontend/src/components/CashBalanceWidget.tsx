@@ -59,7 +59,7 @@ export const CashBalanceWidget: React.FC = () => {
       <button
         onClick={() => setShowMenu(!showMenu)}
         style={{
-          background: 'var(--white)',
+          background: 'var(--surface)',
           border: '2px outset var(--border)',
           padding: '1px 6px',
           fontSize: '8pt',
@@ -101,7 +101,7 @@ export const CashBalanceWidget: React.FC = () => {
               top: '100%',
               right: 0,
               marginTop: '4px',
-              background: 'var(--white)',
+              background: 'var(--surface)',
               border: '2px outset var(--border)',
               boxShadow: '2px 2px 0 rgba(0,0,0,0.2)',
               zIndex: 1000,

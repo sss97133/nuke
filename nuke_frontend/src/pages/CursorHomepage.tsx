@@ -1031,13 +1031,13 @@ const CursorHomepage: React.FC = () => {
           <div style={{ 
             position: 'sticky',
             top: 0,
-            background: filterBarMinimized ? 'rgba(255, 255, 255, 0.95)' : 'var(--grey-50)',
+            background: filterBarMinimized ? 'var(--surface-glass)' : 'var(--surface)',
             backdropFilter: filterBarMinimized ? 'blur(10px)' : 'none',
             border: '1px solid var(--border)',
             padding: filterBarMinimized ? '8px 12px' : '12px',
             marginBottom: '12px',
             zIndex: 100,
-            boxShadow: filterBarMinimized ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+            boxShadow: filterBarMinimized ? '0 2px 8px rgba(0,0,0,0.18)' : 'none',
             transition: 'padding 0.2s ease, background 0.2s ease',
             opacity: 1
           }}>

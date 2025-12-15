@@ -159,12 +159,12 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
           alignItems: 'center',
           width: `${capsuleWidth}px`,
           height: `${circleSize}px`,
-          backgroundColor: '#5a5a5a',
+          backgroundColor: 'var(--surface)',
           borderRadius: '50px',
           overflow: 'hidden',
           transition: 'width 0.3s ease',
           cursor: 'pointer',
-          border: '1px solid #333'
+          border: '2px solid var(--border)'
         }}
         onClick={() => setExpanded(!expanded)}
       >
@@ -178,8 +178,8 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
               width: '10px',
               height: '10px',
               borderRadius: '999px',
-              background: '#dc2626',
-              boxShadow: '0 0 0 2px #1a1a1a'
+              background: 'var(--error)',
+              boxShadow: '0 0 0 2px var(--bg)'
             }}
           />
         )}
@@ -195,7 +195,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#fff',
+              color: 'var(--text)',
               fontSize: '10pt',
               fontWeight: 700,
               fontFamily: '"MS Sans Serif", sans-serif',
@@ -218,7 +218,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
             borderRadius: '50%',
             overflow: 'hidden',
             flexShrink: 0,
-            backgroundColor: '#e5e5e5',
+            backgroundColor: 'var(--surface-hover)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -246,7 +246,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
                 justifyContent: 'center',
                 fontSize: '14pt',
                 fontWeight: 700,
-                color: '#333'
+                color: 'var(--text)'
               }}
             >
               {session.user?.email?.[0].toUpperCase() || 'U'}

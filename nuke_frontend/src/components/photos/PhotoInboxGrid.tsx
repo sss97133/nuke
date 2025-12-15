@@ -162,7 +162,7 @@ export const PhotoInboxGrid: React.FC<PhotoInboxGridProps> = ({
                   top: '6px',
                   right: '6px',
                   padding: '3px 6px',
-                  background: 'rgba(255, 255, 255, 0.95)',
+                  background: 'var(--surface-glass)',
                   color: getStatusColor(photo.ai_processing_status),
                   fontSize: '8px',
                   fontWeight: '700',
@@ -182,8 +182,8 @@ export const PhotoInboxGrid: React.FC<PhotoInboxGridProps> = ({
                   left: 0,
                   right: 0,
                   padding: '6px',
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  borderTop: '1px solid var(--border-light)',
+                  background: 'var(--surface-glass)',
+                  borderTop: '1px solid var(--border)',
                   fontSize: '9px'
                 }}>
                   <div className="text font-bold" style={{ fontSize: '9px' }}>
