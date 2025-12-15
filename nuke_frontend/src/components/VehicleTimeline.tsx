@@ -705,11 +705,12 @@ const VehicleTimeline: React.FC<{
                         };
 
                         const colorForHours = (h: number) => {
-                          if (h <= 0) return '#ebedf0';
-                          if (h < 1) return '#d9f99d';
-                          if (h < 3) return '#a7f3d0';
-                          if (h < 6) return '#34d399';
-                          return '#059669';
+                          if (h <= 0) return 'var(--heat-0)';
+                          if (h < 1) return 'var(--heat-1)';
+                          if (h < 3) return 'var(--heat-2)';
+                          if (h < 6) return 'var(--heat-3)';
+                          if (h < 12) return 'var(--heat-4)';
+                          return 'var(--heat-5)';
                         };
 
                         return (
@@ -717,7 +718,7 @@ const VehicleTimeline: React.FC<{
                             {/* Weekday labels (Mon-Sun) */}
                             <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, 12px)', gap: '2px' }}>
                               {['M','T','W','T','F','S','S'].map((d, i) => (
-                                <div key={i} style={{ textAlign: 'center', fontSize: '8pt', color: '#888888', lineHeight: '12px' }}>{d}</div>
+                                <div key={i} style={{ textAlign: 'center', fontSize: '8pt', color: 'var(--text-secondary)', lineHeight: '12px' }}>{d}</div>
                               ))}
                             </div>
                             {/* Timeline grid */}
@@ -858,9 +859,9 @@ const VehicleTimeline: React.FC<{
                                         gridColumn: weekIdx + 1,
                                         width: '12px',
                                         height: '12px',
-                                        backgroundColor: inYear ? colorForHours(hours) : '#f5f5f5',
+                                        backgroundColor: inYear ? colorForHours(hours) : 'var(--heat-0)',
                                         borderRadius: '2px',
-                                        border: clickable ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                                        border: clickable ? '1px solid var(--heat-border)' : 'none',
                                         opacity: inYear ? 1 : 0.3
                                       }}
                                     />

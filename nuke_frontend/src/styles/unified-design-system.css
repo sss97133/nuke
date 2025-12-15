@@ -84,6 +84,16 @@
   --accent-dim: rgba(42, 42, 42, 0.08);
   --accent-bright: #000000;
   --accent-alt: #2a2a2a;
+
+  /* Heatmap tokens (GitHub-style activity grid) */
+  --heat-0: #ebedf0;
+  --heat-1: #d9f99d;
+  --heat-2: #a7f3d0;
+  --heat-3: #34d399;
+  --heat-4: #059669;
+  --heat-5: #047857;
+  --heat-6: #065f46;
+  --heat-border: rgba(0, 0, 0, 0.12);
 }
 
 :root[data-theme="dark"] {
@@ -102,6 +112,16 @@
   --accent-dim: rgba(204, 204, 204, 0.12);
   --accent-bright: #ffffff;
   --accent-alt: #cccccc;
+
+  /* Heatmap tokens (muted for dark mode) */
+  --heat-0: #2d2d30;
+  --heat-1: rgba(22, 130, 93, 0.18);
+  --heat-2: rgba(22, 130, 93, 0.30);
+  --heat-3: rgba(22, 130, 93, 0.44);
+  --heat-4: rgba(22, 130, 93, 0.62);
+  --heat-5: rgba(22, 130, 93, 0.78);
+  --heat-6: rgba(22, 130, 93, 0.92);
+  --heat-border: rgba(255, 255, 255, 0.10);
 }
 
 /* ================================================

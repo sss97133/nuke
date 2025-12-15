@@ -162,18 +162,17 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
   // Color intensity - Green shades for organization activity
   const colorForActivity = (hours: number, eventCount: number) => {
     // If no events at all, return grey
-    if (eventCount === 0) return '#ebedf0';
+    if (eventCount === 0) return 'var(--heat-0)';
     
     // If we have events but no hours (e.g. inventory photos), show light green
-    if (hours <= 0 && eventCount > 0) return '#d9f99d'; // Lime-200 - light green for documentation
+    if (hours <= 0 && eventCount > 0) return 'var(--heat-1)'; // documentation
     
     // For actual work hours, use intensity-based colors
-    if (hours < 1) return '#bef264';   // Lime-300
-    if (hours < 3) return '#a3e635';   // Lime-400
-    if (hours < 6) return '#84cc16';   // Lime-500
-    if (hours < 12) return '#65a30d';  // Lime-600
-    if (hours < 24) return '#4d7c0f';  // Lime-700
-    return '#3f6212';                  // Lime-800 (very high activity)
+    if (hours < 1) return 'var(--heat-2)';
+    if (hours < 3) return 'var(--heat-3)';
+    if (hours < 6) return 'var(--heat-4)';
+    if (hours < 12) return 'var(--heat-5)';
+    return 'var(--heat-6)';
   };
 
   if (loading) {
@@ -344,9 +343,9 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                                   gridColumn: weekIdx + 1,
                                   width: '12px',
                                   height: '12px',
-                                  backgroundColor: inYear ? colorForActivity(hours, count) : '#f5f5f5',
+                                  backgroundColor: inYear ? colorForActivity(hours, count) : 'var(--heat-0)',
                                   borderRadius: '2px',
-                                  border: clickable ? '1px solid rgba(0,0,0,0.1)' : 'none',
+                                  border: clickable ? '1px solid var(--heat-border)' : 'none',
                                   opacity: inYear ? 1 : 0.3
                                 }}
                               />
@@ -403,7 +402,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                 width: 11,
                 height: 11,
                 backgroundColor: colorForActivity(level, level > 0 ? 1 : 0),
-                border: '1px solid rgba(0,0,0,0.15)',
+                border: '1px solid var(--heat-border)',
                 borderRadius: 2
               }}
             />

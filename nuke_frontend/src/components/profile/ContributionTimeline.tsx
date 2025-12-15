@@ -235,11 +235,12 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
 
   // Use same thresholds/colors as VehicleTimeline heat shading
   const colorForHours = (h: number) => {
-    if (h <= 0) return '#ebedf0';
-    if (h < 1) return '#d9f99d';
-    if (h < 3) return '#a7f3d0';
-    if (h < 6) return '#34d399';
-    return '#059669';
+    if (h <= 0) return 'var(--heat-0)';
+    if (h < 1) return 'var(--heat-1)';
+    if (h < 3) return 'var(--heat-2)';
+    if (h < 6) return 'var(--heat-3)';
+    if (h < 12) return 'var(--heat-4)';
+    return 'var(--heat-5)';
   };
 
   const maxStreak = calculateMaxStreak();
