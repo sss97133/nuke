@@ -40,7 +40,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+        run: npm install --global vercel@49.2.0
 
       - name: Pull Vercel Environment Information (production)
         working-directory: ./nuke_frontend
@@ -50,7 +50,7 @@ jobs:
         run: |
           # If the repo contains a stale .vercel link, vercel pull will fail with "cannot load project settings".
           rm -rf .vercel
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel pull --yes --environment=production --scope "${VERCEL_ORG_ID}" --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts (Vercel)
         working-directory: ./nuke_frontend
@@ -64,7 +64,7 @@ jobs:
         run: |
           echo "🚀 Deploying to Vercel production..."
           # Prebuilt deploy requires vercel pull + vercel build. Those steps run above.
-          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --prod --yes --token=${{ secrets.VERCEL_TOKEN }} 2>&1) || {
+          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --prod --yes --scope "${VERCEL_ORG_ID}" --token=${{ secrets.VERCEL_TOKEN }} 2>&1) || {
             echo "--- Vercel Deployment Output ---"
             echo "$DEPLOY_OUTPUT"
             echo "--- End Output ---"
