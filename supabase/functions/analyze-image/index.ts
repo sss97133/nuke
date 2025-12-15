@@ -49,6 +49,14 @@ serve(async (req) => {
     const { image_url, image_id, timeline_event_id, vehicle_id, user_id, force_reprocess = false } = await req.json()
     if (!image_url) throw new Error('Missing image_url')
 
+    // Reuse a single service key for all internal calls. Different deployments used different env var names.
+    const serviceRoleKey =
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
+      Deno.env.get('SERVICE_ROLE_KEY') ||
+      Deno.env.get('SUPABASE_SERVICE_KEY') ||
+      Deno.env.get('SUPABASE_KEY') ||
+      ''
+
     // Idempotency / caching: if we already completed a scan and caller didn't force reprocess,
     // return early so we don't burn tokens again.
     const existingLookup = image_id
@@ -163,7 +171,15 @@ serve(async (req) => {
       try {
         vinTagResponse = await detectAndExtractVINTag(image_url, vehicle_id, supabase, user_id)
         if (vinTagResponse?.is_vin_tag && vinTagResponse.confidence > 70) {
-          vinTagData = vinTagResponse.extracted_data
+          // Normalize + validate VIN before we write anything to core tables.
+          const raw = String(vinTagResponse?.extracted_data?.vin || '').toUpperCase().trim()
+          const normalizedVin = raw.replace(/[^A-Z0-9]/g, '')
+          const isValidVin = /^[A-HJ-NPR-Z0-9]{17}$/.test(normalizedVin)
+
+          vinTagData = {
+            ...(vinTagResponse.extracted_data || {}),
+            vin: isValidVin ? normalizedVin : null,
+          }
           console.log('VIN tag detected:', vinTagData)
           
           // Verify extracted VIN against vehicle's VIN if available
@@ -262,11 +278,13 @@ serve(async (req) => {
                   })
                 
                 // Trigger NHTSA VIN decode to auto-fill specs (non-blocking)
-                fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/decode-vin-and-update`, {
+                // Use the same key we used for DB writes; older deployments only set SERVICE_ROLE_KEY.
+                if (serviceRoleKey) {
+                  fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/decode-vin-and-update`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+                    'Authorization': `Bearer ${serviceRoleKey}`
                   },
                   body: JSON.stringify({
                     vehicle_id: vehicle_id,
@@ -275,6 +293,9 @@ serve(async (req) => {
                 })
                   .then(() => console.log('✅ VIN decode triggered'))
                   .catch(err => console.warn('VIN decode trigger failed:', err))
+                } else {
+                  console.warn('VIN decode trigger skipped: missing service role key env var')
+                }
               }
             }
           }
