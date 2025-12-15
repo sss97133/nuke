@@ -28,11 +28,15 @@
   /* Text Colors - Black only */
   --text: #000000;
   --text-muted: #424242;
+  --text-secondary: #424242;
+  --text-disabled: #757575;
   
   /* Border Colors - Light greys */
   --border-light: #e0e0e0;
   --border-medium: #bdbdbd;
   --border-dark: #9e9e9e;
+  --border: var(--border-medium);
+  --border-focus: var(--primary);
   
   /* Shadow Colors - Subtle */
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
@@ -58,8 +62,19 @@
   --upload-red-light: #fef2f2;
   
   /* Profile-specific colors */
-  --primary: #007bff;
+  --primary: #2a2a2a;
   --success: #28a745;
+  --warning: #b05a00;
+  --error: #d13438;
+
+  /* Unified token aliases (for compatibility with newer theme system) */
+  --bg: var(--grey-100);
+  --surface: var(--grey-200);
+  --surface-hover: var(--grey-300);
+  --accent: var(--primary);
+  --accent-alt: var(--primary);
+  --accent-dim: rgba(42, 42, 42, 0.08);
+  --accent-bright: #000000;
   
   /* Border Radius - Classic */
   --radius: 0px;
@@ -73,6 +88,198 @@
   /* Line Heights - Tight */
   --leading-tight: 1.1;
   --leading-normal: 1.2;
+}
+
+/* ================================================
+   THEME TOKENS (LIGHT / DARK) + CONTRAST + ACCENTS
+   This file is imported in many legacy components.
+   It MUST respect data-theme/data-accent/data-contrast.
+   ================================================ */
+
+:root[data-theme="light"] {
+  --white: #ffffff;
+  --grey-50: #fafafa;
+  --grey-100: #f5f5f5;
+  --grey-200: #eeeeee;
+  --grey-300: #e0e0e0;
+  --grey-400: #bdbdbd;
+  --grey-500: #9e9e9e;
+  --grey-600: #757575;
+  --grey-700: #616161;
+  --grey-800: #424242;
+  --grey-900: #212121;
+
+  --text: #000000;
+  --text-muted: #424242;
+  --text-secondary: #424242;
+  --text-disabled: #757575;
+
+  --border-light: #e0e0e0;
+  --border-medium: #bdbdbd;
+  --border-dark: #9e9e9e;
+  --border: var(--border-medium);
+
+  --bg: #f5f5f5;
+  --surface: #ebebeb;
+  --surface-hover: #e0e0e0;
+}
+
+:root[data-theme="dark"] {
+  /* Dark-mode greys are mapped so common usages (grey-200 backgrounds, etc.) stay readable */
+  --white: #121212;
+  --grey-50: #1e1e1e;
+  --grey-100: #1e1e1e;
+  --grey-200: #252526;
+  --grey-300: #2d2d30;
+  --grey-400: #3e3e42;
+  --grey-500: #5a5a5a;
+  --grey-600: #858585;
+  --grey-700: #cccccc;
+  --grey-800: #e6e6e6;
+  --grey-900: #ffffff;
+
+  --text: #cccccc;
+  --text-muted: #858585;
+  --text-secondary: #858585;
+  --text-disabled: #656565;
+
+  --border-light: #3e3e42;
+  --border-medium: #3e3e42;
+  --border-dark: #5a5a5a;
+  --border: var(--border-medium);
+
+  --bg: #1e1e1e;
+  --surface: #252526;
+  --surface-hover: #2d2d30;
+}
+
+/* Greyscale / High contrast profiles */
+:root[data-contrast="greyscale"] {
+  --primary: var(--text);
+  --accent: var(--text);
+  --accent-alt: var(--text-secondary);
+  --border-focus: var(--text);
+}
+
+:root[data-theme="light"][data-contrast="high"] {
+  --bg: #ffffff;
+  --surface: #f2f2f2;
+  --surface-hover: #e6e6e6;
+
+  --text: #000000;
+  --text-muted: #111111;
+  --text-secondary: #111111;
+  --text-disabled: #3a3a3a;
+
+  --border-light: #111111;
+  --border-medium: #111111;
+  --border-dark: #111111;
+  --border: #111111;
+}
+
+:root[data-theme="dark"][data-contrast="high"] {
+  --bg: #0a0a0a;
+  --surface: #121212;
+  --surface-hover: #1a1a1a;
+
+  --text: #ffffff;
+  --text-muted: #f5f5f5;
+  --text-secondary: #f5f5f5;
+  --text-disabled: #c9c9c9;
+
+  --border-light: #f5f5f5;
+  --border-medium: #f5f5f5;
+  --border-dark: #f5f5f5;
+  --border: #f5f5f5;
+}
+
+/* Automotive accent colorways */
+:root[data-accent="neutral"] {
+  --primary: #2a2a2a;
+  --accent: #2a2a2a;
+  --accent-alt: #2a2a2a;
+  --accent-dim: rgba(42, 42, 42, 0.08);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="gulf"] {
+  --primary: #ff5f00;
+  --accent: #ff5f00;
+  --accent-alt: #9dd9f3;
+  --accent-dim: rgba(255, 95, 0, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="martini"] {
+  --primary: #012169;
+  --accent: #012169;
+  --accent-alt: #da291c;
+  --accent-dim: rgba(1, 33, 105, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="ricard"] {
+  --primary: #0033a0;
+  --accent: #0033a0;
+  --accent-alt: #ffcd00;
+  --accent-dim: rgba(0, 51, 160, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="rosso"] {
+  --primary: #e4002b;
+  --accent: #e4002b;
+  --accent-alt: #ffd100;
+  --accent-dim: rgba(228, 0, 43, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="brg"] {
+  --primary: #00573f;
+  --accent: #00573f;
+  --accent-alt: #ffef00;
+  --accent-dim: rgba(0, 87, 63, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="jps"] {
+  --primary: #b9975b;
+  --accent: #b9975b;
+  --accent-alt: #111111;
+  --accent-dim: rgba(185, 151, 91, 0.14);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="jaeger"] {
+  --primary: #fe5000;
+  --accent: #fe5000;
+  --accent-alt: #111111;
+  --accent-dim: rgba(254, 80, 0, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="alitalia"] {
+  --primary: #009a44;
+  --accent: #009a44;
+  --accent-alt: #c8102e;
+  --accent-dim: rgba(0, 154, 68, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="bmw-m"] {
+  --primary: #00a3e0;
+  --accent: #00a3e0;
+  --accent-alt: #c8102e;
+  --accent-dim: rgba(0, 163, 224, 0.12);
+  --border-focus: var(--accent);
+}
+
+:root[data-accent="papaya"] {
+  --primary: #ff5f1f;
+  --accent: #ff5f1f;
+  --accent-alt: #111111;
+  --accent-dim: rgba(255, 95, 31, 0.12);
+  --border-focus: var(--accent);
 }
 
 /* Windows 95 theme override */
@@ -130,7 +337,7 @@ body {
   font-size: var(--font-size);
   line-height: var(--leading-normal);
   color: var(--text);
-  background-color: var(--grey-100);
+  background-color: var(--bg);
   margin: 0;
   padding: 0;
 }
