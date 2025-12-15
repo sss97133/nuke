@@ -42,38 +42,37 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@49.2.0
 
-      - name: Pull Vercel Environment Information (production)
-        working-directory: ./nuke_frontend
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          # If the repo contains a stale .vercel link, vercel pull will fail with "cannot load project settings".
-          rm -rf .vercel
-          vercel pull --yes --environment=production --scope "${VERCEL_ORG_ID}" --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build Project Artifacts (Vercel)
-        working-directory: ./nuke_frontend
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy to Vercel Production (prebuilt)
+      - name: Deploy to Vercel Production
         working-directory: ./nuke_frontend
         run: |
           echo "🚀 Deploying to Vercel production..."
-          # Prebuilt deploy requires vercel pull + vercel build. Those steps run above.
-          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --prod --yes --scope "${VERCEL_ORG_ID}" --token=${{ secrets.VERCEL_TOKEN }} 2>&1) || {
-            echo "--- Vercel Deployment Output ---"
-            echo "$DEPLOY_OUTPUT"
-            echo "--- End Output ---"
+          
+          # Check if dist/ exists
+          if [ ! -d "dist" ]; then
+            echo "❌ dist/ directory not found! Build must have failed."
             exit 1
-          }
+          fi
+          
+          echo "✅ dist/ directory found"
+          echo "📦 Contents:"
+          ls -la dist/ | head -10
+
+          # Deploy from built artifacts (static dist/) without relying on `vercel pull`.
+          # This avoids the "Could not retrieve Project Settings" failure mode in CI.
+          set +e
+          cd dist
+          DEPLOY_OUTPUT=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          DEPLOY_EXIT=$?
+          set -e
 
           echo "--- Vercel Deployment Output ---"
           echo "$DEPLOY_OUTPUT"
           echo "--- End Output ---"
+
+          if [ $DEPLOY_EXIT -ne 0 ]; then
+            echo "❌ Vercel deployment failed with exit code: $DEPLOY_EXIT"
+            exit 1
+          fi
           
           # Extract deployment URL (try multiple patterns)
           DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9-]+\.vercel\.app' | head -1 || echo "")
