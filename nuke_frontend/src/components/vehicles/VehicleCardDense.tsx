@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { UnifiedPricingService } from '../../services/unifiedPricingService';
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -42,6 +41,8 @@ interface VehicleCardDenseProps {
     receipt_count?: number; // Number of receipts (build documentation)
     ownership_verified?: boolean; // Has verified ownership records
     listing_start_date?: string; // When listing went live (for auctions, especially BAT)
+    // Optional: precomputed display price (avoid per-card pricing RPCs on feed)
+    display_price?: number;
   };
   viewMode?: 'list' | 'gallery' | 'grid';
   showSocial?: boolean;
@@ -60,33 +61,46 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showPriceOverlay = true,
   showDetailOverlay = true
 }) => {
-const [displayPrice, setDisplayPrice] = useState<string>('—');
-  const [priceLabel, setPriceLabel] = useState<string>('');
-  const priceBadge = React.useMemo(() => {
-    const raw = String(priceLabel || '').trim();
-    const l = raw.toLowerCase();
-    if (!raw) return '';
-    if (l.includes('sold')) return 'SOLD';
-    if (l.includes('asking')) return 'ASKING';
-    if (l.includes('estimated')) return 'EST';
-    if (l.includes('purchased')) return 'PURCHASE';
-    if (l.includes('msrp')) return 'MSRP';
-    return raw.toUpperCase();
-  }, [priceLabel]);
-// Load unified price on component mount
-  useEffect(() => {
-    const loadPrice = async () => {
-      try {
-        const price = await UnifiedPricingService.getDisplayPrice(vehicle.id);
-        setDisplayPrice(UnifiedPricingService.formatPrice(price.displayValue));
-        setPriceLabel(price.displayLabel);
-      } catch (error) {
-        setDisplayPrice('—');
-        setPriceLabel('');
-      }
-    };
-    loadPrice();
-  }, [vehicle.id]);
+  // PERF: Never do per-card network calls on the feed.
+  // Use the already-available vehicle fields (or precomputed display_price) to render pricing synchronously.
+  const { displayPrice, priceLabel, priceBadge } = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const priceValue =
+      (typeof v.display_price === 'number' && Number.isFinite(v.display_price) && v.display_price > 0) ? v.display_price :
+      (typeof v.sale_price === 'number' && v.sale_price > 0) ? v.sale_price :
+      (typeof v.asking_price === 'number' && v.asking_price > 0) ? v.asking_price :
+      (typeof v.current_value === 'number' && v.current_value > 0) ? v.current_value :
+      (typeof v.purchase_price === 'number' && v.purchase_price > 0) ? v.purchase_price :
+      null;
+
+    const label =
+      (typeof v.sale_price === 'number' && v.sale_price > 0) ? 'Sold' :
+      (typeof v.asking_price === 'number' && v.asking_price > 0) ? 'Asking' :
+      (typeof v.current_value === 'number' && v.current_value > 0) ? 'Estimated' :
+      (typeof v.purchase_price === 'number' && v.purchase_price > 0) ? 'Purchased' :
+      '';
+
+    const formatted = priceValue ? new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(priceValue) : '—';
+
+    const badge = (() => {
+      const raw = String(label || '').trim();
+      const l = raw.toLowerCase();
+      if (!raw) return '';
+      if (l.includes('sold')) return 'SOLD';
+      if (l.includes('asking')) return 'ASKING';
+      if (l.includes('estimated')) return 'EST';
+      if (l.includes('purchased')) return 'PURCHASE';
+      if (l.includes('msrp')) return 'MSRP';
+      return raw.toUpperCase();
+    })();
+
+    return { displayPrice: formatted, priceLabel: label, priceBadge: badge };
+  }, [vehicle]);
 
   const formatPrice = (price?: number) => {
     if (!price) return '—';
