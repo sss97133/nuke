@@ -644,6 +644,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return `${m}m`;
   };
 
+  // Live auction timer (header should feel alive)
+  const [auctionNow, setAuctionNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (!auctionPulse?.end_date) return;
+    const tick = () => setAuctionNow(Date.now());
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') tick();
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [auctionPulse?.end_date]);
+
   const formatCountdownClock = (iso?: string | null) => {
     if (!iso) return null;
     const end = new Date(iso).getTime();
@@ -659,6 +670,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (d > 0) return `${d}d ${pad(h)}:${pad(m)}:${pad(s)}`;
     return `${pad(h)}:${pad(m)}:${pad(s)}`;
   };
+
+  const isAuctionLive = useMemo(() => {
+    if (!auctionPulse?.listing_url) return false;
+    const status = String(auctionPulse.listing_status || '').toLowerCase();
+    // Some environments may backfill listings with status='unknown' initially. If we have a future end_date,
+    // treat it as live so the header shows the auction pulse instead of hiding it.
+    if (status !== 'active' && status !== 'live') {
+      if (!auctionPulse?.end_date) return false;
+      const end = new Date(auctionPulse.end_date).getTime();
+      if (!Number.isFinite(end)) return false;
+      return end > auctionNow;
+    }
+    if (!auctionPulse.end_date) return true;
+    const end = new Date(auctionPulse.end_date).getTime();
+    if (!Number.isFinite(end)) return true;
+    return end > auctionNow;
+  }, [auctionPulse, auctionNow]);
 
   const auctionPulseMs = useMemo(() => {
     if (!auctionPulse?.listing_url) return null;
@@ -677,34 +705,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (s <= 24 * 60 * 60) return 3200;
     return 4200;
   }, [auctionPulse?.listing_url, auctionPulse?.end_date, auctionNow, isAuctionLive]);
-
-  // Live auction timer (header should feel alive)
-  const [auctionNow, setAuctionNow] = useState<number>(() => Date.now());
-  useEffect(() => {
-    if (!auctionPulse?.end_date) return;
-    const tick = () => setAuctionNow(Date.now());
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') tick();
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [auctionPulse?.end_date]);
-
-  const isAuctionLive = useMemo(() => {
-    if (!auctionPulse?.listing_url) return false;
-    const status = String(auctionPulse.listing_status || '').toLowerCase();
-    // Some environments may backfill listings with status='unknown' initially. If we have a future end_date,
-    // treat it as live so the header shows the auction pulse instead of hiding it.
-    if (status !== 'active' && status !== 'live') {
-      if (!auctionPulse?.end_date) return false;
-      const end = new Date(auctionPulse.end_date).getTime();
-      if (!Number.isFinite(end)) return false;
-      return end > auctionNow;
-    }
-    if (!auctionPulse.end_date) return true;
-    const end = new Date(auctionPulse.end_date).getTime();
-    if (!Number.isFinite(end)) return true;
-    return end > auctionNow;
-  }, [auctionPulse, auctionNow]);
 
   const auctionStatusForBadge = useMemo(() => {
     const status = String(auctionPulse?.listing_status || '').toLowerCase();
@@ -1555,7 +1555,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           textDecoration: 'none',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : null),
+                          ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : undefined),
                         }}
                         className={auctionPulseMs ? 'auction-cta-pulse' : undefined}
                         onMouseEnter={(e) => {
@@ -1867,7 +1867,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   // Blur effect for RNM auctions (reserve not met)
                   filter: isRNM && highBid ? 'blur(4px)' : 'none',
                   transition: 'filter 0.2s ease',
-                  ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : null),
+                  ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : undefined),
                 }}
                   className={auctionPulseMs && isAuctionLive ? 'auction-price-pulse' : undefined}
                 title={isRNM ? "Reserve not met - high bid hidden (click to reveal)" : "Click to see data source and confidence"}
