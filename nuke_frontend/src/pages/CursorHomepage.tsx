@@ -395,16 +395,50 @@ const CursorHomepage: React.FC = () => {
   // Load accurate stats from database (not filtered feed)
   const loadAccurateStats = async () => {
     try {
-      const { data: statsData, error: statsError } = await supabase.rpc('get_vehicle_feed_stats');
-      
+      // Cache to avoid hammering a sometimes-slow RPC on every homepage visit.
+      // If the RPC times out, we keep the UI responsive and fall back to cached stats.
+      const CACHE_KEY = 'nuke_feed_stats_cache_v1';
+      const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+      try {
+        const cachedRaw = localStorage.getItem(CACHE_KEY);
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw);
+          if (cached?.ts && (Date.now() - cached.ts) < CACHE_TTL_MS && cached?.stats) {
+            setStats(cached.stats);
+            setStatsLoading(false);
+            // Continue in background to refresh cache (best-effort).
+          }
+        }
+      } catch {
+        // ignore cache parse errors
+      }
+
+      const timeoutMs = 4000;
+      const rpcPromise = supabase.rpc('get_vehicle_feed_stats');
+      const timeoutPromise = new Promise<{ data: any; error: any }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), timeoutMs)
+      );
+
+      const { data: statsData, error: statsError } = await Promise.race([rpcPromise, timeoutPromise]);
+
       if (!statsError && statsData) {
-        setStats({
+        const next = {
           totalBuilds: statsData.active_builds || 0,
           totalValue: statsData.total_value || 0,
           activeToday: statsData.updated_today || 0
-        });
+        };
+        setStats(next);
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stats: next }));
+        } catch {
+          // ignore
+        }
       } else {
-        console.warn('Failed to load accurate stats:', statsError);
+        // Don't spam console with repeated timeouts; cache should cover most sessions.
+        if (statsError?.message !== 'timeout') {
+          console.warn('Failed to load accurate stats:', statsError);
+        }
       }
     } catch (err) {
       console.warn('Error loading accurate stats:', err);
@@ -440,21 +474,27 @@ const CursorHomepage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Get vehicles with basic data including origin_metadata for fallback images
+      // Get vehicles for feed (keep payload small; avoid heavy origin_metadata + bulk image joins here).
       let query = supabase
         .from('vehicles')
         .select(`
           id, year, make, model, title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
-          is_for_sale, mileage, status, is_public, origin_metadata, primary_image_url, image_url
+          is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id
         `)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
-        .limit(500);
+        .limit(200);
 
       if (!filters.showPending) {
         query = query.neq('status', 'pending');
+      }
+
+      // Server-side time filtering (avoid fetching 200 then filtering in JS).
+      const timeFilter = getTimePeriodFilter();
+      if (timeFilter) {
+        query = query.gte('updated_at', timeFilter);
       }
 
       const { data: vehicles, error } = await query;
@@ -471,55 +511,9 @@ const CursorHomepage: React.FC = () => {
         return;
       }
 
-      // Apply time filter
-      const timeFilter = getTimePeriodFilter();
-      let filteredVehicles = vehicles;
-      if (timeFilter) {
-        filteredVehicles = vehicles.filter((v: any) =>
-          new Date(v.updated_at) >= new Date(timeFilter)
-        );
-      }
-
-      // Load ANY images for vehicles (not just primary) - handle NULL vehicle_id issue
-      const vehicleIds = filteredVehicles.map(v => v.id);
-      const { data: images } = await supabase
-        .from('vehicle_images')
-        .select('id, vehicle_id, image_url, medium_url, large_url, thumbnail_url, is_primary, storage_path, variants, created_at')
-        .in('vehicle_id', vehicleIds)
-        .not('vehicle_id', 'is', null)
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      // Build per-vehicle image lists (deduped) while preserving ordering (primary first, newest first).
-      const imagesByVehicle = new Map<string, Array<{ id: string; url: string; is_primary: boolean }>>();
-      const seenUrlByVehicle = new Map<string, Set<string>>();
-
-      (images || []).forEach((img: any) => {
-        const vehicleId = img?.vehicle_id;
-        if (!vehicleId) return;
-        const resolved = resolveVehicleImageUrl(img);
-        if (!resolved) return;
-
-        if (!imagesByVehicle.has(vehicleId)) {
-          imagesByVehicle.set(vehicleId, []);
-          seenUrlByVehicle.set(vehicleId, new Set());
-        }
-
-        const seen = seenUrlByVehicle.get(vehicleId)!;
-        if (seen.has(resolved)) return;
-        seen.add(resolved);
-
-        imagesByVehicle.get(vehicleId)!.push({
-          id: String(img?.id || `${vehicleId}-${seen.size}`),
-          url: resolved,
-          is_primary: Boolean(img?.is_primary),
-        });
-      });
-
-      console.log(`Found ${images?.length || 0} total images, mapped to ${imagesByVehicle.size} unique vehicles`);
-
-      // Process vehicles with image data (database + origin metadata fallback)
-      const processed = filteredVehicles.map((v: any) => {
+      // Process vehicles with lightweight image data (vehicles table fields only).
+      // This is the biggest feed perf win: avoid pulling 1000+ vehicle_images rows during homepage load.
+      const processed = (vehicles || []).map((v: any) => {
         const salePrice = v.sale_price ? Number(v.sale_price) : 0;
         const askingPrice = v.asking_price ? Number(v.asking_price) : 0;
         const currentValue = v.current_value ? Number(v.current_value) : 0;
@@ -527,46 +521,18 @@ const CursorHomepage: React.FC = () => {
         const displayPrice = salePrice > 0 ? salePrice : askingPrice > 0 ? askingPrice : currentValue;
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
 
-        // Get images from database first (full list), then fallback to vehicle row fields / origin metadata.
-        const dbImages = imagesByVehicle.get(v.id) || [];
-        let allImages: Array<{ id: string; url: string; is_primary: boolean }> = dbImages;
-
-        // Prefer explicitly primary image, otherwise first in list (which should already be primary-first).
-        let primaryImageUrl =
-          dbImages.find((img) => img.is_primary)?.url ||
-          dbImages[0]?.url ||
+        const primaryImageUrl =
+          normalizeSupabaseStorageUrl(v.primary_image_url) ||
+          normalizeSupabaseStorageUrl(v.image_url) ||
           null;
 
-        // If no DB images, fallback to vehicle row fields and/or origin metadata images.
-        if (!primaryImageUrl) {
-          const fallbackRowUrls = [
-            normalizeSupabaseStorageUrl(v.primary_image_url),
-            normalizeSupabaseStorageUrl(v.image_url),
-          ].filter((u: any) => isUsableImageSrc(u));
+        const allImages = primaryImageUrl
+          ? [{ id: `row-${v.id}-0`, url: primaryImageUrl, is_primary: true }]
+          : [];
 
-          const originUrls = getOriginImages(v)
-            .map((u: string) => normalizeSupabaseStorageUrl(u))
-            .filter((u: any) => isUsableImageSrc(u));
-
-          const combined: string[] = [];
-          const seen = new Set<string>();
-          for (const u of [...fallbackRowUrls, ...originUrls]) {
-            if (!u || seen.has(u)) continue;
-            seen.add(u);
-            combined.push(u);
-          }
-
-          primaryImageUrl = combined[0] || null;
-          allImages = combined.map((url, idx) => ({
-            id: `fallback-${v.id}-${idx}`,
-            url,
-            is_primary: idx === 0,
-          }));
-        }
-
-        // Clean display fields to avoid showing raw listing junk on the homepage.
-        const displayMake = cleanDisplayMake(v.make) || cleanDisplayMake(v.origin_metadata?.make) || v.make || null;
-        const displayModel = cleanDisplayModel(v.model) || cleanDisplayModel(v.origin_metadata?.model) || v.model || null;
+        // Keep display fields simple; feed should stay fast.
+        const displayMake = cleanDisplayMake(v.make) || v.make || null;
+        const displayModel = cleanDisplayModel(v.model) || v.model || null;
 
         let hypeScore = 0;
         let hypeReason = '';
