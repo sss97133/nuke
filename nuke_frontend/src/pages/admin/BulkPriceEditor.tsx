@@ -23,10 +23,10 @@ interface Draft {
 }
 
 const to8 = { fontSize: '12px' } as const;
-const cardHeaderStyle: React.CSSProperties = { ...to8, padding: '10px', borderBottom: '1px solid #c0c0c0', background: '#f3f4f6' };
+const cardHeaderStyle: React.CSSProperties = { ...to8, padding: '10px', borderBottom: '1px solid #c0c0c0', background: 'var(--bg)' };
 const inputStyle: React.CSSProperties = { ...to8, width: 120, padding: '6px 8px', border: '1px solid #c0c0c0', borderRadius: 4 };
 const cellStyle: React.CSSProperties = { ...to8, padding: '8px 10px', borderBottom: '1px solid #e5e7eb', minHeight: 36 };
-const headCellStyle: React.CSSProperties = { ...to8, padding: '8px 10px', borderBottom: '1px solid #c0c0c0', background: '#f3f4f6', fontWeight: 700 };
+const headCellStyle: React.CSSProperties = { ...to8, padding: '8px 10px', borderBottom: '1px solid #c0c0c0', background: 'var(--bg)', fontWeight: 700 };
 
 const BulkPriceEditor: React.FC = () => {
   const navigate = useNavigate();
@@ -352,7 +352,7 @@ const BulkPriceEditor: React.FC = () => {
         </div>
         <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
           {/* Header Row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '260px 100px 120px 120px 120px 120px 100px 160px 180px', minWidth: 1280, borderBottom: '1px solid #c0c0c0', position: 'sticky', top: 0, background: '#f9fafb', zIndex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '260px 100px 120px 120px 120px 120px 100px 160px 180px', minWidth: 1280, borderBottom: '1px solid #c0c0c0', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
             <div style={headCellStyle}>Vehicle</div>
             <div style={headCellStyle}>MSRP</div>
             <div style={headCellStyle}>Purchase</div>

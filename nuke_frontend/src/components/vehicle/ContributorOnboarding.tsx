@@ -503,7 +503,7 @@ export const ContributorOnboarding: React.FC<ContributorOnboardingProps> = ({ ve
         <div>
           <h3 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: '600' }}>Review Your Request</h3>
 
-          <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+          <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: 'var(--bg)', borderRadius: '6px' }}>
             <div style={{ marginBottom: '8px' }}>
               <strong>Role:</strong> {ROLE_TYPES.find(r => r.value === selectedRole)?.label}
             </div>

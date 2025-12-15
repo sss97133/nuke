@@ -288,7 +288,7 @@ export default function MergeProposalsDashboard() {
               {proposal.ai_summary && (
                 <div style={{
                   padding: '10px',
-                  background: '#f9fafb',
+                  background: 'var(--bg)',
                   border: '1px solid #d1d5db',
                   borderRadius: '3px',
                   fontSize: '8pt',

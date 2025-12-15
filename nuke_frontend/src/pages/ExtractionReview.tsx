@@ -219,7 +219,7 @@ const ExtractionReview: React.FC = () => {
                   <div style={{ fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>Dimensions</div>
                   <pre style={{
                     fontSize: '7pt',
-                    background: '#f5f5f5',
+                    background: 'var(--bg)',
                     padding: '8px',
                     borderRadius: '4px',
                     overflow: 'auto'
@@ -237,7 +237,7 @@ const ExtractionReview: React.FC = () => {
                   </div>
                   <pre style={{
                     fontSize: '7pt',
-                    background: '#f5f5f5',
+                    background: 'var(--bg)',
                     padding: '8px',
                     borderRadius: '4px',
                     overflow: 'auto',
@@ -259,7 +259,7 @@ const ExtractionReview: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '8px' }}>
                 {selectedExtraction.extracted_data.colors.map((color: any, index: number) => (
                   <div key={index} style={{
-                    background: '#f5f5f5',
+                    background: 'var(--bg)',
                     padding: '8px',
                     borderRadius: '4px',
                     fontSize: '7pt'
@@ -283,7 +283,7 @@ const ExtractionReview: React.FC = () => {
               </h4>
               <pre style={{
                 fontSize: '7pt',
-                background: '#f5f5f5',
+                background: 'var(--bg)',
                 padding: '8px',
                 borderRadius: '4px',
                 overflow: 'auto',
@@ -302,7 +302,7 @@ const ExtractionReview: React.FC = () => {
               </h4>
               <pre style={{
                 fontSize: '7pt',
-                background: '#f5f5f5',
+                background: 'var(--bg)',
                 padding: '8px',
                 borderRadius: '4px',
                 overflow: 'auto'
@@ -319,7 +319,7 @@ const ExtractionReview: React.FC = () => {
             </summary>
             <pre style={{
               fontSize: '7pt',
-              background: '#f5f5f5',
+              background: 'var(--bg)',
               padding: '8px',
               borderRadius: '4px',
               overflow: 'auto',

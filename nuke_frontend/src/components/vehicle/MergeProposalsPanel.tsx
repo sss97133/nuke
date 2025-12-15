@@ -367,7 +367,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
               {proposal.recommendation_reason && (
                 <div style={{
                   padding: '8px',
-                  background: '#f3f4f6',
+                  background: 'var(--bg)',
                   border: '1px solid #d1d5db',
                   borderRadius: '3px',
                   fontSize: '8pt',

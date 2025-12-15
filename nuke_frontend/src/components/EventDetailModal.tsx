@@ -247,7 +247,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
                   <div
                     key={product.id}
                     style={{
-                      background: '#f5f5f5',
+                      background: 'var(--bg)',
                       border: '1px solid #ccc',
                       padding: '8px',
                       display: 'flex',

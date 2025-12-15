@@ -141,7 +141,7 @@ class ErrorBoundary extends Component<Props, State> {
             </p>
             {eventId && (
               <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: '11px' }}>
-                Error ID: <code style={{ backgroundColor: '#f3f4f6', padding: '2px 4px', borderRadius: '3px' }}>{eventId}</code>
+                Error ID: <code style={{ backgroundColor: 'var(--bg)', padding: '2px 4px', borderRadius: '3px' }}>{eventId}</code>
               </p>
             )}
           </div>

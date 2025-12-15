@@ -95,7 +95,7 @@ const VehicleDiscoveryCard: React.FC<VehicleDiscoveryCardProps> = ({ vehicle, co
       <div style={{ 
         position: 'relative',
         paddingBottom: compact ? '56.25%' : '66.67%', // 16:9 or 3:2 aspect ratio
-        backgroundColor: '#f3f4f6',
+        backgroundColor: 'var(--bg)',
         overflow: 'hidden'
       }}>
         {vehicle.primary_image_url && !imageError ? (

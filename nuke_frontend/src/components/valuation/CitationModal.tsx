@@ -327,7 +327,7 @@ export default function CitationModal({
 
                     {/* Labor details */}
                     {(cit.shop_id || cit.laborer_user_id || cit.mitchell_operation_code) && (
-                      <div style={{ fontSize: '8pt', background: '#f9fafb', padding: '8px', borderRadius: '2px' }}>
+                      <div style={{ fontSize: '8pt', background: 'var(--bg)', padding: '8px', borderRadius: '2px' }}>
                         <div style={{ fontWeight: 600, marginBottom: '4px' }}>Labor Details:</div>
                         {cit.shop_id && <div>Shop: {cit.shop_id.slice(0, 8)}...</div>}
                         {cit.laborer_user_id && <div>Laborer: {cit.laborer_user_id.slice(0, 8)}...</div>}

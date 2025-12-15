@@ -398,7 +398,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
       {/* Add Tag Form */}
       {pendingPosition && isTagging && !readonly && (
         <div style={{
-          background: '#f0f0f0',
+          background: 'var(--surface)',
           border: '2px inset #c0c0c0',
           padding: '8px',
           margin: '8px'
@@ -823,7 +823,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
         {/* Add Tag Form */}
         {pendingPosition && isTagging && !readonly && (
           <div style={{
-            background: '#f0f0f0',
+            background: 'var(--surface)',
             border: '2px inset #c0c0c0',
             padding: '8px',
             margin: '8px'

@@ -111,7 +111,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
   };
 
   const smallChipStyle: React.CSSProperties = {
-    background: '#f3f4f6',
+    background: 'var(--bg)',
     border: '1px solid #c0c0c0',
     padding: '1px 4px',
     borderRadius: '2px',
@@ -171,7 +171,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                   title="Click to see comparable valuations"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   EST: {formatPrice(estimate)}
                 </span>
@@ -187,7 +187,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                   title="Value change over time"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
                 </span>
@@ -200,7 +200,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'confidence', confidence)}
                   title="Data confidence score"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   conf {confidence}
                 </span>
@@ -265,7 +265,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'year', vehicle.year)}
                   title={`See other ${vehicle.year} vehicles`}
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   {vehicle.year}
                 </span>
@@ -276,7 +276,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'make', vehicle.make)}
                   title={`See other ${vehicle.make} vehicles`}
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   {vehicle.make}
                 </span>
@@ -287,7 +287,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'model', vehicle.model)}
                   title={`See other ${vehicle.model} vehicles`}
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   {vehicle.model}
                 </span>
@@ -299,7 +299,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                     onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                     title="Click to see comparable valuations"
                     onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                    onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                    onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                   >
                     EST: {formatPrice(estimate)}
                   </span>
@@ -315,7 +315,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                     onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                     title="Value change over time"
                     onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                    onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                    onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                   >
                     {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
                   </span>
@@ -328,7 +328,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                     onClick={(e) => handleBadgeClick(e, 'band', band)}
                     title="Market value band: 85%–100%–115% of estimate"
                     onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                    onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                    onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                   >
                     Band: {formatPrice(band.low)}–{formatPrice(band.mid)}–{formatPrice(band.high)}
                   </span>
@@ -341,7 +341,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                     onClick={(e) => handleBadgeClick(e, 'confidence', confidence)}
                     title="Data confidence score"
                     onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                    onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                    onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                   >
                     conf {confidence}
                   </span>
@@ -409,7 +409,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                 onClick={(e) => handleBadgeClick(e, 'year', vehicle.year)}
                 title={`See other ${vehicle.year} vehicles`}
                 onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
               >
                 {vehicle.year}
               </span>
@@ -420,7 +420,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                 onClick={(e) => handleBadgeClick(e, 'make', vehicle.make)}
                 title={`See other ${vehicle.make} vehicles`}
                 onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
               >
                 {vehicle.make}
               </span>
@@ -431,7 +431,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                 onClick={(e) => handleBadgeClick(e, 'model', vehicle.model)}
                 title={`See other ${vehicle.model} vehicles`}
                 onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
               >
                 {vehicle.model}
               </span>
@@ -443,7 +443,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                   title="Click to see comparable valuations"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   EST: {formatPrice(estimate)}
                 </span>
@@ -459,7 +459,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'estimate', estimate)}
                   title="Value change over time"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   {change >= 0 ? '↑' : '↓'} {Math.abs(change).toFixed(1)}%
                 </span>
@@ -472,7 +472,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'band', band)}
                   title="Market value band"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   Band: {formatPrice(band.low)}–{formatPrice(band.mid)}–{formatPrice(band.high)}
                 </span>
@@ -485,7 +485,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onClick={(e) => handleBadgeClick(e, 'confidence', confidence)}
                   title="Data confidence score"
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
-                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: '#f3f4f6', borderColor: '#c0c0c0' })}
+                  onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
                   conf {confidence}
                 </span>

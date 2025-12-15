@@ -172,7 +172,7 @@ const AIProviderSettings: React.FC = () => {
       </div>
       <div className="card-body">
         {showAddForm && (
-          <div style={{ marginBottom: '12px', padding: '12px', background: '#f5f5f5', border: '1px solid #e0e0e0' }}>
+          <div style={{ marginBottom: '12px', padding: '12px', background: 'var(--bg)', border: '1px solid #e0e0e0' }}>
             <div className="text font-bold" style={{ marginBottom: '8px', fontSize: '9pt' }}>Add API Key</div>
             <ProviderForm
               provider={{
@@ -193,7 +193,7 @@ const AIProviderSettings: React.FC = () => {
         )}
 
         {providers.length === 0 && !showAddForm && (
-          <div style={{ textAlign: 'center', padding: '24px', background: '#fafafa', border: '1px dashed #ccc' }}>
+          <div style={{ textAlign: 'center', padding: '24px', background: 'var(--bg)', border: '1px dashed #ccc' }}>
             <div style={{ fontSize: '24pt', marginBottom: '8px' }}>🔑</div>
             <div className="text font-bold" style={{ marginBottom: '4px', fontSize: '9pt' }}>No API Keys</div>
             <div className="text text-small text-muted" style={{ fontSize: '8pt' }}>

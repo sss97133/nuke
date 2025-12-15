@@ -411,12 +411,12 @@ const AdminVerifications: React.FC = () => {
                                   onClick={() => viewDocument(d)}
                                 />
                               ) : (
-                                <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', borderRadius: 4, marginBottom: 8 }}>
+                                <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 4, marginBottom: 8 }}>
                                   Loading preview…
                                 </div>
                               )
                             ) : (
-                              <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', borderRadius: 4, marginBottom: 8 }}>
+                              <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 4, marginBottom: 8 }}>
                                 {d.mime_type || 'Document'}
                               </div>
                             )}
@@ -436,7 +436,7 @@ const AdminVerifications: React.FC = () => {
                               )}
                             </div>
                             {dup && openDupIds.has(d.id) && (
-                              <div className="card" style={{ background: '#fafafa', marginTop: 8 }}>
+                              <div className="card" style={{ background: 'var(--bg)', marginTop: 8 }}>
                                 <div className="card-body">
                                   <div className="text-small text-muted" style={{ marginBottom: 6 }}>Matching files:</div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

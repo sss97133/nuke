@@ -367,7 +367,7 @@ const WorkDocumentationPanel: React.FC<WorkDocumentationPanelProps> = ({
           <div style={{ 
             padding: '8px', 
             borderTop: '1px solid #e5e7eb', 
-            backgroundColor: '#f9fafb',
+            backgroundColor: 'var(--bg)',
             display: 'flex',
             justifyContent: 'space-between',
             fontSize: '8pt'

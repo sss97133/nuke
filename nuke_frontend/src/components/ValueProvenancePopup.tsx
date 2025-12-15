@@ -264,7 +264,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: '#f5f5f5'
+          background: 'var(--bg)'
         }}>
           <div>
             <div style={{ fontSize: '7pt', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>

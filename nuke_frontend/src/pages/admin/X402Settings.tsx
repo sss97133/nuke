@@ -424,7 +424,7 @@ Or use Supabase CLI:
             <li>Add the three environment variables (X402_WALLET_ADDRESS, X402_NETWORK, X402_FACILITATOR_URL)</li>
             <li>Deploy the x402-payment edge function:
               <pre style={{ 
-                background: '#f5f5f5', 
+                background: 'var(--bg)', 
                 padding: '8px', 
                 marginTop: '8px',
                 fontSize: '8pt',

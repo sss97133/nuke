@@ -669,7 +669,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                       backgroundImage: v.thumbnail_url ? `url(${v.thumbnail_url})` : 'url(/n-zero.png)',
                       backgroundSize: v.thumbnail_url ? 'cover' : 'contain',
                       backgroundPosition: 'center',
-                      backgroundColor: '#f5f5f5',
+                      backgroundColor: 'var(--bg)',
                       position: 'relative',
                       opacity: v.thumbnail_url ? 1 : 0.3
                     }}>
@@ -883,7 +883,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                           backgroundImage: v.thumbnail_url ? `url(${v.thumbnail_url})` : 'url(/n-zero.png)',
                           backgroundSize: v.thumbnail_url ? 'cover' : 'contain',
                           backgroundPosition: 'center',
-                          backgroundColor: '#f5f5f5',
+                          backgroundColor: 'var(--bg)',
                           border: '1px solid var(--border)',
                           borderRadius: '4px',
                           flexShrink: 0,

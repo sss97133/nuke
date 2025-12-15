@@ -162,7 +162,7 @@ const BidForm: React.FC<BidFormProps> = ({ auction, onBidSubmitted, onCancel }) 
       {/* Current Bid Info */}
       <div
         style={{
-          background: '#f3f4f6',
+          background: 'var(--bg)',
           padding: '8px',
           marginBottom: '12px',
           borderRadius: '2px',
@@ -375,7 +375,7 @@ const BidForm: React.FC<BidFormProps> = ({ auction, onBidSubmitted, onCancel }) 
         style={{
           marginTop: '12px',
           padding: '8px',
-          background: '#f9fafb',
+          background: 'var(--bg)',
           border: '1px solid #e5e7eb',
           borderRadius: '2px',
           fontSize: '8pt',

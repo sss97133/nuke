@@ -109,7 +109,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
       className={`lazy-image-container ${className}`}
       style={{
         position: 'relative',
-        backgroundColor: '#f3f4f6',
+        backgroundColor: 'var(--bg)',
         ...style
       }}
       onMouseEnter={handleMouseEnter}
@@ -127,7 +127,7 @@ const LazyImage: React.FC<LazyImageProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: '#f3f4f6',
+            backgroundColor: 'var(--bg)',
             borderRadius: 'inherit'
           }}
         >

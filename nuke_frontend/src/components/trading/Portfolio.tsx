@@ -107,7 +107,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
             <div
               key={holding.offering_id}
               style={{
-                background: '#f9fafb',
+                background: 'var(--bg)',
                 border: '1px solid #e5e7eb',
                 padding: '10px',
                 borderRadius: '2px',

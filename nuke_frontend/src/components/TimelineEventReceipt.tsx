@@ -275,7 +275,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         <div style={{
           padding: '8px 12px',
           borderBottom: '3px double #000',
-          background: '#fafafa',
+          background: 'var(--bg)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
@@ -336,7 +336,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: '#f0f0f0',
+                    background: 'var(--surface)',
                     border: '1px solid #ccc',
                     borderRadius: '2px',
                     fontSize: '7pt',
@@ -1110,7 +1110,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         )}
 
         {/* TOTAL - COMPACT */}
-        <div style={{ padding: '8px 12px', borderBottom: '3px double #000', background: '#f5f5f5' }}>
+        <div style={{ padding: '8px 12px', borderBottom: '3px double #000', background: 'var(--bg)' }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -1154,7 +1154,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
         {/* PHOTOS - COMPACT GRID */}
         {images.length > 0 && (
-          <div data-images-section style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', background: '#fafafa' }}>
+          <div data-images-section style={{ padding: '8px 12px', borderBottom: '1px solid #bdbdbd', background: 'var(--bg)' }}>
             <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: '#666', textTransform: 'uppercase' }}>
               Documentation ({images.length})
             </div>
@@ -1323,7 +1323,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
         </div>
 
         {/* FOOTER / ACTIONS - COMPACT */}
-        <div style={{ padding: '6px 12px', background: '#f5f5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '6px 12px', background: 'var(--bg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '7pt', color: '#999' }}>
             ESC to close
           </div>

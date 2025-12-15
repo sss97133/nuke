@@ -39,7 +39,7 @@ const panelStyle: React.CSSProperties = {
 const headerStyle: React.CSSProperties = {
   padding: '8px 12px',
   borderBottom: '1px solid #c0c0c0',
-  background: '#f3f4f6',
+  background: 'var(--bg)',
   fontWeight: 700,
   fontSize: '9pt'
 };

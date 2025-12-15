@@ -152,7 +152,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
         style={{
           fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
           fontSize: '8pt',
-          background: '#f5f5f5',
+          background: 'var(--bg)',
           borderLeft: '1px solid #bdbdbd',
           padding: '8px',
           marginBottom: '4px',
@@ -214,7 +214,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
       <div style={{ paddingLeft: is_read ? '0' : '12px', display: 'flex', gap: '12px' }}>
         {/* Vehicle Image */}
         {vehicleImageUrl && (
-          <div style={{ flex: '0 0 60px', height: '60px', background: '#f0f0f0', border: '1px solid #bdbdbd', overflow: 'hidden' }}>
+          <div style={{ flex: '0 0 60px', height: '60px', background: 'var(--surface)', border: '1px solid #bdbdbd', overflow: 'hidden' }}>
             <img
               src={vehicleImageUrl}
               alt="Vehicle"

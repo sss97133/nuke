@@ -88,7 +88,7 @@ export default function CreateOrganization() {
   };
 
   return (
-    <div style={{ background: '#f5f5f5', minHeight: '100vh', padding: '20px' }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', padding: '20px' }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         <div className="card">
           <div className="card-header">

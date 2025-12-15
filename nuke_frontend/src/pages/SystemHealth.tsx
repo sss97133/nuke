@@ -186,7 +186,7 @@ export default function SystemHealth() {
 
       {/* Stats */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-        <div style={{ padding: '8px', background: '#f5f5f5', border: '1px solid #bdbdbd', borderRadius: '2px' }}>
+        <div style={{ padding: '8px', background: 'var(--bg)', border: '1px solid #bdbdbd', borderRadius: '2px' }}>
           <div style={{ fontSize: '7pt', color: '#757575' }}>Open Issues</div>
           <div style={{ fontSize: '14pt', fontWeight: '600' }}>{openCount}</div>
         </div>
@@ -350,7 +350,7 @@ export default function SystemHealth() {
             {selectedIssue.context_data && Object.keys(selectedIssue.context_data).length > 0 && (
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ fontSize: '8pt', fontWeight: '600', marginBottom: '4px' }}>Context:</div>
-                <pre style={{ fontSize: '7pt', background: '#f5f5f5', padding: '8px', overflow: 'auto' }}>
+                <pre style={{ fontSize: '7pt', background: 'var(--bg)', padding: '8px', overflow: 'auto' }}>
                   {JSON.stringify(selectedIssue.context_data, null, 2)}
                 </pre>
               </div>

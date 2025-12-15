@@ -49,7 +49,7 @@ const InventoryQuickPanel: React.FC<{ userId: string; isOwnProfile: boolean }> =
         <div className="grid" style={{ gridTemplateColumns: '1fr', gap: 8 }}>
           {items.map(it => (
             <div key={it.id} className="flex items-center gap-2 border rounded p-2">
-              <div style={{ width: 48, height: 48, borderRadius: 6, background: '#f3f4f6', overflow: 'hidden' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 6, background: 'var(--bg)', overflow: 'hidden' }}>
                 {Array.isArray(it.images) && it.images[0] && (
                   <img src={it.images[0]} alt={it.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 )}

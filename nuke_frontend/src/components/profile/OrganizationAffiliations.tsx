@@ -201,7 +201,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
     <div style={{ padding: '0' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ borderBottom: '2px solid #000', backgroundColor: '#f5f5f5' }}>
+          <tr style={{ borderBottom: '2px solid #000', backgroundColor: 'var(--bg)' }}>
             <th style={{ padding: '8px', textAlign: 'left', fontSize: '10px', fontWeight: 'bold' }}>ORGANIZATION</th>
             <th style={{ padding: '8px', textAlign: 'left', fontSize: '10px', fontWeight: 'bold' }}>ROLE</th>
             <th style={{ padding: '8px', textAlign: 'left', fontSize: '10px', fontWeight: 'bold' }}>STATUS</th>

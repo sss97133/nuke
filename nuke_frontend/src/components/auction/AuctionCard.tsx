@@ -285,7 +285,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
 
         {/* Current Bid Section */}
         <div style={{
-          background: '#f3f4f6',
+          background: 'var(--bg)',
           padding: '8px',
           marginBottom: '8px',
           borderRadius: '2px'

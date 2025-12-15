@@ -132,7 +132,7 @@ const ReceiptViewer = ({ receiptId }: ReceiptViewerProps) => {
   if (loading) {
     return (
       <div style={{
-        background: '#f5f5f5',
+        background: 'var(--bg)',
         border: '1px solid #bdbdbd',
         padding: '16px',
         margin: '16px',
@@ -146,7 +146,7 @@ const ReceiptViewer = ({ receiptId }: ReceiptViewerProps) => {
 
   return (
     <div style={{
-      background: '#f5f5f5',
+      background: 'var(--bg)',
       border: '1px solid #bdbdbd',
       padding: '16px',
       margin: '16px',

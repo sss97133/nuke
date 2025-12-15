@@ -186,7 +186,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
             <div style={{ 
               marginBottom: '8px',
               padding: '4px',
-              backgroundColor: '#f5f5f5',
+              backgroundColor: 'var(--bg)',
               border: '1px solid #e0e0e0',
               fontSize: '8pt'
             }}>

@@ -264,7 +264,7 @@ const OrganizationVehiclesTab: React.FC<Props> = ({ organizationId, userId, canE
                   backgroundImage: v.vehicle_image_url ? `url(${v.vehicle_image_url})` : 'url(/n-zero.png)',
                   backgroundSize: v.vehicle_image_url ? 'cover' : 'contain',
                   backgroundPosition: 'center',
-                  backgroundColor: '#f5f5f5',
+                  backgroundColor: 'var(--bg)',
                   position: 'relative',
                   opacity: v.vehicle_image_url ? 1 : 0.3
                 }}>
@@ -397,7 +397,7 @@ const OrganizationVehiclesTab: React.FC<Props> = ({ organizationId, userId, canE
                       backgroundImage: v.vehicle_image_url ? `url(${v.vehicle_image_url})` : 'url(/n-zero.png)',
                       backgroundSize: v.vehicle_image_url ? 'cover' : 'contain',
                       backgroundPosition: 'center',
-                      backgroundColor: '#f5f5f5',
+                      backgroundColor: 'var(--bg)',
                       border: '1px solid var(--border)',
                       borderRadius: '4px',
                       flexShrink: 0,

@@ -36,7 +36,7 @@ const AITaggingDemo = () => {
 
   return (
     <div style={{
-      background: '#f5f5f5',
+      background: 'var(--bg)',
       border: '1px solid #bdbdbd',
       padding: '16px',
       margin: '16px',
@@ -76,7 +76,7 @@ const AITaggingDemo = () => {
                   padding: '2px 4px',
                   fontSize: '7pt',
                   border: '1px solid #bdbdbd',
-                  background: '#f5f5f5',
+                  background: 'var(--bg)',
                   borderRadius: '0px',
                   cursor: 'pointer'
                 }}

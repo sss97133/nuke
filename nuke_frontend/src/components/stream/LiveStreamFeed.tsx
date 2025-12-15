@@ -126,7 +126,7 @@ const LiveStreamFeed = ({ onStreamSelect }: LiveStreamFeedProps) => {
 
   return (
     <div style={{
-      background: '#f5f5f5',
+      background: 'var(--bg)',
       border: '1px solid #bdbdbd',
       padding: '16px',
       margin: '16px',

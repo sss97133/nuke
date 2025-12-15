@@ -246,7 +246,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
         <div
           style={{
             padding: '8px',
-            backgroundColor: '#f5f5f5',
+            backgroundColor: 'var(--bg)',
             borderRadius: '4px',
             marginBottom: '12px',
           }}

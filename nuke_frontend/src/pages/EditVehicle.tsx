@@ -1103,7 +1103,7 @@ const EditVehicle: React.FC = () => {
                           <div style={{ 
                             marginTop: '12px', 
                             padding: '12px', 
-                            background: '#f9fafb', 
+                            background: 'var(--bg)', 
                             border: '2px solid #e5e7eb',
                             borderRadius: '4px'
                           }}>
