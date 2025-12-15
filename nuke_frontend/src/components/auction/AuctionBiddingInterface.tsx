@@ -31,6 +31,7 @@ export default function AuctionBiddingInterface({
     bidCount,
     auctionEndTime,
     isExtended,
+    softCloseResetSeconds,
   } = useAuctionSubscription(listingId);
 
   useEffect(() => {
@@ -137,13 +138,16 @@ export default function AuctionBiddingInterface({
 
     if (diff <= 0) return 'Ended';
 
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
-    if (days > 0) return `${days}d ${hours % 24}h`;
-    if (hours > 0) return `${hours}h ${minutes % 60}m`;
-    return `${minutes}m`;
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+    if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+    // Show mm:ss in the high-intensity window.
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   if (!user) {
@@ -182,7 +186,10 @@ export default function AuctionBiddingInterface({
         </div>
         {isExtended && (
           <div className="text-yellow-600 text-sm font-medium">
-            Auction extended by 2 minutes due to recent bid
+            Auction extended due to recent bid
+            {typeof softCloseResetSeconds === 'number'
+              ? ` (reset to ${Math.floor(softCloseResetSeconds / 60)}:${(softCloseResetSeconds % 60).toString().padStart(2, '0')})`
+              : ''}
           </div>
         )}
       </div>
