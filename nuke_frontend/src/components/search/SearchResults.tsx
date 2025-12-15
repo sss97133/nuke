@@ -100,7 +100,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
         padding: '48px 24px',
         flexDirection: 'column',
         gap: '16px',
-        background: '#ffffff',
+        background: 'var(--surface)',
         border: '2px solid #e5e7eb',
         borderRadius: '8px',
         boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
@@ -123,7 +123,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
     <div className="search-results" style={{ padding: '0' }}>
       {/* Search Summary */}
       <div style={{
-        background: '#fff',
+        background: 'var(--surface)',
         border: '2px solid #000',
         borderRadius: '0px',
         padding: '12px 16px',
@@ -175,7 +175,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: '#ffffff',
+                  background: 'var(--surface)',
                   border: '2px solid #e5e7eb',
                   padding: '4px 8px',
                   borderRadius: '0px',
@@ -216,7 +216,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
         flexWrap: 'wrap',
         gap: '16px',
         padding: '8px 12px',
-        background: '#fff',
+        background: 'var(--surface)',
         border: '2px solid #000',
         borderRadius: '0px'
       }}>
@@ -269,7 +269,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                 height: '24px',
                 border: '2px solid #000',
                 borderRadius: '0px',
-                background: '#fff',
+                background: 'var(--surface)',
                 color: '#000',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -303,7 +303,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                 height: '24px',
                 border: '2px solid #000',
                 borderRadius: '0px',
-                background: '#fff',
+                background: 'var(--surface)',
                 color: '#000',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -325,7 +325,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
         <div style={{
           textAlign: 'center',
           padding: '32px 16px',
-          background: '#fff',
+          background: 'var(--surface)',
           border: '2px solid #000',
           borderRadius: '0px'
         }}>
@@ -397,7 +397,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
 
           {viewMode === 'list' && (
             <div style={{
-              background: '#fff',
+              background: 'var(--surface)',
               border: '2px solid #000',
               borderRadius: '0px',
               overflow: 'hidden'
@@ -417,7 +417,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                     borderBottom: index < filteredAndSortedResults.length - 1 ? '1px solid #000' : 'none',
                     cursor: 'pointer',
                     transition: 'background 0.12s ease',
-                    background: '#fff'
+                    background: 'var(--surface)'
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
                   onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}

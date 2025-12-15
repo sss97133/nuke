@@ -257,14 +257,14 @@ const OwnershipVerificationDashboard = () => {
 
   return (
     <div style={{
-      background: 'white',
+      background: 'var(--surface)',
       fontFamily: 'Arial, sans-serif',
       padding: '12px'
     }}>
 
       {/* Filter Tabs */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '8px',
         marginBottom: '12px'
@@ -307,7 +307,7 @@ const OwnershipVerificationDashboard = () => {
 
       {/* Verifications List */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         maxHeight: '600px',
         overflowY: 'auto'
@@ -377,7 +377,7 @@ const OwnershipVerificationDashboard = () => {
           justifyContent: 'center'
         }}>
           <div style={{
-            background: 'white',
+            background: 'var(--surface)',
             border: '2px solid #bdbdbd',
             borderRadius: '0px',
             padding: '0px',

@@ -302,7 +302,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
       {/* Tags preview - Show even if empty to indicate section exists */}
       <div style={{ height: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />
       {tags.length > 0 ? (
-        <div style={{ fontSize: '9pt', color: 'rgba(255,255,255,0.7)' }}>
+        <div style={{ fontSize: '9pt', color: 'var(--surface-glass)' }}>
           {tags.slice(0, 5).map(tag => tag.tag_text || tag.tag_name || tag.text || 'tag').filter(Boolean).join(' • ')}
         </div>
       ) : (
@@ -360,7 +360,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               {imageMetadata.ai_scan_metadata.tier_1_analysis.components_visible?.length > 0 && (
                 <div style={{ marginBottom: '8px' }}>
                   <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '7pt', marginBottom: '2px' }}>COMPONENTS</div>
-                  <div style={{ fontSize: '8pt', color: 'rgba(255,255,255,0.7)' }}>
+                  <div style={{ fontSize: '8pt', color: 'var(--surface-glass)' }}>
                     {imageMetadata.ai_scan_metadata.tier_1_analysis.components_visible.map((c: string) => c.replace(/_/g, ' ')).join(' • ')}
                   </div>
                 </div>
@@ -368,7 +368,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
               
               {/* Basic observations - the key insight */}
               {imageMetadata.ai_scan_metadata.tier_1_analysis.basic_observations && (
-                <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '9pt', lineHeight: '1.4' }}>
+                <div style={{ color: 'var(--surface-glass)', fontSize: '9pt', lineHeight: '1.4' }}>
                   {imageMetadata.ai_scan_metadata.tier_1_analysis.basic_observations}
                 </div>
               )}
@@ -391,7 +391,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
                 <div>{imageMetadata.ai_scan_metadata.appraiser.angle}</div>
               )}
               {imageMetadata.ai_scan_metadata.appraiser.description && (
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '9pt', marginTop: '4px' }}>
+                <div style={{ color: 'var(--surface-glass)', fontSize: '9pt', marginTop: '4px' }}>
                   {imageMetadata.ai_scan_metadata.appraiser.description}
                 </div>
               )}
@@ -500,7 +500,7 @@ export const ImageInfoPanel: React.FC<ImageInfoPanelProps> = ({
         style={{
           width: '100%',
           padding: '12px',
-          backgroundColor: 'white',
+          backgroundColor: 'var(--surface)',
           color: 'black',
           border: '2px solid white',
           fontSize: '9pt',

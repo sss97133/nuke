@@ -110,7 +110,7 @@ export const PriceFixButton: React.FC<PriceFixButtonProps> = ({
           disabled={fixing}
           style={{
             padding: '4px 12px',
-            background: 'white',
+            background: 'var(--surface)',
             color: '#f59e0b',
             border: 'none',
             borderRadius: '4px',

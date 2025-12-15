@@ -138,7 +138,7 @@ const LiveStreamFeed = ({ onStreamSelect }: LiveStreamFeedProps) => {
 
       {/* Stream Type Filter */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '8px',
         marginBottom: '12px'
@@ -200,7 +200,7 @@ const LiveStreamFeed = ({ onStreamSelect }: LiveStreamFeedProps) => {
             key={stream.stream_id}
             onClick={() => handleStreamClick(stream.stream_id)}
             style={{
-              background: 'white',
+              background: 'var(--surface)',
               border: '1px solid #bdbdbd',
               padding: '0px',
               cursor: 'pointer',
@@ -390,7 +390,7 @@ const LiveStreamFeed = ({ onStreamSelect }: LiveStreamFeedProps) => {
       {/* No Streams Message */}
       {!loading && streams.length === 0 && (
         <div style={{
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #bdbdbd',
           padding: '24px',
           textAlign: 'center',

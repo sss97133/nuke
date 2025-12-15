@@ -268,7 +268,7 @@ const OrganizationInventoryTab: React.FC<Props> = ({ organizationId, isOwner }) 
             width: '100%',
             borderCollapse: 'collapse',
             fontSize: '8pt',
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid var(--border)'
           }}>
             <thead>

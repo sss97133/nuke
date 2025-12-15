@@ -142,12 +142,12 @@ export const PhotoInboxGrid: React.FC<PhotoInboxGridProps> = ({
                   left: '6px',
                   width: '20px',
                   height: '20px',
-                  background: selected ? 'var(--primary)' : 'rgba(255, 255, 255, 0.9)',
+                  background: selected ? 'var(--accent)' : 'var(--surface-glass)',
                   border: '2px solid ' + (selected ? 'var(--primary)' : 'var(--border-dark)'),
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: selected ? '#fff' : 'transparent',
+                  color: selected ? 'var(--accent-bright)' : 'transparent',
                   fontSize: '12px',
                   fontWeight: '700'
                 }}>

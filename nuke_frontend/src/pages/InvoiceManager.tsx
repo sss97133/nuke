@@ -434,7 +434,7 @@ const InvoiceManager: React.FC = () => {
             {previewInvoice.html_content ? (
               <div
                 style={{
-                  background: '#ffffff',
+                  background: 'var(--surface)',
                   padding: 'var(--space-4)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius)'

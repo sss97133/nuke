@@ -79,7 +79,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
     return (
       <div
         style={{
-          background: 'white',
+          background: 'var(--surface)',
           border: `2px solid ${getStateColor()}`,
           padding: '12px',
           cursor: 'pointer',
@@ -166,7 +166,7 @@ const AuctionCard: React.FC<AuctionCardProps> = ({ auction, onBidClick, compact 
   return (
     <div
       style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: `2px solid ${getStateColor()}`,
         padding: '0',
         cursor: 'pointer',

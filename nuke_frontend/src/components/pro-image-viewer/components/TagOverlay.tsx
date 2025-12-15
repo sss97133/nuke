@@ -107,7 +107,7 @@ const TagOverlay: React.FC<TagOverlayProps> = memo(({
                 left: '50%',
                 top: '-120px',
                 transform: 'translateX(-50%)',
-                backgroundColor: 'white',
+                backgroundColor: 'var(--surface)',
                 border: '1px solid var(--border)',
                 borderRadius: '8px',
                 padding: '12px',

@@ -1222,7 +1222,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         color: 'white',
                         fontSize: '7pt',
                         borderRadius: '0px',
-                        border: '1px solid rgba(255,255,255,0.8)'
+                        border: '1px solid var(--border)'
                       }}>
                         {photo.album_count} ALBUM{photo.album_count > 1 ? 'S' : ''}
                       </div>
@@ -1236,8 +1236,8 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         width: '18px',
                         height: '18px',
                         background: 'var(--primary)',
-                        border: '2px solid white',
-                        color: 'white',
+                        border: '2px solid var(--border)',
+                        color: 'var(--accent-bright)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',

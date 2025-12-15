@@ -302,7 +302,7 @@ const AdminMissionControl: React.FC = () => {
 
       {/* Stats Grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '24px' }}>
-                  <div style={{ border: '2px solid #000', padding: '16px', background: '#fff' }}>
+                  <div style={{ border: '2px solid #000', padding: '16px', background: 'var(--surface)' }}>
                     <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
                       VEHICLE IMAGES
                     </div>
@@ -313,7 +313,7 @@ const AdminMissionControl: React.FC = () => {
                       {imageScanStats.unscanned_vehicle_images?.toLocaleString()} REMAINING
                     </div>
                   </div>
-                  <div style={{ border: '2px solid #000', padding: '16px', background: '#fff' }}>
+                  <div style={{ border: '2px solid #000', padding: '16px', background: 'var(--surface)' }}>
                     <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
                       ORGANIZATION IMAGES
                     </div>
@@ -489,7 +489,7 @@ const AdminMissionControl: React.FC = () => {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     padding: '12px',
-                    background: '#fff',
+                    background: 'var(--surface)',
                     border: '2px solid #e5e5e5'
                   }}
                 >
@@ -508,7 +508,7 @@ const AdminMissionControl: React.FC = () => {
                         fontSize: '8pt', 
                         padding: '8px 12px',
                         border: '2px solid #000',
-                        background: '#fff',
+                        background: 'var(--surface)',
                         cursor: 'pointer',
                         fontWeight: 600
                       }}
@@ -550,7 +550,7 @@ const AdminMissionControl: React.FC = () => {
         }}>
           RECENT ACTIVITY
         </div>
-        <div style={{ padding: '16px', background: '#fff' }}>
+        <div style={{ padding: '16px', background: 'var(--surface)' }}>
           {recentActivity.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#999', fontSize: '8pt' }}>
               NO RECENT ACTIVITY

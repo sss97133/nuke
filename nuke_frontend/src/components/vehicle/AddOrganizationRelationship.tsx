@@ -269,7 +269,7 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
                   fontSize: '9pt',
                   border: '1px solid var(--border)',
                   borderRadius: '4px',
-                  background: 'white'
+                  background: 'var(--surface)'
                 }}
               >
                 <option value="">Select an organization...</option>

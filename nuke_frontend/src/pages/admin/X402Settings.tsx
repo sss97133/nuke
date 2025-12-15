@@ -182,7 +182,7 @@ Or use Supabase CLI:
       <div style={{ 
         border: '2px solid #000',
         borderRadius: '0px',
-        background: '#fff',
+        background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 
@@ -229,7 +229,7 @@ Or use Supabase CLI:
                 <div>Network: <strong>{config.network}</strong></div>
                 {config.wallet_address && (
                   <div style={{ marginTop: '4px' }}>
-                    Wallet: <code style={{ fontSize: '8pt', background: '#fff', padding: '2px 4px' }}>
+                    Wallet: <code style={{ fontSize: '8pt', background: 'var(--surface)', padding: '2px 4px' }}>
                       {config.wallet_address.substring(0, 10)}...{config.wallet_address.substring(config.wallet_address.length - 8)}
                     </code>
                   </div>
@@ -276,7 +276,7 @@ Or use Supabase CLI:
       <div style={{ 
         border: '2px solid #000',
         borderRadius: '0px',
-        background: '#fff',
+        background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 
@@ -402,7 +402,7 @@ Or use Supabase CLI:
       <div style={{ 
         border: '2px solid #000',
         borderRadius: '0px',
-        background: '#fff',
+        background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 

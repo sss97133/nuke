@@ -274,7 +274,7 @@ const AdminNotificationCenter: React.FC<AdminNotificationCenterProps> = ({ onNot
       {/* Verification Details Modal */}
       {selectedNotification && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000 }}>
-          <div className="modal-content" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'white', padding: '24px', borderRadius: '8px', maxWidth: '600px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}>
+          <div className="modal-content" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'var(--surface)', border: '2px solid var(--border)', padding: '24px', borderRadius: '8px', maxWidth: '600px', width: '90%', maxHeight: '80vh', overflow: 'auto', color: 'var(--text)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2>Verification Review</h2>
               <button 
@@ -296,7 +296,7 @@ const AdminNotificationCenter: React.FC<AdminNotificationCenterProps> = ({ onNot
               {selectedNotification.notification_type === 'new_vehicle_import' && selectedNotification.vehicle_id && (
                 <div style={{ marginTop: '20px' }}>
                   <h4>Vehicle Import Details</h4>
-                  <div style={{ marginBottom: '20px', padding: '12px', background: '#f5f5f5', borderRadius: '4px' }}>
+                  <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--surface-hover)', borderRadius: '4px', border: '1px solid var(--border)' }}>
                     <p><strong>Year:</strong> {selectedNotification.metadata?.year || 'N/A'}</p>
                     <p><strong>Make:</strong> {selectedNotification.metadata?.make || 'N/A'}</p>
                     <p><strong>Model:</strong> {selectedNotification.metadata?.model || 'N/A'}</p>
@@ -403,7 +403,7 @@ const AdminNotificationCenter: React.FC<AdminNotificationCenterProps> = ({ onNot
       {/* Approval Modal */}
       {showApprovalModal && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1001 }}>
-          <div className="modal-content" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'white', padding: '24px', borderRadius: '8px', maxWidth: '400px', width: '90%' }}>
+          <div className="modal-content" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'var(--surface)', border: '2px solid var(--border)', padding: '24px', borderRadius: '8px', maxWidth: '400px', width: '90%', color: 'var(--text)' }}>
             <h3>Approve Verification</h3>
             <p>Are you sure you want to approve this ownership verification?</p>
             
@@ -444,7 +444,7 @@ const AdminNotificationCenter: React.FC<AdminNotificationCenterProps> = ({ onNot
       {/* Rejection Modal */}
       {showRejectionModal && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1001 }}>
-          <div className="modal-content" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'white', padding: '24px', borderRadius: '8px', maxWidth: '400px', width: '90%' }}>
+          <div className="modal-content" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'var(--surface)', border: '2px solid var(--border)', padding: '24px', borderRadius: '8px', maxWidth: '400px', width: '90%', color: 'var(--text)' }}>
             <h3>Reject Verification</h3>
             <p>Please provide a reason for rejecting this verification:</p>
             

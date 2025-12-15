@@ -91,7 +91,7 @@ const OrganizationQuickView = ({ organizationId, isOpen, onClose }: Organization
     >
       <div
         style={{
-          background: 'white',
+          background: 'var(--surface)',
           borderRadius: '4px',
           maxWidth: '600px',
           width: '100%',

@@ -128,7 +128,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
   const total = calculateTotal();
 
   return (
-    <div style={{ padding: '16px', background: '#fff', border: '2px solid #000' }}>
+    <div style={{ padding: '16px', background: 'var(--surface)', border: '2px solid #000' }}>
       
       {/* Header */}
       <div style={{ marginBottom: '16px', borderBottom: '2px solid #000', paddingBottom: '12px' }}>
@@ -326,7 +326,7 @@ export function PartsQuoteGenerator({ vehicleId, vehicleInfo }: PartsQuoteGenera
                 fontSize: '8pt',
                 fontWeight: 700,
                 border: '2px solid #000',
-                background: '#fff',
+                background: 'var(--surface)',
                 cursor: 'pointer'
               }}
             >

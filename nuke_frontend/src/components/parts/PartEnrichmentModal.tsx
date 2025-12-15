@@ -28,7 +28,7 @@ const PartEnrichmentModal: React.FC<PartEnrichmentModalProps> = ({ isOpen, tag, 
 			<div
 				onClick={(e) => e.stopPropagation()}
 				style={{
-					background: 'white',
+					background: 'var(--surface)',
 					border: '1px solid #d1d5db',
 					borderRadius: 0,
 					padding: 16,

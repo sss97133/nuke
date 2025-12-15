@@ -115,7 +115,7 @@ const UserProfileCard = ({ userId, userName, userAvatar, expanded = false }: Use
   if (loading) {
     return (
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #e5e7eb',
         borderRadius: '12px',
         padding: '16px',
@@ -170,7 +170,7 @@ const UserProfileCard = ({ userId, userName, userAvatar, expanded = false }: Use
 
   return (
     <div style={{
-      background: 'white',
+      background: 'var(--surface)',
       border: '1px solid #e5e7eb',
       borderRadius: '12px',
       overflow: 'hidden'

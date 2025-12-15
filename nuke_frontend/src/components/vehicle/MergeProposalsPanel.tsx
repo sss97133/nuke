@@ -253,7 +253,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
                 borderRadius: '4px',
                 padding: '12px',
                 marginBottom: '12px',
-                background: 'white'
+                background: 'var(--surface)'
               }}
             >
               {/* Confidence badge */}
@@ -412,7 +412,7 @@ export default function MergeProposalsPanel({ vehicleId, onMergeComplete }: Prop
         <div style={{
           marginTop: '16px',
           padding: '12px',
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #d1d5db',
           borderRadius: '3px',
           fontSize: '8pt',

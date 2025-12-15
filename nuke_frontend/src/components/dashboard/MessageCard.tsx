@@ -326,7 +326,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                   padding: '6px 16px',
                   border: '1px solid #dc2626',
-                  background: '#ffffff',
+                  background: 'var(--surface)',
                   color: '#dc2626',
                   cursor: 'pointer',
                   fontWeight: '600'
@@ -358,7 +358,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                   fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                   padding: '4px 8px',
                   border: '1px solid #bdbdbd',
-                  background: '#ffffff',
+                  background: 'var(--surface)',
                   cursor: 'pointer',
                   color: '#000000'
                 }}
@@ -393,7 +393,7 @@ export const MessageCard: React.FC<MessageCardProps> = ({
                 fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
                 padding: '2px 6px',
                 border: '1px solid #bdbdbd',
-                background: '#ffffff',
+                background: 'var(--surface)',
                 cursor: 'pointer',
                 color: '#757575'
               }}

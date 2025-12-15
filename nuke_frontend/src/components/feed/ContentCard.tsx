@@ -172,7 +172,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
     <div
       className="content-card"
       style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #c0c0c0',
         borderRadius: '2px',
         overflow: 'hidden',
@@ -209,7 +209,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
             }}
           />
           {images.length > 1 && (
-            <div style={{ position: 'absolute', top: '6px', right: '6px', fontSize: '7pt', color: 'rgba(255,255,255,0.9)' }}>
+            <div style={{ position: 'absolute', top: '6px', right: '6px', fontSize: '7pt', color: 'var(--surface-glass)' }}>
               {currentImageIdx + 1}/{images.length}
             </div>
           )}
@@ -231,7 +231,7 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
             </div>
           </div>
           {showUserPopover && (
-            <div style={{ position: 'absolute', top: '18px', left: 0, zIndex: 20, background: 'white', border: '1px solid #c0c0c0', padding: '6px', width: '220px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ position: 'absolute', top: '18px', left: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid #c0c0c0', padding: '6px', width: '220px' }} onClick={(e) => e.stopPropagation()}>
               <div className="text text-bold" style={{ fontSize: '8pt', marginBottom: '4px' }}>{item.user_name || 'User'}</div>
               <div className="text text-muted" style={{ fontSize: '7pt' }}>User profile</div>
             </div>

@@ -194,7 +194,7 @@ const SimpleImageTest: React.FC<SimpleImageTestProps> = ({ vehicleId }) => {
                 overflow: 'hidden',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                backgroundColor: 'white',
+                backgroundColor: 'var(--surface)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
               }}
               onClick={() => {
@@ -300,7 +300,7 @@ const SimpleImageTest: React.FC<SimpleImageTestProps> = ({ vehicleId }) => {
                 position: 'absolute',
                 top: '20px',
                 left: '20px',
-                background: 'rgba(255,255,255,0.9)',
+                background: 'var(--surface-glass)',
                 border: 'none',
                 borderRadius: '50%',
                 width: '44px',
@@ -331,7 +331,7 @@ const SimpleImageTest: React.FC<SimpleImageTestProps> = ({ vehicleId }) => {
             <div style={{
               padding: '20px',
               borderBottom: '1px solid #dee2e6',
-              backgroundColor: 'white'
+              backgroundColor: 'var(--surface)'
             }}>
               <h3 style={{ margin: '0 0 10px 0', fontSize: '18px', fontWeight: '600' }}>
                 Image Tools
@@ -345,7 +345,7 @@ const SimpleImageTest: React.FC<SimpleImageTestProps> = ({ vehicleId }) => {
             <div style={{
               padding: '20px',
               borderBottom: '1px solid #dee2e6',
-              backgroundColor: 'white'
+              backgroundColor: 'var(--surface)'
             }}>
               <button
                 onClick={() => {
@@ -487,7 +487,7 @@ const SimpleImageTest: React.FC<SimpleImageTestProps> = ({ vehicleId }) => {
                   {imageTags.filter(t => !t.isEditing).map((tag) => (
                     <div key={tag.id} style={{
                       padding: '12px',
-                      backgroundColor: 'white',
+                      backgroundColor: 'var(--surface)',
                       border: '1px solid #dee2e6',
                       borderRadius: '6px',
                       fontSize: '14px'

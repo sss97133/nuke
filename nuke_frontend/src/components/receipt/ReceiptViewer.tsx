@@ -197,7 +197,7 @@ const ReceiptViewer = ({ receiptId }: ReceiptViewerProps) => {
 
           {receipts.length === 0 && (
             <div style={{
-              background: 'white',
+              background: 'var(--surface)',
               border: '1px solid #bdbdbd',
               padding: '16px',
               textAlign: 'center',
@@ -213,7 +213,7 @@ const ReceiptViewer = ({ receiptId }: ReceiptViewerProps) => {
         {selectedReceipt && (
           <div style={{ flex: '2' }}>
             <div style={{
-              background: 'white',
+              background: 'var(--surface)',
               border: '1px solid #bdbdbd',
               padding: '12px',
               marginBottom: '8px'
@@ -264,7 +264,7 @@ const ReceiptViewer = ({ receiptId }: ReceiptViewerProps) => {
 
             {/* Receipt Items */}
             <div style={{
-              background: 'white',
+              background: 'var(--surface)',
               border: '1px solid #bdbdbd',
               padding: '12px'
             }}>

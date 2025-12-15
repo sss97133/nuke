@@ -622,7 +622,7 @@ const OwnershipVerificationWizard: React.FC<OwnershipVerificationWizardProps> = 
           maxWidth: '700px',
           maxHeight: '85vh',
           overflow: 'auto',
-          background: 'white'
+          background: 'var(--surface)'
         }}
       >
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>

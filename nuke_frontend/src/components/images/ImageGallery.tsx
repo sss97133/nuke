@@ -1655,7 +1655,7 @@ const ImageGallery = ({
                 {image.caption && (
                   <p className="text" style={{ color: 'var(--white)', fontSize: '7pt', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
                 )}
-                <p className="text" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '6pt', marginTop: '2px' }}>
+                <p className="text" style={{ color: 'var(--surface-glass)', fontSize: '6pt', marginTop: '2px' }}>
                   {getDisplayDate(image)}
                   {imageTagCounts[image.id] && ` • ${imageTagCounts[image.id]} tags`}
                   {showSetCount && imageSetCounts[image.id] && ` • ${imageSetCounts[image.id]} sets`}
@@ -1759,7 +1759,7 @@ const ImageGallery = ({
                 {image.caption && (
                   <p className="text" style={{ color: 'var(--white)', fontSize: '7pt', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
                 )}
-                <p className="text" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '6pt', marginTop: '2px' }}>
+                <p className="text" style={{ color: 'var(--surface-glass)', fontSize: '6pt', marginTop: '2px' }}>
                   {getDisplayDate(image)}
                   {(() => {
                     const metadata = image.ai_scan_metadata;

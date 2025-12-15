@@ -326,7 +326,7 @@ export const ReferenceLibraryUpload: React.FC<ReferenceLibraryUploadProps> = ({
             color: '#166534',
             maxHeight: '150px',
             overflowY: 'auto',
-            background: '#fff',
+            background: 'var(--surface)',
             padding: '8px',
             borderRadius: '4px',
             border: '1px solid #bbf7d0',

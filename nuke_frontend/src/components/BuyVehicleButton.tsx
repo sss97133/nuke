@@ -74,16 +74,16 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
       ) : (
         <div style={{ 
           padding: '16px', 
-          border: '2px solid #000', 
+          border: '2px solid var(--border)', 
           borderRadius: '0px',
-          background: '#fff',
+          background: 'var(--surface)',
           minWidth: '300px'
         }}>
           <h4 style={{ fontSize: '10pt', marginBottom: '12px', margin: 0 }}>
             Purchase {vehicleName}
           </h4>
           
-          <div style={{ fontSize: '9pt', marginBottom: '12px', color: '#666' }}>
+          <div style={{ fontSize: '9pt', marginBottom: '12px', color: 'var(--text-secondary)' }}>
             <div>Sale Price: <strong>${salePrice.toLocaleString()}</strong></div>
             <div>Facilitation Fee (2%): <strong>${facilitationFee}</strong></div>
           </div>
@@ -105,7 +105,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
               style={{
                 width: '100%',
                 padding: '8px',
-                border: '2px solid #000',
+                border: '2px solid var(--border)',
                 borderRadius: '0px',
                 fontSize: '9pt'
               }}
@@ -119,8 +119,9 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
               style={{
                 flex: 1,
                 padding: '8px',
-                border: '2px solid #000',
-                background: '#fff',
+                border: '2px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--text)',
                 fontSize: '9pt',
                 fontWeight: 700,
                 cursor: 'pointer',
@@ -148,7 +149,7 @@ export const BuyVehicleButton: React.FC<BuyVehicleButtonProps> = ({
             </button>
           </div>
 
-          <p style={{ fontSize: '7pt', color: '#666', marginTop: '8px', margin: 0 }}>
+          <p style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginTop: '8px', margin: 0 }}>
             You'll pay ${facilitationFee} now for paperwork & facilitation.
             The ${salePrice.toLocaleString()} purchase price is paid directly to seller after signing.
           </p>

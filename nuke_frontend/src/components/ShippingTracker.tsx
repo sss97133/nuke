@@ -67,7 +67,7 @@ export const ShippingTracker: React.FC<ShippingTrackerProps> = ({ transactionId 
     <div style={{ 
       border: '2px solid #000',
       borderRadius: '0px',
-      background: '#fff'
+      background: 'var(--surface)'
     }}>
       <div style={{ 
         padding: '12px 16px', 

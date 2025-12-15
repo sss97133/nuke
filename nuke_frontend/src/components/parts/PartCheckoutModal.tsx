@@ -27,7 +27,7 @@ const PartCheckoutModal: React.FC<PartCheckoutModalProps> = ({ isOpen, part, onC
 			<div
 				onClick={(e) => e.stopPropagation()}
 				style={{
-					background: 'white',
+					background: 'var(--surface)',
 					border: '1px solid #d1d5db',
 					padding: 16,
 					minWidth: 320,

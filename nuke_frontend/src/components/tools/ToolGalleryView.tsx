@@ -338,7 +338,7 @@ const ToolGalleryView: React.FC<ToolGalleryViewProps> = ({ userId }) => {
                       border: '2px solid #3b82f6',
                       borderRadius: '4px',
                       padding: '4px',
-                      backgroundColor: 'white'
+                      backgroundColor: 'var(--surface)'
                     }}
                   />
                 )}

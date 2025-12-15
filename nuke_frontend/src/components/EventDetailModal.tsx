@@ -168,7 +168,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
         <div style={{ padding: '16px' }}>
           {/* Event Info */}
           <div style={{
-            background: '#ffffff',
+            background: 'var(--surface)',
             border: '2px solid',
             borderColor: '#808080 #ffffff #ffffff #808080',
             padding: '12px',
@@ -211,7 +211,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
           {/* SHOPPABLE PRODUCTS - BUY LINKS */}
           {shoppableProducts.length > 0 && (
             <div style={{
-              background: '#ffffff',
+              background: 'var(--surface)',
               border: '2px solid',
               borderColor: '#808080 #ffffff #ffffff #808080',
               padding: '12px',
@@ -295,7 +295,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({ eventId, onC
           {/* Images Grid */}
           {images.length > 0 && (
             <div style={{
-              background: '#ffffff',
+              background: 'var(--surface)',
               border: '2px solid',
               borderColor: '#808080 #ffffff #ffffff #808080',
               padding: '12px',

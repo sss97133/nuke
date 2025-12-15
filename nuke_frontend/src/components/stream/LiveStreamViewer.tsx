@@ -317,7 +317,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
         {stream.allow_chat && (
           <div style={{
             flex: '1',
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid #bdbdbd',
             display: 'flex',
             flexDirection: 'column',
@@ -434,7 +434,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
 
       {/* Stream Details */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '12px',
         fontSize: '8pt'

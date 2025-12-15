@@ -177,7 +177,7 @@ const TimelineEventDetailsPanel: React.FC<TimelineEventDetailsPanelProps> = ({
                       fontSize: '8pt',
                       padding: '1px 3px',
                       border: '1px solid #ccc',
-                      background: 'white'
+                      background: 'var(--surface)'
                     }}
                   >
                     {eventTypes.map(type => (

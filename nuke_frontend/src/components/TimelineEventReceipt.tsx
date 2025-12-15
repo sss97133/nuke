@@ -260,7 +260,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
     >
       <div 
         style={{
-          background: '#ffffff',
+          background: 'var(--surface)',
           width: '100%',
           maxWidth: '800px',
           maxHeight: '90vh',
@@ -666,7 +666,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
                 </div>
 
                 {/* Total Event Value - Hero */}
-                <div style={{ marginBottom: '12px', padding: '8px', background: '#fff', border: '2px solid #000' }}>
+                <div style={{ marginBottom: '12px', padding: '8px', background: 'var(--surface)', border: '2px solid #000' }}>
                   <div style={{ fontSize: '6pt', fontWeight: 700, color: '#666', marginBottom: '2px', letterSpacing: '0.5px' }}>
                     TOTAL EVENT VALUE
                   </div>
@@ -684,7 +684,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '7pt' }}>
                   {/* Labor Value */}
                   {event.metadata.contextual_analysis.value_assessment.labor_value && (
-                    <div style={{ padding: '6px', background: '#fff', border: '1px solid #d1d5db' }}>
+                    <div style={{ padding: '6px', background: 'var(--surface)', border: '1px solid #d1d5db' }}>
                       <div style={{ fontWeight: 700, marginBottom: '2px', color: '#666' }}>Labor Value</div>
                       <div style={{ fontWeight: 700 }}>
                         ${event.metadata.contextual_analysis.value_assessment.labor_value.total_labor_value?.toLocaleString() || '0'}
@@ -698,7 +698,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
                   {/* Market Comparison */}
                   {event.metadata.contextual_analysis.value_assessment.market_comparison && (
-                    <div style={{ padding: '6px', background: '#fff', border: '1px solid #d1d5db' }}>
+                    <div style={{ padding: '6px', background: 'var(--surface)', border: '1px solid #d1d5db' }}>
                       <div style={{ fontWeight: 700, marginBottom: '2px', color: '#666' }}>Shop Cost</div>
                       <div style={{ fontWeight: 700 }}>
                         ${event.metadata.contextual_analysis.value_assessment.market_comparison.shop_cost_equivalent?.toLocaleString() || '0'}
@@ -713,7 +713,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
                   {/* Vehicle Impact */}
                   {event.metadata.contextual_analysis.value_assessment.vehicle_impact && (
-                    <div style={{ padding: '6px', background: '#fff', border: '1px solid #d1d5db' }}>
+                    <div style={{ padding: '6px', background: 'var(--surface)', border: '1px solid #d1d5db' }}>
                       <div style={{ fontWeight: 700, marginBottom: '2px', color: '#666' }}>Vehicle Impact</div>
                       <div style={{ 
                         fontWeight: 700,
@@ -731,7 +731,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
 
                   {/* Documentation Value */}
                   {event.metadata.contextual_analysis.value_assessment.documentation_value && (
-                    <div style={{ padding: '6px', background: '#fff', border: '1px solid #d1d5db' }}>
+                    <div style={{ padding: '6px', background: 'var(--surface)', border: '1px solid #d1d5db' }}>
                       <div style={{ fontWeight: 700, marginBottom: '2px', color: '#666' }}>Documentation</div>
                       <div style={{ fontWeight: 700 }}>
                         +${event.metadata.contextual_analysis.value_assessment.documentation_value.estimated_value?.toLocaleString() || '0'}
@@ -860,7 +860,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
                 width: '100%',
                 padding: '10px',
                 border: '2px solid #000',
-                background: '#fff',
+                background: 'var(--surface)',
                 color: '#000',
                 fontSize: '8pt',
                 fontWeight: 700,
@@ -1215,7 +1215,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
                 <div key={comment.id} style={{ 
                   marginBottom: '6px', 
                   padding: '6px',
-                  background: '#fff',
+                  background: 'var(--surface)',
                   border: '1px solid #e0e0e0',
                   borderRadius: '2px',
                   fontSize: '7pt'
@@ -1332,7 +1332,7 @@ export const TimelineEventReceipt: React.FC<TimelineEventReceiptProps> = ({ even
             style={{
               padding: '4px 8px',
               border: '1px solid #000',
-              background: '#fff',
+              background: 'var(--surface)',
               color: '#000',
               fontSize: '7pt',
               fontWeight: 700,

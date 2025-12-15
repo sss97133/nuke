@@ -119,7 +119,7 @@ const HotVehicleCard = ({ vehicleId, title, events, onClick }: { vehicleId: stri
           {events} UPDATES
         </div>
       </div>
-      <div style={{ padding: '8px', background: '#fff' }}>
+      <div style={{ padding: '8px', background: 'var(--surface)' }}>
         <div style={{ fontSize: '10px', fontWeight: 'bold' }}>{title}</div>
       </div>
     </div>

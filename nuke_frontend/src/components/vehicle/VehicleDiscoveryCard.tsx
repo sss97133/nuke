@@ -79,7 +79,7 @@ const VehicleDiscoveryCard: React.FC<VehicleDiscoveryCardProps> = ({ vehicle, co
         borderRadius: '8px',
         overflow: 'hidden',
         transition: 'all 0.2s',
-        backgroundColor: '#fff',
+        backgroundColor: 'var(--surface)',
         cursor: 'pointer'
       }}
       onMouseEnter={(e) => {

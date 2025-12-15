@@ -246,7 +246,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                         color: getRoleColor(affiliation.role),
                         fontWeight: 'bold',
                         padding: '4px 6px',
-                        backgroundColor: '#fff',
+                        backgroundColor: 'var(--surface)',
                         border: '1px solid ' + getRoleColor(affiliation.role),
                         borderRadius: '3px',
                         cursor: saving ? 'wait' : 'pointer'

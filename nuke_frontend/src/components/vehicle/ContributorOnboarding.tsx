@@ -383,7 +383,7 @@ export const ContributorOnboarding: React.FC<ContributorOnboardingProps> = ({ ve
               onClick={() => setStep('justification')}
               style={{
                 padding: '10px 20px',
-                backgroundColor: 'white',
+                backgroundColor: 'var(--surface)',
                 color: '#374151',
                 border: '1px solid #e5e7eb',
                 borderRadius: '6px',
@@ -472,7 +472,7 @@ export const ContributorOnboarding: React.FC<ContributorOnboardingProps> = ({ ve
               onClick={() => setStep('shop')}
               style={{
                 padding: '10px 20px',
-                backgroundColor: 'white',
+                backgroundColor: 'var(--surface)',
                 color: '#374151',
                 border: '1px solid #e5e7eb',
                 borderRadius: '6px',

@@ -26,7 +26,7 @@ interface HistPoint { as_of: string; value: number; type: string }
 
 const to8 = { fontSize: '8pt' } as const;
 const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
-const panel: React.CSSProperties = { width: 760, maxWidth: '95%', background: 'white', border: '1px solid #c0c0c0', borderRadius: 2 };
+const panel: React.CSSProperties = { width: 760, maxWidth: '95%', background: 'var(--surface)', border: '1px solid #c0c0c0', borderRadius: 2 };
 const header: React.CSSProperties = { ...to8, padding: 6, borderBottom: '1px solid #c0c0c0', background: '#f3f4f6', fontWeight: 700 };
 const body: React.CSSProperties = { padding: 8 };
 const chip: React.CSSProperties = { ...to8, background: '#f3f4f6', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: 2 };

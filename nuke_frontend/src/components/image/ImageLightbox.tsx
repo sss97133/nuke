@@ -950,7 +950,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                 fontSize: '8px', 
                 padding: '2px 4px', 
                 flexShrink: 0,
-                color: 'rgba(255,255,255,0.8)',
+                color: 'var(--surface-glass)',
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 background: 'none',

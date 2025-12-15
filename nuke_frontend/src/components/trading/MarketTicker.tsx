@@ -39,7 +39,7 @@ const MarketTicker: React.FC<MarketTickerProps> = ({ offeringId, vehicleTitle, o
   if (!orderBook) {
     return (
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '2px solid #bdbdbd',
         padding: '16px',
         borderRadius: '4px',

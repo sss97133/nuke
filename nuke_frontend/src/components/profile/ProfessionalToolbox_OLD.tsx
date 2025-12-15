@@ -480,7 +480,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
           zIndex: 9999
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--surface)',
             borderRadius: '8px',
             padding: '24px',
             maxWidth: '800px',

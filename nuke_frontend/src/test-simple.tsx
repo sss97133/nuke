@@ -6,7 +6,7 @@ export const TestSimple: React.FC = () => {
   return (
     <div style={{
       padding: '20px',
-      backgroundColor: 'white',
+      backgroundColor: 'var(--surface)',
       minHeight: '100vh'
     }}>
       <h1>Simple Image Test</h1>

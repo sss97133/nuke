@@ -145,7 +145,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
 
       {/* Filters */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '8px',
         marginBottom: '12px'
@@ -268,7 +268,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
             key={listing.listing_id}
             onClick={() => handleListingClick(listing.listing_id)}
             style={{
-              background: 'white',
+              background: 'var(--surface)',
               border: listing.featured ? '2px solid #f59e0b' : '1px solid #bdbdbd',
               padding: '0px',
               cursor: 'pointer',
@@ -455,7 +455,7 @@ const AuctionFeed = ({ onListingSelect }: AuctionFeedProps) => {
       {/* No Listings Message */}
       {!loading && listings.length === 0 && (
         <div style={{
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #bdbdbd',
           padding: '24px',
           textAlign: 'center',

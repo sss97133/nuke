@@ -186,7 +186,7 @@ export default function SystemStatus() {
   const imagePercent = (stats.images.analyzed / stats.images.total * 100) || 0;
 
   return (
-    <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto', background: '#fff', minHeight: '100vh' }}>
+    <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto', background: 'var(--surface)', minHeight: '100vh' }}>
       
       {/* Header */}
       <div style={{ marginBottom: '16px', borderBottom: '2px solid #000', paddingBottom: '8px' }}>
@@ -333,7 +333,7 @@ export default function SystemStatus() {
 
       {/* Expanded List View */}
       {expandedSection && (
-        <div style={{ marginBottom: '16px', background: '#fff', border: '2px solid #000', padding: '12px' }}>
+        <div style={{ marginBottom: '16px', background: 'var(--surface)', border: '2px solid #000', padding: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <h3 style={{ fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase' }}>
               {expandedSection === 'tier1' && 'ALL IMAGES'}
@@ -343,7 +343,7 @@ export default function SystemStatus() {
             </h3>
             <button 
               onClick={() => setExpandedSection(null)}
-              style={{ fontSize: '8pt', fontWeight: 700, border: '1px solid #000', background: '#fff', padding: '4px 8px', cursor: 'pointer' }}
+              style={{ fontSize: '8pt', fontWeight: 700, border: '1px solid #000', background: 'var(--surface)', padding: '4px 8px', cursor: 'pointer' }}
             >
               CLOSE
             </button>
@@ -436,7 +436,7 @@ export default function SystemStatus() {
                     justifyContent: 'space-between', 
                     alignItems: 'center',
                     padding: '6px',
-                    background: '#fff',
+                    background: 'var(--surface)',
                     border: '1px solid #ccc',
                     cursor: 'pointer'
                   }}
@@ -485,7 +485,7 @@ export default function SystemStatus() {
                     justifyContent: 'space-between', 
                     alignItems: 'center',
                     padding: '6px',
-                    background: '#fff',
+                    background: 'var(--surface)',
                     border: '1px solid #ccc'
                   }}
                 >
@@ -536,7 +536,7 @@ export default function SystemStatus() {
           onClick={() => navigate('/admin/scripts')}
           style={{ 
             padding: '8px 16px', 
-            background: '#fff', 
+            background: 'var(--surface)', 
             color: '#000', 
             fontWeight: 700,
             fontSize: '8pt',
@@ -550,7 +550,7 @@ export default function SystemStatus() {
           onClick={() => navigate('/admin/image-processing')}
           style={{ 
             padding: '8px 16px', 
-            background: '#fff', 
+            background: 'var(--surface)', 
             color: '#000', 
             fontWeight: 700,
             fontSize: '8pt',
@@ -564,7 +564,7 @@ export default function SystemStatus() {
           onClick={() => navigate('/admin/verifications')}
           style={{ 
             padding: '8px 16px', 
-            background: '#fff', 
+            background: 'var(--surface)', 
             color: '#000', 
             fontWeight: 700,
             fontSize: '8pt',
@@ -596,7 +596,7 @@ export default function SystemStatus() {
           <div 
             onClick={(e) => e.stopPropagation()}
             style={{ 
-              background: '#fff', 
+              background: 'var(--surface)', 
               border: '2px solid #000', 
               padding: '16px', 
               maxWidth: '800px',
@@ -608,7 +608,7 @@ export default function SystemStatus() {
               <h3 style={{ fontSize: '8pt', fontWeight: 700 }}>IMAGE ANALYSIS</h3>
               <button 
                 onClick={() => setSelectedImage(null)}
-                style={{ fontSize: '8pt', border: '1px solid #000', background: '#fff', padding: '4px 8px', cursor: 'pointer' }}
+                style={{ fontSize: '8pt', border: '1px solid #000', background: 'var(--surface)', padding: '4px 8px', cursor: 'pointer' }}
               >
                 CLOSE
               </button>

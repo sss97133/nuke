@@ -120,7 +120,7 @@ export default function LiveImageAnalysisMonitor() {
       {/* Main Progress Card */}
       <div style={{ 
         border: '2px solid #000', 
-        background: '#fff',
+        background: 'var(--surface)',
         marginBottom: '24px'
       }}>
         <div style={{
@@ -185,7 +185,7 @@ export default function LiveImageAnalysisMonitor() {
             gap: '16px',
             marginTop: '20px'
           }}>
-            <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: '#fff' }}>
+            <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: 'var(--surface)' }}>
               <div style={{ fontSize: '8pt', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
                 PROCESSING RATE
               </div>
@@ -197,7 +197,7 @@ export default function LiveImageAnalysisMonitor() {
               </div>
             </div>
 
-            <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: '#fff' }}>
+            <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: 'var(--surface)' }}>
               <div style={{ fontSize: '8pt', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
                 ELAPSED TIME
               </div>
@@ -209,7 +209,7 @@ export default function LiveImageAnalysisMonitor() {
               </div>
             </div>
 
-            <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: '#fff' }}>
+            <div style={{ border: '2px solid #e5e5e5', padding: '12px', background: 'var(--surface)' }}>
               <div style={{ fontSize: '8pt', color: '#666', marginBottom: '4px', fontWeight: 600 }}>
                 ESTIMATED TIME REMAINING
               </div>

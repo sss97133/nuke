@@ -210,7 +210,7 @@ const LocationsTab = ({ locations, onAdd, onCreateDepartments }: any) => {
       </button>
 
       {showForm && (
-        <div style={{ marginBottom: '24px', padding: '20px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: 'white' }}>
+        <div style={{ marginBottom: '24px', padding: '20px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: 'var(--surface)' }}>
           <h3 style={{ marginBottom: '16px', fontWeight: '600' }}>New Location</h3>
           <input
             placeholder="Location Name (e.g., 707 Yucca St HQ)"
@@ -241,7 +241,7 @@ const LocationsTab = ({ locations, onAdd, onCreateDepartments }: any) => {
 
       <div style={{ display: 'grid', gap: '16px' }}>
         {locations.map((loc: any) => (
-          <div key={loc.id} style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: 'white' }}>
+          <div key={loc.id} style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: 'var(--surface)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
               <div>
                 <h4 style={{ fontWeight: '600', marginBottom: '4px' }}>

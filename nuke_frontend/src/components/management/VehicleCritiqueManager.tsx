@@ -354,7 +354,7 @@ export default function VehicleCritiqueManager({
           padding: '20px'
         }}>
           <div style={{
-            backgroundColor: 'white',
+            backgroundColor: 'var(--surface)',
             borderRadius: '8px',
             maxWidth: '600px',
             width: '100%',

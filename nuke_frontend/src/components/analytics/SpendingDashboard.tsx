@@ -167,7 +167,7 @@ const SpendingDashboard = () => {
 
       {/* Filters */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '8px',
         marginBottom: '12px',
@@ -250,7 +250,7 @@ const SpendingDashboard = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
           {/* Total Spending */}
           <div style={{
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid #bdbdbd',
             padding: '12px'
           }}>
@@ -267,7 +267,7 @@ const SpendingDashboard = () => {
 
           {/* Average Receipt */}
           <div style={{
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid #bdbdbd',
             padding: '12px'
           }}>
@@ -284,7 +284,7 @@ const SpendingDashboard = () => {
 
           {/* Spending Breakdown */}
           <div style={{
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid #bdbdbd',
             padding: '12px',
             gridColumn: 'span 2'
@@ -317,7 +317,7 @@ const SpendingDashboard = () => {
 
           {/* Top Categories */}
           <div style={{
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid #bdbdbd',
             padding: '12px'
           }}>
@@ -346,7 +346,7 @@ const SpendingDashboard = () => {
 
           {/* Top Vendors */}
           <div style={{
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid #bdbdbd',
             padding: '12px'
           }}>
@@ -375,7 +375,7 @@ const SpendingDashboard = () => {
         </div>
       ) : !loading && (
         <div style={{
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #bdbdbd',
           padding: '24px',
           textAlign: 'center',

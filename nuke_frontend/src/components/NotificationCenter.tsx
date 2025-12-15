@@ -234,7 +234,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ userId, onNotif
                 onClick={() => handleMarkRead(notification.id)}
                 style={{
                   padding: '2px 8px',
-                  backgroundColor: 'white',
+                  backgroundColor: 'var(--surface)',
                   color: '#000000',
                   border: '1px solid #bdbdbd',
                   fontSize: '8pt',

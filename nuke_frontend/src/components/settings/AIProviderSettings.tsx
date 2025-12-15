@@ -204,7 +204,7 @@ const AIProviderSettings: React.FC = () => {
         )}
 
         {providers.map(provider => (
-          <div key={provider.id} style={{ marginBottom: '8px', padding: '12px', background: '#fff', border: '1px solid #e0e0e0' }}>
+          <div key={provider.id} style={{ marginBottom: '8px', padding: '12px', background: 'var(--surface)', border: '1px solid #e0e0e0' }}>
             {editingProvider?.id === provider.id ? (
               <ProviderForm
                 provider={provider}
