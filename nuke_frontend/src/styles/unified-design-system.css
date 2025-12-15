@@ -17,6 +17,14 @@
 
 /* Default (no data-theme) behaves like light */
 :root {
+  /* User text scaling (accessibility) */
+  --font-scale: 1;
+  --fs-8: calc(8px * var(--font-scale));
+  --fs-9: calc(9px * var(--font-scale));
+  --fs-10: calc(10px * var(--font-scale));
+  --fs-11: calc(11px * var(--font-scale));
+  --fs-12: calc(12px * var(--font-scale));
+
   /* Background Colors - Moderate, not extreme */
   --bg: #f5f5f5;           /* Light grey, NOT white */
   --surface: #ebebeb;       /* Card backgrounds */
@@ -276,12 +284,48 @@
 }
 
 /* ================================================
+   AMERICANA ACCENT COLORWAYS
+   ================================================ */
+
+/* Stars & Stripes: navy primary, red secondary */
+:root[data-accent="americana"] {
+  --accent: #0a2342; /* Pantone example: 282 C */
+  --accent-alt: #c8102e; /* Pantone example: 186 C */
+  --accent-dim: rgba(10, 35, 66, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Route 66: teal primary, sand secondary */
+:root[data-accent="route-66"] {
+  --accent: #005f73; /* Pantone example: 3035 C */
+  --accent-alt: #d4a373; /* Pantone example: 4655 C */
+  --accent-dim: rgba(0, 95, 115, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Denim: deep indigo primary, canvas secondary */
+:root[data-accent="denim"] {
+  --accent: #1b2a41; /* Pantone example: 2965 C */
+  --accent-alt: #d6c9b4; /* Pantone example: 7534 C */
+  --accent-dim: rgba(27, 42, 65, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Desert Sun: warm orange primary */
+:root[data-accent="desert"] {
+  --accent: #c95a00; /* Pantone example: 7576 C */
+  --accent-alt: #7b4b2a; /* Pantone example: 7554 C */
+  --accent-dim: rgba(201, 90, 0, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* ================================================
    TYPOGRAPHY SYSTEM
    ================================================ */
 
 body {
   font-family: var(--font-family);
-  font-size: 10px;
+  font-size: var(--fs-10);
   line-height: 1.3;
   background: var(--bg);
   color: var(--text);
@@ -296,11 +340,11 @@ body {
 }
 
 /* Font Sizes (STRICT - no others allowed) */
-.text-8  { font-size: 8px; }
-.text-9  { font-size: 9px; }
-.text-10 { font-size: 10px; }
-.text-11 { font-size: 11px; }
-.text-12 { font-size: 12px; } /* Rare */
+.text-8  { font-size: var(--fs-8); }
+.text-9  { font-size: var(--fs-9); }
+.text-10 { font-size: var(--fs-10); }
+.text-11 { font-size: var(--fs-11); }
+.text-12 { font-size: var(--fs-12); } /* Rare */
 
 /* ================================================
    BUTTON SYSTEM
@@ -311,7 +355,7 @@ body {
   background: var(--surface);
   color: var(--text);
   padding: 4px 8px;
-  font-size: 9px;
+  font-size: var(--fs-9);
   font-weight: 600;
   font-family: var(--font-family);
   cursor: pointer;
@@ -335,7 +379,7 @@ body {
   background: var(--surface);
   color: var(--text);
   padding: 8px 16px;
-  font-size: 10px;
+  font-size: var(--fs-10);
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
@@ -361,7 +405,7 @@ body {
 .card-header {
   padding: 12px;
   border-bottom: 2px solid var(--border);
-  font-size: 10px;
+  font-size: var(--fs-10);
   font-weight: 700;
 }
 
@@ -381,7 +425,7 @@ textarea,
 select {
   width: 100%;
   padding: 8px;
-  font-size: 10px;
+  font-size: var(--fs-10);
   font-family: var(--font-family);
   border: 2px solid var(--border);
   border-radius: var(--radius);

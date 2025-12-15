@@ -75,6 +75,30 @@ export const APPEARANCE_PRESETS: AppearancePreset[] = [
     pantoneExamples: '1655 C',
     chips: ['#FF5F1F', '#111111', '#F5F5F5'],
   },
+  {
+    id: 'americana',
+    name: 'Americana — Stars & Stripes',
+    pantoneExamples: '282 C / 186 C / 663 C',
+    chips: ['#0A2342', '#C8102E', '#F4F4F4'],
+  },
+  {
+    id: 'route-66',
+    name: 'Americana — Route 66',
+    pantoneExamples: '3035 C / 4655 C',
+    chips: ['#005F73', '#D4A373', '#F5F5F5'],
+  },
+  {
+    id: 'denim',
+    name: 'Americana — Denim',
+    pantoneExamples: '2965 C / 7534 C',
+    chips: ['#1B2A41', '#D6C9B4', '#F5F5F5'],
+  },
+  {
+    id: 'desert',
+    name: 'Americana — Desert Sun',
+    pantoneExamples: '7576 C / 7554 C',
+    chips: ['#C95A00', '#7B4B2A', '#F5F5F5'],
+  },
 ];
 
 

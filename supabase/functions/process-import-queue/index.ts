@@ -47,6 +47,10 @@ function debugLog(payload: {
   })();
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 // Helper function to clean model name - removes pricing, dealer info, financing text, etc.
 function cleanModelName(model: string): string {
   if (!model) return '';
@@ -415,30 +419,20 @@ serve(async (req) => {
       data: { batch_size, priority_only, source_id, fast_mode, max_images_immediate, skip_image_upload },
     });
 
-    // Get pending items from queue - prioritize items with more data
-    let query = supabase
-      .from('import_queue')
-      .select('*')
-      .eq('status', 'pending')
-      .lt('attempts', 3)
-      .order('priority', { ascending: false })
-      // Prioritize items with year/make/model already known (higher quality)
-      .order('listing_year', { ascending: false, nullsLast: true })
-      .order('created_at', { ascending: true })
-      .limit(batch_size);
-
-    if (priority_only) {
-      query = query.gt('priority', 0);
-    }
-
-    if (source_id) {
-      query = query.eq('source_id', source_id);
-    }
-
-    const { data: queueItems, error: queueError } = await query;
+    // Claim work atomically (prevents double-processing and enables horizontal scaling).
+    // Requires migration: 20251215000003_import_queue_schema_and_locking.sql
+    const workerId = `process-import-queue:${crypto.randomUUID?.() || String(Date.now())}`;
+    const { data: queueItems, error: queueError } = await supabase.rpc('claim_import_queue_batch', {
+      p_batch_size: batch_size,
+      p_max_attempts: 3,
+      p_priority_only: priority_only,
+      p_source_id: source_id || null,
+      p_worker_id: workerId,
+      p_lock_ttl_seconds: 15 * 60,
+    });
 
     if (queueError) {
-      throw new Error(`Failed to fetch queue: ${queueError.message}`);
+      throw new Error(`Failed to claim queue: ${queueError.message}`);
     }
 
     if (!queueItems || queueItems.length === 0) {
@@ -480,14 +474,7 @@ serve(async (req) => {
           data: { queue_id: item.id, listing_url: item.listing_url, listing_year: item.listing_year, listing_make: item.listing_make, listing_model: item.listing_model, source_id: item.source_id, raw_flags: { inventory_extraction: item.raw_data?.inventory_extraction, business_type: item.raw_data?.business_type } },
         });
 
-        // Mark as processing
-        await supabase
-          .from('import_queue')
-          .update({ 
-            status: 'processing',
-            attempts: item.attempts + 1
-          })
-          .eq('id', item.id);
+        // Already marked as processing by claim_import_queue_batch().
 
         // Discovery URL dedupe:
         // If a vehicle already exists for this listing URL, DO NOT early-exit as "duplicate".
@@ -1398,7 +1385,10 @@ serve(async (req) => {
             .update({
               status: 'failed',
               error_message: `Invalid make: ${make}`,
-              processed_at: new Date().toISOString()
+              processed_at: new Date().toISOString(),
+              locked_at: null,
+              locked_by: null,
+              next_attempt_at: null,
             })
             .eq('id', item.id);
           continue;
@@ -2815,13 +2805,20 @@ serve(async (req) => {
         await supabase
           .from('import_queue')
           .update({
-            status: item.attempts >= 2 ? 'failed' : 'pending',
-            error_message: error.message,
-            processed_at: new Date().toISOString()
+            // attempts is already incremented by claim_import_queue_batch()
+            status: (Number(item.attempts || 0) >= 3) ? 'failed' : 'pending',
+            error_message: (error as any)?.message || String(error),
+            processed_at: new Date().toISOString(),
+            locked_at: null,
+            locked_by: null,
+            next_attempt_at: (Number(item.attempts || 0) >= 3)
+              ? null
+              : new Date(Date.now() + Math.min(30 * 60 * 1000, 30 * Math.pow(2, Math.max(0, Number(item.attempts || 0))) * 1000)).toISOString(),
           })
           .eq('id', item.id);
 
         results.failed++;
+        await sleep(150);
       }
 
       results.processed++;

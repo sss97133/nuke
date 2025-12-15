@@ -12,6 +12,8 @@
 
 /* Color Palette */
 :root {
+  /* User text scaling (accessibility) */
+  --font-scale: 1;
   /* Background Colors - Light grey and white only */
   --white: #ffffff;
   --grey-50: #fafafa;
@@ -83,8 +85,8 @@
   
   /* Typography - Arial, 8pt text */
   --font-family: Arial, sans-serif;
-  --font-size-small: 8pt;
-  --font-size: 8pt;
+  --font-size-small: calc(8pt * var(--font-scale));
+  --font-size: calc(8pt * var(--font-scale));
 
   /* Line Heights - Tight */
   --leading-tight: 1.1;
