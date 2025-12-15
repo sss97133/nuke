@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { APPEARANCE_PRESETS } from './appearancePresets';
 import { useTheme, type ThemePreference, type AutoThemeSource, type ContrastProfile, type AccentId, type TextScale } from '../../contexts/ThemeContext';
 
@@ -64,6 +64,19 @@ export default function AppearanceSpecimen() {
     setTextScale,
     toggleTheme,
   } = useTheme();
+
+  const [computed, setComputed] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const root = document.documentElement;
+    const cs = getComputedStyle(root);
+    const keys = ['--bg', '--surface', '--surface-hover', '--border', '--text', '--accent', '--surface-glass', '--font-scale'] as const;
+    const next: Record<string, string> = {};
+    for (const k of keys) next[k] = cs.getPropertyValue(k).trim();
+    next['data-theme'] = root.getAttribute('data-theme') || '';
+    next['data-accent'] = root.getAttribute('data-accent') || '';
+    next['data-contrast'] = root.getAttribute('data-contrast') || '';
+    setComputed(next);
+  }, [theme, preference, autoSource, schedule, accent, contrast, textScale]);
 
   const selectedPreset = APPEARANCE_PRESETS.find((p) => p.id === accent) ?? APPEARANCE_PRESETS[0];
 
@@ -163,6 +176,14 @@ export default function AppearanceSpecimen() {
             <button className="btn-utility" onClick={toggleTheme} style={{ fontSize: 9 }}>
               Toggle
             </button>
+          </div>
+
+          <div className="text-9" style={{ gridColumn: '1 / -1', color: 'var(--text-secondary)' }}>
+            <span style={{ fontWeight: 700, color: 'var(--text)' }}>Debug:</span>{' '}
+            effective={theme} pref={preference} auto={preference === 'auto' ? autoSource : '—'} scale={textScale}{' '}
+            · html[data-theme]={computed['data-theme'] || '—'} data-accent={computed['data-accent'] || '—'} data-contrast={computed['data-contrast'] || '—'}
+            <br />
+            tokens: bg={computed['--bg'] || '—'} surface={computed['--surface'] || '—'} border={computed['--border'] || '—'} text={computed['--text'] || '—'} accent={computed['--accent'] || '—'}
           </div>
         </div>
       </div>
