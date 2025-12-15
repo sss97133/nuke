@@ -178,16 +178,16 @@ export default function VehicleCritiqueManager({
 
     const parts = [];
     if (impact.financialImpact && impact.financialImpact !== 'neutral') {
-      parts.push(`💰 ${impact.financialImpact}`);
+      parts.push(`FINANCIAL: ${impact.financialImpact}`);
     }
     if (impact.timeImpact && impact.timeImpact !== 'low') {
-      parts.push(`⏱️ ${impact.timeImpact} time`);
+      parts.push(`TIME: ${impact.timeImpact}`);
     }
     if (impact.spaceImpact && impact.spaceImpact !== 'none') {
-      parts.push(`📦 ${impact.spaceImpact}`);
+      parts.push(`SPACE: ${impact.spaceImpact}`);
     }
     if (impact.reputationImpact && impact.reputationImpact !== 'none') {
-      parts.push(`⭐ ${impact.reputationImpact} reputation`);
+      parts.push(`REPUTATION: ${impact.reputationImpact}`);
     }
 
     return parts.length > 0 ? parts.join(', ') : 'Minimal impact';

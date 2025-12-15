@@ -4,6 +4,16 @@ import { supabase, getCurrentUserId } from '../../lib/supabase';
 import { useToast } from '../../hooks/useToast';
 import '../../design-system.css';
 
+const CATEGORY_SUBCATEGORIES: Record<
+  'categorization' | 'business_impact' | 'data_correction' | 'operational_note',
+  string[]
+> = {
+  categorization: ['incorrect_classification', 'missing_category', 'wrong_status', 'mismatched_specs'],
+  business_impact: ['financial_loss', 'storage_cost', 'time_waste', 'reputation_risk', 'opportunity_cost'],
+  data_correction: ['wrong_specs', 'missing_data', 'outdated_info', 'duplicate_entry'],
+  operational_note: ['maintenance_history', 'storage_location', 'handling_notes', 'partner_feedback'],
+};
+
 interface CritiqueFormData {
   vehicleId: string;
   category: 'categorization' | 'business_impact' | 'data_correction' | 'operational_note';
@@ -23,6 +33,7 @@ interface VehicleCritiqueModeProps {
   isVisible: boolean;
   onClose: () => void;
   vehicleId?: string;
+  variant?: 'dropdown' | 'modal';
   vehicleData?: {
     year?: number;
     make?: string;
@@ -35,7 +46,8 @@ export default function VehicleCritiqueMode({
   isVisible,
   onClose,
   vehicleId: propVehicleId,
-  vehicleData
+  vehicleData,
+  variant = 'dropdown'
 }: VehicleCritiqueModeProps) {
   const location = useLocation();
   const { showToast } = useToast();
@@ -52,7 +64,7 @@ export default function VehicleCritiqueMode({
   const [formData, setFormData] = useState<CritiqueFormData>({
     vehicleId: detectedVehicleId || '',
     category: 'categorization',
-    subcategory: '',
+    subcategory: CATEGORY_SUBCATEGORIES.categorization[0] || '',
     description: '',
     priority: 'medium'
   });
@@ -67,7 +79,16 @@ export default function VehicleCritiqueMode({
   // Check user permissions
   useEffect(() => {
     checkUserPermissions();
-  }, []);
+  }, [detectedVehicleId]);
+
+  // Keep vehicleId synced when opening the critique from non-vehicle pages (feed, admin tools, etc.)
+  useEffect(() => {
+    setFormData((prev) => {
+      const nextVehicleId = detectedVehicleId || '';
+      if (prev.vehicleId === nextVehicleId) return prev;
+      return { ...prev, vehicleId: nextVehicleId };
+    });
+  }, [detectedVehicleId]);
 
   const checkUserPermissions = async () => {
     try {
@@ -120,7 +141,7 @@ export default function VehicleCritiqueMode({
       return;
     }
 
-    if (!formData.vehicleId || !formData.description.trim()) {
+    if (!formData.vehicleId || !formData.subcategory || !formData.description.trim()) {
       showToast('Please fill in all required fields', 'error');
       return;
     }
@@ -155,7 +176,7 @@ export default function VehicleCritiqueMode({
       setFormData({
         vehicleId: detectedVehicleId || '',
         category: 'categorization',
-        subcategory: '',
+        subcategory: CATEGORY_SUBCATEGORIES.categorization[0] || '',
         description: '',
         priority: 'medium'
       });
@@ -169,83 +190,37 @@ export default function VehicleCritiqueMode({
     }
   };
 
-  const getCategorySubcategories = (category: string) => {
-    switch (category) {
-      case 'categorization':
-        return [
-          'incorrect_classification',
-          'missing_category',
-          'wrong_status',
-          'mismatched_specs'
-        ];
-      case 'business_impact':
-        return [
-          'financial_loss',
-          'storage_cost',
-          'time_waste',
-          'reputation_risk',
-          'opportunity_cost'
-        ];
-      case 'data_correction':
-        return [
-          'wrong_specs',
-          'missing_data',
-          'outdated_info',
-          'duplicate_entry'
-        ];
-      case 'operational_note':
-        return [
-          'maintenance_history',
-          'storage_location',
-          'handling_notes',
-          'partner_feedback'
-        ];
-      default:
-        return [];
-    }
+  const getCategorySubcategories = (category: CritiqueFormData['category']) => {
+    return CATEGORY_SUBCATEGORIES[category] || [];
   };
 
   if (!isVisible) return null;
 
-  if (!userPermissions.isAuthorized) {
-    return (
-      <div style={{
-        position: 'absolute',
-        top: '100%',
-        left: 0,
-        right: 0,
-        marginTop: '4px',
-        background: 'var(--white)',
-        border: '2px solid var(--border)',
-        padding: '12px',
-        zIndex: 1000,
-        fontSize: '8pt'
-      }}>
-        <div style={{ color: '#c00', marginBottom: '8px' }}>
-          Access Restricted
-        </div>
-        <div style={{ marginBottom: '8px' }}>
-          You need business-level access to submit critiques.
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="button button-secondary"
-          style={{ fontSize: '8pt', padding: '2px 8px' }}
-        >
-          Close
-        </button>
-      </div>
-    );
-  }
-
-  return (
+  const inner = !userPermissions.isAuthorized ? (
     <div style={{
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      right: 0,
-      marginTop: '4px',
+      background: 'var(--white)',
+      border: '2px solid var(--border)',
+      padding: '12px',
+      zIndex: 1000,
+      fontSize: '8pt'
+    }}>
+      <div style={{ color: '#c00', marginBottom: '8px' }}>
+        Access Restricted
+      </div>
+      <div style={{ marginBottom: '8px' }}>
+        You need business-level access to submit critiques.
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        className="button button-secondary"
+        style={{ fontSize: '8pt', padding: '2px 8px' }}
+      >
+        Close
+      </button>
+    </div>
+  ) : (
+    <div style={{
       background: 'var(--white)',
       border: '2px solid var(--border)',
       padding: '12px',
@@ -274,7 +249,7 @@ export default function VehicleCritiqueMode({
             onChange={(e) => setFormData(prev => ({
               ...prev,
               category: e.target.value as any,
-              subcategory: '' // Reset subcategory when category changes
+              subcategory: (CATEGORY_SUBCATEGORIES as any)[e.target.value]?.[0] || '' // Reset to default subcategory
             }))}
             style={{
               width: '100%',
@@ -294,7 +269,7 @@ export default function VehicleCritiqueMode({
         {/* Subcategory Selection */}
         <div style={{ marginBottom: '8px' }}>
           <label style={{ display: 'block', fontSize: '8pt', fontWeight: 'bold', marginBottom: '2px' }}>
-            Subcategory
+            Subcategory *
           </label>
           <select
             value={formData.subcategory}
@@ -307,7 +282,6 @@ export default function VehicleCritiqueMode({
               padding: '2px'
             }}
           >
-            <option value="">Select subcategory...</option>
             {getCategorySubcategories(formData.category).map(sub => (
               <option key={sub} value={sub}>
                 {sub.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -419,18 +393,54 @@ export default function VehicleCritiqueMode({
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || !formData.description.trim()}
+            disabled={isSubmitting || !formData.description.trim() || !formData.subcategory}
             className="button button-primary"
             style={{
               fontSize: '8pt',
               padding: '2px 8px',
-              opacity: (isSubmitting || !formData.description.trim()) ? 0.5 : 1
+              opacity: (isSubmitting || !formData.description.trim() || !formData.subcategory) ? 0.5 : 1
             }}
           >
             {isSubmitting ? 'Submitting...' : 'Submit Critique'}
           </button>
         </div>
       </form>
+    </div>
+  );
+
+  if (variant === 'modal') {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.4)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}
+        onClick={onClose}
+      >
+        <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(720px, 100%)' }}>
+          {inner}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      position: 'absolute',
+      top: '100%',
+      left: 0,
+      right: 0,
+      marginTop: '4px',
+    }}>
+      {inner}
     </div>
   );
 }
