@@ -636,9 +636,11 @@ const AdminMissionControl: React.FC = () => {
             { label: 'BATCH ANALYSIS', sublabel: 'AI vehicle analysis', path: '/admin/batch-analysis', primary: true },
             { label: 'EXTRACTION MONITOR', sublabel: 'Image extraction progress', path: '/admin/extraction-monitor', primary: true },
             { label: 'KSL SCRAPER', sublabel: 'Import trucks from KSL', path: '/admin/ksl-scraper', primary: true },
+            { label: 'BUSINESS INTELLIGENCE', sublabel: 'Feedback inbox', path: '/admin/business-intelligence', primary: true },
             { label: 'VERIFICATIONS', sublabel: 'Review pending', path: '/admin/verifications' },
             { label: 'MERGE PROPOSALS', sublabel: 'Duplicate vehicles', path: '/admin/merge-proposals' },
-            { label: 'PRICE EDITOR', sublabel: 'Bulk price edits', path: '/admin/price-editor' }
+            { label: 'PRICE EDITOR', sublabel: 'Bulk price edits', path: '/admin/price-editor' },
+            { label: 'MEME LIBRARY', sublabel: 'Index packs + uploads', path: '/admin/meme-library' }
           ].map((action, idx) => (
             <button
               key={idx}
