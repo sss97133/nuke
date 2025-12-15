@@ -25,6 +25,7 @@ type Options = {
   maxListings: number;
   limit: number;
   delayMs: number;
+  writeImages: boolean;
   dryRun: boolean;
 };
 
@@ -47,12 +48,13 @@ function loadEnv(): void {
 }
 
 function parseArgs(argv: string[]): Options {
-  const opts: Options = { maxListings: 2000, limit: 1200, delayMs: 250, dryRun: false };
+  const opts: Options = { maxListings: 2000, limit: 1200, delayMs: 250, writeImages: true, dryRun: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--max-listings' && argv[i + 1]) opts.maxListings = Math.max(1, Math.min(5000, Number(argv[++i])));
     if (a === '--limit' && argv[i + 1]) opts.limit = Math.max(1, Math.min(5000, Number(argv[++i])));
     if (a === '--delay-ms' && argv[i + 1]) opts.delayMs = Math.max(0, Math.min(5000, Number(argv[++i])));
+    if (a === '--no-images') opts.writeImages = false;
     if (a === '--dry-run') opts.dryRun = true;
   }
   return opts;
@@ -105,7 +107,7 @@ async function main() {
 
   console.log(`BaT live auctions import`);
   console.log(`Index: https://bringatrailer.com/auctions/`);
-  console.log(`max_listings=${opts.maxListings} limit=${opts.limit} delay_ms=${opts.delayMs} mode=${opts.dryRun ? 'dry-run' : 'execute'}`);
+  console.log(`max_listings=${opts.maxListings} limit=${opts.limit} delay_ms=${opts.delayMs} images=${opts.writeImages ? 'on' : 'off'} mode=${opts.dryRun ? 'dry-run' : 'execute'}`);
 
   let sourceId: string | null = null;
   if (!opts.dryRun) {
@@ -151,7 +153,10 @@ async function main() {
         continue;
       }
 
-      const r = await postJson(importBatListingUrl, INVOKE_KEY, { url });
+      // import-bat-listing is the canonical BaT deep extractor.
+      // It should write accurate auction fields (end date, bid count, current bid, etc).
+      // Images: keep ON by default (Classic baseline); can be disabled for emergency throughput.
+      const r = await postJson(importBatListingUrl, INVOKE_KEY, { url, skip_images: !opts.writeImages });
       if (!r?.success) throw new Error(r?.error || 'import-bat-listing failed');
 
       const vehicleId = r.vehicleId || r.vehicle_id || null;

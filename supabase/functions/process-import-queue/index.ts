@@ -2452,11 +2452,33 @@ serve(async (req) => {
           updateData.description = scrapeData.data.description;
         }
         if (scrapeData.data.location) updateData.location = scrapeData.data.location;
-        if (scrapeData.data.asking_price && scrapeData.data.asking_price > 100 && scrapeData.data.asking_price < 10000000) {
-          updateData.asking_price = scrapeData.data.asking_price;
-        }
-        if (scrapeData.data.vin && scrapeData.data.vin.length === 17) {
-          updateData.vin = scrapeData.data.vin;
+        // IMPORTANT: do not directly update ledgered fields (vin/asking_price/etc) here.
+        // Those must flow through the forensic/provenance system so overwrites are documented + roll-backable.
+        try {
+          const vinCandidate = (scrapeData?.data?.vin || '').toString().trim();
+          if (vinCandidate && vinCandidate.length === 17) {
+            await supabase.rpc('update_vehicle_field_forensically', {
+              p_vehicle_id: newVehicle.id,
+              p_field_name: 'vin',
+              p_new_value: vinCandidate,
+              p_source: 'scraped_listing',
+              p_context: item.listing_url,
+              p_auto_assign: true,
+            });
+          }
+          const priceCandidate = scrapeData?.data?.asking_price ?? scrapeData?.data?.price ?? null;
+          if (typeof priceCandidate === 'number' && priceCandidate > 100 && priceCandidate < 10000000) {
+            await supabase.rpc('update_vehicle_field_forensically', {
+              p_vehicle_id: newVehicle.id,
+              p_field_name: 'asking_price',
+              p_new_value: String(priceCandidate),
+              p_source: 'scraped_listing',
+              p_context: item.listing_url,
+              p_auto_assign: true,
+            });
+          }
+        } catch (ledgerErr: any) {
+          console.warn(`⚠️ Forensic ledgered field update failed (non-blocking): ${ledgerErr?.message || String(ledgerErr)}`);
         }
         
         if (Object.keys(updateData).length > 0) {
