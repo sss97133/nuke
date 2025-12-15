@@ -15,6 +15,10 @@ const VehiclePricingSection: React.FC<VehiclePricingSectionProps> = ({
 }) => {
   const { isVerifiedOwner, hasContributorAccess } = permissions;
 
+  // Shelved: valuation requires reliable ingestion + analysis pipelines (comparables + images).
+  // We will re-enable once those systems are trustworthy.
+  return null;
+
   return (
     <section className="section" id="price-section">
       <VehiclePricingWidget

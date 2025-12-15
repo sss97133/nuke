@@ -259,20 +259,30 @@ export class ReferenceDocumentService {
         (needle.includes('get_vehicle_documents') && (needle.includes('schema cache') || needle.includes('could not find') || needle.includes('not found')));
       if (!isMissingRpc) throw error;
 
-      const { data: rows, error: linkErr } = await supabase
+      // Some deployments don't have a PostgREST relationship configured for vehicle_documents -> reference_documents,
+      // so embedding `reference_documents(*)` can 400. Use a safe two-step lookup.
+      const { data: links, error: linkErr } = await supabase
         .from('vehicle_documents')
-        .select('document_id, reference_documents(*)')
+        .select('document_id, created_at')
         .eq('vehicle_id', vehicleId)
         .order('created_at', { ascending: false })
         .limit(200);
 
       if (linkErr) throw linkErr;
 
-      const docs = (rows || [])
-        .map((r: any) => r?.reference_documents)
+      const ids = (links || [])
+        .map((r: any) => String(r?.document_id || ''))
         .filter(Boolean);
+      if (ids.length === 0) return [];
 
-      return docs;
+      const { data: docs, error: docErr } = await supabase
+        .from('reference_documents')
+        .select('*')
+        .in('id', ids);
+      if (docErr) throw docErr;
+
+      const byId = new Map<string, any>((docs || []).map((d: any) => [String(d?.id || ''), d]));
+      return ids.map((id) => byId.get(id)).filter(Boolean);
     } catch (error) {
       console.error('Error loading vehicle documents:', error);
       return [];

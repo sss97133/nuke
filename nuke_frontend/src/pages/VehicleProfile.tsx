@@ -16,7 +16,6 @@ const VehicleHeader = React.lazy(() => import('./vehicle-profile/VehicleHeader')
 const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroImage'));
 const VehicleBasicInfo = React.lazy(() => import('./vehicle-profile/VehicleBasicInfo'));
 const VehicleTimelineSection = React.lazy(() => import('./vehicle-profile/VehicleTimelineSection'));
-const VehiclePricingSection = React.lazy(() => import('./vehicle-profile/VehiclePricingSection'));
 const WorkMemorySection = React.lazy(() => import('./vehicle-profile/WorkMemorySection'));
 import type {
   Vehicle,
@@ -206,11 +205,35 @@ const VehicleProfile: React.FC = () => {
     const toLower = (v: any) => String(v || '').toLowerCase();
     const parseTs = (v: any) => {
       try {
-        const t = v ? new Date(v).getTime() : NaN;
+        if (v === null || typeof v === 'undefined') return NaN;
+        // Support unix timestamps (seconds or millis) in addition to ISO strings.
+        if (typeof v === 'number' && Number.isFinite(v)) {
+          const ms = v < 1e12 ? v * 1000 : v;
+          return Number.isFinite(ms) ? ms : NaN;
+        }
+        const s = String(v).trim();
+        if (!s) return NaN;
+        if (/^\d{9,14}$/.test(s)) {
+          const n = Number(s);
+          if (!Number.isFinite(n)) return NaN;
+          return n < 1e12 ? n * 1000 : n;
+        }
+        const t = new Date(s).getTime();
         return Number.isFinite(t) ? t : NaN;
       } catch {
         return NaN;
       }
+    };
+
+    const maxAuctionHorizonMs = (platform: string, url: string) => {
+      const p = toLower(platform);
+      const u = toLower(url);
+      // Auction-style platforms should never show 30+ day countdowns.
+      if (p === 'bat' || u.includes('bringatrailer.com')) return 10 * 24 * 60 * 60 * 1000;
+      if (p === 'cars_and_bids' || u.includes('carsandbids.com')) return 10 * 24 * 60 * 60 * 1000;
+      if (p.includes('ebay') || u.includes('ebay.com')) return 21 * 24 * 60 * 60 * 1000;
+      // Default: 14 days (keeps us from rendering obvious garbage timers).
+      return 14 * 24 * 60 * 60 * 1000;
     };
 
     const byUrl = new Map<string, any[]>();
@@ -267,6 +290,15 @@ const VehicleProfile: React.FC = () => {
       const best = sorted[0];
       if (!best) return null;
 
+      // Prefer telemetry values from the "best" (highest-signal, freshest) row instead of max() across duplicates.
+      const pickNum = (key: string) => {
+        for (const r of sorted) {
+          const v = (r as any)?.[key];
+          if (typeof v === 'number' && Number.isFinite(v)) return v;
+        }
+        return null;
+      };
+
       const statuses = sorted.map((r) => toLower(r?.listing_status)).filter(Boolean);
       const hasActive = statuses.some((s) => s === 'active' || s === 'live');
       const hasSold = statuses.some((s) => s === 'sold');
@@ -292,9 +324,12 @@ const VehicleProfile: React.FC = () => {
         .filter(Boolean)
         .map((iso) => ({ iso: String(iso), t: parseTs(iso) }))
         .filter((x) => Number.isFinite(x.t));
-      const futureEnd = endCandidates.filter((x) => x.t > now).sort((a, b) => a.t - b.t)[0];
-      const anyEnd = endCandidates.sort((a, b) => a.t - b.t)[0];
-      const mergedEndDate = (futureEnd?.iso || anyEnd?.iso || null) as string | null;
+      const horizonMs = maxAuctionHorizonMs(String(best.platform || ''), String(best.listing_url || ''));
+      const futureEnd = endCandidates
+        .filter((x) => x.t > now && (x.t - now) <= horizonMs)
+        .sort((a, b) => a.t - b.t)[0];
+      // If no reasonable future end date exists, don't render a countdown (avoid misleading UI).
+      const mergedEndDate = (futureEnd?.iso || null) as string | null;
 
       const updatedAt = (() => {
         const ts = sorted
@@ -319,9 +354,9 @@ const VehicleProfile: React.FC = () => {
         listing_status: mergedStatus,
         end_date: mergedEndDate,
         current_bid: maxNum(sorted.map((r) => r?.current_bid)),
-        bid_count: maxNum(sorted.map((r) => r?.bid_count)),
-        watcher_count: maxNum(sorted.map((r) => r?.watcher_count)),
-        view_count: maxNum(sorted.map((r) => r?.view_count)),
+        bid_count: pickNum('bid_count'),
+        watcher_count: pickNum('watcher_count'),
+        view_count: pickNum('view_count'),
         comment_count: mergedCommentCount,
         final_price: maxNum(sorted.map((r) => r?.final_price)),
         sold_at: soldAt,
@@ -2011,11 +2046,16 @@ const VehicleProfile: React.FC = () => {
       console.error('Error querying vehicle images:', error);
     }
 
-    // Also include primary image if available
-    if (vehicle.primaryImageUrl && !images.includes(vehicle.primaryImageUrl)) {
-      images = [vehicle.primaryImageUrl, ...images];
+    // Also include primary image if available (support both legacy camelCase and canonical snake_case fields).
+    const primaryUrl =
+      (vehicle as any)?.primary_image_url ||
+      (vehicle as any)?.primaryImageUrl ||
+      (vehicle as any)?.image_url ||
+      null;
+    if (primaryUrl && typeof primaryUrl === 'string' && !images.includes(primaryUrl)) {
+      images = [primaryUrl, ...images];
       // Fallback for lead image
-      if (!leadImageUrl) setLeadImageUrl(vehicle.primaryImageUrl);
+      if (!leadImageUrl) setLeadImageUrl(primaryUrl);
     }
 
     setVehicleImages(images);
@@ -2159,15 +2199,6 @@ const VehicleProfile: React.FC = () => {
             onAddEventClick={() => setShowAddEvent(true)}
               />
             </section>
-
-        {/* Pricing & Analysis Section - Full width */}
-            <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading pricing analysis...</div>}>
-              <VehiclePricingSection
-                vehicle={vehicle}
-                permissions={permissions}
-                initialValuation={latestExpertValuation}
-              />
-            </React.Suspense>
 
             {/* Wiring Query Context Bar & AI Parts Quote Generator */}
             {(isRowOwner || isVerifiedOwner) && (
@@ -2344,7 +2375,6 @@ const VehicleProfile: React.FC = () => {
             session={session}
             permissions={permissions}
             responsibleName={responsibleName || undefined}
-            onPriceClick={handlePriceClick}
             initialValuation={(window as any).__vehicleProfileRpcData?.latest_valuation}
             initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
             organizationLinks={linkedOrganizations}

@@ -48,7 +48,7 @@ export const MemelordPanel: React.FC<{ userId: string }> = ({ userId }) => {
   return (
     <div className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>MEME DROPS</div>
+        <div>Meme Library Activity</div>
         <div style={{ fontSize: '8pt', color: '#6b7280' }}>
           Total: {stats.total} · Spent: ${((stats.spentCents || 0) / 100).toFixed(2)}
         </div>
@@ -57,7 +57,7 @@ export const MemelordPanel: React.FC<{ userId: string }> = ({ userId }) => {
         {loading && <div className="text text-muted">Loading…</div>}
         {error && <div style={{ color: '#b91c1c' }}>{error}</div>}
         {!loading && !error && events.length === 0 && (
-          <div className="text text-muted">No meme drops yet.</div>
+          <div className="text text-muted">No activity yet.</div>
         )}
 
         {!loading && !error && events.length > 0 && (
