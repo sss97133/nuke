@@ -113,6 +113,37 @@ const VehicleTimeline: React.FC<{
   const [readyTargetHours, setReadyTargetHours] = useState<number>(100);
   const autoOpenedTodayRef = React.useRef<boolean>(false);
 
+  // Helper: normalize any date-ish value to YYYY-MM-DD without timezone shifting.
+  // - If it's already a date-only string, keep it.
+  // - If it includes a time, drop the time portion.
+  // - Fallback: parse as Date and use ISO date (UTC).
+  const toDateOnly = (raw: any): string => {
+    if (!raw) return new Date().toISOString().slice(0, 10);
+    try {
+      const s = String(raw);
+      if (s.includes('T')) return s.split('T')[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    } catch {}
+    return new Date().toISOString().slice(0, 10);
+  };
+
+  const yearFromDateOnly = (ymd: string): number => {
+    const y = Number(String(ymd || '').slice(0, 4));
+    return Number.isFinite(y) ? y : new Date().getUTCFullYear();
+  };
+
+  const addDaysYmd = (ymd: string, days: number): string => {
+    const [y, m, d] = String(ymd || '').split('-').map((x) => Number(x));
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return ymd;
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() + days);
+    return dt.toISOString().slice(0, 10);
+  };
+
+  const ymdToUtcStart = (ymd: string): string => `${ymd}T00:00:00.000Z`;
+
   useEffect(() => {
     loadTimelineEvents();
     loadCurrentUser();
@@ -342,7 +373,7 @@ const VehicleTimeline: React.FC<{
         for (const img of imageData) {
           const dt = (img as any)?.taken_at || (img as any)?.created_at;
           if (dt) {
-            const dateKey = new Date(dt).toISOString().split('T')[0];
+            const dateKey = toDateOnly(dt);
             activityDateMap.set(dateKey, (activityDateMap.get(dateKey) || 0) + 1);
           }
         }
@@ -352,7 +383,7 @@ const VehicleTimeline: React.FC<{
       if (auctionData) {
         for (const comment of auctionData) {
           if (comment.posted_at) {
-            const dateKey = new Date(comment.posted_at).toISOString().split('T')[0];
+            const dateKey = toDateOnly(comment.posted_at);
             activityDateMap.set(dateKey, (activityDateMap.get(dateKey) || 0) + 1);
           }
         }
@@ -445,13 +476,13 @@ const VehicleTimeline: React.FC<{
         
         // Count timeline events by year
         merged.forEach((ev: any) => {
-          const year = new Date(ev.event_date).getFullYear();
+          const year = yearFromDateOnly(toDateOnly(ev.event_date));
           yearCounts[year] = (yearCounts[year] || 0) + 1;
         });
         
         // Add activity counts by year (photos + auction)
         activityDateMap.forEach((count, dateStr) => {
-          const year = new Date(dateStr).getFullYear();
+          const year = yearFromDateOnly(toDateOnly(dateStr));
           yearCounts[year] = (yearCounts[year] || 0) + count;
         });
         
@@ -566,7 +597,10 @@ const VehicleTimeline: React.FC<{
   }
 
   // Build list of distinct years for index navigation (plain compute to avoid hook ordering issues)
-  const yearIndex: number[] = Array.from(new Set(events.map(ev => new Date(ev.event_date).getFullYear()))).sort((a,b) => b-a);
+  const yearIndex: number[] = Array.from(new Set([
+    ...events.map((ev) => yearFromDateOnly(toDateOnly((ev as any).event_date))),
+    ...Array.from(photoDates.keys()).map((ymd) => yearFromDateOnly(toDateOnly(ymd))),
+  ])).sort((a,b) => b-a);
 
   const selectYear = (y: number) => {
     setSelectedYear(y);
@@ -627,7 +661,7 @@ const VehicleTimeline: React.FC<{
                   const filtered = filterType==='life' ? events.filter(e => (e as any).event_type==='life') : events;
                   const targetYear = selectedYear ?? currentTopYear;
                   if (!targetYear) return null;
-                  const yearEvents = filtered.filter(e => new Date(e.event_date).getFullYear() === targetYear);
+                  const yearEvents = filtered.filter(e => yearFromDateOnly(toDateOnly((e as any).event_date)) === targetYear);
 
                   return (
                     <div
@@ -685,12 +719,13 @@ const VehicleTimeline: React.FC<{
                       {/* Vertical Day Grid: Weekday labels + 7 rows × 53 columns */}
                       {(() => {
                         const year = targetYear;
-                        const jan1 = new Date(year, 0, 1);
+                        // Build the grid in UTC to prevent timezone shifts when using toISOString().
+                        const jan1 = new Date(Date.UTC(year, 0, 1));
                         const gridStart = new Date(jan1);
-                        // Align to Monday on/before Jan 1
-                        const dow = gridStart.getDay(); // 0=Sun,1=Mon,...
+                        // Align to Monday on/before Jan 1 (UTC)
+                        const dow = gridStart.getUTCDay(); // 0=Sun,1=Mon,...
                         const diffToMonday = (dow + 6) % 7; // 0 if Monday, 6 if Sunday
-                        gridStart.setDate(gridStart.getDate() - diffToMonday);
+                        gridStart.setUTCDate(gridStart.getUTCDate() - diffToMonday);
                         const totalWeeks = 53;
 
                         const hoursForDay = (dayEvents: TimelineEvent[]): number => {
@@ -740,12 +775,12 @@ const VehicleTimeline: React.FC<{
                                   const weekIdx = Math.floor(idx / 7);
                                   const dayIdx = idx % 7; // 0=Mon
                                   const date = new Date(gridStart);
-                                  date.setDate(date.getDate() + weekIdx * 7 + dayIdx);
-                                  const inYear = date.getFullYear() === year;
+                                  date.setUTCDate(date.getUTCDate() + weekIdx * 7 + dayIdx);
+                                  const inYear = date.getUTCFullYear() === year;
                                   const dayYmd = date.toISOString().slice(0, 10);
                                   const dayEvents = inYear
                                     ? yearEvents.filter(e => {
-                                        const evYmd = new Date(e.event_date).toISOString().slice(0, 10);
+                                        const evYmd = toDateOnly((e as any).event_date);
                                         return evYmd === dayYmd;
                                       })
                                     : [];
@@ -761,7 +796,7 @@ const VehicleTimeline: React.FC<{
                                       onClick={async () => {
                                         if (clickable) {
                                           if (onDateClick) {
-                                            onDateClick(date.toISOString().split('T')[0], dayEvents);
+                                            onDateClick(dayYmd, dayEvents);
                                           } else {
                                             // If day has events, open the first event's receipt directly
                                             if (dayEvents.length > 0) {
@@ -769,12 +804,14 @@ const VehicleTimeline: React.FC<{
                                               setSelectedEventForDetail(dayEvents[0].id);
                                             } else if (activityCount > 0) {
                                               // If day has activity but no events, get photos and auction activity for that date
+                                              const dayStart = ymdToUtcStart(dayYmd);
+                                              const dayEnd = ymdToUtcStart(addDaysYmd(dayYmd, 1));
                                               const { data: dayImages } = await supabase
                                                 .from('vehicle_images')
                                                 .select('*')
                                                 .eq('vehicle_id', vehicleId)
-                                                .gte('taken_at', dayYmd)
-                                                .lt('taken_at', new Date(new Date(dayYmd).getTime() + 86400000).toISOString());
+                                                .gte('taken_at', dayStart)
+                                                .lt('taken_at', dayEnd);
 
                                               const { data: dayAuction } = await supabase
                                                 .from('auction_comments')
@@ -790,8 +827,8 @@ const VehicleTimeline: React.FC<{
                                                   )
                                                 `)
                                                 .eq('vehicle_id', vehicleId)
-                                                .gte('posted_at', dayYmd)
-                                                .lt('posted_at', new Date(new Date(dayYmd).getTime() + 86400000).toISOString());
+                                                .gte('posted_at', dayStart)
+                                                .lt('posted_at', dayEnd);
                                               
                                               // Check if there's an existing event for this date
                                               const { data: existingEvent, error: eventError } = await supabase
