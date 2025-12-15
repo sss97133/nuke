@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { UserInteractionService } from '../services/userInteractionService';
+import VehicleCritiqueMode from '../components/search/VehicleCritiqueMode';
 
 interface HypeVehicle {
   id: string;
@@ -238,6 +239,14 @@ const CursorHomepage: React.FC = () => {
   const [filteredVehicles, setFilteredVehicles] = useState<HypeVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
+  const [showCritiqueModal, setShowCritiqueModal] = useState(false);
+  const [critiqueVehicle, setCritiqueVehicle] = useState<{
+    id: string;
+    year?: number;
+    make?: string;
+    model?: string;
+    status?: string;
+  } | null>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('AT');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
@@ -394,6 +403,18 @@ const CursorHomepage: React.FC = () => {
       }
     }
   };
+
+  const openFeedbackForVehicle = useCallback((v: any) => {
+    if (!v?.id) return;
+    setCritiqueVehicle({
+      id: String(v.id),
+      year: typeof v.year === 'number' ? v.year : undefined,
+      make: typeof v.make === 'string' ? v.make : undefined,
+      model: typeof v.model === 'string' ? v.model : undefined,
+      status: typeof v.status === 'string' ? v.status : undefined,
+    });
+    setShowCritiqueModal(true);
+  }, []);
 
   // Load accurate stats from database (not filtered feed)
   const loadAccurateStats = async () => {
@@ -1708,6 +1729,8 @@ const CursorHomepage: React.FC = () => {
                   vehicle={vehicle}
                   viewMode="gallery"
                   infoDense={infoDense}
+                  showFeedbackButton={true}
+                  onFeedbackClick={openFeedbackForVehicle}
                   sourceStampUrl={
                     (vehicle as any)?.discovery_url ||
                     ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
@@ -1730,6 +1753,8 @@ const CursorHomepage: React.FC = () => {
                 vehicle={vehicle}
                 viewMode="grid"
                 infoDense={infoDense}
+                showFeedbackButton={true}
+                onFeedbackClick={openFeedbackForVehicle}
                 sourceStampUrl={
                   (vehicle as any)?.discovery_url ||
                   ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
@@ -1848,6 +1873,22 @@ const CursorHomepage: React.FC = () => {
         >
           ↑
         </button>
+      )}
+
+      {/* Feedback / Critique Modal */}
+      {showCritiqueModal && critiqueVehicle?.id && (
+        <VehicleCritiqueMode
+          isVisible={showCritiqueModal}
+          onClose={() => setShowCritiqueModal(false)}
+          vehicleId={critiqueVehicle.id}
+          vehicleData={{
+            year: critiqueVehicle.year,
+            make: critiqueVehicle.make,
+            model: critiqueVehicle.model,
+            status: critiqueVehicle.status,
+          }}
+          variant="modal"
+        />
       )}
     </div>
   );

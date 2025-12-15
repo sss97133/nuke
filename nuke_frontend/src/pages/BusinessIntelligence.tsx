@@ -264,7 +264,7 @@ export default function BusinessIntelligence() {
         <div className="card">
           <div className="card-header">Advanced Analytics</div>
           <div className="card-body" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
-            <div style={{ fontSize: '14px', marginBottom: '8px' }}>📊 Advanced Analytics</div>
+            <div style={{ fontSize: '14px', marginBottom: '8px' }}>Advanced Analytics</div>
             <div style={{ fontSize: '10pt' }}>
               Detailed trend analysis, predictive insights, and custom reporting coming soon.
             </div>
