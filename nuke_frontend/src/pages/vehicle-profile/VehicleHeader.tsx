@@ -646,6 +646,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const end = new Date(iso).getTime();
     if (!Number.isFinite(end)) return null;
     const diff = end - Date.now();
+    // Guard against obviously-wrong countdowns (bad imports/backfills).
+    // We’d rather show nothing than lie.
+    const maxReasonable = 14 * 24 * 60 * 60 * 1000;
+    if (diff > maxReasonable) return null;
     if (diff <= 0) return 'Ended';
     const s = Math.floor(diff / 1000);
     const d = Math.floor(s / (60 * 60 * 24));
@@ -672,6 +676,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const end = new Date(iso).getTime();
     if (!Number.isFinite(end)) return null;
     const diff = end - auctionNow;
+    const maxReasonable = 14 * 24 * 60 * 60 * 1000;
+    if (diff > maxReasonable) return null;
     if (diff <= 0) return 'Ended';
     const totalSeconds = Math.floor(diff / 1000);
     const d = Math.floor(totalSeconds / 86400);
@@ -699,6 +705,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (!Number.isFinite(end)) return true;
     return end > auctionNow;
   }, [auctionPulse, auctionNow]);
+
+  const auctionTelemetryFresh = useMemo(() => {
+    const updatedAt = auctionPulse?.updated_at ? new Date(auctionPulse.updated_at as any).getTime() : NaN;
+    if (!Number.isFinite(updatedAt)) return false;
+    const diffMin = (Date.now() - updatedAt) / (1000 * 60);
+    // If we don't have a recent update, don't trust counts (avoids misleading UI).
+    return diffMin >= 0 && diffMin <= 15;
+  }, [auctionPulse?.updated_at]);
 
   const auctionPulseMs = useMemo(() => {
     if (!auctionPulse?.listing_url) return null;
@@ -805,6 +819,30 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const extra = Math.max(0, unique.length - visible.length);
     return { visibleOrganizations: visible, extraOrgCount: extra };
   }, [organizationLinks]);
+
+  const sellerBadge = useMemo(() => {
+    const links = (organizationLinks || []) as any[];
+    const pickRel = (r: any) => String(r?.relationship_type || '').toLowerCase();
+    const sellerRels = ['sold_by', 'seller', 'consigner'];
+    const first = links
+      .filter((x) => x && sellerRels.includes(pickRel(x)))
+      .sort((a, b) => sellerRels.indexOf(pickRel(a)) - sellerRels.indexOf(pickRel(b)))[0];
+
+    if (first?.business_name) {
+      return {
+        label: String(first.business_name),
+        logo_url: first.logo_url ? String(first.logo_url) : null,
+        relationship: pickRel(first),
+      };
+    }
+
+    const metaSeller = String((vehicle as any)?.origin_metadata?.bat_seller || (vehicle as any)?.origin_metadata?.seller || '').trim();
+    if (metaSeller) {
+      return { label: metaSeller, logo_url: null, relationship: 'seller' };
+    }
+
+    return null;
+  }, [organizationLinks, vehicle]);
 
   const formatRelationship = (relationship?: string | null) => {
     if (!relationship) return 'Partner';
@@ -962,9 +1000,36 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       'no_sale': { text: 'NO SALE', color: '#6b7280', bg: '#f3f4f6' },
       'pending': { text: 'LIVE', color: '#3b82f6', bg: '#dbeafe' }
     };
+
+    // RNM is only valid once the auction has ended (or the platform explicitly reports RNM).
+    // If an auction is still live/active, showing RNM is misleading.
+    const outcomeIsFinal = (() => {
+      if (!outcome) return false;
+      if (outcome !== 'reserve_not_met') return true;
+
+      // Prefer live telemetry when available.
+      if (auctionPulse?.listing_url) {
+        const status = String(auctionPulse.listing_status || '').toLowerCase();
+        if (status === 'reserve_not_met' || status === 'ended' || status === 'sold') return true;
+        if (status === 'active' || status === 'live') return false;
+        if (auctionPulse.end_date) {
+          const end = new Date(auctionPulse.end_date).getTime();
+          if (Number.isFinite(end)) return end <= auctionNow;
+        }
+        return false;
+      }
+
+      // Fallback to vehicle-level auction_end_date if present.
+      const endDate = (vehicle as any)?.auction_end_date;
+      if (endDate) {
+        const end = new Date(endDate).getTime();
+        if (Number.isFinite(end)) return end <= Date.now();
+      }
+      return false;
+    })();
     
     return {
-      badge: outcome ? badges[outcome] : null,
+      badge: outcome && outcomeIsFinal ? badges[outcome] : null,
       link: sourceUrl,
       outcome: outcome
     };
@@ -1207,6 +1272,22 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               {listingHost || listingSourceLabel}
             </span>
           ) : null}
+
+          {/* Seller visibility (do not hide the seller behind tiny icons) */}
+          {sellerBadge?.label ? (
+            <span
+              className="badge badge-secondary"
+              title={sellerBadge.relationship === 'consigner' ? 'Consigner' : 'Seller'}
+              style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 280 }}
+            >
+              {sellerBadge.logo_url ? (
+                <img src={sellerBadge.logo_url} alt="" style={{ width: 14, height: 14, borderRadius: 3, objectFit: 'cover' }} />
+              ) : null}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {sellerBadge.label}
+              </span>
+            </span>
+          ) : null}
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
           {auctionPulse?.listing_url && auctionStatusForBadge && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -1262,27 +1343,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </span>
                 </span>
               ) : null}
-              {typeof auctionPulse.bid_count === 'number' ? (
+              {auctionTelemetryFresh && typeof auctionPulse.bid_count === 'number' ? (
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Bid count">
                   {auctionPulse.bid_count} bids
                 </span>
               ) : null}
-              {typeof auctionPulse.watcher_count === 'number' ? (
+              {auctionTelemetryFresh && typeof auctionPulse.watcher_count === 'number' ? (
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Watchers">
                   {auctionPulse.watcher_count.toLocaleString()} watching
                 </span>
               ) : null}
-              {typeof auctionPulse.view_count === 'number' ? (
+              {auctionTelemetryFresh && typeof auctionPulse.view_count === 'number' ? (
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Views">
                   {auctionPulse.view_count.toLocaleString()} views
                 </span>
               ) : null}
-              {typeof auctionPulse.comment_count === 'number' ? (
+              {auctionTelemetryFresh && typeof auctionPulse.comment_count === 'number' ? (
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Comments">
                   {auctionPulse.comment_count.toLocaleString()} comments
                 </span>
               ) : null}
-              {auctionPulse.last_bid_at ? (
+              {auctionTelemetryFresh && auctionPulse.last_bid_at ? (
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Time since last bid">
                   last bid {formatAge(auctionPulse.last_bid_at) || '—'} ago
                 </span>
@@ -2139,14 +2220,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               )}
 
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <button
-                  type="button"
-                  className="button button-small"
-                  style={{ fontSize: '8pt' }}
-                  onClick={handleViewValuation}
-                >
-                  View valuation details
-                </button>
+                {Boolean(onPriceClick) && (
+                  <button
+                    type="button"
+                    className="button button-small"
+                    style={{ fontSize: '8pt' }}
+                    onClick={handleViewValuation}
+                  >
+                    View valuation details
+                  </button>
+                )}
                 <button
                   type="button"
                   className="button button-small"

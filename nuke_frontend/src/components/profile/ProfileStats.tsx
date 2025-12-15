@@ -28,23 +28,19 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({ stats, isOwnProfile }) => {
   const statItems = [
     {
       label: 'Total Documented Value',
-      value: `$${totalDocumentedValue.toLocaleString()}`,
-      color: '#00ff00'
+      value: `$${totalDocumentedValue.toLocaleString()}`
     },
     {
       label: 'Labor Value',
-      value: `$${totalLaborValue.toLocaleString()}`,
-      color: '#00ffff'
+      value: `$${totalLaborValue.toLocaleString()}`
     },
     {
       label: 'Receipts/Work Orders',
-      value: stats.total_timeline_events,
-      color: '#ffff00'
+      value: stats.total_timeline_events
     },
     {
       label: 'Photo Evidence',
-      value: stats.total_images,
-      color: '#ff00ff'
+      value: stats.total_images
     }
   ];
 
@@ -66,22 +62,22 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({ stats, isOwnProfile }) => {
               style={{
                 padding: 'var(--space-3)',
                 borderRadius: '4px',
-                background: '#000',
-                border: '2px solid ' + stat.color,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
                 textAlign: 'center'
               }}
             >
               <div style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                color: stat.color,
+                fontSize: '12px',
+                fontWeight: 800,
+                color: 'var(--text)',
                 marginBottom: 'var(--space-1)'
               }}>
                 {stat.value}
               </div>
               <div style={{
                 fontSize: '10px',
-                color: stat.color,
+                color: 'var(--text-muted)',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
                 fontWeight: 600
