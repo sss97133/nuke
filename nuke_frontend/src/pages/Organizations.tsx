@@ -479,7 +479,7 @@ export default function Organizations() {
                       position: 'absolute',
                       bottom: '8px',
                       right: '8px',
-                      background: isFollowing ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.95)',
+                      background: isFollowing ? 'rgba(0,0,0,0.8)' : 'var(--surface)',
                       color: isFollowing ? '#fff' : 'var(--text)',
                       padding: '4px 10px',
                       borderRadius: '2px',

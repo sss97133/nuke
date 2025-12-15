@@ -383,8 +383,8 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
         right: '16px',
         width: '400px',
         maxHeight: '600px',
-        background: '#ffffff',
-        border: '2px solid #bdbdbd',
+        background: 'var(--surface)',
+        border: '2px solid var(--border)',
         boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         zIndex: 1000,
         display: 'flex',
@@ -395,11 +395,12 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
       <div
         style={{
           padding: '12px',
-          borderBottom: '1px solid #bdbdbd',
+          borderBottom: '1px solid var(--border)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: '#f5f5f5'
+          background: 'var(--bg)',
+          color: 'var(--text)'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -424,10 +425,11 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
               onClick={handleMarkAllRead}
               style={{
                 padding: '4px 8px',
-                border: '1px solid #bdbdbd',
-                background: '#ffffff',
+                border: '1px solid var(--border)',
+                background: 'var(--surface)',
                 cursor: 'pointer',
-                fontSize: '7pt'
+                fontSize: '7pt',
+                color: 'var(--text)'
               }}
             >
               Mark All Read
@@ -437,10 +439,11 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
             onClick={onClose}
             style={{
               padding: '4px 8px',
-              border: '1px solid #bdbdbd',
-              background: '#ffffff',
+              border: '1px solid var(--border)',
+              background: 'var(--surface)',
               cursor: 'pointer',
-              fontSize: '7pt'
+              fontSize: '7pt',
+              color: 'var(--text)'
             }}
           >
             CLOSE
@@ -457,11 +460,11 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
         }}
       >
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#757575', fontSize: '8pt' }}>
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '8pt' }}>
             Loading...
           </div>
         ) : notifications.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#757575', fontSize: '8pt' }}>
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '8pt' }}>
             No notifications
           </div>
         ) : (
@@ -477,24 +480,24 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                   onClick={() => handleClick(notification)}
                   style={{
                     padding: '12px',
-                    border: '1px solid #bdbdbd',
-                    background: notification.is_read ? '#ffffff' : '#f0f9ff',
+                    border: '1px solid var(--border)',
+                    background: notification.is_read ? 'var(--surface)' : 'var(--surface-hover)',
                     cursor: requiresConfirmation ? 'default' : 'pointer',
                     transition: '0.12s'
                   }}
                   onMouseEnter={(e) => {
                     if (!requiresConfirmation) {
-                      e.currentTarget.style.background = '#f5f5f5'
+                      e.currentTarget.style.background = 'var(--surface-hover)'
                     }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = notification.is_read ? '#ffffff' : '#f0f9ff'
+                    e.currentTarget.style.background = notification.is_read ? 'var(--surface)' : 'var(--surface-hover)'
                   }}
                 >
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'start' }}>
                     {/* Vehicle Image */}
                     {vehicleImageUrl && (
-                      <div style={{ flex: '0 0 60px', height: '60px', background: '#f0f0f0', border: '1px solid #bdbdbd', overflow: 'hidden' }}>
+                      <div style={{ flex: '0 0 60px', height: '60px', background: 'var(--bg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
                         <img
                           src={vehicleImageUrl}
                           alt="Vehicle"
@@ -519,7 +522,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                       {/* Data Point */}
                       <div style={{ 
                         fontSize: '8pt', 
-                        color: '#424242', 
+                        color: 'var(--text-secondary)', 
                         marginBottom: requiresConfirmation ? '8px' : '4px',
                         fontWeight: '500'
                       }}>
@@ -535,8 +538,8 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                             }}
                             style={{
                               padding: '6px 16px',
-                              border: '1px solid #059669',
-                              background: '#059669',
+                              border: '1px solid var(--success)',
+                              background: 'var(--success)',
                               color: 'white',
                               cursor: 'pointer',
                               fontSize: '8pt',
@@ -552,9 +555,9 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                             }}
                             style={{
                               padding: '6px 16px',
-                              border: '1px solid #dc2626',
-                              background: '#ffffff',
-                              color: '#dc2626',
+                              border: '1px solid var(--error)',
+                              background: 'var(--surface)',
+                              color: 'var(--error)',
                               cursor: 'pointer',
                               fontSize: '8pt',
                               fontWeight: '600'
@@ -565,7 +568,7 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
                         </div>
                       )}
 
-                      <div style={{ fontSize: '7pt', color: '#9e9e9e', marginTop: '4px' }}>
+                      <div style={{ fontSize: '7pt', color: 'var(--text-secondary)', marginTop: '4px' }}>
                         {new Date(notification.created_at).toLocaleString()}
                       </div>
                     </div>
