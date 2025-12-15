@@ -164,7 +164,8 @@ export default function NotificationCenter({ isOpen, onClose }: NotificationCent
     try {
       const { data, error } = await supabase
         .from('vehicle_images')
-        .select('vehicle_id, image_url, thumbnail_url, large_url, variants, is_primary')
+        // Lean payload: avoid pulling large JSON blobs when just rendering a tiny thumbnail.
+        .select('vehicle_id, image_url, thumbnail_url, large_url, is_primary, created_at')
         .in('vehicle_id', vehicleIds)
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: true })

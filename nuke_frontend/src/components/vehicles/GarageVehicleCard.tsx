@@ -22,6 +22,22 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
   const [organizationRelationships, setOrganizationRelationships] = useState<any[]>([]);
   const [session, setSession] = useState<any>(null);
 
+  const FEATURE_VEHICLE_ANALYTICS_UNAVAILABLE_KEY = 'featureVehicleAnalyticsUnavailable';
+
+  function isMissingResourceError(err: any): boolean {
+    const code = err?.code ? String(err.code) : '';
+    const status = typeof err?.status === 'number' ? err.status : undefined;
+    const message = err?.message ? String(err.message) : '';
+    return (
+      status === 404 ||
+      code === 'PGRST116' ||
+      code === 'PGRST301' ||
+      code === '42P01' ||
+      message.toLowerCase().includes('does not exist') ||
+      message.toLowerCase().includes('not found')
+    );
+  }
+
   // Load actual metrics for this vehicle
   useEffect(() => {
     loadVehicleMetrics();
@@ -55,24 +71,26 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
 
   const loadVehicleMetrics = async () => {
     try {
+      const analyticsUnavailable = typeof window !== 'undefined' && localStorage.getItem(FEATURE_VEHICLE_ANALYTICS_UNAVAILABLE_KEY) === '1';
+
       // Get real counts and data
       const [
-        { count: imageCount },
-        { count: eventCount },
-        { data: latestEvent },
-        { data: valuation },
-        { count: viewCount }
+        { count: imageCount, error: imageCountError },
+        { count: eventCount, error: eventCountError },
+        { data: latestEventRows, error: latestEventError },
+        { data: valuationRows, error: valuationError },
+        { count: viewCount, error: viewCountError }
       ] = await Promise.all([
         // Image count
         supabase
           .from('vehicle_images')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'estimated', head: true })
           .eq('vehicle_id', vehicle.id),
         
         // Timeline event count
         supabase
           .from('timeline_events')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'estimated', head: true })
           .eq('vehicle_id', vehicle.id),
         
         // Latest activity
@@ -81,8 +99,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
           .select('event_date, event_type, title')
           .eq('vehicle_id', vehicle.id)
           .order('event_date', { ascending: false })
-          .limit(1)
-          .single(),
+          .limit(1),
         
         // Latest valuation
         supabase
@@ -90,16 +107,36 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
           .select('estimated_value, valuation_date, confidence_score')
           .eq('vehicle_id', vehicle.id)
           .order('valuation_date', { ascending: false })
-          .limit(1)
-          .single(),
+          .limit(1),
         
         // View count (analytics)
-        supabase
-          .from('vehicle_analytics')
-          .select('*', { count: 'exact', head: true })
-          .eq('vehicle_id', vehicle.id)
-          .eq('event_type', 'view')
+        analyticsUnavailable
+          ? Promise.resolve({ count: 0, error: null } as any)
+          : supabase
+              .from('vehicle_analytics')
+              .select('id', { count: 'estimated', head: true })
+              .eq('vehicle_id', vehicle.id)
+              .eq('event_type', 'view')
       ]);
+
+      if (imageCountError) console.warn('[GarageVehicleCard] image count unavailable:', imageCountError.message || imageCountError);
+      if (eventCountError) console.warn('[GarageVehicleCard] event count unavailable:', eventCountError.message || eventCountError);
+      if (latestEventError) console.warn('[GarageVehicleCard] latest event unavailable:', latestEventError.message || latestEventError);
+      if (valuationError) console.warn('[GarageVehicleCard] valuation unavailable:', valuationError.message || valuationError);
+      if (viewCountError) {
+        if (isMissingResourceError(viewCountError)) {
+          try {
+            localStorage.setItem(FEATURE_VEHICLE_ANALYTICS_UNAVAILABLE_KEY, '1');
+          } catch {
+            // ignore
+          }
+        } else {
+          console.warn('[GarageVehicleCard] view count unavailable:', viewCountError.message || viewCountError);
+        }
+      }
+
+      const latestEvent = Array.isArray(latestEventRows) ? latestEventRows[0] : null;
+      const valuation = Array.isArray(valuationRows) ? valuationRows[0] : null;
 
       setLiveData({
         imageCount: imageCount || 0,

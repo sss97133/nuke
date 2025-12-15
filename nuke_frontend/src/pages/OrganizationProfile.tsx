@@ -137,6 +137,11 @@ export default function OrganizationProfile() {
     console.log('[OrgProfile] Extracted - id:', id, 'orgId:', orgId, 'pathnameOrgId:', pathnameOrgId, 'organizationId:', organizationId);
     console.log('[OrgProfile] Current pathname:', location.pathname);
   }
+
+  const isUuid = (value: string | null | undefined): boolean => {
+    if (!value) return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  };
   
   const navigate = useNavigate();
 
@@ -432,6 +437,13 @@ export default function OrganizationProfile() {
   const loadOrganization = async () => {
     if (!organizationId) {
       console.error('[OrgProfile] No organizationId - id:', id, 'orgId:', orgId);
+      setLoading(false);
+      return;
+    }
+
+    // Prevent PostgREST 400 spam when route params are malformed (e.g. "undefined", "null", etc.).
+    if (!isUuid(organizationId)) {
+      console.warn('[OrgProfile] Invalid organizationId (not UUID):', organizationId);
       setLoading(false);
       return;
     }

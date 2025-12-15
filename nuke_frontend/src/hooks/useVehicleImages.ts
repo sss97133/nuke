@@ -47,8 +47,13 @@ export const useVehicleImages = (vehicleId?: string) => {
     try {
       const { data, error: fetchError } = await supabase
         .from('vehicle_images')
-        .select('*, variants')
-        .eq('vehicle_id', vehicleId);
+        // Keep payload lean to reduce the chance of statement timeouts / 500s on large image tables
+        .select('id, vehicle_id, image_url, file_name, file_path, is_primary, is_public, category, description, variants, created_at')
+        .eq('vehicle_id', vehicleId)
+        .eq('is_document', false)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(250);
 
       if (fetchError) {
         console.error('Supabase error:', fetchError);
@@ -95,15 +100,32 @@ export const useVehiclesWithImages = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const chunk = <T,>(arr: T[], size: number): T[][] => {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  };
+
   const loadVehiclesWithImages = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Fetch vehicles and images separately to avoid PostgREST ambiguity
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth?.user?.id || null;
+      if (!userId) {
+        setVehicles([]);
+        return;
+      }
+
+      // Fetch vehicles scoped to current user to avoid huge table scans/timeouts in production.
+      // Include both `user_id` and `uploaded_by` as legacy/new ownership fields.
       const { data: allVehiclesData, error: vehiclesError } = await supabase
         .from('vehicles')
-        .select('*');
+        .select('*')
+        .or(`user_id.eq.${userId},uploaded_by.eq.${userId}`)
+        .order('created_at', { ascending: false })
+        .limit(250);
 
       if (vehiclesError) {
         throw vehiclesError;
@@ -116,14 +138,18 @@ export const useVehiclesWithImages = () => {
 
       // Fetch primary images for all vehicles
       const vehicleIds = allVehiclesData.map(v => v.id);
-      const { data: primaryImages, error: imagesError } = await supabase
-        .from('vehicle_images')
-        .select('vehicle_id, image_url, is_primary')
-        .in('vehicle_id', vehicleIds)
-        .eq('is_primary', true);
+      const primaryImages: any[] = [];
+      for (const ids of chunk(vehicleIds, 150)) {
+        const { data: batch, error: imagesError } = await supabase
+          .from('vehicle_images')
+          .select('vehicle_id, image_url, is_primary')
+          .in('vehicle_id', ids)
+          .eq('is_primary', true);
 
-      if (imagesError) {
-        throw imagesError;
+        if (imagesError) {
+          throw imagesError;
+        }
+        (batch || []).forEach((row: any) => primaryImages.push(row));
       }
 
       // Create map of vehicle_id -> primary image URL
