@@ -274,6 +274,13 @@ export class ReferenceDocumentService {
       // Fallback: safe two-step lookup via the dedicated link table for reference docs.
       // IMPORTANT: Do NOT use `vehicle_documents` here — that name is also used by the vehicle paperwork/receipts table
       // in some deployments, which causes PostgREST 400s when selecting `document_id`.
+      // If the link table is missing in this environment, cache that locally so we stop hitting 404 on every profile view.
+      const hasWindow2 = typeof window !== 'undefined';
+      const hostKey2 = hasWindow2 ? String(window.location?.host || '') : 'server';
+      const tableMissingKey2 = `table_missing_vehicle_reference_documents__${hostKey2}`;
+      const skipLinkTable = hasWindow2 && window.localStorage.getItem(tableMissingKey2) === '1';
+      if (skipLinkTable) return [];
+
       const { data: links, error: linkErr } = await supabase
         .from('vehicle_reference_documents')
         .select('reference_document_id')
@@ -281,7 +288,22 @@ export class ReferenceDocumentService {
         .limit(200);
 
       if (linkErr) {
-        // If the fallback link table isn't deployed in an environment, don't poison the whole vehicle profile page.
+        // If the fallback link table isn't deployed in an environment, don't poison the whole vehicle profile page
+        // OR spam the console/network with repeated 404s.
+        const httpStatus = (linkErr as any)?.status ?? (linkErr as any)?.statusCode;
+        const errCode = String((linkErr as any)?.code || '').toUpperCase();
+        const msg = String((linkErr as any)?.message || '').toLowerCase();
+        const missingTable = httpStatus === 404 || errCode === '42P01' || msg.includes('does not exist') || msg.includes('not found');
+        if (missingTable) {
+          try {
+            const hasWindow = typeof window !== 'undefined';
+            const hostKey = hasWindow ? String(window.location?.host || '') : 'server';
+            const tableMissingKey = `table_missing_vehicle_reference_documents__${hostKey}`;
+            if (hasWindow) window.localStorage.setItem(tableMissingKey, '1');
+          } catch {
+            // ignore
+          }
+        }
         return [];
       }
 

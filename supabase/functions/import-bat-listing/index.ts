@@ -373,6 +373,37 @@ async function upsertBatUser(
   return { id: data?.id || null, username: data?.bat_username || u, profile_url: data?.bat_profile_url || profileUrl };
 }
 
+async function touchBatUserProfile(supabase: any, usernameRaw: string | null) {
+  const username = (usernameRaw || '').trim();
+  if (!username) return;
+  const nowIso = new Date().toISOString();
+  try {
+    // Update-first to avoid overwriting `first_seen` if the row exists.
+    const { data: updated, error: updErr } = await supabase
+      .from('bat_user_profiles')
+      .update({ last_seen: nowIso, updated_at: nowIso })
+      .eq('username', username)
+      .select('username')
+      .maybeSingle();
+
+    if (!updErr && updated?.username) return;
+
+    const { error: insErr } = await supabase
+      .from('bat_user_profiles')
+      .insert({ username, first_seen: nowIso, last_seen: nowIso, updated_at: nowIso });
+
+    // Non-fatal if table is missing or row already exists (race).
+    if (insErr) {
+      const code = String((insErr as any)?.code || '').toUpperCase();
+      const status = (insErr as any)?.status ?? (insErr as any)?.statusCode;
+      const msg = String((insErr as any)?.message || '').toLowerCase();
+      if (status === 404 || code === '42P01' || msg.includes('does not exist') || msg.includes('not found')) return;
+    }
+  } catch {
+    // ignore
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -517,6 +548,12 @@ serve(async (req) => {
     const [sellerUser, buyerUser] = await Promise.all([
       upsertBatUser(supabase, seller || null),
       upsertBatUser(supabase, buyer || null),
+    ]);
+
+    // Build/refresh public bidder profiles immediately (seller + buyer are participants even if we don't have bid history here).
+    await Promise.all([
+      touchBatUserProfile(supabase, sellerUser?.username || null),
+      touchBatUserProfile(supabase, buyerUser?.username || null),
     ]);
 
     // Determine whether we can/should link this listing to a seller organization (public.businesses).

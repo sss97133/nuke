@@ -956,6 +956,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const primaryPrice = getDisplayValue();
   const primaryAmount = typeof primaryPrice.amount === 'number' ? primaryPrice.amount : null;
   const primaryLabel = primaryPrice.label || 'Price pending';
+  const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
   
   // For RNM (Reserve Not Met), show blurred high bid instead of "Set a price"
   const isRNM = (vehicle as any)?.auction_outcome === 'reserve_not_met';
@@ -998,7 +999,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (primaryAmount !== null) return `${priceDescriptor}: ${formatCurrency(primaryAmount)}`;
     return null;
   })();
-  const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
   
   // Auction outcome badge and link
   const getAuctionContext = () => {
