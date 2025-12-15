@@ -1,6 +1,6 @@
 import React from 'react';
 import { APPEARANCE_PRESETS } from './appearancePresets';
-import { useTheme, type ThemePreference, type AutoThemeSource, type ContrastProfile, type AccentId } from '../../contexts/ThemeContext';
+import { useTheme, type ThemePreference, type AutoThemeSource, type ContrastProfile, type AccentId, type TextScale } from '../../contexts/ThemeContext';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -60,6 +60,8 @@ export default function AppearanceSpecimen() {
     setAccent,
     contrast,
     setContrast,
+    textScale,
+    setTextScale,
     toggleTheme,
   } = useTheme();
 
@@ -99,6 +101,19 @@ export default function AppearanceSpecimen() {
               <option value="standard">Standard</option>
               <option value="greyscale">Greyscale</option>
               <option value="high">High Contrast</option>
+            </select>
+          </label>
+
+          <label className="text-9" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            Text size
+            <select
+              value={String(textScale)}
+              onChange={(e) => setTextScale(Number(e.target.value) as TextScale)}
+            >
+              <option value="0.9">Small (90%)</option>
+              <option value="1">Standard (100%)</option>
+              <option value="1.1">Large (110%)</option>
+              <option value="1.2">XL (120%)</option>
             </select>
           </label>
 
