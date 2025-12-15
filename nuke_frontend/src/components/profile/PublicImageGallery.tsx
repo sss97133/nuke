@@ -39,7 +39,19 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
 
       if (error) throw error;
 
-      setImages(data || []);
+      // IMPORTANT:
+      // The importer sets vehicle_images.user_id to a "runner" user for RLS/ownership in some flows.
+      // Those are NOT actually authored/taken by that user and should not appear in a user's gallery.
+      // Filter out imported/scraped images by source and/or presence of a source URL in exif_data.
+      const cleaned = (data || []).filter((img: any) => {
+        const src = String(img?.source || '').toLowerCase();
+        if (src === 'organization_import' || src === 'external_import') return false;
+        const exifSourceUrl = String(img?.exif_data?.source_url || '').trim();
+        if (exifSourceUrl.startsWith('http')) return false;
+        return true;
+      });
+
+      setImages(cleaned);
     } catch (error) {
       console.error('Error loading image gallery:', error);
     } finally {

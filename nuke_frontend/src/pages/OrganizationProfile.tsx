@@ -1042,16 +1042,16 @@ export default function OrganizationProfile() {
     (primaryImage?.image_url ?? null);
 
   return (
-    <div style={{ background: '#f5f5f5', minHeight: '100vh' }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       {/* HEADER: Organization Name - Top Focus */}
       <div style={{
-        background: 'var(--white)',
+        background: 'var(--surface)',
         borderBottom: '2px solid var(--border)',
         padding: '20px 16px',
         position: 'sticky',
         top: 48,
         zIndex: 10,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.08)'
+        boxShadow: '0 2px 4px rgba(0,0,0,0.12)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           {/* Organization name - PRIMARY FOCUS */}
@@ -1101,12 +1101,12 @@ export default function OrganizationProfile() {
                 <span style={{ fontSize: '9pt', color: 'var(--color-text-muted)' }}>per share</span>
               </div>
               <span style={{
-                background: '#f3f4f6',
-                border: '1px solid #c0c0c0',
+                background: 'var(--surface-hover)',
+                border: '1px solid var(--border)',
                 padding: '2px 6px',
                 borderRadius: '2px',
                 fontSize: '8pt',
-                color: '#006400',
+                color: 'var(--success)',
                 fontWeight: 600
               }}>
                 {organization.stock_symbol || 'ORG'}
@@ -1210,7 +1210,7 @@ export default function OrganizationProfile() {
       ) : (
         // Fallback to default tabs while loading
         <div style={{
-          background: 'var(--white)',
+          background: 'var(--surface)',
           borderBottom: '2px solid var(--border)',
           padding: '0 16px'
         }}>
@@ -1324,7 +1324,7 @@ export default function OrganizationProfile() {
                             marginBottom: '8px',
                             border: '2px solid #dc2626',
                             borderRadius: '4px',
-                            background: 'var(--white)',
+                            background: 'var(--surface)',
                             cursor: 'pointer'
                           }}
                           onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
@@ -1356,7 +1356,7 @@ export default function OrganizationProfile() {
                                 {vehicle.auction_current_bid ? (
                                   <div>
                                     <span style={{ color: 'var(--text-muted)' }}>Current Bid: </span>
-                                    <span style={{ fontWeight: 700, color: '#1d4ed8' }}>
+                                    <span style={{ fontWeight: 700, color: 'var(--accent)' }}>
                                       ${(vehicle.auction_current_bid / 100).toLocaleString()}
                                     </span>
                                   </div>
@@ -1369,7 +1369,7 @@ export default function OrganizationProfile() {
                                   </div>
                                 )}
                                 {!vehicle.auction_reserve_price && (
-                                  <div style={{ color: '#ea580c', fontWeight: 600 }}>NO RESERVE</div>
+                                  <div style={{ color: 'var(--warning)', fontWeight: 600 }}>NO RESERVE</div>
                                 )}
                               </div>
                             </div>
@@ -2025,7 +2025,7 @@ export default function OrganizationProfile() {
                         border: '1px solid var(--border)',
                         borderRadius: '4px',
                         overflow: 'hidden',
-              background: 'var(--white)',
+                        background: 'var(--surface)',
                         cursor: 'pointer'
                       }}
                       className="hover-lift"
@@ -2053,7 +2053,7 @@ export default function OrganizationProfile() {
                             top: '8px',
                             left: '8px',
                             background: 'rgba(0,0,0,0.7)',
-                            color: '#fff',
+                            color: 'var(--accent-bright)',
                             padding: '4px 8px',
                             borderRadius: '2px',
                             fontSize: '7pt',
@@ -2071,7 +2071,7 @@ export default function OrganizationProfile() {
                             top: '8px',
                             right: '8px',
                             background: 'var(--accent)',
-                            color: '#fff',
+                            color: 'var(--accent-bright)',
                             padding: '4px 8px',
                             borderRadius: '2px',
                             fontSize: '7pt',
@@ -2088,7 +2088,7 @@ export default function OrganizationProfile() {
                             top: img.category === 'logo' ? '40px' : '8px',
                             right: '8px',
                             background: 'rgba(220, 38, 38, 0.9)',
-                            color: '#fff',
+                            color: 'var(--accent-bright)',
                             padding: '4px 8px',
                             borderRadius: '2px',
                             fontSize: '7pt',
@@ -2122,14 +2122,14 @@ export default function OrganizationProfile() {
                                   setShowContractorWorkInput(true);
                                 }}
                                 style={{
-                                  background: 'rgba(16, 185, 129, 0.95)',
-                                  border: '1px solid #10b981',
+                                  background: 'var(--success)',
+                                  border: '1px solid var(--success)',
                                   borderRadius: '2px',
                                   padding: '4px 8px',
                                   fontSize: '7pt',
                                   cursor: 'pointer',
                                   fontWeight: 600,
-                                  color: 'white'
+                                  color: 'var(--accent-bright)'
                                 }}
                                 title="Log work from this receipt"
                               >
@@ -2694,9 +2694,9 @@ export default function OrganizationProfile() {
                 left: '20px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: '#fff',
+                background: 'rgba(0,0,0,0.45)',
+                border: '1px solid rgba(255,255,255,0.18)',
+                color: 'var(--accent-bright)',
                 fontSize: '24pt',
                 width: '50px',
                 height: '50px',
@@ -2735,11 +2735,11 @@ export default function OrganizationProfile() {
 
             {/* Metadata below image */}
             <div style={{
-              background: 'rgba(255,255,255,0.1)',
+              background: 'rgba(0,0,0,0.45)',
               padding: '12px 16px',
               borderRadius: '4px',
               marginTop: '12px',
-              color: '#fff',
+              color: 'var(--accent-bright)',
               fontSize: '9pt',
               maxWidth: '600px'
             }}>
@@ -2770,9 +2770,9 @@ export default function OrganizationProfile() {
                 right: '20px',
                 top: '50%',
                 transform: 'translateY(-50%)',
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: '#fff',
+                background: 'rgba(0,0,0,0.45)',
+                border: '1px solid rgba(255,255,255,0.18)',
+                color: 'var(--accent-bright)',
                 fontSize: '24pt',
                 width: '50px',
                 height: '50px',
@@ -2794,9 +2794,9 @@ export default function OrganizationProfile() {
               position: 'absolute',
               top: '20px',
               right: '20px',
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              color: '#fff',
+              background: 'rgba(0,0,0,0.45)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              color: 'var(--accent-bright)',
               fontSize: '20pt',
               width: '40px',
               height: '40px',
