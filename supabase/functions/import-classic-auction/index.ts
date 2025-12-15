@@ -300,7 +300,8 @@ serve(async (req) => {
             image_urls: extractedImages,
             source: 'external_import',
             run_analysis: true,
-            max_images: Math.min(50, extractedImages.length),
+            max_images: 0,
+            continue: true,
           },
         });
       } catch {

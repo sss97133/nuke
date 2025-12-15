@@ -231,6 +231,72 @@ function extractSellerUsernameFromHtml(html: string): string | null {
   return null;
 }
 
+function extractBatGalleryImagesFromHtml(html: string): string[] {
+  const h = String(html || '');
+
+  const normalize = (u: string) =>
+    u
+      .split('#')[0]
+      .split('?')[0]
+      .replace(/&#038;/g, '&')
+      .replace(/&amp;/g, '&')
+      .replace(/-scaled\./g, '.')
+      .trim();
+
+  const isOk = (u: string) => {
+    const s = u.toLowerCase();
+    return (
+      u.startsWith('http') &&
+      s.includes('bringatrailer.com/wp-content/uploads/') &&
+      !s.endsWith('.svg') &&
+      !s.endsWith('.pdf')
+    );
+  };
+
+  // 1) Most reliable: embedded JSON gallery attribute.
+  try {
+    const m = h.match(/data-gallery-items="([^"]+)"/i);
+    if (m?.[1]) {
+      const jsonText = m[1]
+        .replace(/&quot;/g, '"')
+        .replace(/&#038;/g, '&')
+        .replace(/&amp;/g, '&');
+      const items = JSON.parse(jsonText);
+      if (Array.isArray(items)) {
+        const urls: string[] = [];
+        for (const it of items) {
+          const u = it?.large?.url || it?.small?.url;
+          if (typeof u !== 'string' || !u.trim()) continue;
+          const nu = normalize(u);
+          if (isOk(nu)) urls.push(nu);
+        }
+        if (urls.length) return [...new Set(urls)];
+      }
+    }
+  } catch {
+    // continue to fallbacks
+  }
+
+  // 2) Regex fallback
+  const abs = h.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || [];
+  const protoRel = h.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || [];
+  const rel = h.match(/\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || [];
+
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [...abs, ...protoRel, ...rel]) {
+    let u = raw;
+    if (u.startsWith('//')) u = 'https:' + u;
+    if (u.startsWith('/')) u = 'https://bringatrailer.com' + u;
+    const nu = normalize(u);
+    if (!isOk(nu)) continue;
+    if (seen.has(nu)) continue;
+    seen.add(nu);
+    out.push(nu);
+  }
+  return out;
+}
+
 function extractBuyerUsernameFromHtml(html: string): string | null {
   // Best-effort; buyer is less consistently linked.
   const m1 = html.match(/to\s+([A-Za-z0-9_]+)\s+for/i);
@@ -699,6 +765,50 @@ serve(async (req) => {
       // Non-blocking
     }
 
+    // Persist BaT gallery images into vehicle_images (fixes: "images show up via UI fallback but DB has 0 images").
+    // IMPORTANT: do not cap galleries; use backfill-images chaining to stay within runtime limits.
+    try {
+      const images = extractBatGalleryImagesFromHtml(html);
+      if (vehicleId && images.length > 0) {
+        await supabase.functions.invoke('backfill-images', {
+          body: {
+            vehicle_id: vehicleId,
+            image_urls: images,
+            source: 'bat_import',
+            run_analysis: false,
+            max_images: 0,
+            continue: true,
+            sleep_ms: 150,
+            max_runtime_ms: 25000,
+          }
+        });
+
+        // Store for provenance + future repair/backfills.
+        try {
+          const { data: vrow } = await supabase
+            .from('vehicles')
+            .select('origin_metadata,primary_image_url,image_url')
+            .eq('id', vehicleId)
+            .maybeSingle();
+          const om = (vrow?.origin_metadata && typeof vrow.origin_metadata === 'object') ? vrow.origin_metadata : {};
+          const nextOm = {
+            ...om,
+            image_urls: images,
+            image_count: images.length,
+          };
+          const primary = images[0] || null;
+          const updates: any = { origin_metadata: nextOm, updated_at: new Date().toISOString() };
+          if (!vrow?.primary_image_url && primary) updates.primary_image_url = primary;
+          if (!vrow?.image_url && primary) updates.image_url = primary;
+          await supabase.from('vehicles').update(updates).eq('id', vehicleId);
+        } catch {
+          // swallow (non-blocking)
+        }
+      }
+    } catch {
+      // Non-blocking
+    }
+
     // For live auctions, keep external_listings in sync so the vehicle header can show watchers/views/comments.
     // external_listings supports watcher_count/view_count/current_bid and is used by the UI auction pulse.
     try {
@@ -900,6 +1010,7 @@ serve(async (req) => {
 
     // Import ALL BaT listing images by scraping URLs then calling backfill-images in batches.
     const imageImport = {
+      original_found: 0,
       found: 0,
       uploaded: 0,
       skipped: 0,
@@ -912,13 +1023,16 @@ serve(async (req) => {
         body: { url: batUrl }
       });
       const images: string[] = (simpleData?.success && Array.isArray(simpleData?.data?.images)) ? simpleData.data.images : [];
-      imageImport.found = images.length;
+      const MAX_TOTAL_IMAGES = 120;
+      const capped = images.slice(0, MAX_TOTAL_IMAGES);
+      imageImport.original_found = images.length;
+      imageImport.found = capped.length;
 
       if (simpleError) {
         console.log('simple-scraper failed (non-fatal):', simpleError.message);
-      } else if (images.length > 0) {
-        for (let start = 0; start < images.length; start += imageBatchSize) {
-          const slice = images.slice(start, start + imageBatchSize);
+      } else if (capped.length > 0) {
+        for (let start = 0; start < capped.length; start += imageBatchSize) {
+          const slice = capped.slice(start, start + imageBatchSize);
           imageImport.batches++;
           const { data: backfillData, error: backfillError } = await supabase.functions.invoke('backfill-images', {
             body: {
