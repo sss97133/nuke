@@ -60,7 +60,7 @@ jobs:
           # Use vercel deploy with --prod flag (not --prebuilt, which requires project linking)
           # This will use the vercel.json config and deploy the dist/ folder
           set +e  # Don't exit on error immediately
-          DEPLOY_OUTPUT=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          DEPLOY_OUTPUT=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
           DEPLOY_EXIT=$?
           set -e  # Re-enable exit on error
           
@@ -75,7 +75,7 @@ jobs:
             echo ""
             echo "Trying alternative: deploy from dist/ directory..."
             cd dist
-            FALLBACK_OUTPUT=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+            FALLBACK_OUTPUT=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
             FALLBACK_EXIT=$?
             
             if [ $FALLBACK_EXIT -ne 0 ]; then
