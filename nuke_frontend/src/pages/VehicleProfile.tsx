@@ -2098,7 +2098,7 @@ const VehicleProfile: React.FC = () => {
         >
           <div
             style={{
-              backgroundColor: 'white',
+              backgroundColor: 'var(--surface)',
               borderRadius: '8px',
               maxWidth: '600px',
               width: '100%',
@@ -2108,7 +2108,7 @@ const VehicleProfile: React.FC = () => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: '16px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700 }}>Claim Vehicle Ownership</h3>
               <button
                 onClick={() => setShowOwnershipClaim(false)}
