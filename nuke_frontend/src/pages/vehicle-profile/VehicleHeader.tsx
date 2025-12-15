@@ -13,6 +13,7 @@ import DataValidationPopup from '../../components/vehicle/DataValidationPopup';
 import { useVINProofs } from '../../hooks/useVINProofs';
 import { FaviconIcon } from '../../components/common/FaviconIcon';
 import { AuctionPlatformBadge, AuctionStatusBadge } from '../../components/auction/AuctionBadges';
+import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -914,18 +915,80 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   // Example: "1985 GMC K10 Wagon" -> "1985 GMC K10" (no body style, include series/trim if available)
   // Prefer normalized_model over raw model
   const displayModel = (vehicle as any)?.normalized_model || vehicle?.model;
-  const identityParts = vehicle ? [
-    vehicle.year,
-    vehicle.make,
-    displayModel, // Use normalized model if available
-    (vehicle as any).series && (vehicle as any).series !== displayModel 
-      ? (vehicle as any).series 
-      : null, // Include series if different from model
-    (vehicle as any).trim 
-      ? (vehicle as any).trim 
-      : null // Include trim if available
-  ].filter(Boolean) : [];
-  
+
+  const extractMileageFromText = (text: string | null | undefined): number | null => {
+    if (!text) return null;
+    const km = text.match(/\b(\d{1,3}(?:,\d{3})?)\s*[kK]\s*[-\s]*mile\b/);
+    if (km?.[1]) return parseInt(km[1].replace(/,/g, ''), 10) * 1000;
+    const mile = text.match(/\b(\d{1,3}(?:,\d{3})+|\d{1,6})\s*[-\s]*mile\b/i);
+    if (mile?.[1]) return parseInt(mile[1].replace(/,/g, ''), 10);
+    const odo = text.match(/\bodometer\s+shows\s+(\d{1,3}(?:,\d{3})+|\d{1,6})\b/i);
+    if (odo?.[1]) return parseInt(odo[1].replace(/,/g, ''), 10);
+    return null;
+  };
+
+  const cleanListingishTitle = (raw: string, year?: number | null, make?: string | null): string => {
+    let s = String(raw || '').trim();
+    if (!s) return s;
+
+    // Drop the trailing site name (often after a pipe)
+    s = s.split('|')[0].trim();
+
+    // Remove common BaT boilerplate
+    s = s.replace(/\bon\s+BaT\s+Auctions\b/gi, '').trim();
+    s = s.replace(/\bBaT\s+Auctions\b/gi, '').trim();
+    s = s.replace(/\bBring\s+a\s+Trailer\b/gi, '').trim();
+    s = s.replace(/\bending\b[\s\S]*$/i, '').trim();
+
+    // Remove lot number parenthetical
+    s = s.replace(/\(\s*Lot\s*#.*?\)\s*/gi, ' ').trim();
+
+    // Remove leading mileage words like "42k-mile"
+    s = s.replace(/^\s*\d{1,3}(?:,\d{3})?\s*[kK]\s*[-\s]*mile\s+/i, '').trim();
+    s = s.replace(/^\s*\d{1,3}(?:,\d{3})+\s*[-\s]*mile\s+/i, '').trim();
+
+    // Remove leading year (we render year separately)
+    if (typeof year === 'number') {
+      const yr = String(year);
+      s = s.replace(new RegExp(`^\\s*${yr}\\s+`, 'i'), '').trim();
+    } else {
+      s = s.replace(/^\s*(19|20)\d{2}\s+/, '').trim();
+    }
+
+    // Remove leading make if it already exists (avoid "Porsche Porsche ...")
+    if (make) {
+      const mk = String(make).trim();
+      if (mk) s = s.replace(new RegExp(`^\\s*${mk}\\s+`, 'i'), '').trim();
+    }
+
+    // Collapse whitespace
+    s = s.replace(/\s+/g, ' ').trim();
+    // Trim trailing separators from previous removals
+    s = s.replace(/[-–—]\s*$/g, '').trim();
+    return s;
+  };
+
+  const appendUnique = (arr: Array<string | number>, part: any) => {
+    const p = String(part || '').trim();
+    if (!p) return;
+    const existing = arr.map(v => String(v).toLowerCase());
+    const lower = p.toLowerCase();
+    if (existing.some(e => e === lower || e.includes(lower) || lower.includes(e))) return;
+    arr.push(p);
+  };
+
+  const derivedMileage = useMemo(() => {
+    if (typeof (vehicle as any)?.mileage === 'number') return (vehicle as any).mileage as number;
+    return extractMileageFromText(String(displayModel || ''));
+  }, [vehicle, displayModel]);
+  const mileageIsExact = typeof (vehicle as any)?.mileage === 'number';
+
+  const identityParts = vehicle ? [vehicle.year, vehicle.make].filter(Boolean) : [];
+  const cleanedModelForHeader = cleanListingishTitle(String(displayModel || ''), vehicle?.year ?? null, vehicle?.make ?? null);
+  appendUnique(identityParts, cleanedModelForHeader);
+  appendUnique(identityParts, (vehicle as any).series);
+  appendUnique(identityParts, (vehicle as any).trim);
+
   const identityLabel = identityParts.join(' ').trim() || 'Vehicle';
   
   const lastSoldText = saleDate ? `Last sold ${formatShortDate(saleDate)}` : 'Off-market estimate';
@@ -1042,6 +1105,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {identityLabel}
           </span>
+          {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
+            <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
+          ) : null}
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
           {auctionPulse?.listing_url && auctionStatusForBadge && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -1079,12 +1145,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   {auctionPulse.bid_count} bids
                 </span>
               ) : null}
-              {typeof auctionPulse.watcher_count === 'number' && auctionPulse.watcher_count > 0 ? (
+              {typeof auctionPulse.watcher_count === 'number' ? (
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Watchers">
                   {auctionPulse.watcher_count.toLocaleString()} watching
                 </span>
               ) : null}
-              {typeof auctionPulse.view_count === 'number' && auctionPulse.view_count > 0 ? (
+              {typeof auctionPulse.view_count === 'number' ? (
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Views">
                   {auctionPulse.view_count.toLocaleString()} views
                 </span>
