@@ -23,6 +23,12 @@ const AdminMissionControl: React.FC = () => {
   const [vehicleImageQueue, setVehicleImageQueue] = useState<any[]>([]);
   const [scanProgress, setScanProgress] = useState<any>(null);
   const [imageScanStats, setImageScanStats] = useState<any>(null);
+  const [originBackfillRunning, setOriginBackfillRunning] = useState(false);
+  const [originBackfillBatchSize, setOriginBackfillBatchSize] = useState(50);
+  // 0 = no cap (import all listing images; the edge function self-chains)
+  const [originBackfillMaxImages, setOriginBackfillMaxImages] = useState(0);
+  const [originBackfillIncludePartials, setOriginBackfillIncludePartials] = useState(true);
+  const [originBackfillLastResult, setOriginBackfillLastResult] = useState<any | null>(null);
 
   useEffect(() => {
     loadDashboard();
@@ -114,6 +120,53 @@ const AdminMissionControl: React.FC = () => {
     }
   };
 
+  const runOriginImageBackfill = async () => {
+    setOriginBackfillRunning(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        alert('You must be logged in to run backfill.');
+        return;
+      }
+
+      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-backfill-origin-images`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          batch_size: originBackfillBatchSize,
+          max_images_per_vehicle: originBackfillMaxImages,
+          include_partials: originBackfillIncludePartials,
+          dry_run: false,
+          force: false,
+          include_profile_origins: ['url_scraper', 'bat_import', 'craigslist_scrape'],
+        }),
+      });
+
+      const text = await resp.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+
+      if (!resp.ok || parsed?.success === false) {
+        console.error('Backfill failed:', parsed);
+        alert(`Backfill failed: ${parsed?.error || resp.status}`);
+        setOriginBackfillLastResult(parsed);
+        return;
+      }
+
+      setOriginBackfillLastResult(parsed);
+      alert(`Backfill complete. Attempted: ${parsed.attempted || 0}. Backfilled: ${parsed.backfilled || 0}. Failed: ${parsed.failed || 0}.`);
+      loadDashboard();
+    } catch (e: any) {
+      console.error('Backfill error:', e);
+      alert('Backfill failed.');
+    } finally {
+      setOriginBackfillRunning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
@@ -132,6 +185,63 @@ const AdminMissionControl: React.FC = () => {
         <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
           Real-time system monitoring and control
         </p>
+      </div>
+
+      {/* ORIGIN IMAGE BACKFILL */}
+      <div style={{ marginBottom: '24px' }} className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Image Backfill: origin_metadata → vehicle_images</span>
+          <button
+            className="button button-primary"
+            style={{ fontSize: '9pt' }}
+            disabled={originBackfillRunning}
+            onClick={runOriginImageBackfill}
+          >
+            {originBackfillRunning ? 'Running...' : 'Run Backfill Batch'}
+          </button>
+        </div>
+        <div className="card-body">
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            Fixes profiles that have `origin_metadata.image_urls` but no rows in `vehicle_images`. Runs in small batches to avoid load spikes.
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Batch size
+              <input
+                type="number"
+                value={originBackfillBatchSize}
+                min={1}
+                max={200}
+                onChange={(e) => setOriginBackfillBatchSize(Number(e.target.value || 50))}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Max images/vehicle (0 = no cap)
+              <input
+                type="number"
+                value={originBackfillMaxImages}
+                min={0}
+                max={5000}
+                onChange={(e) => setOriginBackfillMaxImages(Number(e.target.value || 0))}
+                style={{ marginLeft: 8, width: 110, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={originBackfillIncludePartials}
+                onChange={(e) => setOriginBackfillIncludePartials(e.target.checked)}
+              />
+              Include partial profiles (top off galleries)
+            </label>
+          </div>
+          {originBackfillLastResult && (
+            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
+{JSON.stringify(originBackfillLastResult, null, 2)}
+            </pre>
+          )}
+        </div>
       </div>
 
       {/* AI SCANNING STATUS - PROMINENT */}

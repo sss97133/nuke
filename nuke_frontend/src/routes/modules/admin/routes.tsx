@@ -3,6 +3,7 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import AdminDashboard from '../../../pages/AdminDashboard';
 import AdminVerifications from '../../../pages/AdminVerifications';
+import AdminMissionControl from '../../../pages/AdminMissionControl';
 import OwnershipVerificationDashboard from '../../../components/admin/OwnershipVerificationDashboard';
 import MergeProposalsDashboard from '../../../pages/MergeProposalsDashboard';
 import BulkPriceEditor from '../../../pages/admin/BulkPriceEditor';
@@ -15,6 +16,7 @@ const AdminModuleRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<AdminDashboard />} />
+      <Route path="/mission-control" element={<AdminMissionControl />} />
       <Route path="/verifications" element={<AdminVerifications />} />
       <Route path="/ownership-verifications" element={<OwnershipVerificationDashboard />} />
       <Route path="/merge-proposals" element={<MergeProposalsDashboard />} />
