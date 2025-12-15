@@ -1447,7 +1447,8 @@ const VehicleProfile: React.FC = () => {
     try {
       const { data: imageRecords, error } = await supabase
         .from('vehicle_images')
-        .select('*')
+        // Keep payload lean to reduce DB load/timeouts; we only need URLs + ordering fields here.
+        .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, is_primary, is_document, position, created_at')
         .eq('vehicle_id', vehicle.id)
         .eq('is_document', false) // Filter out documents - they belong in a separate section
         .order('is_primary', { ascending: false })
