@@ -12,8 +12,14 @@
   top: 0;
   z-index: 1000; /* Above content, below modals */
   background: var(--surface);
-  border-bottom: 2px solid var(--border);
+  /* Keep the bottom edge subtle in dark mode */
+  border-bottom: 1px solid var(--border);
   width: 100%;
+}
+
+/* In light mode, a slightly stronger header edge matches the rest of the Win95 frame */
+:root[data-theme="light"] .header-wrapper {
+  border-bottom-width: 2px;
 }
 
 .header-content {

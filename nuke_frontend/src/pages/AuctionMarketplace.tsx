@@ -86,9 +86,14 @@ export default function AuctionMarketplace() {
     let hiddenNoBids = 0;
 
     try {
-      const hasBids = (bidCount: any) => {
-        const n = typeof bidCount === 'number' ? bidCount : Number(bidCount || 0);
-        return Number.isFinite(n) && n > 0;
+      const hasBidSignal = (params: { bidCount: any; currentHighBidCents: any }) => {
+        const n = typeof params.bidCount === 'number' ? params.bidCount : Number(params.bidCount || 0);
+        if (Number.isFinite(n) && n > 0) return true;
+        const bidCents =
+          typeof params.currentHighBidCents === 'number'
+            ? params.currentHighBidCents
+            : Number(params.currentHighBidCents || 0);
+        return Number.isFinite(bidCents) && bidCents > 0;
       };
 
       // 1. Load native vehicle_listings (N-Zero auctions)
@@ -113,14 +118,22 @@ export default function AuctionMarketplace() {
 
       if (!nativeError && nativeListings) {
         for (const listing of nativeListings) {
+          const nativeEndTime = (listing as any).auction_end_time ?? (listing as any).auction_end_date ?? null;
+
           // Marketplace rule: don't show auctions with no bids.
-          if (!includeNoBidAuctions && !hasBids(listing.bid_count)) {
+          if (
+            !includeNoBidAuctions &&
+            !hasBidSignal({
+              bidCount: (listing as any).bid_count,
+              currentHighBidCents: (listing as any).current_high_bid_cents,
+            })
+          ) {
             hiddenNoBids += 1;
             continue;
           }
 
           // Keep auctions even if end time is missing (some sources backfill it later).
-          if (!listing.auction_end_time || new Date(listing.auction_end_time) > new Date()) {
+          if (!nativeEndTime || new Date(nativeEndTime) > new Date()) {
             allListings.push({
               id: listing.id,
               vehicle_id: listing.vehicle_id,
@@ -128,10 +141,10 @@ export default function AuctionMarketplace() {
               sale_type: listing.sale_type,
               source: 'native',
               lead_image_url: listing.vehicle?.primary_image_url || null,
-              current_high_bid_cents: listing.current_high_bid_cents,
+              current_high_bid_cents: (listing as any).current_high_bid_cents ?? null,
               reserve_price_cents: listing.reserve_price_cents,
-              bid_count: listing.bid_count || 0,
-              auction_end_time: listing.auction_end_time,
+              bid_count: (listing as any).bid_count || 0,
+              auction_end_time: nativeEndTime,
               status: listing.status,
               description: listing.description,
               created_at: listing.created_at,
@@ -163,8 +176,13 @@ export default function AuctionMarketplace() {
 
       if (!externalError && externalListings) {
         for (const listing of externalListings) {
+          const currentHighBidCents = listing.current_bid ? Math.round(Number(listing.current_bid) * 100) : null;
+
           // Marketplace rule: don't show auctions with no bids.
-          if (!includeNoBidAuctions && !hasBids(listing.bid_count)) {
+          if (
+            !includeNoBidAuctions &&
+            !hasBidSignal({ bidCount: listing.bid_count, currentHighBidCents })
+          ) {
             hiddenNoBids += 1;
             continue;
           }
@@ -183,7 +201,7 @@ export default function AuctionMarketplace() {
               platform: listing.platform,
               listing_url: listing.listing_url,
               lead_image_url: listing.vehicle?.primary_image_url || metaImage || null,
-              current_high_bid_cents: listing.current_bid ? Math.round(Number(listing.current_bid) * 100) : null,
+              current_high_bid_cents: currentHighBidCents,
               reserve_price_cents: listing.reserve_price ? Math.round(Number(listing.reserve_price) * 100) : null,
               bid_count: listing.bid_count || 0,
               auction_end_time: listing.end_date,
@@ -220,8 +238,15 @@ export default function AuctionMarketplace() {
 
       if (!batError && batListings) {
         for (const listing of batListings) {
+          const currentHighBidCents = (listing.current_bid ?? listing.final_bid)
+            ? Math.round(Number(listing.current_bid ?? listing.final_bid) * 100)
+            : null;
+
           // Marketplace rule: don't show auctions with no bids.
-          if (!includeNoBidAuctions && !hasBids(listing.bid_count)) {
+          if (
+            !includeNoBidAuctions &&
+            !hasBidSignal({ bidCount: listing.bid_count, currentHighBidCents })
+          ) {
             hiddenNoBids += 1;
             continue;
           }
@@ -240,7 +265,7 @@ export default function AuctionMarketplace() {
                 platform: 'bat',
                 listing_url: listing.bat_listing_url,
                 lead_image_url: listing.vehicle?.primary_image_url || listing?.image_url || listing?.primary_image_url || null,
-                current_high_bid_cents: (listing.current_bid ?? listing.final_bid) ? Math.round(Number(listing.current_bid ?? listing.final_bid) * 100) : null,
+                current_high_bid_cents: currentHighBidCents,
                 reserve_price_cents: listing.reserve_price ? listing.reserve_price * 100 : null,
                 bid_count: listing.bid_count || 0,
                 auction_end_time: endDateTime,
@@ -606,7 +631,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
       to={`/vehicle/${vehicle.id}`}
       style={{
         display: 'block',
-        background: 'var(--white)',
+        background: 'var(--surface)',
         border: '2px solid var(--border)',
         borderRadius: '4px',
         overflow: 'hidden',
@@ -629,7 +654,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           position: 'relative',
           width: '100%',
           paddingBottom: '75%',
-          backgroundColor: '#e5e5e5',
+          backgroundColor: 'var(--surface-hover)',
           overflow: 'hidden',
         }}
       >
@@ -654,7 +679,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '10pt',
-              color: 'var(--text-muted)',
+              color: 'var(--text-secondary)',
             }}
           >
             No Image
@@ -779,12 +804,12 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             justifyContent: 'space-between',
             alignItems: 'center',
             paddingTop: '6px',
-            borderTop: '1px solid var(--border-light)',
+            borderTop: '1px solid var(--border)',
             marginTop: '4px',
           }}
         >
           <div>
-            <div style={{ fontSize: '10pt', fontWeight: 700, color: '#1d4ed8' }}>
+            <div style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--accent)' }}>
               Bid: {formatCurrency(listing.current_high_bid_cents)}
             </div>
           </div>
@@ -792,7 +817,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             <div
               style={{
                 fontSize: '7pt',
-                color: 'var(--text-muted)',
+                color: 'var(--text-secondary)',
                 marginBottom: '2px',
               }}
             >

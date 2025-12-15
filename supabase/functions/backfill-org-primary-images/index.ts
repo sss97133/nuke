@@ -60,17 +60,20 @@ serve(async (req) => {
     const dryRun = body.dry_run === true;
 
     // Fetch orgs missing a banner image (primary image).
-    // NOTE: We don't use ilike/null filters heavily here; keep query simple and filter in code.
-    // Some deployments may not have `cover_image_url` yet. Keep this query compatible.
+    // Filter at the DB-level so we don't miss later rows due to paging by updated_at.
+    // Includes NULL and empty-string banners.
     const { data: orgs, error } = await supabase
       .from("businesses")
+      // Some deployments may not have `favicon_url`/`cover_image_url` columns yet.
+      // Keep this query schema-compatible.
       .select("id, business_name, website, logo_url, banner_url, metadata")
+      .or("banner_url.is.null,banner_url.eq.")
       .order("updated_at", { ascending: true })
       .limit(batchSize);
 
     if (error) throw new Error(`businesses select failed: ${error.message}`);
 
-    const candidates = (orgs || []).filter((o: any) => !safeString(o.banner_url));
+    const candidates = orgs || [];
 
     const out = {
       success: true,

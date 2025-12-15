@@ -1277,8 +1277,8 @@ export const PersonalPhotoLibrary: React.FC = () => {
                         bottom: 0,
                         left: 0,
                         right: 0,
-                        background: 'rgba(255,255,255,0.95)',
-                        borderTop: '1px solid var(--border-light)',
+                        background: 'var(--surface-glass)',
+                        borderTop: '1px solid var(--border)',
                         padding: '4px 6px'
                       }}>
                         <div className="text font-bold" style={{ fontSize: '8pt' }}>

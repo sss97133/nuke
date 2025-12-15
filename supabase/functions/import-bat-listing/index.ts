@@ -630,9 +630,15 @@ serve(async (req) => {
         .upsert(
           {
             vehicle_id: vehicleId,
+            // Many BaT auctions are public listings with no known seller organization.
+            // external_listings.organization_id must allow NULL for these cases (see migration).
+            organization_id: shouldLinkSellerOrg ? sellerOrganizationId : null,
             platform: 'bat',
             listing_url: batUrl,
-            listing_status: isSold ? 'sold' : 'live',
+            // DB constraint allows: pending|active|ended|sold|cancelled (no 'live')
+            listing_status: isSold ? 'sold' : 'active',
+            // Use BaT lot number (or URL-derived fallback) as the platform listing_id so ON CONFLICT works.
+            listing_id: lotNumber || batUrl.split('/').filter(Boolean).pop() || null,
             end_date: endDateIso,
             current_bid: metrics.currentBid,
             bid_count: metrics.bidCount,
@@ -647,7 +653,8 @@ serve(async (req) => {
             },
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'listing_url' },
+          // external_listings has UNIQUE (vehicle_id, platform, listing_id)
+          { onConflict: 'vehicle_id,platform,listing_id' },
         );
     } catch (e: any) {
       console.log('external_listings upsert failed (non-fatal):', e?.message || String(e));
@@ -672,8 +679,8 @@ serve(async (req) => {
             buyer_username: buyerUser.username,
             seller_bat_user_id: sellerUser.id,
             buyer_bat_user_id: buyerUser.id,
-            // For live auctions, mark as live so /auctions can include it.
-            listing_status: isSold ? (salePrice > 0 ? 'sold' : 'ended') : 'live',
+            // bat_listings constraint allows: active|ended|sold|no_sale|cancelled (no 'live')
+            listing_status: isSold ? (salePrice > 0 ? 'sold' : 'ended') : 'active',
             final_bid: metrics.currentBid || null, // best-effort for live; UI uses external_listings for current bid
             bid_count: metrics.bidCount || null,
             view_count: metrics.viewCount || null,

@@ -71,6 +71,7 @@
   --bg: var(--grey-100);
   --surface: var(--grey-200);
   --surface-hover: var(--grey-300);
+  --surface-glass: rgba(235, 235, 235, 0.95);
   --accent: var(--primary);
   --accent-alt: var(--primary);
   --accent-dim: rgba(42, 42, 42, 0.08);
@@ -122,6 +123,7 @@
   --bg: #f5f5f5;
   --surface: #ebebeb;
   --surface-hover: #e0e0e0;
+  --surface-glass: rgba(235, 235, 235, 0.95);
 
   /* Heatmap tokens (GitHub-style activity grid) */
   --heat-0: #ebedf0;
@@ -161,6 +163,7 @@
   --bg: #1e1e1e;
   --surface: #252526;
   --surface-hover: #2d2d30;
+  --surface-glass: rgba(37, 37, 38, 0.92);
 
   /* Heatmap tokens (muted for dark mode) */
   --heat-0: #2d2d30;
@@ -320,7 +323,8 @@
   --border-dark: #c4c4c4;
 }
 
-.win95 .button {
+/* Win95 “3D” bevel borders are LIGHT-mode only; in dark mode they create bright white strokes */
+:root[data-theme="light"] .win95 .button {
   background: var(--grey-200);
   border-width: 2px;
   border-style: solid;
@@ -329,23 +333,23 @@
   color: var(--text);
 }
 
-.win95 .button:active {
+:root[data-theme="light"] .win95 .button:active {
   border-color: #c9c9c9 #ffffff #ffffff #c9c9c9;
 }
 
-.win95 .card {
+:root[data-theme="light"] .win95 .card {
   border-width: 2px;
   border-style: solid;
   border-color: #ffffff #cfcfcf #cfcfcf #ffffff;
   box-shadow: none;
 }
 
-.win95 .header-wrapper {
-  background: var(--grey-200);
-  border-bottom: 2px solid #cfcfcf;
+:root[data-theme="light"] .win95 .header-wrapper {
+  background: var(--surface);
+  border-bottom: 2px solid var(--border);
 }
 
-.win95 .logo-text {
+:root[data-theme="light"] .win95 .logo-text {
   background: var(--grey-200);
   border: 2px solid;
   border-color: #ffffff #cfcfcf #cfcfcf #ffffff;

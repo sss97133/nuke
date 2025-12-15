@@ -213,18 +213,8 @@ export default function CashBalance({ compact = false, showActions = true }: Pro
         }}>
           <button
             onClick={handleDeposit}
-            style={{
-              border: '2px solid var(--accent)',
-              background: 'var(--accent-dim)',
-              color: 'var(--accent)',
-              padding: '10px 16px',
-              fontSize: '12px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px'
-            }}
+            className="button button-primary"
+            style={{ fontSize: '9pt', padding: '6px 10px', fontWeight: 700, borderRadius: 4 }}
           >
             + Deposit
           </button>
@@ -232,17 +222,12 @@ export default function CashBalance({ compact = false, showActions = true }: Pro
           <button
             onClick={handleWithdraw}
             disabled={balance.available_cents === 0}
+            className="button button-secondary"
             style={{
-              border: '2px solid var(--border)',
-              background: 'var(--surface)',
-              color: balance.available_cents === 0 ? 'var(--text-secondary)' : 'var(--text)',
-              padding: '10px 16px',
-              fontSize: '12px',
-              fontWeight: 600,
-              fontFamily: 'Arial, sans-serif',
-              cursor: balance.available_cents === 0 ? 'not-allowed' : 'pointer',
-              transition: '0.12s',
-              borderRadius: '4px',
+              fontSize: '9pt',
+              padding: '6px 10px',
+              fontWeight: 700,
+              borderRadius: 4,
               opacity: balance.available_cents === 0 ? 0.5 : 1
             }}
           >
