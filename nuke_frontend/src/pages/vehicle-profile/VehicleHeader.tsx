@@ -1005,11 +1005,22 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (suppressExternalListing || hasClaim) {
       return { badge: null, link: null, outcome: null };
     }
-    const outcome = (vehicle as any)?.auction_outcome;
+    const rawOutcome = (vehicle as any)?.auction_outcome;
     const batUrl = (vehicle as any)?.bat_auction_url || ((vehicle as any)?.discovery_url?.includes('bringatrailer') ? (vehicle as any)?.discovery_url : null);
     const kslUrl = (vehicle as any)?.discovery_url?.includes('ksl.com') ? (vehicle as any)?.discovery_url : null;
     const sourceUrl = batUrl || kslUrl || (vehicle as any)?.discovery_url;
     
+    // Never allow conflicting states like "SOLD RNM".
+    // SOLD wins if we have any sold signal (telemetry > canonical fields > legacy outcome).
+    const telemetryStatus = auctionPulse?.listing_url ? String(auctionPulse.listing_status || '').toLowerCase() : '';
+    const hasSoldSignal =
+      telemetryStatus === 'sold' ||
+      (typeof (auctionPulse as any)?.final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) ||
+      (typeof (vehicle as any)?.sale_price === 'number' && Number.isFinite((vehicle as any).sale_price) && (vehicle as any).sale_price > 0) ||
+      rawOutcome === 'sold';
+
+    const outcome = hasSoldSignal ? 'sold' : rawOutcome;
+
     const badges: Record<string, any> = {
       'sold': { text: 'SOLD', color: '#22c55e', bg: '#dcfce7' },
       'reserve_not_met': { text: 'RNM', color: '#f59e0b', bg: '#fef3c7' },
@@ -1021,6 +1032,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     // If an auction is still live/active, showing RNM is misleading.
     const outcomeIsFinal = (() => {
       if (!outcome) return false;
+      if (outcome === 'sold') return true;
       if (outcome !== 'reserve_not_met') return true;
 
       // Prefer live telemetry when available.
@@ -2111,7 +2123,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               gap: 6
             }}
             className="vehicle-price-button"
-            title={auctionContext.link ? `Click to view on ${auctionContext.link.includes('bringatrailer') ? 'Bring a Trailer' : 'original listing'}` : undefined}
+            title="Click to view price source, confidence, and trend"
           >
             <div 
               style={{ fontSize: '9pt', fontWeight: 700, color: baseTextColor, lineHeight: 1, display: 'flex', alignItems: 'center', gap: 6 }}
@@ -2129,7 +2141,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   textDecorationStyle: 'dotted',
                   textDecorationColor: 'rgba(0,0,0,0.3)',
                   // Blur effect for RNM auctions (reserve not met)
-                  filter: isRNM && highBid ? 'blur(4px)' : 'none',
+                  filter: isRNM && highBid && String(priceDisplay).toUpperCase() !== 'SOLD' ? 'blur(4px)' : 'none',
                   transition: 'filter 0.2s ease',
                   ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
                 }}
@@ -2141,25 +2153,44 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 title={priceHoverText || (isRNM ? "Reserve not met - high bid hidden (click to reveal)" : "Click to see data source and confidence")}
                 onMouseEnter={(e) => {
                   // Un-blur on hover for RNM
-                  if (isRNM && highBid) {
+                  if (isRNM && highBid && String(priceDisplay).toUpperCase() !== 'SOLD') {
                     e.currentTarget.style.filter = 'blur(0px)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   // Re-blur on mouse leave for RNM
-                  if (isRNM && highBid) {
+                  if (isRNM && highBid && String(priceDisplay).toUpperCase() !== 'SOLD') {
                     e.currentTarget.style.filter = 'blur(4px)';
                   }
                 }}
               >
-                {priceDisplay}
+                {String(priceDisplay).toUpperCase() === 'SOLD' ? (
+                  <span
+                    style={{
+                      fontSize: '6pt',
+                      fontWeight: 800,
+                      color: '#22c55e',
+                      background: '#dcfce7',
+                      padding: '2px 6px',
+                      borderRadius: '3px',
+                      letterSpacing: '0.5px',
+                      lineHeight: 1,
+                      whiteSpace: 'nowrap',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    SOLD
+                  </span>
+                ) : (
+                  priceDisplay
+                )}
               </span>
               {priceWasCorrected && (
                 <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 500 }}>*</span>
               )}
               
               {/* Auction Outcome Badge */}
-              {auctionContext.badge && (
+              {auctionContext.badge && auctionContext.badge.text !== 'SOLD' && (
                 <span style={{
                   fontSize: '6pt',
                   fontWeight: 700,
@@ -2223,14 +2254,22 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 </span>
               )}
               
-              {/* External link icon if has listing URL */}
+              {/* External link icon (separate click target; does not open provenance popup) */}
               {auctionContext.link && (
-                <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" opacity="0.4">
-                  <path d="M10.5 1.5h-3v1.5h1.94L4.72 7.72l1.06 1.06L10.5 4.06V6h1.5V1.5zM10.5 10.5h-9v-9H6V0H1.5C.67 0 0 .67 0 1.5v9c0 .83.67 1.5 1.5 1.5h9c.83 0 1.5-.67 1.5-1.5V6h-1.5v4.5z"/>
-                </svg>
+                <a
+                  href={auctionContext.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title={auctionContext.link.includes('bringatrailer') ? 'Open on Bring a Trailer' : 'Open original listing'}
+                  style={{ display: 'inline-flex', alignItems: 'center', color: 'inherit', opacity: 0.45, textDecoration: 'none' }}
+                >
+                  <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor">
+                    <path d="M10.5 1.5h-3v1.5h1.94L4.72 7.72l1.06 1.06L10.5 4.06V6h1.5V1.5zM10.5 10.5h-9v-9H6V0H1.5C.67 0 0 .67 0 1.5v9c0 .83.67 1.5 1.5 1.5h9c.83 0 1.5-.67 1.5-1.5V6h-1.5v4.5z"/>
+                  </svg>
+                </a>
               )}
             </div>
-              {trendIndicator}
           </button>
 
           {priceMenuOpen && (
