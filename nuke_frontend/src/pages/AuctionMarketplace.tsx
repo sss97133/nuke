@@ -55,7 +55,8 @@ export default function AuctionMarketplace() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('ending_soon');
   const [searchQuery, setSearchQuery] = useState('');
-  const [includeNoBidAuctions, setIncludeNoBidAuctions] = useState(false);
+  // Default to including 0-bid auctions so marketplace doesn't look empty while bid_count backfills.
+  const [includeNoBidAuctions, setIncludeNoBidAuctions] = useState(true);
   const [hiddenNoBidCount, setHiddenNoBidCount] = useState(0);
 
   useEffect(() => {
@@ -86,6 +87,45 @@ export default function AuctionMarketplace() {
     let hiddenNoBids = 0;
 
     try {
+      const parseTitle = (title: any): { year?: number; make?: string; model?: string; trim?: string | null } => {
+        const t = typeof title === 'string' ? title.trim() : '';
+        // Best-effort: "<year> <make> <model> <trim...>"
+        const m = t.match(/\b(19\d{2}|20\d{2})\s+([A-Za-z0-9]+)\s+(.+)$/);
+        if (!m) return {};
+        const year = Number(m[1]);
+        const make = m[2];
+        const rest = (m[3] || '').trim();
+        // Split rest into model + optional trim (keep it simple)
+        const parts = rest.split(/\s+/);
+        const model = parts.slice(0, Math.min(2, parts.length)).join(' ');
+        const trim = parts.length > 2 ? parts.slice(2).join(' ') : null;
+        return {
+          year: Number.isFinite(year) ? year : undefined,
+          make: make || undefined,
+          model: model || undefined,
+          trim,
+        };
+      };
+
+      const normalizeVehicle = (params: {
+        vehicleId: string;
+        maybeVehicle: any;
+        fallbackTitle?: any;
+        fallbackImageUrl?: any;
+      }) => {
+        const v = params.maybeVehicle || null;
+        const titleParts = parseTitle(params.fallbackTitle);
+        return {
+          id: (v?.id as string) || params.vehicleId,
+          year: (typeof v?.year === 'number' && v.year > 0 ? v.year : titleParts.year || 0),
+          make: (typeof v?.make === 'string' && v.make ? v.make : titleParts.make || 'Unknown'),
+          model: (typeof v?.model === 'string' && v.model ? v.model : titleParts.model || 'Vehicle'),
+          trim: (v?.trim ?? titleParts.trim ?? null) as string | null,
+          mileage: (typeof v?.mileage === 'number' ? v.mileage : null) as number | null,
+          primary_image_url: (v?.primary_image_url ?? params.fallbackImageUrl ?? null) as string | null,
+        };
+      };
+
       const hasBidSignal = (params: { bidCount: any; currentHighBidCents: any }) => {
         const n = typeof params.bidCount === 'number' ? params.bidCount : Number(params.bidCount || 0);
         if (Number.isFinite(n) && n > 0) return true;
@@ -119,6 +159,12 @@ export default function AuctionMarketplace() {
       if (!nativeError && nativeListings) {
         for (const listing of nativeListings) {
           const nativeEndTime = (listing as any).auction_end_time ?? (listing as any).auction_end_date ?? null;
+          const vehicle = normalizeVehicle({
+            vehicleId: listing.vehicle_id,
+            maybeVehicle: (listing as any).vehicle,
+            fallbackTitle: (listing as any).title,
+            fallbackImageUrl: (listing as any).vehicle?.primary_image_url ?? null,
+          });
 
           // Marketplace rule: don't show auctions with no bids.
           if (
@@ -140,7 +186,7 @@ export default function AuctionMarketplace() {
               seller_id: listing.seller_id,
               sale_type: listing.sale_type,
               source: 'native',
-              lead_image_url: listing.vehicle?.primary_image_url || null,
+              lead_image_url: vehicle.primary_image_url || null,
               current_high_bid_cents: (listing as any).current_high_bid_cents ?? null,
               reserve_price_cents: listing.reserve_price_cents,
               bid_count: (listing as any).bid_count || 0,
@@ -148,7 +194,7 @@ export default function AuctionMarketplace() {
               status: listing.status,
               description: listing.description,
               created_at: listing.created_at,
-              vehicle: listing.vehicle
+              vehicle
             });
           }
         }
@@ -188,11 +234,17 @@ export default function AuctionMarketplace() {
           }
 
           // Keep listings even if end_date is missing (some sources backfill it later).
-          if ((!listing.end_date || new Date(listing.end_date) > new Date()) && listing.vehicle) {
+          if (!listing.end_date || new Date(listing.end_date) > new Date()) {
             const metaImage =
               listing?.metadata?.image_url ||
               listing?.metadata?.primary_image_url ||
               (Array.isArray(listing?.metadata?.images) ? listing.metadata.images[0] : null);
+            const vehicle = normalizeVehicle({
+              vehicleId: listing.vehicle_id,
+              maybeVehicle: (listing as any).vehicle,
+              fallbackTitle: listing?.metadata?.bat_title,
+              fallbackImageUrl: metaImage,
+            });
 
             allListings.push({
               id: listing.id,
@@ -200,14 +252,14 @@ export default function AuctionMarketplace() {
               source: 'external',
               platform: listing.platform,
               listing_url: listing.listing_url,
-              lead_image_url: listing.vehicle?.primary_image_url || metaImage || null,
+              lead_image_url: vehicle.primary_image_url || null,
               current_high_bid_cents: currentHighBidCents,
               reserve_price_cents: listing.reserve_price ? Math.round(Number(listing.reserve_price) * 100) : null,
               bid_count: listing.bid_count || 0,
               auction_end_time: listing.end_date,
               status: listing.listing_status,
               created_at: listing.created_at,
-              vehicle: listing.vehicle
+              vehicle
             });
           }
         }
@@ -251,27 +303,39 @@ export default function AuctionMarketplace() {
             continue;
           }
 
-          if (listing.auction_end_date && listing.vehicle) {
+          if (listing.auction_end_date) {
             // Convert DATE to TIMESTAMPTZ for end of day
             const endDate = new Date(listing.auction_end_date);
             endDate.setHours(23, 59, 59, 999);
             const endDateTime = endDate.toISOString();
 
             if (new Date(endDateTime) > new Date()) {
+              const fallbackTitle = (listing as any).bat_listing_title || (listing as any)?.raw_data?.bat_title || null;
+              const fallbackImageUrl =
+                (listing as any).image_url ||
+                (listing as any).primary_image_url ||
+                (listing as any)?.raw_data?.image_url ||
+                null;
+              const vehicle = normalizeVehicle({
+                vehicleId: listing.vehicle_id,
+                maybeVehicle: (listing as any).vehicle,
+                fallbackTitle,
+                fallbackImageUrl,
+              });
               allListings.push({
                 id: listing.id,
                 vehicle_id: listing.vehicle_id,
                 source: 'bat',
                 platform: 'bat',
                 listing_url: listing.bat_listing_url,
-                lead_image_url: listing.vehicle?.primary_image_url || listing?.image_url || listing?.primary_image_url || null,
+                lead_image_url: vehicle.primary_image_url || null,
                 current_high_bid_cents: currentHighBidCents,
                 reserve_price_cents: listing.reserve_price ? listing.reserve_price * 100 : null,
                 bid_count: listing.bid_count || 0,
                 auction_end_time: endDateTime,
                 status: listing.listing_status,
                 created_at: listing.created_at,
-                vehicle: listing.vehicle
+                vehicle
               });
             }
           }

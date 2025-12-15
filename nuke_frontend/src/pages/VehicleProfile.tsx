@@ -658,13 +658,20 @@ const VehicleProfile: React.FC = () => {
 
   const loadResponsible = async () => {
     try {
-      // For automated bulk imports, show organization instead of user
-      const isAutomatedImport = vehicle?.profile_origin === 'dropbox_import' && 
-                                (vehicle?.origin_metadata?.automated_import === true || 
-                                 vehicle?.origin_metadata?.no_user_uploader === true ||
-                                 !vehicle?.uploaded_by);
+      // For imported profiles, show organization instead of user.
+      // This applies to Classic.com/org imports too (not just Dropbox).
+      const origin = String(vehicle?.profile_origin || '');
+      const isImportedProfile = Boolean(
+        vehicle?.origin_organization_id &&
+          (
+            vehicle?.origin_metadata?.automated_import === true ||
+            vehicle?.origin_metadata?.no_user_uploader === true ||
+            !vehicle?.uploaded_by ||
+            ['dropbox_import', 'url_scraper', 'api_import', 'organization_import', 'classic_com_indexing'].includes(origin)
+          )
+      );
       
-      if (isAutomatedImport && vehicle?.origin_organization_id) {
+      if (isImportedProfile && vehicle?.origin_organization_id) {
         // Load organization name for automated imports
         const { data: orgData, error: orgError } = await supabase
           .from('businesses')
@@ -676,6 +683,9 @@ const VehicleProfile: React.FC = () => {
           setResponsibleName(orgData.business_name);
           return;
         }
+        // If org exists but name fetch fails, still avoid an empty card.
+        setResponsibleName('Imported');
+        return;
       }
       
       // For regular user uploads, show user name

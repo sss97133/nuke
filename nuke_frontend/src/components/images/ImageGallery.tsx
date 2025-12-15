@@ -103,6 +103,17 @@ const getOptimalImageUrl = (image: any, size: 'thumbnail' | 'medium' | 'large' |
   return image.image_url;
 };
 
+const getImportedSourceDomain = (image: any): string | null => {
+  try {
+    const src = String(image?.exif_data?.source_url || image?.exif_data?.discovery_url || '').trim();
+    if (!src || !src.startsWith('http')) return null;
+    const u = new URL(src);
+    return u.hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+};
+
 const ImageGallery = ({ 
   vehicleId, 
   onImagesUpdated, 
@@ -1808,7 +1819,12 @@ const ImageGallery = ({
                 <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
                   {getDisplayDate(image)}
                   {getTimeOfDayLabel(image.taken_at || image.created_at) && ` • ${getTimeOfDayLabel(image.taken_at || image.created_at)}`}
-                  {image.user_id && ` • ${uploaderOrgNames[image.user_id] || imageUploaderNames[image.user_id] || 'user'}`}
+                  {(() => {
+                    // Imported images (scraped listings) should NOT appear “authored” by the user who ran the import.
+                    const domain = getImportedSourceDomain(image);
+                    if (domain) return ` • Imported (${domain})`;
+                    return image.user_id ? ` • ${uploaderOrgNames[image.user_id] || imageUploaderNames[image.user_id] || 'user'}` : '';
+                  })()}
                   {(() => {
                     const metadata = image.ai_scan_metadata;
                     const hasAnalysis = metadata && (
