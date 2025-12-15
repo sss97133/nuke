@@ -908,11 +908,30 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   // For RNM (Reserve Not Met), show blurred high bid instead of "Set a price"
   const isRNM = (vehicle as any)?.auction_outcome === 'reserve_not_met';
   const highBid = (vehicle as any)?.high_bid || (vehicle as any)?.winning_bid;
-  const priceText = primaryAmount !== null 
-    ? formatCurrency(primaryAmount) 
-    : (isRNM && highBid) 
-      ? formatCurrency(highBid)
-      : 'Set a price';
+  const priceText = (() => {
+    // If we have external auction telemetry, reflect it directly in the header.
+    if (auctionPulse?.listing_url) {
+      const status = String(auctionPulse.listing_status || '').toLowerCase();
+      const isLive = status === 'active' || status === 'live';
+      const isSold = status === 'sold';
+      if (isSold && typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) {
+        return `Sold: ${formatCurrency((auctionPulse as any).final_price)}`;
+      }
+      if (isLive && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
+        return `Bid: ${formatCurrency(auctionPulse.current_bid)}`;
+      }
+      if (isLive) return 'BID';
+      if (isSold) return 'SOLD';
+      if (status === 'ended') return 'Ended';
+      return 'Auction';
+    }
+
+    return primaryAmount !== null
+      ? formatCurrency(primaryAmount)
+      : (isRNM && highBid)
+        ? formatCurrency(highBid)
+        : 'Set a price';
+  })();
   const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
   
   // Auction outcome badge and link
@@ -1531,11 +1550,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 );
                 
                 // During a live auction, deprioritize claim CTA and foreground auction telemetry + BID.
-                if (isAuctionLive && auctionPulse?.listing_url) {
-                  const bidLabel =
-                    typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0
-                      ? `Bid: ${formatCurrency(auctionPulse.current_bid)}`
-                      : 'BID';
+                if (auctionPulse?.listing_url) {
+                  const status = String(auctionPulse.listing_status || '').toLowerCase();
+                  const isLiveStatus = status === 'active' || status === 'live';
+                  const isSoldStatus = status === 'sold';
+                  const label = (() => {
+                    if (isLiveStatus) {
+                      return typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0
+                        ? `Bid: ${formatCurrency(auctionPulse.current_bid)}`
+                        : 'BID';
+                    }
+                    if (isSoldStatus && typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) {
+                      return `Sold: ${formatCurrency((auctionPulse as any).final_price)}`;
+                    }
+                    if (isSoldStatus) return 'SOLD';
+                    if (status === 'ended') return 'Auction ended';
+                    return 'View auction';
+                  })();
                   return (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                       <a
@@ -1557,7 +1588,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           alignItems: 'center',
                           ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
                         }}
-                        className={auctionPulseMs ? 'auction-cta-pulse' : undefined}
+                        className={auctionPulseMs && isLiveStatus ? 'auction-cta-pulse' : undefined}
                         onMouseEnter={(e) => {
                           (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
                           (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
@@ -1568,7 +1599,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         }}
                         title="Open live auction (place bids on the auction platform)"
                       >
-                        {bidLabel}
+                        {label}
                       </a>
                     </span>
                   );
