@@ -26,11 +26,43 @@
   max-width: 100%;
   margin: 0 auto;
   padding: 0 8px;
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: space-between;
+  /* 8% n-zero | 2% spacer | (remaining, ~80%) agent | 2% spacer | >=8% capsule (can grow) */
+  grid-template-columns: 8% 2% minmax(0, 1fr) 2% minmax(8%, max-content);
   height: 40px;
   box-sizing: border-box;
+}
+
+/* ============================================================================
+   3-COLUMN HEADER LAYOUT (with fixed proportional spacers)
+   Target: 8% n-zero, 2% space, 80% agent input, 2% space, 8% capsule
+   Notes:
+   - n-zero dropdown is a popup, so opening it should not affect layout.
+   - capsule can expand; when it does, it steals space from the agent input.
+   ============================================================================ */
+
+.header-slot-left {
+  min-width: 72px;
+  display: flex;
+  align-items: center;
+}
+
+.header-spacer {
+  min-width: 6px;
+}
+
+.header-slot-center {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.header-slot-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 /* ============================================================================
@@ -41,7 +73,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1 1 auto;
   min-width: 0;
   overflow: visible; /* allow dropdown to render outside header */
 }
@@ -96,7 +127,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1 1 auto;
+  justify-content: flex-end;
   min-width: 0;
   max-width: none;
 }
@@ -156,14 +187,20 @@
     padding: 0 4px;
     height: auto;
     min-height: 40px;
+    display: flex;
     flex-wrap: nowrap;
+    gap: 4px;
   }
+
+  /* Switch to content-driven layout on small screens */
+  .header-slot-left { flex: 0 0 auto; min-width: auto; }
+  .header-spacer { flex: 0 0 4px; min-width: 4px; }
+  .header-slot-center { flex: 1 1 auto; }
+  .header-slot-right { flex: 0 0 auto; min-width: auto; }
 
   .header-left {
     gap: 4px;
-    flex: 1 1 auto;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible;
   }
 
   .main-nav {
@@ -184,19 +221,7 @@
     flex-shrink: 0;
   }
 
-  .header-right {
-    gap: 4px;
-    flex-shrink: 0;
-  }
-
-  .header-right > div {
-    max-width: none !important;
-  }
-
-  /* Hide search on very small screens */
-  .header-right > div:first-child {
-    display: none;
-  }
+  .header-right { gap: 4px; }
 }
 
 @media (max-width: 480px) {
@@ -219,6 +244,15 @@
   .main-nav {
     flex-wrap: nowrap;
     overflow-x: scroll;
+  }
+
+  /* Hide agent input on very small screens */
+  .header-slot-center {
+    display: none;
+  }
+
+  .header-spacer {
+    display: none;
   }
 }
 
