@@ -2417,6 +2417,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             return 'current_value';
           })()}
           value={primaryAmount || 0}
+          context={{
+            platform: auctionPulse?.platform ? String(auctionPulse.platform) : null,
+            listing_url: auctionPulse?.listing_url ? String(auctionPulse.listing_url) : null,
+            listing_status: auctionPulse?.listing_status ? String(auctionPulse.listing_status) : null,
+            final_price: typeof (auctionPulse as any)?.final_price === 'number' ? (auctionPulse as any).final_price : null,
+            current_bid: typeof auctionPulse?.current_bid === 'number' ? auctionPulse.current_bid : null,
+            bid_count: typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count : null,
+            winner_name: String((vehicle as any)?.origin_metadata?.bat_buyer || (vehicle as any)?.origin_metadata?.buyer || '').trim() || null,
+            inserted_by_name: auctionPulse?.listing_url ? 'System (auction telemetry)' : null,
+            confidence: auctionPulse?.listing_url ? 100 : null,
+            evidence_url: auctionPulse?.listing_url ? String(auctionPulse.listing_url) : ((vehicle as any)?.discovery_url ? String((vehicle as any).discovery_url) : null),
+            trend_pct: typeof trendPct === 'number' ? trendPct : null,
+            trend_period: trendPeriod || null
+          }}
           onClose={() => setShowProvenancePopup(false)}
           onUpdate={(newValue) => {
             // Optionally refresh the vehicle data or update local state
