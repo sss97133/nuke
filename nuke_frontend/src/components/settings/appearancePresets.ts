@@ -99,6 +99,60 @@ export const APPEARANCE_PRESETS: AppearancePreset[] = [
     pantoneExamples: '7576 C / 7554 C',
     chips: ['#C95A00', '#7B4B2A', '#F5F5F5'],
   },
+  {
+    id: 'camo-od',
+    name: 'Camo — Olive Drab',
+    pantoneExamples: '7771 C / 5743 C',
+    chips: ['#4B5320', '#2A2A2A', '#F5F5F5'],
+  },
+  {
+    id: 'camo-blaze',
+    name: 'Camo — Blaze (Hunting)',
+    pantoneExamples: '021 C / Black C',
+    chips: ['#FE5000', '#111111', '#F5F5F5'],
+  },
+  {
+    id: 'camo-snow',
+    name: 'Camo — Snow / Hi-Vis',
+    pantoneExamples: '663 C / 802 C',
+    chips: ['#F4F4F4', '#44D62C', '#111111'],
+  },
+  {
+    id: 'mopar-plum',
+    name: 'Mopar — Plum Crazy',
+    pantoneExamples: '2685 C',
+    chips: ['#5B2C83', '#111111', '#F5F5F5'],
+  },
+  {
+    id: 'mopar-sublime',
+    name: 'Mopar — Sublime',
+    pantoneExamples: '802 C / 375 C',
+    chips: ['#44D62C', '#111111', '#F5F5F5'],
+  },
+  {
+    id: 'mopar-hemi',
+    name: 'Mopar — Hemi Orange',
+    pantoneExamples: '165 C',
+    chips: ['#FF5F00', '#111111', '#F5F5F5'],
+  },
+  {
+    id: 'mopar-b5',
+    name: 'Mopar — B5 Blue',
+    pantoneExamples: '2995 C',
+    chips: ['#00A3E0', '#111111', '#F5F5F5'],
+  },
+  {
+    id: 'flames-heat',
+    name: 'Flames — Heat',
+    pantoneExamples: '165 C / 021 C',
+    chips: ['#FF5F00', '#FE5000', '#111111'],
+  },
+  {
+    id: 'flames-blue',
+    name: 'Flames — Blue',
+    pantoneExamples: 'Process Blue C / 299 C',
+    chips: ['#0085CA', '#00A3E0', '#111111'],
+  },
 ];
 
 

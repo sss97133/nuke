@@ -320,6 +320,82 @@
 }
 
 /* ================================================
+   CAMO + MOPAR + FLAMES (accent-only)
+   ================================================ */
+
+/* Camo: olive drab */
+:root[data-accent="camo-od"] {
+  --accent: #4b5320;
+  --accent-alt: #2a2a2a;
+  --accent-dim: rgba(75, 83, 32, 0.14);
+  --border-focus: var(--accent);
+}
+
+/* Camo: blaze hunting */
+:root[data-accent="camo-blaze"] {
+  --accent: #fe5000;
+  --accent-alt: #111111;
+  --accent-dim: rgba(254, 80, 0, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Camo: snow / hi-vis */
+:root[data-accent="camo-snow"] {
+  --accent: #f4f4f4;
+  --accent-alt: #44d62c;
+  --accent-dim: rgba(244, 244, 244, 0.16);
+  --border-focus: var(--accent-alt);
+}
+
+/* Mopar: Plum Crazy */
+:root[data-accent="mopar-plum"] {
+  --accent: #5b2c83;
+  --accent-alt: #111111;
+  --accent-dim: rgba(91, 44, 131, 0.14);
+  --border-focus: var(--accent);
+}
+
+/* Mopar: Sublime */
+:root[data-accent="mopar-sublime"] {
+  --accent: #44d62c;
+  --accent-alt: #111111;
+  --accent-dim: rgba(68, 214, 44, 0.16);
+  --border-focus: var(--accent);
+}
+
+/* Mopar: Hemi Orange */
+:root[data-accent="mopar-hemi"] {
+  --accent: #ff5f00;
+  --accent-alt: #111111;
+  --accent-dim: rgba(255, 95, 0, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Mopar: B5 Blue */
+:root[data-accent="mopar-b5"] {
+  --accent: #00a3e0;
+  --accent-alt: #111111;
+  --accent-dim: rgba(0, 163, 224, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Flames: heat */
+:root[data-accent="flames-heat"] {
+  --accent: #ff5f00;
+  --accent-alt: #fe5000;
+  --accent-dim: rgba(255, 95, 0, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Flames: blue */
+:root[data-accent="flames-blue"] {
+  --accent: #0085ca;
+  --accent-alt: #00a3e0;
+  --accent-dim: rgba(0, 133, 202, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* ================================================
    TYPOGRAPHY SYSTEM
    ================================================ */
 
