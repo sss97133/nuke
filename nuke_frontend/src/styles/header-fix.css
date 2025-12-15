@@ -11,8 +11,8 @@
   position: sticky;
   top: 0;
   z-index: 1000; /* Above content, below modals */
-  background: #eeeeee;
-  border-bottom: 2px solid #bdbdbd;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border);
   width: 100%;
 }
 
@@ -46,8 +46,8 @@
 
 .logo-text {
   padding: 4px 8px;
-  background: #e0e0e0;
-  border: 2px outset #bdbdbd;
+  background: var(--surface);
+  border: 2px outset var(--border);
   font-size: 9pt;
   font-weight: bold;
   white-space: nowrap;
@@ -67,18 +67,18 @@
   white-space: nowrap;
   border: 1px solid transparent;
   text-decoration: none;
-  color: #000;
+  color: var(--text);
   flex-shrink: 1;
 }
 
 .nav-link:hover {
-  background: #e0e0e0;
-  border: 1px solid #999;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
 }
 
 .nav-link.active {
-  background: #d0d0d0;
-  border: 2px inset #999;
+  background: var(--surface-hover);
+  border: 2px inset var(--border);
   font-weight: bold;
 }
 
@@ -114,8 +114,8 @@
   /* Will be positioned by JS */
   min-width: 180px;
   max-width: 220px;
-  background: #fff !important;
-  border: 2px solid #000 !important;
+  background: var(--surface) !important;
+  border: 2px solid var(--border) !important;
   box-shadow: 4px 4px 0 rgba(0,0,0,0.2) !important;
   z-index: 10001 !important;
   overflow: hidden;
@@ -125,7 +125,7 @@
   width: 100%;
   padding: 10px 12px;
   border: none;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border);
   background: transparent;
   text-align: left;
   font-size: 9pt;
@@ -138,7 +138,7 @@
 }
 
 .profile-dropdown-menu button:hover {
-  background: #e5e5e5;
+  background: var(--surface-hover);
 }
 
 /* ============================================================================
@@ -239,7 +239,7 @@
 }
 
 [data-n-zero-menu] .nav-link:hover {
-  background: #f0f0f0 !important;
+  background: var(--surface-hover) !important;
   border-color: transparent !important;
 }
 

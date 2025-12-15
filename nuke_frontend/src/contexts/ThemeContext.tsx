@@ -6,7 +6,7 @@
  * - Contrast profiles: standard / greyscale / high
  */
 
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 export type Theme = 'dark' | 'light';
 export type ThemePreference = 'auto' | Theme;
@@ -132,6 +132,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [preference, setPreferenceState] = useState<ThemePreference>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.preference);
     if (saved === 'auto' || saved === 'dark' || saved === 'light') return saved;
+    // Back-compat: older builds stored only 'theme' as 'dark'|'light'
+    const legacy = localStorage.getItem('theme');
+    if (legacy === 'dark' || legacy === 'light') return legacy;
     return 'auto';
   });
 
@@ -227,7 +230,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [preference, autoSource, systemPrefersDark, schedule]);
 
   // Apply to document + persist settings
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-theme', theme);
     root.setAttribute('data-accent', accent);

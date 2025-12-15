@@ -630,7 +630,16 @@ const VehicleTimeline: React.FC<{
                   const yearEvents = filtered.filter(e => new Date(e.event_date).getFullYear() === targetYear);
 
                   return (
-                    <div key={targetYear} id={`year-${targetYear}`} className="bg-white rounded-lg p-2">
+                    <div
+                      key={targetYear}
+                      id={`year-${targetYear}`}
+                      className="rounded-lg p-2"
+                      style={{
+                        background: 'var(--surface)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text)',
+                      }}
+                    >
                       {/* Months header positioned above everything */}
                       <div style={{ marginBottom: '2px' }}>
                         <div
@@ -656,7 +665,7 @@ const VehicleTimeline: React.FC<{
                                   gridColumn: `${startWeek + 2} / span ${monthWidth}`,
                                   textAlign: 'center',
                                   fontSize: '8pt',
-                                  color: '#888888',
+                                  color: 'var(--text-secondary)',
                                   lineHeight: '8px'
                                 }}
                               >

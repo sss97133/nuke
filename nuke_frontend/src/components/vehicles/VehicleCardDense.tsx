@@ -568,20 +568,35 @@ const [displayPrice, setDisplayPrice] = useState<string>('—');
   // Use SAME simple logic as VehicleProfile - just use image_url directly
   // VehicleProfile uses: imageRecords.map((r: any) => r.image_url) (line 1151)
   const vehicleImages: string[] = [];
+
+  const isLikelyImageUrl = (url: string) => {
+    const u = String(url || '').trim();
+    if (!u) return false;
+    // Filter obvious non-image URLs that sometimes sneak in via metadata/link scraping.
+    if (u.includes('linkedin.com/shareArticle')) return false;
+    if (u.includes('shareArticle?mini=true')) return false;
+    // Accept common image extensions.
+    if (/\.(png|jpg|jpeg|webp|gif)(\?|#|$)/i.test(u)) return true;
+    // Accept Supabase public storage objects (often no extension).
+    if (u.includes('/storage/v1/object/public/')) return true;
+    // Accept CDN-style image endpoints with width/quality params.
+    if (/(image|img|thumb|thumbnail|media)/i.test(u) && /^https?:\/\//i.test(u)) return true;
+    return false;
+  };
   
   // Use all_images array (which now contains image_url directly)
   if (vehicle.all_images && vehicle.all_images.length > 0) {
-    const urls = vehicle.all_images.map(img => img.url).filter(Boolean);
+    const urls = vehicle.all_images.map(img => img.url).filter((u) => !!u && isLikelyImageUrl(String(u)));
     vehicleImages.push(...urls);
   }
   
   // Fallback to primary_image_url (which is set using large_url || image_url like VehicleProfile)
-  if (vehicle.primary_image_url && !vehicleImages.includes(vehicle.primary_image_url)) {
+  if (vehicle.primary_image_url && isLikelyImageUrl(vehicle.primary_image_url) && !vehicleImages.includes(vehicle.primary_image_url)) {
     vehicleImages.push(vehicle.primary_image_url);
   }
   
   // Fallback to image_url
-  if (vehicle.image_url && !vehicleImages.includes(vehicle.image_url)) {
+  if (vehicle.image_url && isLikelyImageUrl(vehicle.image_url) && !vehicleImages.includes(vehicle.image_url)) {
     vehicleImages.push(vehicle.image_url);
   }
   
@@ -590,8 +605,10 @@ const [displayPrice, setDisplayPrice] = useState<string>('—');
   
   // CRITICAL FIX: If still no URL, check imageUrl from getImageUrl() as last resort
   if (!currentImageUrl) {
-    currentImageUrl = imageUrl || null;
+    currentImageUrl = imageUrl && isLikelyImageUrl(imageUrl) ? imageUrl : null;
   }
+
+  const hasValidImage = !!(currentImageUrl && isLikelyImageUrl(currentImageUrl));
   
   
   
@@ -620,7 +637,7 @@ const [displayPrice, setDisplayPrice] = useState<string>('—');
       to={`/vehicle/${vehicle.id}`}
       style={{
         display: 'block',
-        background: '#000',
+        background: 'transparent',
         border: 'none',
         borderRadius: '0',
         overflow: 'hidden',
@@ -642,9 +659,9 @@ const [displayPrice, setDisplayPrice] = useState<string>('—');
         style={{
           width: '100%',
           paddingBottom: '100%',
-          background: currentImageUrl ? `url(${currentImageUrl}) center/cover` : 'url(/n-zero.png) center/contain',
-          backgroundSize: currentImageUrl ? 'cover' : 'contain',
-          backgroundColor: '#f5f5f5',
+          background: hasValidImage ? `url(${currentImageUrl}) center/cover no-repeat` : 'transparent',
+          backgroundSize: hasValidImage ? 'cover' : 'auto',
+          backgroundColor: 'transparent',
           position: 'relative',
         }}
         onLoad={() => {
