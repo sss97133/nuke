@@ -16,6 +16,8 @@ interface SystemStats {
 const AdminMissionControl: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<SystemStats | null>(null);
+  const [inventoryCompleteness, setInventoryCompleteness] = useState<any | null>(null);
+  const [angleCoverage, setAngleCoverage] = useState<any | null>(null);
   const [analysisQueue, setAnalysisQueue] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +63,9 @@ const AdminMissionControl: React.FC = () => {
         recentData,
         vehicleQueueData,
         scanProgressData,
-        imageScanData
+        imageScanData,
+        completenessData,
+        angleCoverageData
       ] = await Promise.all([
         supabase.from('vehicles').select('id', { count: 'exact', head: true }),
         supabase.from('vehicle_images').select('id', { count: 'exact', head: true }),
@@ -91,7 +95,21 @@ const AdminMissionControl: React.FC = () => {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
-        supabase.rpc('get_image_scan_stats')
+        supabase.rpc('get_image_scan_stats'),
+        supabase.rpc('get_inventory_completeness_metrics', {
+          p_min_fill_pct: 90,
+          p_confidence_threshold: 70,
+          p_statuses: ['active', 'pending'],
+          p_profile_origins: null,
+          p_inventory_only: true,
+        }),
+        supabase.rpc('get_inventory_angle_coverage_metrics', {
+          p_min_angle_confidence: 0.6,
+          p_required_angles: ['front','front_3_4','rear','rear_3_4','side_driver','side_passenger','interior_front','interior_rear','engine_bay','odometer'],
+          p_statuses: ['active', 'pending'],
+          p_profile_origins: null,
+          p_inventory_only: true,
+        })
       ]);
 
       if (!mountedRef.current) return;
@@ -111,6 +129,8 @@ const AdminMissionControl: React.FC = () => {
       setRecentActivity(recentData.data || []);
       setScanProgress(scanProgressData.data);
       setImageScanStats(imageScanData.data);
+      setInventoryCompleteness(completenessData.data || null);
+      setAngleCoverage(angleCoverageData.data || null);
       
       const vehicleGroups = (vehicleQueueData.data || []).reduce((acc: any, img: any) => {
         if (!acc[img.vehicle_id]) {
@@ -526,6 +546,82 @@ const AdminMissionControl: React.FC = () => {
           ))}
             </div>
           </div>
+
+      {/* Inventory Data Completeness */}
+      <div style={{ marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          INVENTORY DATA COMPLETENESS (TRUTH-GATED)
+        </h2>
+        <div style={{ border: '2px solid #000', background: '#fff', padding: '12px' }}>
+          <div style={{ fontSize: '8pt', color: '#666', marginBottom: 10 }}>
+            Counts only fields with confidence at or above threshold. Default: 70.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+                {inventoryCompleteness?.counts?.at_or_above_min ?? '—'} / {inventoryCompleteness?.counts?.total ?? '—'}
+              </div>
+              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+                VEHICLES AT OR ABOVE 90% FIELDS
+              </div>
+            </div>
+            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+                {inventoryCompleteness?.counts?.avg_fill_pct ?? '—'}%
+              </div>
+              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+                AVERAGE FIELD COMPLETENESS
+              </div>
+            </div>
+            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+                {inventoryCompleteness?.counts?.p50_fill_pct ?? '—'}%
+              </div>
+              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+                MEDIAN FIELD COMPLETENESS
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Angle Coverage */}
+      <div style={{ marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          IMAGE ANGLE COVERAGE
+        </h2>
+        <div style={{ border: '2px solid #000', background: '#fff', padding: '12px' }}>
+          <div style={{ fontSize: '8pt', color: '#666', marginBottom: 10 }}>
+            Coverage is computed from image angle tags (AI-detected) with confidence at or above 0.60.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+                {angleCoverage?.counts?.full_coverage ?? '—'} / {angleCoverage?.counts?.vehicles ?? '—'}
+              </div>
+              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+                FULL COVERAGE (ALL REQUIRED ANGLES)
+              </div>
+            </div>
+            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+                {angleCoverage?.counts?.at_or_above_90 ?? '—'} / {angleCoverage?.counts?.vehicles ?? '—'}
+              </div>
+              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+                AT OR ABOVE 90% ANGLES
+              </div>
+            </div>
+            <div style={{ border: '2px solid #e5e5e5', padding: 10 }}>
+              <div style={{ fontSize: '14pt', fontWeight: 700 }}>
+                {angleCoverage?.counts?.avg_angle_coverage_pct ?? '—'}%
+              </div>
+              <div style={{ fontSize: '8pt', color: '#666', fontWeight: 600 }}>
+                AVERAGE ANGLE COVERAGE
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Quick Actions */}
       <div style={{ marginBottom: '24px' }}>

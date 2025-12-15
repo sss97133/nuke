@@ -1179,6 +1179,41 @@ serve(async (req) => {
       }
     };
 
+    // Ensure a minimal behavioral profile row exists for each observed BaT username.
+    // This is intentionally lightweight: it "creates the profile shell" immediately, and downstream pipelines
+    // (comments analysis, auction intelligence, etc.) can enrich it over time.
+    const touchBatUserProfile = async (usernameRaw: string | null | undefined) => {
+      const username = (usernameRaw || '').trim();
+      if (!username) return;
+      const nowIso = new Date().toISOString();
+      try {
+        // Update-first to avoid overwriting `first_seen` on existing profiles.
+        const { data: updated, error: updErr } = await supabase
+          .from('bat_user_profiles')
+          .update({ last_seen: nowIso, updated_at: nowIso })
+          .eq('username', username)
+          .select('username')
+          .maybeSingle();
+
+        if (!updErr && updated?.username) return;
+
+        // Insert if missing (race-safe: ignore duplicates).
+        const { error: insErr } = await supabase
+          .from('bat_user_profiles')
+          .insert({ username, first_seen: nowIso, last_seen: nowIso, updated_at: nowIso });
+
+        // If table is missing (or row raced), do not fail the extraction.
+        if (insErr) {
+          const code = String((insErr as any)?.code || '').toUpperCase();
+          const status = (insErr as any)?.status ?? (insErr as any)?.statusCode;
+          const msg = String((insErr as any)?.message || '').toLowerCase();
+          if (status === 404 || code === '42P01' || msg.includes('does not exist') || msg.includes('not found')) return;
+        }
+      } catch {
+        // ignore
+      }
+    };
+
     const participantUsernames = new Set<string>();
     if (extractedData.seller) participantUsernames.add(String(extractedData.seller).trim());
     if (extractedData.buyer) participantUsernames.add(String(extractedData.buyer).trim());
@@ -1192,6 +1227,11 @@ serve(async (req) => {
     for (const u of participantUsernames) {
       const rec = await ensureBatUser(u);
       if (rec) batIdentityByUsername.set(rec.bat_username, rec);
+    }
+
+    // Kick off / update bidder profile shells for every participant we just observed.
+    for (const u of participantUsernames) {
+      await touchBatUserProfile(u);
     }
 
     // If vehicleId provided, update vehicle and create timeline events

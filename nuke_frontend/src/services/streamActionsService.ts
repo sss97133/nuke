@@ -68,7 +68,14 @@ export const StreamActionsService = {
       .select('id, slug, name, description, price_cents, is_active')
       .eq('is_active', true)
       .order('price_cents', { ascending: true });
-    if (error) throw error;
+    if (error) {
+      // In some environments this feature isn't deployed yet. "Blank is better than wrong/noisy."
+      const status = (error as any)?.status ?? (error as any)?.statusCode;
+      const code = String((error as any)?.code || '').toUpperCase();
+      const msg = String((error as any)?.message || '').toLowerCase();
+      if (status === 404 || code === '42P01' || msg.includes('does not exist') || msg.includes('not found')) return [];
+      throw error;
+    }
     return (data || []) as StreamActionPack[];
   },
 
