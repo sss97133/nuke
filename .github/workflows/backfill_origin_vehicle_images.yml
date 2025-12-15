@@ -49,15 +49,15 @@ jobs:
             local name="$1"
             local path="$2"
             local body="$3"
-            echo "$name"
+            echo "$name" >&2
             OUT="$(post "$path" "$body")"
             HTTP="$(echo "$OUT" | tail -n 1 | sed 's/^HTTP://')"
             RESP="$(echo "$OUT" | sed '$d')"
-            echo "HTTP $HTTP"
-            echo "$RESP" | head -c 1200
-            echo ""
+            echo "HTTP $HTTP" >&2
+            echo "$RESP" | head -c 1200 >&2
+            echo "" >&2
             if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
-              echo "Non-2xx response from $path"
+              echo "Non-2xx response from $path" >&2
               exit 1
             fi
             echo "$RESP" | jq -c . >/dev/null
