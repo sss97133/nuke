@@ -2,8 +2,8 @@ name: Backfill Imported Vehicle Images (Origin URLs -> Storage)
 
 on:
   schedule:
-    # Hourly. GitHub Actions cron is UTC.
-    - cron: "15 * * * *"
+    # Fast catch-up: every 15 minutes. GitHub Actions cron is UTC.
+    - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 concurrency:
@@ -64,8 +64,8 @@ jobs:
             echo "$RESP"
           }
 
-          # A few small batches to respect edge runtime limits.
-          for i in 1 2 3 4; do
+          # Fast catch-up: more small batches (each vehicle is a separate backfill-images call under the hood).
+          for i in 1 2 3 4 5 6 7 8; do
             run_call "backfill-origin-vehicle-images batch $i" "backfill-origin-vehicle-images" \
               '{"batch_size":3,"max_images_per_vehicle":35,"dry_run":false,"include_profile_origins":["url_scraper","bat_import","craigslist_scrape","ksl_import"]}' \
               | jq -c "{i:$i,attempted:.attempted,backfilled:.backfilled,skipped:.skipped,failed:.failed}"
