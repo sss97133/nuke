@@ -118,6 +118,131 @@ const VehicleProfile: React.FC = () => {
   const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
   const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
 
+  // Build a stable "auction pulse" for the header from *all* external listing rows.
+  // We intentionally merge duplicate rows that share the same `listing_url` (multiple import pipelines)
+  // so the UI doesn't flip to SOLD just because a stale duplicate row updated last.
+  const buildAuctionPulseFromExternalListings = useCallback((rows: any[], vehicleIdForRows: string) => {
+    const arr = Array.isArray(rows) ? rows.filter((r) => r && r.listing_url && r.platform) : [];
+    if (arr.length === 0) return null;
+
+    const now = Date.now();
+    const toLower = (v: any) => String(v || '').toLowerCase();
+    const parseTs = (v: any) => {
+      try {
+        const t = v ? new Date(v).getTime() : NaN;
+        return Number.isFinite(t) ? t : NaN;
+      } catch {
+        return NaN;
+      }
+    };
+
+    const byUrl = new Map<string, any[]>();
+    for (const r of arr) {
+      const url = String(r.listing_url || '').trim();
+      if (!url) continue;
+      const list = byUrl.get(url) || [];
+      list.push(r);
+      byUrl.set(url, list);
+    }
+
+    const scoreRow = (r: any) => {
+      const status = toLower(r?.listing_status);
+      const end = parseTs(r?.end_date);
+      const endFuture = Number.isFinite(end) ? end > now : false;
+      const hasTelemetry =
+        typeof r?.current_bid === 'number' ||
+        typeof r?.bid_count === 'number' ||
+        typeof r?.watcher_count === 'number' ||
+        typeof r?.view_count === 'number' ||
+        (typeof r?.metadata?.comment_count === 'number');
+      if (status === 'active' || status === 'live') return 3;
+      if (endFuture) return 2;
+      if (hasTelemetry) return 1;
+      return 0;
+    };
+
+    const maxNum = (vals: any[]) => {
+      const nums = vals.map((v) => (typeof v === 'number' ? v : Number.NaN)).filter((n) => Number.isFinite(n));
+      return nums.length ? Math.max(...nums) : null;
+    };
+
+    const mergeGroup = (group: any[]) => {
+      const sorted = (group || []).slice().sort((a, b) => {
+        const as = scoreRow(a);
+        const bs = scoreRow(b);
+        if (as !== bs) return bs - as;
+        const au = parseTs(a?.updated_at);
+        const bu = parseTs(b?.updated_at);
+        if (Number.isFinite(au) && Number.isFinite(bu) && au !== bu) return bu - au;
+        return 0;
+      });
+
+      const best = sorted[0];
+      if (!best) return null;
+
+      const statuses = sorted.map((r) => toLower(r?.listing_status)).filter(Boolean);
+      const hasActive = statuses.some((s) => s === 'active' || s === 'live');
+      const mergedStatus = hasActive ? 'active' : String(best.listing_status || '');
+
+      const commentCounts = sorted.map((r) => (typeof r?.metadata?.comment_count === 'number' ? r.metadata.comment_count : null));
+      const mergedCommentCount = maxNum(commentCounts);
+
+      const endCandidates = sorted
+        .map((r) => r?.end_date)
+        .filter(Boolean)
+        .map((iso) => ({ iso: String(iso), t: parseTs(iso) }))
+        .filter((x) => Number.isFinite(x.t));
+      const futureEnd = endCandidates.filter((x) => x.t > now).sort((a, b) => a.t - b.t)[0];
+      const anyEnd = endCandidates.sort((a, b) => a.t - b.t)[0];
+      const mergedEndDate = (futureEnd?.iso || anyEnd?.iso || null) as string | null;
+
+      const updatedAt = (() => {
+        const ts = sorted
+          .map((r) => ({ iso: r?.updated_at ? String(r.updated_at) : null, t: parseTs(r?.updated_at) }))
+          .filter((x) => x.iso && Number.isFinite(x.t))
+          .sort((a, b) => b.t - a.t)[0];
+        return ts?.iso || null;
+      })();
+
+      return {
+        platform: String(best.platform || ''),
+        listing_url: String(best.listing_url || ''),
+        listing_status: mergedStatus,
+        end_date: mergedEndDate,
+        current_bid: maxNum(sorted.map((r) => r?.current_bid)),
+        bid_count: maxNum(sorted.map((r) => r?.bid_count)),
+        watcher_count: maxNum(sorted.map((r) => r?.watcher_count)),
+        view_count: maxNum(sorted.map((r) => r?.view_count)),
+        comment_count: mergedCommentCount,
+        last_bid_at: null as string | null,
+        last_comment_at: null as string | null,
+        updated_at: updatedAt,
+        _vehicle_id: vehicleIdForRows,
+      };
+    };
+
+    const mergedGroups = Array.from(byUrl.values()).map(mergeGroup).filter(Boolean) as any[];
+    if (mergedGroups.length === 0) return null;
+
+    mergedGroups.sort((a, b) => {
+      const as = scoreRow(a);
+      const bs = scoreRow(b);
+      if (as !== bs) return bs - as;
+      const ae = parseTs(a?.end_date);
+      const be = parseTs(b?.end_date);
+      const aFuture = Number.isFinite(ae) ? ae > now : false;
+      const bFuture = Number.isFinite(be) ? be > now : false;
+      if (aFuture !== bFuture) return aFuture ? -1 : 1;
+      if (aFuture && bFuture && ae !== be) return ae - be;
+      const au = parseTs(a?.updated_at);
+      const bu = parseTs(b?.updated_at);
+      if (Number.isFinite(au) && Number.isFinite(bu) && au !== bu) return bu - au;
+      return 0;
+    });
+
+    return mergedGroups[0] || null;
+  }, []);
+
 
   // MOBILE DETECTION
   useEffect(() => {
@@ -457,24 +582,24 @@ const VehicleProfile: React.FC = () => {
           // If we already have a specific listing_url, ignore other listings for this vehicle.
           if (auctionPulse?.listing_url && row.listing_url && row.listing_url !== auctionPulse.listing_url) return;
 
-          setAuctionPulse((prev) => {
-            const p = prev || ({} as any);
-            const metaCommentCount = row?.metadata && typeof row.metadata.comment_count === 'number' ? row.metadata.comment_count : null;
-            return {
-              platform: String(row?.platform || p.platform || ''),
-              listing_url: String(row?.listing_url || p.listing_url || ''),
-              listing_status: String(row?.listing_status || p.listing_status || ''),
-              end_date: row?.end_date ?? p.end_date ?? null,
-              current_bid: typeof row?.current_bid === 'number' ? row.current_bid : (p.current_bid ?? null),
-              bid_count: typeof row?.bid_count === 'number' ? row.bid_count : (p.bid_count ?? null),
-              watcher_count: typeof row?.watcher_count === 'number' ? row.watcher_count : (p.watcher_count ?? null),
-              view_count: typeof row?.view_count === 'number' ? row.view_count : (p.view_count ?? null),
-              comment_count: metaCommentCount !== null ? metaCommentCount : (p.comment_count ?? null),
-              last_bid_at: p.last_bid_at ?? null,
-              last_comment_at: p.last_comment_at ?? null,
-              updated_at: row?.updated_at ?? p.updated_at ?? null,
-            };
-          });
+          // IMPORTANT: multiple pipelines can create duplicate rows with the same listing_url.
+          // Recompute from the DB snapshot and merge, so "active" wins over stale "sold" duplicates.
+          (async () => {
+            try {
+              const { data } = await supabase
+                .from('external_listings')
+                .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
+                .eq('vehicle_id', vehicleIdForFilter)
+                .order('updated_at', { ascending: false })
+                .limit(20);
+              const merged = buildAuctionPulseFromExternalListings(Array.isArray(data) ? data : [], vehicleIdForFilter);
+              if (merged) {
+                setAuctionPulse((prev) => ({ ...(prev || {}), ...merged }));
+              }
+            } catch {
+              // ignore
+            }
+          })();
         },
       )
       .on(
@@ -557,22 +682,22 @@ const VehicleProfile: React.FC = () => {
 
     const refreshAuctionPulse = async () => {
       try {
-        // Re-read the listing record (best-effort; if multiple, prefer the exact URL)
-        const { data: listing } = await supabase
+        // Re-read listing records and merge duplicates for the same URL.
+        const { data: listings } = await supabase
           .from('external_listings')
           .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
           .eq('vehicle_id', vehicle.id)
           .eq('listing_url', auctionPulse.listing_url)
           .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(20);
 
-        const platform = String(listing?.platform || auctionPulse.platform || '');
-        const listingUrl = String(listing?.listing_url || auctionPulse.listing_url || '');
+        const merged = buildAuctionPulseFromExternalListings(Array.isArray(listings) ? listings : [], vehicle.id);
+        const platform = String((merged as any)?.platform || auctionPulse.platform || '');
+        const listingUrl = String((merged as any)?.listing_url || auctionPulse.listing_url || '');
 
         let commentCount: number | null =
-          typeof (listing as any)?.metadata?.comment_count === 'number'
-            ? (listing as any).metadata.comment_count
+          typeof (merged as any)?.comment_count === 'number'
+            ? (merged as any).comment_count
             : (typeof auctionPulse.comment_count === 'number' ? auctionPulse.comment_count : null);
         let lastBidAt: string | null = auctionPulse.last_bid_at || null;
         let lastCommentAt: string | null = auctionPulse.last_comment_at || null;
@@ -613,16 +738,16 @@ const VehicleProfile: React.FC = () => {
           setAuctionPulse({
             platform,
             listing_url: listingUrl,
-            listing_status: String(listing?.listing_status || auctionPulse.listing_status || ''),
-            end_date: (listing as any)?.end_date ?? auctionPulse.end_date ?? null,
-            current_bid: typeof (listing as any)?.current_bid === 'number' ? (listing as any).current_bid : (auctionPulse.current_bid ?? null),
-            bid_count: typeof (listing as any)?.bid_count === 'number' ? (listing as any).bid_count : (auctionPulse.bid_count ?? null),
-            watcher_count: typeof (listing as any)?.watcher_count === 'number' ? (listing as any).watcher_count : (auctionPulse.watcher_count ?? null),
-            view_count: typeof (listing as any)?.view_count === 'number' ? (listing as any).view_count : (auctionPulse.view_count ?? null),
+            listing_status: String((merged as any)?.listing_status || auctionPulse.listing_status || ''),
+            end_date: (merged as any)?.end_date ?? auctionPulse.end_date ?? null,
+            current_bid: typeof (merged as any)?.current_bid === 'number' ? (merged as any).current_bid : (auctionPulse.current_bid ?? null),
+            bid_count: typeof (merged as any)?.bid_count === 'number' ? (merged as any).bid_count : (auctionPulse.bid_count ?? null),
+            watcher_count: typeof (merged as any)?.watcher_count === 'number' ? (merged as any).watcher_count : (auctionPulse.watcher_count ?? null),
+            view_count: typeof (merged as any)?.view_count === 'number' ? (merged as any).view_count : (auctionPulse.view_count ?? null),
             comment_count: commentCount,
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
-            updated_at: (listing as any)?.updated_at ?? auctionPulse.updated_at ?? null,
+            updated_at: (merged as any)?.updated_at ?? auctionPulse.updated_at ?? null,
           });
         }
       } catch {
@@ -1104,41 +1229,11 @@ const VehicleProfile: React.FC = () => {
             // ignore
           }
         }
-        // Prefer "active" or future-ending listings; fallback to most recently updated.
-        const now = Date.now();
-        const scoreListing = (l: any) => {
-          const status = String(l?.listing_status || '').toLowerCase();
-          const end = l?.end_date ? new Date(l.end_date).getTime() : NaN;
-          const endFuture = Number.isFinite(end) ? end > now : false;
-          const hasTelemetry = typeof l?.current_bid === 'number' || typeof l?.bid_count === 'number' || typeof l?.watcher_count === 'number' || typeof l?.view_count === 'number';
-          if (status === 'active' || status === 'live') return 3;
-          if (endFuture) return 2;
-          if (hasTelemetry) return 1;
-          return 0;
-        };
-
-        const best = arr
-          .filter((l: any) => Boolean(l?.listing_url) && Boolean(l?.platform))
-          .sort((a: any, b: any) => {
-            const as = scoreListing(a);
-            const bs = scoreListing(b);
-            if (as !== bs) return bs - as;
-
-            const ae = a?.end_date ? new Date(a.end_date).getTime() : 0;
-            const be = b?.end_date ? new Date(b.end_date).getTime() : 0;
-            const aFuture = ae > now;
-            const bFuture = be > now;
-            if (aFuture !== bFuture) return aFuture ? -1 : 1;
-            if (aFuture && bFuture && ae !== be) return ae - be; // sooner-ending first
-
-            const au = a?.updated_at ? new Date(a.updated_at).getTime() : 0;
-            const bu = b?.updated_at ? new Date(b.updated_at).getTime() : 0;
-            return bu - au;
-          })[0];
+        const best = buildAuctionPulseFromExternalListings(arr, vehicleData.id);
 
         if (best?.listing_url && best?.platform) {
           // Lightweight comment telemetry (best-effort; table may not exist in some envs)
-          let commentCount: number | null = typeof best?.metadata?.comment_count === 'number' ? best.metadata.comment_count : null;
+          let commentCount: number | null = typeof (best as any)?.comment_count === 'number' ? (best as any).comment_count : null;
           let lastBidAt: string | null = null;
           let lastCommentAt: string | null = null;
 
@@ -1179,18 +1274,18 @@ const VehicleProfile: React.FC = () => {
           }
 
           setAuctionPulse({
-            platform: String(best.platform),
-            listing_url: String(best.listing_url),
-            listing_status: String(best.listing_status || ''),
-            end_date: best.end_date || null,
-            current_bid: typeof best.current_bid === 'number' ? best.current_bid : null,
-            bid_count: typeof best.bid_count === 'number' ? best.bid_count : null,
-            watcher_count: typeof best.watcher_count === 'number' ? best.watcher_count : null,
-            view_count: typeof best.view_count === 'number' ? best.view_count : null,
+            platform: String((best as any).platform),
+            listing_url: String((best as any).listing_url),
+            listing_status: String((best as any).listing_status || ''),
+            end_date: (best as any).end_date || null,
+            current_bid: typeof (best as any).current_bid === 'number' ? (best as any).current_bid : null,
+            bid_count: typeof (best as any).bid_count === 'number' ? (best as any).bid_count : null,
+            watcher_count: typeof (best as any).watcher_count === 'number' ? (best as any).watcher_count : null,
+            view_count: typeof (best as any).view_count === 'number' ? (best as any).view_count : null,
             comment_count: commentCount,
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
-            updated_at: best.updated_at || null,
+            updated_at: (best as any).updated_at || null,
           });
         } else {
           setAuctionPulse(null);

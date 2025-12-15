@@ -644,6 +644,40 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return `${m}m`;
   };
 
+  const formatCountdownClock = (iso?: string | null) => {
+    if (!iso) return null;
+    const end = new Date(iso).getTime();
+    if (!Number.isFinite(end)) return null;
+    const diff = end - auctionNow;
+    if (diff <= 0) return 'Ended';
+    const totalSeconds = Math.floor(diff / 1000);
+    const d = Math.floor(totalSeconds / 86400);
+    const h = Math.floor((totalSeconds % 86400) / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    if (d > 0) return `${d}d ${pad(h)}:${pad(m)}:${pad(s)}`;
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  };
+
+  const auctionPulseMs = useMemo(() => {
+    if (!auctionPulse?.listing_url) return null;
+    if (!isAuctionLive) return null;
+    if (!auctionPulse?.end_date) return 3800;
+    const end = new Date(auctionPulse.end_date).getTime();
+    if (!Number.isFinite(end)) return 3800;
+    const diff = end - auctionNow;
+    if (diff <= 0) return null;
+    const s = diff / 1000;
+    if (s <= 30) return 500;
+    if (s <= 60) return 650;
+    if (s <= 5 * 60) return 900;
+    if (s <= 30 * 60) return 1400;
+    if (s <= 2 * 60 * 60) return 2200;
+    if (s <= 24 * 60 * 60) return 3200;
+    return 4200;
+  }, [auctionPulse?.listing_url, auctionPulse?.end_date, auctionNow, isAuctionLive]);
+
   // Live auction timer (header should feel alive)
   const [auctionNow, setAuctionNow] = useState<number>(() => Date.now());
   useEffect(() => {
@@ -1120,11 +1154,32 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 status={auctionStatusForBadge as any}
                 title={isAuctionLive ? 'Live auction telemetry' : 'Auction status'}
               />
+              {auctionPulse.updated_at ? (
+                <span
+                  className="badge badge-secondary"
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: (() => {
+                      const age = formatAge(auctionPulse.updated_at);
+                      if (!age) return undefined;
+                      // If older than ~3 minutes, warn.
+                      const t = new Date(auctionPulse.updated_at as any).getTime();
+                      if (!Number.isFinite(t)) return undefined;
+                      const diffMin = (Date.now() - t) / (1000 * 60);
+                      return diffMin > 3 ? '#b45309' : undefined;
+                    })(),
+                  }}
+                  title="Telemetry freshness"
+                >
+                  updated {formatAge(auctionPulse.updated_at) || '—'} ago
+                </span>
+              ) : null}
               {auctionPulse.end_date ? (
                 <span
                   className="badge badge-secondary"
                   style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                  title="Time remaining"
+                  title={auctionPulse.end_date ? `Time remaining: ${formatRemaining(auctionPulse.end_date) || '—'}` : 'Time remaining'}
                 >
                   <span
                     className={isAuctionLive ? 'auction-live-dot' : undefined}
@@ -1137,7 +1192,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       flexShrink: 0
                     }}
                   />
-                  {formatRemaining(auctionPulse.end_date) || '—'}
+                  <span style={{ fontFamily: 'monospace' }}>
+                    {formatCountdownClock(auctionPulse.end_date) || formatRemaining(auctionPulse.end_date) || '—'}
+                  </span>
                 </span>
               ) : null}
               {typeof auctionPulse.bid_count === 'number' ? (
@@ -1178,6 +1235,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             
             // Only show badge if not showing org name
             if (isOrgName) return null;
+
+            // Avoid duplicate platform badging (e.g. BaT favicon + "BaT" twice) when auction telemetry is present.
+            if (auctionPulse?.listing_url) {
+              const origin = String((vehicle as any).profile_origin || '');
+              const discoveryUrl = String((vehicle as any).discovery_url || '');
+              const isBatOrigin = origin === 'bat_import' || discoveryUrl.includes('bringatrailer.com/listing/');
+              const isBatPulse = String(auctionPulse.platform || '').toLowerCase() === 'bat';
+              if (isBatOrigin && isBatPulse) return null;
+            }
             
             return (
               <span 
@@ -1466,6 +1532,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 
                 // During a live auction, deprioritize claim CTA and foreground auction telemetry + BID.
                 if (isAuctionLive && auctionPulse?.listing_url) {
+                  const bidLabel =
+                    typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0
+                      ? `Bid: ${formatCurrency(auctionPulse.current_bid)}`
+                      : 'BID';
                   return (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                       <a
@@ -1484,8 +1554,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           transition: 'all 0.12s ease',
                           textDecoration: 'none',
                           display: 'inline-flex',
-                          alignItems: 'center'
+                          alignItems: 'center',
+                          ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : null),
                         }}
+                        className={auctionPulseMs ? 'auction-cta-pulse' : undefined}
                         onMouseEnter={(e) => {
                           (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
                           (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
@@ -1496,27 +1568,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         }}
                         title="Open live auction (place bids on the auction platform)"
                       >
-                        BID
-                      </a>
-                      <a
-                        href={claimHref}
-                        style={{
-                          border: '1px solid var(--border)',
-                          background: 'transparent',
-                          color: mutedTextColor,
-                          fontWeight: 700,
-                          padding: '4px 8px',
-                          cursor: 'pointer',
-                          fontSize: '8pt',
-                          borderRadius: '3px',
-                          transition: 'all 0.12s ease',
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center'
-                        }}
-                        title="Claim ownership (title-based). We prioritize the vehicle, not the auction."
-                      >
-                        Claim
+                        {bidLabel}
                       </a>
                     </span>
                   );
@@ -1814,8 +1866,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   textDecorationColor: 'rgba(0,0,0,0.3)',
                   // Blur effect for RNM auctions (reserve not met)
                   filter: isRNM && highBid ? 'blur(4px)' : 'none',
-                  transition: 'filter 0.2s ease'
+                  transition: 'filter 0.2s ease',
+                  ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : null),
                 }}
+                  className={auctionPulseMs && isAuctionLive ? 'auction-price-pulse' : undefined}
                 title={isRNM ? "Reserve not met - high bid hidden (click to reveal)" : "Click to see data source and confidence"}
                 onMouseEnter={(e) => {
                   // Un-blur on hover for RNM
