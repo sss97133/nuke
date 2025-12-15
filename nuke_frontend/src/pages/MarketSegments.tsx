@@ -98,10 +98,19 @@ export default function MarketSegments() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '12px',
+            flexWrap: 'wrap',
+            lineHeight: '12px'
+          }}
+        >
           <div>
-            <h1 style={{ margin: 0, fontSize: '14pt' }}>Market Segments</h1>
-            <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+            <h1 style={{ margin: 0, fontSize: '10px' }}>Market Segments</h1>
+            <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 200 }}>
               Browse segments and index stats. Trading is intentionally not enabled here yet.
             </div>
           </div>

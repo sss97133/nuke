@@ -989,7 +989,17 @@ body {
   font-weight: 600;
 }
 
+/* Tablet: keep the 2-pane layout, just tighten it up. */
 @media (max-width: 900px) {
+  .vehicle-library-sidebar {
+    width: 240px;
+    flex: 0 0 240px;
+    min-width: 200px;
+  }
+}
+
+/* Phone: switch to stacked layout. */
+@media (max-width: 640px) {
   .vehicle-library-layout {
     flex-direction: column;
     min-height: auto;

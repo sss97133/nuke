@@ -9,14 +9,17 @@ export const useIsMobile = (): boolean => {
 
   useEffect(() => {
     const checkMobile = () => {
-      // Check viewport width
+      // Primary: viewport width breakpoint.
       const isSmallScreen = window.innerWidth < 768;
-      
-      // Check user agent for mobile devices
-      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      const isMobileUA = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      
-      setIsMobile(isSmallScreen || (isTouchDevice && isMobileUA));
+
+      // Secondary: phone UA (catches phone landscape widths > 768).
+      // Important: exclude tablets (iPad and many Android tablets do NOT include "Mobile" in UA).
+      const ua = navigator.userAgent || '';
+      const isPhoneUA =
+        /iPhone|iPod|Windows Phone/i.test(ua) ||
+        (/Android/i.test(ua) && /Mobile/i.test(ua));
+
+      setIsMobile(isSmallScreen || isPhoneUA);
     };
 
     // Check on mount

@@ -393,10 +393,10 @@ const VehicleProfile: React.FC = () => {
   // MOBILE DETECTION
   useEffect(() => {
     const checkMobile = () => {
-      const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       const isNarrowScreen = window.innerWidth < 768;
-      const isMobileDevice = isNarrowScreen || (hasTouch && window.innerWidth < 1024);
-      setIsMobile(isMobileDevice);
+      // Treat tablet widths (e.g., ~800px iPad) as non-mobile. Mobile UI should only
+      // activate at true phone widths to avoid degrading tablet/desktop layouts.
+      setIsMobile(isNarrowScreen);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
