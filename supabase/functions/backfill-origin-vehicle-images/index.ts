@@ -168,20 +168,13 @@ Deno.serve(async (req) => {
 
     const service = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-    // Candidates: vehicles with no images, but origin_metadata has image URLs.
-    // We include both origin_metadata.image_urls and origin_metadata.external_images.
-    let q = service
-      .from("vehicles")
-      .select("id, profile_origin, discovery_url, origin_organization_id, origin_metadata")
-      .order("updated_at", { ascending: false })
-      .limit(batchSize);
-
-    if (includeOrigins && includeOrigins.length > 0) {
-      q = q.in("profile_origin", includeOrigins);
-    }
-
-    const { data: candidates, error } = await q;
-    if (error) throw new Error(`vehicles select failed: ${error.message}`);
+    // Use DB RPC to efficiently select vehicles missing images + carrying origin image URLs.
+    const { data: candidates, error } = await service.rpc("get_vehicles_missing_images_with_origin_urls", {
+      p_limit: batchSize,
+      p_profile_origins: includeOrigins && includeOrigins.length > 0 ? includeOrigins : null,
+      p_force: false,
+    });
+    if (error) throw new Error(`get_vehicles_missing_images_with_origin_urls failed: ${error.message}`);
 
     const out: any = {
       success: true,
@@ -197,17 +190,6 @@ Deno.serve(async (req) => {
     };
 
     for (const v of (candidates || []) as any[]) {
-      // Skip if already has images
-      const { count: existingCount } = await service
-        .from("vehicle_images")
-        .select("id", { count: "exact", head: true })
-        .eq("vehicle_id", v.id)
-        .eq("is_document", false);
-
-      if (existingCount && existingCount > 0) {
-        out.skipped++;
-        continue;
-      }
 
       const om = v?.origin_metadata && typeof v.origin_metadata === "object" ? v.origin_metadata : {};
       const rawUrls = Array.isArray(om?.image_urls) ? om.image_urls : (Array.isArray(om?.external_images) ? om.external_images : []);
