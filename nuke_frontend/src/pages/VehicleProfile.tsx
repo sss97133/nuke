@@ -434,6 +434,119 @@ const VehicleProfile: React.FC = () => {
     loadLinkedOrgs(vehicle.id);
   }, [vehicle?.id]); // Removed loadLinkedOrgs from deps - it's useCallback with [] deps so never changes
 
+  // Realtime auction pulse: update header telemetry as external listing rows change
+  // (BaT/Classic/etc) and as auction_comments stream in.
+  useEffect(() => {
+    if (!vehicle?.id) return;
+
+    const vehicleIdForFilter = vehicle.id;
+
+    const channel = supabase
+      .channel(`auction-pulse:${vehicleIdForFilter}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'external_listings',
+          filter: `vehicle_id=eq.${vehicleIdForFilter}`,
+        },
+        (payload) => {
+          const row = (payload as any)?.new as any;
+          if (!row) return;
+          // If we already have a specific listing_url, ignore other listings for this vehicle.
+          if (auctionPulse?.listing_url && row.listing_url && row.listing_url !== auctionPulse.listing_url) return;
+
+          setAuctionPulse((prev) => {
+            const p = prev || ({} as any);
+            const metaCommentCount = row?.metadata && typeof row.metadata.comment_count === 'number' ? row.metadata.comment_count : null;
+            return {
+              platform: String(row?.platform || p.platform || ''),
+              listing_url: String(row?.listing_url || p.listing_url || ''),
+              listing_status: String(row?.listing_status || p.listing_status || ''),
+              end_date: row?.end_date ?? p.end_date ?? null,
+              current_bid: typeof row?.current_bid === 'number' ? row.current_bid : (p.current_bid ?? null),
+              bid_count: typeof row?.bid_count === 'number' ? row.bid_count : (p.bid_count ?? null),
+              watcher_count: typeof row?.watcher_count === 'number' ? row.watcher_count : (p.watcher_count ?? null),
+              view_count: typeof row?.view_count === 'number' ? row.view_count : (p.view_count ?? null),
+              comment_count: metaCommentCount !== null ? metaCommentCount : (p.comment_count ?? null),
+              last_bid_at: p.last_bid_at ?? null,
+              last_comment_at: p.last_comment_at ?? null,
+              updated_at: row?.updated_at ?? p.updated_at ?? null,
+            };
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bat_listings',
+          filter: `vehicle_id=eq.${vehicleIdForFilter}`,
+        },
+        (payload) => {
+          const row = (payload as any)?.new as any;
+          if (!row) return;
+          // Only apply BaT table updates when the pulse is already BaT (or not set yet).
+          if (auctionPulse?.platform && auctionPulse.platform !== 'bat') return;
+
+          setAuctionPulse((prev) => {
+            const p = prev || ({} as any);
+            return {
+              platform: 'bat',
+              listing_url: String(row?.bat_listing_url || p.listing_url || ''),
+              listing_status: String(row?.listing_status || p.listing_status || ''),
+              end_date: row?.auction_end_date ? new Date(row.auction_end_date).toISOString() : (p.end_date ?? null),
+              current_bid: typeof row?.current_bid === 'number' ? row.current_bid : (p.current_bid ?? null),
+              bid_count: typeof row?.bid_count === 'number' ? row.bid_count : (p.bid_count ?? null),
+              watcher_count: typeof row?.watcher_count === 'number' ? row.watcher_count : (p.watcher_count ?? null),
+              view_count: typeof row?.view_count === 'number' ? row.view_count : (p.view_count ?? null),
+              comment_count: typeof row?.comment_count === 'number' ? row.comment_count : (p.comment_count ?? null),
+              last_bid_at: p.last_bid_at ?? null,
+              last_comment_at: p.last_comment_at ?? null,
+              updated_at: row?.updated_at ?? p.updated_at ?? null,
+            };
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'auction_comments',
+          filter: `vehicle_id=eq.${vehicleIdForFilter}`,
+        },
+        (payload) => {
+          const row = (payload as any)?.new as any;
+          const postedAt = row?.posted_at ? String(row.posted_at) : null;
+          const isBid = row?.bid_amount !== null && row?.bid_amount !== undefined;
+          setAuctionPulse((prev) => {
+            if (!prev) return prev;
+            const nextCommentCount = typeof prev.comment_count === 'number' ? prev.comment_count + 1 : 1;
+            return {
+              ...prev,
+              comment_count: nextCommentCount,
+              last_comment_at: postedAt || prev.last_comment_at || null,
+              last_bid_at: isBid ? (postedAt || prev.last_bid_at || null) : (prev.last_bid_at || null),
+            };
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch {
+        try {
+          channel.unsubscribe();
+        } catch {}
+      }
+    };
+  }, [vehicle?.id, auctionPulse?.listing_url, auctionPulse?.platform]);
+
   // Lightweight auction pulse polling (external listings + last bid/comment timestamps).
   // This makes live auction vehicles feel bustling without needing a full realtime channel.
   useEffect(() => {
