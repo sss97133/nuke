@@ -286,6 +286,10 @@
 .win95 {
   --radius: 0;
   --radius-sm: 0;
+}
+
+/* Only apply the "lighter greys" Win95 palette in LIGHT mode */
+:root[data-theme="light"] .win95 {
   /* Lighter greys for a softer, light-accent Win95 look */
   --grey-100: #fafafa;
   --grey-200: #f2f2f2;

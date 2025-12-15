@@ -277,7 +277,16 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
               if (!targetYear) return null;
               
               return (
-                <div key={targetYear} id={`year-${targetYear}`} className="bg-white rounded-lg p-2">
+                <div
+                  key={targetYear}
+                  id={`year-${targetYear}`}
+                  className="rounded-lg p-2"
+                  style={{
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text)',
+                  }}
+                >
                   {/* Months header positioned above everything */}
                   <div style={{ marginLeft: '30px', marginBottom: '2px' }}>
                     <div 

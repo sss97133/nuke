@@ -14,8 +14,19 @@ import AIProviderSettings from '../components/settings/AIProviderSettings';
 import APIAccessSubscription from '../components/settings/APIAccessSubscription';
 import KnowledgeLibrary from '../components/profile/KnowledgeLibrary';
 import StreamingDashboard from '../components/profile/StreamingDashboard';
+import AppearanceSpecimen from '../components/settings/AppearanceSpecimen';
 
-type CapsuleTab = 'dashboard' | 'api-access' | 'settings' | 'financials' | 'organizations' | 'knowledge' | 'streaming' | 'professional' | 'photos';
+type CapsuleTab =
+  | 'dashboard'
+  | 'api-access'
+  | 'settings'
+  | 'appearance'
+  | 'financials'
+  | 'organizations'
+  | 'knowledge'
+  | 'streaming'
+  | 'professional'
+  | 'photos';
 
 const Capsule: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -28,7 +39,10 @@ const Capsule: React.FC = () => {
 
   // Update active tab when URL param changes
   useEffect(() => {
-    if (tabParam && ['dashboard', 'api-access', 'settings', 'financials', 'organizations', 'knowledge', 'streaming', 'professional', 'photos'].includes(tabParam)) {
+    if (
+      tabParam &&
+      ['dashboard', 'api-access', 'settings', 'appearance', 'financials', 'organizations', 'knowledge', 'streaming', 'professional', 'photos'].includes(tabParam)
+    ) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -83,6 +97,7 @@ const Capsule: React.FC = () => {
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'api-access', label: 'API Access' },
     { key: 'settings', label: 'Settings' },
+    { key: 'appearance', label: 'Appearance' },
     { key: 'financials', label: 'Financials' },
     { key: 'organizations', label: 'Organizations' },
     { key: 'knowledge', label: 'Knowledge Library' },
@@ -169,6 +184,12 @@ const Capsule: React.FC = () => {
               </div>
 
               <StripeKeysManager />
+            </div>
+          )}
+
+          {activeTab === 'appearance' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+              <AppearanceSpecimen />
             </div>
           )}
 

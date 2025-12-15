@@ -250,7 +250,16 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
           }}
         >
           <div style={{ minWidth: '700px' }}> {/* Ensure full width on mobile */}
-            <div key={year} id={`year-${year}`} className="bg-white rounded-lg p-2">
+            <div
+              key={year}
+              id={`year-${year}`}
+              className="rounded-lg p-2"
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+              }}
+            >
               {/* Months header */}
               <div style={{ marginLeft: '30px', marginBottom: '2px' }}>
                 <div 
@@ -273,7 +282,7 @@ export const OrganizationTimelineHeatmap: React.FC<OrganizationTimelineHeatmapPr
                           gridColumn: `${startWeek + 1} / span ${monthWidth}`,
                           textAlign: 'center',
                           fontSize: '8pt',
-                          color: '#888888',
+                          color: 'var(--text-secondary)',
                           lineHeight: '8px'
                         }}
                       >

@@ -189,8 +189,8 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                     position: 'absolute',
                     top: '100%',
                     left: 0,
-                    background: '#ffffff',
-                    border: '2px solid #bdbdbd',
+                    background: 'var(--surface)',
+                    border: '2px solid var(--border)',
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     zIndex: 2000,
                     minWidth: '160px',
@@ -205,7 +205,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       display: 'block',
                       padding: '8px 12px',
                       textDecoration: 'none',
-                      borderBottom: '1px solid #f0f0f0'
+                      borderBottom: '1px solid var(--border)'
                     }}
                     onClick={() => setNZeroMenuOpen(false)}
                   >
@@ -218,7 +218,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       display: 'block',
                       padding: '8px 12px',
                       textDecoration: 'none',
-                      borderBottom: '1px solid #f0f0f0'
+                      borderBottom: '1px solid var(--border)'
                     }}
                     onClick={() => setNZeroMenuOpen(false)}
                   >
