@@ -69,18 +69,9 @@ serve(async (req) => {
     const response = await fetch(listing.listing_url);
     const html = await response.text();
 
-    // Extract end date (best-effort; used for countdown timers on active auctions)
-    let endDateIso: string | null = listing.end_date ? String(listing.end_date) : null;
-    const jsonLd = html.match(/"endDate"\s*:\s*"([^"]+)"/i);
-    if (jsonLd?.[1]) {
-      const t = Date.parse(jsonLd[1]);
-      if (Number.isFinite(t)) endDateIso = new Date(t).toISOString();
-    }
-    const attr = html.match(/data-countdown-date\s*=\s*"([^"]+)"/i);
-    if (!endDateIso && attr?.[1]) {
-      const t = Date.parse(attr[1]);
-      if (Number.isFinite(t)) endDateIso = new Date(t).toISOString();
-    }
+    // Determine ended/sold state early to avoid writing bogus end_date values on completed auctions.
+    const isEndedText = /Auction Ended/i.test(html);
+    const soldInTitle = html.match(/sold\s+for\s+\$([\d,]+)/i);
 
     // Extract current bid - multiple patterns to handle different HTML structures
     let currentBid = listing.current_bid;
@@ -124,15 +115,38 @@ serve(async (req) => {
     const viewMatch = html.match(/([\d,]+)\s+views?/i);
     const viewCount = viewMatch ? (asInt(viewMatch[1]) ?? listing.view_count) : listing.view_count;
 
-    // Check if auction ended
-    const endedMatch = html.match(/Auction Ended/i);
-    const isEnded = endedMatch !== null;
-
     // Check if sold
     const soldMatch = html.match(/Sold (?:for|to).*?\$([\\d,]+)/i);
-    const finalPrice = soldMatch ? (asInt(soldMatch[1]) ?? null) : null;
+    const finalPrice =
+      (soldInTitle?.[1] ? asInt(soldInTitle[1]) : null) ??
+      (soldMatch?.[1] ? asInt(soldMatch[1]) : null);
 
+    const isEnded = isEndedText || !!finalPrice || /sold/i.test(html.slice(0, 5000));
     const newStatus = finalPrice ? 'sold' : (isEnded ? 'ended' : 'active');
+
+    // Extract end date ONLY for active listings (countdown timers)
+    let endDateIso: string | null = null;
+    if (newStatus === 'active') {
+      const attr = html.match(/data-countdown-date\s*=\s*"([^"]+)"/i);
+      if (attr?.[1]) {
+        const t = Date.parse(attr[1]);
+        if (Number.isFinite(t)) endDateIso = new Date(t).toISOString();
+      }
+
+      // Fallback: choose the nearest reasonable endDate from JSON-LD if present.
+      if (!endDateIso) {
+        const matches = Array.from(html.matchAll(/"endDate"\s*:\s*"([^"]+)"/gi)).map((m) => m?.[1]).filter(Boolean) as string[];
+        const nowMs = Date.now();
+        const candidates = matches
+          .map((iso) => ({ iso, t: Date.parse(iso) }))
+          .filter((x) => Number.isFinite(x.t))
+          .filter((x) => x.t > nowMs)
+          // ignore wildly-future dates (usually unrelated schema fields)
+          .filter((x) => x.t < nowMs + 35 * 24 * 60 * 60 * 1000)
+          .sort((a, b) => a.t - b.t);
+        if (candidates[0]) endDateIso = new Date(candidates[0].t).toISOString();
+      }
+    }
 
     // Update the listing
     const { error: updateError } = await supabase
@@ -146,7 +160,8 @@ serve(async (req) => {
         end_date: endDateIso,
         final_price: finalPrice,
         sold_at: finalPrice ? new Date().toISOString() : null,
-        last_synced_at: new Date().toISOString()
+        last_synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq('id', externalListingId);
 
