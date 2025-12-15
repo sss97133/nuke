@@ -15,6 +15,7 @@
    - Font: Arial, monospace for numbers
    ================================================ */
 
+/* Default (no data-theme) behaves like light */
 :root {
   /* Background Colors - Moderate, not extreme */
   --bg: #f5f5f5;           /* Light grey, NOT white */
@@ -30,10 +31,11 @@
   --text-secondary: #666666;
   --text-disabled: #999999;
   
-  /* Accent Colors - No blue, grey only */
+  /* Accent Colors */
   --accent: #2a2a2a;
   --accent-dim: rgba(42, 42, 42, 0.08);
   --accent-bright: #000000;
+  --accent-alt: #2a2a2a;
   
   /* Status Colors */
   --success: #16825d;
@@ -60,6 +62,194 @@
   
   /* Transitions */
   --transition: 0.12s ease;
+}
+
+/* ================================================
+   THEME TOKENS (LIGHT / DARK)
+   ================================================ */
+
+:root[data-theme="light"] {
+  --bg: #f5f5f5;
+  --surface: #ebebeb;
+  --surface-hover: #e0e0e0;
+
+  --border: #bdbdbd;
+  --border-focus: #2a2a2a;
+
+  --text: #2a2a2a;
+  --text-secondary: #666666;
+  --text-disabled: #999999;
+
+  --accent: #2a2a2a;
+  --accent-dim: rgba(42, 42, 42, 0.08);
+  --accent-bright: #000000;
+  --accent-alt: #2a2a2a;
+}
+
+:root[data-theme="dark"] {
+  --bg: #1e1e1e;
+  --surface: #252526;
+  --surface-hover: #2d2d30;
+
+  --border: #3e3e42;
+  --border-focus: #cccccc;
+
+  --text: #cccccc;
+  --text-secondary: #858585;
+  --text-disabled: #656565;
+
+  --accent: #cccccc;
+  --accent-dim: rgba(204, 204, 204, 0.12);
+  --accent-bright: #ffffff;
+  --accent-alt: #cccccc;
+}
+
+/* ================================================
+   CONTRAST PROFILES
+   ================================================ */
+
+/* Greyscale: keep everything neutral, reduce status emphasis */
+:root[data-contrast="greyscale"] {
+  --accent: var(--text);
+  --accent-alt: var(--text-secondary);
+  --accent-dim: rgba(0, 0, 0, 0.08);
+  --border-focus: var(--text);
+
+  --success: var(--text);
+  --warning: var(--text);
+  --error: var(--text);
+
+  --success-dim: rgba(0, 0, 0, 0.06);
+  --warning-dim: rgba(0, 0, 0, 0.06);
+  --error-dim: rgba(0, 0, 0, 0.06);
+}
+
+/* High contrast: optional accessibility mode */
+:root[data-theme="light"][data-contrast="high"] {
+  --bg: #ffffff;
+  --surface: #f2f2f2;
+  --surface-hover: #e6e6e6;
+
+  --border: #111111;
+  --border-focus: #111111;
+
+  --text: #000000;
+  --text-secondary: #111111;
+  --text-disabled: #3a3a3a;
+
+  --accent: #000000;
+  --accent-alt: #ffd100; /* optional callout */
+  --accent-dim: rgba(0, 0, 0, 0.12);
+  --accent-bright: #000000;
+}
+
+:root[data-theme="dark"][data-contrast="high"] {
+  --bg: #0a0a0a;
+  --surface: #121212;
+  --surface-hover: #1a1a1a;
+
+  --border: #f5f5f5;
+  --border-focus: #ffd100;
+
+  --text: #ffffff;
+  --text-secondary: #f5f5f5;
+  --text-disabled: #c9c9c9;
+
+  --accent: #ffd100;
+  --accent-alt: #ffffff;
+  --accent-dim: rgba(255, 209, 0, 0.16);
+  --accent-bright: #ffd100;
+}
+
+/* ================================================
+   AUTOMOTIVE ACCENT COLORWAYS (accent-only by default)
+   ================================================ */
+
+:root[data-accent="neutral"] {
+  --accent: #2a2a2a;
+  --accent-alt: #2a2a2a;
+  --accent-dim: rgba(42, 42, 42, 0.08);
+  --border-focus: var(--accent);
+}
+
+/* Gulf: orange primary, blue secondary */
+:root[data-accent="gulf"] {
+  --accent: #ff5f00;
+  --accent-alt: #9dd9f3;
+  --accent-dim: rgba(255, 95, 0, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Martini: deep blue primary, red secondary */
+:root[data-accent="martini"] {
+  --accent: #012169; /* navy */
+  --accent-alt: #da291c; /* red */
+  --accent-dim: rgba(1, 33, 105, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Ricard: blue primary, yellow secondary */
+:root[data-accent="ricard"] {
+  --accent: #0033a0;
+  --accent-alt: #ffcd00;
+  --accent-dim: rgba(0, 51, 160, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Ferrari Rosso Corsa */
+:root[data-accent="rosso"] {
+  --accent: #e4002b; /* Pantone example: 185 C */
+  --accent-alt: #ffd100; /* yellow callout */
+  --accent-dim: rgba(228, 0, 43, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* British Racing Green */
+:root[data-accent="brg"] {
+  --accent: #00573f; /* Pantone example: 343 C */
+  --accent-alt: #ffef00;
+  --accent-dim: rgba(0, 87, 63, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* John Player Special: gold highlight */
+:root[data-accent="jps"] {
+  --accent: #b9975b; /* gold */
+  --accent-alt: #111111;
+  --accent-dim: rgba(185, 151, 91, 0.14);
+  --border-focus: var(--accent);
+}
+
+/* Jägermeister: orange */
+:root[data-accent="jaeger"] {
+  --accent: #fe5000; /* Pantone example: 021 C */
+  --accent-alt: #111111;
+  --accent-dim: rgba(254, 80, 0, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* Alitalia: green primary, red secondary */
+:root[data-accent="alitalia"] {
+  --accent: #009a44; /* Pantone example: 348 C */
+  --accent-alt: #c8102e; /* Pantone example: 186 C */
+  --accent-dim: rgba(0, 154, 68, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* BMW M: light blue primary, red secondary */
+:root[data-accent="bmw-m"] {
+  --accent: #00a3e0; /* Pantone example: 299 C */
+  --accent-alt: #c8102e; /* Pantone example: 186 C */
+  --accent-dim: rgba(0, 163, 224, 0.12);
+  --border-focus: var(--accent);
+}
+
+/* McLaren papaya */
+:root[data-accent="papaya"] {
+  --accent: #ff5f1f;
+  --accent-alt: #111111;
+  --accent-dim: rgba(255, 95, 31, 0.12);
+  --border-focus: var(--accent);
 }
 
 /* ================================================

@@ -58,12 +58,22 @@ serve(async (req) => {
       
       // BaT images: wp-content/uploads URLs
       if (url.includes('bringatrailer.com')) {
-        const batImageMatches = html.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)/gi)
-        if (batImageMatches) {
+        // Capture absolute, protocol-relative, and relative gallery URLs.
+        // BaT pages often include many listing images as relative paths.
+        const abs = html.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
+        const protoRel = html.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
+        const rel = html.match(/\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
+
+        const batImageMatches = [...abs, ...protoRel, ...rel]
+        if (batImageMatches.length > 0) {
           images = batImageMatches
-            .map(img => {
+            .map((img) => {
+              let u = img
+              if (u.startsWith('//')) u = 'https:' + u
+              if (u.startsWith('/')) u = 'https://bringatrailer.com' + u
+
               // Clean HTML entities and resize parameters
-              return img
+              return u
                 .replace(/&#038;/g, '&')
                 .replace(/&amp;/g, '&')
                 .replace(/[?&]w=\d+/g, '')
@@ -72,10 +82,11 @@ serve(async (req) => {
                 .replace(/[?&]$/, '')
                 .replace(/-scaled\./g, '.')
             })
-            .filter((url: string) => {
-              const lower = url.toLowerCase()
-              return !lower.includes('themes/') && 
-                     !lower.includes('assets/') && 
+            .filter((u: string) => {
+              const lower = u.toLowerCase()
+              return lower.includes('/wp-content/uploads/') &&
+                     !lower.includes('/wp-content/themes/') &&
+                     !lower.includes('/assets/') &&
                      !lower.includes('.svg')
             })
         }
@@ -91,6 +102,9 @@ serve(async (req) => {
       
       // Remove duplicates and filter
       images = [...new Set(images)].filter((url: string) => url && typeof url === 'string' && url.trim().length > 0)
+
+      // NOTE: do not over-filter BaT here. The goal is to return *all* listing-upload images;
+      // downstream jobs can apply additional heuristics if needed.
 
       // Extract basic vehicle info from title
       let year, make, model

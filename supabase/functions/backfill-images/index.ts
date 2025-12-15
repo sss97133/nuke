@@ -13,6 +13,8 @@ interface BackfillRequest {
   run_analysis?: boolean;
   listed_date?: string;
   max_images?: number;
+  // Resume large galleries without relying on uploaded-count (which is affected by skips/failures).
+  start_index?: number;
   // Optional: chunking / chaining for large galleries (dealer sites like L'Art).
   continue?: boolean;
   chain_depth?: number;
@@ -25,6 +27,8 @@ const CRAIGSLIST_HIRES_SIZE = '1200x900';
 function isProbablyThumbnail(url: string): boolean {
   const lower = url.toLowerCase();
   return (
+    // BaT: only accept actual listing uploads; site chrome lives in /wp-content/themes/... etc.
+    (lower.includes('bringatrailer.com') && !lower.includes('/wp-content/uploads/')) ||
     lower.includes('94x63') ||
     lower.includes('thumbnail') ||
     lower.includes('thumb/') ||
@@ -110,7 +114,11 @@ serve(async (req) => {
       source = 'backfill',
       run_analysis = true,
       listed_date,
-      max_images = 50,
+      // IMPORTANT:
+      // - max_images <= 0 means "no cap" (process until runtime limit, then optionally chain)
+      // - callers that want bounded work can still pass max_images explicitly
+      max_images = 0,
+      start_index = 0,
       continue: shouldContinue = false,
       chain_depth = 0,
       sleep_ms = 200,
@@ -121,7 +129,7 @@ serve(async (req) => {
       throw new Error('vehicle_id and image_urls required');
     }
 
-    console.log(`Backfilling ${image_urls.length} images for vehicle ${vehicle_id} (max_images=${max_images}, continue=${shouldContinue}, chain_depth=${chain_depth})`);
+    console.log(`Backfilling ${image_urls.length} images for vehicle ${vehicle_id} (start_index=${start_index}, max_images=${max_images}, continue=${shouldContinue}, chain_depth=${chain_depth})`);
 
     // Get vehicle info for context
     const { data: vehicle } = await supabase
@@ -178,12 +186,20 @@ serve(async (req) => {
     }
 
     const startedAt = Date.now();
-    for (let i = 0; i < uniqueUrls.length && results.uploaded < max_images; i++) {
+    const maxToUploadThisCall = (typeof max_images === 'number' && Number.isFinite(max_images) && max_images > 0)
+      ? Math.floor(max_images)
+      : Number.POSITIVE_INFINITY;
+
+    // Track actual progress through the list independent of uploaded/skipped/failed.
+    let processed = 0;
+
+    for (let i = Math.max(0, Math.min(start_index, uniqueUrls.length)); i < uniqueUrls.length && results.uploaded < maxToUploadThisCall; i++) {
       if (Date.now() - startedAt > max_runtime_ms) {
         console.log(`⏱️  Stopping early due to max_runtime_ms=${max_runtime_ms}`);
         break;
       }
       const rawUrl = uniqueUrls[i];
+      processed++;
       if (existingSourceUrls.has(rawUrl)) {
         results.skipped++;
         continue;
@@ -316,7 +332,7 @@ serve(async (req) => {
           // If the object already exists, we can reuse the public URL and just ensure DB linkage.
           const msg = String((uploadError as any).message || '');
           if (msg.toLowerCase().includes('already exists')) {
-            results.skipped++;
+            // Do NOT early-continue: we still want to ensure a vehicle_images row exists.
           } else {
           const errorMsg = `Upload failed for ${filename}: ${uploadError.message || JSON.stringify(uploadError)}`;
           console.log(`❌ ${errorMsg}`);
@@ -326,14 +342,19 @@ serve(async (req) => {
           }
         }
         
-        console.log(`✅ Uploaded ${filename} (${(imageBytes.length / 1024).toFixed(1)}KB)`);
+        if (!uploadError) {
+          console.log(`✅ Uploaded ${filename} (${(imageBytes.length / 1024).toFixed(1)}KB)`);
+        } else {
+          console.log(`↩️  Storage object already exists for ${filename}; ensuring DB linkage`);
+        }
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('vehicle-images')
           .getPublicUrl(storagePath);
 
-        // Create database record
+        // Create database record (even if storage object already existed).
+        // If a previous run uploaded to storage but DB insert failed, this is the recovery path.
         const { data: imageRecord, error: dbError } = await supabase
           .from('vehicle_images')
           .insert({
@@ -416,34 +437,30 @@ serve(async (req) => {
 
     // If requested, chain another backfill call to continue processing remaining images.
     // This is critical for dealer galleries with > max_images or when max_runtime_ms is hit.
-    if (shouldContinue && chain_depth < 20) {
+    if (shouldContinue && chain_depth < 80) {
       try {
-        // Determine remaining candidates (skip URLs already present to reduce payload).
-        const remaining = uniqueUrls.filter((u) => !existingSourceUrls.has(u));
-        if (remaining.length > results.uploaded) {
-          // Fire-and-forget next chunk.
-          const nextUrls = remaining.slice(results.uploaded);
-          if (nextUrls.length > 0) {
-            fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/backfill-images`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              },
-              body: JSON.stringify({
-                vehicle_id,
-                image_urls: nextUrls,
-                source,
-                run_analysis,
-                listed_date: imageDate,
-                max_images,
-                continue: true,
-                chain_depth: chain_depth + 1,
-                sleep_ms,
-                max_runtime_ms,
-              } satisfies BackfillRequest)
-            }).catch(() => {});
-          }
+        const nextIndex = Math.max(0, Math.min(start_index, uniqueUrls.length)) + processed;
+        if (nextIndex < uniqueUrls.length) {
+          fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/backfill-images`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({
+              vehicle_id,
+              image_urls: uniqueUrls, // same canonical ordered list
+              source,
+              run_analysis,
+              listed_date: imageDate,
+              max_images,
+              start_index: nextIndex,
+              continue: true,
+              chain_depth: chain_depth + 1,
+              sleep_ms,
+              max_runtime_ms,
+            } satisfies BackfillRequest)
+          }).catch(() => {});
         }
       } catch {
         // non-blocking
@@ -454,6 +471,9 @@ serve(async (req) => {
       success: true,
       vehicle_id,
       ...results,
+      start_index,
+      next_index: Math.max(0, Math.min(start_index, uniqueUrls.length)) + processed,
+      total_candidates: uniqueUrls.length,
       error_summary: results.errors.length > 0 ? results.errors.slice(0, 10) : undefined
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

@@ -2273,8 +2273,10 @@ serve(async (req) => {
                   source: 'organization_import',
                   run_analysis: false,
                   // Dealer galleries can be large; backfill-images can chunk/chain now.
-                  max_images: isLartFiche ? 500 : 50,
-                  continue: isLartFiche ? true : false,
+                  // IMPORTANT: ingest ALL images (not just first 12/50/etc). backfill-images will self-chain
+                  // until it exhausts the URL list (bounded by runtime + chain_depth).
+                  max_images: 0,
+                  continue: true,
                   sleep_ms: isLartFiche ? 150 : 200,
                   max_runtime_ms: 25000,
                 }
