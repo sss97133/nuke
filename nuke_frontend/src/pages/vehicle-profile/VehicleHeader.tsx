@@ -1278,10 +1278,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         marginRight: 'calc(-1 * var(--space-2))',
         position: 'sticky',
         top: '48px',
-        left: 0,
-        right: 0,
-        width: '100vw',
-        maxWidth: '100vw',
+        // Avoid `100vw` here — it includes the scrollbar width and can cause horizontal overflow
+        // (page "pans" sideways and the background looks too wide).
+        width: '100%',
         zIndex: 97,
         boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
         display: 'flex',

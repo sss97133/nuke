@@ -298,17 +298,21 @@ export default function VehicleMemePanel({
               >
                 {selectedPackActions.map((a) => {
                   const isSending = sendingActionId === a.id;
+                  const hasImage = !!a.image_url;
                   return (
                     <button
                       key={a.id}
                       className="button button-primary"
                       style={{
                         fontSize: '8pt',
-                        padding: '10px 8px',
+                        padding: hasImage ? '6px' : '10px 8px',
                         minHeight: 44,
                         whiteSpace: 'normal',
                         lineHeight: 1.1,
                         opacity: !canInteract ? 0.7 : 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
                       }}
                       disabled={!canInteract || isSending}
                       title={a.render_text || a.title}
@@ -317,7 +321,19 @@ export default function VehicleMemePanel({
                       onPointerCancel={() => clearHoldTimer()}
                       onPointerLeave={() => clearHoldTimer()}
                     >
-                      {isSending ? 'SENDING...' : a.title}
+                      {hasImage ? (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: 54,
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            background: `url(${a.image_url}) center/cover`,
+                          }}
+                        />
+                      ) : null}
+                      <div style={{ width: '100%', textAlign: 'left' }}>
+                        {isSending ? 'SENDING...' : a.title}
+                      </div>
                     </button>
                   );
                 })}
@@ -374,8 +390,28 @@ export default function VehicleMemePanel({
               </button>
             </div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {preview.action.image_url ? (
+                <div
+                  style={{
+                    width: '100%',
+                    border: '1px solid rgba(0,0,0,0.12)',
+                    background: '#111',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 8,
+                  }}
+                >
+                  <img
+                    src={preview.action.image_url}
+                    alt={preview.action.title}
+                    style={{ maxWidth: '100%', maxHeight: 340, objectFit: 'contain', display: 'block' }}
+                  />
+                </div>
+              ) : null}
+
               <div style={{ fontSize: '9pt', color: '#374151' }}>
-                {preview.action.render_text || 'Preview unavailable.'}
+                {preview.action.render_text || (!preview.action.image_url ? 'Preview unavailable.' : '')}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                 <button className="button button-secondary" onClick={() => setPreview(null)} style={{ fontSize: '9pt' }}>
