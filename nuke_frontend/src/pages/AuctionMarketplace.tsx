@@ -64,16 +64,46 @@ export default function AuctionMarketplace() {
     loadListings();
     
     // Subscribe to real-time updates
+    let scheduled = false;
+    const scheduleReload = () => {
+      if (scheduled) return;
+      scheduled = true;
+      window.setTimeout(() => {
+        scheduled = false;
+        loadListings();
+      }, 750);
+    };
+
     const channel = supabase
       .channel('auction-updates')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'vehicle_listings',
-        filter: 'status=eq.active'
-      }, () => {
-        loadListings();
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'vehicle_listings',
+          filter: 'status=eq.active',
+        },
+        scheduleReload,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'external_listings',
+        },
+        scheduleReload,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bat_listings',
+        },
+        scheduleReload,
+      )
       .subscribe();
 
     return () => {
@@ -234,35 +264,40 @@ export default function AuctionMarketplace() {
             continue;
           }
 
-          // Keep listings even if end_date is missing (some sources backfill it later).
-          if (!listing.end_date || new Date(listing.end_date) > new Date()) {
-            const metaImage =
-              listing?.metadata?.image_url ||
-              listing?.metadata?.primary_image_url ||
-              (Array.isArray(listing?.metadata?.images) ? listing.metadata.images[0] : null);
-            const vehicle = normalizeVehicle({
-              vehicleId: listing.vehicle_id,
-              maybeVehicle: (listing as any).vehicle,
-              fallbackTitle: listing?.metadata?.bat_title,
-              fallbackImageUrl: metaImage,
-            });
+          // IMPORTANT:
+          // We do NOT hard-filter external auctions by end_date here.
+          // Many sources (especially live auctions) can have stale/missing end_date while still being active.
+          const metaImage =
+            listing?.metadata?.image_url ||
+            listing?.metadata?.primary_image_url ||
+            (Array.isArray(listing?.metadata?.images) ? listing.metadata.images[0] : null);
+          const vehicle = normalizeVehicle({
+            vehicleId: listing.vehicle_id,
+            maybeVehicle: (listing as any).vehicle,
+            fallbackTitle: listing?.metadata?.bat_title,
+            fallbackImageUrl: metaImage,
+          });
 
-            allListings.push({
-              id: listing.id,
-              vehicle_id: listing.vehicle_id,
-              source: 'external',
-              platform: listing.platform,
-              listing_url: listing.listing_url,
-              lead_image_url: vehicle.primary_image_url || null,
-              current_high_bid_cents: currentHighBidCents,
-              reserve_price_cents: listing.reserve_price ? Math.round(Number(listing.reserve_price) * 100) : null,
-              bid_count: listing.bid_count || 0,
-              auction_end_time: listing.end_date,
-              status: listing.listing_status,
-              created_at: listing.created_at,
-              vehicle
-            });
-          }
+          // If the auction is active but end_date is in the past (stale), treat end time as unknown.
+          const endDate = listing.end_date ? new Date(listing.end_date) : null;
+          const endDateOk = !!(endDate && Number.isFinite(endDate.getTime()) && endDate > new Date());
+          const effectiveEndDate = endDateOk ? listing.end_date : null;
+
+          allListings.push({
+            id: listing.id,
+            vehicle_id: listing.vehicle_id,
+            source: 'external',
+            platform: listing.platform,
+            listing_url: listing.listing_url,
+            lead_image_url: vehicle.primary_image_url || null,
+            current_high_bid_cents: currentHighBidCents,
+            reserve_price_cents: listing.reserve_price ? Math.round(Number(listing.reserve_price) * 100) : null,
+            bid_count: listing.bid_count || 0,
+            auction_end_time: effectiveEndDate,
+            status: listing.listing_status,
+            created_at: listing.created_at,
+            vehicle
+          });
         }
       }
 
@@ -283,9 +318,7 @@ export default function AuctionMarketplace() {
           )
         `)
         // Some BaT ingests use 'live' for active auctions
-        .in('listing_status', ['active', 'live'])
-        // BaT uses DATE, not TIMESTAMPTZ. Include auctions ending today.
-        .gte('auction_end_date', today);
+        .in('listing_status', ['active', 'live']);
 
       const { data: batListings, error: batError } = await batQuery;
 
@@ -304,42 +337,43 @@ export default function AuctionMarketplace() {
             continue;
           }
 
+          // BaT rows are often missing auction_end_date; do not hide the auction just because end date is missing.
+          // If present but stale, treat as unknown end time.
+          let endDateTime: string | null = null;
           if (listing.auction_end_date) {
-            // Convert DATE to TIMESTAMPTZ for end of day
             const endDate = new Date(listing.auction_end_date);
             endDate.setHours(23, 59, 59, 999);
-            const endDateTime = endDate.toISOString();
-
-            if (new Date(endDateTime) > new Date()) {
-              const fallbackTitle = (listing as any).bat_listing_title || (listing as any)?.raw_data?.bat_title || null;
-              const fallbackImageUrl =
-                (listing as any).image_url ||
-                (listing as any).primary_image_url ||
-                (listing as any)?.raw_data?.image_url ||
-                null;
-              const vehicle = normalizeVehicle({
-                vehicleId: listing.vehicle_id,
-                maybeVehicle: (listing as any).vehicle,
-                fallbackTitle,
-                fallbackImageUrl,
-              });
-              allListings.push({
-                id: listing.id,
-                vehicle_id: listing.vehicle_id,
-                source: 'bat',
-                platform: 'bat',
-                listing_url: listing.bat_listing_url,
-                lead_image_url: vehicle.primary_image_url || null,
-                current_high_bid_cents: currentHighBidCents,
-                reserve_price_cents: listing.reserve_price ? listing.reserve_price * 100 : null,
-                bid_count: listing.bid_count || 0,
-                auction_end_time: endDateTime,
-                status: listing.listing_status,
-                created_at: listing.created_at,
-                vehicle
-              });
-            }
+            const iso = endDate.toISOString();
+            if (new Date(iso) > new Date()) endDateTime = iso;
           }
+
+          const fallbackTitle = (listing as any).bat_listing_title || (listing as any)?.raw_data?.bat_title || null;
+          const fallbackImageUrl =
+            (listing as any).image_url ||
+            (listing as any).primary_image_url ||
+            (listing as any)?.raw_data?.image_url ||
+            null;
+          const vehicle = normalizeVehicle({
+            vehicleId: listing.vehicle_id,
+            maybeVehicle: (listing as any).vehicle,
+            fallbackTitle,
+            fallbackImageUrl,
+          });
+          allListings.push({
+            id: listing.id,
+            vehicle_id: listing.vehicle_id,
+            source: 'bat',
+            platform: 'bat',
+            listing_url: listing.bat_listing_url,
+            lead_image_url: vehicle.primary_image_url || null,
+            current_high_bid_cents: currentHighBidCents,
+            reserve_price_cents: listing.reserve_price ? listing.reserve_price * 100 : null,
+            bid_count: listing.bid_count || 0,
+            auction_end_time: endDateTime,
+            status: listing.listing_status,
+            created_at: listing.created_at,
+            vehicle
+          });
         }
       }
 
@@ -688,7 +722,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
   const platformBadgeContent = isBat ? (
     batIconOk ? (
       <img
-        src="/vendor/bat/icon.svg"
+        src="/vendor/bat/favicon.ico"
         alt="BaT"
         style={{
           width: 12,

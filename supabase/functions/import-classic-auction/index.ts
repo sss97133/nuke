@@ -63,6 +63,58 @@ function parseIsoDateFromJsonLd(html: string, keys: string[]): string | null {
   return null;
 }
 
+function extractImageUrlsFromHtml(baseUrl: string, html: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (raw: string | null | undefined) => {
+    const r = String(raw || '').trim();
+    if (!r) return;
+    try {
+      const u = new URL(r, baseUrl);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
+      const s = u.toString();
+      if (seen.has(s)) return;
+      seen.add(s);
+      out.push(s);
+    } catch {
+      // ignore
+    }
+  };
+
+  // OG/Twitter meta images
+  add(html.match(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i)?.[1]);
+  add(html.match(/name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i)?.[1]);
+
+  // JSON-LD images
+  const ldBlocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+  for (const block of ldBlocks) {
+    const inner = block.replace(/^[\s\S]*?>/i, '').replace(/<\/script>\s*$/i, '');
+    const txt = String(inner || '').trim();
+    if (!txt) continue;
+    try {
+      const j = JSON.parse(txt);
+      const candidates: any[] = Array.isArray(j) ? j : [j];
+      for (const obj of candidates) {
+        const img = (obj as any)?.image ?? (obj as any)?.primaryImageOfPage?.url ?? null;
+        if (typeof img === 'string') add(img);
+        else if (Array.isArray(img)) img.forEach((x) => typeof x === 'string' && add(x));
+        else if (img && typeof img === 'object' && typeof (img as any).url === 'string') add((img as any).url);
+
+        const contentUrl = (obj as any)?.contentUrl;
+        if (typeof contentUrl === 'string') add(contentUrl);
+      }
+    } catch {
+      // ignore parse failures
+    }
+  }
+
+  // Last resort: pick up a few obvious CDN image URLs from the HTML (cap to avoid huge lists)
+  const urlMatches = html.match(/https?:\/\/[^"'\\s>]+\\.(?:jpg|jpeg|png|webp)(?:\\?[^"'\\s>]*)?/gi) || [];
+  for (const m of urlMatches.slice(0, 50)) add(m);
+
+  return out;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -228,6 +280,7 @@ serve(async (req) => {
           metadata: {
             source: 'import-classic-auction',
             title,
+            images: extractImageUrlsFromHtml(url, html),
           },
           updated_at: new Date().toISOString(),
         },
@@ -236,6 +289,34 @@ serve(async (req) => {
       .select('id')
       .single();
     if (extErr) throw extErr;
+
+    // Persist images into vehicle_images so marketplace/profile cards can show them.
+    const extractedImages = extractImageUrlsFromHtml(url, html);
+    if (extractedImages.length > 0) {
+      try {
+        await supabase.functions.invoke('backfill-images', {
+          body: {
+            vehicle_id: vehicleId,
+            image_urls: extractedImages,
+            source: 'external_import',
+            run_analysis: true,
+            max_images: Math.min(50, extractedImages.length),
+          },
+        });
+      } catch {
+        // non-fatal
+      }
+
+      // Best-effort: set vehicles.primary_image_url if missing.
+      try {
+        const { data: v } = await supabase.from('vehicles').select('primary_image_url').eq('id', vehicleId).maybeSingle();
+        if (!v?.primary_image_url) {
+          await supabase.from('vehicles').update({ primary_image_url: extractedImages[0] }).eq('id', vehicleId);
+        }
+      } catch {
+        // non-fatal
+      }
+    }
 
     return new Response(
       JSON.stringify({
@@ -247,6 +328,7 @@ serve(async (req) => {
         end_date: endDateIso,
         current_bid: currentBid,
         bid_count: bidCount,
+        images_found: extractedImages.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );

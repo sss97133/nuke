@@ -153,6 +153,36 @@ function parseBatLiveMetricsFromHtml(html: string): {
   };
 }
 
+async function tryFirecrawlHtml(url: string): Promise<{ html: string; title: string } | null> {
+  const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!firecrawlApiKey) return null;
+  try {
+    const r = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${firecrawlApiKey}`,
+      },
+      body: JSON.stringify({
+        url,
+        formats: ['html', 'markdown'],
+        onlyMainContent: false,
+        waitFor: 6500,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!r.ok) return null;
+    const j = await r.json().catch(() => ({}));
+    if (!j?.success) return null;
+    return {
+      html: String(j?.data?.html || ''),
+      title: String(j?.data?.metadata?.title || ''),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function looksWrongMake(make: any): boolean {
   const m = String(make || '').trim();
   if (!m) return true;
@@ -303,20 +333,35 @@ serve(async (req) => {
 
     const batUrl = normalizeUrl(batUrlRaw);
     console.log(`Fetching BaT listing: ${batUrl}`);
-    
-    const response = await fetch(batUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; N-Zero Bot/1.0)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      }
-    });
-    const html = await response.text();
+
+    // IMPORTANT: BaT is JS-driven; static HTML often omits live bid/comment/watch counts.
+    // Prefer Firecrawl-rendered HTML when available, then fall back to direct fetch.
+    const firecrawl = await tryFirecrawlHtml(batUrl);
+    let html = '';
+    let title = '';
+
+    if (firecrawl?.html) {
+      html = firecrawl.html;
+      title = String(firecrawl.title || '').trim();
+    }
+
+    if (!html) {
+      const response = await fetch(batUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; N-Zero Bot/1.0)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        }
+      });
+      html = await response.text();
+    }
 
     // Parse title (h1 is the most reliable on BaT listing pages)
-    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-    const pageTitleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = (h1Match?.[1] || pageTitleMatch?.[1] || '').trim();
+    if (!title) {
+      const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+      const pageTitleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      title = (h1Match?.[1] || pageTitleMatch?.[1] || '').trim();
+    }
 
     // Identity: prefer URL pattern (most reliable on BaT)
     const fromUrl = parseBatIdentityFromUrl(batUrl);
@@ -334,7 +379,17 @@ serve(async (req) => {
     })();
 
     const isSold = /Sold for/i.test(html) || /\bSold for\b/i.test(title);
-    const metrics = parseBatLiveMetricsFromHtml(html);
+    let metrics = parseBatLiveMetricsFromHtml(html);
+    // If parsing yields no meaningful signal, try Firecrawl once more (in case we fell back to static HTML).
+    if (!metrics.currentBid && !metrics.watcherCount && !metrics.viewCount && (metrics.commentCount === null || metrics.commentCount === 0)) {
+      const fc2 = firecrawl?.html ? null : await tryFirecrawlHtml(batUrl);
+      if (fc2?.html) {
+        const m2 = parseBatLiveMetricsFromHtml(fc2.html);
+        if (m2.currentBid || m2.watcherCount || m2.viewCount || (typeof m2.commentCount === 'number' && m2.commentCount > 0)) {
+          metrics = m2;
+        }
+      }
+    }
     const auctionEndDate = parseBatAuctionEndDateFromText(title) || parseBatAuctionEndDateFromText(html);
 
     // Extract sale price/date (sold listings only)
