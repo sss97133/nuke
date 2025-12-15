@@ -45,9 +45,9 @@ interface HotVehicle {
 
 const to8pt = { fontSize: '8pt' } as const;
 
-const cardHeaderStyle = { ...to8pt, padding: '4px 6px', borderBottom: '1px solid #c0c0c0', background: '#f3f4f6' } as const;
+const cardHeaderStyle = { ...to8pt, padding: '4px 6px', borderBottom: '1px solid #c0c0c0', background: 'var(--bg)' } as const;
 const cardBodyStyle = { padding: '6px' } as const;
-const chipStyle = { ...to8pt, background: '#f3f4f6', border: '1px solid #c0c0c0', padding: '2px 4px', borderRadius: '2px' } as const;
+const chipStyle = { ...to8pt, background: 'var(--bg)', border: '1px solid #c0c0c0', padding: '2px 4px', borderRadius: '2px' } as const;
 const boxStyle = { border: '1px solid #c0c0c0', borderRadius: '2px', cursor: 'pointer' } as const;
 
 // Helpers for pricing display

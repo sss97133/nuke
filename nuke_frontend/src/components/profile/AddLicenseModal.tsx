@@ -15,7 +15,7 @@ const modalStyle: React.CSSProperties = {
 const panelStyle: React.CSSProperties = {
   width: '560px', maxWidth: '95%', background: 'var(--surface)', border: '1px solid #c0c0c0', borderRadius: 2
 };
-const headerStyle: React.CSSProperties = { padding: 6, borderBottom: '1px solid #c0c0c0', background: '#f3f4f6', fontWeight: 700 };
+const headerStyle: React.CSSProperties = { padding: 6, borderBottom: '1px solid #c0c0c0', background: 'var(--bg)', fontWeight: 700 };
 const bodyStyle: React.CSSProperties = { padding: 8 };
 
 const LICENSE_TYPES = [

@@ -421,7 +421,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                           position: 'relative',
                           width: '100%',
                           paddingTop: '141.4%', // A4 aspect ratio (1:1.414)
-                          background: '#f5f5f5',
+                          background: 'var(--bg)',
                           overflow: 'hidden'
                         }}>
                           <img 

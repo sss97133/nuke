@@ -345,7 +345,7 @@ const VehicleToolbar: React.FC<VehicleToolbarProps> = ({
           gap: '6px',
           marginBottom: '12px',
           padding: '8px',
-          backgroundColor: '#F3F4F6',
+          backgroundColor: 'var(--bg)',
           borderRadius: '6px',
           border: '1px solid #E5E7EB'
         }}>

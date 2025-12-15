@@ -17,7 +17,7 @@ const NUMERIC_KEYS: (keyof CsvRow)[] = ['msrp','current_value','purchase_price',
 
 const to8 = { fontSize: '8pt' } as const;
 const inputStyle: React.CSSProperties = { ...to8, padding: '2px 4px', border: '1px solid #c0c0c0', borderRadius: 0 };
-const chip: React.CSSProperties = { ...to8, background: '#f3f4f6', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: 2 };
+const chip: React.CSSProperties = { ...to8, background: 'var(--bg)', border: '1px solid #c0c0c0', padding: '1px 4px', borderRadius: 2 };
 
 const PriceCsvImport: React.FC = () => {
   const navigate = useNavigate();
@@ -156,7 +156,7 @@ const PriceCsvImport: React.FC = () => {
   return (
     <div className="container compact">
       <div className="card" style={{ border: '1px solid #c0c0c0' }}>
-        <div className="card-header" style={{ ...to8, padding: 6, borderBottom: '1px solid #c0c0c0', background: '#f3f4f6' }}>
+        <div className="card-header" style={{ ...to8, padding: 6, borderBottom: '1px solid #c0c0c0', background: 'var(--bg)' }}>
           <div className="text text-bold" style={to8}>CSV Price Import</div>
         </div>
         <div className="card-body" style={{ padding: 8 }}>

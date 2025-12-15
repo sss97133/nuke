@@ -199,7 +199,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
             gap: '8px',
             marginBottom: '12px',
             padding: '8px',
-            backgroundColor: '#f5f5f5',
+            backgroundColor: 'var(--bg)',
             borderRadius: '4px',
           }}
         >

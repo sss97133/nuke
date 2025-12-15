@@ -222,7 +222,7 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ profileUserId }) => 
                   </div>
                 </div>
 
-                <div style={{ padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px', marginBottom: '12px' }}>
+                <div style={{ padding: '8px', backgroundColor: 'var(--bg)', borderRadius: '4px', marginBottom: '12px' }}>
                   <div style={{ fontSize: '10px', color: '#666' }}>Sold For</div>
                   <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{formatCurrency(v.bat_sold_price || 0)}</div>
                 </div>

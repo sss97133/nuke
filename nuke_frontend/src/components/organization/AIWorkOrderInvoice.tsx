@@ -207,7 +207,7 @@ const AIWorkOrderInvoice: React.FC<AIWorkOrderInvoiceProps> = ({
         {/* Industry Standards Cross-Check */}
         {analysis.industry_standards_check && (
           <div style={{
-            background: '#F3F4F6',
+            background: 'var(--bg)',
             border: '1px solid #D1D5DB',
             borderRadius: '6px',
             padding: '16px',
@@ -283,7 +283,7 @@ const AIWorkOrderInvoice: React.FC<AIWorkOrderInvoiceProps> = ({
               lineHeight: '1.5',
               fontStyle: 'italic',
               padding: '12px',
-              background: '#F9FAFB',
+              background: 'var(--bg)',
               borderRadius: '4px'
             }}>
               {analysis.estimated_labor_hours.reasoning}
@@ -432,7 +432,7 @@ const AIWorkOrderInvoice: React.FC<AIWorkOrderInvoiceProps> = ({
 
         {/* Confidence Meter */}
         <div style={{
-          background: '#F9FAFB',
+          background: 'var(--bg)',
           border: '1px solid #E5E7EB',
           borderRadius: '6px',
           padding: '16px'
@@ -535,7 +535,7 @@ const AIWorkOrderInvoice: React.FC<AIWorkOrderInvoiceProps> = ({
         {renderInvoiceHeader()}
 
         {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '2px solid #E5E7EB', background: '#F9FAFB' }}>
+        <div style={{ display: 'flex', borderBottom: '2px solid #E5E7EB', background: 'var(--bg)' }}>
           {['overview', 'parts', 'labor', 'photos'].map(tab => (
             <button
               key={tab}
@@ -585,7 +585,7 @@ const AIWorkOrderInvoice: React.FC<AIWorkOrderInvoiceProps> = ({
           <div style={{
             padding: '16px',
             borderTop: '2px solid #E5E7EB',
-            background: '#F9FAFB',
+            background: 'var(--bg)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center'

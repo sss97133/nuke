@@ -255,7 +255,7 @@ const LocationsTab = ({ locations, onAdd, onCreateDepartments }: any) => {
               </div>
               <button
                 onClick={() => onCreateDepartments(loc.id)}
-                style={{ padding: '6px 12px', fontSize: '14px', backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer' }}
+                style={{ padding: '6px 12px', fontSize: '14px', backgroundColor: 'var(--bg)', border: '1px solid #e5e7eb', borderRadius: '6px', cursor: 'pointer' }}
               >
                 Add Default Departments
               </button>

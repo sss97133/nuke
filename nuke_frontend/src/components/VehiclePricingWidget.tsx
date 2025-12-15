@@ -821,7 +821,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                           width: '40px',
                           height: '40px',
                           borderRadius: '4px',
-                          backgroundColor: '#f3f4f6',
+                          backgroundColor: 'var(--bg)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',

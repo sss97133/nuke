@@ -360,7 +360,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
       {rarityData && (
         <div className="card" style={{ border: '1px solid #c0c0c0', overflow: 'hidden' }}>
           <div style={{
-            background: '#f3f4f6',
+            background: 'var(--bg)',
             borderBottom: '1px solid #c0c0c0',
             padding: '8px 12px',
             display: 'flex',
@@ -399,11 +399,11 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
             </div>
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '8pt' }}>
-              <div style={{ background: '#f9fafb', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '2px' }}>
+              <div style={{ background: 'var(--bg)', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '2px' }}>
                 <div style={{ color: '#666', marginBottom: '2px' }}>Same Make/Model (Any Year)</div>
                 <div style={{ fontSize: '12pt', fontWeight: 'bold' }}>{rarityData.same_make_model}</div>
               </div>
-              <div style={{ background: '#f9fafb', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '2px' }}>
+              <div style={{ background: 'var(--bg)', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '2px' }}>
                 <div style={{ color: '#666', marginBottom: '2px' }}>Same Year (Any Make/Model)</div>
                 <div style={{ fontSize: '12pt', fontWeight: 'bold' }}>{rarityData.same_year}</div>
               </div>
@@ -490,7 +490,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
       {regionalData && userLocation && (
         <div className="card" style={{ border: '1px solid #c0c0c0', overflow: 'hidden' }}>
           <div style={{
-            background: '#f3f4f6',
+            background: 'var(--bg)',
             borderBottom: '1px solid #c0c0c0',
             padding: '8px 12px',
             display: 'flex',
@@ -529,7 +529,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
             {(regionalData.avg_price_regional || regionalData.avg_price_national) && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '8pt' }}>
                 {regionalData.avg_price_regional && (
-                  <div style={{ background: '#f9fafb', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '2px' }}>
+                  <div style={{ background: 'var(--bg)', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '2px' }}>
                     <div style={{ color: '#666', marginBottom: '2px' }}>Regional Avg Price</div>
                     <div style={{ fontSize: '12pt', fontWeight: 'bold', fontFamily: 'monospace' }}>
                       {formatCurrency(regionalData.avg_price_regional)}
@@ -537,7 +537,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
                   </div>
                 )}
                 {regionalData.avg_price_national && (
-                  <div style={{ background: '#f9fafb', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '2px' }}>
+                  <div style={{ background: 'var(--bg)', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '2px' }}>
                     <div style={{ color: '#666', marginBottom: '2px' }}>National Avg Price</div>
                     <div style={{ fontSize: '12pt', fontWeight: 'bold', fontFamily: 'monospace' }}>
                       {formatCurrency(regionalData.avg_price_national)}
@@ -570,7 +570,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
       {comparables.length > 0 && (
         <div className="card" style={{ border: '1px solid #c0c0c0', overflow: 'hidden' }}>
           <div style={{
-            background: '#f3f4f6',
+            background: 'var(--bg)',
             borderBottom: '1px solid #c0c0c0',
             padding: '8px 12px',
             display: 'flex',
@@ -587,7 +587,7 @@ const VehicleMarketIntelligence = ({ vehicle, userLocation }: VehicleMarketIntel
                   key={comp.id}
                   style={{
                     padding: '8px',
-                    background: '#f9fafb',
+                    background: 'var(--bg)',
                     border: '1px solid #e5e7eb',
                     borderRadius: '2px',
                     cursor: 'pointer',

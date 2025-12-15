@@ -239,7 +239,7 @@ const TradeDetailsManager: React.FC<TradeDetailsManagerProps> = ({ vehicleId, ve
           )}
         </div>
 
-        <div style={{ background: '#f9fafb', padding: '12px', border: '2px solid #e5e7eb', borderRadius: '4px' }}>
+        <div style={{ background: 'var(--bg)', padding: '12px', border: '2px solid #e5e7eb', borderRadius: '4px' }}>
           <div style={{ marginBottom: '8px' }}>
             <strong style={{ fontSize: '8pt', color: '#6b7280' }}>Trade Date:</strong>{' '}
             <span style={{ fontSize: '9pt' }}>{new Date(trade.trade_date).toLocaleDateString()}</span>
@@ -484,7 +484,7 @@ const TradeDetailsManager: React.FC<TradeDetailsManagerProps> = ({ vehicleId, ve
         </button>
       </div>
 
-      <div style={{ marginTop: '12px', padding: '12px', background: '#f9fafb', border: '2px solid #e5e7eb', borderRadius: '4px' }}>
+      <div style={{ marginTop: '12px', padding: '12px', background: 'var(--bg)', border: '2px solid #e5e7eb', borderRadius: '4px' }}>
         <div style={{ fontSize: '8pt', color: '#6b7280', marginBottom: '4px' }}>
           <strong>Trade Summary:</strong>
         </div>

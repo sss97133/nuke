@@ -317,7 +317,7 @@ const ProfessionalToolbox: React.FC<ProfessionalToolboxProps> = ({ userId, isOwn
                       {tool.condition && (
                         <span className="text-small" style={{ 
                           padding: '2px 6px', 
-                          backgroundColor: '#f3f4f6', 
+                          backgroundColor: 'var(--bg)', 
                           borderRadius: '4px' 
                         }}>
                           {tool.condition}

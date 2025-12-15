@@ -140,7 +140,7 @@ const PriceDataWizard: React.FC<PriceDataWizardProps> = ({
                     style={{ display: 'none' }}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 'bold', backgroundColor: '#f0f0f0', padding: '2px 4px', borderRadius: '2px' }}>{source.icon}</span>
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', backgroundColor: 'var(--surface)', padding: '2px 4px', borderRadius: '2px' }}>{source.icon}</span>
                     <span className="text-small">{source.name}</span>
                   </div>
                 </label>

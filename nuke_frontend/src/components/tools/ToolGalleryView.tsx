@@ -139,7 +139,7 @@ const ToolGalleryView: React.FC<ToolGalleryViewProps> = ({ userId }) => {
               <div style={{
                 position: 'relative',
                 height: '250px',
-                backgroundColor: '#f5f5f5'
+                backgroundColor: 'var(--bg)'
               }}>
                 {/* Show product image if available, otherwise user image */}
                 {tool.catalogImages.length > 0 ? (
@@ -369,7 +369,7 @@ const ToolGalleryView: React.FC<ToolGalleryViewProps> = ({ userId }) => {
                   <span style={{
                     fontSize: '12px',
                     padding: '2px 6px',
-                    backgroundColor: '#f3f4f6',
+                    backgroundColor: 'var(--bg)',
                     borderRadius: '4px'
                   }}>
                     Condition: {tool.condition}

@@ -77,7 +77,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
     return (
       <div style={{
         ...getSizeStyles(),
-        background: '#f3f4f6',
+        background: 'var(--bg)',
         borderRadius: '12px',
         display: 'inline-flex',
         alignItems: 'center',
@@ -92,7 +92,7 @@ const UserRatingBadge = ({ userId, size = 'medium', showFullInfo = false }: User
     return (
       <div style={{
         ...getSizeStyles(),
-        background: '#f3f4f6',
+        background: 'var(--bg)',
         borderRadius: '12px',
         display: 'inline-flex',
         alignItems: 'center',

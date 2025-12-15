@@ -328,7 +328,7 @@ export default function CatalogBrowserV2() {
                           style={{ width: '50px', height: '50px', objectFit: 'contain', border: '1px solid #ddd' }}
                         />
                       ) : (
-                        <div style={{ width: '50px', height: '50px', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '7pt', color: '#999' }}>
+                        <div style={{ width: '50px', height: '50px', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '7pt', color: '#999' }}>
                           No img
                         </div>
                       )}
@@ -342,7 +342,7 @@ export default function CatalogBrowserV2() {
                     <td style={{ padding: '12px' }}>
                       <span style={{ 
                         padding: '4px 8px',
-                        background: '#f0f0f0',
+                        background: 'var(--surface)',
                         borderRadius: '2px',
                         fontSize: '7pt'
                       }}>

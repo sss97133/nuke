@@ -317,7 +317,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                   width: '48px',
                   height: '48px',
                   borderRadius: '50%',
-                  backgroundColor: '#F3F4F6',
+                  backgroundColor: 'var(--bg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -370,7 +370,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                   </div>
 
                   {contributor.notes && (
-                    <div className="text text-sm" style={{ marginTop: '8px', padding: '8px', backgroundColor: '#F9FAFB', borderRadius: '4px' }}>
+                    <div className="text text-sm" style={{ marginTop: '8px', padding: '8px', backgroundColor: 'var(--bg)', borderRadius: '4px' }}>
                       {contributor.notes}
                     </div>
                   )}
@@ -438,7 +438,7 @@ const RoleManagementInterface: React.FC<RoleManagementInterfaceProps> = ({
                   width: '48px',
                   height: '48px',
                   borderRadius: '50%',
-                  backgroundColor: '#F3F4F6',
+                  backgroundColor: 'var(--bg)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

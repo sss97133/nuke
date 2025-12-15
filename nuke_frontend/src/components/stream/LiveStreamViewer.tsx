@@ -215,7 +215,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
   if (loading) {
     return (
       <div style={{
-        background: '#f5f5f5',
+        background: 'var(--bg)',
         border: '1px solid #bdbdbd',
         padding: '16px',
         margin: '16px',
@@ -230,7 +230,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
   if (!stream) {
     return (
       <div style={{
-        background: '#f5f5f5',
+        background: 'var(--bg)',
         border: '1px solid #bdbdbd',
         padding: '16px',
         margin: '16px',
@@ -244,7 +244,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
 
   return (
     <div style={{
-      background: '#f5f5f5',
+      background: 'var(--bg)',
       border: '1px solid #bdbdbd',
       padding: '0px',
       margin: '16px',

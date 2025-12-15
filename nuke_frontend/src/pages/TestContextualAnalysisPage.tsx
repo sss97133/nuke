@@ -9,7 +9,7 @@ const TestContextualAnalysisPage: React.FC = () => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#fafafa',
+      background: 'var(--bg)',
       padding: '20px'
     }}>
       <TestContextualAnalysis />

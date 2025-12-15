@@ -273,7 +273,7 @@ const PendingContributionApprovals: React.FC = () => {
                   gap: '8px',
                   marginBottom: '12px',
                   padding: '12px',
-                  background: '#F9FAFB',
+                  background: 'var(--bg)',
                   borderRadius: '4px'
                 }}>
                   {selectedImages.map(img => (
@@ -341,7 +341,7 @@ const PendingContributionApprovals: React.FC = () => {
       {/* Info footer */}
       <div style={{
         padding: '12px 16px',
-        background: '#F9FAFB',
+        background: 'var(--bg)',
         borderTop: '1px solid var(--border)',
         fontSize: '7pt',
         color: '#6B7280'

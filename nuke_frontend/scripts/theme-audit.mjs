@@ -65,6 +65,12 @@ function collectMatches(filePath, text) {
       re: /(?:background|backgroundColor)\s*:\s*['"](?:#fff\b|#ffffff\b|white)['"]/g,
     },
     {
+      id: "light-bg-solid",
+      severity: "warn",
+      why: "Hardcoded near-white background often reads as white in dark mode; prefer theme tokens",
+      re: /(?:background|backgroundColor)\s*:\s*['"](?:#f5f5f5\b|#fafafa\b|#f3f4f6\b|#f9fafb\b|#eeeeee\b|#e5e5e5\b|#f0f0f0\b)['"]/gi,
+    },
+    {
       id: "white-border-solid",
       severity: "warn",
       why: "Hardcoded white border may create bright strokes in dark mode",
@@ -141,6 +147,23 @@ async function main() {
         // background: 'white' / '#fff' / '#ffffff' -> var(--surface)
         [
           /(background)\s*:\s*(['"])(?:white|#fff\b|#ffffff\b)\2/g,
+          "$1: $2var(--surface)$2",
+        ],
+        // Common near-white backgrounds -> tokens
+        [
+          /(backgroundColor)\s*:\s*(['"])(?:#fafafa\b|#f9fafb\b|#f5f5f5\b|#f3f4f6\b)\2/gi,
+          "$1: $2var(--bg)$2",
+        ],
+        [
+          /(background)\s*:\s*(['"])(?:#fafafa\b|#f9fafb\b|#f5f5f5\b|#f3f4f6\b)\2/gi,
+          "$1: $2var(--bg)$2",
+        ],
+        [
+          /(backgroundColor)\s*:\s*(['"])(?:#eeeeee\b|#e5e5e5\b|#f0f0f0\b)\2/gi,
+          "$1: $2var(--surface)$2",
+        ],
+        [
+          /(background)\s*:\s*(['"])(?:#eeeeee\b|#e5e5e5\b|#f0f0f0\b)\2/gi,
           "$1: $2var(--surface)$2",
         ],
       ];

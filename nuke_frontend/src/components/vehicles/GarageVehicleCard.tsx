@@ -277,7 +277,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
       }}
     >
       {/* Image with status overlay */}
-      <div style={{ position: 'relative', width: '100%', height: '140px', overflow: 'hidden', background: '#f5f5f5' }}>
+      <div style={{ position: 'relative', width: '100%', height: '140px', overflow: 'hidden', background: 'var(--bg)' }}>
         <VehicleThumbnail vehicleId={vehicle.id} />
         
         {/* Relationship badge - top left */}

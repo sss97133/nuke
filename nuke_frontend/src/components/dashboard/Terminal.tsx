@@ -29,7 +29,7 @@ export const Terminal: React.FC<TerminalProps> = ({ logs, maxLines = 10 }) => {
       style={{
         fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
         fontSize: '8pt',
-        background: '#f5f5f5',
+        background: 'var(--bg)',
         borderTop: '1px solid #bdbdbd',
         padding: '8px',
         color: '#424242',

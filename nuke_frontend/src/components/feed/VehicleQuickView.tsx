@@ -282,7 +282,7 @@ const VehicleQuickView = ({ vehicleId, isOpen, onClose }: VehicleQuickViewProps)
                     <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
                       {Array.isArray(priceSignal.sources) && priceSignal.sources.length > 0 && (
                         <span style={{ 
-                          background: '#f3f4f6', 
+                          background: 'var(--bg)', 
                           padding: '2px 6px', 
                           fontSize: '8pt',
                           border: '1px solid #d1d5db',
@@ -293,7 +293,7 @@ const VehicleQuickView = ({ vehicleId, isOpen, onClose }: VehicleQuickViewProps)
                       )}
                       {typeof priceSignal.confidence === 'number' && priceSignal.confidence > 0 && (
                         <span style={{ 
-                          background: '#f3f4f6', 
+                          background: 'var(--bg)', 
                           padding: '2px 6px', 
                           fontSize: '8pt',
                           border: '1px solid #d1d5db',

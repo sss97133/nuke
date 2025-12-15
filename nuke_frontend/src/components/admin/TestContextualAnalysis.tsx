@@ -193,7 +193,7 @@ export const TestContextualAnalysis: React.FC = () => {
       {selectedEventData && (
         <div style={{
           padding: '12px',
-          background: '#f0f0f0',
+          background: 'var(--surface)',
           border: '2px solid #000',
           marginBottom: '16px'
         }}>
@@ -290,7 +290,7 @@ export const TestContextualAnalysis: React.FC = () => {
             </summary>
             <pre style={{
               fontSize: '6pt',
-              background: '#f5f5f5',
+              background: 'var(--bg)',
               padding: '8px',
               overflow: 'auto',
               maxHeight: '300px',

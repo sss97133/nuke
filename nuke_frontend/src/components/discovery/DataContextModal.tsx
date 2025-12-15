@@ -304,7 +304,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                         {estimate > 0 && (
                           <span className="badge" style={{
-                            background: '#f3f4f6',
+                            background: 'var(--bg)',
                             border: '1px solid #c0c0c0',
                             padding: '1px 4px',
                             borderRadius: '2px',
@@ -316,7 +316,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                         )}
                         {change !== null && (
                           <span className="badge" style={{
-                            background: '#f3f4f6',
+                            background: 'var(--bg)',
                             border: '1px solid #c0c0c0',
                             padding: '1px 4px',
                             borderRadius: '2px',

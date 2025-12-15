@@ -77,7 +77,7 @@ const ProfileCompletion: React.FC<ProfileCompletionProps> = ({ completion, onAct
           <div style={{ 
             width: '100%', 
             height: '8px', 
-            backgroundColor: '#f0f0f0', 
+            backgroundColor: 'var(--surface)', 
             borderRadius: '4px',
             overflow: 'hidden'
           }}>

@@ -257,7 +257,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
 
               {filters.contentTypes.length > 0 && !filters.contentTypes.includes('all') && (
                 <span className="badge" style={{
-                  background: '#f3f4f6',
+                  background: 'var(--bg)',
                   color: '#374151',
                   padding: '1px 4px',
                   borderRadius: '2px',
@@ -270,7 +270,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
 
               {filters.location && (
                 <span className="badge" style={{
-                  background: '#f3f4f6',
+                  background: 'var(--bg)',
                   color: '#374151',
                   padding: '1px 4px',
                   borderRadius: '2px',
@@ -283,7 +283,7 @@ const SearchFiltersComponent = ({ searchQuery, filters, onSearchChange, onFilter
 
               {filters.dateRange !== 'all' && (
                 <span className="badge" style={{
-                  background: '#f3f4f6',
+                  background: 'var(--bg)',
                   color: '#374151',
                   padding: '1px 4px',
                   borderRadius: '2px',

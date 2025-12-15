@@ -494,7 +494,7 @@ const OwnershipVerificationWizard: React.FC<OwnershipVerificationWizardProps> = 
         return (
           <div>
             <h3 className="text font-bold mb-4">Professional Service Agreement</h3>
-            <div className="card" style={{ padding: '16px', marginBottom: '16px', background: '#f9fafb' }}>
+            <div className="card" style={{ padding: '16px', marginBottom: '16px', background: 'var(--bg)' }}>
               <h4 className="text-small font-bold mb-2">Terms of Service</h4>
               <div className="text-small" style={{ lineHeight: '1.6' }}>
                 <p>By signing this agreement, you confirm that:</p>

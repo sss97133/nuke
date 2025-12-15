@@ -382,7 +382,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
           <div style={{
             padding: '16px',
             borderBottom: '2px solid #000',
-            background: '#f5f5f5',
+            background: 'var(--bg)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center'
@@ -599,7 +599,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
           <div style={{
             padding: '12px 16px',
             borderTop: '2px solid #000',
-            background: '#f5f5f5',
+            background: 'var(--bg)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -1083,7 +1083,7 @@ export default function WorkOrderViewer({ event, organizationName, laborRate = 0
                         style={{
                           fontSize: '8pt',
                           padding: '8px 12px',
-                          background: '#f3f4f6',
+                          background: 'var(--bg)',
                           border: '1px solid #d1d5db',
                           borderRadius: '4px',
                           color: '#374151'

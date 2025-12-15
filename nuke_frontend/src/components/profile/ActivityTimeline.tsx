@@ -26,7 +26,7 @@ interface OrgEventItem {
 const badgeStyle: React.CSSProperties = {
   fontSize: '10px',
   padding: '2px 6px',
-  background: '#f3f4f6',
+  background: 'var(--bg)',
   border: '1px solid #e5e7eb',
   borderRadius: '4px',
   textTransform: 'uppercase'

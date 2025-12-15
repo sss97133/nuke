@@ -406,7 +406,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           justifyContent: 'space-between',
           padding: '12px',
           borderBottom: '2px solid #000',
-          backgroundColor: '#f5f5f5'
+          backgroundColor: 'var(--bg)'
         }}>
           <button
             type="button"
@@ -469,7 +469,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         <div style={{
           padding: '8px 12px',
           borderBottom: '3px double #000',
-          background: '#fafafa',
+          background: 'var(--bg)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
@@ -532,7 +532,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: '#f0f0f0',
+                    background: 'var(--surface)',
                     border: '1px solid #ccc',
                     borderRadius: '2px',
                     fontSize: '7pt',
@@ -554,7 +554,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             style={{ 
               padding: '12px', 
               borderBottom: '2px solid #000',
-              backgroundColor: '#fafafa' 
+              backgroundColor: 'var(--bg)' 
             }}
           >
             <div style={{ 
@@ -936,7 +936,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         )}
 
         {/* TOTAL */}
-        <div style={{ padding: '16px', borderBottom: '2px solid #000', backgroundColor: '#f5f5f5' }}>
+        <div style={{ padding: '16px', borderBottom: '2px solid #000', backgroundColor: 'var(--bg)' }}>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between',
@@ -1010,7 +1010,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           padding: '12px', 
           textAlign: 'center',
           borderTop: '2px solid #000',
-          backgroundColor: '#f5f5f5',
+          backgroundColor: 'var(--bg)',
           fontSize: '7pt',
           color: '#666'
         }}>

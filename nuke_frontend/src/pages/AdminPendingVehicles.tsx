@@ -134,7 +134,7 @@ export default function AdminPendingVehicles() {
         gap: '12px',
         marginBottom: '24px'
       }}>
-        <div style={{ padding: '16px', background: '#f3f4f6', borderRadius: '8px' }}>
+        <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '8px' }}>
           <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{analysis.summary.total_pending}</div>
           <div style={{ fontSize: '12px', color: '#666' }}>Total Pending</div>
         </div>

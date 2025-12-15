@@ -270,7 +270,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
           justifyContent: 'space-between',
           padding: '12px',
           borderBottom: '2px solid #000',
-          backgroundColor: '#f5f5f5'
+          backgroundColor: 'var(--bg)'
         }}>
           <button
             onClick={() => navigateDate('prev')}
@@ -325,7 +325,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
 
         {/* Evidence Set */}
         {evidence.length > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0', backgroundColor: '#fafafa' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0', backgroundColor: 'var(--bg)' }}>
             <div style={{ 
               display: 'flex', 
               justifyContent: 'space-between', 
@@ -383,7 +383,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
 
         {/* Receipt Breakdown */}
         {totals.total > 0 && (
-          <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0', backgroundColor: '#fafafa' }}>
+          <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0', backgroundColor: 'var(--bg)' }}>
             <div style={{ fontSize: '7pt', fontWeight: 'bold', marginBottom: '12px', textTransform: 'uppercase' }}>
               Cost Breakdown
             </div>
@@ -447,7 +447,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
                 <div key={comment.id} style={{ 
                   marginBottom: '12px', 
                   padding: '8px', 
-                  backgroundColor: '#fafafa',
+                  backgroundColor: 'var(--bg)',
                   border: '1px solid #e0e0e0',
                   display: 'flex',
                   gap: '8px'
@@ -548,7 +548,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
           padding: '12px', 
           display: 'flex', 
           justifyContent: 'flex-end',
-          backgroundColor: '#f5f5f5',
+          backgroundColor: 'var(--bg)',
           gap: '8px'
         }}>
           <button

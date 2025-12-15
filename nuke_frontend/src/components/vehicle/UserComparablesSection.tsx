@@ -202,7 +202,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
           borderRadius: '8px',
           padding: '16px',
           marginBottom: '20px',
-          backgroundColor: '#f9fafb'
+          backgroundColor: 'var(--bg)'
         }}>
           <h4 style={{ fontSize: '16px', fontWeight: '600', margin: '0 0 12px 0' }}>
             Submit a Comparable Vehicle
@@ -394,7 +394,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
                   color: '#374151',
                   marginBottom: '12px',
                   padding: '8px',
-                  backgroundColor: '#f9fafb',
+                  backgroundColor: 'var(--bg)',
                   borderRadius: '4px',
                   fontStyle: 'italic'
                 }}>
@@ -472,7 +472,7 @@ export function UserComparablesSection({ vehicleId, vehicleYear, vehicleMake, ve
         <div style={{
           textAlign: 'center',
           padding: '20px',
-          backgroundColor: '#f9fafb',
+          backgroundColor: 'var(--bg)',
           borderRadius: '8px',
           marginTop: '16px'
         }}>

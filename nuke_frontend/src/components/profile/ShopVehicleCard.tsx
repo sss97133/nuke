@@ -36,7 +36,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
   };
 
   const smallChipStyle: React.CSSProperties = {
-    background: '#f3f4f6',
+    background: 'var(--bg)',
     border: '1px solid #c0c0c0',
     padding: '1px 4px',
     borderRadius: '2px',

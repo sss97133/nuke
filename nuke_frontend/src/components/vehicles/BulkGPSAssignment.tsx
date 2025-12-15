@@ -184,7 +184,7 @@ const BulkGPSAssignment: React.FC<BulkGPSAssignmentProps> = ({
             border: '1px solid var(--border)',
             borderRadius: '4px',
             padding: '8px',
-            background: '#f9fafb'
+            background: 'var(--bg)'
           }}>
             {results.map((result) => (
               <div

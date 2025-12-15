@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS public.import_queue (
   thumbnail_url TEXT,
 
   -- Processing state
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'complete', 'failed', 'skipped')),
+  -- NOTE: legacy rows may include status='duplicate'. Keep it allowed for backwards compatibility.
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'complete', 'failed', 'skipped', 'duplicate')),
   attempts INTEGER NOT NULL DEFAULT 0,
   priority INTEGER NOT NULL DEFAULT 0,
 
@@ -108,7 +109,7 @@ BEGIN
   END;
   ALTER TABLE public.import_queue
     ADD CONSTRAINT import_queue_status_check
-    CHECK (status IN ('pending', 'processing', 'complete', 'failed', 'skipped'));
+    CHECK (status IN ('pending', 'processing', 'complete', 'failed', 'skipped', 'duplicate'));
 END
 $$;
 
