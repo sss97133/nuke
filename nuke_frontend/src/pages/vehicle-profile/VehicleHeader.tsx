@@ -1036,6 +1036,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   }, [vehicle, displayModel]);
   const mileageIsExact = typeof (vehicle as any)?.mileage === 'number';
 
+  const listingUrl = (vehicle as any)?.listing_url || (vehicle as any)?.discovery_url || null;
+  const listingLocation =
+    (vehicle as any)?.listing_location ||
+    (vehicle as any)?.location ||
+    (vehicle as any)?.origin_metadata?.listing_location ||
+    (vehicle as any)?.origin_metadata?.location ||
+    null;
+  const listingSourceLabel =
+    String((vehicle as any)?.listing_source || (vehicle as any)?.discovery_source || '').trim() || null;
+  const listingHost = (() => {
+    if (!listingUrl) return null;
+    try {
+      const host = new URL(String(listingUrl)).hostname;
+      return host.startsWith('www.') ? host.slice(4) : host;
+    } catch {
+      return null;
+    }
+  })();
+
   const identityParts = vehicle ? [vehicle.year, vehicle.make].filter(Boolean) : [];
   const cleanedModelForHeader = cleanListingishTitle(String(displayModel || ''), vehicle?.year ?? null, vehicle?.make ?? null);
   appendUnique(identityParts, cleanedModelForHeader);
@@ -1160,6 +1179,21 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           </span>
           {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
             <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
+          ) : null}
+          {listingLocation ? (
+            <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Listing location">
+              {String(listingLocation)}
+            </span>
+          ) : null}
+          {listingHost || listingSourceLabel ? (
+            <span
+              className="badge badge-secondary"
+              style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              title="Listing source"
+            >
+              {listingUrl ? <FaviconIcon url={String(listingUrl)} matchTextSize={true} textSize={8} /> : null}
+              {listingHost || listingSourceLabel}
+            </span>
           ) : null}
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
           {auctionPulse?.listing_url && auctionStatusForBadge && (

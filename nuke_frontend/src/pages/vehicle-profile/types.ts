@@ -142,6 +142,7 @@ export interface VehicleHeaderProps {
 export interface VehicleHeroImageProps {
   leadImageUrl: string | null;
   vehicleId?: string;
+  overlayNode?: React.ReactNode;
 }
 
 // Removed duplicate - see VehicleBasicInfoProps below that extends VehicleBaseProps

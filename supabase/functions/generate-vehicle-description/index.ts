@@ -55,6 +55,25 @@ serve(async (req) => {
     // 4. Construct Context for LLM
     const uniqueTags = [...new Set(tags?.map(t => t.tag_name) || [])]
     const uniqueMods = tags?.filter(t => t.tag_type === 'modification').map(t => t.tag_name) || []
+
+    // Fetch latest raw listing description + provenance snippets (from extraction_metadata) if available.
+    const [{ data: rawDescRow }, { data: provRows }] = await Promise.all([
+      supabase
+        .from('extraction_metadata')
+        .select('field_value, extracted_at, source_url')
+        .eq('vehicle_id', vehicle_id)
+        .eq('field_name', 'raw_listing_description')
+        .order('extracted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('extraction_metadata')
+        .select('field_value, extracted_at, source_url')
+        .eq('vehicle_id', vehicle_id)
+        .eq('field_name', 'provenance_snippet')
+        .order('extracted_at', { ascending: false })
+        .limit(5),
+    ])
     
     const context = {
       year: vehicle.year,
@@ -67,10 +86,17 @@ serve(async (req) => {
       engine: vehicle.engine_type || vehicle.engine_size,
       transmission: vehicle.transmission,
       origin: vehicle.listing_source || vehicle.discovery_source || 'Unknown',
+      listing_title: vehicle.listing_title || null,
+      listing_location: vehicle.listing_location || null,
+      listing_posted_at: vehicle.listing_posted_at || null,
+      listing_updated_at: vehicle.listing_updated_at || null,
       imported_by: vehicle.uploader?.full_name || 'Community Member',
       modifications: uniqueMods,
       detected_features: uniqueTags,
-      recent_history: events?.map(e => `${e.event_date}: ${e.title}`)
+      recent_history: events?.map(e => `${e.event_date}: ${e.title}`),
+      raw_listing_description: rawDescRow?.field_value || null,
+      raw_listing_description_extracted_at: (rawDescRow as any)?.extracted_at || null,
+      provenance_snippets: Array.isArray(provRows) ? provRows.map((r: any) => r?.field_value).filter(Boolean) : [],
     }
 
     // 5. Generate Description with OpenAI (using fetch)
@@ -80,28 +106,47 @@ serve(async (req) => {
     }
 
     const prompt = `
-      Write a concise, engaging listing description for this vehicle.
-      
-      Vehicle: ${context.year} ${context.make} ${context.model} ${context.trim || ''}
-      Mileage: ${context.mileage ? context.mileage.toLocaleString() + ' miles' : 'Unknown'}
-      Engine: ${context.engine || 'Not specified'}
-      Transmission: ${context.transmission || 'Not specified'}
-      
-      Key Features & Modifications Detected:
-      ${context.detected_features.join(', ')}
-      
-      History Highlights:
-      ${context.recent_history?.join('\n') || 'No recent history recorded.'}
-      
-      Context:
-      This vehicle was discovered on ${context.origin} and imported to the N-Zero registry by ${context.imported_by}.
-      
-      Tone: Professional, enthusiast-focused, factual but appreciative. 
-      Structure: 
-      1. Hook (Year/Make/Model + key spec)
-      2. Condition/Features summary
-      3. History/Origin note
-    `
+Write a concise, factual vehicle profile description.
+
+Hard rules:
+- Do not invent facts.
+- If a field is unknown, omit it.
+- Do not include VIN in the output.
+- Use plain text (no icons/emojis).
+
+Vehicle fields:
+- Year: ${context.year ?? 'Unknown'}
+- Make: ${context.make ?? 'Unknown'}
+- Model: ${context.model ?? 'Unknown'}
+- Trim: ${context.trim ?? 'Unknown'}
+- Mileage: ${typeof context.mileage === 'number' ? context.mileage.toLocaleString() + ' miles' : 'Unknown'}
+- Color: ${context.color ?? 'Unknown'}
+- Engine: ${context.engine ?? 'Unknown'}
+- Transmission: ${context.transmission ?? 'Unknown'}
+
+Listing context:
+- Source: ${context.origin}
+- Listing title: ${context.listing_title ?? 'Unknown'}
+- Location: ${context.listing_location ?? 'Unknown'}
+- Posted at: ${context.listing_posted_at ?? 'Unknown'}
+
+Provenance snippets (use only if directly relevant):
+${(context.provenance_snippets || []).map((s: string) => `- ${s}`).join('\n') || '- None'}
+
+Detected features / tags:
+${(context.detected_features || []).slice(0, 25).map((t: string) => `- ${t}`).join('\n') || '- None'}
+
+Recent history (timeline):
+${(context.recent_history || []).slice(0, 10).map((s: string) => `- ${s}`).join('\n') || '- None'}
+
+Raw listing description (for reference; do not copy verbatim unless it is short and clearly factual):
+${context.raw_listing_description ? context.raw_listing_description.slice(0, 1200) : 'None'}
+
+Output structure:
+1) One-sentence summary (Year Make Model + what it is)
+2) 3-6 bullet points of key known specs/condition/history
+3) One-line source note (Source + location if known)
+`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -128,7 +173,12 @@ serve(async (req) => {
     if (description) {
       await supabase
         .from('vehicles')
-        .update({ ai_description: description })
+        .update({
+          description,
+          description_source: 'ai_generated',
+          description_generated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as any)
         .eq('id', vehicle_id)
     }
 

@@ -418,26 +418,39 @@ async function createTimelineEventIfNeeded(supabase: any, result: SupervisorResp
       
       // Only create if date is valid (in the past, after 1970)
       if (eventDate.getTime() > 0 && eventDate < new Date()) {
-        const { error } = await supabase
+        // Idempotency: this function can be retried; avoid creating duplicate events for the same image.
+        const { data: existing } = await supabase
           .from('timeline_events')
-          .insert({
-            vehicle_id,
-            event_date: eventDate.toISOString().split('T')[0], // Date only
-            title: result.work_type,
-            event_type: 'maintenance',
-            source: 'ai_agent_detected',
-            description: result.shop_context,
-            labor_hours: result.labor_hours_estimate,
-            metadata: {
-              image_url,
-              ai_detected_parts: result.specific_parts.length,
-              supplies_used: result.supplies_and_tools.length,
-              confidence: result.confidence_score,
-              work_session: result.work_session,
-              user_notes: result.user_notes,
-              exif_verified: true
-            }
-          })
+          .select('id')
+          .eq('vehicle_id', vehicle_id)
+          .eq('source', 'ai_agent_detected')
+          .eq('event_type', 'maintenance')
+          .eq('metadata->>image_url', image_url)
+          .limit(1)
+          .maybeSingle()
+
+        const { error } = existing?.id
+          ? { error: null }
+          : await supabase
+              .from('timeline_events')
+              .insert({
+                vehicle_id,
+                event_date: eventDate.toISOString().split('T')[0], // Date only
+                title: result.work_type,
+                event_type: 'maintenance',
+                source: 'ai_agent_detected',
+                description: result.shop_context,
+                labor_hours: result.labor_hours_estimate,
+                metadata: {
+                  image_url,
+                  ai_detected_parts: result.specific_parts.length,
+                  supplies_used: result.supplies_and_tools.length,
+                  confidence: result.confidence_score,
+                  work_session: result.work_session,
+                  user_notes: result.user_notes,
+                  exif_verified: true
+                }
+              })
 
         if (error) {
           console.error('Error creating timeline event:', error)

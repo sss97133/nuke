@@ -173,6 +173,24 @@ export default function AIDataIngestionSearch() {
     return () => window.removeEventListener('mousedown', onMouseDown);
   }, [actionsOpen]);
 
+  // Close popovers on outside click WITHOUT blocking the entire page (no full-screen click-catcher)
+  const anyPopoverOpen = showPreview || !!imagePreview || !!error || showCritique || showWiringWorkbench;
+  useEffect(() => {
+    if (!anyPopoverOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const el = containerRef.current;
+      if (!el) return;
+      if (el.contains(e.target as Node)) return;
+      setShowPreview(false);
+      setExtractionPreview(null);
+      setError(null);
+      setShowCritique(false);
+      setShowWiringWorkbench(false);
+    };
+    window.addEventListener('mousedown', onMouseDown);
+    return () => window.removeEventListener('mousedown', onMouseDown);
+  }, [anyPopoverOpen]);
+
   // Handle paste from clipboard
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
@@ -1016,25 +1034,7 @@ export default function AIDataIngestionSearch() {
       )}
 
       {/* Click outside to close */}
-      {(showPreview || imagePreview || error || showCritique || showWiringWorkbench) && (
-        <div
-          onClick={() => {
-            setShowPreview(false);
-            setError(null);
-            setShowCritique(false);
-            setShowWiringWorkbench(false);
-          }}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            // Below the search input + popovers so it can't block focus/typing.
-            zIndex: 1200
-          }}
-        />
-      )}
+      {/* Outside-click handling is done via window mousedown listener so the page stays usable */}
     </div>
   );
 }

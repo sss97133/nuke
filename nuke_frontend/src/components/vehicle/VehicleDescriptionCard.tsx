@@ -21,6 +21,8 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
   const [saving, setSaving] = useState(false);
   const [isAIGenerated, setIsAIGenerated] = useState(false);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  const [rawListingDescriptions, setRawListingDescriptions] = useState<Array<{ text: string; extracted_at: string | null; source_url: string | null }>>([]);
+  const [generating, setGenerating] = useState(false);
   const [sourceInfo, setSourceInfo] = useState<{
     url?: string;
     source?: string;
@@ -61,6 +63,30 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
     } catch (err) {
       console.warn('Failed to load description metadata:', err);
     }
+
+    // Raw listing description history (provenance-backed)
+    try {
+      const { data: rows } = await supabase
+        .from('extraction_metadata')
+        .select('field_value, extracted_at, source_url')
+        .eq('vehicle_id', vehicleId)
+        .eq('field_name', 'raw_listing_description')
+        .order('extracted_at', { ascending: false })
+        .limit(5);
+
+      const mapped = (rows || [])
+        .map((r: any) => ({
+          text: (r?.field_value || '').toString(),
+          extracted_at: r?.extracted_at ? String(r.extracted_at) : null,
+          source_url: r?.source_url ? String(r.source_url) : null
+        }))
+        .filter((r: any) => r.text && r.text.trim().length > 0);
+
+      setRawListingDescriptions(mapped);
+    } catch (err) {
+      // Non-fatal if table missing in some environments
+      setRawListingDescriptions([]);
+    }
   };
 
   const handleSave = async () => {
@@ -98,6 +124,30 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
     setIsEditing(false);
   };
 
+  const handleGenerate = async () => {
+    if (!vehicleId) return;
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-vehicle-description', {
+        body: { vehicle_id: vehicleId }
+      });
+      if (error) throw error;
+      const next = (data as any)?.description;
+      if (typeof next === 'string' && next.trim()) {
+        setDescription(next);
+        setIsAIGenerated(true);
+        setGeneratedAt(new Date().toISOString());
+        if (onUpdate) onUpdate(next);
+      }
+      // Refresh metadata + raw listing descriptions
+      await loadDescriptionMetadata();
+    } catch (err: any) {
+      console.error('Failed to generate description:', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const isEmpty = !description || description.trim().length === 0;
 
   return (
@@ -105,13 +155,24 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: '10px', fontWeight: 700 }}>Description</span>
         {isEditable && !isEditing && (
-          <button
-            className="btn-utility"
-            style={{ fontSize: '8px', padding: '2px 6px' }}
-            onClick={handleEdit}
-          >
-            Edit
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              className="btn-utility"
+              style={{ fontSize: '8px', padding: '2px 6px' }}
+              onClick={handleGenerate}
+              disabled={generating}
+              title="Generate a factual description from known vehicle data and evidence"
+            >
+              {generating ? 'Generating...' : 'Generate'}
+            </button>
+            <button
+              className="btn-utility"
+              style={{ fontSize: '8px', padding: '2px 6px' }}
+              onClick={handleEdit}
+            >
+              Edit
+            </button>
+          </div>
         )}
       </div>
       <div className="card-body">
@@ -161,13 +222,23 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               No description yet.
             </div>
             {isEditable && (
-              <button
-                className="button button-primary"
-                style={{ fontSize: '8pt', padding: '4px 12px' }}
-                onClick={handleEdit}
-              >
-                Add Description
-              </button>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                <button
+                  className="button button-primary"
+                  style={{ fontSize: '8pt', padding: '4px 12px' }}
+                  onClick={handleGenerate}
+                  disabled={generating}
+                >
+                  {generating ? 'Generating...' : 'Generate'}
+                </button>
+                <button
+                  className="button button-secondary"
+                  style={{ fontSize: '8pt', padding: '4px 12px' }}
+                  onClick={handleEdit}
+                >
+                  Add Description
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -175,6 +246,35 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
             <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
               {description}
             </div>
+
+            {rawListingDescriptions.length > 0 && (
+              <div style={{ marginTop: '12px' }}>
+                <details>
+                  <summary style={{ cursor: 'pointer', fontSize: '8pt', fontWeight: 700 }}>
+                    Raw listing descriptions ({rawListingDescriptions.length})
+                  </summary>
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {rawListingDescriptions.map((row, idx) => (
+                      <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: '6px', padding: '8px', background: 'var(--bg-secondary)' }}>
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                          {row.extracted_at ? `Extracted ${new Date(row.extracted_at).toLocaleDateString()}` : 'Extracted date unknown'}
+                          {row.source_url ? ' • ' : ''}
+                          {row.source_url ? (
+                            <a href={row.source_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>
+                              Source
+                            </a>
+                          ) : null}
+                        </div>
+                        <div style={{ fontSize: '8pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                          {row.text}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
+
             {(isAIGenerated || sourceInfo) && (
               <div style={{
                 marginTop: '12px',

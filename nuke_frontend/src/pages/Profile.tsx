@@ -45,6 +45,7 @@ import MyOrganizations from './MyOrganizations';
 import MyAuctions from './MyAuctions';
 import PublicAuctionTrackRecord from '../components/profile/PublicAuctionTrackRecord';
 import VehicleMergeInterface from '../components/vehicle/VehicleMergeInterface';
+import MemelordPanel from '../components/profile/MemelordPanel';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
 import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
@@ -581,6 +582,13 @@ const Profile: React.FC = () => {
                 <div style={{ marginBottom: 'var(--space-4)' }}>
                   <LivePlayer userId={profile.id} isOwnProfile={isOwnProfile} />
                 </div>
+
+                {/* Memelord history (own profile only) */}
+                {isOwnProfile && (
+                  <div style={{ marginBottom: 'var(--space-4)' }}>
+                    <MemelordPanel userId={profile.id} />
+                  </div>
+                )}
 
               </div>
             )}
