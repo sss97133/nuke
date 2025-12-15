@@ -116,6 +116,7 @@ const VehicleProfile: React.FC = () => {
   const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
   const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
+  const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
 
 
   // MOBILE DETECTION
@@ -1591,6 +1592,76 @@ const VehicleProfile: React.FC = () => {
 
     setVehicleImages(images);
   };
+
+  // Auto-run BaT import once for bat_import vehicles that have no images / broken identity.
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!vehicle?.id) return;
+        // Only attempt auto-import when auth has been checked and we have a user session.
+        // Supabase Edge Functions in this project require a real user JWT (not anon key).
+        if (!authChecked) return;
+        if (!session?.user?.id) return;
+
+        const origin = String((vehicle as any)?.profile_origin || '');
+        const discoveryUrl = String((vehicle as any)?.discovery_url || '');
+        const isBat = origin === 'bat_import' || discoveryUrl.includes('bringatrailer.com/listing/');
+        if (!isBat) return;
+
+        // Guard: don't spam imports for the same vehicle.
+        const key = `bat_auto_import_attempted_${vehicle.id}`;
+        const attempted = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+        if (attempted) return;
+
+        const make = String((vehicle as any)?.make || '');
+        const model = String((vehicle as any)?.model || '');
+        const looksBadIdentity = /mile/i.test(make) || /bring a trailer/i.test(model) || /on\s+bat\s+auctions/i.test(model) || model.length > 80;
+
+        // If we already have images and identity looks fine, do nothing.
+        const hasAnyImages = Array.isArray(vehicleImages) && vehicleImages.length > 0;
+        if (hasAnyImages && !looksBadIdentity) return;
+
+        // Mark attempted once we are actually going to call the function (prevents anon 401 from poisoning retries).
+        window.localStorage.setItem(key, new Date().toISOString());
+        setBatAutoImportStatus('running');
+
+        const batUrl =
+          discoveryUrl ||
+          String((vehicle as any)?.bat_auction_url || '') ||
+          String((vehicle as any)?.listing_url || '');
+        if (!batUrl.includes('bringatrailer.com/listing/')) {
+          setBatAutoImportStatus('failed');
+          return;
+        }
+
+        const { data, error } = await supabase.functions.invoke('complete-bat-import', {
+          body: { bat_url: batUrl, vehicle_id: vehicle.id }
+        });
+
+        if (error || !data) {
+          console.warn('BaT auto-import failed:', error);
+          // Allow retry next time.
+          try { window.localStorage.removeItem(key); } catch {}
+          setBatAutoImportStatus('failed');
+          return;
+        }
+
+        // Refresh vehicle + images + timeline after import
+        await loadVehicle();
+        await loadTimelineEvents();
+        await loadVehicleImages();
+        setBatAutoImportStatus('done');
+      } catch (e) {
+        console.warn('BaT auto-import exception:', e);
+        // Allow retry next time.
+        try {
+          if (vehicle?.id) window.localStorage.removeItem(`bat_auto_import_attempted_${vehicle.id}`);
+        } catch {}
+        try { setBatAutoImportStatus('failed'); } catch {}
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle?.id, authChecked, session?.user?.id]);
 
   if (loading) {
     return (

@@ -44,6 +44,133 @@ function coalesceString(...vals: any[]): string | null {
   return null;
 }
 
+function parseBatIdentityFromUrl(batUrl: string): { year: number; make: string; model: string } | null {
+  try {
+    const u = new URL(batUrl);
+    const m = u.pathname.match(/\/listing\/(\d{4})-([a-z0-9-]+)-(\d+)\/?$/i);
+    if (!m?.[1] || !m?.[2]) return null;
+    const year = Number(m[1]);
+    if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 1) return null;
+
+    const parts = String(m[2]).split('-').filter(Boolean);
+    if (parts.length < 2) return null;
+    const make = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+
+    const model = parts
+      .slice(1)
+      .map((p) => {
+        const s = p.toLowerCase();
+        // Keep common BaT URL tokens in their natural casing
+        if (s === '4s') return '4S';
+        if (s === 'gt3') return 'GT3';
+        if (s === 'rs') return 'RS';
+        if (s === 'turbo') return 'Turbo';
+        return p.toUpperCase() === p ? p : (p.charAt(0).toUpperCase() + p.slice(1));
+      })
+      .join(' ')
+      .trim();
+
+    return { year, make, model: model || 'Unknown' };
+  } catch {
+    return null;
+  }
+}
+
+function parseBatAuctionEndDateFromText(text: string): string | null {
+  // Best-effort: BaT page titles often include "ending December 16"
+  const t = String(text || '');
+  const m = t.match(/\bending\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})\b/i);
+  if (!m?.[1] || !m?.[2]) return null;
+  const monthName = m[1].toLowerCase();
+  const day = Number(m[2]);
+  if (!Number.isFinite(day) || day < 1 || day > 31) return null;
+
+  const monthIndex = [
+    'january','february','march','april','may','june','july','august','september','october','november','december'
+  ].indexOf(monthName);
+  if (monthIndex < 0) return null;
+
+  const now = new Date();
+  let year = now.getUTCFullYear();
+  // If the month/day looks far in the past relative to now, assume next year (e.g., importing in late Dec for Jan listings).
+  const candidate = new Date(Date.UTC(year, monthIndex, day));
+  const diffDays = (candidate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000);
+  if (diffDays < -120) year += 1;
+
+  const yyyy = String(year);
+  const mm = String(monthIndex + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function parseBatLiveMetricsFromHtml(html: string): {
+  currentBid: number | null;
+  bidCount: number | null;
+  watcherCount: number | null;
+  viewCount: number | null;
+  commentCount: number | null;
+} {
+  const h = String(html || '');
+  const asInt = (s: string | undefined): number | null => {
+    if (!s) return null;
+    const n = Number(String(s).replace(/[^\d]/g, ''));
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const bid = (() => {
+    const m = h.match(/Current Bid:\s*(?:USD\s*)?\$([\d,]+)/i) || h.match(/\bCurrent Bid\b[\s\S]{0,80}?\$([\d,]+)/i);
+    const n = asInt(m?.[1]);
+    return n;
+  })();
+
+  const watchers = (() => {
+    const m = h.match(/\b([\d,]+)\s+watchers?\b/i);
+    return asInt(m?.[1]);
+  })();
+
+  const views = (() => {
+    const m = h.match(/\b([\d,]+)\s+views?\b/i);
+    return asInt(m?.[1]);
+  })();
+
+  const comments = (() => {
+    const m = h.match(/\b([\d,]+)\s+comments?\b/i);
+    return asInt(m?.[1]) ?? 0;
+  })();
+
+  const bidCount = (() => {
+    // BaT doesn't always show bid count explicitly; counting "bid placed by" in comment flow is a decent proxy.
+    const n = (h.match(/bid placed by/gi) || []).length;
+    return n > 0 ? n : null;
+  })();
+
+  return {
+    currentBid: bid,
+    bidCount,
+    watcherCount: watchers,
+    viewCount: views,
+    commentCount: comments,
+  };
+}
+
+function looksWrongMake(make: any): boolean {
+  const m = String(make || '').trim();
+  if (!m) return true;
+  if (m.length > 30) return true;
+  if (/mile/i.test(m)) return true;
+  if (/bring a trailer/i.test(m)) return true;
+  return false;
+}
+
+function looksWrongModel(model: any): boolean {
+  const s = String(model || '').trim();
+  if (!s) return true;
+  if (/bring a trailer/i.test(s)) return true;
+  if (/on\s+bat\s+auctions/i.test(s)) return true;
+  if (s.length > 80) return true;
+  return false;
+}
+
 function extractSellerTypeFromHtml(html: string): string | undefined {
   const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   // BaT essentials sometimes include "Seller: Dealer" / "Seller: Private Party"
@@ -177,29 +304,45 @@ serve(async (req) => {
     const batUrl = normalizeUrl(batUrlRaw);
     console.log(`Fetching BaT listing: ${batUrl}`);
     
-    const response = await fetch(batUrl);
+    const response = await fetch(batUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; N-Zero Bot/1.0)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      }
+    });
     const html = await response.text();
 
-    // Parse title - extract year/make/model
-    const titleMatch = html.match(/<h1[^>]*>([^<]+)<\/h1>/);
-    const title = titleMatch ? titleMatch[1].trim() : '';
-    
-    const vehicleMatch = title.match(/^(\d{4})\s+([A-Za-z-]+)\s+(.+)$/);
-    const year = vehicleMatch ? parseInt(vehicleMatch[1]) : 0;
-    const make = vehicleMatch ? vehicleMatch[2] : '';
-    const modelAndTrim = vehicleMatch ? vehicleMatch[3] : '';
-    
-    const modelParts = modelAndTrim.split(' ');
-    const model = modelParts.slice(0, 2).join(' ');
-    const trim = modelParts.length > 2 ? modelParts.slice(2).join(' ') : undefined;
+    // Parse title (h1 is the most reliable on BaT listing pages)
+    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+    const pageTitleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = (h1Match?.[1] || pageTitleMatch?.[1] || '').trim();
 
-    // Extract sale price
-    const priceText = html.match(/Sold for.*?USD \$([\\d,]+)/);
-    const salePrice = priceText ? parseInt(priceText[1].replace(/,/g, '')) : 0;
+    // Identity: prefer URL pattern (most reliable on BaT)
+    const fromUrl = parseBatIdentityFromUrl(batUrl);
+    const year = fromUrl?.year || 0;
+    const make = fromUrl?.make || '';
+    const model = fromUrl?.model || '';
 
-    // Extract sale date
-    const dateText = html.match(/on (\d{1,2}\/\d{1,2}\/\d{2,4})/);
-    const saleDate = dateText ? new Date(dateText[1]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    // Basic trim: remove leading mileage + year/make/model tokens from the h1
+    const trim = (() => {
+      const t = title.replace(/^\s*\d+[kK]?-?\s*Mile\s+/i, '').trim();
+      if (!year || !make || !model) return undefined;
+      const prefix = new RegExp(`^\\s*${year}\\s+${make}\\s+${model}\\s+`, 'i');
+      const rest = t.replace(prefix, '').trim();
+      return rest.length > 0 ? rest : undefined;
+    })();
+
+    const isSold = /Sold for/i.test(html) || /\bSold for\b/i.test(title);
+    const metrics = parseBatLiveMetricsFromHtml(html);
+    const auctionEndDate = parseBatAuctionEndDateFromText(title) || parseBatAuctionEndDateFromText(html);
+
+    // Extract sale price/date (sold listings only)
+    const priceText = isSold ? html.match(/Sold for[\s\S]{0,100}?USD\s*\$([\d,]+)/i) : null;
+    const salePrice = priceText?.[1] ? parseInt(priceText[1].replace(/,/g, '')) : 0;
+
+    const dateText = isSold ? html.match(/\b(?:sold|ended)\b[\s\S]{0,200}?\bon\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i) : null;
+    const saleDate = dateText?.[1] ? new Date(dateText[1]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
     // Extract description
     const descMatch = html.match(/<p>([^<]{100,500})<\/p>/);
@@ -333,12 +476,18 @@ serve(async (req) => {
     }
 
     if (vehicleId) {
+      const { data: currentVehicle } = await supabase
+        .from('vehicles')
+        .select('year, make, model, vin')
+        .eq('id', vehicleId)
+        .maybeSingle();
+
       const updateData: any = {
-        sale_price: salePrice,
-        sale_date: saleDate,
+        // For live auctions, avoid poisoning the canonical sale fields.
+        ...(isSold ? { sale_price: salePrice, sale_date: saleDate } : {}),
         trim: trim || undefined,
         description: description,
-        auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met',
+        ...(isSold ? { auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met' } : {}),
         bat_auction_url: batUrl,
         listing_url: batUrl,
         discovery_url: batUrl,
@@ -357,22 +506,31 @@ serve(async (req) => {
           bat_seller_type: sellerType || null,
           seller_business_id: sellerOrganizationId,
           seller_business_linked: shouldLinkSellerOrg,
+          // Keep the URL-derived identity as a stable fallback for bad backfills.
+          url_identity: fromUrl || null,
+          // Store basic live telemetry for UI even if other pipelines fail.
+          live_metrics: {
+            current_bid: metrics.currentBid,
+            bid_count: metrics.bidCount,
+            watcher_count: metrics.watcherCount,
+            view_count: metrics.viewCount,
+            comment_count: metrics.commentCount,
+            auction_end_date: auctionEndDate,
+          },
           imported_at: new Date().toISOString(),
-        }
+        },
       };
       
-      // Update VIN if we found one and vehicle doesn't have one
-      if (vin) {
-        const { data: currentVehicle } = await supabase
-          .from('vehicles')
-          .select('vin')
-          .eq('id', vehicleId)
-          .single();
-        
-        // Only update VIN if vehicle doesn't have one, or if it matches (to avoid conflicts)
-        if (!currentVehicle?.vin || currentVehicle.vin === vin) {
-          updateData.vin = vin;
-        }
+      // Repair identity for known-bad backfills (do not override good data)
+      if (fromUrl) {
+        if (!currentVehicle?.year || currentVehicle.year === 0) updateData.year = fromUrl.year;
+        if (looksWrongMake(currentVehicle?.make)) updateData.make = fromUrl.make;
+        if (looksWrongModel(currentVehicle?.model)) updateData.model = fromUrl.model;
+      }
+
+      // Update VIN if we found one and vehicle doesn't have one, or if it matches (to avoid conflicts)
+      if (vin && (!currentVehicle?.vin || currentVehicle.vin === vin)) {
+        updateData.vin = vin;
       }
       
       await supabase
@@ -456,6 +614,45 @@ serve(async (req) => {
       console.log(`Created new vehicle: ${vehicleId}`);
     }
 
+    // For live auctions, keep external_listings in sync so the vehicle header can show watchers/views/comments.
+    // external_listings supports watcher_count/view_count/current_bid and is used by the UI auction pulse.
+    try {
+      const endDateIso = auctionEndDate
+        ? (() => {
+            const d = new Date(`${auctionEndDate}T00:00:00.000Z`);
+            d.setUTCHours(23, 59, 59, 999);
+            return d.toISOString();
+          })()
+        : null;
+
+      await supabase
+        .from('external_listings')
+        .upsert(
+          {
+            vehicle_id: vehicleId,
+            platform: 'bat',
+            listing_url: batUrl,
+            listing_status: isSold ? 'sold' : 'live',
+            end_date: endDateIso,
+            current_bid: metrics.currentBid,
+            bid_count: metrics.bidCount,
+            watcher_count: metrics.watcherCount,
+            view_count: metrics.viewCount,
+            metadata: {
+              source: 'import-bat-listing',
+              lot_number: lotNumber || null,
+              comment_count: metrics.commentCount,
+              auction_end_date: auctionEndDate,
+              bat_title: title || null,
+            },
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'listing_url' },
+        );
+    } catch (e: any) {
+      console.log('external_listings upsert failed (non-fatal):', e?.message || String(e));
+    }
+
     // Write/refresh bat_listings (if table exists in this project).
     // This keeps auction identity separate from vehicles and lets comments/bids later attach cleanly.
     try {
@@ -468,13 +665,19 @@ serve(async (req) => {
             bat_listing_url: batUrl,
             bat_lot_number: lotNumber || null,
             bat_listing_title: title || null,
-            sale_date: saleDate || null,
-            sale_price: salePrice || null,
+            auction_end_date: auctionEndDate || null,
+            sale_date: isSold ? (saleDate || null) : null,
+            sale_price: isSold ? (salePrice || null) : null,
             seller_username: sellerUser.username,
             buyer_username: buyerUser.username,
             seller_bat_user_id: sellerUser.id,
             buyer_bat_user_id: buyerUser.id,
-            listing_status: salePrice > 0 ? 'sold' : 'ended',
+            // For live auctions, mark as live so /auctions can include it.
+            listing_status: isSold ? (salePrice > 0 ? 'sold' : 'ended') : 'live',
+            final_bid: metrics.currentBid || null, // best-effort for live; UI uses external_listings for current bid
+            bid_count: metrics.bidCount || null,
+            view_count: metrics.viewCount || null,
+            comment_count: metrics.commentCount || null,
             last_updated_at: new Date().toISOString(),
             raw_data: {
               source: 'bat_import',
@@ -483,6 +686,14 @@ serve(async (req) => {
               seller_business_id: sellerOrganizationId,
               seller_business_linked: shouldLinkSellerOrg,
               seller_org_discovered_via: sellerOrgDiscoveredViaLocalPartners ? 'bat_local_partners' : null,
+              live_metrics: {
+                current_bid: metrics.currentBid,
+                bid_count: metrics.bidCount,
+                watcher_count: metrics.watcherCount,
+                view_count: metrics.viewCount,
+                comment_count: metrics.commentCount,
+                auction_end_date: auctionEndDate,
+              }
             },
           },
           { onConflict: 'bat_listing_url' },
@@ -533,6 +744,9 @@ serve(async (req) => {
 
     // Create timeline event for the sale with the actual sale date (deduped by bat_url + event_date).
     try {
+      if (!isSold || !saleDate || !salePrice || salePrice <= 0) {
+        throw new Error('Skipping sale event: listing is live or sale is not confirmed');
+      }
       const { data: existingSaleEvent } = await supabase
         .from('timeline_events')
         .select('id')

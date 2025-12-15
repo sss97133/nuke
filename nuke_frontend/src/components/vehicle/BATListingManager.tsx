@@ -83,7 +83,7 @@ export const BATListingManager: React.FC<BATListingManagerProps> = ({
     setProgress('Importing complete BaT data with AI...');
 
     try {
-      // Use complete import function (GPT-4 powered)
+      // Canonical BaT import (images + structured data)
       const { data, error } = await supabase.functions.invoke('complete-bat-import', {
         body: { bat_url: batUrl, vehicle_id: vehicleId }
       });

@@ -1,11 +1,12 @@
 /**
  * Favicon Icon Component
- * Fetches and displays favicons from URLs (like browser search bars)
- * Checks database cache first, then falls back to external services
+ * Fetches and displays favicons from URLs (like browser search bars).
+ *
+ * NOTE: This component intentionally uses ONLY Google's S2 favicon endpoint.
+ * We do not use other favicon providers or cached/extracted icons.
  */
 
 import React, { useState, useEffect } from 'react';
-import { getCachedFavicon, extractAndCacheFavicon, detectSourceType } from '../../services/sourceFaviconService';
 
 interface FaviconIconProps {
   url: string;
@@ -45,47 +46,14 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
 
   useEffect(() => {
     if (!url) return;
-
-    let cancelled = false;
-
-    // First, try to get from database cache
-    getCachedFavicon(url).then((cachedUrl) => {
-      if (cancelled) return;
-      
-      if (cachedUrl) {
-        setFaviconUrl(cachedUrl);
-        setError(false);
-      } else {
-        // Not in cache, extract and cache it
-        const sourceInfo = detectSourceType(url);
-        extractAndCacheFavicon(
-          url,
-          sourceInfo?.type,
-          sourceInfo?.name
-        ).then((extractedUrl) => {
-          if (cancelled) return;
-          
-          if (extractedUrl) {
-            setFaviconUrl(extractedUrl);
-            setError(false);
-          } else {
-            // Fallback to direct extraction
-            try {
-              const domain = new URL(url).hostname;
-              const fallbackUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=${iconSize}`;
-              setFaviconUrl(fallbackUrl);
-              setError(false);
-            } catch (err) {
-              setError(true);
-            }
-          }
-        });
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const domain = new URL(url).hostname;
+      setFaviconUrl(`https://www.google.com/s2/favicons?domain=${domain}&sz=${iconSize}`);
+      setError(false);
+    } catch {
+      setFaviconUrl(null);
+      setError(true);
+    }
   }, [url, iconSize]);
 
   if (error || !faviconUrl) {
@@ -134,13 +102,7 @@ export const FaviconIcon: React.FC<FaviconIconProps> = ({
           ...style
         }}
         onError={() => {
-          // Try next fallback
-          try {
-            const domain = new URL(url).hostname;
-            setFaviconUrl(`https://icon.horse/icon/${domain}`);
-          } catch {
-            setError(true);
-          }
+          setError(true);
         }}
       />
     );
