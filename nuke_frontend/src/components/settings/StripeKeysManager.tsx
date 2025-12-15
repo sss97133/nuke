@@ -2,6 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useToast } from '../../hooks/useToast';
 
+const FEATURE_UNAVAILABLE_KEY = 'featureStripeKeysUnavailable';
+
+function isMissingResourceError(err: any): boolean {
+  const status = err?.status ?? err?.statusCode;
+  const code = String(err?.code ?? '');
+  const msg = String(err?.message ?? '');
+  // PostgREST missing table/view often manifests as 404
+  if (status === 404) return true;
+  if (code === 'PGRST205' || code === 'PGRST204') return true;
+  if (/not\s*found/i.test(msg) && /user_stripe_keys/i.test(msg)) return true;
+  return false;
+}
+
 const StripeKeysManager: React.FC = () => {
   const [publishableKey, setPublishableKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
@@ -9,6 +22,7 @@ const StripeKeysManager: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [session, setSession] = useState<any>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -17,6 +31,12 @@ const StripeKeysManager: React.FC = () => {
 
   const loadKeys = async () => {
     try {
+      if (localStorage.getItem(FEATURE_UNAVAILABLE_KEY) === '1') {
+        setUnavailable(true);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
@@ -31,6 +51,11 @@ const StripeKeysManager: React.FC = () => {
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
+        if (isMissingResourceError(error)) {
+          localStorage.setItem(FEATURE_UNAVAILABLE_KEY, '1');
+          setUnavailable(true);
+          return;
+        }
         console.error('Error loading Stripe keys:', error);
         return;
       }
@@ -42,6 +67,11 @@ const StripeKeysManager: React.FC = () => {
         setIsActive(data.is_active || false);
       }
     } catch (error) {
+      if (isMissingResourceError(error)) {
+        localStorage.setItem(FEATURE_UNAVAILABLE_KEY, '1');
+        setUnavailable(true);
+        return;
+      }
       console.error('Error loading Stripe keys:', error);
     } finally {
       setLoading(false);
@@ -49,6 +79,10 @@ const StripeKeysManager: React.FC = () => {
   };
 
   const handleSave = async () => {
+    if (unavailable) {
+      showToast('Stripe keys are not enabled on this deployment yet.', 'warning');
+      return;
+    }
     if (!session?.user) {
       showToast('Not authenticated', 'error');
       return;
@@ -104,6 +138,10 @@ const StripeKeysManager: React.FC = () => {
   };
 
   const handleDelete = async () => {
+    if (unavailable) {
+      showToast('Stripe keys are not enabled on this deployment yet.', 'warning');
+      return;
+    }
     if (!session?.user || !confirm('Are you sure you want to delete your Stripe keys?')) {
       return;
     }
@@ -129,6 +167,21 @@ const StripeKeysManager: React.FC = () => {
   if (loading) {
     return (
       <div className="text text-muted">Loading Stripe keys...</div>
+    );
+  }
+
+  if (unavailable) {
+    return (
+      <div className="card">
+        <div className="card-header">
+          <h3 className="heading-3">Stripe Integration</h3>
+        </div>
+        <div className="card-body">
+          <div className="text text-small text-muted">
+            Stripe keys aren’t enabled on this deployment yet (missing `user_stripe_keys` API). This section will appear automatically once it’s turned on.
+          </div>
+        </div>
+      </div>
     );
   }
 
