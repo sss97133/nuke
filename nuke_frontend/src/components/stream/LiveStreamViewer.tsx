@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import StreamActionOverlay from './StreamActionOverlay';
 import StreamActionPanel from './StreamActionPanel';
 import type { StreamActionEvent } from '../../services/streamActionsService';
+import StreamTipOverlay, { type StreamTipEvent } from './StreamTipOverlay';
+import { StreamTipService } from '../../services/streamTipService';
 import '../../design-system.css';
 
 interface LiveStream {
@@ -29,6 +31,9 @@ interface ChatMessage {
   user_name: string;
   user_avatar: string;
   created_at: string;
+  message_type?: string;
+  donation_cents?: number;
+  highlighted?: boolean;
 }
 
 interface LiveStreamViewerProps {
@@ -46,6 +51,10 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
   const [viewerSessionId, setViewerSessionId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [lastActionEvent, setLastActionEvent] = useState<StreamActionEvent | null>(null);
+  const [lastTipEvent, setLastTipEvent] = useState<StreamTipEvent | null>(null);
+  const [tipAmount, setTipAmount] = useState<string>('1.00');
+  const [tipMessage, setTipMessage] = useState<string>('');
+  const [tipping, setTipping] = useState(false);
 
   useEffect(() => {
     loadStream();
@@ -76,6 +85,18 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
         },
         (payload) => {
           setLastActionEvent(payload.new as any);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'stream_tip_events',
+          filter: `stream_id=eq.${streamId}`
+        },
+        (payload) => {
+          setLastTipEvent(payload.new as any);
         }
       )
       .subscribe();
@@ -199,6 +220,29 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
     }
   };
 
+  const sendTip = async (amountCents: number) => {
+    if (!user) return;
+    if (!stream) return;
+    try {
+      setTipping(true);
+      const message = tipMessage.trim() || null;
+      await StreamTipService.tipStream(streamId, amountCents, message);
+      setTipMessage('');
+    } catch (error: any) {
+      console.error('Tip failed:', error);
+      // Avoid noisy UI frameworks here; minimal error
+      alert(error?.message || 'Tip failed');
+    } finally {
+      setTipping(false);
+    }
+  };
+
+  const parseTipAmountCents = (): number | null => {
+    const v = Number(tipAmount);
+    if (!Number.isFinite(v) || v <= 0) return null;
+    return Math.round(v * 100);
+  };
+
   const toggleFollow = async () => {
     if (!user || !stream) return;
 
@@ -296,6 +340,7 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
 
           {/* Action Overlay */}
           <StreamActionOverlay lastEvent={lastActionEvent} />
+          <StreamTipOverlay lastTip={lastTipEvent} />
 
           {/* Stream Info Overlay */}
           <div style={{
@@ -369,7 +414,11 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   style={{
                     marginBottom: '8px',
                     padding: '4px',
-                    borderBottom: '1px solid #f0f0f0'
+                    borderBottom: '1px solid #f0f0f0',
+                    background:
+                      msg.message_type === 'super_chat' || (msg.donation_cents || 0) > 0
+                        ? 'rgba(245, 158, 11, 0.16)'
+                        : 'transparent'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
@@ -387,6 +436,11 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                     <span style={{ fontWeight: 'bold', color: '#424242' }}>
                       {msg.user_name}
                     </span>
+                    {(msg.donation_cents || 0) > 0 && (
+                      <span style={{ fontSize: '7pt', color: '#92400e', fontWeight: 'bold' }}>
+                        TIP ${((msg.donation_cents || 0) / 100).toFixed(2)}
+                      </span>
+                    )}
                     <span style={{ fontSize: '7pt', color: '#9e9e9e' }}>
                       {formatTimestamp(msg.created_at)}
                     </span>
@@ -394,6 +448,93 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                   <div>{msg.message}</div>
                 </div>
               ))}
+            </div>
+
+            {/* Tip Panel */}
+            <div style={{ borderTop: '1px solid #bdbdbd', padding: '8px', fontSize: '8pt' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 6 }}>TIP STREAMER</div>
+              {!user && (
+                <div style={{ color: '#757575' }}>Login to tip.</div>
+              )}
+              {user && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {[
+                      { label: '$1', cents: 100 },
+                      { label: '$5', cents: 500 },
+                      { label: '$20', cents: 2000 },
+                    ].map((b) => (
+                      <button
+                        key={b.label}
+                        onClick={() => sendTip(b.cents)}
+                        disabled={tipping}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '8pt',
+                          border: '1px solid #bdbdbd',
+                          background: '#111827',
+                          color: 'white',
+                          borderRadius: '0px',
+                          cursor: 'pointer',
+                          opacity: tipping ? 0.7 : 1,
+                        }}
+                      >
+                        {tipping ? 'SENDING...' : b.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={tipAmount}
+                      onChange={(e) => setTipAmount(e.target.value)}
+                      style={{
+                        width: 110,
+                        padding: '4px',
+                        border: '1px solid #bdbdbd',
+                        borderRadius: '0px',
+                        fontSize: '8pt',
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={tipMessage}
+                      onChange={(e) => setTipMessage(e.target.value)}
+                      placeholder="Message (optional)"
+                      style={{
+                        flex: 1,
+                        padding: '4px',
+                        border: '1px solid #bdbdbd',
+                        borderRadius: '0px',
+                        fontSize: '8pt',
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const cents = parseTipAmountCents();
+                        if (!cents) return;
+                        sendTip(cents);
+                      }}
+                      disabled={tipping || !parseTipAmountCents()}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '8pt',
+                        border: '1px solid #bdbdbd',
+                        background: '#111827',
+                        color: 'white',
+                        borderRadius: '0px',
+                        cursor: 'pointer',
+                        opacity: tipping || !parseTipAmountCents() ? 0.6 : 1,
+                      }}
+                    >
+                      {tipping ? 'SENDING...' : 'SEND'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Chat Input */}

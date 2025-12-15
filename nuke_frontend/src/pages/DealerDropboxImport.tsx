@@ -8,6 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { DropboxService } from '../services/dropboxService';
 import { supabase } from '../lib/supabase';
 import exifr from 'exifr';
+import vinDecoderService from '../services/vinDecoder';
 
 const DealerDropboxImport: React.FC = () => {
   const { orgId } = useParams();
@@ -271,11 +272,31 @@ const DealerDropboxImport: React.FC = () => {
 
         // Parse folder name for vehicle info
         const vehicleInfo = parseFolderName(folder.name);
+        const sanitizeVin = (raw: any): string | null => {
+          if (!raw) return null;
+          const s = String(raw).trim();
+          if (!s) return null;
+          const res = vinDecoderService.validateVIN(s);
+          if (!res.valid) return null;
+          if (!/\d/.test(res.normalized)) return null;
+          return res.normalized;
+        };
         
         // Use Dropbox service extracted VIN if found
         if (folder.extractedVIN && !vehicleInfo.vin) {
           vehicleInfo.vin = folder.extractedVIN;
           console.log(`  🔑 VIN extracted from folder name: ${folder.extractedVIN}`);
+        }
+
+        // Guard: never write garbage VINs.
+        if (vehicleInfo.vin) {
+          const sanitized = sanitizeVin(vehicleInfo.vin);
+          if (!sanitized) {
+            console.warn(`  ⚠️ Ignoring invalid VIN from folder: ${vehicleInfo.vin}`);
+            vehicleInfo.vin = null as any;
+          } else {
+            vehicleInfo.vin = sanitized;
+          }
         }
         
         // Log document count if any
@@ -294,7 +315,7 @@ const DealerDropboxImport: React.FC = () => {
         let isNewVehicle = false;
         
         // First: Check by VIN (canonical identifier)
-        if (vehicleInfo.vin && vehicleInfo.vin.length === 17) {
+        if (vehicleInfo.vin) {
           const { data: existing } = await supabase
             .from('vehicles')
             .select('id, uploaded_by, make, model, year')

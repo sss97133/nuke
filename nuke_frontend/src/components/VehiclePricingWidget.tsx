@@ -618,8 +618,18 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
     return null;
   }
 
-  // Don't show widget if value is 0 or null and confidence is 0
-  if (pricingStatus && !pricingStatus.estimated_value && pricingStatus.confidence_score === 0) {
+  const estimatedValue =
+    typeof pricingStatus?.estimated_value === 'number' ? pricingStatus.estimated_value : null;
+  const hasEstimate = estimatedValue !== null && estimatedValue > 0;
+
+  const confidenceScore =
+    typeof pricingStatus?.confidence_score === 'number' ? pricingStatus.confidence_score : null;
+  const hasConfidence = confidenceScore !== null && confidenceScore > 0;
+
+  const hasSources = Boolean(pricingStatus?.message && pricingStatus.message !== 'No data available');
+
+  // Don't show widget if we truly have nothing to display and nothing to do
+  if (pricingStatus && !hasEstimate && !hasConfidence && pricingStatus.status === 'not_analyzed') {
     return null;
   }
 
@@ -631,24 +641,21 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
             <div>
               <div className="text" style={{ fontSize: '18pt', fontWeight: 'bold', lineHeight: '1.2' }}>
-                {pricingStatus?.estimated_value ?
-                  formatCurrency(pricingStatus.estimated_value) :
-                  '—'
-                }
+                {hasEstimate ? formatCurrency(estimatedValue) : '—'}
               </div>
               <div className="text text-muted" style={{ fontSize: '8pt', marginTop: '2px', letterSpacing: '0.5px' }}>
-                ESTIMATED VALUE
+                {hasEstimate ? 'ESTIMATED VALUE' : 'ESTIMATE PENDING'}
               </div>
             </div>
-            {pricingStatus?.confidence_score && (
+            {hasEstimate && hasConfidence && (
               <div style={{ textAlign: 'right' }}>
                 <div className="text" style={{
                   fontSize: '12pt',
                   fontWeight: 'bold',
-                  color: pricingStatus.confidence_score >= 80 ? '#008000' :
-                         pricingStatus.confidence_score >= 60 ? '#808000' : '#800000'
+                  color: confidenceScore >= 80 ? '#008000' :
+                         confidenceScore >= 60 ? '#808000' : '#800000'
                 }}>
-                  {pricingStatus.confidence_score}%
+                  {confidenceScore}%
                 </div>
                 <div className="text text-muted" style={{ fontSize: '7pt', marginTop: '2px' }}>CONFIDENCE</div>
               </div>
@@ -656,7 +663,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
           </div>
 
           {/* Decision instrument: connect live auction telemetry to the valuation */}
-          {auctionPulse?.listing_url && pricingStatus?.estimated_value ? (
+          {auctionPulse?.listing_url && hasEstimate ? (
             <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
               <span className="badge badge-secondary" style={{ fontSize: '8pt', fontWeight: 800 }}>
                 {auctionPulse.platform === 'bat' ? 'BAT' : String(auctionPulse.platform).toUpperCase()}
@@ -684,7 +691,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
 
               {(() => {
                 const bid = typeof auctionPulse.current_bid === 'number' ? auctionPulse.current_bid : null;
-                const est = pricingStatus.estimated_value || null;
+                const est = estimatedValue;
                 if (bid === null || est === null || est <= 0) return null;
                 const delta = bid - est;
                 const pct = (delta / est) * 100;
@@ -841,7 +848,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         )}
 
         {/* Market Range */}
-        {pricingStatus?.estimated_value && (
+        {hasEstimate && (
           <div className="card-body" style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
             <div style={{ fontSize: '11px', fontWeight: '600', color: '#6b7280', marginBottom: '12px', letterSpacing: '0.5px' }}>
               MARKET RANGE
@@ -850,13 +857,13 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
               <div>
                 <div style={{ fontSize: '11px', color: '#6b7280' }}>LOW</div>
                 <div style={{ fontSize: '16px', fontWeight: '500' }}>
-                  {formatCurrency((pricingStatus.estimated_value || 0) * 0.85)}
+                  {formatCurrency(estimatedValue * 0.85)}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '11px', color: '#6b7280' }}>HIGH</div>
                 <div style={{ fontSize: '16px', fontWeight: '500' }}>
-                  {formatCurrency((pricingStatus.estimated_value || 0) * 1.15)}
+                  {formatCurrency(estimatedValue * 1.15)}
                 </div>
               </div>
             </div>
@@ -900,15 +907,17 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
                   disabled={isAnalyzing}
                   className="button button-secondary button-small"
                 >
-                  {isAnalyzing ? 'Updating...' : 'Update'}
+                  {isAnalyzing ? 'Refreshing...' : 'Refresh'}
                 </button>
-                <button
-                  className="button button-secondary button-small"
-                  style={{ position: 'relative' }}
-                  onClick={() => setShowDataSources(!showDataSources)}
-                >
-                  Update Data Sources {showDataSources ? '▲' : '▼'}
-                </button>
+                {hasSources && (
+                  <button
+                    className="button button-secondary button-small"
+                    style={{ position: 'relative' }}
+                    onClick={() => setShowDataSources(!showDataSources)}
+                  >
+                    Sources {showDataSources ? '▲' : '▼'}
+                  </button>
+                )}
               </div>
               {pricingStatus.last_analyzed && (
                 <span style={{ fontSize: '11px', color: '#9ca3af' }}>
@@ -919,7 +928,7 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
           )}
           
           {/* Data Sources Dropdown */}
-          {showDataSources && (
+          {showDataSources && hasSources && (
             <div className="card" style={{
               marginTop: 'var(--space-2)',
               padding: 'var(--space-2)',

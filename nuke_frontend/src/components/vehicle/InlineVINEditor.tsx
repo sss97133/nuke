@@ -6,6 +6,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import vinDecoderService from '../../services/vinDecoder';
 
 interface InlineVINEditorProps {
   vehicleId: string;
@@ -26,9 +27,10 @@ export const InlineVINEditor: React.FC<InlineVINEditorProps> = ({
   const [error, setError] = useState('');
 
   const validateVIN = (vin: string): boolean => {
-    // VIN must be 17 characters, alphanumeric, no I/O/Q
-    if (!vin || vin.length !== 17) return false;
-    if (!/^[A-HJ-NPR-Z0-9]{17}$/i.test(vin)) return false;
+    // Guard against garbage strings that happen to be 17 letters.
+    const res = vinDecoderService.validateVIN(vin);
+    if (!res.valid) return false;
+    if (!/\d/.test(res.normalized)) return false;
     return true;
   };
 
@@ -36,7 +38,7 @@ export const InlineVINEditor: React.FC<InlineVINEditorProps> = ({
     const vinUpper = editedVIN.toUpperCase().trim();
     
     if (!validateVIN(vinUpper)) {
-      setError('Invalid VIN format. Must be 17 characters, no I/O/Q.');
+      setError('Invalid VIN. Must be 17 characters, no I/O/Q, and include at least one digit.');
       return;
     }
 

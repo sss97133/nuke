@@ -73,6 +73,7 @@ const VehicleProfile: React.FC = () => {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [session, setSession] = useState<any>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
+  const [fallbackListingImageUrls, setFallbackListingImageUrls] = useState<string[]>([]);
   const [viewCount, setViewCount] = useState<number>(0);
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
   // Tabs disabled until backend processing is ready
@@ -122,6 +123,77 @@ const VehicleProfile: React.FC = () => {
   const ranBatSyncRef = React.useRef<string | null>(null);
   const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
   const [lastMemeDrop, setLastMemeDrop] = useState<ContentActionEvent | null>(null);
+
+  // For BaT-import vehicles with no `vehicle_images` yet, fetch listing gallery URLs so the profile isn't empty.
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!vehicle?.id) return;
+
+        const hasDbImages = Array.isArray(vehicleImages) && vehicleImages.length > 0;
+        if (hasDbImages) {
+          // If we have real images, we don't need fallback listing images.
+          if (fallbackListingImageUrls.length > 0) setFallbackListingImageUrls([]);
+          return;
+        }
+
+        const origin = String((vehicle as any)?.profile_origin || '');
+        const discoveryUrl = String((vehicle as any)?.discovery_url || '');
+        const listingUrl =
+          String((auctionPulse as any)?.listing_url || '').trim() ||
+          discoveryUrl ||
+          String((vehicle as any)?.bat_auction_url || '').trim() ||
+          String((vehicle as any)?.listing_url || '').trim();
+
+        const isBat = origin === 'bat_import' || listingUrl.includes('bringatrailer.com/listing/');
+        if (!isBat) return;
+        if (!listingUrl || !listingUrl.includes('bringatrailer.com/listing/')) return;
+        if (fallbackListingImageUrls.length > 0) return;
+
+        const cacheKey = `bat_fallback_images_${vehicle.id}`;
+        try {
+          const cached = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const urls = parsed.filter((u: any) => typeof u === 'string' && u.startsWith('http'));
+              if (urls.length > 0) {
+                setFallbackListingImageUrls(urls);
+                if (!leadImageUrl && urls[0]) setLeadImageUrl(urls[0]);
+                return;
+              }
+            }
+          }
+        } catch {
+          // ignore cache parse errors
+        }
+
+        const { data, error } = await supabase.functions.invoke('simple-scraper', {
+          body: { url: listingUrl },
+        });
+
+        if (error) throw error;
+        const images: string[] =
+          (data?.success && Array.isArray(data?.data?.images) ? data.data.images : null) ||
+          (Array.isArray(data?.images) ? data.images : null) ||
+          [];
+
+        if (images.length > 0) {
+          setFallbackListingImageUrls(images);
+          try {
+            window.localStorage.setItem(cacheKey, JSON.stringify(images.slice(0, 250)));
+          } catch {
+            // ignore
+          }
+          if (!leadImageUrl && images[0]) setLeadImageUrl(images[0]);
+        }
+      } catch (e) {
+        console.debug('[VehicleProfile] fallback listing images skipped:', e);
+      }
+    })();
+    // Intentionally omit leadImageUrl to avoid re-fetch loops; we set it opportunistically.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle?.id, (vehicle as any)?.profile_origin, (vehicle as any)?.discovery_url, auctionPulse?.listing_url, vehicleImages.length]);
 
   // Build a stable "auction pulse" for the header from *all* external listing rows.
   // We intentionally merge duplicate rows that share the same `listing_url` (multiple import pipelines)
@@ -2239,7 +2311,7 @@ const VehicleProfile: React.FC = () => {
                 <ImageGallery
                   vehicleId={vehicle.id}
                   showUpload={true}
-                  fallbackImageUrls={vehicleImages}
+                  fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
                   fallbackLabel={(vehicle as any)?.profile_origin === 'bat_import' ? 'BaT listing' : 'Listing'}
                   fallbackSourceUrl={
                     (vehicle as any)?.discovery_url ||

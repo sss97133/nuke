@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import vinDecoderService from '../services/vinDecoder';
 
 // Load piexifjs for EXIF data extraction
 declare global {
@@ -174,12 +175,11 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
   };
 
   const validateVinFormat = (vin: string): boolean => {
-    // VIN must be exactly 17 characters
-    if (vin.length !== 17) return false;
-    
-    // VIN can only contain valid characters (no I, O, Q)
-    const validPattern = /^[A-HJ-NPR-Z0-9]{17}$/;
-    return validPattern.test(vin.toUpperCase());
+    const res = vinDecoderService.validateVIN(vin);
+    if (!res.valid) return false;
+    // Guard against garbage strings that happen to match the char class.
+    if (!/\d/.test(res.normalized)) return false;
+    return true;
   };
 
   const extractImageMetadata = async (file: File): Promise<any> => {
