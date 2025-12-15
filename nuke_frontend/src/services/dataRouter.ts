@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import type { ExtractedVehicleData, ExtractedReceiptData } from './aiDataIngestion';
 import { organizationFromSource } from './organizationFromSource';
 import { VehicleDataExtractionService } from './vehicleDataExtractionService';
+import vinDecoderService from './vinDecoder';
 
 export interface VehicleMatchResult {
   vehicleId: string;
@@ -50,6 +51,17 @@ export interface DatabaseOperationPlan {
 }
 
 class DataRouterService {
+  private sanitizeVin(raw: any): string | null {
+    if (!raw) return null;
+    const s = String(raw).trim();
+    if (!s) return null;
+    const res = vinDecoderService.validateVIN(s);
+    if (!res.valid) return null;
+    // Guard against garbage strings that happen to match the VIN regex.
+    if (!/\d/.test(res.normalized)) return null;
+    return res.normalized;
+  }
+
   /**
    * Normalize vehicle data for automation (extract model/series/trim)
    * This is used for automated scraping to ensure proper categorization
@@ -101,6 +113,9 @@ class DataRouterService {
         options.description
       );
     }
+
+    // Never route garbage VINs into the canonical vehicles table.
+    (normalizedData as any).vin = this.sanitizeVin((normalizedData as any).vin);
     // Primary: Try to find by VIN
     if (normalizedData.vin) {
       const { data: existing } = await supabase

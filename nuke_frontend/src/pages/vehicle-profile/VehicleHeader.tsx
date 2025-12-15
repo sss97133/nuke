@@ -14,6 +14,7 @@ import { useVINProofs } from '../../hooks/useVINProofs';
 import { FaviconIcon } from '../../components/common/FaviconIcon';
 import { AuctionPlatformBadge, AuctionStatusBadge } from '../../components/auction/AuctionBadges';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
+import vinDecoderService from '../../services/vinDecoder';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -92,6 +93,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
   // (VIN plate/stamping photo OCR, title OCR, etc). Manual entry alone is not enough.
   const vinIsEvidenceBacked = !!vinProofSummary?.hasConclusiveProof;
+  const vinLooksValid = useMemo(() => {
+    const raw = (vehicle as any)?.vin;
+    if (!raw || typeof raw !== 'string') return false;
+    const v = raw.trim();
+    if (!v) return false;
+    const validation = vinDecoderService.validateVIN(v);
+    // Guard against garbage strings that happen to be 17 letters (e.g. "DUALEXHASUTSTACKS").
+    if (!validation.valid) return false;
+    if (!/\d/.test(validation.normalized)) return false;
+    return true;
+  }, [(vehicle as any)?.vin]);
 
   // Check if price fields have verified sources (FACT-BASED requirement)
   useEffect(() => {
@@ -1974,14 +1986,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 </span>
               )}
               
-              {/* VIN Authority Badge */}
-              {vehicle.vin && vehicle.vin.length >= 11 && (
+              {/* VIN Authority Badge: only show when both (a) structurally valid VIN and (b) conclusive proof exists. */}
+              {vinLooksValid && vinIsEvidenceBacked && (
                 <span 
                   style={{
                     fontSize: '6pt',
                     fontWeight: 700,
-                    color: vinIsEvidenceBacked ? '#22c55e' : '#334155',
-                    background: vinIsEvidenceBacked ? '#dcfce7' : '#e2e8f0',
+                    color: '#22c55e',
+                    background: '#dcfce7',
                     padding: '2px 6px',
                     borderRadius: '3px',
                     letterSpacing: '0.5px',
@@ -1990,9 +2002,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     whiteSpace: 'nowrap'
                   }}
                   title={
-                    vinIsEvidenceBacked
-                      ? `VIN evidence available (${vinProofSummary?.proofCount || 0} proof${(vinProofSummary?.proofCount || 0) === 1 ? '' : 's'}). Click to view citations.`
-                      : 'VIN present, but no cited proof yet. Click to see sources and add proof.'
+                    `VIN evidence available (${vinProofSummary?.proofCount || 0} proof${(vinProofSummary?.proofCount || 0) === 1 ? '' : 's'}). Click to view citations.`
                   }
                   onClick={(e) => {
                     e.preventDefault();
@@ -2000,7 +2010,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     setShowVinValidation(true);
                   }}
                 >
-                  {vinIsEvidenceBacked ? 'VIN VERIFIED' : 'VIN PROVIDED'}
+                  VIN VERIFIED
                 </span>
               )}
 

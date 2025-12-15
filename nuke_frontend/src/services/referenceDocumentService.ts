@@ -243,8 +243,20 @@ export class ReferenceDocumentService {
 
       // Fallback: some envs don't have this RPC deployed (404). In that case, query directly.
       const errMsg = String((error as any)?.message || '');
-      const httpStatus = (error as any)?.status;
-      const isMissingRpc = httpStatus === 404 || errMsg.toLowerCase().includes('not found');
+      const errDetails = String((error as any)?.details || '');
+      const errHint = String((error as any)?.hint || '');
+      const errCode = String((error as any)?.code || '').toUpperCase();
+      const httpStatus = (error as any)?.status ?? (error as any)?.statusCode;
+
+      // PostgREST commonly reports missing RPC as:
+      // - HTTP 404
+      // - code: PGRST202 ("Could not find the function ... in the schema cache")
+      // - message/details containing "schema cache" or "could not find the function"
+      const needle = `${errMsg}\n${errDetails}\n${errHint}`.toLowerCase();
+      const isMissingRpc =
+        httpStatus === 404 ||
+        errCode === 'PGRST202' ||
+        (needle.includes('get_vehicle_documents') && (needle.includes('schema cache') || needle.includes('could not find') || needle.includes('not found')));
       if (!isMissingRpc) throw error;
 
       const { data: rows, error: linkErr } = await supabase

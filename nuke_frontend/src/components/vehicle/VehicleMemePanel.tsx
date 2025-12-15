@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { StreamActionsService, type StreamAction, type StreamActionPack } from '../../services/streamActionsService';
 import { CashBalanceService } from '../../services/cashBalanceService';

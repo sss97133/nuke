@@ -392,32 +392,58 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
       const scrapedData = scrapeResult.data;
       setScrapingStatus('Validating VIN match...');
 
+      const sanitizeVin = (raw: any): string | null => {
+        if (!raw) return null;
+        const s = String(raw).trim();
+        if (!s) return null;
+        // Hard guard: reject garbage strings that match the char class but are not real VINs (must include digits).
+        const cleaned = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (cleaned.length !== 17) return null;
+        if (/[IOQ]/.test(cleaned)) return null;
+        if (!/\d/.test(cleaned)) return null;
+        return cleaned;
+      };
+
+      const vehicleVin = sanitizeVin(vehicle.vin);
+      const scrapedVin = sanitizeVin(scrapedData?.vin);
+
       // VIN matching validation (appraiser brain) - STRICT: NO MIXING DATA
       let vinMatch = false;
       let shouldReject = false;
       let rejectionReason = '';
       
-      if (vehicle.vin && scrapedData.vin) {
-        vinMatch = vehicle.vin.toLowerCase() === scrapedData.vin.toLowerCase();
+      if (vehicleVin && scrapedVin) {
+        vinMatch = vehicleVin.toLowerCase() === scrapedVin.toLowerCase();
         if (!vinMatch) {
           shouldReject = true;
-          rejectionReason = `VIN mismatch: vehicle has ${vehicle.vin}, BAT listing has ${scrapedData.vin}`;
+          rejectionReason = `VIN mismatch: vehicle has ${vehicleVin}, BAT listing has ${scrapedVin}`;
         }
       } else if (scrapedData.vin) {
         // Check if multiple VINs found in scraped data (ambiguous)
-        const vinMatches = scrapedData.vin.match(/([A-HJ-NPR-Z0-9]{17})/gi);
-        if (vinMatches && vinMatches.length > 1) {
+        const vinMatches = (String(scrapedData.vin || '').toUpperCase().match(/([A-HJ-NPR-Z0-9]{17})/gi) || [])
+          .map((x) => sanitizeVin(x))
+          .filter(Boolean) as string[];
+        if (vinMatches.length > 1) {
           shouldReject = true;
           rejectionReason = `Multiple VINs found in listing: ${vinMatches.join(', ')} - ambiguous, cannot import`;
         } else {
-          // If vehicle doesn't have VIN but scraped data does, update vehicle
-          await supabase
-            .from('vehicles')
-            .update({ vin: scrapedData.vin })
-            .eq('id', vehicleId);
-          vinMatch = true;
+          if (!scrapedVin) {
+            shouldReject = true;
+            rejectionReason = `Listing VIN is invalid (${String(scrapedData.vin || '').slice(0, 64)}). Not importing to prevent contaminating VIN field.`;
+          } else if (!vehicleVin) {
+            // If vehicle doesn't have VIN but scraped data does, update vehicle
+            await supabase
+              .from('vehicles')
+              .update({ vin: scrapedVin })
+              .eq('id', vehicleId);
+            vinMatch = true;
+          } else {
+            // Vehicle VIN is invalid/unsane but present; treat as mismatch-risk and reject.
+            shouldReject = true;
+            rejectionReason = `Vehicle VIN is invalid (${String(vehicle.vin || '').slice(0, 64)}). Fix VIN first before importing listing data.`;
+          }
         }
-      } else if (vehicle.vin && !scrapedData.vin) {
+      } else if (vehicleVin && !scrapedData.vin) {
         // Vehicle has VIN but listing doesn't - can't verify, reject
         shouldReject = true;
         rejectionReason = 'Vehicle has VIN but BAT listing does not - cannot verify match';
@@ -437,7 +463,7 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
       // CRITICAL: Only proceed if VIN matches - NEVER use confidence score to override VIN mismatch
       if (!vinMatch) {
         console.error('[VehicleComments] REJECTED: VIN mismatch prevents data import');
-        setScrapingStatus(`REJECTED: VIN mismatch. Vehicle VIN (${vehicle.vin || 'none'}) does not match BAT listing VIN (${scrapedData.vin || 'none'}). Data not imported to prevent mixing.`);
+        setScrapingStatus(`REJECTED: VIN mismatch. Vehicle VIN (${vehicleVin || 'none'}) does not match BAT listing VIN (${scrapedVin || 'none'}). Data not imported to prevent mixing.`);
         setTimeout(() => setScrapingStatus(null), 10000);
         return; // STOP - don't import anything
       }
@@ -475,7 +501,8 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         if (scrapedData.make && !vehicle.make) updates.make = scrapedData.make;
         if (scrapedData.model && !vehicle.model) updates.model = scrapedData.model;
         if (scrapedData.mileage) updates.mileage = scrapedData.mileage;
-        if (scrapedData.vin && vinMatch) updates.vin = scrapedData.vin;
+        // Never write a VIN unless it was validated and matched.
+        if (scrapedVin && vinMatch) updates.vin = scrapedVin;
 
         if (Object.keys(updates).length > 0) {
           await supabase

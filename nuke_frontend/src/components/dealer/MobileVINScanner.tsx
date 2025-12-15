@@ -7,6 +7,7 @@
 import React, { useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import Tesseract from 'tesseract.js';
+import vinDecoderService from '../../services/vinDecoder';
 
 interface MobileVINScannerProps {
   organizationId: string;
@@ -26,8 +27,13 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
   const extractVINFromText = (text: string): string | null => {
     // VIN pattern: 17 alphanumeric (no I, O, Q)
     const vinPattern = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
-    const matches = text.toUpperCase().match(vinPattern);
-    return matches ? matches[0] : null;
+    const matches = text.toUpperCase().match(vinPattern) || [];
+    for (const m of matches) {
+      const res = vinDecoderService.validateVIN(m);
+      // Reject garbage strings that happen to match the character class (must include digits).
+      if (res.valid && /\d/.test(res.normalized)) return res.normalized;
+    }
+    return null;
   };
 
   const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,14 +101,19 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
 
   const updateVehicleVIN = async (vehicleId: string) => {
     try {
+      const res = vinDecoderService.validateVIN(extractedVIN);
+      if (!res.valid || !/\d/.test(res.normalized)) {
+        alert('Invalid VIN. Must be 17 characters, no I/O/Q, and include at least one digit.');
+        return;
+      }
       const { error } = await supabase
         .from('vehicles')
-        .update({ vin: extractedVIN })
+        .update({ vin: res.normalized })
         .eq('id', vehicleId);
 
       if (error) throw error;
 
-      alert(`VIN updated successfully!\n${extractedVIN}`);
+      alert(`VIN updated successfully!\n${res.normalized}`);
       
       // Reset
       setExtractedVIN('');
@@ -110,7 +121,7 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
       setCandidateVehicles([]);
       
       if (onVehicleUpdated) {
-        onVehicleUpdated(vehicleId, extractedVIN);
+        onVehicleUpdated(vehicleId, res.normalized);
       }
 
     } catch (error: any) {
@@ -120,12 +131,14 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
 
   const handleManualVINEntry = async () => {
     const manualVIN = prompt('Enter VIN manually (17 characters):');
-    if (!manualVIN || manualVIN.length !== 17) {
-      alert('VIN must be exactly 17 characters');
+    if (!manualVIN) return;
+    const res = vinDecoderService.validateVIN(manualVIN);
+    if (!res.valid || !/\d/.test(res.normalized)) {
+      alert('Invalid VIN. Must be 17 characters, no I/O/Q, and include at least one digit.');
       return;
     }
 
-    setExtractedVIN(manualVIN.toUpperCase());
+    setExtractedVIN(res.normalized);
 
     // Find candidates
     const { data: orgVehicles } = await supabase
