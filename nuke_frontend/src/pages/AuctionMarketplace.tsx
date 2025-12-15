@@ -58,6 +58,7 @@ export default function AuctionMarketplace() {
   // Default to including 0-bid auctions so marketplace doesn't look empty while bid_count backfills.
   const [includeNoBidAuctions, setIncludeNoBidAuctions] = useState(true);
   const [hiddenNoBidCount, setHiddenNoBidCount] = useState(0);
+  const [debugCounts, setDebugCounts] = useState<{ native: number; external: number; bat: number; total: number } | null>(null);
 
   useEffect(() => {
     loadListings();
@@ -420,11 +421,20 @@ export default function AuctionMarketplace() {
       // Show all live auctions on the page (do not truncate to 50).
       setListings(filtered);
       setHiddenNoBidCount(hiddenNoBids);
-      console.log(`Loaded ${filtered.length} active auction listings (${nativeListings?.length || 0} native, ${externalListings?.length || 0} external, ${batListings?.length || 0} BaT)`);
+      setDebugCounts({
+        native: nativeListings?.length || 0,
+        external: externalListings?.length || 0,
+        bat: batListings?.length || 0,
+        total: filtered.length,
+      });
+      console.log(
+        `Loaded ${filtered.length} active auction listings (${nativeListings?.length || 0} native, ${externalListings?.length || 0} external, ${batListings?.length || 0} BaT)`
+      );
     } catch (error) {
       console.error('Error loading listings:', error);
       setListings([]);
       setHiddenNoBidCount(0);
+      setDebugCounts(null);
     }
 
     setLoading(false);
@@ -489,6 +499,11 @@ export default function AuctionMarketplace() {
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Live auctions across the network.
                 </div>
+                {!loading && debugCounts && (
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Showing {debugCounts.total} (native {debugCounts.native} · external {debugCounts.external} · BaT {debugCounts.bat})
+                  </div>
+                )}
                 {!loading && hiddenNoBidCount > 0 && !includeNoBidAuctions && (
                   <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
                     {hiddenNoBidCount} live auctions hidden (0 bids). Enable "Include 0-bid" to show them.

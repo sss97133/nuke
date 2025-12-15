@@ -34,7 +34,16 @@ export type AccentId =
   | 'americana'
   | 'route-66'
   | 'denim'
-  | 'desert';
+  | 'desert'
+  | 'camo-od'
+  | 'camo-blaze'
+  | 'camo-snow'
+  | 'mopar-plum'
+  | 'mopar-sublime'
+  | 'mopar-hemi'
+  | 'mopar-b5'
+  | 'flames-heat'
+  | 'flames-blue';
 
 interface ThemeContextType {
   // Effective theme applied to the document
@@ -195,7 +204,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       saved === 'americana' ||
       saved === 'route-66' ||
       saved === 'denim' ||
-      saved === 'desert'
+      saved === 'desert' ||
+      saved === 'camo-od' ||
+      saved === 'camo-blaze' ||
+      saved === 'camo-snow' ||
+      saved === 'mopar-plum' ||
+      saved === 'mopar-sublime' ||
+      saved === 'mopar-hemi' ||
+      saved === 'mopar-b5' ||
+      saved === 'flames-heat' ||
+      saved === 'flames-blue'
     ) {
       return saved;
     }
