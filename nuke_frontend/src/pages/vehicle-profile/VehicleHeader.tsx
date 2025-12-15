@@ -1716,24 +1716,26 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 );
               })()
             ) : (
-              <a
-                href={claimHref}
-                style={{
-                  border: '1px solid var(--primary)',
-                  background: 'var(--surface)',
-                  color: 'var(--primary)',
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '8pt',
-                  textDecoration: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center'
-                }}
-              >
-                Claim This Vehicle
-              </a>
+              auctionPulse?.listing_url ? null : (
+                <a
+                  href={claimHref}
+                  style={{
+                    border: '1px solid var(--primary)',
+                    background: 'var(--surface)',
+                    color: 'var(--primary)',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '8pt',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  Claim This Vehicle
+                </a>
+              )
             )}
             {responsibleName && showOwnerCard && ownerProfile && (
               <div

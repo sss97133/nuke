@@ -116,6 +116,7 @@ const VehicleProfile: React.FC = () => {
   const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
   const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
+  const ranBatSyncRef = React.useRef<string | null>(null);
   const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
 
   // Build a stable "auction pulse" for the header from *all* external listing rows.
@@ -1352,6 +1353,39 @@ const VehicleProfile: React.FC = () => {
             last_comment_at: lastCommentAt,
             updated_at: (effective as any).updated_at || null,
           });
+
+          // Best-effort: if this is a BaT listing and we don't yet have end_date/final_price,
+          // trigger a server-side sync once per page load so the header can show a real countdown / sold price.
+          try {
+            const isBat = String((effective as any).platform || '').toLowerCase() === 'bat';
+            const extId = (effective as any).external_listing_id ? String((effective as any).external_listing_id) : null;
+            const needsSync =
+              isBat &&
+              !!extId &&
+              (!((effective as any).end_date) || (typeof (effective as any).final_price !== 'number'));
+
+            if (needsSync && ranBatSyncRef.current !== extId) {
+              ranBatSyncRef.current = extId;
+              supabase.functions
+                .invoke('sync-bat-listing', { body: { externalListingId: extId } })
+                .then(async () => {
+                  // Refresh latest listing rows and re-derive pulse.
+                  const { data } = await supabase
+                    .from('external_listings')
+                    .select('id, platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+                    .eq('vehicle_id', vehicleData.id)
+                    .order('updated_at', { ascending: false })
+                    .limit(10);
+                  const merged = buildAuctionPulseFromExternalListings(Array.isArray(data) ? data : [], vehicleData.id);
+                  if (merged) {
+                    setAuctionPulse((prev) => ({ ...(prev || {}), ...merged }));
+                  }
+                })
+                .catch(() => {});
+            }
+          } catch {
+            // non-blocking
+          }
         } else {
           setAuctionPulse(null);
         }
