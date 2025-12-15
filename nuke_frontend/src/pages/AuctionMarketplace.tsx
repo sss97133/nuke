@@ -584,7 +584,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
   const platformBadgeContent = isBat ? (
     batIconOk ? (
       <img
-        src="/vendor/bat/favicon.ico"
+        src="/vendor/bat/icon.svg"
         alt="BaT"
         style={{
           width: 12,
