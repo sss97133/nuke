@@ -1281,8 +1281,8 @@ Redirecting to vehicle profile...`);
       console.warn(`Filtered out ${files.length - imageFiles.length} non-image files`);
     }
 
-    // Limit to 300 images total - will process and upload in background
-    const MAX_IMAGES = 300;
+    // Client-side safety cap (storage is not capped; this only prevents browser memory blowups).
+    const MAX_IMAGES = 5000;
     const currentCount = extractedImages.length;
     const newTotal = currentCount + imageFiles.length;
     

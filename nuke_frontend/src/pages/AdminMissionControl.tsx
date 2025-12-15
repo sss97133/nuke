@@ -25,10 +25,13 @@ const AdminMissionControl: React.FC = () => {
   const [imageScanStats, setImageScanStats] = useState<any>(null);
   const [originBackfillRunning, setOriginBackfillRunning] = useState(false);
   const [originBackfillBatchSize, setOriginBackfillBatchSize] = useState(50);
-  // 0 = no cap (import all listing images; the edge function self-chains)
+  // 0 means "no cap" (ingest all images).
   const [originBackfillMaxImages, setOriginBackfillMaxImages] = useState(0);
   const [originBackfillIncludePartials, setOriginBackfillIncludePartials] = useState(true);
   const [originBackfillLastResult, setOriginBackfillLastResult] = useState<any | null>(null);
+  const [batBackfillRunning, setBatBackfillRunning] = useState(false);
+  const [batBackfillBatchSize, setBatBackfillBatchSize] = useState(10);
+  const [batBackfillLastResult, setBatBackfillLastResult] = useState<any | null>(null);
   const loadInFlightRef = useRef(false);
   const mountedRef = useRef(true);
 
@@ -197,6 +200,49 @@ const AdminMissionControl: React.FC = () => {
     }
   };
 
+  const runBatMissingImagesBackfill = async () => {
+    setBatBackfillRunning(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        alert('You must be logged in to run backfill.');
+        return;
+      }
+
+      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-backfill-bat-missing-images`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          batch_size: batBackfillBatchSize,
+          dry_run: false,
+        }),
+      });
+
+      const text = await resp.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+
+      if (!resp.ok || parsed?.success === false) {
+        console.error('BaT backfill failed:', parsed);
+        alert(`BaT backfill failed: ${parsed?.error || resp.status}`);
+        setBatBackfillLastResult(parsed);
+        return;
+      }
+
+      setBatBackfillLastResult(parsed);
+      alert(`BaT backfill complete. Candidates: ${parsed.candidates || 0}. Invoked: ${parsed.invoked || 0}. Failed: ${parsed.failed || 0}.`);
+      loadDashboard();
+    } catch (e: any) {
+      console.error('BaT backfill error:', e);
+      alert('BaT backfill failed.');
+    } finally {
+      setBatBackfillRunning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
@@ -247,13 +293,13 @@ const AdminMissionControl: React.FC = () => {
               />
             </label>
             <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
-              Max images/vehicle (0 = no cap)
+              Max images/vehicle (recommended: 80)
               <input
                 type="number"
                 value={originBackfillMaxImages}
-                min={0}
-                max={5000}
-                onChange={(e) => setOriginBackfillMaxImages(Number(e.target.value || 0))}
+                min={1}
+                max={500}
+                onChange={(e) => setOriginBackfillMaxImages(Number(e.target.value || 80))}
                 style={{ marginLeft: 8, width: 110, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
               />
             </label>
@@ -269,6 +315,44 @@ const AdminMissionControl: React.FC = () => {
           {originBackfillLastResult && (
             <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
 {JSON.stringify(originBackfillLastResult, null, 2)}
+            </pre>
+          )}
+        </div>
+      </div>
+
+      {/* BaT MISSING IMAGES BACKFILL */}
+      <div style={{ marginBottom: '24px' }} className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Backfill: BaT vehicles with 0 images</span>
+          <button
+            className="button button-primary"
+            style={{ fontSize: '9pt' }}
+            disabled={batBackfillRunning}
+            onClick={runBatMissingImagesBackfill}
+          >
+            {batBackfillRunning ? 'Running...' : 'Run BaT Backfill Batch'}
+          </button>
+        </div>
+        <div className="card-body">
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            Fixes BaT profiles where the UI can show a gallery but `vehicle_images` has 0 rows by re-invoking `import-bat-listing` in a controlled batch.
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Batch size
+              <input
+                type="number"
+                value={batBackfillBatchSize}
+                min={1}
+                max={25}
+                onChange={(e) => setBatBackfillBatchSize(Number(e.target.value || 10))}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+          </div>
+          {batBackfillLastResult && (
+            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
+{JSON.stringify(batBackfillLastResult, null, 2)}
             </pre>
           )}
         </div>

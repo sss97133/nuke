@@ -415,19 +415,71 @@ serve(async (req) => {
       const apiUrls: string[] = [];
       let totalReported: number | null = null;
 
+      const parseBhccIdentityFromListingUrl = (listingUrl: string): { year: number | null; make: string | null; model: string | null; title: string | null } => {
+        try {
+          const uu = new URL(listingUrl);
+          const m = uu.pathname.match(/\/(\d{4})-([^/]+?)-c-\d+\.htm$/i);
+          if (!m?.[1] || !m?.[2]) return { year: null, make: null, model: null, title: null };
+          const year = parseInt(m[1], 10);
+          const slug = String(m[2] || '').trim().toLowerCase();
+          if (!Number.isFinite(year)) return { year: null, make: null, model: null, title: null };
+
+          const makeMap: Array<[string, string]> = [
+            ['mercedes-benz', 'Mercedes-Benz'],
+            ['alfa-romeo', 'Alfa Romeo'],
+            ['aston-martin', 'Aston Martin'],
+            ['rolls-royce', 'Rolls-Royce'],
+            ['land-rover', 'Land Rover'],
+            ['austin-healey', 'Austin Healey'],
+            ['de-tomaso', 'De Tomaso'],
+          ];
+
+          const words = slug.split('-').filter(Boolean);
+          if (words.length === 0) return { year, make: null, model: null, title: String(year) };
+
+          let make: string | null = null;
+          let modelSlug: string | null = null;
+
+          for (const [prefix, canonical] of makeMap) {
+            if (slug === prefix || slug.startsWith(prefix + '-')) {
+              make = canonical;
+              modelSlug = slug.slice(prefix.length).replace(/^-+/, '');
+              break;
+            }
+          }
+
+          if (!make) {
+            make = words[0] ? (words[0].slice(0, 1).toUpperCase() + words[0].slice(1)) : null;
+            modelSlug = words.slice(1).join('-') || null;
+          }
+
+          const model = modelSlug ? modelSlug.split('-').filter(Boolean).map((w) => {
+            // Keep numeric tokens like 911, 300sl, etc.
+            if (/^\d+[a-z0-9]*$/i.test(w)) return w.toUpperCase();
+            return w.slice(0, 1).toUpperCase() + w.slice(1);
+          }).join(' ') : null;
+
+          const title = make && model ? `${year} ${make} ${model}` : (make ? `${year} ${make}` : String(year));
+          return { year, make, model, title };
+        } catch {
+          return { year: null, make: null, model: null, title: null };
+        }
+      };
+
       for (const mode of modes) {
         const bhcc = await tryBhccInventoryExtract(source_url, maxListingsToProcess, startOffset, mode);
         if (!bhcc?.listing_urls?.length) continue;
         if (bhcc.api_url) apiUrls.push(bhcc.api_url);
         if (typeof bhcc.total_listings_reported === 'number') totalReported = bhcc.total_listings_reported;
         for (const url of bhcc.listing_urls) {
+          const id = parseBhccIdentityFromListingUrl(url);
           allListings.push({
-            title: null,
+            title: id.title,
             url,
             price: null,
-            year: null,
-            make: null,
-            model: null,
+            year: id.year,
+            make: id.make,
+            model: id.model,
             thumbnail_url: null,
             listing_status: mode === 'sold' ? 'sold' : 'in_stock',
             raw: {

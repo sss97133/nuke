@@ -88,6 +88,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [showProvenancePopup, setShowProvenancePopup] = useState(false);
   const [priceSources, setPriceSources] = useState<Record<string, boolean>>({});
   const [showVinValidation, setShowVinValidation] = useState(false);
+  const [listingSourceOpen, setListingSourceOpen] = useState(false);
+  const listingSourceRef = useRef<HTMLDivElement | null>(null);
 
   const { summary: vinProofSummary } = useVINProofs(vehicle?.id);
   // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
@@ -958,15 +960,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   // For RNM (Reserve Not Met), show blurred high bid instead of "Set a price"
   const isRNM = (vehicle as any)?.auction_outcome === 'reserve_not_met';
   const highBid = (vehicle as any)?.high_bid || (vehicle as any)?.winning_bid;
-  const priceText = (() => {
+  const priceDisplay = (() => {
     // If we have external auction telemetry, reflect it directly in the header.
     if (auctionPulse?.listing_url) {
       const status = String(auctionPulse.listing_status || '').toLowerCase();
       const isLive = status === 'active' || status === 'live';
       const isSold = status === 'sold';
-      if (isSold && typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) {
-        return `Sold: ${formatCurrency((auctionPulse as any).final_price)}`;
-      }
       if (isLive && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
         return `Bid: ${formatCurrency(auctionPulse.current_bid)}`;
       }
@@ -981,6 +980,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       : (isRNM && highBid)
         ? formatCurrency(highBid)
         : 'Set a price';
+  })();
+
+  const priceHoverText = (() => {
+    // Hover reveals more detail (without adding noise to the visible header).
+    if (auctionPulse?.listing_url) {
+      const status = String(auctionPulse.listing_status || '').toLowerCase();
+      const isSold = status === 'sold';
+      const isLive = status === 'active' || status === 'live';
+      if (isSold && typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) {
+        return `Sold price: ${formatCurrency((auctionPulse as any).final_price)}`;
+      }
+      if (isLive && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
+        return `Current bid: ${formatCurrency(auctionPulse.current_bid)}`;
+      }
+    }
+    if (primaryAmount !== null) return `${priceDescriptor}: ${formatCurrency(primaryAmount)}`;
+    return null;
   })();
   const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
   
@@ -1226,6 +1242,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
   }, [showPendingDetails]);
 
+  // Close listing source popover when clicking outside
+  useEffect(() => {
+    const handler = (event: MouseEvent) => {
+      if (!listingSourceOpen) return;
+      if (listingSourceRef.current && !listingSourceRef.current.contains(event.target as Node)) {
+        setListingSourceOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [listingSourceOpen]);
+
   return (
     <div
         className="vehicle-price-header"
@@ -1262,15 +1290,91 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               {String(listingLocation)}
             </span>
           ) : null}
-          {listingHost || listingSourceLabel ? (
-            <span
-              className="badge badge-secondary"
-              style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              title="Listing source"
-            >
-              {listingUrl ? <FaviconIcon url={String(listingUrl)} matchTextSize={true} textSize={8} /> : null}
-              {listingHost || listingSourceLabel}
-            </span>
+          {listingUrl ? (
+            <div ref={listingSourceRef} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="badge badge-secondary"
+                title="Listing source (click)"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setListingSourceOpen((v) => !v);
+                }}
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: 'pointer',
+                  background: 'var(--grey-50)',
+                }}
+              >
+                <FaviconIcon url={String(listingUrl)} size={14} preserveAspectRatio={true} />
+              </button>
+
+              {listingSourceOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 6px)',
+                    left: 0,
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 6,
+                    boxShadow: '0 12px 24px rgba(15, 23, 42, 0.15)',
+                    padding: 10,
+                    minWidth: 260,
+                    zIndex: 200,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ fontWeight: 800, fontSize: '10px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                    Listing source
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: '10px', fontWeight: 700, color: baseTextColor }}>
+                    {listingHost || listingSourceLabel || 'External listing'}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: '9px', color: mutedTextColor, wordBreak: 'break-all' }}>
+                    {String(listingUrl)}
+                  </div>
+                  <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="button button-small"
+                      onClick={() => {
+                        try {
+                          window.open(String(listingUrl), '_blank', 'noopener,noreferrer');
+                        } catch {
+                          // ignore
+                        } finally {
+                          setListingSourceOpen(false);
+                        }
+                      }}
+                      style={{ fontSize: '8pt' }}
+                    >
+                      OPEN
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-small"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(String(listingUrl));
+                          toast.success('Link copied', { duration: 1200 });
+                        } catch {
+                          toast.error('Copy failed', { duration: 1200 });
+                        }
+                      }}
+                      style={{ fontSize: '8pt' }}
+                    >
+                      COPY
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : null}
 
           {/* Seller visibility (do not hide the seller behind tiny icons) */}
@@ -2030,7 +2134,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
                 }}
                   className={auctionPulseMs && isAuctionLive ? 'auction-price-pulse' : undefined}
-                title={isRNM ? "Reserve not met - high bid hidden (click to reveal)" : "Click to see data source and confidence"}
+                // Prefer compact visible text; reveal actual amount on hover when available.
+                // We intentionally avoid asserting price in the primary display for SOLD states.
+                // (Time is linear; by the time a number is posted, it may already be "stale".)
+                // Users can still see the amount via hover/provenance.
+                title={priceHoverText || (isRNM ? "Reserve not met - high bid hidden (click to reveal)" : "Click to see data source and confidence")}
                 onMouseEnter={(e) => {
                   // Un-blur on hover for RNM
                   if (isRNM && highBid) {
@@ -2044,7 +2152,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   }
                 }}
               >
-                {priceText}
+                {priceDisplay}
               </span>
               {priceWasCorrected && (
                 <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 500 }}>*</span>

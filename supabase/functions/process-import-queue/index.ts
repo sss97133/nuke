@@ -51,6 +51,54 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function isProbablyValidHttpUrl(raw: any): boolean {
+  const s = (typeof raw === 'string' ? raw : String(raw || '')).trim();
+  if (!s) return false;
+  if (/[<>\n\r\t]/.test(s)) return false;
+  try {
+    const u = new URL(s);
+    return (u.protocol === 'http:' || u.protocol === 'https:') && Boolean(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function looksLikeNonListingPage(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const path = (u.pathname || '').toLowerCase();
+    if (path === '/' || path.length < 2) return true;
+    // Common inventory/category/marketing paths that should not become vehicles.
+    if (path.includes('/inventory') && !/\b(19|20)\d{2}\b/.test(path)) return true;
+    if (path.includes('/sold') && !/\b(19|20)\d{2}\b/.test(path)) return true;
+    if (path.includes('/location/') || path.includes('/about') || path.includes('/contact')) return true;
+    if (path.includes('/auth/') || path.includes('/sign-up') || path.includes('/signup')) return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function isLikelyJunkIdentity(year: any, make: any, model: any): boolean {
+  const y = typeof year === 'number' ? year : Number(year);
+  const mk = String(make || '').toLowerCase().trim();
+  const md = String(model || '').toLowerCase().trim();
+
+  if (!Number.isFinite(y) || y < 1885 || y > new Date().getFullYear() + 1) return true;
+  if (!mk || !md) return true;
+
+  // Known “site name got stuffed into make/model” patterns seen in prod samples.
+  if (mk === 'beverly' && md.includes('car club')) return true;
+  if (mk === 'bring' && md.includes('a trailer')) return true;
+  if (md.includes('view inventory') || md.includes('sold inventory')) return true;
+
+  // Garbage length checks
+  if (mk.length > 40) return true;
+  if (md.length > 120) return true;
+
+  return false;
+}
+
 // Helper function to clean model name - removes pricing, dealer info, financing text, etc.
 function cleanModelName(model: string): string {
   if (!model) return '';
@@ -1793,8 +1841,7 @@ serve(async (req) => {
                     : 1;
 
                 if (!hasAnyHiResAlready && hiResCandidates.length > 0 && thumbRatio >= 0.75) {
-                  const MAX_IMAGES_REPAIR = 12;
-                  const toUpload = hiResCandidates.filter((u) => !existingSource.has(u)).slice(0, MAX_IMAGES_REPAIR);
+                  const toUpload = hiResCandidates.filter((u) => !existingSource.has(u));
                   if (toUpload.length > 0) {
                     console.log(`🧪 L'Art hi-res repair: uploading ${toUpload.length} hi-res images for ${existingByUrlId}`);
 
@@ -1934,6 +1981,58 @@ serve(async (req) => {
           console.warn(`⚠️ discovery_url dedupe/update failed (continuing): ${dupeErr.message}`);
         }
 
+        // Guardrails: stop creating junk vehicle profiles from malformed/non-listing URLs.
+        if (!isProbablyValidHttpUrl(item.listing_url)) {
+          await supabase
+            .from('import_queue')
+            .update({
+              status: 'failed',
+              error_message: 'Invalid listing_url (not a valid http/https URL)',
+              processed_at: new Date().toISOString(),
+              locked_at: null,
+              locked_by: null,
+              next_attempt_at: null,
+            } as any)
+            .eq('id', item.id);
+          results.errors++;
+          results.processed++;
+          continue;
+        }
+
+        if (looksLikeNonListingPage(item.listing_url)) {
+          await supabase
+            .from('import_queue')
+            .update({
+              status: 'failed',
+              error_message: 'Non-listing URL (inventory/home/marketing page); skipping vehicle creation',
+              processed_at: new Date().toISOString(),
+              locked_at: null,
+              locked_by: null,
+              next_attempt_at: null,
+            } as any)
+            .eq('id', item.id);
+          results.errors++;
+          results.processed++;
+          continue;
+        }
+
+        if (isLikelyJunkIdentity(year, make, model)) {
+          await supabase
+            .from('import_queue')
+            .update({
+              status: 'failed',
+              error_message: `Junk identity detected (year/make/model). year=${year ?? null} make=${make ?? null} model=${model ?? null}`,
+              processed_at: new Date().toISOString(),
+              locked_at: null,
+              locked_by: null,
+              next_attempt_at: null,
+            } as any)
+            .eq('id', item.id);
+          results.errors++;
+          results.processed++;
+          continue;
+        }
+
         // Create vehicle - START AS PENDING until validated
         const bhccStockNo =
           (typeof (scrapeData as any)?.data?.bhcc_stockno === 'number' && Number.isFinite((scrapeData as any).data.bhcc_stockno))
@@ -2046,9 +2145,11 @@ serve(async (req) => {
           return [];
         })();
         if (imageUrls.length > 0) {
-          // Keep import-queue processing within Edge runtime limits.
-          // Upload a capped number immediately; defer the rest to background backfill.
+          // IMPORTANT: do not cap total gallery size. We batch uploads to stay within Edge runtime.
           const isLartFiche = item.listing_url.includes('lartdelautomobile.com/fiche/');
+
+          // Keep import-queue processing within Edge runtime limits:
+          // upload a limited number immediately; defer the rest to background backfill.
           const defaultMaxImmediate = isLartFiche ? 24 : 12;
           let MAX_IMAGES_IMMEDIATE = defaultMaxImmediate;
           if (skip_image_upload) {
@@ -2269,9 +2370,6 @@ serve(async (req) => {
                   image_urls: deferredImageUrls,
                   source: 'organization_import',
                   run_analysis: false,
-                  // Dealer galleries can be large; backfill-images can chunk/chain now.
-                  // IMPORTANT: ingest ALL images (not just first 12/50/etc). backfill-images will self-chain
-                  // until it exhausts the URL list (bounded by runtime + chain_depth).
                   max_images: 0,
                   continue: true,
                   sleep_ms: isLartFiche ? 150 : 200,

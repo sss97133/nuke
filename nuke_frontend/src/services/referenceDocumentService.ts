@@ -235,43 +235,58 @@ export class ReferenceDocumentService {
    */
   static async getVehicleDocuments(vehicleId: string): Promise<ReferenceDocument[]> {
     try {
-      // Preferred (fast): RPC if present
-      const { data, error } = await supabase
-        .rpc('get_vehicle_documents', { p_vehicle_id: vehicleId });
+      // Preferred: RPC (lets the backend choose the right joins + ordering).
+      // Cache missing-RPC environments (per-host) to avoid repeated 404/PGRST202 spam.
+      const hasWindow = typeof window !== 'undefined';
+      const hostKey = hasWindow ? String(window.location?.host || '') : 'server';
+      const rpcMissingKey = `rpc_missing_get_vehicle_documents__${hostKey}`;
+      const skipRpc = hasWindow && window.localStorage.getItem(rpcMissingKey) === '1';
 
-      if (!error) return data || [];
+      if (!skipRpc) {
+        const { data, error } = await supabase.rpc('get_vehicle_documents', { p_vehicle_id: vehicleId });
+        if (!error) return data || [];
 
-      // Fallback: some envs don't have this RPC deployed (404). In that case, query directly.
-      const errMsg = String((error as any)?.message || '');
-      const errDetails = String((error as any)?.details || '');
-      const errHint = String((error as any)?.hint || '');
-      const errCode = String((error as any)?.code || '').toUpperCase();
-      const httpStatus = (error as any)?.status ?? (error as any)?.statusCode;
+        const errMsg = String((error as any)?.message || '');
+        const errDetails = String((error as any)?.details || '');
+        const errHint = String((error as any)?.hint || '');
+        const errCode = String((error as any)?.code || '').toUpperCase();
+        const httpStatus = (error as any)?.status ?? (error as any)?.statusCode;
+        const needle = `${errMsg}\n${errDetails}\n${errHint}`.toLowerCase();
 
-      // PostgREST commonly reports missing RPC as:
-      // - HTTP 404
-      // - code: PGRST202 ("Could not find the function ... in the schema cache")
-      // - message/details containing "schema cache" or "could not find the function"
-      const needle = `${errMsg}\n${errDetails}\n${errHint}`.toLowerCase();
-      const isMissingRpc =
-        httpStatus === 404 ||
-        errCode === 'PGRST202' ||
-        (needle.includes('get_vehicle_documents') && (needle.includes('schema cache') || needle.includes('could not find') || needle.includes('not found')));
-      if (!isMissingRpc) throw error;
+        // PostgREST commonly reports missing RPC as:
+        // - HTTP 404
+        // - code: PGRST202 ("Could not find the function ... in the schema cache")
+        // - message/details containing "schema cache" or "could not find the function"
+        const isMissingRpc =
+          httpStatus === 404 ||
+          errCode === 'PGRST202' ||
+          (needle.includes('get_vehicle_documents') &&
+            (needle.includes('schema cache') || needle.includes('could not find') || needle.includes('not found')));
 
-      // Some deployments don't have a PostgREST relationship configured for vehicle_documents -> reference_documents,
-      // so embedding `reference_documents(*)` can 400. Use a safe two-step lookup.
+        if (!isMissingRpc) throw error;
+        try {
+          if (hasWindow) window.localStorage.setItem(rpcMissingKey, '1');
+        } catch {
+          // ignore
+        }
+      }
+
+      // Fallback: safe two-step lookup via the dedicated link table for reference docs.
+      // IMPORTANT: Do NOT use `vehicle_documents` here — that name is also used by the vehicle paperwork/receipts table
+      // in some deployments, which causes PostgREST 400s when selecting `document_id`.
       const { data: links, error: linkErr } = await supabase
-        .from('vehicle_documents')
-        .select('document_id, created_at')
+        .from('vehicle_reference_documents')
+        .select('reference_document_id')
         .eq('vehicle_id', vehicleId)
-        .order('created_at', { ascending: false })
         .limit(200);
 
-      if (linkErr) throw linkErr;
+      if (linkErr) {
+        // If the fallback link table isn't deployed in an environment, don't poison the whole vehicle profile page.
+        return [];
+      }
 
       const ids = (links || [])
-        .map((r: any) => String(r?.document_id || ''))
+        .map((r: any) => String(r?.reference_document_id || ''))
         .filter(Boolean);
       if (ids.length === 0) return [];
 
@@ -301,10 +316,10 @@ export class ReferenceDocumentService {
   ): Promise<void> {
     try {
       const { error } = await supabase
-        .from('vehicle_documents')
+        .from('vehicle_reference_documents')
         .insert({
           vehicle_id: vehicleId,
-          document_id: documentId,
+          reference_document_id: documentId,
           linked_by: userId,
           link_type: linkType,
           notes
@@ -332,10 +347,10 @@ export class ReferenceDocumentService {
   ): Promise<void> {
     try {
       const { error } = await supabase
-        .from('vehicle_documents')
+        .from('vehicle_reference_documents')
         .delete()
         .eq('vehicle_id', vehicleId)
-        .eq('document_id', documentId);
+        .eq('reference_document_id', documentId);
 
       if (error) throw error;
     } catch (error) {
