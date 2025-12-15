@@ -21,6 +21,17 @@ body {
   min-height: -webkit-fill-available;
 }
 
+/* Ensure the "very back" never stays white in dark mode (or after partial CSS loads). */
+html, body, #root {
+  background: var(--bg);
+}
+
+/* Layout shells should not paint white behind cards */
+.app-layout,
+.main-content {
+  background: var(--bg);
+}
+
 /* Override Tailwind headings to use our font sizes */
 @layer base {
   h1 { font-size: 11px; font-weight: 700; }
