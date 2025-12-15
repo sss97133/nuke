@@ -1555,7 +1555,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           textDecoration: 'none',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : undefined),
+                          ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
                         }}
                         className={auctionPulseMs ? 'auction-cta-pulse' : undefined}
                         onMouseEnter={(e) => {
@@ -1867,7 +1867,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   // Blur effect for RNM auctions (reserve not met)
                   filter: isRNM && highBid ? 'blur(4px)' : 'none',
                   transition: 'filter 0.2s ease',
-                  ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : undefined),
+                  ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
                 }}
                   className={auctionPulseMs && isAuctionLive ? 'auction-price-pulse' : undefined}
                 title={isRNM ? "Reserve not met - high bid hidden (click to reveal)" : "Click to see data source and confidence"}
