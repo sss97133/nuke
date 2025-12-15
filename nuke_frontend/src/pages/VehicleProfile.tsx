@@ -155,7 +155,17 @@ const VehicleProfile: React.FC = () => {
         typeof r?.watcher_count === 'number' ||
         typeof r?.view_count === 'number' ||
         (typeof r?.metadata?.comment_count === 'number');
-      if (status === 'active' || status === 'live') return 3;
+      const hasFinalPrice = typeof r?.final_price === 'number' && Number.isFinite(r.final_price) && r.final_price > 0;
+      const hasLiveSignals =
+        endFuture ||
+        (typeof r?.current_bid === 'number' && Number.isFinite(r.current_bid) && r.current_bid > 0) ||
+        (typeof r?.bid_count === 'number' && Number.isFinite(r.bid_count) && r.bid_count > 0);
+
+      // Prefer rows that are demonstrably live or demonstrably sold.
+      if (status === 'sold' && hasFinalPrice) return 5;
+      if ((status === 'active' || status === 'live') && hasLiveSignals) return 4;
+      if (status === 'sold') return 3;
+      if (status === 'active' || status === 'live') return 2;
       if (endFuture) return 2;
       if (hasTelemetry) return 1;
       return 0;
@@ -182,13 +192,26 @@ const VehicleProfile: React.FC = () => {
 
       const statuses = sorted.map((r) => toLower(r?.listing_status)).filter(Boolean);
       const hasActive = statuses.some((s) => s === 'active' || s === 'live');
-      const mergedStatus = hasActive ? 'active' : String(best.listing_status || '');
+      const hasSold = statuses.some((s) => s === 'sold');
+      const mergedStatus = (() => {
+        // If any row has a sold marker + final_price, treat the group as sold.
+        const anyFinal = maxNum(sorted.map((r) => r?.final_price));
+        if (typeof anyFinal === 'number' && anyFinal > 0) return 'sold';
+        // Otherwise, keep active if we have active/live.
+        if (hasActive) return 'active';
+        if (hasSold) return 'sold';
+        return String(best.listing_status || '');
+      })();
 
       const commentCounts = sorted.map((r) => (typeof r?.metadata?.comment_count === 'number' ? r.metadata.comment_count : null));
       const mergedCommentCount = maxNum(commentCounts);
 
       const endCandidates = sorted
-        .map((r) => r?.end_date)
+        .flatMap((r) => {
+          const direct = r?.end_date ? [r.end_date] : [];
+          const meta = r?.metadata?.auction_end_date ? [r.metadata.auction_end_date] : [];
+          return [...direct, ...meta];
+        })
         .filter(Boolean)
         .map((iso) => ({ iso: String(iso), t: parseTs(iso) }))
         .filter((x) => Number.isFinite(x.t));
@@ -204,7 +227,16 @@ const VehicleProfile: React.FC = () => {
         return ts?.iso || null;
       })();
 
+      const soldAt = (() => {
+        const ts = sorted
+          .map((r) => ({ iso: r?.sold_at ? String(r.sold_at) : null, t: parseTs(r?.sold_at) }))
+          .filter((x) => x.iso && Number.isFinite(x.t))
+          .sort((a, b) => b.t - a.t)[0];
+        return ts?.iso || null;
+      })();
+
       return {
+        external_listing_id: String(best.id || ''),
         platform: String(best.platform || ''),
         listing_url: String(best.listing_url || ''),
         listing_status: mergedStatus,
@@ -214,6 +246,8 @@ const VehicleProfile: React.FC = () => {
         watcher_count: maxNum(sorted.map((r) => r?.watcher_count)),
         view_count: maxNum(sorted.map((r) => r?.view_count)),
         comment_count: mergedCommentCount,
+        final_price: maxNum(sorted.map((r) => r?.final_price)),
+        sold_at: soldAt,
         last_bid_at: null as string | null,
         last_comment_at: null as string | null,
         updated_at: updatedAt,
@@ -1220,7 +1254,7 @@ const VehicleProfile: React.FC = () => {
           try {
             const { data } = await supabase
               .from('external_listings')
-              .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
+              .select('id, platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
               .eq('vehicle_id', vehicleData.id)
               .order('updated_at', { ascending: false })
               .limit(10);
@@ -1231,9 +1265,37 @@ const VehicleProfile: React.FC = () => {
         }
         const best = buildAuctionPulseFromExternalListings(arr, vehicleData.id);
 
-        if (best?.listing_url && best?.platform) {
+        // Fallback: if we can't access external_listings due to RLS, still treat BaT-discovered vehicles as "auction mode"
+        // so we hide Claim/Set-price and show a link to the listing.
+        const fallbackListingUrl =
+          (vehicleData as any)?.bat_auction_url ||
+          (String((vehicleData as any)?.discovery_url || '').includes('bringatrailer.com/listing/')
+            ? String((vehicleData as any)?.discovery_url)
+            : null);
+
+        const effective = best?.listing_url && best?.platform
+          ? best
+          : (fallbackListingUrl
+              ? ({
+                  external_listing_id: null,
+                  platform: 'bat',
+                  listing_url: fallbackListingUrl,
+                  listing_status: String((vehicleData as any)?.auction_outcome || 'unknown'),
+                  end_date: (vehicleData as any)?.auction_end_date || null,
+                  current_bid: typeof (vehicleData as any)?.current_bid === 'number' ? (vehicleData as any).current_bid : null,
+                  bid_count: typeof (vehicleData as any)?.bid_count === 'number' ? (vehicleData as any).bid_count : null,
+                  watcher_count: null,
+                  view_count: null,
+                  comment_count: null,
+                  final_price: typeof (vehicleData as any)?.sale_price === 'number' ? (vehicleData as any).sale_price : null,
+                  sold_at: (vehicleData as any)?.sold_at || null,
+                  updated_at: (vehicleData as any)?.updated_at || null,
+                } as any)
+              : null);
+
+        if (effective?.listing_url && effective?.platform) {
           // Lightweight comment telemetry (best-effort; table may not exist in some envs)
-          let commentCount: number | null = typeof (best as any)?.comment_count === 'number' ? (best as any).comment_count : null;
+          let commentCount: number | null = typeof (effective as any)?.comment_count === 'number' ? (effective as any).comment_count : null;
           let lastBidAt: string | null = null;
           let lastCommentAt: string | null = null;
 
@@ -1274,18 +1336,21 @@ const VehicleProfile: React.FC = () => {
           }
 
           setAuctionPulse({
-            platform: String((best as any).platform),
-            listing_url: String((best as any).listing_url),
-            listing_status: String((best as any).listing_status || ''),
-            end_date: (best as any).end_date || null,
-            current_bid: typeof (best as any).current_bid === 'number' ? (best as any).current_bid : null,
-            bid_count: typeof (best as any).bid_count === 'number' ? (best as any).bid_count : null,
-            watcher_count: typeof (best as any).watcher_count === 'number' ? (best as any).watcher_count : null,
-            view_count: typeof (best as any).view_count === 'number' ? (best as any).view_count : null,
+            external_listing_id: (effective as any).external_listing_id || null,
+            platform: String((effective as any).platform),
+            listing_url: String((effective as any).listing_url),
+            listing_status: String((effective as any).listing_status || ''),
+            end_date: (effective as any).end_date || null,
+            current_bid: typeof (effective as any).current_bid === 'number' ? (effective as any).current_bid : null,
+            bid_count: typeof (effective as any).bid_count === 'number' ? (effective as any).bid_count : null,
+            watcher_count: typeof (effective as any).watcher_count === 'number' ? (effective as any).watcher_count : null,
+            view_count: typeof (effective as any).view_count === 'number' ? (effective as any).view_count : null,
             comment_count: commentCount,
+            final_price: typeof (effective as any).final_price === 'number' ? (effective as any).final_price : null,
+            sold_at: (effective as any).sold_at || null,
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
-            updated_at: (best as any).updated_at || null,
+            updated_at: (effective as any).updated_at || null,
           });
         } else {
           setAuctionPulse(null);

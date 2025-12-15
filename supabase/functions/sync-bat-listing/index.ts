@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function asInt(s?: string | null): number | null {
+  if (!s) return null;
+  const n = Number(String(s).replace(/[^\d]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
  * Sync live BaT listing data (bid count, watcher count, current bid)
  * Called periodically or manually to update active listings
@@ -16,11 +22,34 @@ serve(async (req) => {
   }
 
   try {
+    // Require authentication (prevents public abuse of upstream scraping).
+    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || '';
+    if (!authHeader) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { externalListingId } = await req.json();
+
+    // Verify user token quickly (even though we use service role for writes).
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: authData, error: authErr } = await supabaseAuth.auth.getUser();
+    if (authErr || !authData?.user) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     );
 
     // Get the external listing
@@ -40,6 +69,19 @@ serve(async (req) => {
     const response = await fetch(listing.listing_url);
     const html = await response.text();
 
+    // Extract end date (best-effort; used for countdown timers on active auctions)
+    let endDateIso: string | null = listing.end_date ? String(listing.end_date) : null;
+    const jsonLd = html.match(/"endDate"\s*:\s*"([^"]+)"/i);
+    if (jsonLd?.[1]) {
+      const t = Date.parse(jsonLd[1]);
+      if (Number.isFinite(t)) endDateIso = new Date(t).toISOString();
+    }
+    const attr = html.match(/data-countdown-date\s*=\s*"([^"]+)"/i);
+    if (!endDateIso && attr?.[1]) {
+      const t = Date.parse(attr[1]);
+      if (Number.isFinite(t)) endDateIso = new Date(t).toISOString();
+    }
+
     // Extract current bid - multiple patterns to handle different HTML structures
     let currentBid = listing.current_bid;
     const bidPatterns = [
@@ -53,7 +95,7 @@ serve(async (req) => {
     for (const pattern of bidPatterns) {
       const match = html.match(pattern);
       if (match && match[1]) {
-        currentBid = parseInt(match[1].replace(/,/g, ''));
+        currentBid = asInt(match[1]) ?? currentBid;
         break;
       }
     }
@@ -69,18 +111,18 @@ serve(async (req) => {
     for (const pattern of bidCountPatterns) {
       const match = html.match(pattern);
       if (match && match[1]) {
-        bidCount = parseInt(match[1]);
+        bidCount = asInt(match[1]) ?? bidCount;
         break;
       }
     }
 
     // Extract watcher count
     const watcherMatch = html.match(/(\d+)\s+watchers?/i);
-    const watcherCount = watcherMatch ? parseInt(watcherMatch[1]) : listing.watcher_count;
+    const watcherCount = watcherMatch ? (asInt(watcherMatch[1]) ?? listing.watcher_count) : listing.watcher_count;
 
     // Extract view count
     const viewMatch = html.match(/([\d,]+)\s+views?/i);
-    const viewCount = viewMatch ? parseInt(viewMatch[1].replace(/,/g, '')) : listing.view_count;
+    const viewCount = viewMatch ? (asInt(viewMatch[1]) ?? listing.view_count) : listing.view_count;
 
     // Check if auction ended
     const endedMatch = html.match(/Auction Ended/i);
@@ -88,7 +130,7 @@ serve(async (req) => {
 
     // Check if sold
     const soldMatch = html.match(/Sold (?:for|to).*?\$([\\d,]+)/i);
-    const finalPrice = soldMatch ? parseInt(soldMatch[1].replace(/,/g, '')) : null;
+    const finalPrice = soldMatch ? (asInt(soldMatch[1]) ?? null) : null;
 
     const newStatus = finalPrice ? 'sold' : (isEnded ? 'ended' : 'active');
 
@@ -101,6 +143,7 @@ serve(async (req) => {
         watcher_count: watcherCount,
         view_count: viewCount,
         listing_status: newStatus,
+        end_date: endDateIso,
         final_price: finalPrice,
         sold_at: finalPrice ? new Date().toISOString() : null,
         last_synced_at: new Date().toISOString()
