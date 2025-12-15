@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useVINProofs } from '../../hooks/useVINProofs';
 
 interface ValidationSource {
   source_type: string; // "title_upload", "registration_image", etc.
@@ -36,6 +37,10 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editedValue, setEditedValue] = useState(fieldValue);
   const [saving, setSaving] = useState(false);
+  const [fieldAttribution, setFieldAttribution] = useState<any | null>(null);
+
+  const isVinField = String(fieldName || '').toLowerCase() === 'vin';
+  const { summary: vinProofSummary, loading: vinProofLoading } = useVINProofs(isVinField ? vehicleId : undefined);
 
   useEffect(() => {
     loadValidations();
@@ -45,6 +50,21 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
     try {
       setLoading(true);
       const allSources: ValidationSource[] = [];
+
+      // Field attribution (where the current field value came from)
+      try {
+        const { data: attrRow, error: attrErr } = await supabase
+          .from('vehicle_field_sources')
+          .select('*')
+          .eq('vehicle_id', vehicleId)
+          .eq('field_name', fieldName)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!attrErr) setFieldAttribution(attrRow || null);
+      } catch {
+        setFieldAttribution(null);
+      }
 
       // 0. Factory Reference Pages - SPECIFIC PAGES for this field (HIGHEST AUTHORITY)
       const { data: manualPages, error: pagesError } = await supabase
@@ -208,6 +228,16 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
   const emblemUrl = getEmblemUrl();
   const uniqueValidators = new Set(sources.map(s => s.verified_by).filter(Boolean)).size;
 
+  const attribution = (() => {
+    if (!fieldAttribution) return null;
+    const sourceType = String(fieldAttribution.source_type || 'unknown');
+    const sourceUrl = typeof fieldAttribution.source_url === 'string' ? fieldAttribution.source_url : null;
+    const who = fieldAttribution.source_user_id || fieldAttribution.user_id || fieldAttribution.updated_by || null;
+    const when = fieldAttribution.entered_at || fieldAttribution.updated_at || null;
+    const storedValue = typeof fieldAttribution.field_value === 'string' ? fieldAttribution.field_value : null;
+    return { sourceType, sourceUrl, who, when, storedValue };
+  })();
+
   return (
     <div
       style={{
@@ -325,6 +355,64 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           </div>
         </div>
 
+        {/* VIN provenance (where the VIN value came from) */}
+        {isVinField ? (
+          <div
+            style={{
+              padding: '6px 12px',
+              borderBottom: '1px solid var(--border)',
+              background: 'var(--surface)',
+              fontSize: '7pt',
+              color: 'var(--text-muted)',
+              lineHeight: 1.4
+            }}
+          >
+            <div>
+              <strong>VIN origin:</strong>{' '}
+              {attribution ? (
+                <>
+                  {attribution.sourceType}
+                  {attribution.when ? ` • ${new Date(attribution.when).toLocaleString()}` : ''}
+                  {attribution.sourceUrl ? (
+                    <>
+                      {' '}
+                      •{' '}
+                      <a
+                        href={attribution.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: 'var(--text)', textDecoration: 'underline' }}
+                      >
+                        source
+                      </a>
+                    </>
+                  ) : null}
+                  {attribution.storedValue && attribution.storedValue !== fieldValue ? (
+                    <>
+                      {' '}
+                      • stored value differs
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>No citation found (VIN is just present on the vehicle record)</>
+              )}
+            </div>
+            <div>
+              <strong>Evidence-backed proofs:</strong>{' '}
+              {vinProofLoading ? (
+                <>Loading…</>
+              ) : vinProofSummary?.hasConclusiveProof ? (
+                <>
+                  {vinProofSummary.conclusiveProofCount} conclusive proof{vinProofSummary.conclusiveProofCount !== 1 ? 's' : ''} • {vinProofSummary.totalConfidence}%
+                </>
+              ) : (
+                <>None yet</>
+              )}
+            </div>
+          </div>
+        ) : null}
+
         {/* Document previews - main focus */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
           {loading ? (
@@ -334,7 +422,9 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           ) : sources.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px' }}>
               <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                No proof yet
+                {isVinField
+                  ? 'No uploaded proof artifacts yet (title/registration/VIN plate). This does not explain where the VIN value came from.'
+                  : 'No proof yet'}
               </div>
               <button
                 className="button button-primary"
