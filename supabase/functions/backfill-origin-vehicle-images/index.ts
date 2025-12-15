@@ -73,13 +73,60 @@ function filterBatNoise(urls: string[]): string[] {
     cleaned.push(u);
   }
 
-  // listing galleries usually cluster in a single uploads YYYY/MM bucket.
-  const bucketCounts = new Map<string, number>();
+  // Drop known BaT "page noise" assets that frequently appear on listing pages but aren't the listing gallery.
+  // These can dominate a month bucket and cause us to pick the wrong cluster.
+  const isKnownNoise = (u: string) => {
+    const f = u.toLowerCase();
+    return (
+      f.includes("qotw") ||
+      f.includes("winner-template") ||
+      f.includes("weekly-weird") ||
+      f.includes("mile-marker") ||
+      f.includes("podcast") ||
+      f.includes("merch") ||
+      // Generic editorial "Web-#####-" images
+      /\/web-\d{3,}-/i.test(f)
+    );
+  };
+  const cleanedNoNoise = cleaned.filter((u) => !isKnownNoise(u));
+
+  // First-pass: bias toward the first chunk of images.
+  // On BaT pages, the listing gallery tends to appear early in the extracted list, while "recommended auctions"
+  // and other noise tends to appear later.
+  const head = cleanedNoNoise.slice(0, 20);
   const bucketKey = (u: string) => {
     const m = u.match(/\/wp-content\/uploads\/(\d{4})\/(\d{2})\//);
     return m ? `${m[1]}/${m[2]}` : "";
   };
-  for (const u of cleaned) {
+  const pickBestBucket = (list: string[]) => {
+    const counts = new Map<string, number>();
+    for (const u of list) {
+      const k = bucketKey(u);
+      if (!k) continue;
+      counts.set(k, (counts.get(k) || 0) + 1);
+    }
+    let best = "";
+    let bestCount = 0;
+    for (const [k, c] of counts.entries()) {
+      if (c > bestCount) {
+        best = k;
+        bestCount = c;
+      }
+    }
+    return { best, bestCount, total: list.length };
+  };
+
+  const headPick = pickBestBucket(head);
+  // If the head chunk clearly clusters, trust it over the global distribution.
+  if (headPick.best && headPick.bestCount >= 3) {
+    const headFiltered = cleanedNoNoise.filter((u) => bucketKey(u) === headPick.best);
+    if (headFiltered.length >= 3) return headFiltered;
+  }
+
+  // Fallback: global bucket heuristic (original behavior), but run against noise-filtered list.
+  // listing galleries usually cluster in a single uploads YYYY/MM bucket.
+  const bucketCounts = new Map<string, number>();
+  for (const u of cleanedNoNoise) {
     const k = bucketKey(u);
     if (!k) continue;
     bucketCounts.set(k, (bucketCounts.get(k) || 0) + 1);
@@ -93,9 +140,9 @@ function filterBatNoise(urls: string[]): string[] {
     }
   }
   if (bestBucket && bestCount >= 8 && bestCount >= Math.floor(cleaned.length * 0.5)) {
-    return cleaned.filter((u) => bucketKey(u) === bestBucket);
+    return cleanedNoNoise.filter((u) => bucketKey(u) === bestBucket);
   }
-  return cleaned;
+  return cleanedNoNoise;
 }
 
 function pickSource(profileOrigin: string, hasOrg: boolean): "bat_import" | "organization_import" | "external_import" {
