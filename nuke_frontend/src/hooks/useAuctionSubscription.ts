@@ -20,6 +20,7 @@ export interface UseAuctionSubscriptionReturn {
   error: Error | null;
   subscribe: (listingId: string) => void;
   unsubscribe: () => void;
+  softCloseResetSeconds?: number | null;
 }
 
 /**
@@ -33,6 +34,7 @@ export function useAuctionSubscription(listingId: string | null) {
   const [isExtended, setIsExtended] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [channel, setChannel] = useState<RealtimeChannel | null>(null);
+  const [softCloseResetSeconds, setSoftCloseResetSeconds] = useState<number | null>(null);
 
   // Load initial auction state
   useEffect(() => {
@@ -41,7 +43,7 @@ export function useAuctionSubscription(listingId: string | null) {
     const loadAuctionState = async () => {
       const { data, error: fetchError } = await supabase
         .from('vehicle_listings')
-        .select('current_high_bid_cents, bid_count, auction_end_time')
+        .select('current_high_bid_cents, bid_count, auction_end_time, soft_close_reset_seconds')
         .eq('id', listingId)
         .single();
 
@@ -54,6 +56,7 @@ export function useAuctionSubscription(listingId: string | null) {
         setCurrentHighBid(data.current_high_bid_cents);
         setBidCount(data.bid_count || 0);
         setAuctionEndTime(data.auction_end_time ? new Date(data.auction_end_time) : null);
+        setSoftCloseResetSeconds(typeof data.soft_close_reset_seconds === 'number' ? data.soft_close_reset_seconds : null);
       }
     };
 
@@ -78,7 +81,15 @@ export function useAuctionSubscription(listingId: string | null) {
           // Handle bid updates
           if (payload.eventType === 'INSERT') {
             const bid = payload.new as any;
-            setCurrentHighBid(bid.displayed_bid_cents);
+            // Backward/forward compatible: some environments used `bid_amount` (USD) before we added `displayed_bid_cents`.
+            const nextHighBidCents =
+              typeof bid.displayed_bid_cents === 'number'
+                ? bid.displayed_bid_cents
+                : typeof bid.bid_amount === 'number'
+                  ? Math.round(bid.bid_amount * 100)
+                  : null;
+
+            if (nextHighBidCents !== null) setCurrentHighBid(nextHighBidCents);
             setBidCount((prev) => prev + 1);
           }
         }
@@ -95,6 +106,9 @@ export function useAuctionSubscription(listingId: string | null) {
           const listing = payload.new as any;
           setCurrentHighBid(listing.current_high_bid_cents);
           setBidCount(listing.bid_count || 0);
+          if (typeof listing.soft_close_reset_seconds === 'number') {
+            setSoftCloseResetSeconds(listing.soft_close_reset_seconds);
+          }
           
           if (listing.auction_end_time) {
             const newEndTime = new Date(listing.auction_end_time);
@@ -147,6 +161,8 @@ export function useAuctionSubscription(listingId: string | null) {
     error,
     subscribe,
     unsubscribe,
+    // Exposed for UI copy ("resets to 2:00 on late bids") without hardcoding.
+    softCloseResetSeconds,
   };
 }
 

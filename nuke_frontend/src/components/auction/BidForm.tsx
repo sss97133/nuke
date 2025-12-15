@@ -123,8 +123,8 @@ const BidForm: React.FC<BidFormProps> = ({ auction, onBidSubmitted, onCancel }) 
       if (result.success) {
         setSuccessMessage(
           result.extended
-            ? '🎉 Bid placed! Auction extended!'
-            : '✅ Bid placed successfully!'
+            ? 'Bid placed. Auction extended.'
+            : 'Bid placed successfully.'
         );
         setBidAmount('');
         setTimeout(() => {
@@ -242,7 +242,7 @@ const BidForm: React.FC<BidFormProps> = ({ auction, onBidSubmitted, onCancel }) 
             color: '#dc2626',
             marginTop: '4px'
           }}>
-            ⚠️ {error}
+            {error}
           </div>
         )}
       </div>
@@ -305,7 +305,7 @@ const BidForm: React.FC<BidFormProps> = ({ auction, onBidSubmitted, onCancel }) 
           color: '#1e40af'
         }}
       >
-        💡 <strong>Suggested Bid:</strong> {formatCurrency(suggestedBid)}
+        <strong>Suggested Bid:</strong> {formatCurrency(suggestedBid)}
       </div>
 
       {/* Success Message */}
@@ -382,7 +382,7 @@ const BidForm: React.FC<BidFormProps> = ({ auction, onBidSubmitted, onCancel }) 
           color: '#6b7280'
         }}
       >
-        ℹ️ If you bid in the final {auction.config.minimum_seconds_remaining}s, the auction will be extended by{' '}
+        If you bid in the final {auction.config.minimum_seconds_remaining}s, the auction will be extended by{' '}
         {auction.config.extension_time_seconds}s
       </div>
     </div>
