@@ -476,8 +476,11 @@ const CursorHomepage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      setDebugInfo(null);
 
       // Get vehicles for feed (keep payload small; avoid heavy origin_metadata + bulk image joins here).
+      // NOTE: Do NOT select `listing_start_date` here. It is not a real column in the DB and will cause
+      // PostgREST 400 errors if included in the `select()` list.
       let query = supabase
         .from('vehicles')
         .select(`
@@ -486,7 +489,6 @@ const CursorHomepage: React.FC = () => {
           sale_date, sale_status,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin,
-          listing_start_date
         `)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
@@ -505,7 +507,23 @@ const CursorHomepage: React.FC = () => {
       const { data: vehicles, error } = await query;
 
       if (error) {
-        console.error('❌ Error loading vehicles:', error);
+        // Supabase/PostgREST errors often include a useful `details` / `hint` payload.
+        // Log a structured object so production console isn't just "Object".
+        console.error('❌ Error loading vehicles:', {
+          message: error.message,
+          code: (error as any).code,
+          details: (error as any).details,
+          hint: (error as any).hint,
+        });
+        setDebugInfo({
+          when: 'CursorHomepage.loadHypeFeed',
+          message: error.message,
+          code: (error as any).code,
+          details: (error as any).details,
+          hint: (error as any).hint,
+          // Snapshot of the intended query shape (helps debug schema drift)
+          filters: { is_public: true, showPending: filters.showPending, timePeriod },
+        });
         setError(`Failed to load vehicles: ${error.message}`);
         setFeedVehicles([]);
         return;
