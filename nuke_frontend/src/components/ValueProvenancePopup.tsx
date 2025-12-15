@@ -9,11 +9,26 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { FaviconIcon } from './common/FaviconIcon';
 
 interface ValueProvenancePopupProps {
   vehicleId: string;
   field: 'current_value' | 'sale_price' | 'purchase_price' | 'asking_price';
   value: number;
+  context?: {
+    platform?: string | null;
+    listing_url?: string | null;
+    listing_status?: string | null;
+    final_price?: number | null;
+    current_bid?: number | null;
+    bid_count?: number | null;
+    winner_name?: string | null;
+    inserted_by_name?: string | null;
+    confidence?: number | null;
+    evidence_url?: string | null;
+    trend_pct?: number | null;
+    trend_period?: string | null;
+  };
   onClose: () => void;
   onUpdate?: (newValue: number) => void;
 }
@@ -35,6 +50,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   vehicleId,
   field,
   value,
+  context,
   onClose,
   onUpdate
 }) => {
@@ -56,7 +72,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       // Also load vehicle data to check for BAT auction info
       const { data: vehicle } = await supabase
         .from('vehicles')
-        .select('bat_auction_url, sale_date, bat_sale_date, updated_at, user_id, uploaded_by')
+        .select('bat_auction_url, sale_date, bat_sale_date, updated_at, user_id, uploaded_by, discovery_url, origin_metadata, profile_origin')
         .eq('id', vehicleId)
         .single();
       
@@ -74,20 +90,19 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       
       // Check timeline_events for sale_price from BAT auctions
       let batAuctionInfo: any = null;
-      if (field === 'sale_price' && vehicle?.bat_auction_url) {
+      if (field === 'sale_price' && (vehicle?.bat_auction_url || vehicle?.discovery_url)) {
         const { data: saleEvent } = await supabase
           .from('timeline_events')
           .select('event_date, cost_amount, metadata')
           .eq('vehicle_id', vehicleId)
           .eq('event_type', 'auction_sold')
-          .eq('cost_amount', value)
           .order('event_date', { ascending: false })
           .limit(1)
           .maybeSingle();
         
         if (saleEvent) {
           batAuctionInfo = {
-            url: vehicle.bat_auction_url,
+            url: vehicle.bat_auction_url || vehicle?.discovery_url,
             lot_number: saleEvent.metadata?.lot_number,
             sale_date: saleEvent.event_date || vehicle.bat_sale_date || vehicle.sale_date
           };
@@ -120,9 +135,9 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         // No evidence but we have BAT auction info - use that as source
         setProvenance({
           source: `Bring a Trailer${batAuctionInfo.lot_number ? ` (Lot #${batAuctionInfo.lot_number})` : ''}`,
-          confidence: 95,
+          confidence: 100,
           inserted_by: 'system',
-          inserted_by_name: 'BAT Import',
+          inserted_by_name: 'System (auction telemetry)',
           inserted_at: batAuctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString(),
           evidence_count: 1,
           can_edit: false,
@@ -135,7 +150,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         setEvidence([{
           source_type: 'bat_auction',
           proposed_value: value.toString(),
-          source_confidence: 95,
+          source_confidence: 100,
           extraction_context: `Auction URL: ${batAuctionInfo.url}`,
           created_at: batAuctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString()
         }]);
@@ -217,6 +232,25 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
     return '#ef4444';
   };
 
+  const isAuctionResultMode = (() => {
+    const status = String(context?.listing_status || '').toLowerCase();
+    const platform = String(context?.platform || '').toLowerCase();
+    const hasFinal = typeof context?.final_price === 'number' && Number.isFinite(context.final_price) && context.final_price > 0;
+    if (field !== 'sale_price') return false;
+    if (status === 'sold' && hasFinal) return true;
+    // Fallback: BaT timeline event based mode (we'll render as auction-ish when we have a listing url)
+    if ((platform === 'bat' || (context?.listing_url || '').includes('bringatrailer.com')) && (context?.evidence_url || batAuctionInfo?.url)) return true;
+    return false;
+  })();
+
+  const headerValue = (() => {
+    if (isAuctionResultMode) {
+      const finalPrice = typeof context?.final_price === 'number' && Number.isFinite(context.final_price) && context.final_price > 0 ? context.final_price : null;
+      if (finalPrice !== null) return finalPrice;
+    }
+    return value;
+  })();
+
   const getSourceLabel = (source: string) => {
     const labels: Record<string, string> = {
       'vin_checksum_valid': 'VIN Decode (Authoritative)',
@@ -250,34 +284,41 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       <div 
         style={{
           background: 'var(--surface)',
-          border: '2px solid #000',
+          border: '1px solid var(--border)',
+          borderRadius: '8px',
           minWidth: '500px',
-          maxWidth: '600px',
-          fontFamily: 'Arial, sans-serif'
+          maxWidth: '640px',
+          fontFamily: 'Arial, sans-serif',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.25)'
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{
           padding: '12px 16px',
-          borderBottom: '2px solid #000',
+          borderBottom: '1px solid var(--border)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           background: 'var(--bg)'
         }}>
           <div>
-            <div style={{ fontSize: '7pt', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
-              Value Provenance
+            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+              {isAuctionResultMode ? 'Auction result' : 'Value provenance'}
             </div>
             <div style={{ fontSize: '14pt', fontWeight: 'bold' }}>
-              ${value.toLocaleString()}
+              {field === 'sale_price' && isAuctionResultMode ? `SOLD ${headerValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}` : headerValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}
             </div>
+            {isAuctionResultMode && (context?.winner_name || '').trim() ? (
+              <div style={{ marginTop: 4, fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>
+                Winner: {String(context?.winner_name).trim()}
+              </div>
+            ) : null}
           </div>
           <button
             onClick={onClose}
             style={{
-              border: '2px solid #000',
+              border: '1px solid var(--border)',
               background: 'var(--surface)',
               padding: '4px 12px',
               fontSize: '7pt',
@@ -292,75 +333,82 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
 
         {/* Provenance Info */}
         <div style={{ padding: '16px' }}>
+          {/* Trend (what we think it’s worth based on price signal) */}
+          {typeof context?.trend_pct === 'number' && Number.isFinite(context.trend_pct) ? (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+                Trend
+              </div>
+              <div style={{ fontSize: '9pt', fontWeight: 800, color: context.trend_pct >= 0 ? '#16a34a' : '#dc2626' }}>
+                {context.trend_pct >= 0 ? 'UP' : 'DOWN'} {Math.abs(context.trend_pct).toFixed(1)}% {context.trend_period ? String(context.trend_period).toUpperCase() : ''}
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 4 }}>
+                Based on internal price signal. Open price timeline for details.
+              </div>
+            </div>
+          ) : null}
+
           {/* Source */}
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '7pt', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
+            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
               Source
             </div>
-            <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>
-              {provenance && getSourceLabel(provenance.source)}
+            <div style={{ fontSize: '9pt', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+              {(context?.evidence_url || provenance?.bat_url) ? (
+                <FaviconIcon url={String(context?.evidence_url || provenance?.bat_url)} size={14} preserveAspectRatio={true} />
+              ) : null}
+              <span>
+                {(() => {
+                  // Prefer explicit platform label when auction telemetry is present.
+                  const platform = String(context?.platform || '').toLowerCase();
+                  if (platform === 'bat') return 'Bring a Trailer';
+                  return provenance ? getSourceLabel(provenance.source) : 'Unknown';
+                })()}
+              </span>
             </div>
           </div>
 
           {/* Confidence */}
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '7pt', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
+            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
               Confidence
             </div>
             <div style={{ 
               fontSize: '9pt', 
               fontWeight: 'bold',
-              color: getConfidenceColor(provenance?.confidence || 0)
+              color: getConfidenceColor((typeof context?.confidence === 'number' ? context?.confidence : provenance?.confidence) || 0)
             }}>
-              {provenance?.confidence}%
+              {(typeof context?.confidence === 'number' ? context?.confidence : provenance?.confidence) || 0}%
             </div>
           </div>
 
           {/* Inserted By */}
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '7pt', color: '#666', textTransform: 'uppercase', marginBottom: '4px' }}>
+            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
               Inserted By
             </div>
             <div style={{ fontSize: '9pt' }}>
-              {provenance?.inserted_by_name || 'Unknown'}
+              {context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown'}
               <span style={{ fontSize: '7pt', color: '#999', marginLeft: '8px' }}>
                 {provenance?.inserted_at && new Date(provenance.inserted_at).toLocaleString()}
               </span>
             </div>
           </div>
 
-          {/* BAT Auction Details */}
-          {(provenance?.bat_url || provenance?.lot_number) && (
-            <div style={{ marginBottom: '16px', padding: '12px', background: '#f9f9f9', border: '1px solid #e0e0e0' }}>
-              <div style={{ fontSize: '7pt', color: '#666', textTransform: 'uppercase', marginBottom: '8px' }}>
-                Auction Details
+          {/* Evidence (at minimum, the listing URL counts as evidence for auction telemetry) */}
+          {(context?.evidence_url || provenance?.bat_url) && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+                Evidence
               </div>
-              {provenance.lot_number && (
-                <div style={{ fontSize: '9pt', marginBottom: '4px' }}>
-                  <strong>Lot #:</strong> {provenance.lot_number}
-                </div>
-              )}
-              {provenance.sale_date && (
-                <div style={{ fontSize: '9pt', marginBottom: '4px' }}>
-                  <strong>Sale Date:</strong> {new Date(provenance.sale_date).toLocaleDateString()}
-                </div>
-              )}
-              {provenance.bat_url && (
-                <div style={{ marginTop: '8px' }}>
-                  <a 
-                    href={provenance.bat_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    style={{
-                      fontSize: '9pt',
-                      color: '#0066cc',
-                      textDecoration: 'underline'
-                    }}
-                  >
-                    View Auction Listing →
-                  </a>
-                </div>
-              )}
+              <a
+                href={String(context?.evidence_url || provenance?.bat_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: '9pt', fontWeight: 700, textDecoration: 'underline' }}
+              >
+                Open listing
+              </a>
             </div>
           )}
 
@@ -401,7 +449,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           )}
 
           {/* No Evidence Warning */}
-          {evidence.length === 0 && (
+          {evidence.length === 0 && !(context?.evidence_url || provenance?.bat_url) && (
             <div style={{
               padding: '12px',
               background: '#fff3cd',
@@ -410,7 +458,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               marginBottom: '16px'
             }}>
               <div style={{ fontSize: '7pt', fontWeight: 'bold', color: '#856404', marginBottom: '4px' }}>
-                ⚠️ NO EVIDENCE FOUND
+                NO EVIDENCE FOUND
               </div>
               <div style={{ fontSize: '7pt', color: '#856404' }}>
                 This value has no supporting evidence. Upload receipts or build estimates to verify.
