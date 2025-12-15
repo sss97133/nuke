@@ -42,6 +42,41 @@ serve(async (req) => {
 
     const html = await response.text()
 
+    // BaT listing pages embed the real gallery as JSON inside `data-gallery-items="[...]"`
+    // This is the most reliable way to get *all* listing images without pulling "recommended auctions" noise.
+    const extractBatGalleryImages = (html: string): string[] => {
+      try {
+        const m = html.match(/data-gallery-items="([^"]+)"/i)
+        if (!m?.[1]) return []
+
+        // Decode minimal HTML entities used inside the attribute.
+        const jsonText = m[1]
+          .replace(/&quot;/g, '"')
+          .replace(/&#038;/g, '&')
+          .replace(/&amp;/g, '&')
+
+        const items = JSON.parse(jsonText)
+        if (!Array.isArray(items)) return []
+
+        const urls: string[] = []
+        for (const it of items) {
+          const u = it?.large?.url || it?.small?.url
+          if (typeof u !== 'string' || !u.trim()) continue
+          // Normalize: drop query params (fit/resize), keep canonical path.
+          urls.push(u.split('#')[0].split('?')[0])
+        }
+
+        return [...new Set(urls)].filter((u) =>
+          u.startsWith('http') &&
+          u.includes('bringatrailer.com/wp-content/uploads/') &&
+          !u.toLowerCase().endsWith('.svg') &&
+          !u.toLowerCase().endsWith('.pdf')
+        )
+      } catch {
+        return []
+      }
+    }
+
     // Basic data extraction for Craigslist
     const extractBasicData = (html: string, url: string) => {
       // Extract title
@@ -58,6 +93,11 @@ serve(async (req) => {
       
       // BaT images: wp-content/uploads URLs
       if (url.includes('bringatrailer.com')) {
+        // 1) Prefer the embedded gallery JSON (full listing set, no noise).
+        const gallery = extractBatGalleryImages(html)
+        if (gallery.length > 0) {
+          images = gallery
+        } else {
         // Capture absolute, protocol-relative, and relative gallery URLs.
         // BaT pages often include many listing images as relative paths.
         const abs = html.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
@@ -89,6 +129,7 @@ serve(async (req) => {
                      !lower.includes('/assets/') &&
                      !lower.includes('.svg')
             })
+        }
         }
       }
       
