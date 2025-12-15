@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
@@ -29,14 +29,23 @@ const AdminMissionControl: React.FC = () => {
   const [originBackfillMaxImages, setOriginBackfillMaxImages] = useState(0);
   const [originBackfillIncludePartials, setOriginBackfillIncludePartials] = useState(true);
   const [originBackfillLastResult, setOriginBackfillLastResult] = useState<any | null>(null);
+  const loadInFlightRef = useRef(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     loadDashboard();
     const interval = setInterval(loadDashboard, 5000); // Refresh every 5 seconds for scanning
-    return () => clearInterval(interval);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const loadDashboard = async () => {
+    // Prevent overlapping polls (if one refresh takes >5s, they can stack up and feel "slow")
+    if (loadInFlightRef.current) return;
+    loadInFlightRef.current = true;
     try {
       const [
         vehiclesCount,
@@ -55,16 +64,34 @@ const AdminMissionControl: React.FC = () => {
         supabase.from('vehicle_images').select('id', { count: 'exact', head: true }),
         supabase.from('organization_inventory').select('organization_id', { count: 'exact', head: true }),
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('organization_analysis_queue').select('*'),
+        // Only fetch what we render (cuts payload dramatically vs select '*')
+        supabase
+          .from('organization_analysis_queue')
+          .select('organization_id,pending_count,oldest_image')
+          .order('pending_count', { ascending: false })
+          .limit(50),
         supabase.from('organization_narratives').select('id', { count: 'exact', head: true }),
         supabase.from('vehicle_images').select('id', { count: 'exact', head: true }).gte('created_at', new Date(new Date().setHours(0,0,0,0)).toISOString()),
-        supabase.from('timeline_events').select('*').order('created_at', { ascending: false }).limit(10),
+        // Only fetch what we render (timeline_events can have large JSON columns)
+        supabase
+          .from('timeline_events')
+          .select('id,event_type,description,created_at')
+          .order('created_at', { ascending: false })
+          .limit(10),
         // NOTE: `vehicle_images.ai_analysis` does not exist in production schema.
         // Use `ai_processing_status` to find images that have not been processed by the AI pipeline yet.
         supabase.from('vehicle_images').select('vehicle_id, created_at').is('ai_processing_status', null).limit(100),
-        supabase.from('ai_scan_progress').select('*').order('created_at', { ascending: false }).limit(1).single(),
+        // Only fetch fields we render; avoid throwing if table is empty.
+        supabase
+          .from('ai_scan_progress')
+          .select('status,scan_type,started_at,processed_images,total_images,failed_images,created_at')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
         supabase.rpc('get_image_scan_stats')
       ]);
+
+      if (!mountedRef.current) return;
 
       setStats({
         totalVehicles: vehiclesCount.count || 0,
@@ -94,7 +121,8 @@ const AdminMissionControl: React.FC = () => {
     } catch (err) {
       console.error('Error loading dashboard:', err);
     } finally {
-      setLoading(false);
+      loadInFlightRef.current = false;
+      if (mountedRef.current) setLoading(false);
     }
   };
 
