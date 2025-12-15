@@ -99,7 +99,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onClear }) =
       border: '2px solid #000', 
       borderRadius: '0px',
       display: 'inline-block',
-      background: '#fff'
+      background: 'var(--surface)'
     }}>
       <canvas
         ref={canvasRef}

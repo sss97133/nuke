@@ -199,7 +199,7 @@ const ComprehensiveAnalytics = () => {
     }}>
       {/* Vehicle Stats */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '12px'
       }}>
@@ -216,7 +216,7 @@ const ComprehensiveAnalytics = () => {
 
       {/* Activity Stats */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '12px'
       }}>
@@ -233,7 +233,7 @@ const ComprehensiveAnalytics = () => {
 
       {/* Social Stats */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '12px'
       }}>
@@ -250,7 +250,7 @@ const ComprehensiveAnalytics = () => {
 
       {/* Marketplace Stats */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '12px'
       }}>
@@ -274,7 +274,7 @@ const ComprehensiveAnalytics = () => {
       gap: '12px'
     }}>
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '12px'
       }}>
@@ -295,7 +295,7 @@ const ComprehensiveAnalytics = () => {
       </div>
 
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '12px'
       }}>
@@ -341,7 +341,7 @@ const ComprehensiveAnalytics = () => {
 
       {/* Time Range Selector */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '8px',
         marginBottom: '12px',
@@ -372,7 +372,7 @@ const ComprehensiveAnalytics = () => {
 
       {/* Tab Navigation */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         padding: '8px',
         marginBottom: '12px'
@@ -428,7 +428,7 @@ const ComprehensiveAnalytics = () => {
           {selectedTab === 'spending' && <SpendingDashboard />}
           {selectedTab === 'social' && (
             <div style={{
-              background: 'white',
+              background: 'var(--surface)',
               border: '1px solid #bdbdbd',
               padding: '12px',
               textAlign: 'center',
@@ -440,7 +440,7 @@ const ComprehensiveAnalytics = () => {
           )}
           {selectedTab === 'marketplace' && (
             <div style={{
-              background: 'white',
+              background: 'var(--surface)',
               border: '1px solid #bdbdbd',
               padding: '12px',
               textAlign: 'center',
@@ -452,7 +452,7 @@ const ComprehensiveAnalytics = () => {
           )}
           {selectedTab === 'streaming' && (
             <div style={{
-              background: 'white',
+              background: 'var(--surface)',
               border: '1px solid #bdbdbd',
               padding: '12px',
               textAlign: 'center',

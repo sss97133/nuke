@@ -112,7 +112,7 @@ const OffloadVehicleButton: React.FC<OffloadVehicleButtonProps> = ({
                 fontSize: '8pt',
                 fontWeight: 600,
                 border: '1px solid var(--border)',
-                background: 'white',
+                background: 'var(--surface)',
                 color: 'var(--text-muted)',
                 cursor: loading ? 'wait' : 'pointer',
                 borderRadius: '4px'
@@ -130,7 +130,7 @@ const OffloadVehicleButton: React.FC<OffloadVehicleButtonProps> = ({
             fontSize: '7pt',
             fontWeight: 600,
             border: '1px solid #991b1b',
-            background: 'white',
+            background: 'var(--surface)',
             color: '#991b1b',
             cursor: 'pointer',
             borderRadius: '3px',

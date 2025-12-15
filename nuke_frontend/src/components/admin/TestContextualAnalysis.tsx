@@ -246,7 +246,7 @@ export const TestContextualAnalysis: React.FC = () => {
       {result && (
         <div style={{
           padding: '12px',
-          background: '#fff',
+          background: 'var(--surface)',
           border: '2px solid #000'
         }}>
           <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px' }}>

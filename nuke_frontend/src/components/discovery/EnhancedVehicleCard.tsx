@@ -139,7 +139,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
         <div
           className="content-card"
           style={{
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid #c0c0c0',
             borderRadius: '2px',
             overflow: 'hidden',
@@ -228,7 +228,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
         <div
           className="content-card"
           style={{
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid #c0c0c0',
             borderRadius: '2px',
             overflow: 'hidden',
@@ -369,7 +369,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
       <div
         className="content-card"
         style={{
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #c0c0c0',
           borderRadius: '2px',
           overflow: 'hidden',

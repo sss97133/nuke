@@ -134,7 +134,7 @@ export default function CatalogBrowser() {
   const providerHref = providerBaseUrl || null;
 
   return (
-    <div style={{ padding: '16px', maxWidth: '1600px', margin: '0 auto', background: '#fff', minHeight: '100vh' }}>
+    <div style={{ padding: '16px', maxWidth: '1600px', margin: '0 auto', background: 'var(--surface)', minHeight: '100vh' }}>
       
       {/* Header */}
       <div style={{ marginBottom: '16px', borderBottom: '2px solid #000', paddingBottom: '12px' }}>
@@ -239,7 +239,7 @@ export default function CatalogBrowser() {
               fontSize: '8pt',
               fontWeight: 700,
               border: '2px solid #000',
-              background: '#fff',
+              background: 'var(--surface)',
               cursor: 'pointer'
             }}
           >
@@ -268,7 +268,7 @@ export default function CatalogBrowser() {
               key={part.id}
               style={{
                 border: '2px solid #000',
-                background: '#fff',
+                background: 'var(--surface)',
                 overflow: 'hidden',
                 transition: 'transform 0.12s',
                 cursor: 'pointer'
@@ -390,7 +390,7 @@ export default function CatalogBrowser() {
                         fontSize: '7pt',
                         fontWeight: 700,
                         border: '2px solid #000',
-                        background: '#fff',
+                        background: 'var(--surface)',
                         cursor: 'pointer'
                       }}
                     >

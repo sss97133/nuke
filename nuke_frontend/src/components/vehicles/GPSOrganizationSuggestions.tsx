@@ -129,7 +129,7 @@ const GPSOrganizationSuggestions: React.FC<GPSOrganizationSuggestionsProps> = ({
               justifyContent: 'space-between',
               alignItems: 'center',
               padding: '6px 8px',
-              background: 'white',
+              background: 'var(--surface)',
               border: '1px solid #bfdbfe',
               borderRadius: '3px'
             }}

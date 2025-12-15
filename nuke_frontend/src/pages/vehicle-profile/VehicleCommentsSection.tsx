@@ -11,7 +11,7 @@ const VehicleCommentsSection = forwardRef<HTMLDivElement, VehicleCommentsSection
           position: 'sticky',
           top: 'calc(var(--header-height, 48px) + 200px)',
           zIndex: 9, // Lower than work memory so it slides under
-          backgroundColor: 'white',
+          backgroundColor: 'var(--surface)',
           borderRadius: 'var(--radius)',
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
           border: '1px solid var(--color-border)',

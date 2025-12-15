@@ -110,7 +110,7 @@ const SignDocument: React.FC = () => {
           padding: '30px', 
           border: '2px solid #ef4444',
           borderRadius: '0px',
-          background: '#fff'
+          background: 'var(--surface)'
         }}>
           <h2 style={{ fontSize: '14pt', marginBottom: '16px', color: '#ef4444' }}>
             ❌ Error
@@ -121,7 +121,7 @@ const SignDocument: React.FC = () => {
             style={{
               padding: '8px 16px',
               border: '2px solid #000',
-              background: '#fff',
+              background: 'var(--surface)',
               fontSize: '9pt',
               fontWeight: 700,
               cursor: 'pointer',
@@ -149,7 +149,7 @@ const SignDocument: React.FC = () => {
           padding: '40px', 
           border: '2px solid #10b981',
           borderRadius: '0px',
-          background: '#fff',
+          background: 'var(--surface)',
           textAlign: 'center'
         }}>
           <h2 style={{ fontSize: '16pt', marginBottom: '20px', color: '#10b981' }}>
@@ -230,7 +230,7 @@ const SignDocument: React.FC = () => {
     <div style={{ minHeight: '100vh', padding: '20px', background: 'var(--surface-light, #f5f5f5)' }}>
       <div style={{ maxWidth: '900px', margin: '0 auto' }}>
         <div style={{ 
-          background: '#fff', 
+          background: 'var(--surface)', 
           border: '2px solid #000', 
           borderRadius: '0px',
           marginBottom: '20px'

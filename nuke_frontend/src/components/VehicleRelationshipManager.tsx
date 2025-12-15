@@ -46,7 +46,7 @@ const VehicleRelationshipManager: React.FC<VehicleRelationshipManagerProps> = ({
   return (
     <div style={{ 
       padding: '8px', 
-      backgroundColor: 'white', 
+      backgroundColor: 'var(--surface)', 
       border: '1px solid #bdbdbd',
       fontSize: '8pt'
     }}>

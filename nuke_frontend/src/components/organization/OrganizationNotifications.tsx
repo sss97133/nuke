@@ -272,7 +272,7 @@ const OrganizationNotifications: React.FC<Props> = ({ organizationId, userId }) 
                         padding: '4px 8px',
                         fontSize: '7pt',
                         border: '1px solid var(--border)',
-                        background: 'white',
+                        background: 'var(--surface)',
                         cursor: 'pointer',
                         borderRadius: '3px'
                       }}

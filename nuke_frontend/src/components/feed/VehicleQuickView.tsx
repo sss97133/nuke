@@ -143,7 +143,7 @@ const VehicleQuickView = ({ vehicleId, isOpen, onClose }: VehicleQuickViewProps)
     >
       <div
         style={{
-          background: 'white',
+          background: 'var(--surface)',
           borderRadius: '4px',
           maxWidth: '900px',
           width: '100%',
@@ -183,7 +183,7 @@ const VehicleQuickView = ({ vehicleId, isOpen, onClose }: VehicleQuickViewProps)
                         left: '10px',
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        background: 'rgba(255, 255, 255, 0.9)',
+                        background: 'var(--surface-glass)',
                         border: '1px solid #000',
                         padding: '8px 12px',
                         cursor: 'pointer',
@@ -200,7 +200,7 @@ const VehicleQuickView = ({ vehicleId, isOpen, onClose }: VehicleQuickViewProps)
                         right: '10px',
                         top: '50%',
                         transform: 'translateY(-50%)',
-                        background: 'rgba(255, 255, 255, 0.9)',
+                        background: 'var(--surface-glass)',
                         border: '1px solid #000',
                         padding: '8px 12px',
                         cursor: 'pointer',
@@ -239,7 +239,7 @@ const VehicleQuickView = ({ vehicleId, isOpen, onClose }: VehicleQuickViewProps)
                   right: '10px',
                   padding: '4px 8px',
                   fontSize: '12pt',
-                  background: 'rgba(255, 255, 255, 0.9)',
+                  background: 'var(--surface-glass)',
                   zIndex: 10
                 }}
               >

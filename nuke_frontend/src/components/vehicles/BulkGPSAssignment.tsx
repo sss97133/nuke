@@ -72,7 +72,7 @@ const BulkGPSAssignment: React.FC<BulkGPSAssignmentProps> = ({
       position: 'sticky',
       top: 0,
       zIndex: 100,
-      background: 'white',
+      background: 'var(--surface)',
       border: '2px solid #1e40af',
       borderRadius: '4px',
       padding: '12px',
@@ -158,7 +158,7 @@ const BulkGPSAssignment: React.FC<BulkGPSAssignmentProps> = ({
               fontSize: '9pt',
               fontWeight: 600,
               border: '1px solid var(--border)',
-              background: 'white',
+              background: 'var(--surface)',
               color: 'var(--text-muted)',
               cursor: 'pointer',
               borderRadius: '4px'
@@ -222,7 +222,7 @@ const BulkGPSAssignment: React.FC<BulkGPSAssignmentProps> = ({
               fontSize: '9pt',
               fontWeight: 600,
               border: '1px solid var(--border)',
-              background: 'white',
+              background: 'var(--surface)',
               color: 'var(--text-muted)',
               cursor: 'pointer',
               borderRadius: '4px'

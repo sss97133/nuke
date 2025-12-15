@@ -231,7 +231,7 @@ export default function SystemHealth() {
               style={{
                 border: '1px solid #bdbdbd',
                 padding: '12px',
-                background: '#ffffff',
+                background: 'var(--surface)',
                 cursor: 'pointer'
               }}
               onClick={() => setSelectedIssue(issue)}
@@ -277,7 +277,7 @@ export default function SystemHealth() {
                       style={{
                         padding: '4px 8px',
                         border: '1px solid #bdbdbd',
-                        background: '#ffffff',
+                        background: 'var(--surface)',
                         cursor: 'pointer',
                         fontSize: '7pt'
                       }}
@@ -329,7 +329,7 @@ export default function SystemHealth() {
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--surface)',
               padding: '24px',
               maxWidth: '600px',
               maxHeight: '80vh',
@@ -382,7 +382,7 @@ export default function SystemHealth() {
                 style={{
                   padding: '8px 16px',
                   border: '1px solid #bdbdbd',
-                  background: '#ffffff',
+                  background: 'var(--surface)',
                   cursor: 'pointer',
                   fontSize: '8pt'
                 }}
@@ -394,7 +394,7 @@ export default function SystemHealth() {
                 style={{
                   padding: '8px 16px',
                   border: '1px solid #bdbdbd',
-                  background: '#ffffff',
+                  background: 'var(--surface)',
                   cursor: 'pointer',
                   fontSize: '8pt'
                 }}

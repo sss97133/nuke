@@ -41,7 +41,7 @@ const SpatialPartPopup: React.FC<SpatialPartPopupProps> = ({ part, onClose, onOr
 			<div
 				onClick={(e) => e.stopPropagation()}
 				style={{
-					background: 'white',
+					background: 'var(--surface)',
 					border: '1px solid #d1d5db',
 					padding: 16,
 					minWidth: 320,

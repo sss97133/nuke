@@ -120,7 +120,7 @@ const AITaggingDemo = () => {
       {/* Results */}
       {results && (
         <div style={{
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #bdbdbd',
           padding: '8px',
           fontSize: '8pt'

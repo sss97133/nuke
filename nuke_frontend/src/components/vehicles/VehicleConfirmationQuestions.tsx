@@ -96,7 +96,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
       marginBottom: '16px',
       border: '2px solid var(--accent)',
       borderRadius: '4px',
-      background: 'white'
+      background: 'var(--surface)'
     }}>
       <div style={{
         padding: '12px',
@@ -143,7 +143,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
                 color: 'var(--text-muted)',
                 marginBottom: '12px',
                 padding: '6px',
-                background: 'white',
+                background: 'var(--surface)',
                 borderRadius: '3px'
               }}>
                 {question.question_type === 'org_link_move' && (
@@ -185,7 +185,7 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
                   fontSize: '8pt',
                   fontWeight: 600,
                   border: '1px solid var(--border)',
-                  background: 'white',
+                  background: 'var(--surface)',
                   color: 'var(--text-muted)',
                   cursor: responding.has(question.question_id) ? 'wait' : 'pointer',
                   borderRadius: '4px',

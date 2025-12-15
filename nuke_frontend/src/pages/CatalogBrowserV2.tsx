@@ -121,7 +121,7 @@ export default function CatalogBrowserV2() {
     <div style={{ 
       display: 'flex', 
       height: '100vh', 
-      background: '#fff',
+      background: 'var(--surface)',
       overflow: 'hidden'
     }}>
       
@@ -245,7 +245,7 @@ export default function CatalogBrowserV2() {
             fontSize: '8pt',
             fontWeight: 700,
             border: '2px solid #000',
-            background: '#fff',
+            background: 'var(--surface)',
             cursor: 'pointer'
           }}
         >
@@ -273,7 +273,7 @@ export default function CatalogBrowserV2() {
         <div style={{ 
           borderBottom: '2px solid #000',
           padding: '16px 24px',
-          background: '#fff',
+          background: 'var(--surface)',
           flexShrink: 0
         }}>
           <h1 style={{ fontSize: '14pt', fontWeight: 700, marginBottom: '4px' }}>
@@ -403,7 +403,7 @@ export default function CatalogBrowserV2() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          background: '#fff',
+          background: 'var(--surface)',
           flexShrink: 0
         }}>
           <button
@@ -462,7 +462,7 @@ export default function CatalogBrowserV2() {
           <div 
             onClick={(e) => e.stopPropagation()}
             style={{ 
-              background: '#fff', 
+              background: 'var(--surface)', 
               border: '2px solid #000', 
               padding: '24px', 
               maxWidth: '800px',
@@ -487,7 +487,7 @@ export default function CatalogBrowserV2() {
               </div>
               <button 
                 onClick={() => { setSelectedPart(null); setPartAssemblies([]); setAssemblyParts([]); }}
-                style={{ fontSize: '8pt', fontWeight: 700, border: '2px solid #000', background: '#fff', padding: '8px 16px', cursor: 'pointer', height: 'fit-content' }}
+                style={{ fontSize: '8pt', fontWeight: 700, border: '2px solid #000', background: 'var(--surface)', padding: '8px 16px', cursor: 'pointer', height: 'fit-content' }}
               >
                 CLOSE
               </button>

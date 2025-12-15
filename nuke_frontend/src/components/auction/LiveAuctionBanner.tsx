@@ -226,7 +226,7 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
         >
           <div
             style={{
-              background: 'white',
+              background: 'var(--surface)',
               borderRadius: '8px',
               padding: '20px',
               maxWidth: '600px',

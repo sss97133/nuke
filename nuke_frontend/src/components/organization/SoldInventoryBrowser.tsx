@@ -652,7 +652,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    background: 'white',
+                    background: 'var(--surface)',
                     border: '2px solid var(--border)',
                     borderRadius: '8px',
                     padding: '16px',
@@ -822,7 +822,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'white',
+              background: 'var(--surface)',
               borderRadius: '8px',
               padding: '20px',
               maxWidth: '500px',

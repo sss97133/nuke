@@ -208,7 +208,7 @@ export const AnnotoriousImageTagger: React.FC<AnnotoriousImageTaggerProps> = ({
           <h4 style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Annotation Tools
           </h4>
-          <div style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.4' }}>
+          <div style={{ fontSize: '9px', color: 'var(--surface-glass)', lineHeight: '1.4' }}>
             <div style={{ marginBottom: '4px' }}>• Click and drag to draw a rectangle</div>
             <div style={{ marginBottom: '4px' }}>• Use toolbar for polygon or point tools</div>
             <div style={{ marginBottom: '4px' }}>• Press ESC to cancel annotation</div>

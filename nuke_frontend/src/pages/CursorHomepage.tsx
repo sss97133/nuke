@@ -1761,9 +1761,9 @@ const CursorHomepage: React.FC = () => {
               <details style={{ fontSize: '8pt', color: '#666', marginTop: '8px' }}>
                 <summary style={{ cursor: 'pointer', marginBottom: '4px' }}>Debug Info</summary>
                 <pre style={{ 
-                  background: '#fff', 
+                  background: 'var(--surface)', 
                   padding: '8px', 
-                  border: '1px solid #ddd',
+                  border: '1px solid var(--border)',
                   overflow: 'auto',
                   fontSize: '7pt'
                 }}>

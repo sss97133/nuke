@@ -31,7 +31,7 @@ const VehicleStats: React.FC<VehicleStatsProps> = ({
 }) => {
   return (
     <div className="vehicle-stats-bar" style={{
-      background: 'white',
+      background: 'var(--surface)',
       border: '1px solid var(--color-border)',
       borderRadius: 'var(--radius)',
       padding: '12px 16px',

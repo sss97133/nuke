@@ -160,28 +160,28 @@ const BuildAnalysisResults = ({ results, query, analysis, loading = false }: Bui
           gap: '12px',
           marginTop: '16px'
         }}>
-          <div style={{ textAlign: 'center', background: 'white', padding: '8px', borderRadius: '6px' }}>
+          <div style={{ textAlign: 'center', background: 'var(--surface)', padding: '8px', borderRadius: '6px' }}>
             <div className="text text-bold" style={{ fontSize: '18px', color: '#0369a1' }}>{stats.total}</div>
             <div className="text text-muted" style={{ fontSize: '12px' }}>Total Builds</div>
           </div>
 
-          <div style={{ textAlign: 'center', background: 'white', padding: '8px', borderRadius: '6px' }}>
+          <div style={{ textAlign: 'center', background: 'var(--surface)', padding: '8px', borderRadius: '6px' }}>
             <div className="text text-bold" style={{ fontSize: '18px', color: '#ef4444' }}>{stats.highRisk}</div>
             <div className="text text-muted" style={{ fontSize: '12px' }}>High Risk</div>
           </div>
 
-          <div style={{ textAlign: 'center', background: 'white', padding: '8px', borderRadius: '6px' }}>
+          <div style={{ textAlign: 'center', background: 'var(--surface)', padding: '8px', borderRadius: '6px' }}>
             <div className="text text-bold" style={{ fontSize: '18px', color: '#10b981' }}>{stats.active}</div>
             <div className="text text-muted" style={{ fontSize: '12px' }}>Active</div>
           </div>
 
-          <div style={{ textAlign: 'center', background: 'white', padding: '8px', borderRadius: '6px' }}>
+          <div style={{ textAlign: 'center', background: 'var(--surface)', padding: '8px', borderRadius: '6px' }}>
             <div className="text text-bold" style={{ fontSize: '18px', color: '#3b82f6' }}>{Math.round(stats.avgHealth)}%</div>
             <div className="text text-muted" style={{ fontSize: '12px' }}>Avg Health</div>
           </div>
 
           {stats.totalSpent > 0 && (
-            <div style={{ textAlign: 'center', background: 'white', padding: '8px', borderRadius: '6px' }}>
+            <div style={{ textAlign: 'center', background: 'var(--surface)', padding: '8px', borderRadius: '6px' }}>
               <div className="text text-bold" style={{ fontSize: '18px', color: '#8b5cf6' }}>
                 ${stats.totalSpent.toLocaleString()}
               </div>
@@ -244,7 +244,7 @@ const BuildAnalysisResults = ({ results, query, analysis, loading = false }: Bui
             <div
               key={result.vehicle_id}
               style={{
-                background: 'white',
+                background: 'var(--surface)',
                 border: `2px solid ${getStagnationColor(result.stagnation_risk)}`,
                 borderRadius: '12px',
                 padding: '16px',
@@ -357,7 +357,7 @@ const BuildAnalysisResults = ({ results, query, analysis, loading = false }: Bui
         </div>
       ) : (
         <div style={{
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #e5e7eb',
           borderRadius: '12px',
           overflow: 'hidden'

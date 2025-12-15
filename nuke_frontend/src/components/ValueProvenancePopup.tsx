@@ -199,7 +199,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        background: '#fff',
+        background: 'var(--surface)',
         border: '2px solid #000',
         padding: '20px',
         zIndex: 10000,
@@ -249,7 +249,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
     >
       <div 
         style={{
-          background: '#fff',
+          background: 'var(--surface)',
           border: '2px solid #000',
           minWidth: '500px',
           maxWidth: '600px',
@@ -278,7 +278,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             onClick={onClose}
             style={{
               border: '2px solid #000',
-              background: '#fff',
+              background: 'var(--surface)',
               padding: '4px 12px',
               fontSize: '7pt',
               fontWeight: 'bold',
@@ -432,7 +432,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                     width: '100%',
                     padding: '8px',
                     border: '2px solid #000',
-                    background: '#fff',
+                    background: 'var(--surface)',
                     fontSize: '7pt',
                     fontWeight: 'bold',
                     cursor: 'pointer',
@@ -481,7 +481,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                       style={{
                         padding: '8px 16px',
                         border: '2px solid #000',
-                        background: '#fff',
+                        background: 'var(--surface)',
                         fontSize: '7pt',
                         fontWeight: 'bold',
                         cursor: 'pointer',

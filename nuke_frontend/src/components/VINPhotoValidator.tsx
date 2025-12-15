@@ -667,7 +667,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
         zIndex: 1000
       }}>
         <div className="modal-content" style={{
-          backgroundColor: 'white',
+          backgroundColor: 'var(--surface)',
           borderRadius: '12px',
           padding: '32px',
           maxWidth: '600px',

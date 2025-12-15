@@ -180,7 +180,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
     >
       <div
         style={{
-          background: 'white',
+          background: 'var(--surface)',
           borderRadius: '2px',
           border: '1px solid #c0c0c0',
           maxWidth: '900px',
@@ -289,7 +289,7 @@ const DataContextModal: React.FC<DataContextModalProps> = ({
                       border: '1px solid #c0c0c0',
                       borderRadius: '2px',
                       overflow: 'hidden',
-                      background: 'white',
+                      background: 'var(--surface)',
                       cursor: 'pointer',
                       display: 'block'
                     }}

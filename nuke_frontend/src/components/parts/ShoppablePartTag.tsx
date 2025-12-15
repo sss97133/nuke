@@ -99,7 +99,7 @@ const ShoppablePartTag: React.FC<ShoppablePartTagProps> = ({ tag, onBuy, onEnric
           {suppliers.length === 1 ? (
             // Single supplier - direct buy button
             <div style={{
-              background: '#fff',
+              background: 'var(--surface)',
               border: '1px inset #808080',
               padding: '4px',
               display: 'flex',
@@ -159,7 +159,7 @@ const ShoppablePartTag: React.FC<ShoppablePartTagProps> = ({ tag, onBuy, onEnric
               
               {showSuppliers && (
                 <div style={{
-                  background: '#fff',
+                  background: 'var(--surface)',
                   border: '1px inset #808080',
                   marginTop: '2px',
                   padding: '2px',

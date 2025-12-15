@@ -27,7 +27,7 @@ if (!rootEl) {
       style: { 
         padding: '20px', 
         fontSize: '16px',
-        backgroundColor: 'white',
+        backgroundColor: 'var(--surface)',
         color: 'black',
         border: '2px solid green'
       } 

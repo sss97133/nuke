@@ -51,7 +51,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         to={`/vehicle/${vehicle.id}`}
         className="content-card"
         style={{
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #c0c0c0',
           borderRadius: '2px',
           overflow: 'hidden',
@@ -87,7 +87,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         to={`/vehicle/${vehicle.id}`}
         className="content-card"
         style={{
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #c0c0c0',
           borderRadius: '2px',
           overflow: 'hidden',
@@ -137,7 +137,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
       to={`/vehicle/${vehicle.id}`}
       className="content-card"
       style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid #c0c0c0',
         borderRadius: '2px',
         overflow: 'hidden',

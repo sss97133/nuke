@@ -131,7 +131,7 @@ export default function CitationModal({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'white',
+          background: 'var(--surface)',
           width: '720px',
           maxWidth: '100%',
           maxHeight: '90vh',
@@ -383,7 +383,7 @@ export default function CitationModal({
                 position: 'absolute',
                 top: '20px',
                 right: '20px',
-                background: 'white',
+                background: 'var(--surface)',
                 border: 'none',
                 padding: '8px 12px',
                 fontSize: '9pt',

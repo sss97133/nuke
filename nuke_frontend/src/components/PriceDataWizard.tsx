@@ -282,7 +282,7 @@ const PriceDataWizard: React.FC<PriceDataWizardProps> = ({
           maxWidth: '600px',
           maxHeight: '80vh',
           overflow: 'auto',
-          background: 'white'
+          background: 'var(--surface)'
         }}
       >
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -336,7 +336,7 @@ const DealerBulkEditor: React.FC = () => {
               padding: '6px 12px',
               fontSize: '8pt',
               border: '1px solid var(--border)',
-              background: 'white',
+              background: 'var(--surface)',
               cursor: 'pointer'
             }}
           >
@@ -377,7 +377,7 @@ const DealerBulkEditor: React.FC = () => {
 
       {/* AI Spreadsheet Import */}
       <div style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '2px solid var(--accent)',
         borderRadius: '4px',
         padding: '16px',
@@ -420,7 +420,7 @@ const DealerBulkEditor: React.FC = () => {
       {/* Spreadsheet Grid */}
       <div style={{ 
         overflowX: 'auto',
-        background: 'white',
+        background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: '4px'
       }}>
@@ -653,7 +653,7 @@ const DealerBulkEditor: React.FC = () => {
                       padding: '4px 8px',
                       fontSize: '7pt',
                       border: '1px solid var(--danger)',
-                      background: 'white',
+                      background: 'var(--surface)',
                       color: 'var(--danger)',
                       cursor: 'pointer'
                     }}

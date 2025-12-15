@@ -307,7 +307,7 @@ const TradeDetailsManager: React.FC<TradeDetailsManagerProps> = ({ vehicleId, ve
 
   // Editing mode
   return (
-    <div style={{ marginTop: '16px', padding: '16px', background: '#fff', border: '2px solid #e5e7eb', borderRadius: '4px' }}>
+    <div style={{ marginTop: '16px', padding: '16px', background: 'var(--surface)', border: '2px solid #e5e7eb', borderRadius: '4px' }}>
       <h4 style={{ fontSize: '10pt', fontWeight: 'bold', marginBottom: '12px' }}>
         {trade ? 'Edit' : 'Record'} Trade Details
       </h4>

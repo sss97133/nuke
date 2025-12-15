@@ -1497,7 +1497,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           top: '100%',
           left: 0,
           right: 0,
-          background: 'white',
+          background: 'var(--surface)',
           border: '1px solid #e5e7eb',
           borderRadius: '8px',
           marginTop: '4px',

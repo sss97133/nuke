@@ -2145,7 +2145,7 @@ export default function OrganizationProfile() {
                                     handleSetPrimary(img.id);
                                   }}
                                   style={{
-                                    background: 'rgba(255,255,255,0.9)',
+                                    background: 'var(--surface-glass)',
                                     border: '1px solid var(--border)',
                                     borderRadius: '2px',
                                     padding: '4px 8px',
@@ -2163,7 +2163,7 @@ export default function OrganizationProfile() {
                                     handleScanImage(img.id);
                                   }}
                                   style={{
-                                    background: 'rgba(255,255,255,0.9)',
+                                    background: 'var(--surface-glass)',
                                     border: '1px solid var(--border)',
                                     borderRadius: '2px',
                                     padding: '4px 8px',
@@ -2184,7 +2184,7 @@ export default function OrganizationProfile() {
                                 handleDeleteImage(img.id);
                               }}
                               style={{
-                                background: 'rgba(255,255,255,0.9)',
+                                background: 'var(--surface-glass)',
                                 border: '1px solid var(--border)',
                                 borderRadius: '2px',
                                 padding: '4px 8px',
@@ -2521,7 +2521,7 @@ export default function OrganizationProfile() {
           justifyContent: 'center'
         }} onClick={() => setShowOwnershipModal(false)}>
           <div onClick={(e) => e.stopPropagation()} style={{
-            background: 'white',
+            background: 'var(--surface)',
             width: '540px',
             maxWidth: '95vw',
             border: '1px solid var(--border)',

@@ -69,7 +69,7 @@ const OrderBook: React.FC<{ offeringId: string }> = ({ offeringId }) => {
 
   return (
     <div style={{
-      background: 'white',
+      background: 'var(--surface)',
       border: '2px solid #bdbdbd',
       borderRadius: '4px',
       padding: '12px',

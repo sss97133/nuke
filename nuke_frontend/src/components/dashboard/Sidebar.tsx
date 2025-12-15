@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       style={{
         width: '200px',
         borderRight: '1px solid #bdbdbd',
-        background: '#ffffff',
+        background: 'var(--surface)',
         height: '100%',
         overflowY: 'auto',
         fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",

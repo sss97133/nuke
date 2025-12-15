@@ -292,7 +292,7 @@ const DataIntelligenceSearch = ({ onResults }: DataIntelligenceSearchProps) => {
             style={{
               fontSize: '16px',
               padding: '12px 60px 12px 16px',
-              background: 'white',
+              background: 'var(--surface)',
               border: '2px solid #3b82f6',
               borderRadius: '12px',
               boxShadow: isAnalyzing ? '0 0 20px rgba(59, 130, 246, 0.3)' : '0 2px 8px rgba(0,0,0,0.1)',

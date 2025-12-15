@@ -173,7 +173,7 @@ export default function AdminPendingVehicles() {
               padding: '16px',
               border: '1px solid #e5e7eb',
               borderRadius: '8px',
-              background: 'white'
+              background: 'var(--surface)'
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>

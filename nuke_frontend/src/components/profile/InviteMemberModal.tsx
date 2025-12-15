@@ -13,7 +13,7 @@ const modalStyle: React.CSSProperties = {
   background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
 };
 const panelStyle: React.CSSProperties = {
-  width: '520px', maxWidth: '95%', background: 'white', border: '1px solid #c0c0c0', borderRadius: 2
+  width: '520px', maxWidth: '95%', background: 'var(--surface)', border: '1px solid #c0c0c0', borderRadius: 2
 };
 const headerStyle: React.CSSProperties = { padding: 6, borderBottom: '1px solid #c0c0c0', background: '#f3f4f6', fontWeight: 700 };
 const bodyStyle: React.CSSProperties = { padding: 8 };

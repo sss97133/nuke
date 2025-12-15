@@ -479,12 +479,34 @@ serve(async (req) => {
       }
       html = await resp.text();
     } else {
+      // Some “index” pages (notably BaT Live Auctions and Classic.com auctions) are JS-driven and
+      // return almost no listing links without a renderer. In those cases we allow Firecrawl even
+      // when `cheap_mode=true` (we still skip LLM extraction; we only want HTML for URL enumeration).
+      const baseForMode = new URL(source_url);
+      const baseHostForMode = baseForMode.hostname.replace(/^www\./, '').toLowerCase();
+      const isBatAuctionsIndex =
+        baseHostForMode === 'bringatrailer.com' &&
+        (baseForMode.pathname === '/auctions/' || baseForMode.pathname === '/auctions');
+      const isClassicAuctionsIndex =
+        baseHostForMode === 'classic.com' &&
+        (baseForMode.pathname === '/auctions/' || baseForMode.pathname === '/auctions');
+
       const shouldUseFirecrawl =
-        !cheap_mode &&
-        !!FIRECRAWL_API_KEY;
+        !!FIRECRAWL_API_KEY &&
+        (
+          // Standard behavior: only use Firecrawl when not cheap_mode.
+          (!cheap_mode) ||
+          // Exception: allow Firecrawl for known JS index pages so we can actually discover listing URLs.
+          (cheap_mode && (isBatAuctionsIndex || isClassicAuctionsIndex))
+        );
 
       try {
         if (shouldUseFirecrawl) {
+          // For cheap_mode “index” pages, don't request `extract` to keep the Firecrawl job light.
+          const formats =
+            cheap_mode
+              ? ['html']
+              : ['markdown', 'html', 'extract'];
           const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
             method: 'POST',
             headers: {
@@ -493,12 +515,11 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               url: source_url,
-              formats: ['markdown', 'html', 'extract'],
-              extract: {
-                schema: extractionSchema
-              },
+              formats,
+              ...(cheap_mode ? {} : { extract: { schema: extractionSchema } }),
               onlyMainContent: false,
-              waitFor: 4000 // More time for JS-heavy dealer sites
+              // Give JS-heavy pages (BaT /auctions, Classic /auctions) time to render listing cards.
+              waitFor: cheap_mode ? 6500 : 4000
             }),
             signal: AbortSignal.timeout(30000),
           });
@@ -782,6 +803,25 @@ Return ONLY valid JSON in this format:
               if (u.hostname.replace(/^www\./, '').toLowerCase() !== 'classic.com') continue;
               if (!u.pathname.toLowerCase().startsWith('/l/')) continue;
               // Normalize trailing slash
+              const normalized = u.pathname.endsWith('/') ? `${u.origin}${u.pathname}` : `${u.origin}${u.pathname}/`;
+              found.add(normalized);
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        // Bring a Trailer: enumerate listing detail URLs from live auction index pages.
+        if (baseHost === 'bringatrailer.com') {
+          const anyBatListingHref = /href="([^"]*\/listing\/[^"]+)"/gi;
+          while ((m = anyBatListingHref.exec(html)) !== null) {
+            const raw = (m[1] || '').trim();
+            if (!raw) continue;
+            const abs = raw.startsWith('http') ? raw : `${baseUrl.origin}${raw.startsWith('/') ? '' : '/'}${raw}`;
+            try {
+              const u = new URL(abs);
+              if (u.hostname.replace(/^www\./, '').toLowerCase() !== 'bringatrailer.com') continue;
+              if (!u.pathname.toLowerCase().startsWith('/listing/')) continue;
               const normalized = u.pathname.endsWith('/') ? `${u.origin}${u.pathname}` : `${u.origin}${u.pathname}/`;
               found.add(normalized);
             } catch {

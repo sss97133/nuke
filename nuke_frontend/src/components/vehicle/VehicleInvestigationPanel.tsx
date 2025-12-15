@@ -526,7 +526,7 @@ export default function VehicleInvestigationPanel({ vehicleId, onClose }: Props)
                 key={nearby.id}
                 style={{
                   padding: '10px',
-                  background: 'white',
+                  background: 'var(--surface)',
                   border: `2px solid ${nearby.duplicate_likelihood >= 70 ? '#dc2626' : '#d97706'}`,
                   borderRadius: '3px',
                   marginBottom: '8px'

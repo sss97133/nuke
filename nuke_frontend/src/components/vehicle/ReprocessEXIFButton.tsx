@@ -50,7 +50,7 @@ const ReprocessEXIFButton: React.FC<Props> = ({ vehicleId, onComplete }) => {
           fontSize: '8pt',
           fontWeight: 700,
           border: '1px solid var(--border)',
-          background: 'white',
+          background: 'var(--surface)',
           color: 'var(--text)',
           cursor: processing ? 'wait' : 'pointer',
           borderRadius: '4px',

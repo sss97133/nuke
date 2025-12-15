@@ -19,7 +19,9 @@
     "start-proxy": "npm run proxy",
     "fix-imports": "node fix-imports.cjs",
     "scan-fix-all": "node scan-fix-all-imports.cjs",
-    "type-check": "npx tsc --noEmit --skipLibCheck"
+    "type-check": "npx tsc --noEmit --skipLibCheck",
+    "theme-audit": "node scripts/theme-audit.mjs",
+    "theme-audit:fail": "node scripts/theme-audit.mjs --fail"
   },
   "dependencies": {
     "@annotorious/react": "^3.7.18",

@@ -234,7 +234,7 @@ const AIWorkOrderInvoice: React.FC<AIWorkOrderInvoiceProps> = ({
 
         {/* Work Details */}
         <div style={{
-          background: '#fff',
+          background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: '6px',
           padding: '16px'
@@ -405,7 +405,7 @@ const AIWorkOrderInvoice: React.FC<AIWorkOrderInvoiceProps> = ({
 
           <div style={{
             padding: '16px',
-            background: 'rgba(255,255,255,0.7)',
+            background: 'var(--surface-glass)',
             borderRadius: '6px',
             marginBottom: '16px'
           }}>
@@ -521,7 +521,7 @@ const AIWorkOrderInvoice: React.FC<AIWorkOrderInvoiceProps> = ({
     >
       <div
         style={{
-          background: '#fff',
+          background: 'var(--surface)',
           width: '100%',
           maxWidth: '900px',
           maxHeight: '90vh',
@@ -599,7 +599,7 @@ const AIWorkOrderInvoice: React.FC<AIWorkOrderInvoiceProps> = ({
                 style={{
                   padding: '8px 16px',
                   border: '1px solid #D1D5DB',
-                  background: '#fff',
+                  background: 'var(--surface)',
                   borderRadius: '4px',
                   fontSize: '9pt',
                   cursor: 'pointer'

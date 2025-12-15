@@ -64,7 +64,7 @@ const ShippingSettings: React.FC = () => {
       <div style={{ 
         border: '2px solid #000',
         borderRadius: '0px',
-        background: '#fff',
+        background: 'var(--surface)',
         marginBottom: '20px'
       }}>
         <div style={{ 
@@ -154,7 +154,7 @@ const ShippingSettings: React.FC = () => {
                   marginTop: '20px',
                   padding: '8px 16px',
                   border: '2px solid #ef4444',
-                  background: '#fff',
+                  background: 'var(--surface)',
                   color: '#ef4444',
                   fontSize: '9pt',
                   fontWeight: 700,
@@ -243,7 +243,7 @@ const ShippingSettings: React.FC = () => {
       <div style={{ 
         border: '2px solid #000',
         borderRadius: '0px',
-        background: '#fff'
+        background: 'var(--surface)'
       }}>
         <div style={{ 
           padding: '16px', 
@@ -295,7 +295,7 @@ supabase secrets set CENTRAL_DISPATCH_TEST_MODE="true"`}
           marginTop: '20px',
           padding: '8px 16px',
           border: '2px solid #000',
-          background: '#fff',
+          background: 'var(--surface)',
           fontSize: '9pt',
           fontWeight: 700,
           cursor: 'pointer',

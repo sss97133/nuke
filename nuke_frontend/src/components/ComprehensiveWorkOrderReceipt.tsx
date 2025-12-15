@@ -313,9 +313,9 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         onClick={onClose}
       >
         <div style={{ 
-          background: '#fff', 
+          background: 'var(--surface)', 
           padding: '24px', 
-          border: '2px solid #000',
+          border: '2px solid var(--border)',
           maxWidth: '400px'
         }}>
           <div style={{ fontSize: '10pt', marginBottom: '16px' }}>
@@ -327,8 +327,9 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               padding: '8px 16px',
               fontSize: '8pt',
               fontWeight: 'bold',
-              backgroundColor: '#fff',
-              border: '2px solid #000',
+              backgroundColor: 'var(--surface)',
+              border: '2px solid var(--border)',
+              color: 'var(--text)',
               cursor: 'pointer'
             }}
           >
@@ -388,12 +389,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
     >
       <div 
         style={{
-          background: '#fff',
+          background: 'var(--surface)',
           width: '100%',
           maxWidth: '800px',
           maxHeight: '90vh',
           overflow: 'auto',
-          border: '2px solid #000',
+          border: '2px solid var(--border)',
           fontFamily: 'Arial, sans-serif'
         }}
         onClick={(e) => e.stopPropagation()}

@@ -256,7 +256,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
       to={`/vehicle/${vehicle.id}`}
       style={{
         display: 'block',
-        background: 'white',
+        background: 'var(--surface)',
         border: '2px solid #c0c0c0',
         borderRadius: '2px',
         overflow: 'hidden',

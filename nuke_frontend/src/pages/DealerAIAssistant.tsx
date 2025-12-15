@@ -197,7 +197,7 @@ What do you want to do first?`,
       <div style={{
         padding: '12px 20px',
         borderBottom: '1px solid var(--border)',
-        background: 'white',
+        background: 'var(--surface)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
@@ -217,7 +217,7 @@ What do you want to do first?`,
               padding: '6px 12px',
               fontSize: '8pt',
               border: '1px solid var(--border)',
-              background: 'white',
+              background: 'var(--surface)',
               cursor: 'pointer'
             }}
           >
@@ -229,7 +229,7 @@ What do you want to do first?`,
               padding: '6px 12px',
               fontSize: '8pt',
               border: '1px solid var(--border)',
-              background: 'white',
+              background: 'var(--surface)',
               cursor: 'pointer'
             }}
           >
@@ -241,7 +241,7 @@ What do you want to do first?`,
               padding: '6px 12px',
               fontSize: '8pt',
               border: '1px solid var(--border)',
-              background: 'white',
+              background: 'var(--surface)',
               cursor: 'pointer'
             }}
           >
@@ -361,7 +361,7 @@ What do you want to do first?`,
             alignSelf: 'flex-start',
             padding: '12px',
             borderRadius: '8px',
-            background: 'white',
+            background: 'var(--surface)',
             border: '1px solid var(--border)',
             fontSize: '9pt',
             color: 'var(--text-muted)'
@@ -378,7 +378,7 @@ What do you want to do first?`,
       <div style={{
         padding: '16px 20px',
         borderTop: '1px solid var(--border)',
-        background: 'white'
+        background: 'var(--surface)'
       }}>
         {/* Selected Files */}
         {selectedFiles.length > 0 && (
@@ -441,7 +441,7 @@ What do you want to do first?`,
             style={{
               padding: '10px',
               border: '1px solid var(--border)',
-              background: 'white',
+              background: 'var(--surface)',
               borderRadius: '4px',
               cursor: 'pointer',
               fontSize: '14pt'

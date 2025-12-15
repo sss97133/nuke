@@ -407,7 +407,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                         bottom: '8px',
                         left: '8px',
                         fontSize: '7pt',
-                        color: 'rgba(255,255,255,0.7)'
+                        color: 'var(--surface-glass)'
                       }}>
                         {new Date(source.created_at).toLocaleDateString()}
                       </div>
@@ -494,7 +494,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            background: 'white',
+            background: 'var(--surface)',
             padding: '20px',
             borderRadius: '8px',
             boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
@@ -539,7 +539,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            background: 'white',
+            background: 'var(--surface)',
             padding: '20px',
             borderRadius: '8px',
             boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
@@ -600,7 +600,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
               position: 'absolute',
               top: '20px',
               right: '20px',
-              background: 'white',
+              background: 'var(--surface)',
               border: 'none',
               borderRadius: '50%',
               width: '40px',

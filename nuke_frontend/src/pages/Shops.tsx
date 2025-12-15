@@ -490,7 +490,7 @@ const Shops: React.FC = () => {
                 zIndex: 1000
               }}>
                 <div style={{
-                  backgroundColor: 'white',
+                  backgroundColor: 'var(--surface)',
                   borderRadius: '8px',
                   maxWidth: '900px',
                   width: '90%',

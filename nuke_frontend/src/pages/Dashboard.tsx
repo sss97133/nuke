@@ -311,7 +311,7 @@ export default function Dashboard() {
             fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
             padding: '8px 16px',
             border: '1px solid #bdbdbd',
-            background: '#ffffff',
+            background: 'var(--surface)',
             cursor: 'pointer',
             color: '#000000'
           }}
@@ -386,7 +386,7 @@ export default function Dashboard() {
         padding: '16px',
         fontFamily: "'SF Mono', Monaco, 'Cascadia Code', monospace",
         fontSize: '8pt',
-        background: '#ffffff',
+        background: 'var(--surface)',
         maxWidth: '800px',
         margin: '0 auto'
       }}
@@ -461,7 +461,7 @@ export default function Dashboard() {
         >
           <div
             style={{
-              background: '#ffffff',
+              background: 'var(--surface)',
               padding: '20px',
               border: '2px solid #bdbdbd',
               maxWidth: '500px',
@@ -501,7 +501,7 @@ export default function Dashboard() {
                 style={{
                   padding: '6px 16px',
                   border: '1px solid #bdbdbd',
-                  background: '#ffffff',
+                  background: 'var(--surface)',
                   cursor: 'pointer',
                   fontSize: '8pt'
                 }}

@@ -240,7 +240,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
     <div style={{
       position: 'relative',
       border: '2px inset #c0c0c0',
-      background: '#ffffff',
+      background: 'var(--surface)',
       fontFamily: 'MS Sans Serif, sans-serif',
       fontSize: '11px'
     }}>
@@ -665,7 +665,7 @@ const EnhancedImageTagger: React.FC<EnhancedImageTaggerProps> = ({
       <div style={{
         position: 'relative',
         border: '2px inset #c0c0c0',
-        background: '#ffffff',
+        background: 'var(--surface)',
         fontFamily: 'MS Sans Serif, sans-serif',
         fontSize: '11px'
       }}>

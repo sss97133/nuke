@@ -253,7 +253,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
     >
       <div 
         style={{
-          background: '#fff',
+          background: 'var(--surface)',
           width: '100%',
           maxWidth: '800px',
           maxHeight: '90vh',
@@ -279,7 +279,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
               fontSize: '7pt',
               fontWeight: 'bold',
               border: '2px solid #000',
-              background: '#fff',
+              background: 'var(--surface)',
               cursor: 'pointer',
               textTransform: 'uppercase'
             }}
@@ -298,7 +298,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
               fontSize: '7pt',
               fontWeight: 'bold',
               border: '2px solid #000',
-              background: '#fff',
+              background: 'var(--surface)',
               cursor: 'pointer',
               textTransform: 'uppercase'
             }}
@@ -557,7 +557,7 @@ export const UnifiedWorkOrderReceipt: React.FC<UnifiedWorkOrderReceiptProps> = (
               padding: '6px 16px',
               fontSize: '7pt',
               fontWeight: 'bold',
-              backgroundColor: '#fff',
+              backgroundColor: 'var(--surface)',
               border: '2px solid #000',
               cursor: 'pointer',
               textTransform: 'uppercase'

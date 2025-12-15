@@ -57,7 +57,7 @@ const Portfolio: React.FC<{ userId: string }> = ({ userId }) => {
 
   return (
     <div style={{
-      background: 'white',
+      background: 'var(--surface)',
       border: '2px solid #bdbdbd',
       borderRadius: '4px',
       padding: '16px'

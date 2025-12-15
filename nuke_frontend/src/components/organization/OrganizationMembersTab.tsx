@@ -347,7 +347,7 @@ const OrganizationMembersTab: React.FC<Props> = ({ organizationId, userId, canMa
                             padding: '4px 12px',
                             fontSize: '7pt',
                             border: '1px solid var(--danger)',
-                            background: 'white',
+                            background: 'var(--surface)',
                             color: 'var(--danger)',
                             cursor: 'pointer',
                             borderRadius: '4px'

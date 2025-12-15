@@ -206,7 +206,7 @@ export const MobileTagActions: React.FC<MobileTagActionsProps> = ({
       style={{
         position: 'relative',
         overflow: 'hidden',
-        background: '#ffffff',
+        background: 'var(--surface)',
         border: '1px solid #808080',
         marginBottom: '4px'
       }}

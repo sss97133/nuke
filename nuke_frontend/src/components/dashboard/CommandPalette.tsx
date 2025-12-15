@@ -72,7 +72,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         transform: 'translateX(-50%)',
         width: '600px',
         maxWidth: '90vw',
-        background: '#ffffff',
+        background: 'var(--surface)',
         border: '1px solid #bdbdbd',
         boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         zIndex: 1000,
@@ -98,7 +98,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           border: 'none',
           borderBottom: '1px solid #bdbdbd',
           outline: 'none',
-          background: '#ffffff',
+          background: 'var(--surface)',
           color: '#000000'
         }}
       />

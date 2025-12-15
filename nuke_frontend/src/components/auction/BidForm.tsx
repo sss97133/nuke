@@ -143,7 +143,7 @@ const BidForm: React.FC<BidFormProps> = ({ auction, onBidSubmitted, onCancel }) 
   return (
     <div
       style={{
-        background: 'white',
+        background: 'var(--surface)',
         border: '2px solid #2563eb',
         padding: '16px',
         borderRadius: '4px',

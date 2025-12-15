@@ -1938,7 +1938,7 @@ const VehiclesInner: React.FC = () => {
                                           bottom: '38px',
                                           right: '8px',
                                           zIndex: 10,
-                                          background: 'rgba(255,255,255,0.9)',
+                                          background: 'var(--surface-glass)',
                                           border: '1px solid var(--border-light)',
                                           padding: '3px 6px',
                                           fontSize: '8px',
@@ -1957,7 +1957,7 @@ const VehiclesInner: React.FC = () => {
                                           bottom: '8px',
                                           right: '8px',
                                           zIndex: 10,
-                                          background: 'rgba(255,255,255,0.9)',
+                                          background: 'var(--surface-glass)',
                                           border: '1px solid var(--border-light)',
                                           padding: '3px'
                                         }}
@@ -2037,7 +2037,7 @@ const VehiclesInner: React.FC = () => {
                                     bottom: '38px',
                                     right: '8px',
                                     zIndex: 10,
-                                    background: 'rgba(255,255,255,0.9)',
+                                    background: 'var(--surface-glass)',
                                     border: '1px solid var(--border-light)',
                                     padding: '3px 6px',
                                     fontSize: '8px',
@@ -2056,7 +2056,7 @@ const VehiclesInner: React.FC = () => {
                                     bottom: '8px',
                                     right: '8px',
                                     zIndex: 10,
-                                    background: 'rgba(255,255,255,0.9)',
+                                    background: 'var(--surface-glass)',
                                     border: '1px solid var(--border-light)',
                                     padding: '3px'
                                   }}

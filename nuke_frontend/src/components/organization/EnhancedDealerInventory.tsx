@@ -406,7 +406,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
               fontSize: '8pt',
               fontWeight: 700,
               border: '1px solid var(--border)',
-              background: 'white',
+              background: 'var(--surface)',
               cursor: 'pointer',
               borderRadius: '4px',
             }}
@@ -1284,7 +1284,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
             onClick={onClose}
             style={{
               border: '1px solid var(--border)',
-              background: 'white',
+              background: 'var(--surface)',
               padding: '2px 8px',
               fontSize: '8pt',
               cursor: 'pointer',
@@ -1430,7 +1430,7 @@ const AddVehiclesModal: React.FC<AddVehiclesModalProps> = ({
               style={{
                 padding: '4px 10px',
                 border: '1px solid var(--border)',
-                background: 'white',
+                background: 'var(--surface)',
                 fontSize: '8pt',
                 cursor: 'pointer',
               }}
