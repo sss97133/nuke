@@ -42,58 +42,35 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      - name: Deploy to Vercel Production
+      - name: Pull Vercel Environment Information (production)
+        working-directory: ./nuke_frontend
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts (Vercel)
+        working-directory: ./nuke_frontend
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel Production (prebuilt)
         working-directory: ./nuke_frontend
         run: |
           echo "🚀 Deploying to Vercel production..."
-          
-          # Check if dist/ exists
-          if [ ! -d "dist" ]; then
-            echo "❌ dist/ directory not found! Build must have failed."
+          # Prebuilt deploy requires vercel pull + vercel build. Those steps run above.
+          DEPLOY_OUTPUT=$(vercel deploy --prebuilt --prod --yes --token=${{ secrets.VERCEL_TOKEN }} 2>&1) || {
+            echo "--- Vercel Deployment Output ---"
+            echo "$DEPLOY_OUTPUT"
+            echo "--- End Output ---"
             exit 1
-          fi
-          
-          echo "✅ dist/ directory found"
-          echo "📦 Contents:"
-          ls -la dist/ | head -10
-          
-          # Use vercel deploy with --prod flag (not --prebuilt, which requires project linking)
-          # This will use the vercel.json config and deploy the dist/ folder
-          set +e  # Don't exit on error immediately
-          DEPLOY_OUTPUT=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
-          DEPLOY_EXIT=$?
-          set -e  # Re-enable exit on error
-          
+          }
+
           echo "--- Vercel Deployment Output ---"
           echo "$DEPLOY_OUTPUT"
           echo "--- End Output ---"
-          
-          # If primary deployment failed, try fallback and capture its output
-          if [ $DEPLOY_EXIT -ne 0 ]; then
-            echo "❌ Vercel deployment failed with exit code: $DEPLOY_EXIT"
-            echo "Full output above ⬆️"
-            echo ""
-            echo "Trying alternative: deploy from dist/ directory..."
-            cd dist
-            FALLBACK_OUTPUT=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
-            FALLBACK_EXIT=$?
-            
-            if [ $FALLBACK_EXIT -ne 0 ]; then
-              echo "❌ Alternative deployment also failed"
-              echo "--- Fallback Deployment Output ---"
-              echo "$FALLBACK_OUTPUT"
-              echo "--- End Output ---"
-              exit 1
-            fi
-            
-            echo "✅ Fallback deployment succeeded!"
-            echo "--- Fallback Deployment Output ---"
-            echo "$FALLBACK_OUTPUT"
-            echo "--- End Output ---"
-            
-            # Use fallback output for URL extraction
-            DEPLOY_OUTPUT="$FALLBACK_OUTPUT"
-          fi
           
           # Extract deployment URL (try multiple patterns)
           DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[a-zA-Z0-9-]+\.vercel\.app' | head -1 || echo "")
