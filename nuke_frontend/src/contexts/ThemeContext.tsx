@@ -12,6 +12,7 @@ export type Theme = 'dark' | 'light';
 export type ThemePreference = 'auto' | Theme;
 export type AutoThemeSource = 'system' | 'time';
 export type ContrastProfile = 'standard' | 'greyscale' | 'high';
+export type TextScale = 0.9 | 1 | 1.1 | 1.2;
 
 export type TimeSchedule = {
   start: string; // "HH:MM"
@@ -29,7 +30,11 @@ export type AccentId =
   | 'jaeger'
   | 'alitalia'
   | 'bmw-m'
-  | 'papaya';
+  | 'papaya'
+  | 'americana'
+  | 'route-66'
+  | 'denim'
+  | 'desert';
 
 interface ThemeContextType {
   // Effective theme applied to the document
@@ -54,6 +59,9 @@ interface ThemeContextType {
   contrast: ContrastProfile;
   setContrast: (contrast: ContrastProfile) => void;
 
+  textScale: TextScale;
+  setTextScale: (scale: TextScale) => void;
+
   // Convenience / back-compat
   setTheme: (theme: Theme) => void; // sets preference to explicit theme
   toggleTheme: () => void; // toggles explicit dark/light (exits auto)
@@ -67,7 +75,15 @@ const STORAGE_KEYS = {
   schedule: 'themeSchedule',
   accent: 'uiAccent',
   contrast: 'uiContrast',
+  textScale: 'uiTextScale',
 } as const;
+
+function parseTextScale(v: string | null): TextScale | null {
+  if (!v) return null;
+  const n = Number(v);
+  if (n === 0.9 || n === 1 || n === 1.1 || n === 1.2) return n;
+  return null;
+}
 
 function isValidHHMM(v: string): boolean {
   return /^\d{2}:\d{2}$/.test(v);
@@ -175,7 +191,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       saved === 'jaeger' ||
       saved === 'alitalia' ||
       saved === 'bmw-m' ||
-      saved === 'papaya'
+      saved === 'papaya' ||
+      saved === 'americana' ||
+      saved === 'route-66' ||
+      saved === 'denim' ||
+      saved === 'desert'
     ) {
       return saved;
     }
@@ -186,6 +206,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const saved = localStorage.getItem(STORAGE_KEYS.contrast) as ContrastProfile | null;
     if (saved === 'standard' || saved === 'greyscale' || saved === 'high') return saved;
     return 'standard';
+  });
+
+  const [textScale, setTextScaleState] = useState<TextScale>(() => {
+    const saved = parseTextScale(localStorage.getItem(STORAGE_KEYS.textScale));
+    return saved ?? 1;
   });
 
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(() => prefersDarkQuery.matches);
@@ -235,6 +260,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.setAttribute('data-theme', theme);
     root.setAttribute('data-accent', accent);
     root.setAttribute('data-contrast', contrast);
+    root.style.setProperty('--font-scale', String(textScale));
 
     // Helps native controls match
     (root.style as any).colorScheme = theme;
@@ -244,13 +270,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem(STORAGE_KEYS.schedule, JSON.stringify(schedule));
     localStorage.setItem(STORAGE_KEYS.accent, accent);
     localStorage.setItem(STORAGE_KEYS.contrast, contrast);
-  }, [theme, preference, autoSource, schedule, accent, contrast]);
+    localStorage.setItem(STORAGE_KEYS.textScale, String(textScale));
+  }, [theme, preference, autoSource, schedule, accent, contrast, textScale]);
 
   const setPreference = (pref: ThemePreference) => setPreferenceState(pref);
   const setAutoSource = (source: AutoThemeSource) => setAutoSourceState(source);
   const setSchedule = (s: TimeSchedule) => setScheduleState(s);
   const setAccent = (a: AccentId) => setAccentState(a);
   const setContrast = (c: ContrastProfile) => setContrastState(c);
+  const setTextScale = (s: TextScale) => setTextScaleState(s);
 
   const setTheme = (t: Theme) => setPreferenceState(t);
 
@@ -276,6 +304,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAccent,
         contrast,
         setContrast,
+        textScale,
+        setTextScale,
         setTheme,
         toggleTheme,
       }}
