@@ -59,7 +59,9 @@ const AdminMissionControl: React.FC = () => {
         supabase.from('organization_narratives').select('id', { count: 'exact', head: true }),
         supabase.from('vehicle_images').select('id', { count: 'exact', head: true }).gte('created_at', new Date(new Date().setHours(0,0,0,0)).toISOString()),
         supabase.from('timeline_events').select('*').order('created_at', { ascending: false }).limit(10),
-        supabase.from('vehicle_images').select('vehicle_id, created_at').is('ai_analysis', null).limit(100),
+        // NOTE: `vehicle_images.ai_analysis` does not exist in production schema.
+        // Use `ai_processing_status` to find images that have not been processed by the AI pipeline yet.
+        supabase.from('vehicle_images').select('vehicle_id, created_at').is('ai_processing_status', null).limit(100),
         supabase.from('ai_scan_progress').select('*').order('created_at', { ascending: false }).limit(1).single(),
         supabase.rpc('get_image_scan_stats')
       ]);
