@@ -140,11 +140,15 @@ serve(async (req) => {
 
     // Trigger AI analysis on comments (async, don't wait)
     if (comments.length > 0) {
+      const anonJwt = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('ANON_KEY') ?? ''
+      const inboundAuth = req.headers.get('Authorization') || ''
+      const authToUse = inboundAuth || (anonJwt.startsWith('eyJ') ? `Bearer ${anonJwt}` : '')
       fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-auction-comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SERVICE_ROLE_KEY')}`
+          // analyze-auction-comments is deployed with verify_jwt enabled.
+          ...(authToUse ? { 'Authorization': authToUse } : {})
         },
         body: JSON.stringify({ auction_event_id })
       }).catch(e => console.error('Failed to trigger analysis:', e))

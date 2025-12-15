@@ -582,7 +582,8 @@ export default function AIDataIngestionSearch() {
       >
         <input
           type="text"
-          placeholder="Paste URL, text, or drop an image"
+          placeholder=""
+          aria-label="AI input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}

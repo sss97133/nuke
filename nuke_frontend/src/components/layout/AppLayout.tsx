@@ -163,113 +163,117 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       {/* Main Navigation Header */}
       <div className="header-wrapper">
         <div className="header-content">
-          <div className="header-left">
-            {/* n-zero Expandable Menu */}
-            <div style={{ position: 'relative' }} data-n-zero-menu>
-              <button
-                onClick={() => setNZeroMenuOpen(!nZeroMenuOpen)}
-                className={`nav-link ${nZeroMenuOpen ? 'active' : ''}`}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  padding: '8px 12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <span>n-zero</span>
-                <span style={{ fontSize: '7pt' }}>{nZeroMenuOpen ? '▼' : '▶'}</span>
-              </button>
-              
-              {nZeroMenuOpen && (
-                <div
+          {/* 8%: n-zero button (dropdown is popup so doesn't affect layout) */}
+          <div className="header-slot-left">
+            <div className="header-left">
+              {/* n-zero Expandable Menu */}
+              <div style={{ position: 'relative' }} data-n-zero-menu>
+                <button
+                  onClick={() => setNZeroMenuOpen(!nZeroMenuOpen)}
+                  className={`nav-link ${nZeroMenuOpen ? 'active' : ''}`}
                   style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    background: 'var(--surface)',
-                    border: '2px solid var(--border)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    zIndex: 2000,
-                    minWidth: '160px',
-                    marginTop: '2px'
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    padding: '8px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
                   }}
-                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Link
-                    to="/vehicles"
-                    className={`nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
-                    style={{
-                      display: 'block',
-                      padding: '8px 12px',
-                      textDecoration: 'none',
-                      borderBottom: '1px solid var(--border)'
-                    }}
-                    onClick={() => setNZeroMenuOpen(false)}
-                  >
-                    Vehicles
-                  </Link>
-                  <Link
-                    to="/auctions"
-                    className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
-                    style={{
-                      display: 'block',
-                      padding: '8px 12px',
-                      textDecoration: 'none',
-                      borderBottom: '1px solid var(--border)'
-                    }}
-                    onClick={() => setNZeroMenuOpen(false)}
-                  >
-                    Auctions
-                  </Link>
-                  <Link
-                    to={orgNavPath}
-                    className={`nav-link ${isActivePage('/org') ? 'active' : ''}`}
-                    style={{
-                      display: 'block',
-                      padding: '8px 12px',
-                      textDecoration: 'none',
-                      borderBottom: '1px solid #f0f0f0'
-                    }}
-                    onClick={() => setNZeroMenuOpen(false)}
-                  >
-                    Organizations
-                  </Link>
-                  <a
-                    href="https://n-zero.dev/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="nav-link"
-                    style={{
-                      display: 'block',
-                      padding: '8px 12px',
-                      textDecoration: 'none'
-                    }}
-                    onClick={() => setNZeroMenuOpen(false)}
-                  >
-                    n-zero
-                  </a>
-                </div>
-              )}
-            </div>
+                  <span>n-zero</span>
+                  <span style={{ fontSize: '7pt' }}>{nZeroMenuOpen ? '▼' : '▶'}</span>
+                </button>
 
+                {nZeroMenuOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      background: 'var(--surface)',
+                      border: '2px solid var(--border)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 2000,
+                      minWidth: '160px',
+                      marginTop: '2px'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Link
+                      to="/vehicles"
+                      className={`nav-link ${isActivePage('/vehicles') ? 'active' : ''}`}
+                      style={{
+                        display: 'block',
+                        padding: '8px 12px',
+                        textDecoration: 'none',
+                        borderBottom: '1px solid var(--border)'
+                      }}
+                      onClick={() => setNZeroMenuOpen(false)}
+                    >
+                      Vehicles
+                    </Link>
+                    <Link
+                      to="/auctions"
+                      className={`nav-link ${isActivePage('/auctions') ? 'active' : ''}`}
+                      style={{
+                        display: 'block',
+                        padding: '8px 12px',
+                        textDecoration: 'none',
+                        borderBottom: '1px solid var(--border)'
+                      }}
+                      onClick={() => setNZeroMenuOpen(false)}
+                    >
+                      Auctions
+                    </Link>
+                    <Link
+                      to={orgNavPath}
+                      className={`nav-link ${isActivePage('/org') ? 'active' : ''}`}
+                      style={{
+                        display: 'block',
+                        padding: '8px 12px',
+                        textDecoration: 'none',
+                        borderBottom: '1px solid #f0f0f0'
+                      }}
+                      onClick={() => setNZeroMenuOpen(false)}
+                    >
+                      Organizations
+                    </Link>
+                    <a
+                      href="https://n-zero.dev/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="nav-link"
+                      style={{
+                        display: 'block',
+                        padding: '8px 12px',
+                        textDecoration: 'none'
+                      }}
+                      onClick={() => setNZeroMenuOpen(false)}
+                    >
+                      n-zero
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="header-right">
-            {/* Global Search - AI Data Ingestion - Extended to left edge */}
-            <div style={{ flex: '1 1 auto', minWidth: 0, maxWidth: 'none', marginRight: '8px', display: 'flex' }}>
-              <AIDataIngestionSearch />
-            </div>
+          {/* 2% spacer */}
+          <div className="header-spacer" aria-hidden="true" />
 
-            {/* Upload Indicator - Windows 95 style */}
-            <div style={{ flex: '0 0 auto', marginRight: '8px' }}>
+          {/* 80%: agent input (shrinks when right capsule expands) */}
+          <div className="header-slot-center">
+            <AIDataIngestionSearch />
+          </div>
+
+          {/* 2% spacer */}
+          <div className="header-spacer" aria-hidden="true" />
+
+          {/* 8%: capsule area (can grow beyond 8% when expanded; steals from center) */}
+          <div className="header-slot-right">
+            <div className="header-right">
               <GlobalUploadIndicator />
-            </div>
-
-            {/* Profile Balance Capsule - Combined balance + profile + navigation */}
-            <div style={{ flex: '0 0 auto' }}>
               {session ? (
                 <ProfileBalancePill
                   session={session}
@@ -278,7 +282,11 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                   onOpenNotifications={() => setShowNotifications(true)}
                 />
               ) : (
-                <Link to="/login" className="button button-primary" style={{ border: '2px solid #0ea5e9', transition: 'all 0.12s ease' }}>
+                <Link
+                  to="/login"
+                  className="button button-primary"
+                  style={{ border: '2px solid #0ea5e9', transition: 'all 0.12s ease' }}
+                >
                   Login
                 </Link>
               )}

@@ -441,6 +441,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const serviceRoleKey =
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
+      Deno.env.get('SERVICE_ROLE_KEY') ||
+      Deno.env.get('SUPABASE_SERVICE_KEY') ||
+      '';
+
     // Create stable claimable identities for seller/buyer as BaT users (UUIDs in bat_users)
     const [sellerUser, buyerUser] = await Promise.all([
       upsertBatUser(supabase, seller || null),
@@ -667,6 +673,30 @@ serve(async (req) => {
       }
 
       console.log(`Created new vehicle: ${vehicleId}`);
+    }
+
+    // VIN extraction (text/HTML): run after we have a vehicle id.
+    // This catches VINs embedded in the BaT HTML, description, or JSON blobs.
+    // Also creates "VIN needed" notifications when extraction is not possible yet.
+    try {
+      if (vehicleId && serviceRoleKey) {
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/extract-vin-from-vehicle`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            vehicle_id: vehicleId,
+            extra_text: html,
+            notify_if_missing: true,
+          }),
+        })
+          .then(() => console.log('VIN text extraction triggered'))
+          .catch(() => null);
+      }
+    } catch {
+      // Non-blocking
     }
 
     // For live auctions, keep external_listings in sync so the vehicle header can show watchers/views/comments.
