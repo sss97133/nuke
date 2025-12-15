@@ -186,7 +186,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
               fontFamily: '"MS Sans Serif", sans-serif',
               userSelect: 'none',
               height: '100%',
-              paddingLeft: '12px'
+              paddingLeft: '0px'
             }}
           >
             ${amount}
