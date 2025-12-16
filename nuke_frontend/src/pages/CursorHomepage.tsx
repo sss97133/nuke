@@ -1863,6 +1863,7 @@ const CursorHomepage: React.FC = () => {
                   vehicle={vehicle}
                   viewMode="gallery"
                   infoDense={infoDense}
+                  viewerUserId={session?.user?.id}
                   sourceStampUrl={
                     (vehicle as any)?.discovery_url ||
                     ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
@@ -1885,6 +1886,7 @@ const CursorHomepage: React.FC = () => {
                 vehicle={vehicle}
                 viewMode="grid"
                 infoDense={infoDense}
+                viewerUserId={session?.user?.id}
                 sourceStampUrl={
                   (vehicle as any)?.discovery_url ||
                   ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)

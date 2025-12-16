@@ -83,6 +83,16 @@ Deno.serve(async (req: Request) => {
       global: { headers: { Authorization: `Bearer ${jwt}` } }
     })
 
+    // Resolve the authenticated user (for attribution). Many downstream UIs rely on user_id being present.
+    const { data: userRes, error: userErr } = await supabase.auth.getUser()
+    const authedUserId = !userErr ? (userRes?.user?.id || null) : null
+    if (!authedUserId) {
+      return new Response(JSON.stringify({ error: 'Unable to resolve authenticated user' }), {
+        status: 401,
+        headers: { 'content-type': 'application/json', ...corsHeaders }
+      })
+    }
+
     // CRITICAL: Verify vehicle exists before processing
     const { data: vehicle, error: vehicleError } = await supabase
       .from('vehicles')
@@ -220,9 +230,18 @@ Deno.serve(async (req: Request) => {
           // Create vehicle_images record with EXIF date
           await supabase.from('vehicle_images').insert({
             vehicle_id: vehicleId,
+            user_id: authedUserId,
+            documented_by_user_id: authedUserId,
             image_url: pub.publicUrl,
             is_primary: false,
+            is_document: false,
+            is_duplicate: false,
             process_stage: stage || null,
+            source: 'apple_import',
+            source_url: album ? `apple_album:${album}` : 'apple_import',
+            storage_path: filePath,
+            file_name: fileName,
+            timeline_event_id: eventRec.id,
             taken_at: item.exifDate ? item.exifDate.toISOString() : null
           })
           
@@ -303,9 +322,17 @@ Deno.serve(async (req: Request) => {
           if (pub?.publicUrl) {
             await supabase.from('vehicle_images').insert({
               vehicle_id: vehicleId,
+              user_id: authedUserId,
+              documented_by_user_id: authedUserId,
               image_url: pub.publicUrl,
               is_primary: false,
+              is_document: false,
+              is_duplicate: false,
               process_stage: stage || null,
+              source: 'apple_import',
+              source_url: album ? `apple_album:${album}` : 'apple_import',
+              storage_path: filePath,
+              file_name: fileName,
               taken_at: null
             })
             totalImagesUploaded++

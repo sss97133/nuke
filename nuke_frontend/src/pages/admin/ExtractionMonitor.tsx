@@ -53,21 +53,21 @@ const ExtractionMonitor: React.FC = () => {
       const { count: totalCount } = await supabase
         .from('vehicle_images')
         .select('*', { count: 'exact', head: true })
-        .eq('is_document', false)
+        .not('is_document', 'is', true)
         .not('image_url', 'is', null);
 
       // Get images with extractions
       const { data: extractedImages } = await supabase
         .from('vehicle_images')
         .select('ai_scan_metadata, id, image_url, created_at, vehicle_id')
-        .eq('is_document', false)
+        .not('is_document', 'is', true)
         .not('image_url', 'is', null);
 
       // Get images without extractions (potential failures or pending)
       const { data: unextractedImages } = await supabase
         .from('vehicle_images')
         .select('id, image_url, created_at, vehicle_id, ai_scan_metadata')
-        .eq('is_document', false)
+        .not('is_document', 'is', true)
         .not('image_url', 'is', null)
         .or('ai_scan_metadata.is.null,ai_scan_metadata.eq.{}');
 

@@ -19,14 +19,14 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
       setLoading(true);
       
       // Load images actually taken/photographed by this user
-      // Filter by vehicle_images.user_id (photographer), not vehicle ownership
+      // Filter by attribution fields (schema has evolved; many legacy/imported rows won't have user_id set)
       let query = supabase
         .from('vehicle_images')
         .select(`
           *,
           vehicle:vehicles!vehicle_images_vehicle_id_fkey(id, is_public, user_id, year, make, model)
         `)
-        .eq('user_id', userId); // Filter by who took the photo, not vehicle owner
+        .or(`user_id.eq.${userId},documented_by_user_id.eq.${userId},submitted_by.eq.${userId}`) // Photographer/author attribution
 
       // If viewing someone else's profile, only show images from public vehicles
       if (!isOwnProfile) {

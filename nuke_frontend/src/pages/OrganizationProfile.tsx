@@ -177,10 +177,31 @@ export default function OrganizationProfile() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showVehicleInquiry, setShowVehicleInquiry] = useState(false);
   const [selectedInquiryVehicle, setSelectedInquiryVehicle] = useState<{id: string, name: string} | null>(null);
+  const [primaryHeroSrcIndex, setPrimaryHeroSrcIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
   const ownershipUploadId = `org-ownership-${organizationId}`;
+
+  // Primary image selection (safe even before organization is loaded)
+  const primaryImage = images.find(i => i.is_primary) || images.find(i => i.category === 'logo') || images[0];
+  const fallbackVehicleImageUrl =
+    vehicles.find(v => typeof v.vehicle_image_url === 'string' && v.vehicle_image_url.length > 0)?.vehicle_image_url || null;
+  const bannerUrl = (organization as any)?.banner_url || null;
+  const heroCandidates = [
+    bannerUrl,
+    primaryImage?.large_url,
+    primaryImage?.image_url,
+    fallbackVehicleImageUrl,
+  ]
+    .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+    .map((u) => (u.startsWith('//') ? `https:${u}` : u));
+  const heroKey = heroCandidates.join('|');
+
+  // Reset hero fallback index when candidate set changes
+  useEffect(() => {
+    setPrimaryHeroSrcIndex(0);
+  }, [heroKey]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -596,7 +617,15 @@ export default function OrganizationProfile() {
                 const now = new Date().toISOString();
                 const [vehicleResult, imageResult, nativeAuction, externalAuction, batAuction] = await Promise.all([
                   supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date').eq('id', ov.vehicle_id).single(),
-                  supabase.from('vehicle_images').select('image_url').eq('vehicle_id', ov.vehicle_id).eq('is_primary', true).maybeSingle(),
+                  // Prefer primary image, but fall back to the first available image so thumbnails don't look "broken"
+                  supabase
+                    .from('vehicle_images')
+                    .select('image_url')
+                    .eq('vehicle_id', ov.vehicle_id)
+                    .order('is_primary', { ascending: false })
+                    .order('created_at', { ascending: true })
+                    .limit(1)
+                    .maybeSingle(),
                   // Check for active native auction listing
                   supabase.from('vehicle_listings')
                     .select('id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents')
@@ -859,17 +888,16 @@ export default function OrganizationProfile() {
       const selectedImage = images.find(img => img.id === imageId);
       if (!selectedImage) return;
 
-      // First, remove 'logo' from all images
+      // Clear primary flag for all org images (do NOT overwrite categories)
       await supabase
         .from('organization_images')
-        .update({ category: 'facility' })
-        .eq('organization_id', id)
-        .eq('category', 'logo');
+        .update({ is_primary: false })
+        .eq('organization_id', organizationId);
 
-      // Then set the selected image as 'logo' (primary)
+      // Set selected image as primary (and optionally mark as logo category for legacy UI)
       const { error: imageError } = await supabase
         .from('organization_images')
-        .update({ category: 'logo' })
+        .update({ is_primary: true, category: selectedImage.category || 'logo' })
         .eq('id', imageId);
 
       if (imageError) throw imageError;
@@ -1047,11 +1075,10 @@ export default function OrganizationProfile() {
     );
   }
 
-  const primaryImage = images.find(i => i.category === 'logo') || images[0];
   const displayName = organization.business_name || organization.legal_name || 'Unnamed Organization';
   const headerLogoUrl =
     (organization as any)?.logo_url ||
-    (primaryImage?.image_url ?? null);
+    (primaryImage?.large_url ?? primaryImage?.image_url ?? null);
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
@@ -1196,18 +1223,26 @@ export default function OrganizationProfile() {
               </div>
 
       {/* Primary Image */}
-      {primaryImage && (
+      {heroCandidates.length > 0 && (
         <section style={{ margin: '16px' }}>
           <div
             style={{
-              backgroundImage: `url(${primaryImage.image_url})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
+              position: 'relative',
               height: '300px',
               border: '1px solid var(--border)',
-              position: 'relative'
+              overflow: 'hidden',
+              background: 'var(--surface)'
             }}
-          />
+          >
+            <img
+              src={heroCandidates[Math.min(primaryHeroSrcIndex, heroCandidates.length - 1)]}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              onError={() => {
+                setPrimaryHeroSrcIndex((idx) => Math.min(idx + 1, heroCandidates.length - 1));
+              }}
+            />
+          </div>
         </section>
       )}
 
@@ -1577,17 +1612,18 @@ export default function OrganizationProfile() {
                     );
                   }
                   
-                  // Sort by value (highest first) or date
+                  // IMPORTANT: Do not sort by price/value here. Scraped/derived values are often incomplete
+                  // and create misleading UI. Prefer a stable, non-financial sort (newer model years first).
                   const sorted = [...productsForSale].sort((a, b) => {
-                    const aAsk = Number((a as any).vehicle_asking_price || 0) || 0;
-                    const bAsk = Number((b as any).vehicle_asking_price || 0) || 0;
-                    const aEst = Number((a as any).vehicle_current_value || 0) || 0;
-                    const bEst = Number((b as any).vehicle_current_value || 0) || 0;
-                    // Prefer asking price when present; otherwise fall back to estimate.
-                    const aValue = aAsk > 0 ? aAsk : aEst;
-                    const bValue = bAsk > 0 ? bAsk : bEst;
-                    if (aValue !== bValue) return bValue - aValue;
-                    return 0;
+                    const ay = Number((a as any).vehicle_year || 0) || 0;
+                    const by = Number((b as any).vehicle_year || 0) || 0;
+                    if (ay !== by) return by - ay;
+                    const am = String((a as any).vehicle_make || '');
+                    const bm = String((b as any).vehicle_make || '');
+                    if (am !== bm) return am.localeCompare(bm);
+                    const amd = String((a as any).vehicle_model || '');
+                    const bmd = String((b as any).vehicle_model || '');
+                    return amd.localeCompare(bmd);
                   });
                   
                   return (
@@ -1611,11 +1647,6 @@ export default function OrganizationProfile() {
                           listingStatus === 'reserved' ? 'Reserved' :
                           listingStatus ? (vehicle.listing_status || 'Active') :
                           null;
-
-                        const asking = Number((vehicle as any).vehicle_asking_price || 0) || 0;
-                        const est = Number((vehicle as any).vehicle_current_value || 0) || 0;
-                        const priceValue = asking > 0 ? asking : est;
-                        const priceLabel = asking > 0 ? 'ASKING' : (est > 0 ? 'EST' : '');
 
                         return (
                           <div
@@ -1647,6 +1678,13 @@ export default function OrganizationProfile() {
                                     objectFit: 'cover',
                                     border: '1px solid var(--border)',
                                     background: 'var(--grey-100)'
+                                  }}
+                                  loading="lazy"
+                                  decoding="async"
+                                  onError={(e) => {
+                                    // If the URL is bad/missing in storage, fall back to an empty box rather than a broken icon
+                                    const img = e.currentTarget as HTMLImageElement;
+                                    img.style.display = 'none';
                                   }}
                                 />
                               ) : (
@@ -1716,22 +1754,8 @@ export default function OrganizationProfile() {
                                 </div>
                               </div>
 
-                              {/* Actions / Price */}
+                              {/* Actions */}
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                                {priceValue > 0 ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.1 }}>
-                                    {priceLabel && (
-                                      <div style={{ fontSize: '7pt', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.6px' }}>
-                                        {priceLabel}
-                                      </div>
-                                    )}
-                                    <div style={{ fontSize: '10pt', fontWeight: 800, whiteSpace: 'nowrap' }}>
-                                      ${Number(priceValue).toLocaleString()}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>—</div>
-                                )}
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();

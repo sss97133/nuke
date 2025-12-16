@@ -431,6 +431,9 @@ export class UnifiedImageImportService {
           file_size: fileBlob.size,
           mime_type: fileBlob.type || 'image/jpeg',
           is_primary: isPrimary || false,
+          // Explicitly mark as non-document to keep legacy NULL rows from disappearing in galleries.
+          is_document: false,
+          is_duplicate: false,
           taken_at: photoDate.toISOString(),
           source: source,
           source_url: sourceUrl || null,

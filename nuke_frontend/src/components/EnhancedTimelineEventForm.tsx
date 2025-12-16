@@ -227,7 +227,9 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
 
             try {
               // Upload directly to Supabase Storage
-              const fileName = `${currentUser.id}/${Date.now()}_${file.name}`;
+              // Use a vehicle-scoped path to avoid cross-vehicle collisions and make cleanup/migrations easier.
+              const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+              const fileName = `vehicles/${vehicleId}/events/${data.id}/${Date.now()}_${safeName}`;
               const { error: uploadError } = await supabase.storage
                 .from('vehicle-images')
                 .upload(fileName, file);
@@ -244,8 +246,10 @@ const EnhancedTimelineEventForm: React.FC<EnhancedTimelineEventFormProps> = ({
                 .from('vehicle_images')
                 .insert({
                   vehicle_id: vehicleId,
+                  user_id: currentUser.id,
                   image_url: publicUrl,
-                  uploaded_by: currentUser.id,
+                  storage_path: fileName,
+                  file_name: safeName,
                   category: 'timeline_event',
                   caption: `${formData.title} - ${file.name}`,
                   timeline_event_id: data.id

@@ -842,7 +842,9 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
           user_id: session.user.id,
           category: 'bat_listing',
           is_primary: i === 0,
+          position: i,
           source: 'bat_listing',
+          source_url: batUrl,
           // Store BAT metadata in ai_scan_metadata since metadata column doesn't exist
           ai_scan_metadata: {
             source: 'bat_scraper',

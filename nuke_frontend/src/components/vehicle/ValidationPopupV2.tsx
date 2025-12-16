@@ -116,7 +116,8 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
       // 2. Tagged images (title/registration/VIN photos)
       const { data: docImages } = await supabase
         .from('vehicle_images')
-        .select('sensitive_type, image_url, created_at, uploaded_by, exif_data')
+        // `vehicle_images` does not have an `uploaded_by` column in production schema; use attribution fields.
+        .select('sensitive_type, image_url, created_at, user_id, documented_by_user_id, exif_data')
         .eq('vehicle_id', vehicleId)
         .in('sensitive_type', ['title', 'registration', 'vin_plate', 'bill_of_sale'])
         .order('created_at', { ascending: false });
@@ -129,7 +130,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
             confidence_score: 85,
             image_url: img.image_url,
             created_at: img.created_at,
-            verified_by: img.uploaded_by
+            verified_by: img.documented_by_user_id || img.user_id
           });
         });
       }

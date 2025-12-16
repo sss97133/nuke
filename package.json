@@ -3,6 +3,7 @@
     "audit": "tsx scripts/run-autonomous-audit.ts",
     "audit:dry-run": "tsx scripts/run-autonomous-audit.ts --dry-run",
     "audit:verbose": "VERBOSE=true tsx scripts/run-autonomous-audit.ts",
+    "audit:bat-titles": "tsx scripts/bat-title-signal-audit.ts",
     "process-stuck": "tsx scripts/process-stuck-images.ts stuck",
     "process-failed": "tsx scripts/process-stuck-images.ts failed",
     "duplicate-worker": "tsx scripts/duplicate-detection-worker.ts",

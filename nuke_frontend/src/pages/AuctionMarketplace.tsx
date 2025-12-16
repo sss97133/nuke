@@ -393,8 +393,8 @@ export default function AuctionMarketplace() {
           .from('vehicle_images')
           .select('vehicle_id, image_url, is_primary, created_at')
           .in('vehicle_id', missingImageVehicleIds)
-          .eq('is_document', false)
-          .or('is_duplicate.is.null,is_duplicate.eq.false')
+          .not('is_document', 'is', true)
+          .not('is_duplicate', 'is', true)
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(5000);
@@ -927,8 +927,8 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           }}
         >
           <div>
-            <div style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--accent)' }}>
-              Bid: {formatCurrency(listing.current_high_bid_cents)}
+            <div style={{ fontSize: '10pt', fontWeight: 800, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
+              {formatCurrency(listing.current_high_bid_cents)}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>

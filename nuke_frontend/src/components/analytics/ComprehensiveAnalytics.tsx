@@ -100,7 +100,8 @@ const ComprehensiveAnalytics = () => {
       const { data: imageData } = await supabase
         .from('vehicle_images')
         .select('id, created_at, likes_count')
-        .eq('uploaded_by', user.id)
+        // `vehicle_images` does not have an `uploaded_by` column in production; use attribution fields.
+        .or(`user_id.eq.${user.id},documented_by_user_id.eq.${user.id},submitted_by.eq.${user.id}`)
         .gte('created_at', startDate.toISOString());
 
       // Load follow counts
