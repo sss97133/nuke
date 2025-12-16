@@ -633,25 +633,25 @@ if (data.posted_date) {
                   .maybeSingle()
 
                 if (!existingEvent?.id) {
-                  await supabase
-                    .from('timeline_events')
-                    .insert({
-                      vehicle_id: vehicleId,
-                      user_id: importUserId,
-                      event_type: 'discovery',
-                      source: 'craigslist',
-                      title: `Listed on Craigslist`,
-                      event_date: eventDate,
-                      description: `Vehicle listed for sale on Craigslist${data.asking_price ? ` for $${data.asking_price.toLocaleString()}` : ''}`,
-                      metadata: {
-                        listing_url: queueItem.listing_url,
-                        asking_price: data.asking_price || data.price,
-                        location: data.location,
+await supabase
+                  .from('timeline_events')
+                  .insert({
+                    vehicle_id: vehicleId,
+                    user_id: importUserId,
+                    event_type: 'discovery',
+                    source: 'craigslist',
+                    title: `Listed on Craigslist`,
+                    event_date: eventDate,
+                    description: `Vehicle listed for sale on Craigslist${data.asking_price ? ` for $${data.asking_price.toLocaleString()}` : ''}`,
+                    metadata: {
+                      listing_url: queueItem.listing_url,
+                      asking_price: data.asking_price || data.price,
+                      location: data.location,
                         posted_date: data.posted_date,
                         listing_posted_at: (data as any)?.listing_posted_at || null,
                         listing_updated_at: (data as any)?.listing_updated_at || null,
-                      }
-                    })
+                    }
+                  })
                 }
 } catch (timelineErr) {
                 console.warn(`  ⚠️ Timeline event creation error:`, timelineErr)
@@ -1004,11 +1004,11 @@ const priceMatch = data.title.match(/\$\s*([\d,]+)/)
   if (chosen) {
     try {
       const parsedDate = new Date(chosen)
-      if (!isNaN(parsedDate.getTime())) {
-        data.posted_date = parsedDate.toISOString()
-        postedDateFound = true
-      }
-    } catch (e) {
+        if (!isNaN(parsedDate.getTime())) {
+          data.posted_date = parsedDate.toISOString()
+          postedDateFound = true
+        }
+      } catch (e) {
       // Continue to fallbacks
     }
   }

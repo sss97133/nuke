@@ -47,6 +47,16 @@ export default function MemeLibraryAdmin() {
   const [actionImportUrl, setActionImportUrl] = useState('');
 
   const selectedPack = useMemo(() => packs.find((p) => p.id === selectedPackId) || null, [packs, selectedPackId]);
+  const selectedPackSlug = selectedPack?.slug || '';
+
+  const addTags = (next: string[]) => {
+    const existing = actionTags
+      ? actionTags.split(',').map((t) => t.trim()).filter(Boolean)
+      : [];
+    const set = new Set(existing);
+    for (const t of next) set.add(t);
+    setActionTags(Array.from(set).join(', '));
+  };
 
   const refresh = async () => {
     const { data, error } = await supabase
@@ -331,6 +341,24 @@ export default function MemeLibraryAdmin() {
           <div style={{ fontSize: '9pt', color: '#6b7280' }}>
             You can upload a file, or import by URL from an allowlisted source (with license/provenance).
           </div>
+
+          {(selectedPackSlug === 'frog' || selectedPackSlug === 'pepe') ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+              <div style={{ fontSize: '8pt', color: '#6b7280' }}>Quick tags</div>
+              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['frog', 'reaction'])} style={{ fontSize: '8pt', padding: '6px 10px' }}>
+                frog + reaction
+              </button>
+              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['pepe', 'frog'])} style={{ fontSize: '8pt', padding: '6px 10px' }}>
+                pepe + frog
+              </button>
+              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['template', 'blank'])} style={{ fontSize: '8pt', padding: '6px 10px' }}>
+                template + blank
+              </button>
+              <button className="button button-secondary" disabled={loading} onClick={() => addTags(['wojak_adjacent'])} style={{ fontSize: '8pt', padding: '6px 10px' }}>
+                wojak_adjacent
+              </button>
+            </div>
+          ) : null}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

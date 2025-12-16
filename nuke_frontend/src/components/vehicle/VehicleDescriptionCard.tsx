@@ -165,13 +165,13 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
             >
               {generating ? 'Generating...' : 'Generate'}
             </button>
-            <button
-              className="btn-utility"
-              style={{ fontSize: '8px', padding: '2px 6px' }}
-              onClick={handleEdit}
-            >
-              Edit
-            </button>
+          <button
+            className="btn-utility"
+            style={{ fontSize: '8px', padding: '2px 6px' }}
+            onClick={handleEdit}
+          >
+            Edit
+          </button>
           </div>
         )}
       </div>
@@ -223,8 +223,8 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
             </div>
             {isEditable && (
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                <button
-                  className="button button-primary"
+              <button
+                className="button button-primary"
                   style={{ fontSize: '8pt', padding: '4px 12px' }}
                   onClick={handleGenerate}
                   disabled={generating}
@@ -233,11 +233,11 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                 </button>
                 <button
                   className="button button-secondary"
-                  style={{ fontSize: '8pt', padding: '4px 12px' }}
-                  onClick={handleEdit}
-                >
-                  Add Description
-                </button>
+                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                onClick={handleEdit}
+              >
+                Add Description
+              </button>
               </div>
             )}
           </div>

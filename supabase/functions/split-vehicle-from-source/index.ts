@@ -226,21 +226,21 @@ serve(async (req) => {
         .maybeSingle();
 
       if (!existing?.id) {
-        await admin.from("timeline_events").insert({
-          vehicle_id: vehicleId,
-          user_id: user.id,
-          event_type: "other",
-          source: "split_from_source",
-          event_date: new Date().toISOString().split("T")[0],
-          title: "Split created from external listing",
-          description: `Created a new vehicle profile from Source URL to prevent cross-contamination.\n\nSource: ${sourceUrl}\nNew vehicle: ${newVehicle.id}`,
-          metadata: {
-            action: "split",
-            source_url: sourceUrl,
-            new_vehicle_id: newVehicle.id,
-            reason: reason ?? null,
-          },
-        });
+      await admin.from("timeline_events").insert({
+        vehicle_id: vehicleId,
+        user_id: user.id,
+        event_type: "other",
+        source: "split_from_source",
+        event_date: new Date().toISOString().split("T")[0],
+        title: "Split created from external listing",
+        description: `Created a new vehicle profile from Source URL to prevent cross-contamination.\n\nSource: ${sourceUrl}\nNew vehicle: ${newVehicle.id}`,
+        metadata: {
+          action: "split",
+          source_url: sourceUrl,
+          new_vehicle_id: newVehicle.id,
+          reason: reason ?? null,
+        },
+      });
       }
     } catch {
       // ignore

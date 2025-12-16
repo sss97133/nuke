@@ -1086,6 +1086,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   };
 
   const cleanListingishTitle = (raw: string, year?: number | null, make?: string | null): string => {
+    const escapeRegExp = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     let s = String(raw || '').trim();
     if (!s) return s;
 
@@ -1107,7 +1108,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
     // Remove leading year (we render year separately)
     if (typeof year === 'number') {
-      const yr = String(year);
+      const yr = escapeRegExp(String(year));
       s = s.replace(new RegExp(`^\\s*${yr}\\s+`, 'i'), '').trim();
     } else {
       s = s.replace(/^\s*(19|20)\d{2}\s+/, '').trim();
@@ -1116,7 +1117,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     // Remove leading make if it already exists (avoid "Porsche Porsche ...")
     if (make) {
       const mk = String(make).trim();
-      if (mk) s = s.replace(new RegExp(`^\\s*${mk}\\s+`, 'i'), '').trim();
+      if (mk) s = s.replace(new RegExp(`^\\s*${escapeRegExp(mk)}\\s+`, 'i'), '').trim();
     }
 
     // Collapse whitespace

@@ -100,6 +100,34 @@ function angleFamilyToYawDeg(angleFamily: string | null | undefined): number | n
   return Object.prototype.hasOwnProperty.call(map, a) ? map[a] : null;
 }
 
+async function resolveAngleTaxonomyIdFromAlias(supabase: any, aliasKey: string | null | undefined): Promise<string | null> {
+  const key = (aliasKey || '').trim();
+  if (!key) return null;
+  try {
+    const { data } = await supabase
+      .from('angle_aliases')
+      .select('angle_id')
+      .eq('alias_key', key)
+      .maybeSingle();
+    return (data?.angle_id as string) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveFallbackAngleTaxonomyId(supabase: any): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from('angle_taxonomy')
+      .select('angle_id')
+      .eq('canonical_key', 'detail.general')
+      .maybeSingle();
+    return (data?.angle_id as string) || null;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -222,6 +250,9 @@ serve(async (req) => {
     
     console.log(`🚀 Processing ${imagesToProcess.length} images in parallel (starting with ${CONCURRENT_LIMIT} concurrent)...`);
     
+    // Resolve fallback taxonomy id once (best-effort).
+    const fallbackAngleTaxonomyId = await resolveFallbackAngleTaxonomyId(supabase);
+    
     // Pre-load ALL vehicle contexts in parallel (one query per unique vehicle)
     const uniqueVehicleIds = [...new Set(imagesToProcess.map(img => img.vehicle_id))];
     console.log(`📚 Pre-loading contexts for ${uniqueVehicleIds.length} unique vehicles...`);
@@ -243,7 +274,7 @@ serve(async (req) => {
         batch.map(async (img) => {
           const useEnhanced = true; // Always use enhanced for detailed extraction (extracted_tags, colors, materials, etc.)
           const context = vehicleContextCache.get(img.vehicle_id)!;
-          return processImage(img, supabase, minConfidence, requireReview, useEnhanced, context);
+          return processImage(img, supabase, minConfidence, requireReview, useEnhanced, context, fallbackAngleTaxonomyId);
         })
       );
       
@@ -331,7 +362,8 @@ async function processImage(
   minConfidence: number,
   requireReview: boolean,
   useEnhancedContext: boolean,
-  vehicleContext?: VehicleContext // Pre-loaded context to avoid repeated queries
+  vehicleContext?: VehicleContext, // Pre-loaded context to avoid repeated queries
+  fallbackAngleTaxonomyId?: string | null
 ): Promise<'processed' | 'skipped' | 'review' | 'failed'> {
   try {
     // Check if already classified (check BOTH vehicle_image_angles AND recent audit)
@@ -494,6 +526,64 @@ async function processImage(
             yaw_confidence: yaw !== null ? (Number.isFinite(conf01) ? conf01 : null) : null,
           } as any)
           .eq('id', img.id);
+      } catch {
+        // Non-blocking
+      }
+
+      // Decades-proof: append observations over time (do not overwrite).
+      try {
+        const conf01 = Math.max(0, Math.min(1, Number(classification.confidence || 0) / 100));
+        const taxonomyAngleId =
+          (await resolveAngleTaxonomyIdFromAlias(supabase, classification.angle_family)) ||
+          fallbackAngleTaxonomyId ||
+          null;
+
+        if (taxonomyAngleId) {
+          await supabase.from('image_angle_observations').insert({
+            image_id: img.id,
+            vehicle_id: img.vehicle_id,
+            angle_id: taxonomyAngleId,
+            confidence: Number.isFinite(conf01) ? conf01 : null,
+            source: 'ai',
+            source_version: 'backfill-image-angles_v1',
+            evidence: {
+              needs_review: !!classification.needs_review,
+              validation_notes: classification.validation_notes || null,
+              angle_family: classification.angle_family || null,
+              primary_label: classification.primary_label || null,
+              role: classification.role || null,
+            },
+          } as any);
+        }
+
+        const yaw = angleFamilyToYawDeg(classification.angle_family || null);
+        const focalMm = mapFocalLengthToMM(classification.focal_length);
+        const fam = (classification.angle_family || '').toString();
+        const targetAnchor =
+          fam.startsWith('engine') ? 'anchor.engine.bay.center'
+          : fam.startsWith('interior') ? 'anchor.interior.cabin.center'
+          : fam.startsWith('undercarriage') ? 'anchor.undercarriage.center'
+          : 'anchor.vehicle.center';
+
+        await supabase.from('image_pose_observations').insert({
+          image_id: img.id,
+          vehicle_id: img.vehicle_id,
+          reference_frame: 'vehicle_frame_v1',
+          yaw_deg: yaw,
+          pose_confidence: (yaw !== null && Number.isFinite(conf01)) ? conf01 : null,
+          focal_length_mm: focalMm || null,
+          target_anchor: targetAnchor,
+          source: 'ai',
+          source_version: 'backfill-image-angles_v1',
+          raw: {
+            angle_family: classification.angle_family || null,
+            view_axis: classification.view_axis || null,
+            elevation: classification.elevation || null,
+            distance: classification.distance || null,
+            focal_length: classification.focal_length || null,
+          },
+          observed_at: new Date().toISOString(),
+        } as any);
       } catch {
         // Non-blocking
       }
