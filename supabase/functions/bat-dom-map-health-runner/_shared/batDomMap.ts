@@ -328,17 +328,51 @@ function extractDescription(doc: any): { text: string | null; method: string } {
   return { text: null, method: 'none' };
 }
 
-function extractCommentsAndBids(doc: any): { comments: number; bids: number; method: string } {
+function extractCommentsAndBids(doc: any, html: string): { comments: number; bids: number; method: string } {
+  // Goal: deterministic counts with a bias toward "real" comment thread parsing when available.
+  // Firecrawl-rendered HTML usually includes .comment nodes; static HTML sometimes does not.
+  const h = String(html || '');
+
   try {
     const commentEls = doc.querySelectorAll('.comment') || [];
-    const commentCount = Array.isArray(commentEls) ? commentEls.length : Number(commentEls?.length || 0);
-    const body = textContent(doc.body);
-    const bids = (body.match(/\$[\d,]+\s+bid placed by/gi) || []).length;
-    return { comments: commentCount || 0, bids: bids || 0, method: 'selector:.comment + text:bids' };
+    const commentArr: any[] = Array.isArray(commentEls) ? commentEls : Array.from(commentEls || []);
+
+    let commentCount = Number(commentArr.length || 0);
+    let bidCount = 0;
+
+    // Prefer scanning comment bodies (matches extract-auction-comments behavior).
+    for (const el of commentArr) {
+      const p = el?.querySelector?.('p') || el;
+      const t = textContent(p);
+      if (!t) continue;
+      if (/bid placed by/i.test(t)) bidCount++;
+    }
+
+    // If comments didn't render, fall back to headline "X comments" counter.
+    if (commentCount === 0) {
+      const bodyText = textContent(doc.body);
+      const cm = bodyText.match(/\b([\d,]+)\s+comments?\b/i);
+      commentCount = asInt(cm?.[1]) || 0;
+    }
+
+    // If we still have no bid signal, fall back to HTML-wide patterns (fast + deterministic).
+    if (bidCount === 0) {
+      // Try a dedicated stats element first (less noisy).
+      const sm =
+        h.match(/data-stats-item="bids"[^>]*>\s*([\d,]+)\s*bids?\s*</i) ||
+        h.match(/\b([\d,]+)\s*bids?\b/i);
+      bidCount = asInt(sm?.[1]) || 0;
+    }
+    if (bidCount === 0) {
+      bidCount = (h.match(/\b(?:USD\s*)?\$[\d,]+\s+bid placed by\b/gi) || []).length;
+    }
+
+    return { comments: commentCount || 0, bids: bidCount || 0, method: commentArr.length ? 'dom:.comment' : 'text:headline_fallback' };
   } catch {
     const body = textContent(doc.body);
-    const bids = (body.match(/\$[\d,]+\s+bid placed by/gi) || []).length;
-    return { comments: 0, bids: bids || 0, method: 'text:fallback' };
+    const comments = asInt(body.match(/\b([\d,]+)\s+comments?\b/i)?.[1]) || 0;
+    const bids = (String(html || '').match(/\b(?:USD\s*)?\$[\d,]+\s+bid placed by\b/gi) || []).length;
+    return { comments, bids: bids || 0, method: 'text:fallback' };
   }
 }
 
@@ -426,7 +460,7 @@ export function extractBatDomMap(html: string, url: string): { extracted: BatDom
   const sale = extractSaleAndCurrentBid(doc);
   const gallery = extractGalleryImagesFromHtml(html);
   const desc = extractDescription(doc);
-  const cb = extractCommentsAndBids(doc);
+  const cb = extractCommentsAndBids(doc, html);
 
   const extracted: BatDomExtracted = {
     url,

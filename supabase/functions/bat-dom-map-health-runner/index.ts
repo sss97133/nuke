@@ -15,6 +15,156 @@ type RunnerRequest = {
   extractor_version?: string;
 };
 
+async function getOrCreateSnapshotId(opts: {
+  supabase: any;
+  platform: string;
+  listing_url: string;
+  fetch_method: string;
+  http_status: number | null;
+  success: boolean;
+  error_message: string | null;
+  html: string;
+  html_sha256: string | null;
+  content_length: number;
+}): Promise<string | null> {
+  const {
+    supabase,
+    platform,
+    listing_url,
+    fetch_method,
+    http_status,
+    success,
+    error_message,
+    html,
+    html_sha256,
+    content_length,
+  } = opts;
+
+  // Use upsert + ignoreDuplicates so repeated runs do NOT fail on the unique (platform, listing_url, html_sha256) index.
+  // NOTE: the index is partial (html_sha256 IS NOT NULL). When html_sha256 is null, we cannot dedupe reliably.
+  const row = {
+    platform,
+    listing_url,
+    fetched_at: new Date().toISOString(),
+    fetch_method,
+    http_status,
+    success,
+    error_message,
+    html,
+    html_sha256,
+    content_length,
+    metadata: { runner: 'bat-dom-map-health-runner' },
+  };
+
+  if (html_sha256) {
+    const { data: upserted, error: upsertErr } = await supabase
+      .from('listing_page_snapshots')
+      .upsert(row, {
+        onConflict: 'platform,listing_url,html_sha256',
+        ignoreDuplicates: true,
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (!upsertErr && upserted?.id) return upserted.id;
+
+    // If we ignored a duplicate, we may not get a row back; fetch existing snapshot id deterministically by sha.
+    const { data: existing, error: existingErr } = await supabase
+      .from('listing_page_snapshots')
+      .select('id')
+      .eq('platform', platform)
+      .eq('listing_url', listing_url)
+      .eq('html_sha256', html_sha256)
+      .order('fetched_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!existingErr && existing?.id) return existing.id;
+    return null;
+  }
+
+  // Fallback: no sha (should be rare). Insert best-effort; ignore any failure.
+  const { data: inserted } = await supabase
+    .from('listing_page_snapshots')
+    .insert(row)
+    .select('id')
+    .maybeSingle()
+    .catch(() => ({ data: null }));
+
+  return inserted?.id || null;
+}
+
+async function upsertHealthRow(opts: {
+  supabase: any;
+  platform: string;
+  listing_url: string;
+  snapshot_id: string | null;
+  extractor_name: string;
+  extractor_version: string;
+  extracted_at: string;
+  overall_score: number;
+  ok: boolean;
+  health: any;
+  error_message: string | null;
+}): Promise<void> {
+  const {
+    supabase,
+    platform,
+    listing_url,
+    snapshot_id,
+    extractor_name,
+    extractor_version,
+    extracted_at,
+    overall_score,
+    ok,
+    health,
+    error_message,
+  } = opts;
+
+  // If we have a snapshot_id, dedupe by (snapshot_id, extractor_name, extractor_version).
+  if (snapshot_id) {
+    await supabase
+      .from('listing_extraction_health')
+      .upsert(
+        {
+          platform,
+          listing_url,
+          snapshot_id,
+          extractor_name,
+          extractor_version,
+          extracted_at,
+          overall_score,
+          ok,
+          health,
+          error_message,
+        },
+        {
+          onConflict: 'snapshot_id,extractor_name,extractor_version',
+          ignoreDuplicates: true,
+        }
+      )
+      .catch(() => null);
+    return;
+  }
+
+  // No snapshot id means we can't safely dedupe. Insert best-effort (still useful for surfacing errors).
+  await supabase
+    .from('listing_extraction_health')
+    .insert({
+      platform,
+      listing_url,
+      snapshot_id: null,
+      extractor_name,
+      extractor_version,
+      extracted_at,
+      overall_score,
+      ok,
+      health,
+      error_message,
+    })
+    .catch(() => null);
+}
+
 async function sha256Hex(text: string): Promise<string> {
   const data = new TextEncoder().encode(text);
   const digest = await crypto.subtle.digest('SHA-256', data);
@@ -148,28 +298,18 @@ serve(async (req) => {
         const sha = html ? await sha256Hex(html) : null;
 
         if (persistHtml) {
-          // Upsert snapshot (deduped by unique index)
-          const { data: snap, error: snapErr } = await supabase
-            .from('listing_page_snapshots')
-            .insert({
-              platform,
-              listing_url,
-              fetched_at: new Date().toISOString(),
-              fetch_method: fetchMethod,
-              http_status: httpStatus,
-              success: !!html && contentLen > 1000 && (httpStatus ? httpStatus < 500 : true),
-              error_message: fetchError,
-              html,
-              html_sha256: sha,
-              content_length: contentLen,
-              metadata: {
-                runner: 'bat-dom-map-health-runner',
-              },
-            })
-            .select('id')
-            .single();
-
-          if (!snapErr && snap?.id) snapshotId = snap.id;
+          snapshotId = await getOrCreateSnapshotId({
+            supabase,
+            platform,
+            listing_url,
+            fetch_method: fetchMethod,
+            http_status: httpStatus,
+            success: !!html && contentLen > 1000 && (httpStatus ? httpStatus < 500 : true),
+            error_message: fetchError,
+            html,
+            html_sha256: sha,
+            content_length: contentLen,
+          });
         }
 
         const { health } = extractBatDomMap(html, listing_url);
@@ -177,25 +317,20 @@ serve(async (req) => {
         const ok = health.overall_score >= 70 && health.counts.images > 0 && (health.fields.location.ok || health.fields.title.ok);
         if (ok) okCount++; else failCount++;
 
-        // Persist health row
-        const { error: healthErr } = await supabase
-          .from('listing_extraction_health')
-          .insert({
-            platform,
-            listing_url,
-            snapshot_id: snapshotId,
-            extractor_name: 'bat_dom_map',
-            extractor_version: extractorVersion,
-            extracted_at: new Date().toISOString(),
-            overall_score: health.overall_score,
-            ok,
-            health,
-            error_message: null,
-          });
-
-        if (healthErr) {
-          // Non-fatal; still return the computed result.
-        }
+        // Persist health row (idempotent if snapshot_id present)
+        await upsertHealthRow({
+          supabase,
+          platform,
+          listing_url,
+          snapshot_id: snapshotId,
+          extractor_name: 'bat_dom_map',
+          extractor_version: extractorVersion,
+          extracted_at: new Date().toISOString(),
+          overall_score: health.overall_score,
+          ok,
+          health,
+          error_message: null,
+        });
 
         results.push({
           listing_url,
@@ -216,27 +351,25 @@ serve(async (req) => {
         failCount++;
 
         // Persist failure health row
-        await supabase
-          .from('listing_extraction_health')
-          .insert({
-            platform,
-            listing_url,
-            snapshot_id: snapshotId,
-            extractor_name: 'bat_dom_map',
-            extractor_version: extractorVersion,
-            extracted_at: new Date().toISOString(),
+        await upsertHealthRow({
+          supabase,
+          platform,
+          listing_url,
+          snapshot_id: snapshotId,
+          extractor_name: 'bat_dom_map',
+          extractor_version: extractorVersion,
+          extracted_at: new Date().toISOString(),
+          overall_score: 0,
+          ok: false,
+          health: {
             overall_score: 0,
-            ok: false,
-            health: {
-              overall_score: 0,
-              fields: {},
-              counts: { images: 0, comments: 0, bids: 0 },
-              warnings: [],
-              errors: [fetchError],
-            },
-            error_message: fetchError,
-          })
-          .catch(() => null);
+            fields: {},
+            counts: { images: 0, comments: 0, bids: 0 },
+            warnings: [],
+            errors: [fetchError],
+          },
+          error_message: fetchError,
+        });
 
         results.push({
           listing_url,
