@@ -21,7 +21,7 @@ import { supabase } from '../lib/supabase';
 export interface UnifiedPrice {
   displayValue: number;
   displayLabel: string;
-  source: 'sale_price' | 'asking_price' | 'current_value' | 'purchase_price' | 'msrp';
+  source: 'sale_price' | 'auction_bid' | 'asking_price' | 'current_value' | 'purchase_price' | 'msrp';
   confidence: 'verified' | 'high' | 'medium' | 'low';
   lastUpdated: string;
   metadata?: {
@@ -41,6 +41,94 @@ export interface UnifiedPrice {
  * 5. msrp - Manufacturer suggested (BASELINE)
  */
 export class UnifiedPricingService {
+  /**
+   * Best-effort: if the vehicle is in a live auction, prefer the current/high bid.
+   * This keeps cards and profile headers aligned with "current bid" truth during auctions.
+   */
+  private static async getLiveAuctionBid(vehicleId: string): Promise<{
+    bid: number;
+    platform?: string;
+    url?: string;
+    updated_at?: string | null;
+  } | null> {
+    try {
+      // 1) external_listings (BaT/C&B/etc) - canonical live feed for current_bid
+      const { data: ext } = await supabase
+        .from('external_listings')
+        .select('platform, listing_url, listing_status, current_bid, updated_at')
+        .eq('vehicle_id', vehicleId)
+        .in('listing_status', ['active', 'live'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const extBid = typeof (ext as any)?.current_bid === 'number' ? (ext as any).current_bid : Number((ext as any)?.current_bid || 0);
+      if (Number.isFinite(extBid) && extBid > 0) {
+        return {
+          bid: extBid,
+          platform: (ext as any)?.platform || undefined,
+          url: (ext as any)?.listing_url || undefined,
+          updated_at: (ext as any)?.updated_at || null,
+        };
+      }
+    } catch {
+      // ignore (table may not exist in some environments)
+    }
+
+    try {
+      // 2) bat_listings (fallback)
+      const { data: bat } = await supabase
+        .from('bat_listings')
+        .select('bat_listing_url, listing_status, current_bid, final_bid, updated_at')
+        .eq('vehicle_id', vehicleId)
+        .in('listing_status', ['active', 'live'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const batBidRaw = (bat as any)?.current_bid ?? (bat as any)?.final_bid ?? 0;
+      const batBid = typeof batBidRaw === 'number' ? batBidRaw : Number(batBidRaw || 0);
+      if (Number.isFinite(batBid) && batBid > 0) {
+        return {
+          bid: batBid,
+          platform: 'bat',
+          url: (bat as any)?.bat_listing_url || undefined,
+          updated_at: (bat as any)?.updated_at || null,
+        };
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      // 3) native vehicle_listings (N-Zero) - cents column
+      const { data: native } = await supabase
+        .from('vehicle_listings')
+        .select('listing_url, status, current_high_bid_cents, updated_at')
+        .eq('vehicle_id', vehicleId)
+        .eq('status', 'active')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const centsRaw = (native as any)?.current_high_bid_cents ?? 0;
+      const cents = typeof centsRaw === 'number' ? centsRaw : Number(centsRaw || 0);
+      const bid = cents > 0 ? cents / 100 : 0;
+      if (Number.isFinite(bid) && bid > 0) {
+        return {
+          bid,
+          platform: 'native',
+          url: (native as any)?.listing_url || undefined,
+          updated_at: (native as any)?.updated_at || null,
+        };
+      }
+    } catch {
+      // ignore
+    }
+
+    return null;
+  }
+
   /**
    * Get display price for vehicle (respects truth hierarchy)
    * This is the ONLY function components should call for pricing
@@ -81,7 +169,24 @@ export class UnifiedPricingService {
       };
     }
 
-    // 2. SECOND TRUTH: Owner's asking price (intent to sell)
+    // 2. LIVE AUCTION TRUTH: Current bid (highest live signal)
+    const liveBid = await this.getLiveAuctionBid(vehicleId);
+    if (liveBid && liveBid.bid > 0) {
+      return {
+        displayValue: liveBid.bid,
+        displayLabel: 'Current',
+        source: 'auction_bid',
+        confidence: 'high',
+        lastUpdated: liveBid.updated_at || vehicle.updated_at || new Date().toISOString(),
+        metadata: {
+          platform: liveBid.platform,
+          url: liveBid.url,
+          bat_auction_url: vehicle.bat_auction_url || undefined,
+        }
+      };
+    }
+
+    // 3. SECOND TRUTH: Owner's asking price (intent to sell)
     if (vehicle.asking_price && vehicle.asking_price > 0) {
       return {
         displayValue: vehicle.asking_price,
@@ -92,7 +197,7 @@ export class UnifiedPricingService {
       };
     }
 
-    // 3. THIRD TRUTH: Current estimated value
+    // 4. THIRD TRUTH: Current estimated value
     if (vehicle.current_value && vehicle.current_value > 0) {
       return {
         displayValue: vehicle.current_value,
@@ -103,7 +208,7 @@ export class UnifiedPricingService {
       };
     }
 
-    // 4. FOURTH TRUTH: Historical purchase price
+    // 5. FOURTH TRUTH: Historical purchase price
     if (vehicle.purchase_price && vehicle.purchase_price > 0) {
       return {
         displayValue: vehicle.purchase_price,
@@ -114,7 +219,7 @@ export class UnifiedPricingService {
       };
     }
 
-    // 5. LOWEST TRUTH: MSRP (baseline reference)
+    // 6. LOWEST TRUTH: MSRP (baseline reference)
     if (vehicle.msrp && vehicle.msrp > 0) {
       return {
         displayValue: vehicle.msrp,

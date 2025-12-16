@@ -138,7 +138,8 @@ const ImageGallery = ({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'masonry' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState<'quality' | 'date_desc' | 'date_asc'>('quality'); // Default to quality (best first)
+  // Default to newest-first to keep ordering stable across vehicles while AI sorting ramps up.
+  const [sortBy, setSortBy] = useState<'quality' | 'date_desc' | 'date_asc'>('date_desc');
   const [showFilters, setShowFilters] = useState(false);
   const [showImages, setShowImages] = useState(false);
   const [imagesPerPage] = useState(25);
@@ -158,6 +159,17 @@ const ImageGallery = ({
   const [importingFallback, setImportingFallback] = useState(false);
   // NOTE: Must be declared before any hooks/callbacks reference it (avoids TDZ crashes in production builds).
   const [session, setSession] = useState<any>(null);
+
+  // Prevent "polluted" galleries when navigating between vehicles: clear stale images immediately,
+  // then the fetch effect for the new `vehicleId` will repopulate.
+  useEffect(() => {
+    setAllImages([]);
+    setDisplayedImages([]);
+    setShowImages(false);
+    setUsingFallback(false);
+    setError(null);
+    setLoading(true);
+  }, [vehicleId]);
 
   // Vehicle meta (used to suppress "BaT homepage noise" images that were mistakenly attached to some vehicles)
   const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
@@ -253,7 +265,7 @@ const ImageGallery = ({
         .from('vehicle_images')
         .select('image_url')
         .eq('vehicle_id', vehicleId)
-        .eq('is_document', false)
+        .not('is_document', 'is', true)
         .limit(5000);
       if (existingErr) throw existingErr;
 
@@ -273,8 +285,12 @@ const ImageGallery = ({
           large_url: url,
           variants: { full: url, large: url, medium: url, thumbnail: url },
           is_primary: idx === 0 && existing.size === 0,
+          position: existing.size + idx,
           caption: fallbackLabel,
           category: 'general',
+          is_document: false,
+          is_duplicate: false,
+          taken_at: nowIso,
           is_external: true,
           source: 'bat_import',
           source_url: typeof fallbackSourceUrl === 'string' && fallbackSourceUrl.startsWith('http') ? fallbackSourceUrl : null,
@@ -293,8 +309,8 @@ const ImageGallery = ({
         .from('vehicle_images')
         .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
         .eq('vehicle_id', vehicleId)
-        .eq('is_document', false)
-        .or('is_duplicate.is.null,is_duplicate.eq.false')
+        .not('is_document', 'is', true)
+        .not('is_duplicate', 'is', true)
         .order('is_primary', { ascending: false });
       if (refreshErr) throw refreshErr;
 
@@ -334,75 +350,70 @@ const ImageGallery = ({
   const [toolSearchTerm, setToolSearchTerm] = useState('');
 
   // Define getSortedImages BEFORE loadMoreImages (which depends on it)
-  const getSortedImages = () => {
-    if (sortBy === 'quality') {
+  const sortRows = (rows: any[], mode: 'quality' | 'date_desc' | 'date_asc') => {
+    if (mode === 'quality') {
       // Presentation sorting - best images first
       // Try AI-based sorting first, fallback to heuristics if no angle data
       try {
-        const sorted = sortImagesByPriority(allImages);
-        // Check if it actually sorted (has variety in positions)
+        const sorted = sortImagesByPriority(rows || []);
         if (sorted.length > 0) return sorted;
       } catch (e) {
         console.log('AI sorting unavailable, using heuristics');
       }
-      
+
       // Fallback: Smart heuristics when no AI angle data exists
-      return [...allImages].sort((a, b) => {
+      return [...(rows || [])].sort((a, b) => {
         // Primary images always first
         if (a.is_primary && !b.is_primary) return -1;
         if (!a.is_primary && b.is_primary) return 1;
-        
+
         // Category-based priority (exterior > interior > engine > other)
         const catPriority: Record<string, number> = {
-          'exterior': 100,
-          'hero': 95,
-          'interior': 80,
-          'engine': 70,
-          'engine_bay': 70,
-          'undercarriage': 50,
-          'detail': 40,
-          'general': 30,
-          'work': 10,
-          'document': 5,
-          'receipt': -10
+          exterior: 100,
+          hero: 95,
+          interior: 80,
+          engine: 70,
+          engine_bay: 70,
+          undercarriage: 50,
+          detail: 40,
+          general: 30,
+          work: 10,
+          document: 5,
+          receipt: -10
         };
-        
-        const catA = catPriority[(a.category || 'general').toLowerCase()] || 20;
-        const catB = catPriority[(b.category || 'general').toLowerCase()] || 20;
-        
+
+        const catA = catPriority[String(a.category || 'general').toLowerCase()] || 20;
+        const catB = catPriority[String(b.category || 'general').toLowerCase()] || 20;
+
         if (catA !== catB) return catB - catA;
-        
+
         // Within same category, newer first
         const dateA = new Date(a.taken_at || a.created_at).getTime();
         const dateB = new Date(b.taken_at || b.created_at).getTime();
-        
+
         if (dateA !== dateB) return dateB - dateA;
-        
-        // Stable fallback when dates are equal
-        return (a.id || '').localeCompare(b.id || '');
-      });
-    } else if (sortBy === 'date_desc') {
-      return [...allImages].sort((a, b) => {
-        const dateA = new Date(a.taken_at || a.created_at).getTime();
-        const dateB = new Date(b.taken_at || b.created_at).getTime();
-        
-        if (dateA !== dateB) return dateB - dateA;
-        
-        // Stable fallback when dates are equal
-        return (a.id || '').localeCompare(b.id || '');
-      });
-    } else {
-      // date_asc
-      return [...allImages].sort((a, b) => {
-        const dateA = new Date(a.taken_at || a.created_at).getTime();
-        const dateB = new Date(b.taken_at || b.created_at).getTime();
-        
-        if (dateA !== dateB) return dateA - dateB;
-        
+
         // Stable fallback when dates are equal
         return (a.id || '').localeCompare(b.id || '');
       });
     }
+
+    const dir = mode === 'date_desc' ? -1 : 1;
+    return [...(rows || [])].sort((a, b) => {
+      // Primary images always first regardless of date ordering (stable UX)
+      if (a.is_primary && !b.is_primary) return -1;
+      if (!a.is_primary && b.is_primary) return 1;
+
+      const dateA = new Date(a.taken_at || a.created_at).getTime();
+      const dateB = new Date(b.taken_at || b.created_at).getTime();
+
+      if (dateA !== dateB) return (dateA - dateB) * dir;
+      return (a.id || '').localeCompare(b.id || '');
+    });
+  };
+
+  const getSortedImages = () => {
+    return sortRows(allImages, sortBy);
   };
 
   const dedupeFetchedImages = (images: any[]): any[] => {
@@ -628,10 +639,13 @@ const ImageGallery = ({
           .from('vehicle_images')
           .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
           .eq('vehicle_id', vehicleId)
-          .eq('is_document', false) // Filter out documents - they should be in a separate section
-          // Hide duplicate rows by default (upload pipeline marks true duplicates)
-          .or('is_duplicate.is.null,is_duplicate.eq.false')
-          .order('is_primary', { ascending: false });
+          // Filter out documents (treat NULL as false for legacy rows)
+          .not('is_document', 'is', true)
+          // Hide duplicate rows by default (treat NULL as false for legacy rows)
+          .not('is_duplicate', 'is', true)
+          .order('is_primary', { ascending: false })
+          .order('taken_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false });
 
         if (error) throw error;
         const images = filterBatNoiseRows(dedupeFetchedImages(rawImages || []), meta);
@@ -656,14 +670,10 @@ const ImageGallery = ({
         } else {
           setUsingFallback(false);
           setAllImages(images);
-          // Load an initial batch (50 or fewer) immediately
-          const sorted = [...images].sort((a: any, b: any) => {
-            const da = new Date(a.taken_at || a.created_at).getTime();
-            const db = new Date(b.taken_at || b.created_at).getTime();
-            return sortBy === 'date_desc' ? db - da : da - db;
-          });
-          const initialBatch = Math.min(50, sorted.length);
-          setDisplayedImages(sorted.slice(0, initialBatch));
+          // Load an initial batch (50 or fewer) immediately using the SAME sort logic used for pagination.
+          // This prevents "reordering" / "scrambled" galleries as you scroll.
+          const sorted = sortRows(images, sortBy);
+          setDisplayedImages(sorted.slice(0, Math.min(50, sorted.length)));
           setShowImages(true);
         }
         
@@ -705,8 +715,8 @@ const ImageGallery = ({
               .from('vehicle_images')
               .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
               .eq('vehicle_id', vehicleId)
-              .eq('is_document', false)
-              .or('is_duplicate.is.null,is_duplicate.eq.false')
+              .not('is_document', 'is', true)
+              .not('is_duplicate', 'is', true)
               .order('is_primary', { ascending: false });
             
             if (!error && refreshedImages) {
@@ -909,8 +919,9 @@ const ImageGallery = ({
         .from('vehicle_images')
         .select('id, image_url, thumbnail_url, medium_url, large_url, is_primary, caption, created_at, taken_at, is_document, document_category')
         .eq('vehicle_id', vehicleId)
-        .eq('is_document', false) // Filter out documents
-        .or('is_duplicate.is.null,is_duplicate.eq.false')
+        // Filter out documents (treat NULL as false)
+        .not('is_document', 'is', true)
+        .not('is_duplicate', 'is', true)
         .order('is_primary', { ascending: false });
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
@@ -1405,12 +1416,8 @@ const ImageGallery = ({
             value={sortBy}
             onChange={(e) => {
               const newSort = e.target.value as any;
-              if (newSort === 'quality') {
-                alert('Presentation sorting requires AI angle analysis.\n\nImages will be analyzed automatically on upload in the future.\n\nUsing newest first for now.');
-                setSortBy('date_desc');
-              } else {
-                setSortBy(newSort);
-              }
+              // Keep sorting deterministic; "Best First" uses AI when available and heuristics otherwise.
+              setSortBy(newSort);
             }}
             className="form-select"
             style={{ fontSize: '8pt', padding: '4px 8px', height: '24px', minHeight: '24px' }}

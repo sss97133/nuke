@@ -16,7 +16,13 @@ export interface UserInteraction {
     session_duration?: number;
     source_page?: string;
     device_type?: 'mobile' | 'desktop';
-    gesture_type?: 'swipe' | 'tap' | 'double_tap' | 'long_press' | 'click';
+    gesture_type?: 'swipe' | 'tap' | 'double_tap' | 'long_press' | 'click' | 'hover';
+    // Identity telemetry (for training contextual identity/differentiator selection)
+    identity_kind?: string;
+    identity_value?: string;
+    identity_position?: number;
+    identity_strategy?: string;
+    identity_max_differentiators?: number;
   };
   created_at?: string;
 }

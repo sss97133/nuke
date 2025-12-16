@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
+type SegmentSubcategory = {
+  id: string;
+  segment_id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+};
+
 type SegmentIndexRow = {
   segment_id: string;
   slug: string;
@@ -16,6 +24,8 @@ type SegmentIndexRow = {
   market_cap_usd: number;
   change_7d_pct: number | null;
   change_30d_pct: number | null;
+  subcategory_count?: number;
+  subcategories?: SegmentSubcategory[];
 };
 
 const formatUSD0 = (value: number) =>
@@ -27,6 +37,15 @@ const formatPct = (value: number | null) => {
   return `${sign}${value.toFixed(2)}%`;
 };
 
+function slugify(s: string) {
+  return String(s || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
+}
+
 export default function MarketSegmentDetail() {
   const { slug } = useParams();
   const navigate = useNavigate();
@@ -34,6 +53,18 @@ export default function MarketSegmentDetail() {
   const [segment, setSegment] = useState<SegmentIndexRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+
+  const [subcatName, setSubcatName] = useState('');
+  const [subcatDescription, setSubcatDescription] = useState('');
+  const [subcatSaving, setSubcatSaving] = useState(false);
+  const [subcatError, setSubcatError] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSessionUserId(data.session?.user?.id ?? null);
+    });
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -45,7 +76,7 @@ export default function MarketSegmentDetail() {
         const { data, error } = await supabase
           .from('market_segments_index')
           .select(
-            'segment_id, slug, name, description, manager_type, year_min, year_max, makes, model_keywords, vehicle_count, market_cap_usd, change_7d_pct, change_30d_pct'
+            'segment_id, slug, name, description, manager_type, year_min, year_max, makes, model_keywords, vehicle_count, market_cap_usd, change_7d_pct, change_30d_pct, subcategory_count, subcategories'
           )
           .eq('slug', slug)
           .maybeSingle();
@@ -70,7 +101,9 @@ export default function MarketSegmentDetail() {
           vehicle_count: Number(r.vehicle_count || 0),
           market_cap_usd: Number(r.market_cap_usd || 0),
           change_7d_pct: r.change_7d_pct === null ? null : Number(r.change_7d_pct),
-          change_30d_pct: r.change_30d_pct === null ? null : Number(r.change_30d_pct)
+          change_30d_pct: r.change_30d_pct === null ? null : Number(r.change_30d_pct),
+          subcategory_count: r.subcategory_count === null || r.subcategory_count === undefined ? undefined : Number(r.subcategory_count),
+          subcategories: Array.isArray(r.subcategories) ? (r.subcategories as SegmentSubcategory[]) : undefined
         });
       } catch (e: any) {
         console.error('Failed to load segment detail:', e);
@@ -80,6 +113,52 @@ export default function MarketSegmentDetail() {
       }
     })();
   }, [slug]);
+
+  const handleAddSubcategory = async () => {
+    if (!segment) return;
+    const name = subcatName.trim();
+    const description = subcatDescription.trim() || null;
+    const nextSlug = slugify(name);
+
+    if (!name) {
+      setSubcatError('Name is required');
+      return;
+    }
+    if (!nextSlug) {
+      setSubcatError('Name cannot produce a valid slug');
+      return;
+    }
+
+    try {
+      setSubcatSaving(true);
+      setSubcatError(null);
+
+      const { data, error } = await supabase
+        .from('market_segment_subcategories')
+        .insert({
+          segment_id: segment.segment_id,
+          slug: nextSlug,
+          name,
+          description,
+          status: 'active'
+        })
+        .select('id, segment_id, slug, name, description')
+        .single();
+
+      if (error) throw error;
+      const created = data as SegmentSubcategory;
+      const prev = Array.isArray(segment.subcategories) ? segment.subcategories : [];
+      const next = [...prev, created].sort((a, b) => a.name.localeCompare(b.name));
+      setSegment({ ...segment, subcategories: next, subcategory_count: next.length });
+      setSubcatName('');
+      setSubcatDescription('');
+    } catch (e: any) {
+      console.error('Failed to create subcategory:', e);
+      setSubcatError(e?.message || 'Failed to create subcategory');
+    } finally {
+      setSubcatSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -177,6 +256,90 @@ export default function MarketSegmentDetail() {
               <div style={{ marginTop: '6px', color: 'var(--text-muted)' }}>
                 Next step: add “constituents” listing + time-series index chart once you confirm the index math.
               </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h3 className="heading-3">Subcategories</h3>
+            </div>
+            <div className="card-body" style={{ display: 'grid', gap: '10px' }}>
+              {Array.isArray(segment.subcategories) && segment.subcategories.length > 0 ? (
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  {segment.subcategories.map((sc) => (
+                    <div
+                      key={sc.id}
+                      style={{
+                        border: '2px solid var(--border)',
+                        borderRadius: '4px',
+                        padding: '10px',
+                        background: 'var(--white)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'baseline' }}>
+                        <div style={{ fontWeight: 900 }}>{sc.name}</div>
+                        <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>{sc.slug}</div>
+                      </div>
+                      {sc.description && (
+                        <div style={{ marginTop: '6px', fontSize: '9pt', color: 'var(--text-muted)' }}>{sc.description}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>No subcategories yet.</div>
+              )}
+
+              {sessionUserId ? (
+                <div style={{ borderTop: '2px solid var(--border)', paddingTop: '10px' }}>
+                  <div style={{ fontWeight: 900, marginBottom: '6px', fontSize: '9pt' }}>Add subcategory</div>
+                  {subcatError && (
+                    <div style={{ marginBottom: '8px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                      Error: <strong style={{ color: 'var(--text)' }}>{subcatError}</strong>
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    <input
+                      value={subcatName}
+                      onChange={(e) => setSubcatName(e.target.value)}
+                      placeholder="Name (e.g. Commuter, Luxury, Track)"
+                      style={{
+                        border: '2px solid var(--border)',
+                        borderRadius: '4px',
+                        padding: '8px',
+                        background: 'var(--white)',
+                        color: 'var(--text)'
+                      }}
+                    />
+                    <textarea
+                      value={subcatDescription}
+                      onChange={(e) => setSubcatDescription(e.target.value)}
+                      placeholder="Description (optional)"
+                      rows={3}
+                      style={{
+                        border: '2px solid var(--border)',
+                        borderRadius: '4px',
+                        padding: '8px',
+                        background: 'var(--white)',
+                        color: 'var(--text)',
+                        resize: 'vertical'
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                        Slug preview: <strong style={{ color: 'var(--text)' }}>{slugify(subcatName.trim()) || '—'}</strong>
+                      </div>
+                      <button className="button button-secondary" onClick={handleAddSubcategory} disabled={subcatSaving}>
+                        {subcatSaving ? 'Saving...' : 'Add'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                  Sign in to add subcategories.
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaviconIcon } from '../common/FaviconIcon';
-import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
+import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
+import { UserInteractionService } from '../../services/userInteractionService';
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -63,6 +64,8 @@ interface VehicleCardDenseProps {
   infoDense?: boolean;
   /** Optional URL to use for favicon/source stamp (listing source or org website). */
   sourceStampUrl?: string;
+  /** When present, we can log identity-part telemetry for training contextual identity selection. */
+  viewerUserId?: string;
 }
 
 const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
@@ -73,7 +76,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showPriceOverlay = true,
   showDetailOverlay = true,
   infoDense = false,
-  sourceStampUrl
+  sourceStampUrl,
+  viewerUserId
 }) => {
   // Local CSS for badge animations. We scope keyframes to avoid collisions
   // (the design system defines multiple `@keyframes pulse` variations).
@@ -125,7 +129,35 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return { displayPrice: formatted };
   }, [vehicle]);
 
-  const identity = React.useMemo(() => getVehicleIdentityParts(vehicle as any), [vehicle]);
+  const identity = React.useMemo(() => getVehicleIdentityTokens(vehicle as any), [vehicle]);
+  const loggedKeysRef = React.useRef<Set<string>>(new Set());
+
+  const logIdentityToken = React.useCallback((kind: string, value: string, position: number) => {
+    if (!viewerUserId) return;
+    if (!vehicle?.id) return;
+    const key = `${vehicle.id}:${kind}:${position}`;
+    if (loggedKeysRef.current.has(key)) return;
+    loggedKeysRef.current.add(key);
+
+    // Best-effort: do not block rendering.
+    UserInteractionService.logInteraction(
+      viewerUserId,
+      'view',
+      'vehicle',
+      vehicle.id,
+      {
+        vehicle_id: vehicle.id,
+        source_page: typeof window !== 'undefined' ? window.location.pathname : undefined,
+        device_type: 'desktop',
+        gesture_type: 'hover',
+        identity_kind: kind,
+        identity_value: value,
+        identity_position: position,
+        identity_strategy: identity.meta.transmissionStrategy,
+        identity_max_differentiators: identity.meta.maxDifferentiators,
+      } as any
+    ).catch(() => null);
+  }, [viewerUserId, vehicle?.id, identity.meta.maxDifferentiators, identity.meta.transmissionStrategy]);
 
   const formatPrice = (price?: number) => {
     if (!price) return '—';
@@ -870,11 +902,30 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               marginBottom: '4px',
             }}
           >
-            <span title="Year">{identity.primary[0] || ''}</span>
-            {identity.primary[1] ? <span title="Make">{` ${identity.primary[1]}`}</span> : null}
-            {identity.primary[2] ? <span title="Model">{` ${identity.primary[2]}`}</span> : null}
+            {identity.primary.map((t, idx) => (
+              <span
+                key={`p-${t.kind}-${idx}`}
+                title={t.kind.toUpperCase()}
+                onMouseEnter={() => logIdentityToken(t.kind, t.value, idx)}
+                style={{ cursor: viewerUserId ? 'help' : 'default' }}
+              >
+                {idx === 0 ? t.value : ` ${t.value}`}
+              </span>
+            ))}
             {identity.differentiators.length > 0 ? (
-              <span title="Differentiators">{` • ${identity.differentiators.join(' • ')}`}</span>
+              <span>
+                {' '}
+                {identity.differentiators.map((t, j) => (
+                  <span
+                    key={`d-${t.kind}-${j}`}
+                    title={t.kind.toUpperCase()}
+                    onMouseEnter={() => logIdentityToken(t.kind, t.value, identity.primary.length + j)}
+                    style={{ cursor: viewerUserId ? 'help' : 'default' }}
+                  >
+                    {`• ${t.value} `}
+                  </span>
+                ))}
+              </span>
             ) : null}
           </div>
 

@@ -13,6 +13,7 @@ interface VehicleData {
   vin?: string | null;
   created_at?: string;
   sale_price?: number | null;
+  asking_price?: number | null;
   current_value?: number | null;
   purchase_price?: number | null;
   msrp?: number | null;
@@ -41,6 +42,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
   const [sortPreference, setSortPreference] = useState<'coolest' | 'nearest' | 'best_opportunity'>('coolest');
   const [unifiedPrice, setUnifiedPrice] = useState<number>(0);
   const [priceLabel, setPriceLabel] = useState<string>('');
+  const [priceSource, setPriceSource] = useState<string>('');
 
   // Load unified price on component mount
   useEffect(() => {
@@ -49,10 +51,12 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
         const price = await UnifiedPricingService.getDisplayPrice(vehicle.id);
         setUnifiedPrice(price.displayValue);
         setPriceLabel(price.displayLabel);
+        setPriceSource(price.source);
       } catch (error) {
         // Fallback to legacy pricing logic
         setUnifiedPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value || vehicle.purchase_price || vehicle.msrp || 0);
         setPriceLabel('Estimated at');
+        setPriceSource('current_value');
       }
     };
     loadPrice();
@@ -108,6 +112,16 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
       return `$${(price / 1000).toFixed(0)}k`;
     }
     return `$${price.toLocaleString()}`;
+  };
+
+  const getPriceChipPrefix = () => {
+    const src = String(priceSource || '').toLowerCase();
+    if (src === 'sale_price') return 'SOLD';
+    if (src === 'auction_bid') return 'CURRENT';
+    if (src === 'asking_price') return 'ASK';
+    if (src === 'purchase_price') return 'PAID';
+    if (src === 'msrp') return 'MSRP';
+    return 'EST';
   };
 
   const smallChipStyle: React.CSSProperties = {
@@ -173,7 +187,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
                   onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
-                  EST: {formatPrice(estimate)}
+                  {getPriceChipPrefix()}: {formatPrice(estimate)}
                 </span>
               )}
               
@@ -301,7 +315,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                     onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
                     onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                   >
-                    EST: {formatPrice(estimate)}
+                    {getPriceChipPrefix()}: {formatPrice(estimate)}
                   </span>
                 )}
                 
@@ -445,7 +459,7 @@ const EnhancedVehicleCard: React.FC<EnhancedVehicleCardProps> = ({
                   onMouseEnter={(e) => Object.assign(e.currentTarget.style, hoverStyle)}
                   onMouseLeave={(e) => Object.assign(e.currentTarget.style, { background: 'var(--bg)', borderColor: '#c0c0c0' })}
                 >
-                  EST: {formatPrice(estimate)}
+                  {getPriceChipPrefix()}: {formatPrice(estimate)}
                 </span>
               )}
               

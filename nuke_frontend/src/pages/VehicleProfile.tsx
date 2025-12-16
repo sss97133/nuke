@@ -2063,7 +2063,8 @@ const VehicleProfile: React.FC = () => {
         // Keep payload lean to reduce DB load/timeouts; we only need URLs + ordering fields here.
         .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, is_primary, is_document, position, created_at, storage_path')
         .eq('vehicle_id', vehicle.id)
-        .eq('is_document', false) // Filter out documents - they belong in a separate section
+        // Legacy rows may have is_document = NULL; treat that as "not a document"
+        .not('is_document', 'is', true) // Filter out documents - they belong in a separate section
         .order('is_primary', { ascending: false })
         .order('position', { ascending: true })
         .order('created_at', { ascending: false });

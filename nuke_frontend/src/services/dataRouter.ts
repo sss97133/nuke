@@ -393,7 +393,8 @@ class DataRouterService {
             vehicle_id: plan.vehicleOperation.vehicleId,
             image_url: imgOp.imageUrl,
             is_primary: imgOp.isPrimary || false,
-            uploaded_by: userId
+            user_id: userId,
+            source: 'ai_data_ingestion'
           })
           .select('id')
           .single();

@@ -23,6 +23,13 @@ export type VehicleIdentityOptions = {
   transmissionStrategy?: 'never' | 'contextual' | 'manual_only' | 'always';
 };
 
+export type VehicleIdentityTokenKind = 'year' | 'make' | 'model' | 'series' | 'trim' | 'transmission';
+
+export type VehicleIdentityToken = {
+  kind: VehicleIdentityTokenKind;
+  value: string;
+};
+
 const escapeRegExp = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
@@ -115,6 +122,21 @@ export function getVehicleIdentityParts(
   primary: string[];        // year/make/model (always first)
   differentiators: string[]; // series/trim/transmission signals
 } {
+  const tokens = getVehicleIdentityTokens(v, opts);
+  return {
+    primary: tokens.primary.map(t => t.value),
+    differentiators: tokens.differentiators.map(t => t.value),
+  };
+}
+
+export function getVehicleIdentityTokens(
+  v: VehicleIdentitySource,
+  opts: VehicleIdentityOptions = {}
+): {
+  primary: VehicleIdentityToken[];
+  differentiators: VehicleIdentityToken[];
+  meta: Required<Pick<VehicleIdentityOptions, 'maxDifferentiators' | 'transmissionStrategy'>>;
+} {
   const {
     maxDifferentiators = 3,
     transmissionStrategy = 'contextual',
@@ -146,9 +168,23 @@ export function getVehicleIdentityParts(
     return shouldIncludeTransmissionByNiche(v) && (isManual || transmissionDisplay === 'PDK');
   })();
 
-  const primary = [year, make, model].filter(Boolean);
-  const differentiatorsAll = [series, trim, includeTransmission ? transmissionDisplay : ''].filter(Boolean);
-  return { primary, differentiators: differentiatorsAll.slice(0, Math.max(0, maxDifferentiators)) };
+  const primary: VehicleIdentityToken[] = [
+    year ? { kind: 'year', value: year } : null,
+    make ? { kind: 'make', value: make } : null,
+    model ? { kind: 'model', value: model } : null,
+  ].filter(Boolean) as VehicleIdentityToken[];
+
+  const differentiatorsAll: VehicleIdentityToken[] = [
+    series ? { kind: 'series', value: series } : null,
+    trim ? { kind: 'trim', value: trim } : null,
+    includeTransmission && transmissionDisplay ? { kind: 'transmission', value: transmissionDisplay } : null,
+  ].filter(Boolean) as VehicleIdentityToken[];
+
+  return {
+    primary,
+    differentiators: differentiatorsAll.slice(0, Math.max(0, maxDifferentiators)),
+    meta: { maxDifferentiators, transmissionStrategy },
+  };
 }
 
 

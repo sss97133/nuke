@@ -304,6 +304,7 @@ serve(async (req: Request) => {
             imported_at: new Date().toISOString(),
             external_images: parsed.images,
             image_count: parsed.images.length,
+            scraped_asking_price: askingPrice,
             bhcc: (typeof parsed.bhcc_stockno === "number" && Number.isFinite(parsed.bhcc_stockno))
               ? { stockno: parsed.bhcc_stockno }
               : undefined,
@@ -314,7 +315,8 @@ serve(async (req: Request) => {
               year,
               make,
               model,
-              asking_price: askingPrice,
+              // IMPORTANT: scraped asking price is not a canonical vehicle field.
+              // Keep it in origin_metadata + dealer_inventory, but do not set vehicles.asking_price.
               // Dealer inventory imports should be visible in the feed immediately.
               // If we don't have an org link, keep it private/pending.
               status: shouldPublish ? "active" : "pending",
@@ -381,7 +383,7 @@ serve(async (req: Request) => {
             updates.model = model;
           }
           if (!existingVehicle.year && year) updates.year = year;
-          if (askingPrice) updates.asking_price = askingPrice;
+          // Do not promote scraped prices into vehicles.asking_price (see insert comment above).
 
           // If this item is tied to a dealer org, ensure the vehicle is visible in the public feed.
           // (Homepage feed filters on is_public=true and hides status='pending'.)
