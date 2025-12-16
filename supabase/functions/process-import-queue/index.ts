@@ -2771,6 +2771,17 @@ serve(async (req) => {
           console.log(`⚠️ Vehicle ${newVehicle.id} still pending: ${finalValidation?.recommendation || 'Unknown'}`);
         }
 
+        // Signal-tiering: assign analysis_tier based on available signals (weak signal => less investment).
+        // Best-effort; never blocks ingestion.
+        try {
+          await supabase.rpc('refresh_vehicle_analysis_tier', {
+            p_vehicle_id: newVehicle.id,
+            p_confidence_threshold: 70
+          } as any);
+        } catch {
+          // swallow
+        }
+
         // Update queue item
         await supabase
           .from('import_queue')

@@ -237,10 +237,31 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
     const platform = String(context?.platform || '').toLowerCase();
     const hasFinal = typeof context?.final_price === 'number' && Number.isFinite(context.final_price) && context.final_price > 0;
     if (field !== 'sale_price') return false;
-    if (status === 'sold' && hasFinal) return true;
-    // Fallback: BaT timeline event based mode (we'll render as auction-ish when we have a listing url)
-    if ((platform === 'bat' || (context?.listing_url || '').includes('bringatrailer.com')) && (context?.evidence_url || batAuctionInfo?.url)) return true;
+    // Only show "auction result" when the auction is actually final (blank is better than wrong).
+    const outcomeIsFinal =
+      status === 'sold' ||
+      status === 'ended' ||
+      status === 'reserve_not_met';
+    if (outcomeIsFinal && (hasFinal || (typeof context?.current_bid === 'number' && Number.isFinite(context.current_bid) && context.current_bid > 0))) {
+      return true;
+    }
+    // Fallback: BaT timeline-event-based sale price can be treated as an auction result only when there's an explicit "sold" marker.
+    if (
+      status === 'sold' &&
+      (platform === 'bat' || (context?.listing_url || '').includes('bringatrailer.com')) &&
+      (context?.evidence_url || batAuctionInfo?.url)
+    ) {
+      return true;
+    }
     return false;
+  })();
+
+  const auctionStatus = String(context?.listing_status || '').toLowerCase();
+  const auctionPrice = (() => {
+    if (!isAuctionResultMode) return null;
+    if (typeof context?.final_price === 'number' && Number.isFinite(context.final_price) && context.final_price > 0) return context.final_price;
+    if (typeof context?.current_bid === 'number' && Number.isFinite(context.current_bid) && context.current_bid > 0) return context.current_bid;
+    return value;
   })();
 
   const headerValue = (() => {
@@ -249,6 +270,20 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       if (finalPrice !== null) return finalPrice;
     }
     return value;
+  })();
+
+  const headerPrefix = (() => {
+    if (!isAuctionResultMode) return null;
+    if (auctionStatus === 'sold') return 'SOLD';
+    if (auctionStatus === 'reserve_not_met') return 'WINNING BID (RNM)';
+    return 'WINNING BID';
+  })();
+
+  const effectiveConfidence = (() => {
+    if (typeof context?.confidence === 'number' && Number.isFinite(context.confidence)) return context.confidence;
+    if (isAuctionResultMode && (context?.evidence_url || context?.listing_url)) return 100;
+    if (typeof provenance?.confidence === 'number' && Number.isFinite(provenance.confidence)) return provenance.confidence;
+    return 0;
   })();
 
   const getSourceLabel = (source: string) => {
@@ -307,7 +342,9 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               {isAuctionResultMode ? 'Auction result' : 'Value provenance'}
             </div>
             <div style={{ fontSize: '14pt', fontWeight: 'bold' }}>
-              {field === 'sale_price' && isAuctionResultMode ? `SOLD ${headerValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}` : headerValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}
+              {isAuctionResultMode
+                ? `${headerPrefix || ''} ${Number(auctionPrice ?? headerValue).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}`.trim()
+                : headerValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}
             </div>
             {isAuctionResultMode && (context?.winner_name || '').trim() ? (
               <div style={{ marginTop: 4, fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -376,9 +413,9 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             <div style={{ 
               fontSize: '9pt', 
               fontWeight: 'bold',
-              color: getConfidenceColor((typeof context?.confidence === 'number' ? context?.confidence : provenance?.confidence) || 0)
+              color: getConfidenceColor(effectiveConfidence)
             }}>
-              {(typeof context?.confidence === 'number' ? context?.confidence : provenance?.confidence) || 0}%
+              {effectiveConfidence}%
             </div>
           </div>
 

@@ -76,6 +76,41 @@ serve(async (req) => {
 
       for (const image of images) {
         try {
+          // Weak-signal tiering: skip expensive analysis for low-signal vehicles.
+          // We still record a non-null appraiser label so the image doesn't get re-queued endlessly.
+          let analysisTier = 0
+          try {
+            const { data: v } = await supabase
+              .from('vehicles')
+              .select('analysis_tier')
+              .eq('id', image.vehicle_id)
+              .maybeSingle()
+            analysisTier = Number(v?.analysis_tier || 0)
+          } catch {
+            analysisTier = 0
+          }
+
+          if (analysisTier < 1) {
+            const skipped = {
+              appraiser: {
+                angle: 'skipped_low_signal',
+                primary_label: 'Skipped (low signal)',
+                description: 'Skipped expensive analysis due to low signal tiering policy',
+                context: 'analysis_tier=0',
+                model: 'tiering_policy',
+                analyzed_at: new Date().toISOString(),
+                analysis_tier: analysisTier,
+              }
+            }
+            await supabase
+              .from('vehicle_images')
+              .update({ ai_scan_metadata: skipped, ai_processing_status: 'completed' })
+              .eq('id', image.id)
+            continue
+          }
+
+          const modelToUse = analysisTier >= 2 ? 'gpt-4o' : 'gpt-4o-mini'
+
           const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -83,7 +118,7 @@ serve(async (req) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'gpt-4o',
+              model: modelToUse,
               messages: [{
                 role: 'user',
                 content: [
@@ -228,8 +263,9 @@ Return ONLY valid JSON:
               primary_label: angleLabels[finalAngle || 'exterior'] || 'Exterior View',
               description: descriptionParts.join(' • ') || 'Vehicle exterior view',
               context: contextParts.join(' | ') || 'Vehicle listing photo',
-              model: 'gpt-4o',
+              model: modelToUse,
               analyzed_at: new Date().toISOString(),
+              analysis_tier: analysisTier,
               condition_score: result.condition_score,
               rust_severity: result.rust_severity,
               paint_quality: result.paint_quality,
@@ -255,8 +291,8 @@ Return ONLY valid JSON:
             }
           }
 
-          // Rate limit delay
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          // Rate limit delay (tier 1 uses cheaper model; keep faster loop)
+          await new Promise(resolve => setTimeout(resolve, modelToUse === 'gpt-4o' ? 1000 : 350))
 
         } catch (error: any) {
           console.error(`Error analyzing image ${image.id}:`, error.message)

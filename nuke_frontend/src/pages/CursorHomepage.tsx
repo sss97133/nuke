@@ -557,6 +557,7 @@ const CursorHomepage: React.FC = () => {
           id, year, make, model, title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
+          auction_outcome, high_bid, winning_bid, bid_count,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin
         `)
@@ -747,7 +748,11 @@ const CursorHomepage: React.FC = () => {
         const salePrice = Number((v as any).sale_price || 0) || 0;
         const saleDate = (v as any).sale_date;
         const saleStatus = String((v as any).sale_status || '').toLowerCase();
-        const isSold = salePrice > 0 || Boolean(saleDate) || saleStatus === 'sold';
+        const outcome = String((v as any).auction_outcome || '').toLowerCase();
+        const isAuctionResult =
+          ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) ||
+          ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(saleStatus);
+        const isSold = salePrice > 0 || Boolean(saleDate) || saleStatus === 'sold' || isAuctionResult;
         return !isSold;
       });
     }
