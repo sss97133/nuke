@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { extractBatDomMap } from '../_shared/batDomMap.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -538,6 +539,65 @@ async function touchBatUserProfile(supabase: any, usernameRaw: string | null) {
   }
 }
 
+function toIsoEndOfDay(dateYmd: string | null): string | null {
+  if (!dateYmd) return null;
+  const d = new Date(`${dateYmd}T00:00:00.000Z`);
+  if (!Number.isFinite(d.getTime())) return null;
+  d.setUTCHours(23, 59, 59, 999);
+  return d.toISOString();
+}
+
+function toIsoMidday(dateYmd: string | null): string | null {
+  if (!dateYmd) return null;
+  const d = new Date(`${dateYmd}T00:00:00.000Z`);
+  if (!Number.isFinite(d.getTime())) return null;
+  d.setUTCHours(12, 0, 0, 0);
+  return d.toISOString();
+}
+
+async function upsertAuctionEvent(opts: {
+  supabase: any;
+  vehicle_id: string;
+  platform: string;
+  listing_url: string;
+  outcome: string;
+  high_bid: number | null;
+  auction_start_date: string | null; // YYYY-MM-DD
+  auction_end_date: string | null; // YYYY-MM-DD
+  metadata: any;
+}): Promise<string | null> {
+  const { supabase, vehicle_id, platform, listing_url, outcome, high_bid, auction_start_date, auction_end_date, metadata } = opts;
+  const nowIso = new Date().toISOString();
+  try {
+    const { data, error } = await supabase
+      .from('auction_events')
+      .upsert(
+        {
+          vehicle_id,
+          platform,
+          listing_url,
+          outcome,
+          high_bid,
+          auction_start_at: toIsoMidday(auction_start_date),
+          auction_end_at: toIsoEndOfDay(auction_end_date),
+          metadata: metadata && typeof metadata === 'object' ? metadata : {},
+          updated_at: nowIso,
+        },
+        { onConflict: 'platform,listing_url' },
+      )
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      console.log('auction_events upsert failed (non-fatal):', error.message);
+      return null;
+    }
+    return data?.id ? String(data.id) : null;
+  } catch (e: any) {
+    console.log('auction_events upsert error (non-fatal):', e?.message || String(e));
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -593,6 +653,12 @@ serve(async (req) => {
       const pageTitleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
       title = (h1Match?.[1] || pageTitleMatch?.[1] || '').trim();
     }
+
+    // Canonical deterministic DOM-map extraction (shared across health checks + ingestion).
+    // This is our "stable template" for BaT.
+    const dom = extractBatDomMap(html, batUrl);
+    const domExtracted = dom?.extracted;
+    const domHealth = dom?.health;
 
     // Identity: prefer URL pattern (most reliable on BaT)
     const fromUrl = parseBatIdentityFromUrl(batUrl);
@@ -659,18 +725,23 @@ serve(async (req) => {
       metrics = { ...metrics, currentBid: resultHighBid };
     }
 
-    // Extract description
+    // Extract description (DOM-map first; regex fallback last)
+    const descFromDom = typeof domExtracted?.description_text === 'string' ? domExtracted.description_text.trim() : '';
     const descMatch = html.match(/<p>([^<]{100,500})<\/p>/);
-    const description = descMatch ? descMatch[1].trim() : '';
+    const description = descFromDom || (descMatch ? descMatch[1].trim() : '');
 
     // Extract seller/buyer
-    const seller = extractSellerUsernameFromHtml(html);
-    const buyer = extractBuyerUsernameFromHtml(html);
+    const seller = (domExtracted?.seller_username || extractSellerUsernameFromHtml(html)) || null;
+    const buyer = (domExtracted?.buyer_username || extractBuyerUsernameFromHtml(html)) || null;
     const sellerType = extractSellerTypeFromHtml(html);
 
     // Extract lot number
     const lotMatch = html.match(/Lot.*?#(\d+)/);
-    const lotNumber = lotMatch ? lotMatch[1] : '';
+    const lotNumber = (domExtracted?.lot_number || (lotMatch ? lotMatch[1] : '') || '').trim();
+
+    // Listing location (time-sensitive observation)
+    const listingLocationRaw = (domExtracted?.location_raw || null);
+    const listingLocationClean = (domExtracted?.location_clean || null);
 
     // Extract VIN - BaT uses both "VIN:" and "Chassis:" labels
     const vinMatch = html.match(/(?:VIN|Chassis)[:\s]+([A-HJ-NPR-Z0-9]{17})/i) ||
@@ -815,7 +886,7 @@ serve(async (req) => {
     if (vehicleId) {
       const { data: currentVehicle } = await supabase
         .from('vehicles')
-        .select('year, make, model, vin')
+        .select('year, make, model, vin, description, listing_title, listing_location, listing_location_raw, listing_location_source, origin_metadata')
         .eq('id', vehicleId)
         .maybeSingle();
 
@@ -824,7 +895,10 @@ serve(async (req) => {
         ...(auctionOutcome === 'sold' ? { sale_price: salePrice, sale_date: saleDate, sale_status: 'sold' } : {}),
         ...(auctionOutcome !== 'active' && auctionOutcome !== 'sold' ? { sale_date: saleDate, sale_status: 'ended' } : {}),
         trim: trim || undefined,
-        description: description,
+        // Description: only overwrite when we have real BaT description text (avoid poisoning with empty strings).
+        ...(description && description.length > 40 && (!currentVehicle?.description || String(currentVehicle.description || '').trim().length < 40)
+          ? { description: description, description_source: 'bat', description_generated_at: null }
+          : {}),
         transmission: transmission || undefined,
         ...(auctionOutcome !== 'active' ? { auction_outcome: auctionOutcome } : { auction_outcome: 'pending' }),
         ...(typeof resultHighBid === 'number' && resultHighBid > 0 ? { high_bid: resultHighBid } : {}),
@@ -832,16 +906,26 @@ serve(async (req) => {
         bat_auction_url: batUrl,
         listing_url: batUrl,
         discovery_url: batUrl,
+        ...(domExtracted?.title && !currentVehicle?.listing_title ? { listing_title: domExtracted.title } : {}),
         // Keep the human-readable seller (legacy fields)
         bat_seller: seller || null,
         // Store the claimable BaT identity IDs in origin_metadata (no schema change required)
         origin_metadata: {
+          ...((currentVehicle as any)?.origin_metadata && typeof (currentVehicle as any).origin_metadata === 'object' ? (currentVehicle as any).origin_metadata : {}),
           source: 'bat_import',
           bat_url: batUrl,
           raw_title: title || null,
           cleaned_title: cleanedTitle || null,
           derived_trim: trim || null,
           extracted_transmission: transmission || null,
+          dom_map_health_v1: domHealth
+            ? {
+                overall_score: domHealth.overall_score,
+                counts: domHealth.counts,
+                fields: Object.fromEntries(Object.entries(domHealth.fields || {}).map(([k, v]: any) => [k, { ok: v?.ok, method: v?.method }])),
+              }
+            : null,
+          location: listingLocationClean || listingLocationRaw || null,
           bat_seller_username: sellerUser.username,
           bat_seller_user_id: sellerUser.id,
           bat_seller_profile_url: sellerUser.profile_url,
@@ -866,6 +950,21 @@ serve(async (req) => {
           imported_at: new Date().toISOString(),
         },
       };
+
+      // Location snapshot fields (safe, source-aware; do not overwrite an existing non-bat location)
+      if (listingLocationClean || listingLocationRaw) {
+        const shouldWriteLocation =
+          !currentVehicle?.listing_location ||
+          !currentVehicle?.listing_location_source ||
+          String(currentVehicle.listing_location_source) === 'bat';
+        if (shouldWriteLocation) {
+          updateData.listing_location = listingLocationClean || listingLocationRaw;
+          updateData.listing_location_raw = listingLocationRaw || listingLocationClean;
+          updateData.listing_location_source = 'bat';
+          updateData.listing_location_confidence = 0.8;
+          updateData.listing_location_observed_at = toIsoMidday(domExtracted?.auction_start_date || auctionEndDate || saleDate) || new Date().toISOString();
+        }
+      }
       
       // Repair identity for known-bad backfills (do not override good data)
       if (fromUrl) {
@@ -911,6 +1010,17 @@ serve(async (req) => {
           sale_price: salePrice,
           sale_date: saleDate,
           description,
+          ...(domExtracted?.title ? { listing_title: domExtracted.title } : {}),
+          ...(listingLocationClean || listingLocationRaw
+            ? {
+                listing_location: listingLocationClean || listingLocationRaw,
+                listing_location_raw: listingLocationRaw || listingLocationClean,
+                listing_location_source: 'bat',
+                listing_location_confidence: 0.8,
+                listing_location_observed_at: toIsoMidday(domExtracted?.auction_start_date || auctionEndDate || saleDate) || new Date().toISOString(),
+              }
+            : {}),
+          ...(description && description.length > 40 ? { description_source: 'bat', description_generated_at: null } : {}),
           auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met',
           bat_auction_url: batUrl,
           imported_by: null,
@@ -926,6 +1036,14 @@ serve(async (req) => {
             cleaned_title: cleanedTitle || null,
             derived_trim: trim || null,
             extracted_transmission: transmission || null,
+            dom_map_health_v1: domHealth
+              ? {
+                  overall_score: domHealth.overall_score,
+                  counts: domHealth.counts,
+                  fields: Object.fromEntries(Object.entries(domHealth.fields || {}).map(([k, v]: any) => [k, { ok: v?.ok, method: v?.method }])),
+                }
+              : null,
+            location: listingLocationClean || listingLocationRaw || null,
             bat_seller_username: sellerUser.username,
             bat_seller_user_id: sellerUser.id,
             bat_seller_profile_url: sellerUser.profile_url,
@@ -965,6 +1083,64 @@ serve(async (req) => {
       console.log(`Created new vehicle: ${vehicleId}`);
     }
 
+    // Persist a time-series location observation (best-effort)
+    try {
+      if (vehicleId && (listingLocationClean || listingLocationRaw)) {
+        await supabase
+          .from('vehicle_location_observations')
+          .insert({
+            vehicle_id: vehicleId,
+            source_type: 'listing',
+            source_platform: 'bat',
+            source_url: batUrl,
+            observed_at: toIsoMidday(domExtracted?.auction_start_date || auctionEndDate || saleDate) || new Date().toISOString(),
+            location_text_raw: listingLocationRaw || listingLocationClean,
+            location_text_clean: listingLocationClean || listingLocationRaw,
+            precision: (String(listingLocationClean || listingLocationRaw || '').includes(',') ? 'region' : 'country'),
+            confidence: 0.8,
+            metadata: { source: 'import-bat-listing' },
+          })
+          .catch(() => null);
+      }
+    } catch {
+      // ignore
+    }
+
+    // Ensure there's an auction_event row so comments/bids can attach and UI can stream them by vehicle_id.
+    const auctionEventId = await upsertAuctionEvent({
+      supabase,
+      vehicle_id: vehicleId!,
+      platform: 'bat',
+      listing_url: batUrl,
+      outcome: auctionOutcome,
+      high_bid: (typeof resultHighBid === 'number' && resultHighBid > 0) ? resultHighBid : (metrics.currentBid || null),
+      auction_start_date: domExtracted?.auction_start_date || null,
+      auction_end_date: domExtracted?.auction_end_date || auctionEndDate || null,
+      metadata: {
+        lot_number: lotNumber || null,
+        seller_username: seller || null,
+        buyer_username: buyer || null,
+      },
+    });
+
+    // Kick off comment ingestion (async, non-blocking). This is what makes bids/comments actually land in `auction_comments`.
+    try {
+      if (auctionEventId && serviceRoleKey) {
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/extract-auction-comments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({ auction_url: batUrl, auction_event_id: auctionEventId, vehicle_id: vehicleId }),
+        })
+          .then(() => console.log('extract-auction-comments triggered'))
+          .catch(() => null);
+      }
+    } catch {
+      // ignore
+    }
+
     // VIN extraction (text/HTML): run after we have a vehicle id.
     // This catches VINs embedded in the BaT HTML, description, or JSON blobs.
     // Also creates "VIN needed" notifications when extraction is not possible yet.
@@ -992,7 +1168,9 @@ serve(async (req) => {
     // Persist BaT gallery images into vehicle_images (fixes: "images show up via UI fallback but DB has 0 images").
     // IMPORTANT: do not cap galleries; use backfill-images chaining to stay within runtime limits.
     try {
-      const images = extractBatGalleryImagesFromHtml(html);
+      const images = (Array.isArray(domExtracted?.image_urls) && domExtracted.image_urls.length > 0)
+        ? domExtracted.image_urls
+        : extractBatGalleryImagesFromHtml(html);
       if (vehicleId && images.length > 0) {
         await supabase.functions.invoke('backfill-images', {
           body: {
@@ -1174,7 +1352,7 @@ serve(async (req) => {
 
     // Create timeline event for the sale with the actual sale date (deduped by bat_url + event_date).
     try {
-      if (!isSold || !saleDate || !salePrice || salePrice <= 0) {
+      if (auctionOutcome !== 'sold' || !saleDate || !salePrice || salePrice <= 0) {
         throw new Error('Skipping sale event: listing is live or sale is not confirmed');
       }
       const { data: existingSaleEvent } = await supabase
@@ -1247,6 +1425,11 @@ serve(async (req) => {
       batch_size: imageBatchSize
     };
     try {
+      // If DOM-map already found a real gallery, don't spend runtime re-scraping.
+      const alreadyHaveGallery = Array.isArray(domExtracted?.image_urls) && domExtracted.image_urls.length >= 20;
+      if (alreadyHaveGallery) {
+        console.log('Skipping simple-scraper: DOM-map gallery is sufficient');
+      } else {
       const { data: simpleData, error: simpleError } = await supabase.functions.invoke('simple-scraper', {
         body: { url: batUrl }
       });
@@ -1283,6 +1466,7 @@ serve(async (req) => {
         }
       } else {
         console.log('No images found by simple-scraper');
+      }
       }
     } catch (e: any) {
       console.log('Image import failed (non-fatal):', e?.message || String(e));

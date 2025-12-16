@@ -38,6 +38,7 @@ const AdminMissionControl: React.FC = () => {
   const [batDomHealthBatchSize, setBatDomHealthBatchSize] = useState(50);
   const [batDomHealthLastResult, setBatDomHealthLastResult] = useState<any | null>(null);
   const [batDomHealthSummary, setBatDomHealthSummary] = useState<any | null>(null);
+  const [batDomFieldBreakdown, setBatDomFieldBreakdown] = useState<any[] | null>(null);
   const [angleBackfillRunning, setAngleBackfillRunning] = useState(false);
   const [angleBackfillBatchSize, setAngleBackfillBatchSize] = useState(25);
   const [angleBackfillMinConfidence, setAngleBackfillMinConfidence] = useState(80);
@@ -74,7 +75,8 @@ const AdminMissionControl: React.FC = () => {
         imageScanData,
         completenessData,
         angleCoverageData,
-        batHealthSummaryData
+        batHealthSummaryData,
+        batHealthFieldBreakdownData
       ] = await Promise.all([
         supabase.from('vehicles').select('id', { count: 'exact', head: true }),
         supabase.from('vehicle_images').select('id', { count: 'exact', head: true }),
@@ -120,7 +122,8 @@ const AdminMissionControl: React.FC = () => {
           p_inventory_only: true,
         })
         ,
-        supabase.rpc('get_bat_dom_health_summary', { p_hours: 24 * 14 })
+        supabase.rpc('get_bat_dom_health_summary', { p_hours: 24 * 14 }),
+        supabase.rpc('get_bat_dom_health_field_breakdown', { p_hours: 24 * 14 })
       ]);
 
       if (!mountedRef.current) return;
@@ -143,6 +146,7 @@ const AdminMissionControl: React.FC = () => {
       setInventoryCompleteness(completenessData.data || null);
       setAngleCoverage(angleCoverageData.data || null);
       setBatDomHealthSummary(batHealthSummaryData.data || null);
+      setBatDomFieldBreakdown(Array.isArray(batHealthFieldBreakdownData.data) ? batHealthFieldBreakdownData.data : null);
       
       const vehicleGroups = (vehicleQueueData.data || []).reduce((acc: any, img: any) => {
         if (!acc[img.vehicle_id]) {
@@ -522,8 +526,16 @@ const AdminMissionControl: React.FC = () => {
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>OK LISTINGS</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.fail_listings ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>FAILED LISTINGS</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
                 <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.avg_score ?? '—'}</div>
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>AVG SCORE</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.p50_score ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>P50 SCORE</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
                 <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.images_missing ?? '—'}</div>
@@ -534,6 +546,10 @@ const AdminMissionControl: React.FC = () => {
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>LOCATION MISSING</div>
               </div>
               <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.description_missing ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>DESCRIPTION MISSING</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
                 <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.comments_missing ?? '—'}</div>
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>COMMENTS MISSING</div>
               </div>
@@ -541,6 +557,31 @@ const AdminMissionControl: React.FC = () => {
                 <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.bids_missing ?? '—'}</div>
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>BIDS MISSING</div>
               </div>
+            </div>
+          )}
+
+          {Array.isArray(batDomFieldBreakdown) && batDomFieldBreakdown.length > 0 && (
+            <div style={{ marginTop: 12, border: '1px solid var(--border)', overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+                <thead>
+                  <tr style={{ background: 'var(--grey-100)' }}>
+                    <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>FIELD</th>
+                    <th style={{ textAlign: 'right', padding: 8, borderBottom: '1px solid var(--border)' }}>OK %</th>
+                    <th style={{ textAlign: 'right', padding: 8, borderBottom: '1px solid var(--border)' }}>OK</th>
+                    <th style={{ textAlign: 'right', padding: 8, borderBottom: '1px solid var(--border)' }}>MISSING</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batDomFieldBreakdown.map((r: any) => (
+                    <tr key={String(r.field_key)}>
+                      <td style={{ padding: 8, borderBottom: '1px solid var(--border)', fontFamily: 'monospace' }}>{String(r.field_key)}</td>
+                      <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right' }}>{typeof r.ok_pct === 'number' ? `${r.ok_pct}%` : String(r.ok_pct ?? '—')}</td>
+                      <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right' }}>{String(r.ok_listings ?? '—')}</td>
+                      <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right' }}>{String(r.missing_listings ?? '—')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
