@@ -1114,7 +1114,8 @@ Return ONLY valid JSON in this format:
           .insert({
             business_name: normalizedDealer.name,
             type: businessType,
-            business_type: businessType === 'auction_house' ? 'other' : 'dealership',
+            // Auction houses are a first-class organization type (do not bucket into "other")
+            business_type: businessType === 'auction_house' ? 'auction_house' : 'dealership',
             description: normalizedDealer.description,
             address: normalizedDealer.address,
             city: normalizedDealer.city,
