@@ -938,7 +938,8 @@ async function findOrCreateOrganizationWithGeographicLogic(
     .from('businesses')
     .insert({
       business_name: dealerData.name,
-      business_type: dealerData.business_type === 'auction_house' ? 'other' : 'dealership',
+      // Auction houses are a first-class organization type (do not bucket into "other")
+      business_type: dealerData.business_type === 'auction_house' ? 'auction_house' : 'dealership',
       type: dealerData.business_type, // Store in type field if it exists
       website: dealerData.website,
       phone: dealerData.phone,

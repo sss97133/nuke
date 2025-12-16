@@ -15,7 +15,9 @@ export interface OrganizationIntelligence {
   source: 'explicit_ui_config' | 'explicit_business_type' | 'data_driven' | 'default';
   config: {
     type?: string;
-    primary_focus?: 'service' | 'inventory' | 'collection' | 'mixed';
+    // Primary focus is used for UI tab selection. Keep this permissive: new verticals (like auctions)
+    // should not be forced into "other".
+    primary_focus?: 'service' | 'inventory' | 'collection' | 'auctions' | 'mixed';
     specializations?: string[];
     confidence?: number;
   };
@@ -230,6 +232,11 @@ export class OrganizationIntelligenceService {
           });
         }
       }
+      } else if (effectiveType === 'auction_house') {
+        // Explicitly an auction house (BaT, Cars & Bids, etc.)
+        // Auctions is the core product; hide irrelevant tabs by default.
+        pushUnique({ id: 'auctions', priority: 95, label: 'Auctions' });
+      }
     } else {
       // No explicit settings - use data-driven intelligence
       if (primaryFocus === 'service') {
@@ -277,14 +284,24 @@ export class OrganizationIntelligenceService {
             badge: dataSignals.vehicles.sold
           });
         }
+      } else if (primaryFocus === 'auctions') {
+        pushUnique({ id: 'auctions', priority: 95, label: 'Auctions' });
       }
     }
 
-    // Always available but lower priority
+    // Always available but lower priority (with type-aware gating)
     pushUnique({ id: 'images', priority: 70, label: 'Images' });
-    pushUnique({ id: 'contributors', priority: 50, label: 'Contributors' });
-    pushUnique({ id: 'marketplace', priority: 40, label: 'Marketplace' });
-    pushUnique({ id: 'notifications', priority: 20, label: 'Notifications' });
+
+    const effectiveType = intelligence.effectiveType;
+    if (effectiveType === 'auction_house') {
+      // "Contributors" is a loaded term for marketplaces; for auction houses this is closer to staff/history.
+      pushUnique({ id: 'contributors', priority: 50, label: 'People' });
+      // Marketplace/Notifications are not shown by default for auction houses.
+    } else {
+      pushUnique({ id: 'contributors', priority: 50, label: 'Contributors' });
+      pushUnique({ id: 'marketplace', priority: 40, label: 'Marketplace' });
+      pushUnique({ id: 'notifications', priority: 20, label: 'Notifications' });
+    }
 
     // Sort by priority (highest first)
     return tabs.sort((a, b) => b.priority - a.priority);

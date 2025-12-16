@@ -24,6 +24,7 @@ import VehicleInquiryModal from '../components/organization/VehicleInquiryModal'
 import { extractImageMetadata } from '../utils/imageMetadata';
 import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationServiceTab } from '../components/organization/OrganizationServiceTab';
+import { OrganizationAuctionsTab } from '../components/organization/OrganizationAuctionsTab';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import '../design-system.css';
 
@@ -152,6 +153,19 @@ export default function OrganizationProfile() {
   const isUuid = (value: string | null | undefined): boolean => {
     if (!value) return false;
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  };
+
+  const formatBusinessTypeLabel = (t?: string | null) => {
+    const v = String(t || '').toLowerCase().trim();
+    if (!v) return null;
+    if (v === 'auction_house') return 'Online Auction House';
+    if (v === 'dealership') return 'Dealership';
+    if (v === 'body_shop') return 'Body Shop';
+    if (v === 'restoration_shop') return 'Restoration Shop';
+    if (v === 'performance_shop') return 'Performance Shop';
+    if (v === 'garage') return 'Garage';
+    if (v === 'other') return 'Other';
+    return v.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
   
   const navigate = useNavigate();
@@ -1325,7 +1339,7 @@ export default function OrganizationProfile() {
             </h1>
             {organization.business_type && (
               <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                {organization.business_type}
+                {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
               </div>
             )}
           </div>
@@ -2621,11 +2635,13 @@ export default function OrganizationProfile() {
         {/* CONTRIBUTORS TAB - Attribution Chain */}
         {activeTab === 'contributors' && (
           <div className="card">
-            <div className="card-header">Contributors ({contributors.length})</div>
+            <div className="card-header">
+              {(intelligence?.effectiveType === 'auction_house' ? 'People' : 'Contributors')} ({contributors.length})
+            </div>
             <div className="card-body">
               {contributors.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)', fontSize: '9pt' }}>
-                  No contributors yet
+                  {intelligence?.effectiveType === 'auction_house' ? 'No people yet' : 'No contributors yet'}
                 </div>
               ) : (
                 <>
@@ -2728,6 +2744,11 @@ export default function OrganizationProfile() {
               <div className="text text-small text-muted">Loading organization…</div>
             )}
           </div>
+        )}
+
+        {/* AUCTIONS TAB */}
+        {activeTab === 'auctions' && organizationId && (
+          <OrganizationAuctionsTab organizationId={organizationId} />
         )}
 
         {/* Inventory Tab */}
