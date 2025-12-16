@@ -4,6 +4,7 @@ import { FaviconIcon } from '../common/FaviconIcon';
 import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
 import { UserInteractionService } from '../../services/userInteractionService';
 import ResilientImage from '../images/ResilientImage';
+import { OdometerBadge } from '../vehicle/OdometerBadge';
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -287,6 +288,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   };
 
   const imageUrl = getImageUrl();
+  const primaryFromAllImages =
+    (vehicle.all_images?.find((img) => img?.is_primary && img?.url)?.url) ||
+    (vehicle.all_images?.[0]?.url) ||
+    null;
   const effectiveSourceStampUrl =
     sourceStampUrl ||
     (vehicle.discovery_url ? String(vehicle.discovery_url) : '') ||
@@ -468,6 +473,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               vehicle?.image_variants?.thumbnail,
               vehicle?.image_variants?.medium,
               vehicle?.image_variants?.large,
+              primaryFromAllImages,
               imageUrl,
               vehicle.primary_image_url,
               vehicle.image_url,
@@ -492,7 +498,21 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         
         {/* Stats - compact */}
         <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
-          {vehicle.mileage ? `${(vehicle.mileage / 1000).toFixed(0)}k mi` : '—'}
+          {typeof vehicle.mileage === 'number' && vehicle.mileage > 0 ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {/* Clean numeric mileage for extraction (no "k", no "mi", no stroke). */}
+              <span
+                title={`${Math.floor(vehicle.mileage).toLocaleString()} miles`}
+                aria-label={`Mileage: ${Math.floor(vehicle.mileage).toLocaleString()} miles`}
+                data-mileage={Math.max(0, Math.floor(Math.abs(vehicle.mileage || 0)))}
+                style={{ fontWeight: 700 }}
+              >
+                {Math.max(0, Math.floor(Math.abs(vehicle.mileage || 0)))}
+              </span>
+            </span>
+          ) : (
+            '—'
+          )}
           {vehicle.condition_rating && ` • C:${vehicle.condition_rating}`}
           {vehicle.vin && ` • ${vehicle.vin.slice(-4)}`}
         </div>
@@ -504,7 +524,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         
         {/* Value */}
         <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '9pt' }}>
-          {displayPrice}
+          {badgeMainText}
         </div>
         
         {/* Profit (if valid) */}
@@ -554,6 +574,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               vehicle?.image_variants?.large,
               vehicle?.image_variants?.medium,
               vehicle?.image_variants?.thumbnail,
+              primaryFromAllImages,
               imageUrl,
               vehicle.primary_image_url,
               vehicle.image_url,
@@ -651,6 +672,15 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   opacity: 0.9,
                 }}
               >
+                  {/* Compact odometer badge (optional, infoDense only) */}
+                  {infoDense && typeof vehicle.mileage === 'number' && vehicle.mileage > 0 ? (
+                    <OdometerBadge
+                      mileage={vehicle.mileage}
+                      year={vehicle.year ?? null}
+                      isExact={true}
+                      className=""
+                    />
+                  ) : null}
                 {/* Vehicle Tier - alphabet-based (F, E, D, C, B, A, S, SSS) */}
                 {(() => {
                   const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
@@ -856,10 +886,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           backgroundColor: 'transparent',
           position: 'relative',
         }}
-        onLoad={() => {
-}}
-        onError={() => {
-}}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >

@@ -406,6 +406,20 @@ export class UnifiedImageImportService {
         isPrimary = (count || 0) === 0;
       }
 
+      // If caller explicitly wants to make this primary, clear any existing primary first.
+      // (DB has a unique index guardrail, so this prevents hard failures.)
+      if (vehicleId && makePrimary === true) {
+        try {
+          await supabase
+            .from('vehicle_images')
+            .update({ is_primary: false } as any)
+            .eq('vehicle_id', vehicleId)
+            .eq('is_primary', true);
+        } catch {
+          // best-effort
+        }
+      }
+
       // Step 10: Build EXIF payload
       const exifPayload: Record<string, any> = {
         DateTimeOriginal: photoDate.toISOString(),
@@ -420,12 +434,19 @@ export class UnifiedImageImportService {
       }
 
       // Step 11: Insert into database
+      const thumbUrl = (variants?.thumbnail || variants?.small || variants?.medium || urlData.publicUrl) as string;
+      const mediumUrl = (variants?.medium || variants?.large || urlData.publicUrl) as string;
+      const largeUrl = (variants?.large || variants?.full || urlData.publicUrl) as string;
+
       const { data: dbResult, error: dbError } = await supabase
         .from('vehicle_images')
         .insert({
           vehicle_id: vehicleId || null,
           user_id: photographerId, // Photographer (ghost user or real user)
           image_url: urlData.publicUrl,
+          thumbnail_url: thumbUrl,
+          medium_url: mediumUrl,
+          large_url: largeUrl,
           storage_path: storagePath,
           category: category,
           file_size: fileBlob.size,
@@ -452,6 +473,26 @@ export class UnifiedImageImportService {
       }
 
       const imageId = dbResult.id;
+
+      // Keep `vehicles.primary_image_url` + denormalized variants in sync for fast feeds/cards.
+      // Best-effort: failures here shouldn't block the upload/import.
+      if (vehicleId && (isPrimary === true)) {
+        try {
+          const vehicleUpdates: any = {
+            primary_image_url: largeUrl || urlData.publicUrl,
+            image_url: largeUrl || urlData.publicUrl,
+            image_variants: {
+              thumbnail: thumbUrl || urlData.publicUrl,
+              medium: mediumUrl || urlData.publicUrl,
+              large: largeUrl || urlData.publicUrl,
+            },
+            updated_at: new Date().toISOString(),
+          };
+          await supabase.from('vehicles').update(vehicleUpdates).eq('id', vehicleId);
+        } catch {
+          // ignore (non-blocking)
+        }
+      }
 
       // Step 12: Create device attribution if ghost user was used
       if (ghostUserId && exifData) {
