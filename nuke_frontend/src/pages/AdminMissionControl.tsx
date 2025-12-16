@@ -34,6 +34,10 @@ const AdminMissionControl: React.FC = () => {
   const [batBackfillRunning, setBatBackfillRunning] = useState(false);
   const [batBackfillBatchSize, setBatBackfillBatchSize] = useState(10);
   const [batBackfillLastResult, setBatBackfillLastResult] = useState<any | null>(null);
+  const [batDomHealthRunning, setBatDomHealthRunning] = useState(false);
+  const [batDomHealthBatchSize, setBatDomHealthBatchSize] = useState(50);
+  const [batDomHealthLastResult, setBatDomHealthLastResult] = useState<any | null>(null);
+  const [batDomHealthSummary, setBatDomHealthSummary] = useState<any | null>(null);
   const [angleBackfillRunning, setAngleBackfillRunning] = useState(false);
   const [angleBackfillBatchSize, setAngleBackfillBatchSize] = useState(25);
   const [angleBackfillMinConfidence, setAngleBackfillMinConfidence] = useState(80);
@@ -69,7 +73,8 @@ const AdminMissionControl: React.FC = () => {
         scanProgressData,
         imageScanData,
         completenessData,
-        angleCoverageData
+        angleCoverageData,
+        batHealthSummaryData
       ] = await Promise.all([
         supabase.from('vehicles').select('id', { count: 'exact', head: true }),
         supabase.from('vehicle_images').select('id', { count: 'exact', head: true }),
@@ -114,6 +119,8 @@ const AdminMissionControl: React.FC = () => {
           p_profile_origins: null,
           p_inventory_only: true,
         })
+        ,
+        supabase.rpc('get_bat_dom_health_summary', { p_hours: 24 * 14 })
       ]);
 
       if (!mountedRef.current) return;
@@ -135,6 +142,7 @@ const AdminMissionControl: React.FC = () => {
       setImageScanStats(imageScanData.data);
       setInventoryCompleteness(completenessData.data || null);
       setAngleCoverage(angleCoverageData.data || null);
+      setBatDomHealthSummary(batHealthSummaryData.data || null);
       
       const vehicleGroups = (vehicleQueueData.data || []).reduce((acc: any, img: any) => {
         if (!acc[img.vehicle_id]) {
@@ -264,6 +272,51 @@ const AdminMissionControl: React.FC = () => {
       alert('BaT backfill failed.');
     } finally {
       setBatBackfillRunning(false);
+    }
+  };
+
+  const runBatDomHealthBatch = async () => {
+    setBatDomHealthRunning(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        alert('You must be logged in to run health checks.');
+        return;
+      }
+
+      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/bat-dom-map-health-runner`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          limit: batDomHealthBatchSize,
+          force_rescrape: false,
+          persist_html: true,
+          extractor_version: 'v1',
+        }),
+      });
+
+      const text = await resp.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+
+      if (!resp.ok || parsed?.success === false) {
+        console.error('BaT DOM health batch failed:', parsed);
+        alert(`BaT DOM health batch failed: ${parsed?.error || resp.status}`);
+        setBatDomHealthLastResult(parsed);
+        return;
+      }
+
+      setBatDomHealthLastResult(parsed);
+      alert(`BaT DOM health batch complete. Processed: ${parsed.processed || 0}. OK: ${parsed.ok || 0}. Failed: ${parsed.failed || 0}.`);
+      loadDashboard();
+    } catch (e: any) {
+      console.error('BaT DOM health batch error:', e);
+      alert('BaT DOM health batch failed.');
+    } finally {
+      setBatDomHealthRunning(false);
     }
   };
 
@@ -422,6 +475,78 @@ const AdminMissionControl: React.FC = () => {
           {batBackfillLastResult && (
             <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
 {JSON.stringify(batBackfillLastResult, null, 2)}
+            </pre>
+          )}
+        </div>
+      </div>
+
+      {/* BaT DOM MAP HEALTH (coverage / gaps) */}
+      <div style={{ marginBottom: '24px' }} className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>BaT DOM Health: template pass-rate (images/location/description/comments/bids)</span>
+          <button
+            className="button button-primary"
+            style={{ fontSize: '9pt' }}
+            disabled={batDomHealthRunning}
+            onClick={runBatDomHealthBatch}
+          >
+            {batDomHealthRunning ? 'Running...' : 'Run Health Batch'}
+          </button>
+        </div>
+        <div className="card-body">
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            Computes a deterministic BaT DOM-map over listings, persists HTML snapshots + per-field health, and shows coverage gaps so we can target backfills (especially images, location, comments, bids).
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Batch size
+              <input
+                type="number"
+                value={batDomHealthBatchSize}
+                min={1}
+                max={500}
+                onChange={(e) => setBatDomHealthBatchSize(Number(e.target.value || 50))}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+          </div>
+
+          {batDomHealthSummary && (
+            <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.listings ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>LISTINGS (LAST 14 DAYS)</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.ok_listings ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>OK LISTINGS</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.avg_score ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>AVG SCORE</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.images_missing ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>IMAGES MISSING</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.location_missing ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>LOCATION MISSING</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.comments_missing ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>COMMENTS MISSING</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', padding: 10 }}>
+                <div style={{ fontSize: '14pt', fontWeight: 700 }}>{batDomHealthSummary?.[0]?.bids_missing ?? '—'}</div>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>BIDS MISSING</div>
+              </div>
+            </div>
+          )}
+
+          {batDomHealthLastResult && (
+            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
+{JSON.stringify(batDomHealthLastResult, null, 2)}
             </pre>
           )}
         </div>

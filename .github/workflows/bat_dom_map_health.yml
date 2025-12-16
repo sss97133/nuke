@@ -1,0 +1,126 @@
+name: BaT DOM Map Health
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "How many BaT listings to process"
+        required: false
+        default: "75"
+      force_rescrape:
+        description: "Force re-scrape instead of reusing latest stored snapshot"
+        required: false
+        default: "false"
+      persist_html:
+        description: "Persist HTML into listing_page_snapshots"
+        required: false
+        default: "true"
+      extractor_version:
+        description: "Extractor version tag to store in listing_extraction_health"
+        required: false
+        default: "v1"
+      min_ok_rate:
+        description: "Fail the job if ok/processed drops below this (0-1)"
+        required: false
+        default: "0.70"
+  schedule:
+    # Every day at 07:15 UTC
+    - cron: "15 7 * * *"
+
+jobs:
+  bat_dom_map_health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      LIMIT: ${{ github.event.inputs.limit || '75' }}
+      FORCE_RESCRAPE: ${{ github.event.inputs.force_rescrape || 'false' }}
+      PERSIST_HTML: ${{ github.event.inputs.persist_html || 'true' }}
+      EXTRACTOR_VERSION: ${{ github.event.inputs.extractor_version || 'v1' }}
+      MIN_OK_RATE: ${{ github.event.inputs.min_ok_rate || '0.70' }}
+
+    steps:
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_URL}" ]]; then
+            echo "Missing secret SUPABASE_URL" >&2
+            exit 1
+          fi
+          if [[ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]]; then
+            echo "Missing secret SUPABASE_SERVICE_ROLE_KEY" >&2
+            exit 1
+          fi
+
+      - name: Run bat-dom-map-health-runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          echo "Calling runner: limit=$LIMIT force_rescrape=$FORCE_RESCRAPE persist_html=$PERSIST_HTML extractor_version=$EXTRACTOR_VERSION"
+          curl -sS --fail \
+            "${SUPABASE_URL}/functions/v1/bat-dom-map-health-runner" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data-binary "{\"limit\":${LIMIT},\"force_rescrape\":${FORCE_RESCRAPE},\"persist_html\":${PERSIST_HTML},\"extractor_version\":\"${EXTRACTOR_VERSION}\"}" \
+            | tee artifacts/bat_dom_map_health_runner_result.json \
+            > /dev/null
+
+      - name: Fetch BaT DOM health summary (RPC)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sS --fail \
+            "${SUPABASE_URL}/rest/v1/rpc/get_bat_dom_health_summary" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --data-binary "{}" \
+            | tee artifacts/bat_dom_map_health_summary.json \
+            > /dev/null
+
+      - name: Enforce minimum OK rate
+        shell: bash
+        run: |
+          set -euo pipefail
+          processed="$(jq -r '.processed // 0' artifacts/bat_dom_map_health_runner_result.json)"
+          ok="$(jq -r '.ok // 0' artifacts/bat_dom_map_health_runner_result.json)"
+          failed="$(jq -r '.failed // 0' artifacts/bat_dom_map_health_runner_result.json)"
+
+          if [[ "${processed}" == "0" ]]; then
+            echo "Runner processed 0 listings; failing." >&2
+            exit 1
+          fi
+
+          ok_rate="$(jq -nr --argjson ok "${ok}" --argjson processed "${processed}" '($ok / $processed)')"
+          echo "processed=${processed} ok=${ok} failed=${failed} ok_rate=${ok_rate} min_ok_rate=${MIN_OK_RATE}"
+
+          jq -nr \
+            --argjson processed "${processed}" \
+            --argjson ok "${ok}" \
+            --argjson failed "${failed}" \
+            --arg ok_rate "${ok_rate}" \
+            --arg min_ok_rate "${MIN_OK_RATE}" \
+            '{processed:$processed, ok:$ok, failed:$failed, ok_rate:($ok_rate|tonumber), min_ok_rate:($min_ok_rate|tonumber)}' \
+            | tee artifacts/bat_dom_map_health_ci_metrics.json \
+            > /dev/null
+
+          # Compare as numbers using jq to avoid bash float pitfalls
+          should_fail="$(jq -nr --arg ok_rate "${ok_rate}" --arg min "${MIN_OK_RATE}" '($ok_rate|tonumber) < ($min|tonumber)')"
+          if [[ "${should_fail}" == "true" ]]; then
+            echo "OK rate below threshold; failing job." >&2
+            exit 2
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bat-dom-map-health
+          path: artifacts/*.json
+          if-no-files-found: error
+

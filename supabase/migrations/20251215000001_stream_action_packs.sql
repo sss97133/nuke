@@ -307,6 +307,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.send_stream_action(UUID, UUID) TO authenticated;
 
 -- ==========================
+-- 7.5) PostgREST privileges (RLS still applies)
+-- ==========================
+GRANT SELECT ON public.stream_action_packs TO anon, authenticated;
+GRANT SELECT ON public.stream_actions TO anon, authenticated;
+GRANT SELECT ON public.stream_action_events TO anon, authenticated;
+GRANT SELECT ON public.stream_action_purchases TO authenticated;
+
+-- ==========================
 -- 8) SEED: "DEEP CUTS" PACK (no copyrighted assets shipped)
 -- ==========================
 INSERT INTO public.stream_action_packs (slug, name, description, price_cents, is_active)
