@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactDOM from 'react-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
+import { FaviconIcon } from '../components/common/FaviconIcon';
 import TradePanel from '../components/trading/TradePanel';
 import AddOrganizationData from '../components/organization/AddOrganizationData';
 import OrganizationInventory from '../components/organization/OrganizationInventory';
@@ -91,6 +92,7 @@ interface OrgVehicle {
   vehicle_vin?: string;
   vehicle_current_value?: number;
   vehicle_image_url?: string;
+  vehicle_location?: string | null;
   sale_date?: string;
   sale_price?: number;
   vehicle_sale_status?: string;
@@ -102,6 +104,15 @@ interface OrgVehicle {
   auction_reserve_price?: number | null;
   auction_platform?: string | null;
   auction_url?: string | null;
+  auction_view_count?: number | null;
+  auction_watcher_count?: number | null;
+  auction_comment_count?: number | null;
+  seller_handle?: string | null;
+  seller_org_id?: string | null;
+  seller_org_name?: string | null;
+  seller_org_website?: string | null;
+  analysis_tier?: number | null;
+  signal_score?: number | null;
   vehicles?: any;
 }
 
@@ -182,6 +193,118 @@ export default function OrganizationProfile() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
   const ownershipUploadId = `org-ownership-${organizationId}`;
+
+  // One-time CSS for "aliveness" bursts
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const id = 'nuke-alive-burst-css-v1';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.textContent = `
+      @keyframes nuke-alive-burst {
+        0% { transform: translateY(0) scale(0.9); opacity: 0; }
+        15% { opacity: 0.35; }
+        100% { transform: translateY(-52px) scale(1.15); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
+
+  const formatUsd = (value: number | null | undefined): string => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '';
+    return `$${Math.round(value).toLocaleString()}`;
+  };
+
+  const computeSignal = (opts: { bids?: number | null; watchers?: number | null; views?: number | null; comments?: number | null }) => {
+    const bids = Math.max(0, Math.floor(Number(opts.bids ?? 0) || 0));
+    const watchers = Math.max(0, Math.floor(Number(opts.watchers ?? 0) || 0));
+    const views = Math.max(0, Math.floor(Number(opts.views ?? 0) || 0));
+    const comments = Math.max(0, Math.floor(Number(opts.comments ?? 0) || 0));
+    const score = bids * 10 + watchers * 3 + comments * 2 + Math.floor(views / 100);
+    return { bids, watchers, views, comments, score };
+  };
+
+  const tierLabelFromAnalysisTier = (tier: number | null | undefined): string | null => {
+    if (typeof tier !== 'number' || !Number.isFinite(tier)) return null;
+    const t = Math.max(0, Math.min(10, Math.floor(tier)));
+    return `TIER ${t}`;
+  };
+
+  const hasSeenCardThisSession = (vehicleId: string): boolean => {
+    try {
+      const key = `nuke:card_seen:v1:${vehicleId}`;
+      return sessionStorage.getItem(key) === '1';
+    } catch {
+      return false;
+    }
+  };
+
+  const markCardSeenThisSession = (vehicleId: string) => {
+    try {
+      const key = `nuke:card_seen:v1:${vehicleId}`;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      // ignore
+    }
+  };
+
+  const AliveBurst = ({ vehicleId, intensity }: { vehicleId: string; intensity: number }) => {
+    const [show, setShow] = useState(false);
+
+    useEffect(() => {
+      if (!vehicleId) return;
+      if (hasSeenCardThisSession(vehicleId)) return;
+      if (intensity <= 0) return;
+      markCardSeenThisSession(vehicleId);
+      setShow(true);
+      const t = window.setTimeout(() => setShow(false), 900);
+      return () => window.clearTimeout(t);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [vehicleId, intensity]);
+
+    if (!show) return null;
+
+    const count = Math.max(6, Math.min(18, Math.floor(intensity)));
+    const dots = Array.from({ length: count }, (_, i) => i);
+
+    return (
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          overflow: 'hidden',
+        }}
+      >
+        {dots.map((i) => {
+          const left = (i * 37) % 100;
+          const delay = (i % 6) * 35;
+          const size = 4 + (i % 3) * 2;
+          const opacity = 0.22 + (i % 4) * 0.08;
+          return (
+            <span
+              key={i}
+              style={{
+                position: 'absolute',
+                left: `${left}%`,
+                top: '65%',
+                width: `${size}px`,
+                height: `${size}px`,
+                borderRadius: 999,
+                background: 'var(--accent)',
+                opacity,
+                transform: 'translateY(0)',
+                animation: `nuke-alive-burst 900ms ease-out ${delay}ms 1 both`,
+                filter: 'saturate(1.1)',
+              }}
+            />
+          );
+        })}
+      </div>
+    );
+  };
 
   // Primary image selection (safe even before organization is loaded)
   const primaryImage = images.find(i => i.is_primary) || images.find(i => i.category === 'logo') || images[0];
@@ -616,11 +739,15 @@ export default function OrganizationProfile() {
               try {
                 const now = new Date().toISOString();
                 const [vehicleResult, imageResult, nativeAuction, externalAuction, batAuction] = await Promise.all([
-                  supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date').eq('id', ov.vehicle_id).single(),
+                  supabase
+                    .from('vehicles')
+                    .select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score')
+                    .eq('id', ov.vehicle_id)
+                    .single(),
                   // Prefer primary image, but fall back to the first available image so thumbnails don't look "broken"
                   supabase
                     .from('vehicle_images')
-                    .select('image_url')
+                    .select('thumbnail_url, medium_url, image_url, variants')
                     .eq('vehicle_id', ov.vehicle_id)
                     .order('is_primary', { ascending: false })
                     .order('created_at', { ascending: true })
@@ -636,14 +763,14 @@ export default function OrganizationProfile() {
                     .maybeSingle(),
                   // Check for active external listing (BaT, Cars & Bids, etc.)
                   supabase.from('external_listings')
-                    .select('id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url')
+                    .select('id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata')
                     .eq('vehicle_id', ov.vehicle_id)
-                    .eq('listing_status', 'active')
+                    .in('listing_status', ['active', 'live'])
                     .gt('end_date', now)
                     .maybeSingle(),
                   // Check for active BaT listing
                   supabase.from('bat_listings')
-                    .select('id, listing_status, auction_end_date, final_bid, bid_count, reserve_price, bat_listing_url')
+                    .select('id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url')
                     .eq('vehicle_id', ov.vehicle_id)
                     .eq('listing_status', 'active')
                     .gt('auction_end_date', now.split('T')[0])
@@ -661,17 +788,27 @@ export default function OrganizationProfile() {
                     auction_bid_count: nativeAuction.data.bid_count || 0,
                     auction_reserve_price: nativeAuction.data.reserve_price_cents,
                     auction_platform: null,
-                    auction_url: null
+                    auction_url: null,
+                    auction_view_count: null,
+                    auction_watcher_count: null
                   };
                 } else if (externalAuction.data) {
                   const endDate = externalAuction.data.end_date;
+                  const meta = externalAuction.data.metadata && typeof externalAuction.data.metadata === 'object' ? externalAuction.data.metadata : {};
+                  const metaLocation = typeof meta?.location === 'string' ? meta.location : null;
                   auctionData = {
                     auction_end_time: endDate,
                     auction_current_bid: externalAuction.data.current_bid ? Math.round(Number(externalAuction.data.current_bid) * 100) : null,
                     auction_bid_count: externalAuction.data.bid_count || 0,
                     auction_reserve_price: externalAuction.data.reserve_price ? Math.round(Number(externalAuction.data.reserve_price) * 100) : null,
                     auction_platform: externalAuction.data.platform,
-                    auction_url: externalAuction.data.listing_url
+                    auction_url: externalAuction.data.listing_url,
+                    auction_view_count: typeof externalAuction.data.view_count === 'number' ? externalAuction.data.view_count : null,
+                    auction_watcher_count: typeof externalAuction.data.watcher_count === 'number' ? externalAuction.data.watcher_count : null,
+                    auction_comment_count: null,
+                    vehicle_location: metaLocation || null,
+                    seller_org_id: typeof externalAuction.data.organization_id === 'string' ? externalAuction.data.organization_id : null,
+                    seller_handle: null
                   };
                 } else if (batAuction.data) {
                   // Convert DATE to TIMESTAMPTZ for end of day
@@ -683,7 +820,12 @@ export default function OrganizationProfile() {
                     auction_bid_count: batAuction.data.bid_count || 0,
                     auction_reserve_price: batAuction.data.reserve_price ? batAuction.data.reserve_price * 100 : null,
                     auction_platform: 'bat',
-                    auction_url: batAuction.data.bat_listing_url
+                    auction_url: batAuction.data.bat_listing_url,
+                    auction_view_count: typeof batAuction.data.view_count === 'number' ? batAuction.data.view_count : null,
+                    auction_watcher_count: null,
+                    auction_comment_count: typeof batAuction.data.comment_count === 'number' ? batAuction.data.comment_count : null,
+                    seller_org_id: typeof batAuction.data.organization_id === 'string' ? batAuction.data.organization_id : null,
+                    seller_handle: typeof batAuction.data.seller_username === 'string' ? batAuction.data.seller_username : null
                   };
                 }
                 
@@ -691,6 +833,21 @@ export default function OrganizationProfile() {
                 const finalSaleDate = ov.sale_date || vehicleResult.data?.sale_date;
                 const finalSalePrice = ov.sale_price || vehicleResult.data?.sale_price;
                 
+                const vehicleLocation =
+                  (auctionData?.vehicle_location as string | null) ||
+                  (vehicleResult.data?.listing_location_raw as string | null) ||
+                  (vehicleResult.data?.listing_location as string | null) ||
+                  null;
+
+                const imgVariants = imageResult.data?.variants && typeof imageResult.data.variants === 'object' ? imageResult.data.variants : {};
+                const bestImg =
+                  (typeof imgVariants?.thumbnail === 'string' && imgVariants.thumbnail) ||
+                  (typeof imgVariants?.medium === 'string' && imgVariants.medium) ||
+                  (typeof imageResult.data?.thumbnail_url === 'string' && imageResult.data.thumbnail_url) ||
+                  (typeof imageResult.data?.medium_url === 'string' && imageResult.data.medium_url) ||
+                  (typeof imageResult.data?.image_url === 'string' && imageResult.data.image_url) ||
+                  null;
+
                 return {
                   id: ov.id,
                   vehicle_id: ov.vehicle_id,
@@ -707,7 +864,8 @@ export default function OrganizationProfile() {
                   vehicle_current_value: vehicleResult.data?.current_value,
                   vehicle_asking_price: vehicleResult.data?.asking_price || ov.asking_price,
                   vehicle_sale_status: vehicleResult.data?.sale_status,
-                  vehicle_image_url: imageResult.data?.image_url,
+                  vehicle_image_url: bestImg,
+                  vehicle_location: vehicleLocation,
                   listing_status: ov.listing_status,
                   cost_basis: ov.cost_basis,
                   days_on_lot: ov.days_on_lot,
@@ -718,6 +876,13 @@ export default function OrganizationProfile() {
                   auction_reserve_price: auctionData?.auction_reserve_price || null,
                   auction_platform: auctionData?.auction_platform || null,
                   auction_url: auctionData?.auction_url || null,
+                  auction_view_count: auctionData?.auction_view_count || null,
+                  auction_watcher_count: auctionData?.auction_watcher_count || null,
+                  auction_comment_count: auctionData?.auction_comment_count || null,
+                  seller_org_id: auctionData?.seller_org_id || null,
+                  seller_handle: auctionData?.seller_handle || null,
+                  analysis_tier: typeof vehicleResult.data?.analysis_tier === 'number' ? vehicleResult.data.analysis_tier : null,
+                  signal_score: typeof vehicleResult.data?.signal_score === 'number' ? vehicleResult.data.signal_score : null,
                   vehicles: vehicleResult.data || {}
                 };
               } catch {
@@ -726,7 +891,42 @@ export default function OrganizationProfile() {
             })
           );
           
-          setVehicles(enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value));
+          const baseRows = enriched
+            .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+            .map((r) => r.value) as OrgVehicle[];
+
+          // Batch-load seller org metadata (for favicon + dealer name)
+          const sellerOrgIds = Array.from(
+            new Set(
+              baseRows
+                .map((v) => v?.seller_org_id)
+                .filter((x): x is string => typeof x === 'string' && x.length > 0)
+            )
+          );
+
+          let orgById = new Map<string, { business_name?: string | null; website?: string | null }>();
+          if (sellerOrgIds.length > 0) {
+            const { data: orgRows } = await supabase
+              .from('businesses')
+              .select('id, business_name, website')
+              .in('id', sellerOrgIds);
+            for (const o of (orgRows || []) as any[]) {
+              if (!o?.id) continue;
+              orgById.set(String(o.id), { business_name: o.business_name ?? null, website: o.website ?? null });
+            }
+          }
+
+          const withSeller = baseRows.map((v) => {
+            const sellerOrgId = v?.seller_org_id || null;
+            const org = sellerOrgId ? orgById.get(String(sellerOrgId)) : null;
+            return {
+              ...v,
+              seller_org_name: org?.business_name ?? null,
+              seller_org_website: org?.website ?? null,
+            };
+          });
+
+          setVehicles(withSeller);
         } catch {
           setVehicles([]);
         }
@@ -1351,6 +1551,13 @@ export default function OrganizationProfile() {
                     </div>
                     <div className="card-body">
                       {sortedAuctions.map((vehicle) => {
+                        const signal = computeSignal({
+                          bids: vehicle.auction_bid_count,
+                          watchers: (vehicle as any).auction_watcher_count,
+                          views: (vehicle as any).auction_view_count,
+                          comments: (vehicle as any).auction_comment_count,
+                        });
+                        const tierLabel = tierLabelFromAnalysisTier((vehicle as any).analysis_tier ?? null);
                         const formatTimeRemaining = (endTime: string | null) => {
                           if (!endTime) return 'N/A';
                           const now = new Date();
@@ -1372,12 +1579,46 @@ export default function OrganizationProfile() {
                             border: '2px solid #dc2626',
                             borderRadius: '4px',
                             background: 'var(--surface)',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            position: 'relative'
                           }}
                           onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
                         >
-                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <div style={{ flex: 1 }}>
+                          <AliveBurst vehicleId={vehicle.vehicle_id} intensity={Math.min(18, Math.floor(signal.score / 12))} />
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: '6px' }}>
+                            <div style={{ display: 'flex', gap: 10, minWidth: 0, flex: 1 }}>
+                              {vehicle.vehicle_image_url ? (
+                                <img
+                                  src={vehicle.vehicle_image_url}
+                                  alt={`${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`}
+                                  style={{
+                                    width: '96px',
+                                    height: '72px',
+                                    objectFit: 'cover',
+                                    borderRadius: '4px',
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--grey-100)',
+                                  }}
+                                  loading="lazy"
+                                  decoding="async"
+                                  onError={(e) => {
+                                    const img = e.currentTarget as HTMLImageElement;
+                                    img.style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: '96px',
+                                    height: '72px',
+                                    borderRadius: '4px',
+                                    border: '1px solid var(--border)',
+                                    background: 'var(--grey-100)',
+                                  }}
+                                />
+                              )}
+
+                              <div style={{ flex: 1, minWidth: 0 }}>
                               <a 
                                 href={`/vehicle/${vehicle.vehicle_id}`}
                                 onClick={(e) => e.stopPropagation()}
@@ -1393,32 +1634,40 @@ export default function OrganizationProfile() {
                               >
                                 {vehicle.vehicle_year} {vehicle.vehicle_make} {vehicle.vehicle_model}
                               </a>
-                              {vehicle.vehicle_vin && (
-                                <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                                  VIN: {vehicle.vehicle_vin}
+
+                              <div style={{ marginTop: 4, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+                                <div style={{ fontSize: '12pt', fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                                  {vehicle.auction_current_bid ? formatUsd(vehicle.auction_current_bid / 100) : 'No bids yet'}
                                 </div>
-                              )}
-                              {/* Auction bid info */}
-                              <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '8pt' }}>
-                                {vehicle.auction_current_bid ? (
-                                  <div>
-                                    <span style={{ color: 'var(--text-muted)' }}>Current Bid: </span>
-                                    <span style={{ fontWeight: 700, color: 'var(--accent)' }}>
-                                      ${(vehicle.auction_current_bid / 100).toLocaleString()}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <div style={{ color: 'var(--text-muted)' }}>No bids yet</div>
+                                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                                  {vehicle.vehicle_location ? vehicle.vehicle_location : 'Location unknown'}
+                                </div>
+                              </div>
+
+                              <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                {tierLabel ? (
+                                  <span style={{ fontSize: '7pt', color: 'var(--text-secondary)' }}>{tierLabel}</span>
+                                ) : null}
+                                <span style={{ fontSize: '7pt', color: 'var(--text-secondary)' }}>
+                                  SIGNAL {signal.score}
+                                </span>
+                                {signal.bids > 0 && (
+                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>BIDS {signal.bids}</span>
                                 )}
-                                {vehicle.auction_bid_count > 0 && (
-                                  <div style={{ color: 'var(--text-secondary)' }}>
-                                    {vehicle.auction_bid_count} {vehicle.auction_bid_count === 1 ? 'bid' : 'bids'}
-                                  </div>
+                                {signal.watchers > 0 && (
+                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>WATCH {signal.watchers}</span>
+                                )}
+                                {signal.comments > 0 && (
+                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>COMM {signal.comments}</span>
+                                )}
+                                {signal.views > 0 && (
+                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>VIEWS {signal.views}</span>
                                 )}
                                 {!vehicle.auction_reserve_price && (
-                                  <div style={{ color: 'var(--warning)', fontWeight: 600 }}>NO RESERVE</div>
+                                  <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 700 }}>NO RESERVE</span>
                                 )}
                               </div>
+                            </div>
                             </div>
                             <div style={{ textAlign: 'right', marginLeft: '12px' }}>
                               <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>
@@ -1432,17 +1681,42 @@ export default function OrganizationProfile() {
                           
                           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                              <div style={{
-                                fontSize: '7pt',
-                                padding: '2px 6px',
-                                borderRadius: '2px',
-                                background: '#dc2626',
-                                color: 'white',
-                                fontWeight: 700
-                              }}>
-                                {vehicle.auction_platform === 'bat' ? 'LIVE AUCTION (BaT)' :
-                                 vehicle.auction_platform ? `LIVE AUCTION (${vehicle.auction_platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())})` :
-                                 'LIVE AUCTION'}
+                              <div
+                                style={{
+                                  fontSize: '7pt',
+                                  padding: '2px 6px',
+                                  borderRadius: '2px',
+                                  background: '#dc2626',
+                                  color: 'white',
+                                  fontWeight: 700,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  maxWidth: 220,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                                title={
+                                  vehicle.seller_org_name
+                                    ? `Seller: ${vehicle.seller_org_name}`
+                                    : vehicle.seller_handle
+                                      ? `Seller: ${vehicle.seller_handle}`
+                                      : 'Seller'
+                                }
+                              >
+                                {vehicle.seller_org_website ? (
+                                  <FaviconIcon
+                                    url={vehicle.seller_org_website}
+                                    textSize={7}
+                                    matchTextSize
+                                    preserveAspectRatio
+                                    style={{ marginRight: 0 }}
+                                  />
+                                ) : null}
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {vehicle.seller_org_name || vehicle.seller_handle || 'SELLER'}
+                                </span>
                               </div>
                               {vehicle.relationship_type && (
                                 <div style={{
@@ -1458,18 +1732,6 @@ export default function OrganizationProfile() {
                               )}
                             </div>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              {vehicle.vehicle_image_url && (
-                                <img 
-                                  src={vehicle.vehicle_image_url} 
-                                  alt={`${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`}
-                                  style={{
-                                    width: '60px',
-                                    height: '40px',
-                                    objectFit: 'cover',
-                                    borderRadius: '4px'
-                                  }}
-                                />
-                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1639,6 +1901,14 @@ export default function OrganizationProfile() {
                         const relationshipLabel = vehicle.relationship_type
                           ? String(vehicle.relationship_type).replace(/_/g, ' ')
                           : null;
+                        const signal = computeSignal({
+                          bids: vehicle.auction_bid_count,
+                          watchers: (vehicle as any).auction_watcher_count,
+                          views: (vehicle as any).auction_view_count,
+                          comments: (vehicle as any).auction_comment_count,
+                        });
+                        const tierLabel = tierLabelFromAnalysisTier((vehicle as any).analysis_tier ?? null);
+                        const hasTelemetry = signal.bids > 0 || signal.watchers > 0 || signal.views > 0 || signal.comments > 0;
 
                         // This section already represents inventory; avoid repeating "For Sale" on every tile.
                         const listingStatus = String(vehicle.listing_status || '').toLowerCase();
@@ -1655,10 +1925,12 @@ export default function OrganizationProfile() {
                               border: '1px solid var(--border)',
                               background: 'var(--surface)',
                               padding: '10px',
-                              cursor: 'pointer'
+                              cursor: 'pointer',
+                              position: 'relative'
                             }}
                             onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
                           >
+                            <AliveBurst vehicleId={vehicle.vehicle_id} intensity={Math.min(14, Math.floor(signal.score / 18))} />
                             <div
                               style={{
                                 display: 'grid',
@@ -1733,6 +2005,11 @@ export default function OrganizationProfile() {
                                       {listingLabel}
                                     </span>
                                   )}
+                                  {tierLabel ? (
+                                    <span style={{ fontSize: '7pt', color: 'var(--text-secondary)' }}>
+                                      {tierLabel}
+                                    </span>
+                                  ) : null}
                                   {relationshipLabel && (
                                     <span
                                       style={{
@@ -1746,9 +2023,33 @@ export default function OrganizationProfile() {
                                       {relationshipLabel}
                                     </span>
                                   )}
-                                  {vehicle.vehicle_vin && (
+                                  {vehicle.seller_org_website ? (
+                                    <FaviconIcon
+                                      url={vehicle.seller_org_website}
+                                      textSize={8}
+                                      matchTextSize
+                                      preserveAspectRatio
+                                      style={{ marginRight: 0 }}
+                                    />
+                                  ) : null}
+                                  {(vehicle.seller_org_name || vehicle.seller_handle) ? (
                                     <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                                      VIN {String(vehicle.vehicle_vin)}
+                                      {vehicle.seller_org_name || vehicle.seller_handle}
+                                    </span>
+                                  ) : null}
+                                  {vehicle.auction_current_bid ? (
+                                    <span style={{ fontSize: '8pt', fontWeight: 800, color: 'var(--text)' }}>
+                                      {formatUsd(vehicle.auction_current_bid / 100)}
+                                    </span>
+                                  ) : null}
+                                  {vehicle.vehicle_location && (
+                                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                                      {vehicle.vehicle_location}
+                                    </span>
+                                  )}
+                                  {hasTelemetry && (
+                                    <span style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                                      SIGNAL {signal.score}
                                     </span>
                                   )}
                                 </div>
