@@ -18,13 +18,39 @@ serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { auction_url, auction_event_id } = await req.json()
+    const { auction_url, auction_event_id, vehicle_id } = await req.json()
     if (!auction_url) throw new Error('Missing auction_url')
 
     console.log(`Extracting comments from: ${auction_url}`)
+
+    // Resolve auction_event_id if caller didn't provide it (best-effort convenience).
+    const platformGuess = String(auction_url).includes('bringatrailer.com') ? 'bat' : null
+    let eventId: string | null = auction_event_id ? String(auction_event_id) : null
+    if (!eventId && platformGuess) {
+      const { data: ev } = await supabase
+        .from('auction_events')
+        .select('id')
+        .eq('platform', platformGuess)
+        .eq('listing_url', String(auction_url))
+        .limit(1)
+        .maybeSingle()
+      if (ev?.id) eventId = String(ev.id)
+    }
+    if (!eventId) throw new Error('Missing auction_event_id (and could not resolve by listing_url)')
+
+    // Resolve vehicle_id for UI filters + auction pulse; prefer explicit input, else read from auction_events.
+    let vehicleId: string | null = vehicle_id ? String(vehicle_id) : null
+    if (!vehicleId) {
+      const { data: ev2 } = await supabase
+        .from('auction_events')
+        .select('vehicle_id')
+        .eq('id', eventId)
+        .maybeSingle()
+      if (ev2?.vehicle_id) vehicleId = String(ev2.vehicle_id)
+    }
 
     // Use Firecrawl to get JavaScript-rendered page
     const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
@@ -57,6 +83,7 @@ serve(async (req) => {
     }
     
     const doc = new DOMParser().parseFromString(html, 'text/html')
+    if (!doc) throw new Error('Failed to parse HTML (DOMParser returned null)')
 
     // Extract auction metadata
     const auctionEndMatch = html.match(/Auction ended?[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i)
@@ -113,7 +140,8 @@ serve(async (req) => {
       const has_image = el.querySelector('img') !== null
       
       comments.push({
-        auction_event_id,
+        auction_event_id: eventId,
+        vehicle_id: vehicleId,
         sequence_number: i + 1,
         posted_at: posted_at.toISOString(),
         hours_until_close: Math.max(0, hours_until_close),
@@ -174,7 +202,7 @@ serve(async (req) => {
     if (comments.length > 0) {
       const { error } = await supabase
         .from('auction_comments')
-        .insert(commentsWithIdentities)
+        .upsert(commentsWithIdentities, { onConflict: 'auction_event_id,sequence_number' })
       
       if (error) throw error
     }
@@ -198,7 +226,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       comments_extracted: comments.length,
-      auction_event_id
+      auction_event_id: eventId,
+      vehicle_id: vehicleId
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
