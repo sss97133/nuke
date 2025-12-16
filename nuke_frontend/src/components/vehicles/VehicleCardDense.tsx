@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FaviconIcon } from '../common/FaviconIcon';
 import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
 import { UserInteractionService } from '../../services/userInteractionService';
+import ResilientImage from '../images/ResilientImage';
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -115,8 +116,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       (typeof v.display_price === 'number' && Number.isFinite(v.display_price) && v.display_price > 0) ? v.display_price :
       (typeof v.sale_price === 'number' && v.sale_price > 0) ? v.sale_price :
       (typeof v.asking_price === 'number' && v.asking_price > 0) ? v.asking_price :
-      (typeof v.current_value === 'number' && v.current_value > 0) ? v.current_value :
-      (typeof v.purchase_price === 'number' && v.purchase_price > 0) ? v.purchase_price :
       null;
 
     const formatted = priceValue ? new Intl.NumberFormat('en-US', {
@@ -452,19 +451,33 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         }}
       >
         {/* Compact thumbnail - 60px */}
-        <div style={{
-          width: '60px',
-          height: '60px',
-          flexShrink: 0,
-          borderRadius: '0px',
-          border: '1px solid var(--border)',
-          background: (imageUrl || vehicle.primary_image_url) ? `url(${imageUrl || vehicle.primary_image_url}) center/cover` : 'var(--grey-200)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '20px',
-        }}>
-          {!(imageUrl || vehicle.primary_image_url) && 'CAR'}
+        <div
+          style={{
+            width: '60px',
+            height: '60px',
+            flexShrink: 0,
+            borderRadius: '0px',
+            border: '1px solid var(--border)',
+            background: 'var(--grey-200)',
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          <ResilientImage
+            sources={[
+              vehicle?.image_variants?.thumbnail,
+              vehicle?.image_variants?.medium,
+              vehicle?.image_variants?.large,
+              imageUrl,
+              vehicle.primary_image_url,
+              vehicle.image_url,
+            ]}
+            alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
+            fill={true}
+            objectFit="cover"
+            placeholderSrc="/n-zero.png"
+            placeholderOpacity={0.25}
+          />
         </div>
         
         {/* Vehicle - single line */}
@@ -532,12 +545,26 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           style={{
             width: '100%',
             height: '220px',
-            background: (imageUrl || vehicle.primary_image_url) ? `url(${imageUrl || vehicle.primary_image_url}) center/cover` : 'url(/n-zero.png) center/contain',
-            backgroundSize: (imageUrl || vehicle.primary_image_url) ? 'cover' : 'contain',
             backgroundColor: '#000',
             position: 'relative',
           }}
         >
+          <ResilientImage
+            sources={[
+              vehicle?.image_variants?.large,
+              vehicle?.image_variants?.medium,
+              vehicle?.image_variants?.thumbnail,
+              imageUrl,
+              vehicle.primary_image_url,
+              vehicle.image_url,
+            ]}
+            alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
+            fill={true}
+            objectFit="cover"
+            placeholderSrc="/n-zero.png"
+            placeholderOpacity={0.25}
+          />
+
           {/* LIVE badge (kept separate) */}
           {vehicle.is_streaming && (
             <div

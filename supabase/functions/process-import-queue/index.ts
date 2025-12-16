@@ -2715,8 +2715,45 @@ serve(async (req) => {
         if (scrapeData.data.description && scrapeData.data.description.length > 10) {
           updateData.description = scrapeData.data.description;
         }
-        if (scrapeData.data.location) {
-          const loc = normalizeListingLocation(scrapeData.data.location);
+        // Location: always attempt to populate. Prefer explicit listing location, otherwise fall back to dealer org location.
+        // NOTE: Location is time-sensitive; we store observed_at + provenance.
+        {
+          let locCandidate: any = scrapeData.data.location || null;
+          let locSource: string = 'scraped_listing';
+
+          if (!locCandidate && organizationId) {
+            try {
+              const { data: biz } = await supabase
+                .from('businesses')
+                .select('city, state, country')
+                .eq('id', organizationId)
+                .maybeSingle();
+
+              const city = (biz as any)?.city ? String((biz as any).city).trim() : '';
+              const state = (biz as any)?.state ? String((biz as any).state).trim() : '';
+              const country = (biz as any)?.country ? String((biz as any).country).trim() : '';
+
+              const parts: string[] = [];
+              if (city) parts.push(city);
+              if (state) {
+                if (parts.length > 0) parts[parts.length - 1] = `${parts[parts.length - 1]}, ${state}`;
+                else parts.push(state);
+              }
+              if (parts.length === 0 && country) parts.push(country);
+              else if (country && country.toLowerCase() !== 'united states' && country.toLowerCase() !== 'usa') {
+                parts.push(country);
+              }
+
+              if (parts.length > 0) {
+                locCandidate = parts.join(' ');
+                locSource = 'dealer_org';
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          const loc = normalizeListingLocation(locCandidate);
           if (loc.clean) {
             // Keep legacy column but only with cleaned content (prevents UI concatenation issues).
             updateData.location = loc.clean;
@@ -2724,8 +2761,8 @@ serve(async (req) => {
             updateData.listing_location = loc.clean;
             updateData.listing_location_raw = loc.raw;
             updateData.listing_location_observed_at = new Date().toISOString();
-            updateData.listing_location_source = 'scraped_listing';
-            updateData.listing_location_confidence = 0.55;
+            updateData.listing_location_source = locSource;
+            updateData.listing_location_confidence = locSource === 'dealer_org' ? 0.45 : 0.55;
           }
         }
         // IMPORTANT: do not directly update ledgered fields (vin/asking_price/etc) here.

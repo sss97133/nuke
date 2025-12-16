@@ -6,6 +6,7 @@ import QuickRelationshipEditor from './QuickRelationshipEditor';
 import MarkAsDuplicateButton from '../vehicle/MarkAsDuplicateButton';
 import QuickStatusBadge from './QuickStatusBadge';
 import FlagProblemButton from './FlagProblemButton';
+import ResilientImage from '../images/ResilientImage';
 
 interface DealerVehicle {
   id: string;
@@ -38,6 +39,7 @@ interface DealerVehicle {
     sale_status?: string | null;
   };
   thumbnail_url?: string;
+  thumbnail_sources?: string[] | null;
 }
 
 interface Props {
@@ -132,12 +134,13 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
       );
 
       const thumbByVehicleId = new Map<string, string | null>();
+      const thumbSourcesByVehicleId = new Map<string, string[]>();
       const chunkSize = 75; // keep URL size + concurrency low
       for (let i = 0; i < uniqueVehicleIds.length; i += chunkSize) {
         const chunk = uniqueVehicleIds.slice(i, i + chunkSize);
         const { data: imgs, error: imgErr } = await supabase
           .from('vehicle_images')
-          .select('vehicle_id, thumbnail_url, medium_url, image_url')
+          .select('vehicle_id, thumbnail_url, medium_url, image_url, variants')
           .in('vehicle_id', chunk)
           .eq('is_primary', true);
         if (imgErr) {
@@ -148,8 +151,59 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
         for (const r of (imgs || []) as any[]) {
           const vid = r?.vehicle_id;
           if (typeof vid !== 'string' || !vid) continue;
-          const best = r?.thumbnail_url || r?.medium_url || r?.image_url || null;
+          const variants = r?.variants && typeof r.variants === 'object' ? r.variants : {};
+          const sources = [
+            variants?.thumbnail,
+            variants?.medium,
+            variants?.large,
+            variants?.full,
+            r?.thumbnail_url,
+            r?.medium_url,
+            r?.image_url,
+          ]
+            .filter((x: any) => typeof x === 'string' && x.trim().length > 0)
+            .map((x: any) => String(x));
+          const best = sources[0] || null;
           if (!thumbByVehicleId.has(vid)) thumbByVehicleId.set(vid, best);
+          if (!thumbSourcesByVehicleId.has(vid)) thumbSourcesByVehicleId.set(vid, sources);
+        }
+
+        // Fallback: if a vehicle has no primary image flagged, grab the newest non-document image and use it.
+        const missing = chunk.filter((vid) => !thumbByVehicleId.has(vid));
+        if (missing.length > 0) {
+          const { data: fallbackImgs, error: fallbackErr } = await supabase
+            .from('vehicle_images')
+            .select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at')
+            .in('vehicle_id', missing)
+            .not('is_document', 'is', true)
+            .not('is_duplicate', 'is', true)
+            .order('is_primary', { ascending: false })
+            .order('created_at', { ascending: false })
+            .limit(Math.min(500, missing.length * 4));
+          if (fallbackErr) {
+            console.warn('Failed to fetch fallback thumbnails:', fallbackErr);
+          } else {
+            for (const r of (fallbackImgs || []) as any[]) {
+              const vid = r?.vehicle_id;
+              if (typeof vid !== 'string' || !vid) continue;
+              if (thumbByVehicleId.has(vid)) continue;
+              const variants = r?.variants && typeof r.variants === 'object' ? r.variants : {};
+              const sources = [
+                variants?.thumbnail,
+                variants?.medium,
+                variants?.large,
+                variants?.full,
+                r?.thumbnail_url,
+                r?.medium_url,
+                r?.image_url,
+              ]
+                .filter((x: any) => typeof x === 'string' && x.trim().length > 0)
+                .map((x: any) => String(x));
+              const best = sources[0] || null;
+              thumbByVehicleId.set(vid, best);
+              thumbSourcesByVehicleId.set(vid, sources);
+            }
+          }
         }
       }
 
@@ -163,6 +217,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           ...v,
           vehicles: vehicleObj,
           thumbnail_url: thumbByVehicleId.get(v.vehicle_id) || null,
+          thumbnail_sources: thumbSourcesByVehicleId.get(v.vehicle_id) || null,
         };
       });
 
@@ -666,13 +721,18 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                     <div style={{
                       width: '100%',
                       height: '200px',
-                      backgroundImage: v.thumbnail_url ? `url(${v.thumbnail_url})` : 'url(/n-zero.png)',
-                      backgroundSize: v.thumbnail_url ? 'cover' : 'contain',
-                      backgroundPosition: 'center',
                       backgroundColor: 'var(--bg)',
                       position: 'relative',
-                      opacity: v.thumbnail_url ? 1 : 0.3
                     }}>
+                      <ResilientImage
+                        sources={(v.thumbnail_sources && v.thumbnail_sources.length > 0) ? v.thumbnail_sources : [v.thumbnail_url]}
+                        alt={`${v.vehicles.year} ${v.vehicles.make} ${v.vehicles.model}`}
+                        fill={true}
+                        objectFit="cover"
+                        placeholderSrc="/n-zero.png"
+                        placeholderOpacity={0.3}
+                      />
+
                       {/* Status Badge */}
                       <div style={{
                         position: 'absolute',
@@ -688,15 +748,22 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                         {badge.text}
                       </div>
 
-                      {/* Featured Star */}
+                      {/* Featured */}
                       {v.featured && (
                         <div style={{
                           position: 'absolute',
                           top: '8px',
                           left: '8px',
-                          fontSize: '18pt'
+                          padding: '4px 10px',
+                          background: 'rgba(0,0,0,0.75)',
+                          backdropFilter: 'blur(5px)',
+                          color: 'white',
+                          fontSize: '7pt',
+                          fontWeight: 800,
+                          borderRadius: '3px',
+                          letterSpacing: '0.5px'
                         }}>
-                          ⭐
+                          FEATURED
                         </div>
                       )}
 
@@ -877,23 +944,32 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                         )}
 
                         {/* Thumbnail */}
-                        <div style={{
-                          width: '120px',
-                          height: '80px',
-                          backgroundImage: v.thumbnail_url ? `url(${v.thumbnail_url})` : 'url(/n-zero.png)',
-                          backgroundSize: v.thumbnail_url ? 'cover' : 'contain',
-                          backgroundPosition: 'center',
-                          backgroundColor: 'var(--bg)',
-                          border: '1px solid var(--border)',
-                          borderRadius: '4px',
-                          flexShrink: 0,
-                          opacity: v.thumbnail_url ? 1 : 0.3
-                        }} />
+                        <div
+                          style={{
+                            width: '120px',
+                            height: '80px',
+                            backgroundColor: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '4px',
+                            flexShrink: 0,
+                            overflow: 'hidden',
+                            position: 'relative',
+                          }}
+                        >
+                          <ResilientImage
+                            sources={(v.thumbnail_sources && v.thumbnail_sources.length > 0) ? v.thumbnail_sources : [v.thumbnail_url]}
+                            alt={`${v.vehicles.year} ${v.vehicles.make} ${v.vehicles.model}`}
+                            fill={true}
+                            objectFit="cover"
+                            placeholderSrc="/n-zero.png"
+                            placeholderOpacity={0.3}
+                          />
+                        </div>
 
                         {/* Info */}
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '11pt', fontWeight: 700, marginBottom: '4px' }}>
-                            {v.featured && '⭐ '}
+                            {v.featured && <span style={{ fontWeight: 800 }}>FEATURED </span>}
                             {v.vehicles.year} {v.vehicles.make} {v.vehicles.model}
                             {v.vehicles.trim && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> {v.vehicles.trim}</span>}
                           </div>

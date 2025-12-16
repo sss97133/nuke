@@ -31,13 +31,13 @@ export const OdometerBadge: React.FC<OdometerBadgeProps> = ({
   className = '',
 }) => {
   const digitsCount = useMemo(() => clampDigitsCount(mileage, year), [mileage, year]);
+  const absMileageInt = useMemo(() => Math.max(0, Math.floor(Math.abs(mileage || 0))), [mileage]);
   const digits = useMemo(() => {
-    const abs = Math.max(0, Math.floor(Math.abs(mileage || 0)));
-    return String(abs).padStart(digitsCount, '0').slice(-digitsCount);
-  }, [mileage, digitsCount]);
+    return String(absMileageInt).padStart(digitsCount, '0').slice(-digitsCount);
+  }, [absMileageInt, digitsCount]);
 
   const variant: 'digital' | 'mechanical' = typeof year === 'number' && year >= 2004 ? 'digital' : 'mechanical';
-  const exactText = `${Math.max(0, Math.floor(mileage || 0)).toLocaleString()} miles`;
+  const exactText = `${absMileageInt.toLocaleString()} miles`;
   const approxText = `${formatCompactK(mileage)} miles (approx)`;
 
   return (
@@ -45,6 +45,8 @@ export const OdometerBadge: React.FC<OdometerBadgeProps> = ({
       className={`odometer-badge odometer-badge--${variant} ${className}`.trim()}
       title={isExact ? exactText : approxText}
       aria-label={isExact ? `Mileage: ${exactText}` : `Mileage: ${approxText}`}
+      data-mileage={absMileageInt}
+      data-mileage-exact={isExact ? 'true' : 'false'}
     >
       <span className="odometer-badge__digits" aria-hidden="true">
         {digits.split('').map((d, idx) => (
