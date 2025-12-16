@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1286,7 +1287,20 @@ serve(async (req) => {
       if (extractedData.description) vehicleUpdates.description = extractedData.description;
       if (extractedData.sale_price) vehicleUpdates.sale_price = extractedData.sale_price;
       if (extractedData.sale_date) vehicleUpdates.sale_date = extractedData.sale_date;
-      if (extractedData.location) vehicleUpdates.bat_location = extractedData.location;
+      if (extractedData.location) {
+        const loc = normalizeListingLocation(extractedData.location);
+        if (loc.clean) {
+          vehicleUpdates.bat_location = loc.clean;
+          vehicleUpdates.listing_location = loc.clean;
+          vehicleUpdates.listing_location_raw = loc.raw;
+          vehicleUpdates.listing_location_observed_at =
+            extractedData.auction_start_date
+              ? new Date(String(extractedData.auction_start_date)).toISOString()
+              : new Date().toISOString();
+          vehicleUpdates.listing_location_source = 'bat';
+          vehicleUpdates.listing_location_confidence = 0.7;
+        }
+      }
       if (extractedData.seller) vehicleUpdates.bat_seller = extractedData.seller;
       if (extractedData.bid_count !== undefined) vehicleUpdates.bat_bids = extractedData.bid_count;
       if (extractedData.view_count !== undefined) vehicleUpdates.bat_views = extractedData.view_count;
@@ -1299,6 +1313,26 @@ serve(async (req) => {
         .eq('id', vehicleId)
         .select()
         .single();
+
+      // Best-effort: record time-series location observation for this listing.
+      try {
+        if ((vehicleUpdates as any).listing_location) {
+          await supabase.from('vehicle_location_observations').insert({
+            vehicle_id: vehicleId,
+            source_type: 'listing',
+            source_platform: 'bat',
+            source_url: batUrl,
+            observed_at: (vehicleUpdates as any).listing_location_observed_at || new Date().toISOString(),
+            location_text_raw: (vehicleUpdates as any).listing_location_raw || null,
+            location_text_clean: (vehicleUpdates as any).listing_location,
+            precision: /,/.test(String((vehicleUpdates as any).listing_location)) ? 'region' : 'country',
+            confidence: 0.7,
+            metadata: { source: 'comprehensive-bat-extraction' },
+          } as any);
+        }
+      } catch {
+        // ignore
+      }
       
       // CRITICAL: Create source attribution for sale_price if we're updating it
       // This ensures every price has a verifiable source mapped back to the BAT listing
@@ -1417,7 +1451,10 @@ serve(async (req) => {
               buyer_bat_user_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.id || null) : null,
               seller_external_identity_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.external_identity_id || null) : null,
               buyer_external_identity_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.external_identity_id || null) : null,
-              location: extractedData.location,
+              location: (() => {
+                const loc = normalizeListingLocation(extractedData.location);
+                return loc.clean;
+              })(),
               technical_specs: {
                 engine: extractedData.engine,
                 transmission: extractedData.transmission,
@@ -1469,7 +1506,10 @@ serve(async (req) => {
               buyer_bat_user_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.id || null) : null,
               seller_external_identity_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.external_identity_id || null) : null,
               buyer_external_identity_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.external_identity_id || null) : null,
-              location: extractedData.location,
+              location: (() => {
+                const loc = normalizeListingLocation(extractedData.location);
+                return loc.clean;
+              })(),
               technical_specs: {
                 engine: extractedData.engine,
                 transmission: extractedData.transmission,
