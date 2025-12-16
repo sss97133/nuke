@@ -74,6 +74,32 @@ interface AngleClassification {
   text_labels?: string[]; // NEW: Text visible (part numbers, labels, etc)
 }
 
+function angleFamilyToYawDeg(angleFamily: string | null | undefined): number | null {
+  const a = (angleFamily || '').trim().toLowerCase();
+  if (!a) return null;
+
+  // Exterior / full vehicle yaw mapping (0 = front, 90 = driver side, 180 = rear, 270 = passenger side)
+  // NOTE: Only set yaw for angles where the side is explicit to avoid guessing.
+  const map: Record<string, number> = {
+    front_straight: 0,
+    front_quarter_driver: 45,
+    front_three_quarter_driver: 45,
+    profile_driver: 90,
+    side_driver: 90,
+    rear_quarter_driver: 135,
+    rear_three_quarter_driver: 135,
+    rear_straight: 180,
+    rear_quarter_passenger: 225,
+    rear_three_quarter_passenger: 225,
+    profile_passenger: 270,
+    side_passenger: 270,
+    front_quarter_passenger: 315,
+    front_three_quarter_passenger: 315,
+  };
+
+  return Object.prototype.hasOwnProperty.call(map, a) ? map[a] : null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -101,18 +127,21 @@ serve(async (req) => {
 
     console.log(`🔍 Starting context-aware classification (minConfidence: ${minConfidence}%)`);
 
-    // Get ALL images in storage
+    // IMPORTANT: Don't load all images. We only pull a small window that still needs angle tagging.
     let query = supabase
       .from('vehicle_images')
-      .select('id, image_url, vehicle_id, created_at, category, image_category, storage_path, is_external')
+      .select('id, image_url, vehicle_id, created_at, category, image_category, storage_path, is_external, ai_detected_angle')
       .not('storage_path', 'is', null)
+      .is('ai_detected_angle', null)
       .order('created_at', { ascending: false });
 
     if (vehicleId) {
       query = query.eq('vehicle_id', vehicleId);
     }
 
-    const { data: allImages, error: imagesError } = await query;
+    // Limit the scan window (batchSize is what we'll actually process).
+    const scanWindow = Math.max(50, Math.min(1000, batchSize * 8));
+    const { data: allImages, error: imagesError } = await query.limit(scanWindow);
 
     if (imagesError) {
       throw new Error(`Failed to load images: ${imagesError.message}`);
@@ -131,24 +160,17 @@ serve(async (req) => {
       );
     }
 
-    // Get already tagged images (check BOTH vehicle_image_angles AND recent audit entries)
-    const { data: existingAngles } = await supabase
-      .from('vehicle_image_angles')
-      .select('image_id');
-
-    // Also check for recent audit entries to avoid re-processing
+    // Images pulled already satisfy: storage_path present AND ai_detected_angle is null.
+    // We still avoid reprocessing anything audited recently (best-effort guardrail).
     const { data: recentAudits } = await supabase
       .from('ai_angle_classifications_audit')
       .select('image_id')
       .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()); // Last 24 hours
-
-    const alreadyTagged = new Set((existingAngles || []).map(r => r.image_id));
     const recentlyProcessed = new Set((recentAudits || []).map(r => r.image_id));
 
-    // Two-pass system: separate easy vs difficult images
-    const untaggedImages = allImages.filter(img => {
-      if (alreadyTagged.has(img.id)) return false;
-      if (recentlyProcessed.has(img.id)) return false; // Skip recently processed to avoid duplicates
+    const untaggedImages = (allImages || []).filter((img: any) => {
+      if (!img?.id) return false;
+      if (recentlyProcessed.has(img.id)) return false;
       if (!img.storage_path) return false;
       return true;
     });
@@ -454,6 +476,26 @@ async function processImage(
       if (insertError) {
         console.error(`Failed to insert vehicle_image_angles for ${img.id}:`, insertError);
         // Continue anyway - audit entry is already created
+      }
+
+      // ALSO write canonical pose signals onto vehicle_images for fast queries + profile rendering.
+      // This is what powers angle coverage metrics and "3D position" (yaw) without needing joins.
+      try {
+        const yaw = angleFamilyToYawDeg(classification.angle_family || null);
+        const conf01 = Math.max(0, Math.min(1, Number(classification.confidence || 0) / 100));
+
+        await supabase
+          .from('vehicle_images')
+          .update({
+            ai_detected_angle: classification.angle_family || null,
+            ai_detected_angle_confidence: Number.isFinite(conf01) ? conf01 : null,
+            angle_source: 'backfill_image_angles_v1',
+            yaw_deg: yaw,
+            yaw_confidence: yaw !== null ? (Number.isFinite(conf01) ? conf01 : null) : null,
+          } as any)
+          .eq('id', img.id);
+      } catch {
+        // Non-blocking
       }
 
       return validation.needsReview ? 'review' : 'processed';
@@ -810,7 +852,8 @@ Be precise and consistent. If uncertain, use lower confidence scores.`;
           'Authorization': `Bearer ${openaiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-4o',
+          // Cheaper default; this runs at scale.
+          model: 'gpt-4o-mini',
           messages: [
             {
               role: 'system',
@@ -830,7 +873,7 @@ Be precise and consistent. If uncertain, use lower confidence scores.`;
               ]
             }
           ],
-          max_tokens: useEnhanced ? 2000 : 500,
+          max_tokens: useEnhanced ? 900 : 350,
           temperature: 0.1
         })
       });
