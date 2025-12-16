@@ -63,13 +63,26 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
           echo "Calling runner: limit=$LIMIT force_rescrape=$FORCE_RESCRAPE persist_html=$PERSIST_HTML extractor_version=$EXTRACTOR_VERSION"
-          curl -sS --fail \
-            "${SUPABASE_URL}/functions/v1/bat-dom-map-health-runner" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-            -H "Content-Type: application/json" \
-            --data-binary "{\"limit\":${LIMIT},\"force_rescrape\":${FORCE_RESCRAPE},\"persist_html\":${PERSIST_HTML},\"extractor_version\":\"${EXTRACTOR_VERSION}\"}" \
-            | tee artifacts/bat_dom_map_health_runner_result.json \
-            > /dev/null
+          # Supabase edge functions gateway requires `apikey` as well as `Authorization`.
+          # Capture body + HTTP code for debugging and CI gating.
+          http_code="$(
+            curl -sS \
+              --retry 2 --retry-delay 2 --retry-all-errors \
+              -o artifacts/bat_dom_map_health_runner_result.json \
+              -w "%{http_code}" \
+              "${SUPABASE_URL}/functions/v1/bat-dom-map-health-runner" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Content-Type: application/json" \
+              --data-binary "{\"limit\":${LIMIT},\"force_rescrape\":${FORCE_RESCRAPE},\"persist_html\":${PERSIST_HTML},\"extractor_version\":\"${EXTRACTOR_VERSION}\"}"
+          )"
+          echo "runner_http_code=${http_code}"
+          echo "{\"runner_http_code\":${http_code}}" > artifacts/bat_dom_map_health_runner_http.json
+          if [[ "${http_code}" -lt 200 || "${http_code}" -ge 300 ]]; then
+            echo "Runner call failed (HTTP ${http_code}). Response body:" >&2
+            cat artifacts/bat_dom_map_health_runner_result.json >&2 || true
+            exit 1
+          fi
 
       - name: Fetch BaT DOM health summary (RPC)
         shell: bash
