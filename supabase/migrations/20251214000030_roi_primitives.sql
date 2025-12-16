@@ -107,6 +107,9 @@ $$;
 
 COMMENT ON FUNCTION public.get_vehicle_roi_summary IS 'Returns spend vs value delta ROI summary for a vehicle (30d delta from vehicle_price_history if available).';
 
+-- Allow PostgREST RPC for signed-in users (RLS still applies for underlying tables)
+GRANT EXECUTE ON FUNCTION public.get_vehicle_roi_summary(UUID) TO authenticated;
+
 -- ==========================
 -- 2) WORK ORDER ROI SUMMARY
 -- ==========================
@@ -166,6 +169,8 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.get_work_order_roi_summary IS 'Returns spend vs value_impact ROI summary for a work order (requires timeline_events.work_order_id links).';
+
+GRANT EXECUTE ON FUNCTION public.get_work_order_roi_summary(UUID) TO authenticated;
 
 COMMIT;
 

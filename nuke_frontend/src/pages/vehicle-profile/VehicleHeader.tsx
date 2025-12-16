@@ -2149,7 +2149,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               title={priceWasCorrected ? 'Price was auto-corrected from listing (e.g., $15 -> $15,000)' : undefined}
             >
               <span
-                className="provenance-price-clickable"
+                className={`provenance-price-clickable${auctionPulseMs && isAuctionLive ? ' auction-price-pulse' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowProvenancePopup(true);
@@ -2164,7 +2164,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   transition: 'filter 0.2s ease',
                   ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
                 }}
-                  className={auctionPulseMs && isAuctionLive ? 'auction-price-pulse' : undefined}
                 // Prefer compact visible text; reveal actual amount on hover when available.
                 // We intentionally avoid asserting price in the primary display for SOLD states.
                 // (Time is linear; by the time a number is posted, it may already be "stale".)
