@@ -6,7 +6,8 @@ on:
       limit:
         description: "How many BaT listings to process"
         required: false
-        default: "75"
+        # Keep this modest; the runner does HTML fetch + DOM parsing and can hit WORKER_LIMIT on large batches.
+        default: "25"
       force_rescrape:
         description: "Force re-scrape instead of reusing latest stored snapshot"
         required: false
@@ -37,7 +38,7 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      LIMIT: ${{ github.event.inputs.limit || '75' }}
+      LIMIT: ${{ github.event.inputs.limit || '25' }}
       FORCE_RESCRAPE: ${{ github.event.inputs.force_rescrape || 'false' }}
       PERSIST_HTML: ${{ github.event.inputs.persist_html || 'true' }}
       EXTRACTOR_VERSION: ${{ github.event.inputs.extractor_version || 'v1' }}
@@ -62,24 +63,51 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          echo "Calling runner: limit=$LIMIT force_rescrape=$FORCE_RESCRAPE persist_html=$PERSIST_HTML extractor_version=$EXTRACTOR_VERSION"
           # Supabase edge functions gateway requires `apikey` as well as `Authorization`.
-          # Capture body + HTTP code for debugging and CI gating.
-          http_code="$(
-            curl -sS \
-              --retry 2 --retry-delay 2 --retry-all-errors \
-              -o artifacts/bat_dom_map_health_runner_result.json \
-              -w "%{http_code}" \
-              "${SUPABASE_URL}/functions/v1/bat-dom-map-health-runner" \
-              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-              -H "Content-Type: application/json" \
-              --data-binary "{\"limit\":${LIMIT},\"force_rescrape\":${FORCE_RESCRAPE},\"persist_html\":${PERSIST_HTML},\"extractor_version\":\"${EXTRACTOR_VERSION}\"}"
-          )"
-          echo "runner_http_code=${http_code}"
-          echo "{\"runner_http_code\":${http_code}}" > artifacts/bat_dom_map_health_runner_http.json
-          if [[ "${http_code}" -lt 200 || "${http_code}" -ge 300 ]]; then
+          # The runner can hit WORKER_LIMIT (HTTP 546) on larger batches; automatically back off and retry.
+          attempt_limit="${LIMIT}"
+          max_attempts=4
+          http_code="0"
+          for attempt in $(seq 1 "${max_attempts}"); do
+            echo "Calling runner (attempt ${attempt}/${max_attempts}): limit=${attempt_limit} force_rescrape=${FORCE_RESCRAPE} persist_html=${PERSIST_HTML} extractor_version=${EXTRACTOR_VERSION}"
+            http_code="$(
+              curl -sS \
+                --retry 2 --retry-delay 2 --retry-all-errors \
+                -o artifacts/bat_dom_map_health_runner_result.json \
+                -w "%{http_code}" \
+                "${SUPABASE_URL}/functions/v1/bat-dom-map-health-runner" \
+                -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+                -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+                -H "Content-Type: application/json" \
+                --data-binary "{\"limit\":${attempt_limit},\"force_rescrape\":${FORCE_RESCRAPE},\"persist_html\":${PERSIST_HTML},\"extractor_version\":\"${EXTRACTOR_VERSION}\"}"
+            )"
+            echo "runner_http_code=${http_code}"
+            echo "{\"runner_http_code\":${http_code},\"attempt\":${attempt},\"limit\":${attempt_limit}}" > artifacts/bat_dom_map_health_runner_http.json
+
+            if [[ "${http_code}" -ge 200 && "${http_code}" -lt 300 ]]; then
+              echo "{\"used_limit\":${attempt_limit},\"attempt\":${attempt}}" > artifacts/bat_dom_map_health_runner_used_limit.json
+              break
+            fi
+
+            # If we're compute-constrained, back off and try again with a smaller sample.
+            if [[ "${http_code}" == "546" ]] && jq -e '.code=="WORKER_LIMIT"' artifacts/bat_dom_map_health_runner_result.json >/dev/null 2>&1; then
+              echo "Runner hit WORKER_LIMIT; backing off batch size." >&2
+              attempt_limit="$(( (attempt_limit + 1) / 2 ))"
+              if [[ "${attempt_limit}" -lt 1 ]]; then
+                echo "Backoff limit dropped below 1; failing." >&2
+                exit 1
+              fi
+              sleep 6
+              continue
+            fi
+
             echo "Runner call failed (HTTP ${http_code}). Response body:" >&2
+            cat artifacts/bat_dom_map_health_runner_result.json >&2 || true
+            exit 1
+          done
+
+          if [[ "${http_code}" -lt 200 || "${http_code}" -ge 300 ]]; then
+            echo "Runner call failed after retries (HTTP ${http_code}). Response body:" >&2
             cat artifacts/bat_dom_map_health_runner_result.json >&2 || true
             exit 1
           fi
