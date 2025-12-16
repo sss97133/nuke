@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { AdminNotificationService } from '../../services/adminNotificationService';
 
 type StreamActionPackRow = {
   id: string;
@@ -76,16 +77,10 @@ export default function MemeLibraryAdmin() {
         return;
       }
 
-      const { data: adminRow } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .single();
-
-      if (!adminRow) {
+      const ok = await AdminNotificationService.isCurrentUserAdmin();
+      if (!ok) {
         setIsAdmin(false);
-        navigate('/dashboard');
+        navigate('/org/dashboard');
         return;
       }
 

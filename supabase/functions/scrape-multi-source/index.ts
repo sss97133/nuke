@@ -802,6 +802,8 @@ Return ONLY valid JSON in this format:
         /href="([^"]*\/vehicle\/[^"]+)"/gi,
         // Classic.com listing detail pages often use /l/<id-or-slug>/
         /href="([^"]*\/l\/[^"]+)"/gi,
+        // Cars & Bids: listing detail pages use /auctions/<id>/<slug>
+        /href="([^"]*\/auctions\/[^"]+)"/gi,
         // L'Art de L'Automobile (and similar) uses /fiche/<slug> for vehicle detail pages.
         /href="([^"]*\/fiche\/[^"]+)"/gi,
         // Beverly Hills Car Club: listing detail pages end with -c-<id>.htm (no /inventory/ segment)
@@ -825,7 +827,7 @@ Return ONLY valid JSON in this format:
           }
           // Filter out non-vehicle URLs
           if (
-            url.match(/\/(vehicle|listing|inventory|cars|trucks|detail|detail\.aspx|fiche)\b/i) ||
+            url.match(/\/(vehicle|listing|inventory|cars|trucks|detail|detail\.aspx|fiche|auctions)\b/i) ||
             url.match(/-c-\d+\.htm$/i)
           ) {
             foundUrls.add(url);
@@ -908,6 +910,26 @@ Return ONLY valid JSON in this format:
               const u = new URL(abs);
               if (u.hostname.replace(/^www\./, '').toLowerCase() !== 'bringatrailer.com') continue;
               if (!u.pathname.toLowerCase().startsWith('/listing/')) continue;
+              const normalized = u.pathname.endsWith('/') ? `${u.origin}${u.pathname}` : `${u.origin}${u.pathname}/`;
+              found.add(normalized);
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        // Cars & Bids: enumerate listing detail URLs from /auctions/ index pages.
+        if (baseHost === 'carsandbids.com') {
+          const anyCbAuctionHref = /href="([^"]*\/auctions\/[^"]+)"/gi;
+          while ((m = anyCbAuctionHref.exec(html)) !== null) {
+            const raw = (m[1] || '').trim();
+            if (!raw) continue;
+            const abs = raw.startsWith('http') ? raw : `${baseUrl.origin}${raw.startsWith('/') ? '' : '/'}${raw}`;
+            try {
+              const u = new URL(abs);
+              if (u.hostname.replace(/^www\./, '').toLowerCase() !== 'carsandbids.com') continue;
+              if (!u.pathname.toLowerCase().startsWith('/auctions/')) continue;
+              if (u.pathname.toLowerCase() === '/auctions' || u.pathname.toLowerCase() === '/auctions/') continue;
               const normalized = u.pathname.endsWith('/') ? `${u.origin}${u.pathname}` : `${u.origin}${u.pathname}/`;
               found.add(normalized);
             } catch {

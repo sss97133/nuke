@@ -54,7 +54,7 @@ const AdminDashboard: React.FC = () => {
 
       if (!adminData) {
         alert('Access denied: Admin privileges required');
-        navigate('/dashboard');
+        navigate('/org/dashboard');
         return;
       }
 
@@ -62,7 +62,7 @@ const AdminDashboard: React.FC = () => {
       await loadPendingApprovals();
     } catch (error) {
       console.error('Error checking admin status:', error);
-      navigate('/dashboard');
+      navigate('/org/dashboard');
     }
   };
 

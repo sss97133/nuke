@@ -104,8 +104,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           mileage,
           sale_status,
           sale_price,
-          sale_date,
-          listing_status
+          sale_date
         `)
         .in('id', vehicleIds);
 
@@ -161,7 +160,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           const externalListing = externalMap.get(v.id);
 
           const saleStatus = String(v.sale_status || '').toLowerCase();
-          const listingStatus = String(orgVehicle.listing_status || v.listing_status || '').toLowerCase();
+          const listingStatus = String(orgVehicle.listing_status || externalListing?.listing_status || '').toLowerCase();
 
           const ovSalePriceNum = orgVehicle.sale_price ? Number(orgVehicle.sale_price) : 0;
           const vSalePriceNum = v.sale_price ? Number(v.sale_price) : 0;

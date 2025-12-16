@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { AdminNotificationService } from '../../services/adminNotificationService';
 import '../../design-system.css';
 
 interface VehicleRow {
@@ -49,7 +50,6 @@ const BulkPriceEditor: React.FC = () => {
   const debouncedQuery = useDebounce(query, 300);
 
   useEffect(() => {
-    // Admin gate - TEMPORARILY DISABLED
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -58,28 +58,18 @@ const BulkPriceEditor: React.FC = () => {
           navigate('/login');
           return;
         }
-        // TEMP: Skip admin check
-        setIsAdmin(true);
-        return;
-        
-        /* Original admin check - uncomment after adding yourself to admin_users table
-        const { data: adminRow } = await supabase
-          .from('admin_users')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .single();
-        if (!adminRow) {
+
+        const ok = await AdminNotificationService.isCurrentUserAdmin();
+        if (!ok) {
           setIsAdmin(false);
-          navigate('/dashboard');
+          navigate('/org/dashboard');
           return;
         }
+
         setIsAdmin(true);
-        */
       } catch {
-        setIsAdmin(true); // TEMP: Allow access on error
-        // setIsAdmin(false);
-        // navigate('/dashboard');
+        setIsAdmin(false);
+        navigate('/org/dashboard');
       }
     })();
   }, []);
