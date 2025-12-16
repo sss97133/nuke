@@ -719,8 +719,8 @@ const AdminMissionControl: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-      </div>
+            </div>
+          </div>
 
       {/* Quick Actions */}
       <div style={{ marginBottom: '24px' }}>

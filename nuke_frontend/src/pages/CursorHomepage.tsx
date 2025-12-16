@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { UserInteractionService } from '../services/userInteractionService';
-import VehicleCritiqueMode from '../components/search/VehicleCritiqueMode';
 
 interface HypeVehicle {
   id: string;
@@ -212,6 +211,13 @@ interface FilterState {
   hasImages: boolean;
   forSale: boolean;
   hideSold: boolean;
+  // Source / dealer-ish filters
+  hideDealerListings: boolean;
+  hideCraigslist: boolean;
+  hideDealerSites: boolean;
+  hideKsl: boolean;
+  hideBat: boolean;
+  hideClassic: boolean;
   zipCode: string;
   radiusMiles: number;
   showPending: boolean;
@@ -229,9 +235,65 @@ const DEFAULT_FILTERS: FilterState = {
   forSale: false,
   // Homepage should focus on active listings; sold inventory can be toggled back on.
   hideSold: true,
+  // Dealer/source defaults:
+  // Craigslist is typically the noisiest dealer channel; default to hiding it.
+  hideDealerListings: false,
+  hideCraigslist: true,
+  hideDealerSites: false,
+  hideKsl: false,
+  hideBat: false,
+  hideClassic: false,
   zipCode: '',
   radiusMiles: 50,
   showPending: false
+};
+
+type SourceKind = 'craigslist' | 'dealer_site' | 'ksl' | 'bat' | 'classic' | 'user' | 'unknown';
+
+const normalizeHost = (url: string | null | undefined): string => {
+  try {
+    if (!url) return '';
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    // Sometimes stored URLs are missing protocol; fall back to a cheap parse.
+    const s = String(url || '').trim().toLowerCase();
+    const m = s.match(/^(?:https?:\/\/)?([^/]+)/i);
+    return (m?.[1] || '').replace(/^www\./, '').toLowerCase();
+  }
+};
+
+const classifySource = (v: any): SourceKind => {
+  const origin = String(v?.profile_origin || '').trim().toLowerCase();
+  const discoverySource = String(v?.discovery_source || '').trim().toLowerCase();
+  const discoveryUrl = String(v?.discovery_url || '').trim().toLowerCase();
+  const host = normalizeHost(v?.discovery_url || null);
+
+  // Craigslist
+  if (origin === 'craigslist_scrape' || host.includes('craigslist.org') || discoveryUrl.includes('craigslist.org') || discoverySource.includes('craigslist')) {
+    return 'craigslist';
+  }
+  // KSL
+  if (origin === 'ksl_import' || host === 'ksl.com' || host.endsWith('.ksl.com') || discoveryUrl.includes('ksl.com') || discoverySource.includes('ksl')) {
+    return 'ksl';
+  }
+  // BaT (auction)
+  if (origin === 'bat_import' || host.includes('bringatrailer.com') || discoveryUrl.includes('bringatrailer.com/listing') || discoverySource.includes('bat')) {
+    return 'bat';
+  }
+  // Classic.com
+  if (origin === 'classic_com_indexing' || host === 'classic.com' || host.endsWith('.classic.com') || discoveryUrl.includes('classic.com') || discoverySource.includes('classic')) {
+    return 'classic';
+  }
+  // Generic dealer site scrape
+  if (origin === 'url_scraper') {
+    return 'dealer_site';
+  }
+  // User-ish
+  if (!origin || origin === 'user_upload' || origin === 'manual' || origin === 'user_import') {
+    return 'user';
+  }
+  return 'unknown';
 };
 
 const CursorHomepage: React.FC = () => {
@@ -239,14 +301,6 @@ const CursorHomepage: React.FC = () => {
   const [filteredVehicles, setFilteredVehicles] = useState<HypeVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
-  const [showCritiqueModal, setShowCritiqueModal] = useState(false);
-  const [critiqueVehicle, setCritiqueVehicle] = useState<{
-    id: string;
-    year?: number;
-    make?: string;
-    model?: string;
-    status?: string;
-  } | null>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('AT');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
@@ -362,6 +416,12 @@ const CursorHomepage: React.FC = () => {
     if (filters.hasImages !== DEFAULT_FILTERS.hasImages) n++;
     if (filters.forSale !== DEFAULT_FILTERS.forSale) n++;
     if (filters.hideSold !== DEFAULT_FILTERS.hideSold) n++;
+    if (filters.hideDealerListings !== DEFAULT_FILTERS.hideDealerListings) n++;
+    if (filters.hideCraigslist !== DEFAULT_FILTERS.hideCraigslist) n++;
+    if (filters.hideDealerSites !== DEFAULT_FILTERS.hideDealerSites) n++;
+    if (filters.hideKsl !== DEFAULT_FILTERS.hideKsl) n++;
+    if (filters.hideBat !== DEFAULT_FILTERS.hideBat) n++;
+    if (filters.hideClassic !== DEFAULT_FILTERS.hideClassic) n++;
     if (filters.zipCode !== DEFAULT_FILTERS.zipCode) n++;
     if (filters.zipCode && filters.radiusMiles !== DEFAULT_FILTERS.radiusMiles) n++;
     if (filters.showPending !== DEFAULT_FILTERS.showPending) n++;
@@ -404,17 +464,6 @@ const CursorHomepage: React.FC = () => {
     }
   };
 
-  const openFeedbackForVehicle = useCallback((v: any) => {
-    if (!v?.id) return;
-    setCritiqueVehicle({
-      id: String(v.id),
-      year: typeof v.year === 'number' ? v.year : undefined,
-      make: typeof v.make === 'string' ? v.make : undefined,
-      model: typeof v.model === 'string' ? v.model : undefined,
-      status: typeof v.status === 'string' ? v.status : undefined,
-    });
-    setShowCritiqueModal(true);
-  }, []);
 
   // Load accurate stats from database (not filtered feed)
   const loadAccurateStats = async () => {
@@ -700,6 +749,34 @@ const CursorHomepage: React.FC = () => {
         const saleStatus = String((v as any).sale_status || '').toLowerCase();
         const isSold = salePrice > 0 || Boolean(saleDate) || saleStatus === 'sold';
         return !isSold;
+      });
+    }
+
+    // Source / dealer-ish filtering
+    if (
+      filters.hideDealerListings ||
+      filters.hideCraigslist ||
+      filters.hideDealerSites ||
+      filters.hideKsl ||
+      filters.hideBat ||
+      filters.hideClassic
+    ) {
+      result = result.filter((v: any) => {
+        const src = classifySource(v);
+
+        // Master toggle: remove the "dealer-ish" channels, but keep auctions/classic by default.
+        if (filters.hideDealerListings) {
+          if (src === 'craigslist' || src === 'dealer_site' || src === 'ksl') return false;
+        }
+
+        // Per-source toggles
+        if (filters.hideCraigslist && src === 'craigslist') return false;
+        if (filters.hideDealerSites && src === 'dealer_site') return false;
+        if (filters.hideKsl && src === 'ksl') return false;
+        if (filters.hideBat && src === 'bat') return false;
+        if (filters.hideClassic && src === 'classic') return false;
+
+        return true;
       });
     }
     
@@ -1237,6 +1314,58 @@ const CursorHomepage: React.FC = () => {
                   <span>Show Pending Vehicles</span>
                 </label>
 
+                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Source Filters</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.hideDealerListings}
+                      onChange={(e) => setFilters({ ...filters, hideDealerListings: e.target.checked })}
+                    />
+                    <span>Hide dealer listings (CL + dealer sites + KSL)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.hideCraigslist}
+                      onChange={(e) => setFilters({ ...filters, hideCraigslist: e.target.checked })}
+                    />
+                    <span>Hide Craigslist (CL)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.hideDealerSites}
+                      onChange={(e) => setFilters({ ...filters, hideDealerSites: e.target.checked })}
+                    />
+                    <span>Hide dealer websites</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.hideKsl}
+                      onChange={(e) => setFilters({ ...filters, hideKsl: e.target.checked })}
+                    />
+                    <span>Hide KSL</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.hideBat}
+                      onChange={(e) => setFilters({ ...filters, hideBat: e.target.checked })}
+                    />
+                    <span>Hide BaT</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.hideClassic}
+                      onChange={(e) => setFilters({ ...filters, hideClassic: e.target.checked })}
+                    />
+                    <span>Hide Classic.com</span>
+                  </label>
+                </div>
+
                 <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <input
@@ -1729,8 +1858,6 @@ const CursorHomepage: React.FC = () => {
                   vehicle={vehicle}
                   viewMode="gallery"
                   infoDense={infoDense}
-                  showFeedbackButton={true}
-                  onFeedbackClick={openFeedbackForVehicle}
                   sourceStampUrl={
                     (vehicle as any)?.discovery_url ||
                     ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
@@ -1753,8 +1880,6 @@ const CursorHomepage: React.FC = () => {
                 vehicle={vehicle}
                 viewMode="grid"
                 infoDense={infoDense}
-                showFeedbackButton={true}
-                onFeedbackClick={openFeedbackForVehicle}
                 sourceStampUrl={
                   (vehicle as any)?.discovery_url ||
                   ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
@@ -1875,21 +2000,6 @@ const CursorHomepage: React.FC = () => {
         </button>
       )}
 
-      {/* Feedback / Critique Modal */}
-      {showCritiqueModal && critiqueVehicle?.id && (
-        <VehicleCritiqueMode
-          isVisible={showCritiqueModal}
-          onClose={() => setShowCritiqueModal(false)}
-          vehicleId={critiqueVehicle.id}
-          vehicleData={{
-            year: critiqueVehicle.year,
-            make: critiqueVehicle.make,
-            model: critiqueVehicle.model,
-            status: critiqueVehicle.status,
-          }}
-          variant="modal"
-        />
-      )}
     </div>
   );
 };

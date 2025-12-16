@@ -55,7 +55,7 @@ serve(async (req) => {
     // 4. Construct Context for LLM
     const uniqueTags = [...new Set(tags?.map(t => t.tag_name) || [])]
     const uniqueMods = tags?.filter(t => t.tag_type === 'modification').map(t => t.tag_name) || []
-
+    
     // Fetch latest raw listing description + provenance snippets (from extraction_metadata) if available.
     const [{ data: rawDescRow }, { data: provRows }] = await Promise.all([
       supabase
@@ -113,7 +113,7 @@ Hard rules:
 - If a field is unknown, omit it.
 - Do not include VIN in the output.
 - Use plain text (no icons/emojis).
-
+      
 Vehicle fields:
 - Year: ${context.year ?? 'Unknown'}
 - Make: ${context.make ?? 'Unknown'}
@@ -135,7 +135,7 @@ ${(context.provenance_snippets || []).map((s: string) => `- ${s}`).join('\n') ||
 
 Detected features / tags:
 ${(context.detected_features || []).slice(0, 25).map((t: string) => `- ${t}`).join('\n') || '- None'}
-
+      
 Recent history (timeline):
 ${(context.recent_history || []).slice(0, 10).map((s: string) => `- ${s}`).join('\n') || '- None'}
 
@@ -146,7 +146,7 @@ Output structure:
 1) One-sentence summary (Year Make Model + what it is)
 2) 3-6 bullet points of key known specs/condition/history
 3) One-line source note (Source + location if known)
-`
+    `
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

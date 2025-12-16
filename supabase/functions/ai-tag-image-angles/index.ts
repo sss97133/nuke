@@ -188,6 +188,31 @@ Return JSON:
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Resolve angle taxonomy id via alias mapping (decades-proof, stable IDs).
+    let taxonomyAngleId: string | null = null;
+    try {
+      const { data: aliasRow } = await supabase
+        .from('angle_aliases')
+        .select('angle_id')
+        .eq('alias_key', String(angleName || '').trim())
+        .maybeSingle();
+      taxonomyAngleId = (aliasRow?.angle_id as string) || null;
+    } catch {
+      taxonomyAngleId = null;
+    }
+    if (!taxonomyAngleId) {
+      try {
+        const { data: fallback } = await supabase
+          .from('angle_taxonomy')
+          .select('angle_id')
+          .eq('canonical_key', 'detail.general')
+          .maybeSingle();
+        taxonomyAngleId = (fallback?.angle_id as string) || null;
+      } catch {
+        taxonomyAngleId = null;
+      }
+    }
+
     // Find the angle ID
     const { data: angle } = await supabase
       .from('image_coverage_angles')
@@ -224,6 +249,41 @@ Return JSON:
             // yaw_deg is only meaningful for a subset of exterior angles; leave null here.
           } as any)
           .eq('id', imageId);
+      } catch {
+        // non-blocking
+      }
+
+      // Append observation rows (never overwrite).
+      try {
+        const conf01 = Math.max(0, Math.min(1, confidence / 100));
+        if (taxonomyAngleId) {
+          await supabase.from('image_angle_observations').insert({
+            image_id: imageId,
+            vehicle_id: vehicleId,
+            angle_id: taxonomyAngleId,
+            confidence: conf01,
+            source: 'ai',
+            source_version: 'ai-tag-image-angles_v1',
+            evidence: parsed?.evidence || null,
+          } as any);
+        }
+
+        // Pose: for now we only store focal length + perspective; yaw is not set here (insufficient info).
+        await supabase.from('image_pose_observations').insert({
+          image_id: imageId,
+          vehicle_id: vehicleId,
+          reference_frame: 'vehicle_frame_v1',
+          focal_length_mm: typeof parsed?.focal_length === 'number' ? parsed.focal_length : null,
+          target_anchor: (parsed?.category || '').toString().toLowerCase() === 'engine_bay' ? 'anchor.engine.bay.center' : 'anchor.vehicle.center',
+          source: 'ai',
+          source_version: 'ai-tag-image-angles_v1',
+          raw: {
+            perspective: parsed?.perspective || null,
+            sensor_type: parsed?.sensor_type || null,
+            notes: parsed?.notes || null,
+          },
+          observed_at: new Date().toISOString(),
+        } as any);
       } catch {
         // non-blocking
       }

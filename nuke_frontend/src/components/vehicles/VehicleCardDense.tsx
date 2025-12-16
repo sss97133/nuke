@@ -58,10 +58,6 @@ interface VehicleCardDenseProps {
   infoDense?: boolean;
   /** Optional URL to use for favicon/source stamp (listing source or org website). */
   sourceStampUrl?: string;
-  /** Optional: show a feedback action on the card (used by feed pages). */
-  showFeedbackButton?: boolean;
-  /** Optional: invoked when user clicks FEEDBACK (must prevent navigation). */
-  onFeedbackClick?: (vehicle: VehicleCardDenseProps['vehicle']) => void;
 }
 
 const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
@@ -72,9 +68,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showPriceOverlay = true,
   showDetailOverlay = true,
   infoDense = false,
-  sourceStampUrl,
-  showFeedbackButton = false,
-  onFeedbackClick
+  sourceStampUrl
 }) => {
   // Local CSS for badge animations. We scope keyframes to avoid collisions
   // (the design system defines multiple `@keyframes pulse` variations).
@@ -499,34 +493,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             </div>
           )}
 
-          {showFeedbackButton && typeof onFeedbackClick === 'function' && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onFeedbackClick(vehicle);
-              }}
-              style={{
-                position: 'absolute',
-                top: vehicle.is_streaming ? '34px' : '8px',
-                left: '8px',
-                background: 'rgba(255,255,255,0.92)',
-                color: '#000',
-                border: '1px solid rgba(0,0,0,0.25)',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                fontSize: '7pt',
-                fontWeight: 800,
-                letterSpacing: '0.5px',
-                cursor: 'pointer',
-              }}
-              title="Submit feedback for this vehicle"
-            >
-              FEEDBACK
-            </button>
-          )}
-
           {/* Combined Source + Price/Bid badge */}
           {showPriceOverlay && badgeMainText !== '—' && (
             <div style={{ ...badgeStyle, top: '8px', right: '8px' }}>
@@ -821,34 +787,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           }}>
             LIVE
           </div>
-        )}
-
-        {showFeedbackButton && typeof onFeedbackClick === 'function' && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onFeedbackClick(vehicle);
-            }}
-            style={{
-              position: 'absolute',
-              top: vehicle.is_streaming ? '30px' : '6px',
-              left: '6px',
-              background: 'rgba(255,255,255,0.92)',
-              color: '#000',
-              border: '1px solid rgba(0,0,0,0.25)',
-              padding: '3px 7px',
-              borderRadius: '3px',
-              fontSize: '7pt',
-              fontWeight: 800,
-              letterSpacing: '0.5px',
-              cursor: 'pointer',
-            }}
-            title="Submit feedback for this vehicle"
-          >
-            FEEDBACK
-          </button>
         )}
 
         {/* Combined Source + Price/Bid badge */}

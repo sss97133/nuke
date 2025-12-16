@@ -432,25 +432,25 @@ async function createTimelineEventIfNeeded(supabase: any, result: SupervisorResp
         const { error } = existing?.id
           ? { error: null }
           : await supabase
-              .from('timeline_events')
-              .insert({
-                vehicle_id,
-                event_date: eventDate.toISOString().split('T')[0], // Date only
-                title: result.work_type,
-                event_type: 'maintenance',
-                source: 'ai_agent_detected',
-                description: result.shop_context,
-                labor_hours: result.labor_hours_estimate,
-                metadata: {
-                  image_url,
-                  ai_detected_parts: result.specific_parts.length,
-                  supplies_used: result.supplies_and_tools.length,
-                  confidence: result.confidence_score,
-                  work_session: result.work_session,
-                  user_notes: result.user_notes,
-                  exif_verified: true
-                }
-              })
+          .from('timeline_events')
+          .insert({
+            vehicle_id,
+            event_date: eventDate.toISOString().split('T')[0], // Date only
+            title: result.work_type,
+            event_type: 'maintenance',
+            source: 'ai_agent_detected',
+            description: result.shop_context,
+            labor_hours: result.labor_hours_estimate,
+            metadata: {
+              image_url,
+              ai_detected_parts: result.specific_parts.length,
+              supplies_used: result.supplies_and_tools.length,
+              confidence: result.confidence_score,
+              work_session: result.work_session,
+              user_notes: result.user_notes,
+              exif_verified: true
+            }
+          })
 
         if (error) {
           console.error('Error creating timeline event:', error)
