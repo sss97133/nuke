@@ -1147,19 +1147,131 @@ serve(async (req) => {
         let dealerName: string | null = null;
         let dealerPhone: string | null = null;
         let dealerLocation: string | null = null;
-        let businessType: 'dealer' | 'auction_house' = (rawData.business_type === 'auction_house' ? 'auction_house' : 'dealer');
+        type OrgBusinessType = 'dealer' | 'auction_house' | 'service';
+        const inferOrgBusinessType = (t: any): OrgBusinessType => {
+          const s = String(t || '').toLowerCase();
+          if (s === 'auction_house') return 'auction_house';
+          // Service-oriented orgs (shops) should not be treated as dealers/consigners.
+          if (
+            s.includes('restoration') ||
+            s.includes('repair') ||
+            s.includes('service') ||
+            s.includes('garage') ||
+            s.includes('workshop') ||
+            s.includes('detail')
+          ) {
+            return 'service';
+          }
+          return 'dealer';
+        };
+
+        const extractServiceSignalText = (doc: any, fallbackTitle?: string | null): string => {
+          try {
+            const title =
+              (fallbackTitle && String(fallbackTitle)) ||
+              doc?.querySelector?.('meta[property="og:title"]')?.getAttribute?.('content') ||
+              doc?.querySelector?.('meta[name="twitter:title"]')?.getAttribute?.('content') ||
+              doc?.querySelector?.('title')?.textContent ||
+              '';
+            const h1 = doc?.querySelector?.('h1')?.textContent || '';
+            const desc =
+              doc?.querySelector?.('meta[name="description"]')?.getAttribute?.('content') ||
+              doc?.querySelector?.('meta[property="og:description"]')?.getAttribute?.('content') ||
+              '';
+            return `${title} ${h1} ${desc}`.toLowerCase();
+          } catch {
+            return String(fallbackTitle || '').toLowerCase();
+          }
+        };
+
+        // Conservative: only used when URL already looks like a portfolio/project page on the org's own domain.
+        const inferServiceBusinessTypeFromSignal = (
+          signalText: string
+        ):
+          | 'restoration_shop'
+          | 'performance_shop'
+          | 'body_shop'
+          | 'detailing'
+          | 'garage'
+          | 'mobile_service'
+          | 'specialty_shop'
+          | null => {
+          const s = String(signalText || '').toLowerCase();
+          if (!s) return null;
+
+          // Strongest signals first
+          if (s.includes('restoration') || s.includes('frame-off') || s.includes('coachbuild') || s.includes('concours')) {
+            return 'restoration_shop';
+          }
+          if (s.includes('performance') || s.includes('tuning') || s.includes('dyno') || s.includes('race') || s.includes('racing')) {
+            return 'performance_shop';
+          }
+          if (s.includes('body shop') || s.includes('collision') || s.includes('paint') || s.includes('panel') || s.includes('paintwork')) {
+            return 'body_shop';
+          }
+          if (s.includes('detail') || s.includes('detailing') || s.includes('ceramic') || s.includes('ppf') || s.includes('paint correction')) {
+            return 'detailing';
+          }
+          if (s.includes('mobile') && (s.includes('service') || s.includes('mechanic') || s.includes('repair'))) {
+            return 'mobile_service';
+          }
+          // Generic service/repair/fabrication keywords
+          if (
+            s.includes('service') ||
+            s.includes('repair') ||
+            s.includes('workshop') ||
+            s.includes('garage') ||
+            s.includes('fabrication') ||
+            s.includes('custom build') ||
+            s.includes('build')
+          ) {
+            return 'garage';
+          }
+          return null;
+        };
+
+        const isProjectOrPortfolioUrl = (listingUrl: string, orgWebsite?: string | null): boolean => {
+          try {
+            const url = new URL(listingUrl);
+            const path = url.pathname.toLowerCase();
+            const looksLikeProjectPath =
+              path.includes('/projects/') ||
+              path.includes('/project/') ||
+              path.includes('/portfolio/') ||
+              path.includes('/work/') ||
+              path.includes('/restoration/');
+
+            if (!looksLikeProjectPath) return false;
+
+            if (orgWebsite) {
+              try {
+                const orgUrl = new URL(String(orgWebsite));
+                // Require same host to avoid cross-site false positives.
+                if (orgUrl.host && url.host && orgUrl.host !== url.host) return false;
+              } catch {
+                // ignore website parse errors
+              }
+            }
+
+            return true;
+          } catch {
+            return false;
+          }
+        };
+
+        let businessType: OrgBusinessType = (rawData.business_type === 'auction_house' ? 'auction_house' : 'dealer');
 
         // Highest priority: explicit organization_id from the queue item (used by dealer indexers).
         if (rawData.organization_id) {
           try {
             const { data: existingBusiness } = await supabase
               .from('businesses')
-              .select('id, business_name, type')
+              .select('id, business_name, type, business_type, website')
               .eq('id', rawData.organization_id)
               .maybeSingle();
             if (existingBusiness?.id) {
               organizationId = existingBusiness.id;
-              businessType = (existingBusiness.type === 'auction_house' ? 'auction_house' : businessType);
+              businessType = inferOrgBusinessType(existingBusiness.type || existingBusiness.business_type || businessType);
               console.log(`Using explicit organization_id: ${existingBusiness.business_name} (${organizationId})`);
             }
           } catch (e: any) {
@@ -1235,7 +1347,7 @@ serve(async (req) => {
           if (dealerWebsite) {
             const { data: orgByWebsite } = await supabase
               .from('businesses')
-              .select('id, business_name, website, type')
+              .select('id, business_name, website, type, business_type')
               .eq('website', dealerWebsite)
               .limit(1)
               .maybeSingle();
@@ -1250,7 +1362,7 @@ serve(async (req) => {
           if (!existingOrg && orgSlug) {
             const { data: orgByName } = await supabase
               .from('businesses')
-              .select('id, business_name, website, type')
+              .select('id, business_name, website, type, business_type')
               .or(`business_name.ilike.%${dealerName}%`)
               .limit(1)
               .maybeSingle();
@@ -1270,7 +1382,7 @@ serve(async (req) => {
           
           if (existingOrg) {
             organizationId = existingOrg.id;
-            businessType = (existingOrg.type === 'auction_house' ? 'auction_house' : 'dealer');
+            businessType = inferOrgBusinessType(existingOrg.type || (existingOrg as any).business_type || businessType);
             console.log(`Found existing business: ${existingOrg.business_name} (${organizationId})`);
             
             // Trigger inventory sync if website available (async, don't wait)
@@ -2426,13 +2538,66 @@ serve(async (req) => {
         // Also ensure organization_vehicles link exists for new vehicles with organization
         if (organizationId) {
           const isInventoryExtraction = rawData.inventory_extraction === true || rawData.inventory_extraction === 'true';
+          let orgWebsite = dealerWebsite || rawData.dealer_website || null;
+
+          // If the org exists, prefer its canonical website for host matching.
+          try {
+            const { data: orgRow } = await supabase
+              .from('businesses')
+              .select('id, website, business_type, type')
+              .eq('id', organizationId)
+              .maybeSingle();
+            if (orgRow?.website) orgWebsite = orgRow.website;
+
+            const projectLikeUrl = isProjectOrPortfolioUrl(item.listing_url, orgWebsite);
+            const signalText = projectLikeUrl ? extractServiceSignalText(doc, scrapeData?.data?.title || null) : '';
+            const inferredServiceType = projectLikeUrl ? inferServiceBusinessTypeFromSignal(signalText) : null;
+
+            // Start as dealer when data is thin, but promote as soon as we see strong service/portfolio evidence.
+            const currentBusinessType = String((orgRow as any)?.business_type || '').toLowerCase();
+            const currentType = String((orgRow as any)?.type || '').toLowerCase();
+            const isCurrentlyDealerish =
+              !currentBusinessType ||
+              currentBusinessType === 'dealership' ||
+              currentType === 'dealer' ||
+              currentType === 'dealership';
+
+            if (
+              inferredServiceType &&
+              businessType !== 'auction_house' &&
+              !isInventoryExtraction &&
+              isCurrentlyDealerish
+            ) {
+              const { error: promoteErr } = await supabase
+                .from('businesses')
+                .update({
+                  business_type: inferredServiceType,
+                  type: inferredServiceType,
+                  updated_at: new Date().toISOString(),
+                  intelligence_last_updated: new Date().toISOString(),
+                } as any)
+                .eq('id', organizationId);
+              if (!promoteErr) {
+                businessType = 'service';
+              }
+            }
+          } catch {
+            // non-blocking
+          }
+
+          const isProjectPage = businessType === 'service' && isProjectOrPortfolioUrl(item.listing_url, orgWebsite);
+
           const relationshipType =
-            (businessType === 'dealer' && isInventoryExtraction)
-              ? (isSoldListing ? 'sold_by' : 'consigner')
+            businessType === 'service'
+              ? 'service_provider'
               : (
-                  businessType === 'dealer'
-                    ? (isSoldListing ? 'sold_by' : 'seller')
-                    : (businessType === 'auction_house' ? 'consigner' : 'service_provider')
+                  (businessType === 'dealer' && isInventoryExtraction)
+                    ? (isSoldListing ? 'sold_by' : 'consigner')
+                    : (
+                        businessType === 'dealer'
+                          ? (isSoldListing ? 'sold_by' : 'seller')
+                          : 'consigner'
+                      )
                 );
 
           const invListingStatus =
@@ -2442,7 +2607,7 @@ serve(async (req) => {
           const invStatus =
             (businessType === 'dealer' && isInventoryExtraction)
               ? (isSoldListing ? 'sold' : 'active')
-              : 'active';
+              : (businessType === 'service' && isProjectPage ? 'archived' : 'active');
           const invSalePrice =
             (businessType === 'dealer' && isInventoryExtraction && isSoldListing)
               ? (scrapeData.data.asking_price || scrapeData.data.price || null)

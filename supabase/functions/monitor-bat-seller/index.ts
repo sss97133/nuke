@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log(`🔍 Monitoring BAT seller: ${sellerUsername} for organization: ${organizationId}`);
+    console.log(`Monitoring BaT seller: ${sellerUsername} for organization: ${organizationId}`);
 
     // Get or create monitor record
     const { data: monitor, error: monitorError } = await supabase
@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
 
     // Fetch BAT seller profile page
     const sellerUrl = `https://bringatrailer.com/member/${sellerUsername}/`;
-    console.log(`📡 Fetching: ${sellerUrl}`);
+    console.log(`Fetching: ${sellerUrl}`);
 
     const response = await fetch(sellerUrl, {
       headers: {
@@ -80,7 +80,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    console.log(`📋 Found ${listingUrls.length} listings on seller page`);
+    console.log(`Found ${listingUrls.length} listings on seller page`);
 
     // Check which listings are new (not in external_listings table)
     const { data: existingListings } = await supabase
@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
     const existingUrls = new Set(existingListings?.map(l => l.listing_url) || []);
     const newListings = listingUrls.filter(url => !existingUrls.has(url));
 
-    console.log(`✨ Found ${newListings.length} new listings`);
+    console.log(`Found ${newListings.length} new listings`);
 
     let processed = 0;
     let matched = 0;
@@ -100,7 +100,7 @@ Deno.serve(async (req: Request) => {
     // Process each new listing
     for (const listingUrl of newListings) {
       try {
-        console.log(`\n📦 Processing: ${listingUrl}`);
+        console.log(`Processing: ${listingUrl}`);
 
         // Fetch listing page
         const listingResponse = await fetch(listingUrl, {
@@ -144,7 +144,7 @@ Deno.serve(async (req: Request) => {
         const listingStatus = endedMatch ? 'ended' : 'active';
 
         if (!year || !make || !model) {
-          console.log(`⚠️  Could not parse vehicle data from: ${listingUrl}`);
+          console.log(`Could not parse vehicle data from: ${listingUrl}`);
           continue;
         }
 
@@ -163,7 +163,7 @@ Deno.serve(async (req: Request) => {
 
           if (existingVehicle) {
             vehicleId = existingVehicle.id;
-            console.log(`  ✅ Found existing vehicle by VIN: ${vehicleId}`);
+            console.log(`  Found existing vehicle by VIN: ${vehicleId}`);
           }
         }
 
@@ -194,26 +194,29 @@ Deno.serve(async (req: Request) => {
             .single();
 
           if (vehicleError) {
-            console.error(`  ❌ Error creating vehicle:`, vehicleError);
+            console.error(`  Error creating vehicle:`, vehicleError);
             continue;
           }
 
           vehicleId = newVehicle.id;
-          console.log(`  ✅ Created vehicle: ${vehicleId}`);
+          console.log(`  Created vehicle: ${vehicleId}`);
+        }
 
-          // Link to organization
-          await supabase
-            .from('organization_vehicles')
-            .upsert({
+        // Link/update relationship to organization for *all* listings, even if the vehicle already existed.
+        // This is a seller account, so relationship is "seller" (not consignment).
+        const orgStatus = listingStatus === 'ended' ? 'sold' : 'active';
+        await supabase
+          .from('organization_vehicles')
+          .upsert(
+            {
               organization_id: organizationId,
               vehicle_id: vehicleId,
-              relationship_type: 'consigner',
-              status: 'active',
+              relationship_type: 'seller',
+              status: orgStatus,
               auto_tagged: true
-            }, {
-              onConflict: 'organization_id,vehicle_id'
-            });
-        }
+            },
+            { onConflict: 'organization_id,vehicle_id' }
+          );
 
         // Create external listing record
         const { data: externalListing, error: listingError } = await supabase
@@ -239,7 +242,7 @@ Deno.serve(async (req: Request) => {
           .single();
 
         if (listingError) {
-          console.error(`  ❌ Error creating external listing:`, listingError);
+          console.error(`  Error creating external listing:`, listingError);
           continue;
         }
 
@@ -251,13 +254,13 @@ Deno.serve(async (req: Request) => {
 
         const matchesCreated = matchResult || 0;
         if (matchesCreated > 0) {
-          console.log(`  🎯 Matched ${matchesCreated} watchlist(s)`);
+          console.log(`  Matched ${matchesCreated} watchlist(s)`);
           matched += matchesCreated;
         }
 
         processed++;
       } catch (error) {
-        console.error(`  ❌ Error processing ${listingUrl}:`, error);
+        console.error(`  Error processing ${listingUrl}:`, error);
         continue;
       }
     }

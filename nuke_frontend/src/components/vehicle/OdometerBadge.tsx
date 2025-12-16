@@ -46,7 +46,6 @@ export const OdometerBadge: React.FC<OdometerBadgeProps> = ({
       title={isExact ? exactText : approxText}
       aria-label={isExact ? `Mileage: ${exactText}` : `Mileage: ${approxText}`}
     >
-      <span className="odometer-badge__k">{formatCompactK(mileage)}</span>
       <span className="odometer-badge__digits" aria-hidden="true">
         {digits.split('').map((d, idx) => (
           <span key={`${idx}-${d}`} className="odometer-badge__digit">
@@ -54,8 +53,6 @@ export const OdometerBadge: React.FC<OdometerBadgeProps> = ({
           </span>
         ))}
       </span>
-      <span className="odometer-badge__unit">mi</span>
-      {!isExact ? <span className="odometer-badge__note">approx</span> : null}
     </span>
   );
 };

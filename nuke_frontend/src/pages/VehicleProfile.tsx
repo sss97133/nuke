@@ -150,12 +150,36 @@ const VehicleProfile: React.FC = () => {
         if (fallbackListingImageUrls.length > 0) return;
 
         const cacheKey = `bat_fallback_images_${vehicle.id}`;
+        const filterNonPhotoListingUrls = (arr: string[]): string[] => {
+          const urls = Array.isArray(arr) ? arr : [];
+          const keep = urls.filter((rawUrl) => {
+            const raw = String(rawUrl || '').trim();
+            if (!raw || !raw.startsWith('http')) return false;
+            const s = raw.toLowerCase();
+            if (s.includes('gstatic.com/faviconv2')) return false;
+            if (s.includes('favicon.ico') || s.includes('/favicon')) return false;
+            if (s.includes('apple-touch-icon')) return false;
+            if (s.endsWith('.ico')) return false;
+            try {
+              const u = new URL(raw);
+              const sizeParam = u.searchParams.get('size') || u.searchParams.get('sz') || u.searchParams.get('w') || u.searchParams.get('width');
+              if (sizeParam) {
+                const n = Number(String(sizeParam).replace(/[^0-9.]/g, ''));
+                if (Number.isFinite(n) && n > 0 && n <= 64) return false;
+              }
+            } catch {
+              // ignore
+            }
+            return true;
+          });
+          return keep.length > 0 ? keep : urls;
+        };
         try {
           const cached = typeof window !== 'undefined' ? window.localStorage.getItem(cacheKey) : null;
           if (cached) {
             const parsed = JSON.parse(cached);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              const urls = parsed.filter((u: any) => typeof u === 'string' && u.startsWith('http'));
+              const urls = filterNonPhotoListingUrls(parsed.filter((u: any) => typeof u === 'string' && u.startsWith('http')));
               if (urls.length > 0) {
                 setFallbackListingImageUrls(urls);
                 if (!leadImageUrl && urls[0]) setLeadImageUrl(urls[0]);
@@ -177,14 +201,15 @@ const VehicleProfile: React.FC = () => {
           (Array.isArray(data?.images) ? data.images : null) ||
           [];
 
-        if (images.length > 0) {
-          setFallbackListingImageUrls(images);
+        const filtered = filterNonPhotoListingUrls(images);
+        if (filtered.length > 0) {
+          setFallbackListingImageUrls(filtered);
           try {
-            window.localStorage.setItem(cacheKey, JSON.stringify(images.slice(0, 250)));
+            window.localStorage.setItem(cacheKey, JSON.stringify(filtered.slice(0, 250)));
           } catch {
             // ignore
           }
-          if (!leadImageUrl && images[0]) setLeadImageUrl(images[0]);
+          if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
         }
       } catch (e) {
         console.debug('[VehicleProfile] fallback listing images skipped:', e);
@@ -1841,6 +1866,13 @@ const VehicleProfile: React.FC = () => {
   const loadVehicleImages = async () => {
     if (!vehicle) return;
 
+    const normalizeUrl = (u: any): string => {
+      const s = String(u || '').trim();
+      if (!s) return '';
+      // Some scrapers store HTML-encoded query params (e.g. &amp;). Browsers won't decode those in URLs.
+      return s.replace(/&amp;/g, '&');
+    };
+
     const buildBatImageNeedle = (v: any): string | null => {
       try {
         const discoveryUrl = String(v?.discovery_url || '');
@@ -1861,11 +1893,69 @@ const VehicleProfile: React.FC = () => {
       }
     };
 
+    const isIconUrl = (rawUrl: string): boolean => {
+      const raw = String(rawUrl || '').trim();
+      if (!raw) return true;
+      const s = raw.toLowerCase();
+
+      // Hard blocks: favicon endpoints and icon manifests
+      if (s.includes('gstatic.com/faviconv2')) return true;
+      if (s.includes('favicon.ico') || s.includes('/favicon')) return true;
+      if (s.includes('apple-touch-icon')) return true;
+      if (s.includes('site.webmanifest')) return true;
+      if (s.includes('safari-pinned-tab')) return true;
+      if (s.includes('android-chrome')) return true;
+      if (s.includes('mstile')) return true;
+
+      // Likely non-photo assets (avoid using as hero/gallery)
+      if (s.endsWith('.ico')) return true;
+      // In practice, SVGs from listing/service sites are almost always logos or UI assets.
+      if (s.endsWith('.svg')) return true;
+      if (s.includes('/logo') || s.includes('logo.')) return true;
+      if (s.includes('avatar') || s.includes('badge') || s.includes('sprite')) return true;
+
+      // Query-param size heuristics (favicons/icons are commonly <= 64px)
+      try {
+        const url = new URL(raw);
+        // Small square assets (e.g. Framer site badges/icons) often appear as PNGs with width/height params.
+        const wRaw = url.searchParams.get('width') || url.searchParams.get('w');
+        const hRaw = url.searchParams.get('height') || url.searchParams.get('h');
+        if (wRaw && hRaw) {
+          const w = Number(String(wRaw).replace(/[^0-9.]/g, ''));
+          const h = Number(String(hRaw).replace(/[^0-9.]/g, ''));
+          if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
+            const squareish = Math.abs(w - h) <= 8;
+            if (squareish && Math.max(w, h) <= 512 && (s.endsWith('.png') || s.endsWith('.svg'))) return true;
+          }
+        }
+        const sizeParam =
+          url.searchParams.get('size') ||
+          url.searchParams.get('sz') ||
+          url.searchParams.get('w') ||
+          url.searchParams.get('width');
+        if (sizeParam) {
+          const n = Number(String(sizeParam).replace(/[^0-9.]/g, ''));
+          if (Number.isFinite(n) && n > 0 && n <= 64) return true;
+        }
+      } catch {
+        // ignore URL parsing errors; fall back to substring filters above
+      }
+
+      return false;
+    };
+
+    const filterIconNoise = (urls: string[]): string[] => {
+      const arr = Array.isArray(urls) ? urls : [];
+      const keep = arr.filter((u) => !isIconUrl(String(u || '')));
+      // Safety: if we filtered everything out, keep the originals rather than showing nothing.
+      return keep.length > 0 ? keep : arr;
+    };
+
     const filterBatNoise = (urls: string[], v: any): string[] => {
       const needle = buildBatImageNeedle(v);
       if (!needle) return urls;
       const keep = (urls || []).filter((u) => {
-        const s = String(u || '');
+        const s = normalizeUrl(u);
         if (!s) return false;
         // Never filter out non-BaT URLs (user uploads, Supabase storage, etc.)
         if (!s.includes('bringatrailer.com/wp-content/uploads/')) return true;
@@ -1875,17 +1965,88 @@ const VehicleProfile: React.FC = () => {
       return keep.length > 0 ? keep : urls;
     };
 
+    const filterClassicNoise = (urls: string[], v: any): string[] => {
+      try {
+        const discoveryUrl = String(v?.discovery_url || '');
+        const origin = String(v?.profile_origin || '');
+        const isClassic = origin === 'url_scraper' && discoveryUrl.includes('classic.com/veh/');
+        if (!isClassic) return urls;
+
+        const keep = (urls || []).filter((u) => {
+          const raw = normalizeUrl(u);
+          if (!raw) return false;
+          const s = raw.toLowerCase();
+
+          // Remove dealer logos and other site assets that get picked up by naive image scraping.
+          if (s.includes('images.classic.com/uploads/dealer/')) return false;
+          if (s.includes('/uploads/dealer/')) return false;
+
+          // For Classic CDN, only keep actual vehicle images.
+          if (s.includes('images.classic.com/')) {
+            if (!s.includes('/vehicles/')) return false;
+          }
+
+          return true;
+        });
+
+        return keep.length > 0 ? keep : urls;
+      } catch {
+        return urls;
+      }
+    };
+
+    const filterProfileImages = (urls: string[], v: any): string[] => {
+      const normalized = (Array.isArray(urls) ? urls : []).map(normalizeUrl).filter(Boolean);
+      return filterIconNoise(filterClassicNoise(filterBatNoise(normalized, v), v));
+    };
+
+    const getOriginImages = (v: any): { images: string[]; declaredCount: number | null } => {
+      try {
+        const originRaw: unknown =
+          v?.origin_metadata?.images ??
+          v?.origin_metadata?.image_urls ??
+          v?.origin_metadata?.imageUrls ??
+          null;
+
+        const originCountRaw: unknown =
+          v?.origin_metadata?.image_count ??
+          v?.origin_metadata?.imageCount ??
+          null;
+
+        const declaredCount = typeof originCountRaw === 'number' && Number.isFinite(originCountRaw) ? originCountRaw : null;
+        const originList = Array.isArray(originRaw) ? originRaw : [];
+
+        // Normalize + basic cleanup; then apply our general filters.
+        const cleaned = originList
+          .map((u: any) => normalizeUrl(u))
+          .filter((url: any) =>
+            url &&
+            typeof url === 'string' &&
+            url.startsWith('http') &&
+            !url.includes('94x63') &&
+            !url.toLowerCase().includes('youtube.com') &&
+            !url.toLowerCase().includes('thumbnail')
+          );
+
+        const filtered = filterProfileImages(cleaned, v);
+        const limited = filtered.slice(0, declaredCount ?? 120);
+        return { images: limited, declaredCount };
+      } catch {
+        return { images: [], declaredCount: null };
+      }
+    };
+
     // Check if RPC data is available (avoid duplicate query)
     const rpcData = (window as any).__vehicleProfileRpcData;
     const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicle.id;
     if (rpcMatchesThisVehicle && rpcData?.images && Array.isArray(rpcData.images) && rpcData.images.length > 0) {
       const imagesRaw = rpcData.images.map((img: any) => img.image_url).filter(Boolean);
-      const images = filterBatNoise(imagesRaw, vehicle);
+      const images = filterProfileImages(imagesRaw, vehicle);
       setVehicleImages(images);
       // Pick lead image from the filtered list to avoid BaT homepage noise becoming the hero.
       const leadFromRpc = rpcData.images.find((img: any) => img.is_primary) || rpcData.images[0];
       const leadCandidate = leadFromRpc?.large_url || leadFromRpc?.image_url;
-      const leadOk = leadCandidate && filterBatNoise([leadCandidate], vehicle).length > 0;
+      const leadOk = leadCandidate && filterProfileImages([leadCandidate], vehicle).length > 0;
       const lead = leadOk ? leadCandidate : (images[0] || null);
       if (lead) {
         setLeadImageUrl(lead as any);
@@ -1900,7 +2061,7 @@ const VehicleProfile: React.FC = () => {
       const { data: imageRecords, error } = await supabase
         .from('vehicle_images')
         // Keep payload lean to reduce DB load/timeouts; we only need URLs + ordering fields here.
-        .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, is_primary, is_document, position, created_at')
+        .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, is_primary, is_document, position, created_at, storage_path')
         .eq('vehicle_id', vehicle.id)
         .eq('is_document', false) // Filter out documents - they belong in a separate section
         .order('is_primary', { ascending: false })
@@ -1910,6 +2071,16 @@ const VehicleProfile: React.FC = () => {
       if (error) {
         console.error('❌ Error loading vehicle images from database:', error);
       } else if (imageRecords && imageRecords.length > 0) {
+        const origin = String((vehicle as any)?.profile_origin || '');
+        const discoveryUrl = String((vehicle as any)?.discovery_url || '');
+        const isClassicScrape = origin === 'url_scraper' && discoveryUrl.includes('classic.com/veh/');
+
+        const { images: originImages, declaredCount } = getOriginImages(vehicle);
+        const isImportedStoragePath = (p: any) => {
+          const s = String(p || '').toLowerCase();
+          return s.includes('external_import') || s.includes('organization_import') || s.includes('import_queue');
+        };
+
         // PERFORMANCE FIX: Load lead image immediately, don't wait for all signed URLs
         const leadImage = imageRecords.find((r: any) => r.is_primary === true) || imageRecords[0];
         const leadCandidate = leadImage?.large_url || leadImage?.image_url || null;
@@ -1917,8 +2088,12 @@ const VehicleProfile: React.FC = () => {
         // Set lead image URL immediately using public URL (fast)
         if (leadImage) {
           // Prefer large_url for hero image, fallback to image_url
-          const leadOk = leadCandidate && filterBatNoise([leadCandidate], vehicle).length > 0;
-          setLeadImageUrl((leadOk ? leadCandidate : null) as any);
+          const leadOk = leadCandidate && filterProfileImages([leadCandidate], vehicle).length > 0;
+          const fastFallbackPool = imageRecords
+            .map((r: any) => r?.large_url || r?.image_url)
+            .filter(Boolean) as string[];
+          const fastFallback = filterProfileImages([...fastFallbackPool, ...originImages], vehicle)[0] || null;
+          setLeadImageUrl(((leadOk ? leadCandidate : fastFallback) || null) as any);
 
           // Signed URL upgrade disabled due to storage configuration issues
           // Would generate 400 errors - using direct public URL instead
@@ -1933,12 +2108,34 @@ const VehicleProfile: React.FC = () => {
         }
 
         // Load all images using public URLs (fast) and de-dupe (storage/variants can create repeats)
-        const raw = Array.from(new Set((imageRecords || []).map((r: any) => r?.image_url).filter(Boolean)));
-        images = filterBatNoise(raw, vehicle);
+        const raw = Array.from(new Set((imageRecords || []).map((r: any) => normalizeUrl(r?.image_url)).filter(Boolean)));
+        images = filterProfileImages(raw, vehicle);
+
+        // If this is a Classic.com scraped vehicle, prefer the origin_metadata gallery over contaminated imports.
+        // Keep any non-imported images (e.g., manual uploads) in front.
+        if (isClassicScrape && originImages.length > 0) {
+          const manual = (imageRecords || [])
+            .filter((r: any) => r?.image_url && !isImportedStoragePath(r?.storage_path))
+            .map((r: any) => normalizeUrl(r?.image_url))
+            .filter(Boolean) as string[];
+
+          const merged = Array.from(new Set([...manual, ...originImages]));
+          const mergedFiltered = filterProfileImages(merged, vehicle);
+
+          // If DB images look significantly larger than the source gallery, assume contamination and override display set.
+          const dbCount = images.length;
+          const sourceCount = declaredCount ?? originImages.length;
+          const looksContaminated = dbCount > sourceCount + 10;
+
+          if (looksContaminated && mergedFiltered.length > 0) {
+            images = mergedFiltered;
+          }
+        }
+
         setVehicleImages(images);
 
         // If we filtered out a noisy lead image, ensure we still have a hero.
-        const leadStillOk = leadCandidate && filterBatNoise([leadCandidate], vehicle).length > 0;
+        const leadStillOk = leadCandidate && filterProfileImages([leadCandidate], vehicle).length > 0;
         if (!leadStillOk && images.length > 0) {
           setLeadImageUrl(images[0]);
         }
@@ -1949,32 +2146,7 @@ const VehicleProfile: React.FC = () => {
       } else {
         // No DB rows: try origin_metadata images first (from scraping)
         try {
-          const originRaw: unknown =
-            (vehicle as any)?.origin_metadata?.images ??
-            (vehicle as any)?.origin_metadata?.image_urls ??
-            (vehicle as any)?.origin_metadata?.imageUrls ??
-            null;
-
-          const originCountRaw: unknown =
-            (vehicle as any)?.origin_metadata?.image_count ??
-            (vehicle as any)?.origin_metadata?.imageCount ??
-            null;
-
-          const originLimit = typeof originCountRaw === 'number' && Number.isFinite(originCountRaw) ? originCountRaw : null;
-
-          const originList = Array.isArray(originRaw) ? originRaw : [];
-          const originImages = originList
-            .filter((url: any) =>
-              url &&
-              typeof url === 'string' &&
-              url.startsWith('http') &&
-              !url.includes('94x63') && // Filter out thumbnails
-              !url.includes('youtube.com') && // Filter out YouTube thumbnails
-              !url.includes('thumbnail')
-            )
-            // IMPORTANT: some scrapes may accidentally include site-wide images;
-            // trust image_count if present to keep the listing gallery tight.
-            .slice(0, originLimit ?? 120);
+          const { images: originImages } = getOriginImages(vehicle);
 
           if (originImages.length > 0) {
             images = originImages;
@@ -2035,7 +2207,7 @@ const VehicleProfile: React.FC = () => {
               }
             }
 
-            images = Array.from(new Set(gathered));
+            images = filterIconNoise(Array.from(new Set(gathered)));
             if (images.length > 0 && !leadImageUrl) setLeadImageUrl(images[0]);
           } catch (e) {
             console.warn('Storage fallback for hero/gallery failed:', e);
@@ -2052,7 +2224,7 @@ const VehicleProfile: React.FC = () => {
       (vehicle as any)?.primaryImageUrl ||
       (vehicle as any)?.image_url ||
       null;
-    if (primaryUrl && typeof primaryUrl === 'string' && !images.includes(primaryUrl)) {
+    if (primaryUrl && typeof primaryUrl === 'string' && !images.includes(primaryUrl) && !isIconUrl(primaryUrl)) {
       images = [primaryUrl, ...images];
       // Fallback for lead image
       if (!leadImageUrl) setLeadImageUrl(primaryUrl);

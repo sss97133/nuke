@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { UnifiedListing } from '../../services/myAuctionsService';
 import '../../design-system.css';
 import { AuctionPlatformBadge, AuctionStatusBadge, ParticipantBadge } from './AuctionBadges';
+import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
 
 interface ListingCardProps {
   listing: UnifiedListing;
@@ -226,9 +227,12 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
           )}
           <div style={{ flex: 1 }}>
             <h3 className="heading-3" style={{ margin: 0, fontSize: '16px', marginBottom: '4px' }}>
-              {listing.vehicle
-                ? `${listing.vehicle.year} ${listing.vehicle.make} ${listing.vehicle.model}`
-                : 'Unknown Vehicle'}
+              {listing.vehicle ? (() => {
+                const identity = getVehicleIdentityParts(listing.vehicle as any);
+                const primary = identity.primary.join(' ');
+                const diffs = identity.differentiators;
+                return `${primary || 'Vehicle'}${diffs.length > 0 ? ` • ${diffs.join(' • ')}` : ''}`;
+              })() : 'Unknown Vehicle'}
             </h3>
             {listing.vehicle?.trim && (
               <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>

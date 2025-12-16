@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
+import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
 import '../design-system.css';
 
 // Add pulse animation for LIVE badge
@@ -894,8 +895,12 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             margin: '0 0 4px 0',
           }}
         >
-          {vehicle.year} {vehicle.make} {vehicle.model}
-          {vehicle.trim && ` ${vehicle.trim}`}
+          {(() => {
+            const identity = getVehicleIdentityParts(vehicle as any);
+            const primary = identity.primary.join(' ');
+            const diffs = identity.differentiators;
+            return `${primary || 'Vehicle'}${diffs.length > 0 ? ` • ${diffs.join(' • ')}` : ''}`;
+          })()}
         </h3>
 
         {vehicle.mileage && (
