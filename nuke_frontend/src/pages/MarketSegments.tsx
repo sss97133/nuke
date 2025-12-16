@@ -230,7 +230,8 @@ export default function MarketSegments() {
           <div style={{ marginTop: '18px', padding: '14px', border: '2px solid var(--border)', background: 'var(--surface)' }}>
             <div style={{ fontWeight: 900, marginBottom: '6px' }}>No segments returned</div>
             <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
-              This usually means you are not signed in (RLS returns 0 rows for anon), or there are no segments with status = active.
+              This usually means there are no segments with status = active, or your database permissions/policies are preventing reads of the
+              market segments index view.
             </div>
             <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {!hasSession && (

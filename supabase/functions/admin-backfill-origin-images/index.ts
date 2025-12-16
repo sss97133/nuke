@@ -206,7 +206,8 @@ Deno.serve(async (req) => {
           .from("vehicle_images")
           .select("id", { count: "exact", head: true })
           .eq("vehicle_id", v.id)
-          .eq("is_document", false);
+          // Legacy rows may have is_document = NULL; treat that as "not a document"
+          .not("is_document", "is", true);
 
         if (existingCount && existingCount > 0) {
           results.skipped += 1;

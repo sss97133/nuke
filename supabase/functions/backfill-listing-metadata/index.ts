@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeListingLocation } from "../_shared/normalizeListingLocation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -73,11 +74,24 @@ serve(async (req) => {
       const listingUrl = coalesceString((v as any)?.listing_url, (om as any)?.listing_url);
       if (!listingUrl) continue;
 
+      const locCandidate =
+        coalesceString((v as any)?.listing_location, (om as any)?.listing_location, (om as any)?.location, (v as any)?.location) || null;
+      const locNorm = normalizeListingLocation(locCandidate);
+
+      const observedAt =
+        safeIso((v as any)?.listing_posted_at || (om as any)?.listing_posted_at || (om as any)?.posted_date) ||
+        safeIso((v as any)?.listing_updated_at || (om as any)?.listing_updated_at || (om as any)?.updated_date) ||
+        new Date().toISOString();
+
       const next = {
         listing_source: coalesceString((v as any)?.listing_source, (om as any)?.listing_source, (om as any)?.source, "classified"),
         listing_url: listingUrl,
         listing_title: coalesceString((v as any)?.listing_title, (om as any)?.listing_title, (om as any)?.title),
-        listing_location: coalesceString((v as any)?.listing_location, (om as any)?.listing_location, (om as any)?.location),
+        listing_location: locNorm.clean,
+        listing_location_raw: locNorm.raw,
+        listing_location_observed_at: observedAt,
+        listing_location_source: coalesceString((v as any)?.listing_source, (om as any)?.listing_source, (om as any)?.source, "classified"),
+        listing_location_confidence: locNorm.clean ? 0.6 : null,
         listing_posted_at: safeIso((v as any)?.listing_posted_at || (om as any)?.listing_posted_at || (om as any)?.posted_date),
         listing_updated_at: safeIso((v as any)?.listing_updated_at || (om as any)?.listing_updated_at || (om as any)?.updated_date),
       };
@@ -113,6 +127,26 @@ serve(async (req) => {
             .update({ ...next, updated_at: new Date().toISOString() } as any)
             .eq("id", (v as any).id);
           if (!upErr) updated++;
+        }
+
+        // Best-effort: persist an observation row. (Non-fatal if table doesn't exist yet.)
+        try {
+          if (locNorm.clean) {
+            await supabase.from("vehicle_location_observations").insert({
+              vehicle_id: (v as any).id,
+              source_type: "listing",
+              source_platform: coalesceString((v as any)?.listing_source, (om as any)?.listing_source, (om as any)?.source) || null,
+              source_url: listingUrl,
+              observed_at: observedAt,
+              location_text_raw: locNorm.raw,
+              location_text_clean: locNorm.clean,
+              precision: /,/.test(locNorm.clean || "") ? "region" : "country",
+              confidence: 0.6,
+              metadata: { backfill: true },
+            } as any);
+          }
+        } catch {
+          // ignore
         }
 
         if (wouldInsertRawDesc && rawDesc) {

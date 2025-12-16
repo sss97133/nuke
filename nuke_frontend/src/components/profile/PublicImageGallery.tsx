@@ -45,7 +45,9 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
       // Filter out imported/scraped images by source and/or presence of a source URL in exif_data.
       const cleaned = (data || []).filter((img: any) => {
         const src = String(img?.source || '').toLowerCase();
-        if (src === 'organization_import' || src === 'external_import') return false;
+        // Do not attribute imported/scraped images to the importing runner user.
+        // These will later be attributed via external identities (e.g. BaT usernames) or claimed by humans.
+        if (src === 'organization_import' || src === 'external_import' || src === 'bat_import' || src === 'bat_listing' || src === 'scraper') return false;
         const exifSourceUrl = String(img?.exif_data?.source_url || '').trim();
         if (exifSourceUrl.startsWith('http')) return false;
         return true;
