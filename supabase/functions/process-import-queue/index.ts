@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
+import { normalizeListingLocation } from "../_shared/normalizeListingLocation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -2714,7 +2715,19 @@ serve(async (req) => {
         if (scrapeData.data.description && scrapeData.data.description.length > 10) {
           updateData.description = scrapeData.data.description;
         }
-        if (scrapeData.data.location) updateData.location = scrapeData.data.location;
+        if (scrapeData.data.location) {
+          const loc = normalizeListingLocation(scrapeData.data.location);
+          if (loc.clean) {
+            // Keep legacy column but only with cleaned content (prevents UI concatenation issues).
+            updateData.location = loc.clean;
+            // Canonical listing location snapshot (time-sensitive).
+            updateData.listing_location = loc.clean;
+            updateData.listing_location_raw = loc.raw;
+            updateData.listing_location_observed_at = new Date().toISOString();
+            updateData.listing_location_source = 'scraped_listing';
+            updateData.listing_location_confidence = 0.55;
+          }
+        }
         // IMPORTANT: do not directly update ledgered fields (vin/asking_price/etc) here.
         // Those must flow through the forensic/provenance system so overwrites are documented + roll-backable.
         try {
@@ -2749,6 +2762,27 @@ serve(async (req) => {
             .from('vehicles')
             .update(updateData)
             .eq('id', newVehicle.id);
+        }
+
+        // Best-effort: record a location observation for time-series history.
+        // Non-fatal if table doesn't exist yet (new migration may not be applied in all envs).
+        try {
+          if (updateData.listing_location) {
+            await supabase.from('vehicle_location_observations').insert({
+              vehicle_id: newVehicle.id,
+              source_type: 'listing',
+              source_platform: null,
+              source_url: item.listing_url,
+              observed_at: updateData.listing_location_observed_at || new Date().toISOString(),
+              location_text_raw: updateData.listing_location_raw || null,
+              location_text_clean: updateData.listing_location,
+              precision: /,/.test(String(updateData.listing_location)) ? 'region' : 'country',
+              confidence: typeof updateData.listing_location_confidence === 'number' ? updateData.listing_location_confidence : 0.55,
+              metadata: { source: 'process-import-queue' },
+            } as any);
+          }
+        } catch {
+          // ignore
         }
 
         // CRITICAL: Filter images with AI to remove other vehicles, then backfill

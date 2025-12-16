@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { extractAndCacheFavicon } from '../_shared/extractFavicon.ts'
+import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -461,6 +462,7 @@ serve(async (req) => {
 
         // Create new vehicle if not found (REFITTED - minimal insert)
         if (!vehicleId) {
+          const loc = normalizeListingLocation((data as any)?.location || null)
           const { data: newVehicle, error: vehicleError } = await supabase
             .from('vehicles')
             .insert({
@@ -474,13 +476,17 @@ serve(async (req) => {
               listing_posted_at: (data as any)?.listing_posted_at || null,
               listing_updated_at: (data as any)?.listing_updated_at || null,
               listing_title: (data as any)?.title || null,
-              listing_location: (data as any)?.location || null,
+              listing_location: loc.clean,
+              listing_location_raw: loc.raw,
+              listing_location_observed_at: (data as any)?.listing_posted_at || (data as any)?.listing_updated_at || new Date().toISOString(),
+              listing_location_source: 'craigslist',
+              listing_location_confidence: loc.clean ? 0.7 : null,
               profile_origin: 'craigslist_scrape',
               origin_metadata: {
                 listing_url: queueItem.listing_url,
                 imported_at: new Date().toISOString(),
                 listing_title: (data as any)?.title || null,
-                listing_location: (data as any)?.location || null,
+                listing_location: loc.clean,
                 listing_posted_at: (data as any)?.listing_posted_at || null,
                 listing_updated_at: (data as any)?.listing_updated_at || null,
                 raw_description: rawDesc || null,
@@ -525,7 +531,7 @@ serve(async (req) => {
               scraped_data: data,
               fields: [
                 { field_name: 'listing_title', field_value: (data as any)?.title || null, confidence: 0.9 },
-                { field_name: 'listing_location', field_value: (data as any)?.location || null, confidence: 0.7 },
+                { field_name: 'listing_location', field_value: loc.clean, confidence: loc.clean ? 0.7 : 0.2 },
                 { field_name: 'listing_posted_at', field_value: (data as any)?.listing_posted_at || null, confidence: (data as any)?.listing_posted_at ? 0.9 : 0.4 },
                 { field_name: 'listing_updated_at', field_value: (data as any)?.listing_updated_at || null, confidence: (data as any)?.listing_updated_at ? 0.8 : 0.4 },
                 { field_name: 'year', field_value: yearNum ? String(yearNum) : null, confidence: yearNum ? 0.9 : 0.4 },
@@ -548,7 +554,7 @@ serve(async (req) => {
                 source: 'craigslist',
                 listing_url: queueItem.listing_url,
                 title: (data as any)?.title || null,
-                location: (data as any)?.location || null,
+                location: loc.clean,
                 listing_posted_at: (data as any)?.listing_posted_at || null,
                 listing_updated_at: (data as any)?.listing_updated_at || null,
                 asking_price: (data as any)?.asking_price || (data as any)?.price || null,
@@ -779,6 +785,7 @@ await supabase
           }
         } else {
           // Update existing vehicle
+          const loc = normalizeListingLocation((data as any)?.location || null)
           await supabase
             .from('vehicles')
             .update({
@@ -789,7 +796,11 @@ await supabase
               listing_posted_at: (data as any)?.listing_posted_at || null,
               listing_updated_at: (data as any)?.listing_updated_at || null,
               listing_title: (data as any)?.title || null,
-              listing_location: (data as any)?.location || null,
+              listing_location: loc.clean,
+              listing_location_raw: loc.raw,
+              listing_location_observed_at: (data as any)?.listing_posted_at || (data as any)?.listing_updated_at || new Date().toISOString(),
+              listing_location_source: 'craigslist',
+              listing_location_confidence: loc.clean ? 0.6 : null,
             })
             .eq('id', vehicleId)
 
@@ -801,7 +812,7 @@ await supabase
             scraped_data: data,
             fields: [
               { field_name: 'listing_title', field_value: (data as any)?.title || null, confidence: 0.8 },
-              { field_name: 'listing_location', field_value: (data as any)?.location || null, confidence: 0.6 },
+              { field_name: 'listing_location', field_value: loc.clean, confidence: loc.clean ? 0.6 : 0.2 },
               { field_name: 'listing_posted_at', field_value: (data as any)?.listing_posted_at || null, confidence: (data as any)?.listing_posted_at ? 0.8 : 0.4 },
               { field_name: 'listing_updated_at', field_value: (data as any)?.listing_updated_at || null, confidence: (data as any)?.listing_updated_at ? 0.7 : 0.4 },
               { field_name: 'vin', field_value: (data as any)?.vin ? String((data as any).vin) : null, confidence: (data as any)?.vin ? 0.6 : 0.3 },
@@ -819,7 +830,7 @@ await supabase
               source: 'craigslist',
               listing_url: queueItem.listing_url,
               title: (data as any)?.title || null,
-              location: (data as any)?.location || null,
+              location: loc.clean,
               listing_posted_at: (data as any)?.listing_posted_at || null,
               listing_updated_at: (data as any)?.listing_updated_at || null,
               asking_price: (data as any)?.asking_price || (data as any)?.price || null,

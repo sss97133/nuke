@@ -65,6 +65,7 @@ serve(async (req) => {
     // Extract all comments
     const commentElements = doc.querySelectorAll('.comment')
     const comments = []
+    const authorSet = new Set<string>()
     
     for (let i = 0; i < commentElements.length; i++) {
       const el = commentElements[i]
@@ -72,7 +73,9 @@ serve(async (req) => {
       // Extract fields
       const dateText = el.querySelector('.comment-datetime')?.textContent?.trim() || ''
       const authorEl = el.querySelector('[data-bind*="authorName"]')
-      const author = authorEl?.textContent?.trim() || 'Unknown'
+      const authorRaw = authorEl?.textContent?.trim() || 'Unknown'
+      // Normalize to a stable BaT handle key for attribution + future claiming.
+      const author = String(authorRaw).trim()
       const textEl = el.querySelector('p')
       const text = textEl?.textContent?.trim() || ''
       
@@ -125,15 +128,53 @@ serve(async (req) => {
         bid_amount,
         comment_likes: commentLikes
       })
+
+      if (author && author !== 'Unknown') {
+        authorSet.add(author)
+      }
     }
 
     console.log(`Extracted ${comments.length} comments`)
+
+    // Upsert external identities (platform + handle) so later humans can claim/merge them.
+    // NOTE: This function runs with service role key, so it can write to external_identities.
+    const handleToExternalIdentityId = new Map<string, string>()
+    if (authorSet.size > 0) {
+      const nowIso = new Date().toISOString()
+      const rows = Array.from(authorSet).map((h) => ({
+        platform: 'bat',
+        // Use the handle as seen on BaT. (We keep it as-is for display; uniqueness is platform+handle.)
+        handle: h,
+        last_seen_at: nowIso,
+        updated_at: nowIso,
+      }))
+
+      // Idempotent upsert
+      const { data: upserted, error: upsertErr } = await supabase
+        .from('external_identities')
+        .upsert(rows, { onConflict: 'platform,handle' })
+        .select('id, handle')
+
+      if (upsertErr) {
+        console.warn('Failed to upsert external identities (non-fatal):', upsertErr)
+      } else {
+        ;(upserted || []).forEach((r: any) => {
+          if (r?.handle && r?.id) handleToExternalIdentityId.set(String(r.handle), String(r.id))
+        })
+      }
+    }
+
+    // Attach external identity IDs to comments when possible.
+    const commentsWithIdentities = comments.map((c: any) => ({
+      ...c,
+      external_identity_id: handleToExternalIdentityId.get(String(c.author_username)) || null,
+    }))
 
     // Store comments
     if (comments.length > 0) {
       const { error } = await supabase
         .from('auction_comments')
-        .insert(comments)
+        .insert(commentsWithIdentities)
       
       if (error) throw error
     }

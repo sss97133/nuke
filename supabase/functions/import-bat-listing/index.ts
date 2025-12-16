@@ -472,6 +472,41 @@ async function upsertBatUser(
   return { id: data?.id || null, username: data?.bat_username || u, profile_url: data?.bat_profile_url || profileUrl };
 }
 
+async function upsertExternalIdentity(
+  supabase: any,
+  platform: string,
+  handleRaw: string | null,
+  profileUrl: string | null,
+): Promise<string | null> {
+  const handle = handleRaw ? handleRaw.trim() : '';
+  if (!handle) return null;
+  const nowIso = new Date().toISOString();
+  try {
+    const { data, error } = await supabase
+      .from('external_identities')
+      .upsert(
+        {
+          platform: String(platform || '').toLowerCase(),
+          handle,
+          profile_url: profileUrl,
+          last_seen_at: nowIso,
+          updated_at: nowIso,
+        },
+        { onConflict: 'platform,handle' },
+      )
+      .select('id')
+      .single();
+    if (error) {
+      console.log('external_identities upsert failed (non-fatal):', error.message);
+      return null;
+    }
+    return data?.id || null;
+  } catch (e: any) {
+    console.log('external_identities upsert error (non-fatal):', e?.message || String(e));
+    return null;
+  }
+}
+
 async function touchBatUserProfile(supabase: any, usernameRaw: string | null) {
   const username = (usernameRaw || '').trim();
   if (!username) return;
@@ -680,6 +715,12 @@ serve(async (req) => {
     const [sellerUser, buyerUser] = await Promise.all([
       upsertBatUser(supabase, seller || null),
       upsertBatUser(supabase, buyer || null),
+    ]);
+
+    // Also upsert external_identities (platform+handle) so later real users can claim them.
+    const [sellerExternalIdentityId, buyerExternalIdentityId] = await Promise.all([
+      upsertExternalIdentity(supabase, 'bat', sellerUser?.username || null, sellerUser?.profile_url || null),
+      upsertExternalIdentity(supabase, 'bat', buyerUser?.username || null, buyerUser?.profile_url || null),
     ]);
 
     // Build/refresh public bidder profiles immediately (seller + buyer are participants even if we don't have bid history here).
@@ -1059,6 +1100,8 @@ serve(async (req) => {
             buyer_username: buyerUser.username,
             seller_bat_user_id: sellerUser.id,
             buyer_bat_user_id: buyerUser.id,
+            seller_external_identity_id: sellerExternalIdentityId,
+            buyer_external_identity_id: buyerExternalIdentityId,
             // bat_listings constraint allows: active|ended|sold|no_sale|cancelled (no 'live')
             listing_status: auctionOutcome === 'sold' ? 'sold' : (auctionOutcome === 'active' ? 'active' : 'ended'),
             final_bid: (auctionOutcome === 'active' ? null : (resultHighBid || metrics.currentBid || null)),

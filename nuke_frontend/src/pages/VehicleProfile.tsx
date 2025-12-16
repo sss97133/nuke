@@ -39,6 +39,7 @@ import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
 import { BATListingManager } from '../components/vehicle/BATListingManager';
 import VehicleDescriptionCard from '../components/vehicle/VehicleDescriptionCard';
 import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
+import VehicleROISummaryCard from '../components/vehicle/VehicleROISummaryCard';
 import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 import VehicleMemePanel from '../components/vehicle/VehicleMemePanel';
@@ -2426,6 +2427,9 @@ const VehicleProfile: React.FC = () => {
                       onEditClick={handleEditClick}
                     />
                   </React.Suspense>
+
+                  {/* 1b. Investment / ROI summary */}
+                  <VehicleROISummaryCard vehicleId={vehicle.id} />
                   
                   {/* 2. Description */}
               <VehicleDescriptionCard
