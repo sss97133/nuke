@@ -1136,6 +1136,24 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     arr.push(p);
   };
 
+  const normalizeListingLocation = (raw: any): string | null => {
+    let s = String(raw ?? '').trim();
+    if (!s) return null;
+
+    // Some scraped sources accidentally concatenate adjacent CTA/link text into the "location" field.
+    // Example: "United StatesView all listingsNotify me about new listings"
+    const junkPhrases = ['View all listings', 'Notify me about new listings'];
+    for (const phrase of junkPhrases) {
+      // allow missing or weird whitespace in the concatenated string
+      const re = new RegExp(escapeRegExp(phrase).replace(/\s+/g, '\\s*'), 'gi');
+      s = s.replace(re, ' ');
+    }
+
+    s = s.replace(/\s+/g, ' ').trim();
+    s = s.replace(/[•·|,;:–—-]\s*$/g, '').trim();
+    return s || null;
+  };
+
   const derivedMileage = useMemo(() => {
     if (typeof (vehicle as any)?.mileage === 'number') return (vehicle as any).mileage as number;
     return extractMileageFromText(String(displayModel || ''));
@@ -1143,12 +1161,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const mileageIsExact = typeof (vehicle as any)?.mileage === 'number';
 
   const listingUrl = (vehicle as any)?.listing_url || (vehicle as any)?.discovery_url || null;
-  const listingLocation =
+  const listingLocationRaw =
     (vehicle as any)?.listing_location ||
     (vehicle as any)?.location ||
     (vehicle as any)?.origin_metadata?.listing_location ||
     (vehicle as any)?.origin_metadata?.location ||
     null;
+  const listingLocation = normalizeListingLocation(listingLocationRaw);
   const listingSourceLabel =
     String((vehicle as any)?.listing_source || (vehicle as any)?.discovery_source || '').trim() || null;
   const listingHost = (() => {
@@ -2463,8 +2482,19 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             final_price: typeof (auctionPulse as any)?.final_price === 'number' ? (auctionPulse as any).final_price : null,
             current_bid: typeof auctionPulse?.current_bid === 'number' ? auctionPulse.current_bid : null,
             bid_count: typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count : null,
-            winner_name: String((vehicle as any)?.origin_metadata?.bat_buyer || (vehicle as any)?.origin_metadata?.buyer || '').trim() || null,
+            winner_name: (() => {
+              const pulseWinner =
+                typeof (auctionPulse as any)?.winner_name === 'string' ? (auctionPulse as any).winner_name :
+                typeof (auctionPulse as any)?.winning_bidder_name === 'string' ? (auctionPulse as any).winning_bidder_name :
+                typeof (auctionPulse as any)?.winner_display_name === 'string' ? (auctionPulse as any).winner_display_name :
+                null;
+              const fallback = String((vehicle as any)?.origin_metadata?.bat_buyer || (vehicle as any)?.origin_metadata?.buyer || '').trim() || null;
+              return (pulseWinner && String(pulseWinner).trim()) ? String(pulseWinner).trim() : fallback;
+            })(),
             inserted_by_name: auctionPulse?.listing_url ? 'System (auction telemetry)' : null,
+            inserted_at: auctionPulse?.updated_at
+              ? String(auctionPulse.updated_at as any)
+              : (auctionPulse?.end_date ? String(auctionPulse.end_date as any) : null),
             confidence: auctionPulse?.listing_url ? 100 : null,
             evidence_url: auctionPulse?.listing_url ? String(auctionPulse.listing_url) : ((vehicle as any)?.discovery_url ? String((vehicle as any).discovery_url) : null),
             trend_pct: typeof trendPct === 'number' ? trendPct : null,

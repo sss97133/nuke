@@ -259,7 +259,7 @@ const LinkedOrganizations: React.FC<LinkedOrganizationsProps> = ({
 
         {organizations.some(o => o.auto_tagged) && (
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
-            <div className="font-medium">🎯 Auto-linked from GPS data</div>
+            <div className="font-medium">Auto-linked from GPS data</div>
             <div className="mt-1 text-blue-700">
               Organizations were automatically detected from image location data and receipt information.
             </div>

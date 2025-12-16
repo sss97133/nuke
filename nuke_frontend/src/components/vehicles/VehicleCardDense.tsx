@@ -1,67 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaviconIcon } from '../common/FaviconIcon';
-
-const escapeRegExp = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-// Scraped listings sometimes end up with a "listing-ish" title shoved into model/name fields.
-// Keep the card title tight: Year Make Model + Series/Trim, and strip platform boilerplate.
-const cleanListingishTitle = (raw: string, year?: number | null, make?: string | null): string => {
-  let s = String(raw || '').trim();
-  if (!s) return s;
-
-  // Drop the trailing site name (often after a pipe)
-  s = s.split('|')[0].trim();
-
-  // Remove common BaT boilerplate
-  s = s.replace(/\bon\s+BaT\s+Auctions\b/gi, '').trim();
-  s = s.replace(/\bBaT\s+Auctions\b/gi, '').trim();
-  s = s.replace(/\bBring\s+a\s+Trailer\b/gi, '').trim();
-  s = s.replace(/\bending\b[\s\S]*$/i, '').trim();
-
-  // Remove lot number parenthetical
-  s = s.replace(/\(\s*Lot\s*#.*?\)\s*/gi, ' ').trim();
-
-  // Remove leading mileage words like "42k-mile"
-  s = s.replace(/^\s*\d{1,3}(?:,\d{3})?\s*[kK]\s*[-\s]*mile\s+/i, '').trim();
-  s = s.replace(/^\s*\d{1,3}(?:,\d{3})+\s*[-\s]*mile\s+/i, '').trim();
-
-  // Remove leading year (we render year separately)
-  if (typeof year === 'number') {
-    const yr = escapeRegExp(String(year));
-    s = s.replace(new RegExp(`^\\s*${yr}\\s+`, 'i'), '').trim();
-  } else {
-    s = s.replace(/^\s*(19|20)\d{2}\s+/, '').trim();
-  }
-
-  // Remove leading make if it already exists (avoid "Porsche Porsche ...")
-  if (make) {
-    const mk = String(make).trim();
-    if (mk) s = s.replace(new RegExp(`^\\s*${escapeRegExp(mk)}\\s+`, 'i'), '').trim();
-  }
-
-  // Collapse whitespace
-  s = s.replace(/\s+/g, ' ').trim();
-  // Trim trailing separators from previous removals
-  s = s.replace(/[-–—]\s*$/g, '').trim();
-  return s;
-};
-
-const appendUnique = (arr: Array<string | number>, part: any) => {
-  const p = String(part || '').trim();
-  if (!p) return;
-  const existing = arr.map(v => String(v).toLowerCase());
-  const lower = p.toLowerCase();
-  if (existing.some(e => e === lower || e.includes(lower) || lower.includes(e))) return;
-  arr.push(p);
-};
-
-const isManualTransmission = (transmissionRaw: string): boolean => {
-  const t = String(transmissionRaw || '').trim().toLowerCase();
-  if (!t) return false;
-  // Keep this conservative to avoid false positives like "6-speed automatic".
-  return /\b(manual|m\/t|mt|stick|three[-\s]?pedal|3[-\s]?pedal)\b/i.test(t);
-};
+import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -185,25 +125,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return { displayPrice: formatted };
   }, [vehicle]);
 
-  const titleLabel = React.useMemo(() => {
-    const v: any = vehicle as any;
-    const year = typeof v.year === 'number' ? v.year : (typeof v.year === 'string' ? parseInt(v.year, 10) : undefined);
-    const make = typeof v.make === 'string' ? v.make : undefined;
-    const displayModel = v.normalized_model || v.model || '';
-    const cleanedModel = cleanListingishTitle(String(displayModel || ''), year ?? null, make ?? null);
-
-    const parts: Array<string | number> = [];
-    if (year) parts.push(year);
-    if (make) parts.push(make);
-    appendUnique(parts, cleanedModel);
-    appendUnique(parts, v.series);
-    appendUnique(parts, v.trim);
-
-    const base = parts.join(' ').trim() || 'Vehicle';
-    const transmissionText = String(v.transmission_model || v.transmission || '').trim();
-    const manualSignal = transmissionText && isManualTransmission(transmissionText) ? 'Manual' : '';
-    return `${base}${manualSignal ? ` • ${manualSignal}` : ''}`;
-  }, [vehicle]);
+  const identity = React.useMemo(() => getVehicleIdentityParts(vehicle as any), [vehicle]);
 
   const formatPrice = (price?: number) => {
     if (!price) return '—';
@@ -948,7 +870,12 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               marginBottom: '4px',
             }}
           >
-            {titleLabel}
+            <span title="Year">{identity.primary[0] || ''}</span>
+            {identity.primary[1] ? <span title="Make">{` ${identity.primary[1]}`}</span> : null}
+            {identity.primary[2] ? <span title="Model">{` ${identity.primary[2]}`}</span> : null}
+            {identity.differentiators.length > 0 ? (
+              <span title="Differentiators">{` • ${identity.differentiators.join(' • ')}`}</span>
+            ) : null}
           </div>
 
           {/* Metadata row - clean by default; infoDense adds extras */}

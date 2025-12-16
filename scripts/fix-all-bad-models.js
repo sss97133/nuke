@@ -43,6 +43,23 @@ if (!SUPABASE_SERVICE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+function parseArgs(argv) {
+  const out = {
+    all: false,
+    dryRun: false,
+    limit: 1000,
+  };
+  for (const a of argv.slice(2)) {
+    if (a === '--all') out.all = true;
+    else if (a === '--dry-run') out.dryRun = true;
+    else if (a.startsWith('--limit=')) {
+      const n = Number(a.split('=')[1]);
+      if (Number.isFinite(n) && n > 0) out.limit = Math.min(20000, Math.floor(n));
+    }
+  }
+  return out;
+}
+
 function cleanModelName(model) {
   if (!model) return '';
   
@@ -108,14 +125,14 @@ function fixMake(make, model) {
 }
 
 async function main() {
+  const args = parseArgs(process.argv);
   console.log('🔧 Fixing vehicles with contaminated model/trim (and backfilling transmission when possible)...\n');
+  console.log(`   mode=${args.all ? 'ALL' : 'active+public'} dryRun=${args.dryRun} limit=${args.limit}\n`);
   
   // Get vehicles with bad models or bad trims
-  const { data: vehicles, error } = await supabase
+  let q = supabase
     .from('vehicles')
     .select('id, year, make, model, trim, transmission, origin_metadata')
-    .eq('status', 'active')
-    .eq('is_public', true)
     .or([
       'model.like.%$%',
       'model.like.%(Est.%',
@@ -130,7 +147,13 @@ async function main() {
       'trim.like.%Bring a Trailer%',
       'trim.like.%ending%',
     ].join(','))
-    .limit(1000);
+    .limit(args.limit);
+
+  if (!args.all) {
+    q = q.eq('status', 'active').eq('is_public', true);
+  }
+
+  const { data: vehicles, error } = await q;
   
   if (error) {
     console.error('❌ Failed to fetch vehicles:', error.message);
@@ -175,10 +198,12 @@ async function main() {
         updates.transmission = metaTransmission;
       }
       
-      const { error: updateError } = await supabase
-        .from('vehicles')
-        .update(updates)
-        .eq('id', vehicle.id);
+      const updateError = args.dryRun
+        ? null
+        : (await supabase
+            .from('vehicles')
+            .update(updates)
+            .eq('id', vehicle.id)).error;
       
       if (updateError) {
         console.error(`❌ Failed to fix ${vehicle.id}: ${updateError.message}`);

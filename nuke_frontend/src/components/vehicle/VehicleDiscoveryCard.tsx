@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { VehicleDiscoveryService } from '../../services/vehicleDiscoveryService';
 import type { VehicleStatusMetadata } from '../../types/vehicleDiscovery';
+import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
 import { 
   getStatusLabel, 
   getStatusColor, 
@@ -191,7 +192,12 @@ const VehicleDiscoveryCard: React.FC<VehicleDiscoveryCardProps> = ({ vehicle, co
           fontWeight: 600,
           lineHeight: 1.2
         }}>
-          {vehicle.year} {vehicle.make} {vehicle.model}
+          {(() => {
+            const identity = getVehicleIdentityParts(vehicle as any);
+            const primary = identity.primary.join(' ');
+            const diffs = identity.differentiators;
+            return `${primary || 'Vehicle'}${diffs.length > 0 ? ` • ${diffs.join(' • ')}` : ''}`;
+          })()}
         </h3>
 
         {/* Quick Details */}

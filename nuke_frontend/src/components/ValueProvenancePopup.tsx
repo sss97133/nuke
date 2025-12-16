@@ -24,6 +24,7 @@ interface ValueProvenancePopupProps {
     bid_count?: number | null;
     winner_name?: string | null;
     inserted_by_name?: string | null;
+    inserted_at?: string | null;
     confidence?: number | null;
     evidence_url?: string | null;
     trend_pct?: number | null;
@@ -286,6 +287,14 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
     return 0;
   })();
 
+  const insertedAtLabel = (() => {
+    const ts = context?.inserted_at || provenance?.inserted_at;
+    if (!ts) return null;
+    const t = new Date(ts).getTime();
+    if (!Number.isFinite(t)) return null;
+    return new Date(t).toLocaleString();
+  })();
+
   const getSourceLabel = (source: string) => {
     const labels: Record<string, string> = {
       'vin_checksum_valid': 'VIN Decode (Authoritative)',
@@ -426,9 +435,11 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             </div>
             <div style={{ fontSize: '9pt' }}>
               {context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown'}
-              <span style={{ fontSize: '7pt', color: '#999', marginLeft: '8px' }}>
-                {provenance?.inserted_at && new Date(provenance.inserted_at).toLocaleString()}
-              </span>
+              {insertedAtLabel ? (
+                <span style={{ fontSize: '7pt', color: '#999', marginLeft: '8px' }}>
+                  {insertedAtLabel}
+                </span>
+              ) : null}
             </div>
           </div>
 
