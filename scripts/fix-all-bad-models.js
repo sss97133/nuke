@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Fix all vehicles with bad model names
+ * Fix vehicles with contaminated identity fields from scraped listings:
+ * - Clean `model` when it contains listing boilerplate (BaT, dealers, pricing, etc.)
+ * - Clean `trim` when it contains listing boilerplate (common when title parsing is naive)
+ * - Backfill `transmission` from origin_metadata when present (e.g. BaT imports)
+ *
+ * Notes:
+ * - Requires SUPABASE_SERVICE_ROLE_KEY for writes
+ * - Does NOT scrape/re-fetch listings; this is a safe text cleanup pass
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -63,6 +70,8 @@ function cleanModelName(model) {
   cleaned = cleaned.replace(/\s*on\s*BaT\s*Auctions?\s*-?\s*ending[^|]*/gi, '');
   cleaned = cleaned.replace(/\s*\(Lot\s*#?\s*[\d,]+\)/gi, '');
   cleaned = cleaned.replace(/\s*\|\s*Bring\s*a\s*Trailer/gi, '');
+  cleaned = cleaned.replace(/\s*\bBaT\s*Auctions?\b/gi, '');
+  cleaned = cleaned.replace(/\s*\bBring\s*a\s*Trailer\b/gi, '');
   
   // Remove common descriptors
   cleaned = cleaned.replace(/\s*\b(classic|vintage|restored|clean|mint|excellent|beautiful|collector['s]?|very\s+original|with\s+only|stunning|gorgeous|more\s+your\s+money)\b/gi, '');
@@ -80,6 +89,14 @@ function cleanModelName(model) {
   return cleaned;
 }
 
+function cleanTrimName(trim) {
+  if (!trim) return null;
+  const cleaned = cleanModelName(trim);
+  if (!cleaned) return null;
+  if (cleaned.length > 60) return null;
+  return cleaned;
+}
+
 function fixMake(make, model) {
   if (make === 'This' && model.toLowerCase().includes('lincoln')) {
     return 'Lincoln';
@@ -91,16 +108,29 @@ function fixMake(make, model) {
 }
 
 async function main() {
-  console.log('🔧 Fixing all vehicles with bad model names...\n');
+  console.log('🔧 Fixing vehicles with contaminated model/trim (and backfilling transmission when possible)...\n');
   
-  // Get vehicles with bad models
+  // Get vehicles with bad models or bad trims
   const { data: vehicles, error } = await supabase
     .from('vehicles')
-    .select('id, year, make, model')
+    .select('id, year, make, model, trim, transmission, origin_metadata')
     .eq('status', 'active')
     .eq('is_public', true)
-    .or('model.like.%$%,model.like.%(Est.%,model.like.%BUY HERE%,model.like.%Call%,model.like.%SKU:%,model.like.%on BaT%,model.like.%Lot #%')
-    .limit(500);
+    .or([
+      'model.like.%$%',
+      'model.like.%(Est.%',
+      'model.like.%BUY HERE%',
+      'model.like.%Call%',
+      'model.like.%SKU:%',
+      'model.like.%on BaT%',
+      'model.like.%Lot #%',
+      'model.like.%Bring a Trailer%',
+      'trim.like.%on BaT%',
+      'trim.like.%Lot #%',
+      'trim.like.%Bring a Trailer%',
+      'trim.like.%ending%',
+    ].join(','))
+    .limit(1000);
   
   if (error) {
     console.error('❌ Failed to fetch vehicles:', error.message);
@@ -112,7 +142,7 @@ async function main() {
     return;
   }
   
-  console.log(`📋 Found ${vehicles.length} vehicles with bad models\n`);
+  console.log(`📋 Found ${vehicles.length} vehicles with contaminated fields\n`);
   
   let fixed = 0;
   let failed = 0;
@@ -120,14 +150,29 @@ async function main() {
   for (const vehicle of vehicles) {
     const cleanedModel = cleanModelName(vehicle.model);
     const fixedMake = fixMake(vehicle.make, vehicle.model);
+    const cleanedTrim = cleanTrimName(vehicle.trim);
+    const existingTransmission = vehicle.transmission ? String(vehicle.transmission).trim() : '';
+    const meta = vehicle.origin_metadata || {};
+    const metaTransmission = typeof meta.extracted_transmission === 'string' ? meta.extracted_transmission.trim() : '';
     
-    if (cleanedModel !== vehicle.model || fixedMake !== vehicle.make) {
+    const shouldUpdateTransmission = !existingTransmission && metaTransmission;
+    const shouldUpdateModel = cleanedModel !== (vehicle.model || '');
+    const shouldUpdateMake = fixedMake !== (vehicle.make || '');
+    const shouldUpdateTrim = (vehicle.trim || null) !== cleanedTrim;
+
+    if (shouldUpdateModel || shouldUpdateMake || shouldUpdateTrim || shouldUpdateTransmission) {
       const updates = {};
-      if (cleanedModel !== vehicle.model) {
+      if (shouldUpdateModel) {
         updates.model = cleanedModel;
       }
-      if (fixedMake !== vehicle.make) {
+      if (shouldUpdateMake) {
         updates.make = fixedMake;
+      }
+      if (shouldUpdateTrim) {
+        updates.trim = cleanedTrim;
+      }
+      if (shouldUpdateTransmission) {
+        updates.transmission = metaTransmission;
       }
       
       const { error: updateError } = await supabase
@@ -139,7 +184,10 @@ async function main() {
         console.error(`❌ Failed to fix ${vehicle.id}: ${updateError.message}`);
         failed++;
       } else {
-        console.log(`✅ Fixed: ${vehicle.year} ${vehicle.make} "${vehicle.model}" → "${cleanedModel}"`);
+        const trimBefore = vehicle.trim ? `"${vehicle.trim}"` : 'null';
+        const trimAfter = cleanedTrim ? `"${cleanedTrim}"` : 'null';
+        const txNote = shouldUpdateTransmission ? ` + transmission="${metaTransmission}"` : '';
+        console.log(`✅ Fixed: ${vehicle.year} ${vehicle.make} "${vehicle.model}" → "${cleanedModel}" | trim ${trimBefore} → ${trimAfter}${txNote}`);
         fixed++;
       }
     }

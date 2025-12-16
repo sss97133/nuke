@@ -300,9 +300,9 @@ export default function VehicleMemePanel({
                   const isSending = sendingActionId === a.id;
                   const hasImage = !!a.image_url;
                   return (
-                    <button
-                      key={a.id}
-                      className="button button-primary"
+                  <button
+                    key={a.id}
+                    className="button button-primary"
                       style={{
                         fontSize: '8pt',
                         padding: hasImage ? '6px' : '10px 8px',
@@ -315,7 +315,7 @@ export default function VehicleMemePanel({
                         gap: 6,
                       }}
                       disabled={!canInteract || isSending}
-                      title={a.render_text || a.title}
+                    title={a.render_text || a.title}
                       onPointerDown={() => onActionPointerDown(a)}
                       onPointerUp={() => onActionPointerUp(a)}
                       onPointerCancel={() => clearHoldTimer()}
@@ -427,12 +427,12 @@ export default function VehicleMemePanel({
                   style={{ fontSize: '9pt' }}
                 >
                   {sendingActionId === preview.action.id ? 'SENDING...' : 'DROP'}
-                </button>
+                  </button>
               </div>
               <div style={{ fontSize: '8pt', color: '#6b7280' }}>Tip: press Escape to close.</div>
             </div>
           </div>
-        </div>
+      </div>
       ) : null}
     </div>
   );

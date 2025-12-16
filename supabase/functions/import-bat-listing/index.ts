@@ -13,6 +13,7 @@ interface BaTListing {
   make: string;
   model: string;
   trim?: string;
+  transmission?: string;
   vin?: string;
   salePrice: number;
   saleDate: string;
@@ -21,6 +22,65 @@ interface BaTListing {
   sellerType?: string; // 'dealer' | 'private_party' | 'unknown' (best-effort)
   buyer: string;
   lotNumber: string;
+}
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Keep raw page titles out of structured fields. We only want the vehicle identity portion.
+function cleanListingishTitle(raw: string, year?: number | null, make?: string | null): string {
+  let s = String(raw || '').trim();
+  if (!s) return s;
+
+  // Drop trailing site name (often after a pipe)
+  s = s.split('|')[0].trim();
+
+  // Remove common BaT boilerplate
+  s = s.replace(/\bon\s+BaT\s+Auctions\b/gi, '').trim();
+  s = s.replace(/\bBaT\s+Auctions\b/gi, '').trim();
+  s = s.replace(/\bBring\s+a\s+Trailer\b/gi, '').trim();
+  s = s.replace(/\bending\b[\s\S]*$/i, '').trim();
+
+  // Remove lot number parenthetical
+  s = s.replace(/\(\s*Lot\s*#.*?\)\s*/gi, ' ').trim();
+
+  // Remove leading mileage words like "42k-mile"
+  s = s.replace(/^\s*\d{1,3}(?:,\d{3})?\s*[kK]\s*[-\s]*mile\s+/i, '').trim();
+  s = s.replace(/^\s*\d{1,3}(?:,\d{3})+\s*[-\s]*mile\s+/i, '').trim();
+
+  // Remove leading year (we store year separately)
+  if (typeof year === 'number') {
+    const yr = escapeRegExp(String(year));
+    s = s.replace(new RegExp(`^\\s*${yr}\\s+`, 'i'), '').trim();
+  } else {
+    s = s.replace(/^\s*(19|20)\d{2}\s+/, '').trim();
+  }
+
+  // Remove leading make if it already exists (avoid "Porsche Porsche ...")
+  if (make) {
+    const mk = String(make).trim();
+    if (mk) s = s.replace(new RegExp(`^\\s*${escapeRegExp(mk)}\\s+`, 'i'), '').trim();
+  }
+
+  // Collapse whitespace + trim dangling separators
+  s = s.replace(/\s+/g, ' ').trim();
+  s = s.replace(/[-–—]\s*$/g, '').trim();
+  return s;
+}
+
+function extractTransmissionFromHtml(html: string): string | undefined {
+  const h = String(html || '');
+  // Most common: list items in "Vehicle Details"
+  const m1 =
+    h.match(/>\s*Transmission\s*:\s*<\/[^>]+>\s*([^<]{2,80})</i) ||
+    h.match(/\bTransmission\s*:\s*([^<\n\r]{2,80})/i);
+  const raw = m1?.[1] ? String(m1[1]).replace(/\s+/g, ' ').trim() : '';
+  if (!raw) return undefined;
+
+  // Avoid capturing obvious page boilerplate
+  if (/bring a trailer|bat auctions/i.test(raw)) return undefined;
+  return raw;
 }
 
 function normalizeUrl(raw: string): string {
@@ -151,6 +211,45 @@ function parseBatLiveMetricsFromHtml(html: string): {
     viewCount: views,
     commentCount: comments,
   };
+}
+
+function parseBatResultHighBidFromHtml(html: string): number | null {
+  const h = String(html || '');
+  const asInt = (s: string | undefined): number | null => {
+    if (!s) return null;
+    const n = Number(String(s).replace(/[^\d]/g, ''));
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // Common on results pages:
+  // - "High Bid | USD $29,250"
+  // - "Bid to USD $29,250 on 12/14/25"
+  // - "High Bid      | USD $29,250 (Reserve Not Met)"
+  const patterns: RegExp[] = [
+    /\bHigh Bid\b[\s\S]{0,120}?\bUSD\s*\$([\d,]+)/i,
+    /\bBid to\b[\s\S]{0,60}?\bUSD\s*\$([\d,]+)/i,
+    /\bHigh Bid\b[\s\S]{0,120}?\$([\d,]+)/i,
+    /\bBid to\b[\s\S]{0,60}?\$([\d,]+)/i,
+  ];
+  for (const re of patterns) {
+    const m = h.match(re);
+    const n = asInt(m?.[1]);
+    if (n && n > 0) return n;
+  }
+  return null;
+}
+
+function parseBatResultEndDateFromHtml(html: string): string | null {
+  const h = String(html || '');
+  // Example: "Bid to USD $29,250 on 12/14/25"
+  const m =
+    h.match(/\bBid to\b[\s\S]{0,80}?\bon\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
+    h.match(/\bAuction Ended\b[\s\S]{0,80}?\bon\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i) ||
+    null;
+  if (!m?.[1]) return null;
+  const d = new Date(m[1]);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d.toISOString().split('T')[0];
 }
 
 async function tryFirecrawlHtml(url: string): Promise<{ html: string; title: string } | null> {
@@ -466,16 +565,36 @@ serve(async (req) => {
     const make = fromUrl?.make || '';
     const model = fromUrl?.model || '';
 
-    // Basic trim: remove leading mileage + year/make/model tokens from the h1
+    // Clean the visible page title down to just the identity portion.
+    // This prevents polluting trim/model with "on BaT Auctions - ending ... | Bring a Trailer".
+    const cleanedTitle = cleanListingishTitle(title, year || null, make || null);
+
+    // Basic trim: remove leading year/make/model tokens from the cleaned title.
+    // If there's nothing left, trim is undefined.
     const trim = (() => {
-      const t = title.replace(/^\s*\d+[kK]?-?\s*Mile\s+/i, '').trim();
-      if (!year || !make || !model) return undefined;
-      const prefix = new RegExp(`^\\s*${year}\\s+${make}\\s+${model}\\s+`, 'i');
+      const t = String(cleanedTitle || '').trim();
+      if (!t || !year || !make || !model) return undefined;
+      const prefix = new RegExp(`^\\s*${escapeRegExp(String(year))}\\s+${escapeRegExp(String(make))}\\s+${escapeRegExp(String(model))}\\s+`, 'i');
       const rest = t.replace(prefix, '').trim();
-      return rest.length > 0 ? rest : undefined;
+      // Guardrails: trim should be short + not contain obvious boilerplate
+      if (!rest) return undefined;
+      if (rest.length > 60) return undefined;
+      if (/bat auctions|bring a trailer|ending\s+(january|february|march|april|may|june|july|august|september|october|november|december)/i.test(rest)) return undefined;
+      return rest;
     })();
 
-    const isSold = /Sold for/i.test(html) || /\bSold for\b/i.test(title);
+    const isSoldFor = /Sold for/i.test(html) || /\bSold for\b/i.test(title);
+    const isAuctionResult =
+      /\bAuction Result\b/i.test(html) ||
+      /\bView Result\b/i.test(html) ||
+      /\bBid to\b/i.test(html) ||
+      /\bgot away\b/i.test(html);
+    const reserveNotMet = /\bReserve Not Met\b/i.test(html) || /\bReserve Not Met\b/i.test(title);
+    const auctionOutcome: 'active' | 'sold' | 'reserve_not_met' | 'ended' | 'no_sale' =
+      isSoldFor ? 'sold' :
+      isAuctionResult ? (reserveNotMet ? 'reserve_not_met' : 'ended') :
+      'active';
+
     let metrics = parseBatLiveMetricsFromHtml(html);
     // If parsing yields no meaningful signal, try Firecrawl once more (in case we fell back to static HTML).
     if (!metrics.currentBid && !metrics.watcherCount && !metrics.viewCount && (metrics.commentCount === null || metrics.commentCount === 0)) {
@@ -490,11 +609,20 @@ serve(async (req) => {
     const auctionEndDate = parseBatAuctionEndDateFromText(title) || parseBatAuctionEndDateFromText(html);
 
     // Extract sale price/date (sold listings only)
-    const priceText = isSold ? html.match(/Sold for[\s\S]{0,100}?USD\s*\$([\d,]+)/i) : null;
+    const priceText = isSoldFor ? html.match(/Sold for[\s\S]{0,100}?USD\s*\$([\d,]+)/i) : null;
     const salePrice = priceText?.[1] ? parseInt(priceText[1].replace(/,/g, '')) : 0;
 
-    const dateText = isSold ? html.match(/\b(?:sold|ended)\b[\s\S]{0,200}?\bon\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i) : null;
-    const saleDate = dateText?.[1] ? new Date(dateText[1]).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const dateText = isSoldFor ? html.match(/\b(?:sold|ended)\b[\s\S]{0,200}?\bon\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i) : null;
+    const saleDate =
+      (dateText?.[1] ? new Date(dateText[1]).toISOString().split('T')[0] : null) ||
+      parseBatResultEndDateFromHtml(html) ||
+      new Date().toISOString().split('T')[0];
+
+    // Final/high bid (results pages). Keep separate from salePrice: reserve-not-met pages still have a meaningful high bid.
+    const resultHighBid = auctionOutcome !== 'active' ? parseBatResultHighBidFromHtml(html) : null;
+    if (!metrics.currentBid && resultHighBid) {
+      metrics = { ...metrics, currentBid: resultHighBid };
+    }
 
     // Extract description
     const descMatch = html.match(/<p>([^<]{100,500})<\/p>/);
@@ -514,6 +642,9 @@ serve(async (req) => {
                      html.match(/<li>Chassis:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{17})<\/a><\/li>/i);
     const vin = vinMatch ? vinMatch[1].toUpperCase() : undefined;
 
+    // Extract transmission (collector signal; keeps manual cars discoverable)
+    const transmission = extractTransmissionFromHtml(html);
+
     const listing: BaTListing = {
       url: batUrl,
       title,
@@ -521,6 +652,7 @@ serve(async (req) => {
       make,
       model,
       trim,
+      transmission,
       vin,
       salePrice,
       saleDate,
@@ -648,10 +780,14 @@ serve(async (req) => {
 
       const updateData: any = {
         // For live auctions, avoid poisoning the canonical sale fields.
-        ...(isSold ? { sale_price: salePrice, sale_date: saleDate } : {}),
+        ...(auctionOutcome === 'sold' ? { sale_price: salePrice, sale_date: saleDate, sale_status: 'sold' } : {}),
+        ...(auctionOutcome !== 'active' && auctionOutcome !== 'sold' ? { sale_date: saleDate, sale_status: 'ended' } : {}),
         trim: trim || undefined,
         description: description,
-        ...(isSold ? { auction_outcome: salePrice > 0 ? 'sold' : 'reserve_not_met' } : {}),
+        transmission: transmission || undefined,
+        ...(auctionOutcome !== 'active' ? { auction_outcome: auctionOutcome } : { auction_outcome: 'pending' }),
+        ...(typeof resultHighBid === 'number' && resultHighBid > 0 ? { high_bid: resultHighBid } : {}),
+        ...(typeof metrics.bidCount === 'number' && metrics.bidCount > 0 ? { bid_count: metrics.bidCount } : {}),
         bat_auction_url: batUrl,
         listing_url: batUrl,
         discovery_url: batUrl,
@@ -661,6 +797,10 @@ serve(async (req) => {
         origin_metadata: {
           source: 'bat_import',
           bat_url: batUrl,
+          raw_title: title || null,
+          cleaned_title: cleanedTitle || null,
+          derived_trim: trim || null,
+          extracted_transmission: transmission || null,
           bat_seller_username: sellerUser.username,
           bat_seller_user_id: sellerUser.id,
           bat_seller_profile_url: sellerUser.profile_url,
@@ -681,6 +821,7 @@ serve(async (req) => {
             comment_count: metrics.commentCount,
             auction_end_date: auctionEndDate,
           },
+          auction_outcome: auctionOutcome,
           imported_at: new Date().toISOString(),
         },
       };
@@ -724,6 +865,7 @@ serve(async (req) => {
           make,
           model,
           trim,
+          transmission,
           vin,
           sale_price: salePrice,
           sale_date: saleDate,
@@ -739,6 +881,10 @@ serve(async (req) => {
           origin_metadata: {
             source: 'bat_import',
             bat_url: batUrl,
+            raw_title: title || null,
+            cleaned_title: cleanedTitle || null,
+            derived_trim: trim || null,
+            extracted_transmission: transmission || null,
             bat_seller_username: sellerUser.username,
             bat_seller_user_id: sellerUser.id,
             bat_seller_profile_url: sellerUser.profile_url,
@@ -868,7 +1014,7 @@ serve(async (req) => {
             platform: 'bat',
             listing_url: batUrl,
             // DB constraint allows: pending|active|ended|sold|cancelled (no 'live')
-            listing_status: isSold ? 'sold' : 'active',
+            listing_status: auctionOutcome === 'sold' ? 'sold' : (auctionOutcome === 'active' ? 'active' : 'ended'),
             // Use BaT lot number (or URL-derived fallback) as the platform listing_id so ON CONFLICT works.
             listing_id: lotNumber || batUrl.split('/').filter(Boolean).pop() || null,
             end_date: endDateIso,
@@ -882,6 +1028,8 @@ serve(async (req) => {
               comment_count: metrics.commentCount,
               auction_end_date: auctionEndDate,
               bat_title: title || null,
+              auction_outcome: auctionOutcome,
+              reserve_not_met: auctionOutcome === 'reserve_not_met',
             },
             updated_at: new Date().toISOString(),
           },
@@ -905,15 +1053,15 @@ serve(async (req) => {
             bat_lot_number: lotNumber || null,
             bat_listing_title: title || null,
             auction_end_date: auctionEndDate || null,
-            sale_date: isSold ? (saleDate || null) : null,
-            sale_price: isSold ? (salePrice || null) : null,
+            sale_date: auctionOutcome !== 'active' ? (saleDate || null) : null,
+            sale_price: auctionOutcome === 'sold' ? (salePrice || null) : null,
             seller_username: sellerUser.username,
             buyer_username: buyerUser.username,
             seller_bat_user_id: sellerUser.id,
             buyer_bat_user_id: buyerUser.id,
             // bat_listings constraint allows: active|ended|sold|no_sale|cancelled (no 'live')
-            listing_status: isSold ? (salePrice > 0 ? 'sold' : 'ended') : 'active',
-            final_bid: metrics.currentBid || null, // best-effort for live; UI uses external_listings for current bid
+            listing_status: auctionOutcome === 'sold' ? 'sold' : (auctionOutcome === 'active' ? 'active' : 'ended'),
+            final_bid: (auctionOutcome === 'active' ? null : (resultHighBid || metrics.currentBid || null)),
             bid_count: metrics.bidCount || null,
             view_count: metrics.viewCount || null,
             comment_count: metrics.commentCount || null,

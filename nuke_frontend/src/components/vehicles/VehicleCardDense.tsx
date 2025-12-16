@@ -1,12 +1,75 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaviconIcon } from '../common/FaviconIcon';
+
+const escapeRegExp = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Scraped listings sometimes end up with a "listing-ish" title shoved into model/name fields.
+// Keep the card title tight: Year Make Model + Series/Trim, and strip platform boilerplate.
+const cleanListingishTitle = (raw: string, year?: number | null, make?: string | null): string => {
+  let s = String(raw || '').trim();
+  if (!s) return s;
+
+  // Drop the trailing site name (often after a pipe)
+  s = s.split('|')[0].trim();
+
+  // Remove common BaT boilerplate
+  s = s.replace(/\bon\s+BaT\s+Auctions\b/gi, '').trim();
+  s = s.replace(/\bBaT\s+Auctions\b/gi, '').trim();
+  s = s.replace(/\bBring\s+a\s+Trailer\b/gi, '').trim();
+  s = s.replace(/\bending\b[\s\S]*$/i, '').trim();
+
+  // Remove lot number parenthetical
+  s = s.replace(/\(\s*Lot\s*#.*?\)\s*/gi, ' ').trim();
+
+  // Remove leading mileage words like "42k-mile"
+  s = s.replace(/^\s*\d{1,3}(?:,\d{3})?\s*[kK]\s*[-\s]*mile\s+/i, '').trim();
+  s = s.replace(/^\s*\d{1,3}(?:,\d{3})+\s*[-\s]*mile\s+/i, '').trim();
+
+  // Remove leading year (we render year separately)
+  if (typeof year === 'number') {
+    const yr = escapeRegExp(String(year));
+    s = s.replace(new RegExp(`^\\s*${yr}\\s+`, 'i'), '').trim();
+  } else {
+    s = s.replace(/^\s*(19|20)\d{2}\s+/, '').trim();
+  }
+
+  // Remove leading make if it already exists (avoid "Porsche Porsche ...")
+  if (make) {
+    const mk = String(make).trim();
+    if (mk) s = s.replace(new RegExp(`^\\s*${escapeRegExp(mk)}\\s+`, 'i'), '').trim();
+  }
+
+  // Collapse whitespace
+  s = s.replace(/\s+/g, ' ').trim();
+  // Trim trailing separators from previous removals
+  s = s.replace(/[-–—]\s*$/g, '').trim();
+  return s;
+};
+
+const appendUnique = (arr: Array<string | number>, part: any) => {
+  const p = String(part || '').trim();
+  if (!p) return;
+  const existing = arr.map(v => String(v).toLowerCase());
+  const lower = p.toLowerCase();
+  if (existing.some(e => e === lower || e.includes(lower) || lower.includes(e))) return;
+  arr.push(p);
+};
+
+const isManualTransmission = (transmissionRaw: string): boolean => {
+  const t = String(transmissionRaw || '').trim().toLowerCase();
+  if (!t) return false;
+  // Keep this conservative to avoid false positives like "6-speed automatic".
+  return /\b(manual|m\/t|mt|stick|three[-\s]?pedal|3[-\s]?pedal)\b/i.test(t);
+};
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
     year?: number;
     make?: string;
     model?: string;
+    series?: string;
+    trim?: string;
     vin?: string;
     mileage?: number;
     image_url?: string;
@@ -16,6 +79,8 @@ interface VehicleCardDenseProps {
       large?: string;
     };
     primary_image_url?: string;
+    transmission?: string;
+    transmission_model?: string;
     sale_price?: number;
     current_value?: number;
     purchase_price?: number;
@@ -118,6 +183,26 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     }).format(priceValue) : '—';
 
     return { displayPrice: formatted };
+  }, [vehicle]);
+
+  const titleLabel = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const year = typeof v.year === 'number' ? v.year : (typeof v.year === 'string' ? parseInt(v.year, 10) : undefined);
+    const make = typeof v.make === 'string' ? v.make : undefined;
+    const displayModel = v.normalized_model || v.model || '';
+    const cleanedModel = cleanListingishTitle(String(displayModel || ''), year ?? null, make ?? null);
+
+    const parts: Array<string | number> = [];
+    if (year) parts.push(year);
+    if (make) parts.push(make);
+    appendUnique(parts, cleanedModel);
+    appendUnique(parts, v.series);
+    appendUnique(parts, v.trim);
+
+    const base = parts.join(' ').trim() || 'Vehicle';
+    const transmissionText = String(v.transmission_model || v.transmission || '').trim();
+    const manualSignal = transmissionText && isManualTransmission(transmissionText) ? 'Manual' : '';
+    return `${base}${manualSignal ? ` • ${manualSignal}` : ''}`;
   }, [vehicle]);
 
   const formatPrice = (price?: number) => {
@@ -286,6 +371,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
   const auctionHighBidText = React.useMemo(() => {
     const v: any = vehicle as any;
+    // Prefer canonical auction fields if present (newer schema)
+    const highBid =
+      (typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0 ? v.sale_price : null) ??
+      (typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0 ? v.winning_bid : null) ??
+      (typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0 ? v.high_bid : null);
+    if (typeof highBid === 'number' && Number.isFinite(highBid) && highBid > 0) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(highBid);
+    }
     const cents =
       (typeof v.current_high_bid_cents === 'number' ? v.current_high_bid_cents : null) ??
       (typeof v.latest_bid_cents === 'number' ? v.latest_bid_cents : null);
@@ -353,8 +446,27 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     };
   }, [isAuctionSource, auctionProgress01, badgePulseSeconds, badgeExplode]);
 
-  // Auctions should never show asking/estimated labels. If we don't have bid data yet, show a compact "BID".
-  const badgeMainText = isAuctionSource ? (auctionHighBidText || 'BID') : displayPrice;
+  const badgeMainText = React.useMemo(() => {
+    if (!isAuctionSource) return displayPrice;
+    const v: any = vehicle as any;
+    const outcome = String(v.auction_outcome || '').toLowerCase();
+    const saleStatus = String(v.sale_status || '').toLowerCase();
+    const isResult = ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) || ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(saleStatus);
+
+    if (isResult) {
+      if (outcome === 'sold' || saleStatus === 'sold' || (Number(v.sale_price || 0) > 0)) {
+        return `SOLD ${auctionHighBidText || ''}`.trim();
+      }
+      if (outcome === 'reserve_not_met') {
+        // Reserve not met still has a meaningful final high bid; don't show a misleading "BID" label.
+        return `${auctionHighBidText ? `RESULT ${auctionHighBidText}` : 'RESERVE NOT MET'}`.trim();
+      }
+      return `${auctionHighBidText ? `ENDED ${auctionHighBidText}` : 'ENDED'}`.trim();
+    }
+
+    // Live auction: show the amount if we have it, otherwise a compact placeholder.
+    return auctionHighBidText || 'BID';
+  }, [isAuctionSource, displayPrice, vehicle, auctionHighBidText]);
 
   // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {
@@ -836,7 +948,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               marginBottom: '4px',
             }}
           >
-            {vehicle.year} {vehicle.make} {vehicle.model}
+            {titleLabel}
           </div>
 
           {/* Metadata row - clean by default; infoDense adds extras */}
