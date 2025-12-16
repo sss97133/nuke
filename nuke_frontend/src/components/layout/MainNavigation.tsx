@@ -56,13 +56,13 @@ const navigationItems: NavigationItem[] = [
   { name: 'Live Feed', href: '/live-feed', icon: ChartBarIcon, category: 'tools', description: 'Real-time activity monitoring' },
   
   // Admin & Development
-  { name: 'Database Audit', href: '/database-audit', icon: ShieldCheckIcon, category: 'admin', description: 'Database health monitoring' },
-  { name: 'Data Diagnostic', href: '/data-diagnostic', icon: BeakerIcon, category: 'admin', description: 'System diagnostics and testing' },
+  { name: 'Database Audit', href: '/admin/database-audit', icon: ShieldCheckIcon, category: 'admin', description: 'Database health monitoring' },
+  { name: 'Data Diagnostic', href: '/admin/data-diagnostic', icon: BeakerIcon, category: 'admin', description: 'System diagnostics and testing' },
   { name: 'Admin Dashboard', href: '/admin', icon: ShieldCheckIcon, category: 'admin', description: 'Admin approval dashboard' },
   { name: 'Admin Verifications', href: '/admin/verifications', icon: ShieldCheckIcon, category: 'admin', description: 'Manage user verifications' },
   { name: 'Shipping Settings', href: '/admin/shipping-settings', icon: ShieldCheckIcon, category: 'admin', description: 'Configure shipping integrations' },
   { name: 'x402 Payment Settings', href: '/admin/x402-settings', icon: ShieldCheckIcon, category: 'admin', description: 'Configure blockchain payments' },
-  { name: 'Test Contributions', href: '/test-contributions', icon: BeakerIcon, category: 'admin', description: 'Test contribution system' },
+  { name: 'Test Contributions', href: '/admin/test-contributions', icon: BeakerIcon, category: 'admin', description: 'Test contribution system' },
 ];
 
 interface MainNavigationProps {

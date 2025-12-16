@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { AdminNotificationService } from '../../services/adminNotificationService';
 import '../../design-system.css';
 
 interface CsvRow {
@@ -35,16 +36,11 @@ const PriceCsvImport: React.FC = () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { setIsAdmin(false); navigate('/login'); return; }
-        const { data: adminRow } = await supabase
-          .from('admin_users')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('is_active', true)
-          .single();
-        if (!adminRow) { setIsAdmin(false); navigate('/dashboard'); return; }
+        const ok = await AdminNotificationService.isCurrentUserAdmin();
+        if (!ok) { setIsAdmin(false); navigate('/org/dashboard'); return; }
         setIsAdmin(true);
       } catch {
-        setIsAdmin(false); navigate('/dashboard');
+        setIsAdmin(false); navigate('/org/dashboard');
       }
     })();
   }, []);

@@ -1074,6 +1074,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   // Prefer normalized_model over raw model
   const displayModel = (vehicle as any)?.normalized_model || vehicle?.model;
 
+  // Shared helper (must be in outer scope; used by multiple helpers below)
+  const escapeRegExp = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
   const extractMileageFromText = (text: string | null | undefined): number | null => {
     if (!text) return null;
     const km = text.match(/\b(\d{1,3}(?:,\d{3})?)\s*[kK]\s*[-\s]*mile\b/);
@@ -1086,7 +1089,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   };
 
   const cleanListingishTitle = (raw: string, year?: number | null, make?: string | null): string => {
-    const escapeRegExp = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     let s = String(raw || '').trim();
     if (!s) return s;
 

@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Operational scripts for Nuke (environment checks and database helpers)",
   "scripts": {
-    "env:doctor": "node scripts/tools/env-doctor.js",
+    "env:doctor": "node scripts/tools/env-doctor.cjs",
     "db:helpers:list": "ls -1 supabase/sql/helpers | sed 's/^/- /'",
     "db:run": "bash -c 'SQL_FILE=\"$1\"; if [ -z \"$SQL_FILE\" ]; then echo \"Usage: npm run db:run -- <path-to-sql>\" && exit 1; fi; if [ \"$ALLOW_PROD\" = \"true\" ] && [ \"$I_KNOW_WHAT_IM_DOING\" != \"true\" ]; then echo \"Blocked: Set I_KNOW_WHAT_IM_DOING=true to run with ALLOW_PROD=true\" && exit 2; fi; psql \"$SUPABASE_DB_URL\" -f \"$SQL_FILE\"'",
     "db:seed": "bash -c 'if [ \"$ALLOW_PROD\" = \"true\" ]; then echo \"Refusing to run seeds with ALLOW_PROD=true\" && exit 2; fi; psql \"$SUPABASE_DB_URL\" -f supabase/sql/seeds/test_sample_data.sql'",

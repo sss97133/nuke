@@ -12,6 +12,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+async function sha256Hex(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  const bytes = Array.from(new Uint8Array(digest));
+  return bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -33,8 +40,8 @@ serve(async (req) => {
       const { data: ev } = await supabase
         .from('auction_events')
         .select('id')
-        .eq('platform', platformGuess)
-        .eq('listing_url', String(auction_url))
+        .eq('source', platformGuess)
+        .eq('source_url', String(auction_url))
         .limit(1)
         .maybeSingle()
       if (ev?.id) eventId = String(ev.id)
@@ -51,6 +58,7 @@ serve(async (req) => {
         .maybeSingle()
       if (ev2?.vehicle_id) vehicleId = String(ev2.vehicle_id)
     }
+    if (!vehicleId) throw new Error('auction_event_id resolved but vehicle_id is missing on auction_events row')
 
     // Use Firecrawl to get JavaScript-rendered page
     const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
@@ -138,10 +146,25 @@ serve(async (req) => {
       // Media detection
       const has_video = text.toLowerCase().includes('cold start') || text.toLowerCase().includes('video')
       const has_image = el.querySelector('img') !== null
+
+      // Stable idempotency key (unique on (vehicle_id, content_hash) exists in DB).
+      const content_hash = await sha256Hex(
+        [
+          'bat',
+          String(auction_url),
+          String(i + 1),
+          String(posted_at.toISOString()),
+          String(author),
+          String(text),
+        ].join('|')
+      )
       
       comments.push({
         auction_event_id: eventId,
         vehicle_id: vehicleId,
+        platform: platformGuess,
+        source_url: String(auction_url),
+        content_hash,
         sequence_number: i + 1,
         posted_at: posted_at.toISOString(),
         hours_until_close: Math.max(0, hours_until_close),
@@ -202,7 +225,7 @@ serve(async (req) => {
     if (comments.length > 0) {
       const { error } = await supabase
         .from('auction_comments')
-        .upsert(commentsWithIdentities, { onConflict: 'auction_event_id,sequence_number' })
+        .upsert(commentsWithIdentities, { onConflict: 'vehicle_id,content_hash' })
       
       if (error) throw error
     }

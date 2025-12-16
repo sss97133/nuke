@@ -558,15 +558,15 @@ function toIsoMidday(dateYmd: string | null): string | null {
 async function upsertAuctionEvent(opts: {
   supabase: any;
   vehicle_id: string;
-  platform: string;
-  listing_url: string;
+  source: string;
+  source_url: string;
   outcome: string;
   high_bid: number | null;
   auction_start_date: string | null; // YYYY-MM-DD
   auction_end_date: string | null; // YYYY-MM-DD
   metadata: any;
 }): Promise<string | null> {
-  const { supabase, vehicle_id, platform, listing_url, outcome, high_bid, auction_start_date, auction_end_date, metadata } = opts;
+  const { supabase, vehicle_id, source, source_url, outcome, high_bid, auction_start_date, auction_end_date, metadata } = opts;
   const nowIso = new Date().toISOString();
   try {
     const { data, error } = await supabase
@@ -574,16 +574,17 @@ async function upsertAuctionEvent(opts: {
       .upsert(
         {
           vehicle_id,
-          platform,
-          listing_url,
+          source,
+          source_url,
           outcome,
           high_bid,
-          auction_start_at: toIsoMidday(auction_start_date),
-          auction_end_at: toIsoEndOfDay(auction_end_date),
-          metadata: metadata && typeof metadata === 'object' ? metadata : {},
+          auction_start_date: toIsoMidday(auction_start_date),
+          auction_end_date: toIsoEndOfDay(auction_end_date),
+          raw_data: metadata && typeof metadata === 'object' ? metadata : {},
           updated_at: nowIso,
         },
-        { onConflict: 'platform,listing_url' },
+        // matches existing UNIQUE index: (vehicle_id, source_url)
+        { onConflict: 'vehicle_id,source_url' },
       )
       .select('id')
       .maybeSingle();
@@ -1110,8 +1111,8 @@ serve(async (req) => {
     const auctionEventId = await upsertAuctionEvent({
       supabase,
       vehicle_id: vehicleId!,
-      platform: 'bat',
-      listing_url: batUrl,
+      source: 'bat',
+      source_url: batUrl,
       outcome: auctionOutcome,
       high_bid: (typeof resultHighBid === 'number' && resultHighBid > 0) ? resultHighBid : (metrics.currentBid || null),
       auction_start_date: domExtracted?.auction_start_date || null,

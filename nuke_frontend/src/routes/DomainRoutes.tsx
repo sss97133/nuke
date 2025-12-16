@@ -60,6 +60,9 @@ export const DomainRoutes = () => {
         <Route path="/shops" element={<Navigate to="/org" replace />} />
         <Route path="/shops/onboarding" element={<Navigate to="/org/create" replace />} />
         <Route path="/shops/new" element={<Navigate to="/org/create" replace />} />
+        <Route path="/database-audit" element={<Navigate to="/admin/database-audit" replace />} />
+        <Route path="/data-diagnostic" element={<Navigate to="/admin/data-diagnostic" replace />} />
+        <Route path="/test-contributions" element={<Navigate to="/admin/test-contributions" replace />} />
 
         {/* Legacy user pages (used by header nav / profile capsule) */}
         <Route path="/profile" element={<Profile />} />

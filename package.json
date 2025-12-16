@@ -1,5 +1,6 @@
 {
   "scripts": {
+    "env:doctor": "node scripts/tools/env-doctor.cjs",
     "audit": "tsx scripts/run-autonomous-audit.ts",
     "audit:dry-run": "tsx scripts/run-autonomous-audit.ts --dry-run",
     "audit:verbose": "VERBOSE=true tsx scripts/run-autonomous-audit.ts",

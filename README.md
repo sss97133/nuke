@@ -47,9 +47,14 @@ Backend is deployed via [deployment method TBD].
 
 ## Environment Setup
 
-1. Copy `.env.example` to `.env`
-2. Add required environment variables
-3. Set up Supabase connection
-4. Configure API keys
+The repo is wired into **Supabase** (DB/Auth/Storage/Edge Functions) and deploys the **frontend to Vercel**.
+
+1. Review `docs/ENV_QUICKREF.md` (canonical “what vars exist + where they live”)
+2. For frontend local dev, set `VITE_*` variables in `nuke_frontend/.env.local`
+3. Run the env sanity checker from repo root:
+
+```bash
+npm run env:doctor
+```
 
 For detailed setup instructions, see `docs/archive/SETUP_CHECKLIST.md`
