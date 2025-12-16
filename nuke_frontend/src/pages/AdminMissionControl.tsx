@@ -34,6 +34,10 @@ const AdminMissionControl: React.FC = () => {
   const [batBackfillRunning, setBatBackfillRunning] = useState(false);
   const [batBackfillBatchSize, setBatBackfillBatchSize] = useState(10);
   const [batBackfillLastResult, setBatBackfillLastResult] = useState<any | null>(null);
+  const [angleBackfillRunning, setAngleBackfillRunning] = useState(false);
+  const [angleBackfillBatchSize, setAngleBackfillBatchSize] = useState(25);
+  const [angleBackfillMinConfidence, setAngleBackfillMinConfidence] = useState(80);
+  const [angleBackfillLastResult, setAngleBackfillLastResult] = useState<any | null>(null);
   const loadInFlightRef = useRef(false);
   const mountedRef = useRef(true);
 
@@ -263,6 +267,51 @@ const AdminMissionControl: React.FC = () => {
     }
   };
 
+  const runAnglePoseBackfill = async () => {
+    setAngleBackfillRunning(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        alert('You must be logged in to run backfill.');
+        return;
+      }
+
+      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/backfill-image-angles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          batchSize: angleBackfillBatchSize,
+          dryRun: false,
+          minConfidence: angleBackfillMinConfidence,
+          requireReview: true,
+        }),
+      });
+
+      const text = await resp.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+
+      if (!resp.ok || parsed?.success === false) {
+        console.error('Angle backfill failed:', parsed);
+        alert(`Angle backfill failed: ${parsed?.error || resp.status}`);
+        setAngleBackfillLastResult(parsed);
+        return;
+      }
+
+      setAngleBackfillLastResult(parsed);
+      alert(`Angle/Pose backfill complete. Processed: ${parsed.processed || 0}. Needs review: ${parsed.needsReview || 0}. Failed: ${parsed.failed || 0}.`);
+      loadDashboard();
+    } catch (e: any) {
+      console.error('Angle backfill error:', e);
+      alert('Angle/Pose backfill failed.');
+    } finally {
+      setAngleBackfillRunning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
@@ -313,13 +362,13 @@ const AdminMissionControl: React.FC = () => {
               />
             </label>
             <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
-              Max images/vehicle (recommended: 80)
+              Max images/vehicle (0 = no cap)
               <input
                 type="number"
                 value={originBackfillMaxImages}
-                min={1}
-                max={500}
-                onChange={(e) => setOriginBackfillMaxImages(Number(e.target.value || 80))}
+                min={0}
+                max={5000}
+                onChange={(e) => setOriginBackfillMaxImages(Number(e.target.value || 0))}
                 style={{ marginLeft: 8, width: 110, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
               />
             </label>
@@ -373,6 +422,56 @@ const AdminMissionControl: React.FC = () => {
           {batBackfillLastResult && (
             <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
 {JSON.stringify(batBackfillLastResult, null, 2)}
+            </pre>
+          )}
+        </div>
+      </div>
+
+      {/* ANGLE + POSE BACKFILL */}
+      <div style={{ marginBottom: '24px' }} className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Backfill: image angles + yaw (contextual, cheap)</span>
+          <button
+            className="button button-primary"
+            style={{ fontSize: '9pt' }}
+            disabled={angleBackfillRunning}
+            onClick={runAnglePoseBackfill}
+          >
+            {angleBackfillRunning ? 'Running...' : 'Run Angle/Pose Batch'}
+          </button>
+        </div>
+        <div className="card-body">
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            Tags images with a precise angle taxonomy and writes pose signals directly onto `vehicle_images` (`ai_detected_angle`, confidence, and `yaw_deg` when applicable).
+            Uses a cheaper model and processes only images missing `ai_detected_angle`.
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Batch size
+              <input
+                type="number"
+                value={angleBackfillBatchSize}
+                min={1}
+                max={200}
+                onChange={(e) => setAngleBackfillBatchSize(Number(e.target.value || 25))}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Min confidence
+              <input
+                type="number"
+                value={angleBackfillMinConfidence}
+                min={1}
+                max={100}
+                onChange={(e) => setAngleBackfillMinConfidence(Number(e.target.value || 80))}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+          </div>
+          {angleBackfillLastResult && (
+            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
+{JSON.stringify(angleBackfillLastResult, null, 2)}
             </pre>
           )}
         </div>

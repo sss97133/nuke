@@ -39,7 +39,8 @@ serve(async (req) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        // Cheaper default; used for large backfills.
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -136,7 +137,7 @@ Return JSON:
             ]
           }
         ],
-        max_tokens: 300
+        max_tokens: 280
       })
     });
 
@@ -209,6 +210,23 @@ Return JSON:
           focal_length_mm: parsed.focal_length,
           sensor_type: parsed.sensor_type
         });
+
+      // Also write canonical fields onto vehicle_images for fast queries and coverage metrics.
+      // Confidence stored as 0..1 for ai_detected_angle_confidence.
+      try {
+        const conf01 = Math.max(0, Math.min(1, confidence / 100));
+        await supabase
+          .from('vehicle_images')
+          .update({
+            ai_detected_angle: angleName || null,
+            ai_detected_angle_confidence: conf01,
+            angle_source: 'ai_tag_image_angles_v1',
+            // yaw_deg is only meaningful for a subset of exterior angles; leave null here.
+          } as any)
+          .eq('id', imageId);
+      } catch {
+        // non-blocking
+      }
     }
 
     return new Response(
