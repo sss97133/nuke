@@ -1,0 +1,46 @@
+name: BaT Make Profiles Correct (batch repair)
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: "Batch size (max 50)"
+        required: false
+        default: "10"
+      dry_run:
+        description: "Dry run (true/false)"
+        required: false
+        default: "false"
+  schedule:
+    - cron: "15 3 * * *" # daily 03:15 UTC
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke bat-make-profiles-correct-runner
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BATCH_SIZE: ${{ github.event.inputs.batch_size || '10' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
+            echo "Missing secrets: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          echo "Running BaT profile repair batch_size=${BATCH_SIZE} dry_run=${DRY_RUN}"
+          curl -sS -X POST "${SUPABASE_URL}/functions/v1/bat-make-profiles-correct-runner" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            --data "{\"batch_size\": ${BATCH_SIZE}, \"dry_run\": ${DRY_RUN}, \"min_vehicle_age_hours\": 6}" \
+            | tee bat-make-profiles-correct-result.json
+
+      - name: Upload result artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bat-make-profiles-correct-result
+          path: bat-make-profiles-correct-result.json
+
+

@@ -34,6 +34,9 @@ const AdminMissionControl: React.FC = () => {
   const [batBackfillRunning, setBatBackfillRunning] = useState(false);
   const [batBackfillBatchSize, setBatBackfillBatchSize] = useState(10);
   const [batBackfillLastResult, setBatBackfillLastResult] = useState<any | null>(null);
+  const [batRepairRunning, setBatRepairRunning] = useState(false);
+  const [batRepairBatchSize, setBatRepairBatchSize] = useState(10);
+  const [batRepairLastResult, setBatRepairLastResult] = useState<any | null>(null);
   const [batDomHealthRunning, setBatDomHealthRunning] = useState(false);
   const [batDomHealthBatchSize, setBatDomHealthBatchSize] = useState(50);
   const [batDomHealthLastResult, setBatDomHealthLastResult] = useState<any | null>(null);
@@ -324,6 +327,50 @@ const AdminMissionControl: React.FC = () => {
     }
   };
 
+  const runBatMakeProfilesCorrectBatch = async () => {
+    setBatRepairRunning(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        alert('You must be logged in to run BaT repair.');
+        return;
+      }
+
+      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/bat-make-profiles-correct-runner`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          batch_size: batRepairBatchSize,
+          dry_run: false,
+          min_vehicle_age_hours: 6,
+        }),
+      });
+
+      const text = await resp.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+
+      if (!resp.ok || parsed?.success === false) {
+        console.error('BaT repair batch failed:', parsed);
+        alert(`BaT repair batch failed: ${parsed?.error || resp.status}`);
+        setBatRepairLastResult(parsed);
+        return;
+      }
+
+      setBatRepairLastResult(parsed);
+      alert(`BaT repair batch complete. Scanned: ${parsed.scanned || 0}. Candidates: ${parsed.candidates || 0}. Repaired: ${parsed.repaired || 0}. Failed: ${parsed.failed || 0}.`);
+      loadDashboard();
+    } catch (e: any) {
+      console.error('BaT repair batch error:', e);
+      alert('BaT repair batch failed.');
+    } finally {
+      setBatRepairRunning(false);
+    }
+  };
+
   const runAnglePoseBackfill = async () => {
     setAngleBackfillRunning(true);
     try {
@@ -588,6 +635,44 @@ const AdminMissionControl: React.FC = () => {
           {batDomHealthLastResult && (
             <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
 {JSON.stringify(batDomHealthLastResult, null, 2)}
+            </pre>
+          )}
+        </div>
+      </div>
+
+      {/* BaT REPAIR LOOP (make profiles correct) */}
+      <div style={{ marginBottom: '24px' }} className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>BaT Repair Loop: make profiles correct (images + description + location + comments)</span>
+          <button
+            className="button button-primary"
+            style={{ fontSize: '9pt' }}
+            disabled={batRepairRunning}
+            onClick={runBatMakeProfilesCorrectBatch}
+          >
+            {batRepairRunning ? 'Running...' : 'Run Repair Batch'}
+          </button>
+        </div>
+        <div className="card-body">
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            Selects incomplete BaT vehicles and re-invokes `import-bat-listing`, which chains image backfill, comprehensive extraction, and comment ingestion.
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Batch size
+              <input
+                type="number"
+                value={batRepairBatchSize}
+                min={1}
+                max={50}
+                onChange={(e) => setBatRepairBatchSize(Number(e.target.value || 10))}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+          </div>
+          {batRepairLastResult && (
+            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
+{JSON.stringify(batRepairLastResult, null, 2)}
             </pre>
           )}
         </div>

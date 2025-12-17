@@ -413,6 +413,29 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
   const getAutoDisplay = () => {
     if (!vehicle) return { amount: null as number | null, label: '' };
+    // Prefer live auction telemetry (external_listings pulse) when present.
+    try {
+      if (auctionPulse?.listing_url) {
+        const status = String(auctionPulse.listing_status || '').toLowerCase();
+        const isLive = status === 'active' || status === 'live';
+        const isSold = status === 'sold';
+        const reserveNotMet = (auctionPulse as any)?.metadata?.reserve_not_met === true;
+
+        if (isSold && typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) {
+          return { amount: (auctionPulse as any).final_price, label: 'SOLD FOR' };
+        }
+        if (isLive && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
+          return { amount: auctionPulse.current_bid, label: 'Current Bid' };
+        }
+        // Ended but not sold: show the high bid when we have it (more truthful than showing an estimate).
+        if (!isLive && !isSold && reserveNotMet) {
+          const hb = typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) ? auctionPulse.current_bid : null;
+          return { amount: hb, label: hb ? 'High Bid' : 'Reserve Not Met' };
+        }
+      }
+    } catch {
+      // ignore
+    }
     // Auction current bid
     if (vehicle.auction_source && vehicle.bid_count && typeof vehicle.current_bid === 'number') {
       return { amount: vehicle.current_bid, label: 'Current Bid' };
@@ -476,10 +499,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (!vehicle) return { amount: null as number | null, label: '' };
     const mode = displayMode || 'auto';
     if (mode === 'auto') {
-      // Prefer computed valuation if available
-      if (valuation && typeof valuation.estimatedValue === 'number' && valuation.estimatedValue > 0) {
-        return { amount: valuation.estimatedValue, label: 'Estimated Value' };
-      }
       return getAutoDisplay();
     }
     if (mode === 'estimate') {
@@ -498,7 +517,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       // If no verified current_value, return null (don't show unverified estimates)
       return { amount: null, label: '' };
     }
-    if (mode === 'auction') return { amount: typeof vehicle.current_bid === 'number' ? vehicle.current_bid : null, label: 'Current Bid' };
+    if (mode === 'auction') {
+      const pulseBid = (auctionPulse && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0)
+        ? auctionPulse.current_bid
+        : null;
+      return { amount: pulseBid ?? (typeof vehicle.current_bid === 'number' ? vehicle.current_bid : null), label: 'Current Bid' };
+    }
     if (mode === 'asking') {
       // Asking price - user intent, but still check for verified source if available
       if (typeof vehicle.asking_price === 'number') {

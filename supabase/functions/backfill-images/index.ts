@@ -364,6 +364,9 @@ serve(async (req) => {
             storage_path: storagePath,
             source: effectiveSource,
             source_url: rawUrl,
+            // Preserve gallery order deterministically (fixes: profiles showing BaT galleries reversed/random).
+            // We use the source list index so repeated runs keep a stable ordering.
+            position: i,
             // Only set primary if there isn't one already (prevents later chunks from overwriting primary).
             is_primary: !hasPrimaryAlready && results.uploaded === 0,
             taken_at: imageDate,
