@@ -332,69 +332,12 @@ function extractSellerUsernameFromHtml(html: string): string | null {
 }
 
 function extractBatGalleryImagesFromHtml(html: string): string[] {
-  const h = String(html || '');
-
-  const normalize = (u: string) =>
-    u
-      .split('#')[0]
-      .split('?')[0]
-      .replace(/&#038;/g, '&')
-      .replace(/&amp;/g, '&')
-      .replace(/-scaled\./g, '.')
-      .trim();
-
-  const isOk = (u: string) => {
-    const s = u.toLowerCase();
-    return (
-      u.startsWith('http') &&
-      s.includes('bringatrailer.com/wp-content/uploads/') &&
-      !s.endsWith('.svg') &&
-      !s.endsWith('.pdf')
-    );
-  };
-
-  // 1) Most reliable: embedded JSON gallery attribute.
-  try {
-    const m = h.match(/data-gallery-items="([^"]+)"/i);
-    if (m?.[1]) {
-      const jsonText = m[1]
-        .replace(/&quot;/g, '"')
-        .replace(/&#038;/g, '&')
-        .replace(/&amp;/g, '&');
-      const items = JSON.parse(jsonText);
-      if (Array.isArray(items)) {
-        const urls: string[] = [];
-        for (const it of items) {
-          const u = it?.large?.url || it?.small?.url;
-          if (typeof u !== 'string' || !u.trim()) continue;
-          const nu = normalize(u);
-          if (isOk(nu)) urls.push(nu);
-        }
-        if (urls.length) return [...new Set(urls)];
-      }
-    }
-  } catch {
-    // continue to fallbacks
-  }
-
-  // 2) Regex fallback
-  const abs = h.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || [];
-  const protoRel = h.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || [];
-  const rel = h.match(/\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || [];
-
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const raw of [...abs, ...protoRel, ...rel]) {
-    let u = raw;
-    if (u.startsWith('//')) u = 'https:' + u;
-    if (u.startsWith('/')) u = 'https://bringatrailer.com' + u;
-    const nu = normalize(u);
-    if (!isOk(nu)) continue;
-    if (seen.has(nu)) continue;
-    seen.add(nu);
-    out.push(nu);
-  }
-  return out;
+  // DEPRECATED: This function is kept for backward compatibility but should not be used.
+  // The canonical extractor is in _shared/batDomMap.ts which uses data-gallery-items only.
+  // This regex-based approach was too greedy and captured images from related auctions.
+  // If DOM map extraction fails, it's better to return empty than risk contamination.
+  console.warn('[import-bat-listing] extractBatGalleryImagesFromHtml called - this should use DOM map extractor instead');
+  return [];
 }
 
 function extractBuyerUsernameFromHtml(html: string): string | null {
@@ -1167,11 +1110,10 @@ serve(async (req) => {
     }
 
     // Persist BaT gallery images into vehicle_images (fixes: "images show up via UI fallback but DB has 0 images").
-    // IMPORTANT: do not cap galleries; use backfill-images chaining to stay within runtime limits.
+    // IMPORTANT: Only use DOM map extracted images (data-gallery-items attribute).
+    // Do NOT fall back to regex extraction - it captures images from related auctions and pollutes the gallery.
     try {
-      const images = (Array.isArray(domExtracted?.image_urls) && domExtracted.image_urls.length > 0)
-        ? domExtracted.image_urls
-        : extractBatGalleryImagesFromHtml(html);
+      const images = Array.isArray(domExtracted?.image_urls) ? domExtracted.image_urls : [];
       if (vehicleId && images.length > 0) {
         await supabase.functions.invoke('backfill-images', {
           body: {

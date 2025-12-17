@@ -1,0 +1,45 @@
+name: BaT Image Contamination Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (true/false)"
+        required: false
+        default: "true"
+      limit:
+        description: "Max vehicles to process (safety limit)"
+        required: false
+        default: "1000"
+  schedule:
+    - cron: "30 4 * * 0" # Weekly on Sundays at 04:30 UTC
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup BaT image contamination
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'true' }}
+          LIMIT: ${{ github.event.inputs.limit || '1000' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
+            echo "Missing secrets: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          echo "Running BaT image contamination cleanup dry_run=${DRY_RUN} limit=${LIMIT}"
+          curl -sS -X POST "${SUPABASE_URL}/functions/v1/cleanup-bat-image-contamination" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            --data "{\"dry_run\": ${DRY_RUN}, \"limit\": ${LIMIT}}" \
+            | tee cleanup-bat-image-contamination-result.json
+
+      - name: Upload result artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanup-bat-image-contamination-result
+          path: cleanup-bat-image-contamination-result.json
+

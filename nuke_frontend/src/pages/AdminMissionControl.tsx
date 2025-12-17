@@ -371,6 +371,49 @@ const AdminMissionControl: React.FC = () => {
     }
   };
 
+  const runBatImageCleanup = async () => {
+    setBatCleanupRunning(true);
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        alert('You must be logged in to run BaT cleanup.');
+        return;
+      }
+
+      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/cleanup-bat-image-contamination`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          dry_run: false,
+          limit: 1000, // Process up to 1000 vehicles
+        }),
+      });
+
+      const text = await resp.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+
+      if (!resp.ok || parsed?.success === false) {
+        console.error('BaT cleanup failed:', parsed);
+        alert(`BaT cleanup failed: ${parsed?.error || resp.status}`);
+        setBatCleanupLastResult(parsed);
+        return;
+      }
+
+      setBatCleanupLastResult(parsed);
+      alert(`BaT cleanup complete. Processed: ${parsed.vehicles_processed || 0}. Cleaned: ${parsed.vehicles_cleaned || 0}. Images removed: ${parsed.images_removed || 0}. Skipped: ${parsed.vehicles_skipped || 0}.`);
+      loadDashboard();
+    } catch (e: any) {
+      console.error('BaT cleanup error:', e);
+      alert('BaT cleanup failed.');
+    } finally {
+      setBatCleanupRunning(false);
+    }
+  };
+
   const runAnglePoseBackfill = async () => {
     setAngleBackfillRunning(true);
     try {
@@ -673,6 +716,31 @@ const AdminMissionControl: React.FC = () => {
           {batRepairLastResult && (
             <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
 {JSON.stringify(batRepairLastResult, null, 2)}
+            </pre>
+          )}
+        </div>
+      </div>
+
+      {/* BaT IMAGE CONTAMINATION CLEANUP */}
+      <div style={{ marginBottom: '24px' }} className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>BaT Image Contamination Cleanup (removes images from related auctions)</span>
+          <button
+            className="button button-primary"
+            style={{ fontSize: '9pt' }}
+            disabled={batCleanupRunning}
+            onClick={runBatImageCleanup}
+          >
+            {batCleanupRunning ? 'Running...' : 'Clean All BaT Images'}
+          </button>
+        </div>
+        <div className="card-body">
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            Removes contaminated images from all BaT vehicles. Identifies images that don't belong using date bucket heuristics and canonical image lists from DOM map extraction. Processes ALL BaT vehicles with images (up to 1000 per run).
+          </div>
+          {batCleanupLastResult && (
+            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
+{JSON.stringify(batCleanupLastResult, null, 2)}
             </pre>
           )}
         </div>
