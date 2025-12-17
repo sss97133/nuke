@@ -325,6 +325,14 @@ export default function OrganizationProfile() {
   const fallbackVehicleImageUrl =
     vehicles.find(v => typeof v.vehicle_image_url === 'string' && v.vehicle_image_url.length > 0)?.vehicle_image_url || null;
   const bannerUrl = (organization as any)?.banner_url || null;
+  const isBadHeroImageUrl = (u: string) => {
+    const s = String(u || '').toLowerCase();
+    // Never use favicons as hero images (they are tiny and will look terrible when stretched).
+    if (s.includes('google.com/s2/favicons') || s.includes('/s2/favicons')) return true;
+    if (s.includes('favicon')) return true;
+    if (s.endsWith('.ico')) return true;
+    return false;
+  };
   const heroCandidates = [
     bannerUrl,
     primaryImage?.large_url,
@@ -332,6 +340,7 @@ export default function OrganizationProfile() {
     fallbackVehicleImageUrl,
   ]
     .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+    .filter((u) => !isBadHeroImageUrl(u))
     .map((u) => (u.startsWith('//') ? `https:${u}` : u));
   const heroKey = heroCandidates.join('|');
 

@@ -1191,8 +1191,16 @@ Return ONLY valid JSON in this format:
               .maybeSingle();
 
             const updates: any = { updated_at: new Date().toISOString() };
+            const looksLikeFavicon = (u: string) => {
+              const s = String(u || '').toLowerCase();
+              return s.includes('google.com/s2/favicons') || s.includes('/s2/favicons') || s.includes('favicon') || s.endsWith('.ico');
+            };
+
             if (assets.logo_url && !existingBiz?.logo_url) updates.logo_url = assets.logo_url;
-            if (assets.banner_url && !existingBiz?.banner_url) updates.banner_url = assets.banner_url;
+            // Never store favicons as banner images; they are tiny and will be stretched in the hero.
+            if (assets.banner_url && !existingBiz?.banner_url && !looksLikeFavicon(assets.banner_url)) {
+              updates.banner_url = assets.banner_url;
+            }
             // NOTE: some deployments don't have businesses.favicon_url; store favicon under metadata.brand_assets instead.
 
             const existingPortfolio: string[] = Array.isArray(existingBiz?.portfolio_images) ? existingBiz!.portfolio_images : [];

@@ -2067,8 +2067,10 @@ const VehicleProfile: React.FC = () => {
         // Legacy rows may have is_document = NULL; treat that as "not a document"
         .not('is_document', 'is', true) // Filter out documents - they belong in a separate section
         .order('is_primary', { ascending: false })
-        .order('position', { ascending: true })
-        .order('created_at', { ascending: false });
+          // IMPORTANT: NULL positions should sort LAST (older backfills didn't set position).
+          .order('position', { ascending: true, nullsFirst: false })
+          // For un-positioned rows, show in chronological insert order (stable, matches source list order better than DESC).
+          .order('created_at', { ascending: true });
 
       if (error) {
         console.error('❌ Error loading vehicle images from database:', error);
