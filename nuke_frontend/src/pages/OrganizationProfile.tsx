@@ -1033,7 +1033,7 @@ export default function OrganizationProfile() {
           console.log(`Loading timeline events for organization: ${organizationId}`);
           const { data: eventsData, error: eventsError } = await supabase
             .from('business_timeline_events')
-            .select('id, event_type, title, description, event_date, created_by, metadata')
+            .select('id, event_type, title, description, event_date, created_by, metadata, image_urls, documentation_urls')
             .eq('business_id', organizationId)
             .order('event_date', { ascending: false })
             .limit(50);
@@ -1174,6 +1174,50 @@ export default function OrganizationProfile() {
     } catch (error: any) {
       console.error('Error scanning image:', error);
       alert(`Scan failed: ${error.message}`);
+    }
+  };
+
+  const handleAddArticle = async (articleUrl: string) => {
+    if (!session?.user?.id || !organizationId) {
+      alert('Please log in to add articles');
+      return;
+    }
+
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (!currentSession) {
+        alert('Session expired. Please log in again.');
+        return;
+      }
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/discover-org-articles`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.access_token}`
+        },
+        body: JSON.stringify({
+          organizationId,
+          articleUrl
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to process article');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        alert('Article added to timeline! Images extracted and timeline event created.');
+        // Reload timeline events
+        loadOrganization();
+      } else {
+        alert(`Failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('Error adding article:', error);
+      alert(`Failed to add article: ${error.message}`);
     }
   };
 
@@ -2695,9 +2739,25 @@ export default function OrganizationProfile() {
 
               {/* Attribution Timeline */}
               <div style={{ marginTop: '24px', borderTop: '2px solid var(--border)', paddingTop: '16px' }}>
-                <h4 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px' }}>
-                  Contribution Timeline
-                </h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h4 style={{ fontSize: '10pt', fontWeight: 700, margin: 0 }}>
+                    Contribution Timeline
+                  </h4>
+                  {session && (
+                    <button
+                      onClick={() => {
+                        const url = prompt('Enter article URL to add to timeline (e.g., blog post, news article, press release):');
+                        if (url && url.trim()) {
+                          handleAddArticle(url.trim());
+                        }
+                      }}
+                      className="button button-secondary button-small"
+                      style={{ fontSize: '8pt' }}
+                    >
+                      Add Article
+                    </button>
+                  )}
+                </div>
                 {timelineEvents.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '9pt' }}>
                     No timeline events yet
@@ -2732,11 +2792,53 @@ export default function OrganizationProfile() {
                           {event.title}
                         </div>
                         {event.description && (
-                          <div style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                          <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                             {event.description}
-                  </div>
-                )}
-              </div>
+                          </div>
+                        )}
+                        {/* Display images from article */}
+                        {event.image_urls && Array.isArray(event.image_urls) && event.image_urls.length > 0 && (
+                          <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', 
+                            gap: '8px',
+                            marginTop: '8px'
+                          }}>
+                            {event.image_urls.slice(0, 6).map((imgUrl: string, idx: number) => (
+                              <img
+                                key={idx}
+                                src={imgUrl}
+                                alt=""
+                                style={{
+                                  width: '100%',
+                                  height: '80px',
+                                  objectFit: 'cover',
+                                  borderRadius: '4px',
+                                  border: '1px solid var(--border)',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => window.open(imgUrl, '_blank')}
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {/* Link to source article */}
+                        {event.documentation_urls && Array.isArray(event.documentation_urls) && event.documentation_urls.length > 0 && (
+                          <div style={{ marginTop: '8px' }}>
+                            <a
+                              href={event.documentation_urls[0]}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontSize: '7pt', color: 'var(--accent)', textDecoration: 'none' }}
+                            >
+                              View Source Article →
+                            </a>
+                          </div>
+                        )}
+                      </div>
             ))}
                   </>
                 )}
