@@ -104,7 +104,9 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           mileage,
           sale_status,
           sale_price,
-          sale_date
+          sale_date,
+          listing_url,
+          listing_source
         `)
         .in('id', vehicleIds);
 
