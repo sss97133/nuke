@@ -26,6 +26,7 @@ import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationServiceTab } from '../components/organization/OrganizationServiceTab';
 import { OrganizationAuctionsTab } from '../components/organization/OrganizationAuctionsTab';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
+import VehicleThumbnail from '../components/VehicleThumbnail';
 import '../design-system.css';
 
 interface Organization {
@@ -127,6 +128,63 @@ interface Offering {
   closing_price?: number;
   status: string;
 }
+
+// Countdown Timer Component
+const CountdownTimer: React.FC<{ endTime: string | null }> = ({ endTime }) => {
+  const [timeRemaining, setTimeRemaining] = useState<string>(() => {
+    if (!endTime) return 'N/A';
+    const now = new Date();
+    const end = new Date(endTime);
+    const diff = end.getTime() - now.getTime();
+    if (diff <= 0) return 'Ended';
+    const totalSeconds = Math.floor(diff / 1000);
+    const d = Math.floor(totalSeconds / 86400);
+    const h = Math.floor((totalSeconds % 86400) / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    if (d > 0) return `${d}d ${pad(h)}:${pad(m)}:${pad(s)}`;
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  });
+
+  useEffect(() => {
+    if (!endTime) return;
+    const interval = setInterval(() => {
+      const now = new Date();
+      const end = new Date(endTime);
+      const diff = end.getTime() - now.getTime();
+      if (diff <= 0) {
+        setTimeRemaining('Ended');
+        return;
+      }
+      const totalSeconds = Math.floor(diff / 1000);
+      const d = Math.floor(totalSeconds / 86400);
+      const h = Math.floor((totalSeconds % 86400) / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      if (d > 0) {
+        setTimeRemaining(`${d}d ${pad(h)}:${pad(m)}:${pad(s)}`);
+      } else {
+        setTimeRemaining(`${pad(h)}:${pad(m)}:${pad(s)}`);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [endTime]);
+
+  if (!endTime) return null;
+
+  return (
+    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>
+        Time Left
+      </div>
+      <div style={{ fontSize: '9pt', fontWeight: 700, color: 'var(--text)', fontFamily: 'monospace' }}>
+        {timeRemaining}
+      </div>
+    </div>
+  );
+};
 
 export default function OrganizationProfile() {
   const params = useParams();
@@ -1989,155 +2047,176 @@ export default function OrganizationProfile() {
                           <div
                             key={vehicle.id}
                             style={{
-                              border: '1px solid var(--border)',
+                              border: '2px solid var(--border)',
                               background: 'var(--surface)',
-                              padding: '10px',
+                              padding: '12px',
                               cursor: 'pointer',
-                              position: 'relative'
+                              position: 'relative',
+                              transition: 'all 0.12s ease',
+                              borderRadius: '0px'
                             }}
                             onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = 'var(--text)';
+                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = 'var(--border)';
+                              e.currentTarget.style.boxShadow = 'none';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
                           >
                             <AliveBurst vehicleId={vehicle.vehicle_id} intensity={Math.min(14, Math.floor(signal.score / 18))} />
                             <div
                               style={{
                                 display: 'grid',
-                                gridTemplateColumns: '72px 1fr auto',
-                                gap: '10px',
+                                gridTemplateColumns: '120px 1fr',
+                                gap: '12px',
                                 alignItems: 'start'
                               }}
                             >
-                              {/* Thumbnail */}
-                              {vehicle.vehicle_image_url ? (
-                                <img
-                                  src={vehicle.vehicle_image_url}
-                                  alt={title}
-                                  style={{
-                                    width: '72px',
-                                    height: '54px',
-                                    objectFit: 'cover',
-                                    border: '1px solid var(--border)',
-                                    background: 'var(--grey-100)'
-                                  }}
-                                  loading="lazy"
-                                  decoding="async"
-                                  onError={(e) => {
-                                    // If the URL is bad/missing in storage, fall back to an empty box rather than a broken icon
-                                    const img = e.currentTarget as HTMLImageElement;
-                                    img.style.display = 'none';
-                                  }}
+                              {/* Thumbnail with proper resolution */}
+                              <div
+                                style={{
+                                  width: '120px',
+                                  height: '90px',
+                                  border: '2px solid var(--border)',
+                                  background: 'var(--grey-100)',
+                                  overflow: 'hidden',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <VehicleThumbnail
+                                  vehicleId={vehicle.vehicle_id}
+                                  vehicleName={title}
+                                  size="medium"
                                 />
-                              ) : (
-                                <div
-                                  style={{
-                                    width: '72px',
-                                    height: '54px',
-                                    border: '1px solid var(--border)',
-                                    background: 'var(--grey-100)'
-                                  }}
-                                />
-                              )}
+                              </div>
 
-                              {/* Main */}
-                              <div style={{ minWidth: 0 }}>
-                                <a
-                                  href={`/vehicle/${vehicle.vehicle_id}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  style={{
-                                    fontSize: '10pt',
-                                    fontWeight: 700,
-                                    color: 'var(--text)',
-                                    display: 'block',
-                                    textDecoration: 'none',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis'
-                                  }}
-                                  className="hover:underline"
-                                >
-                                  {title}
-                                </a>
+                              {/* Main Content */}
+                              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {/* Title Row with Countdown */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                                  <a
+                                    href={`/vehicle/${vehicle.vehicle_id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                      fontSize: '11pt',
+                                      fontWeight: 700,
+                                      color: 'var(--text)',
+                                      display: 'block',
+                                      textDecoration: 'none',
+                                      lineHeight: 1.3,
+                                      flex: 1,
+                                      transition: 'color 0.12s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.color = 'var(--accent)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.color = 'var(--text)';
+                                    }}
+                                  >
+                                    {title}
+                                  </a>
+                                  
+                                  {/* Countdown Timer */}
+                                  {vehicle.auction_end_time && <CountdownTimer endTime={vehicle.auction_end_time} />}
+                                </div>
 
-                                <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                {/* Dealer Badge / Username Tag */}
+                                {(vehicle.seller_org_name || vehicle.seller_handle) && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {vehicle.seller_org_website && (
+                                      <FaviconIcon
+                                        url={vehicle.seller_org_website}
+                                        textSize={8}
+                                        matchTextSize
+                                        preserveAspectRatio
+                                        style={{ marginRight: 0 }}
+                                      />
+                                    )}
+                                    <span
+                                      style={{
+                                        fontSize: '8pt',
+                                        padding: '3px 6px',
+                                        border: '1px solid var(--border)',
+                                        background: 'var(--grey-100)',
+                                        color: 'var(--text)',
+                                        fontWeight: 600,
+                                        borderRadius: '0px',
+                                        display: 'inline-block'
+                                      }}
+                                    >
+                                      {vehicle.seller_org_name || vehicle.seller_handle}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Current Bid and Comment Count Row */}
+                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '2px' }}>
+                                  {vehicle.auction_current_bid && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                                      <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Bid:</span>
+                                      <span style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--text)', fontFamily: 'monospace' }}>
+                                        {formatUsd(vehicle.auction_current_bid / 100)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {signal.comments > 0 && (
+                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                                      <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Comments:</span>
+                                      <span style={{ fontSize: '9pt', fontWeight: 600, color: 'var(--text)' }}>
+                                        {signal.comments}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Signal Badges Row */}
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: '2px' }}>
+                                  {tierLabel && (
+                                    <span style={{ fontSize: '7pt', color: 'var(--text-secondary)' }}>
+                                      {tierLabel}
+                                    </span>
+                                  )}
+                                  {signal.score > 0 && (
+                                    <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                      SIGNAL {signal.score}
+                                    </span>
+                                  )}
+                                  {signal.bids > 0 && (
+                                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                                      BIDS {signal.bids}
+                                    </span>
+                                  )}
+                                  {signal.watchers > 0 && (
+                                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                                      WATCH {signal.watchers}
+                                    </span>
+                                  )}
+                                  {signal.views > 0 && (
+                                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                                      VIEWS {signal.views}
+                                    </span>
+                                  )}
                                   {showListingPill && listingLabel && (
                                     <span
                                       style={{
                                         fontSize: '7pt',
-                                        padding: '2px 6px',
+                                        padding: '3px 6px',
                                         border: '1px solid var(--border)',
                                         background: 'var(--grey-100)',
                                         color: 'var(--text)',
-                                        fontWeight: 700
+                                        fontWeight: 700,
+                                        borderRadius: '0px'
                                       }}
                                     >
                                       {listingLabel}
                                     </span>
                                   )}
-                                  {tierLabel ? (
-                                    <span style={{ fontSize: '7pt', color: 'var(--text-secondary)' }}>
-                                      {tierLabel}
-                                    </span>
-                                  ) : null}
-                                  {relationshipLabel && (
-                                    <span
-                                      style={{
-                                        fontSize: '7pt',
-                                        padding: '2px 6px',
-                                        border: '1px solid var(--border)',
-                                        background: 'var(--surface)',
-                                        color: 'var(--text-secondary)'
-                                      }}
-                                    >
-                                      {relationshipLabel}
-                                    </span>
-                                  )}
-                                  {vehicle.seller_org_website ? (
-                                    <FaviconIcon
-                                      url={vehicle.seller_org_website}
-                                      textSize={8}
-                                      matchTextSize
-                                      preserveAspectRatio
-                                      style={{ marginRight: 0 }}
-                                    />
-                                  ) : null}
-                                  {(vehicle.seller_org_name || vehicle.seller_handle) ? (
-                                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                                      {vehicle.seller_org_name || vehicle.seller_handle}
-                                    </span>
-                                  ) : null}
-                                  {vehicle.auction_current_bid ? (
-                                    <span style={{ fontSize: '8pt', fontWeight: 800, color: 'var(--text)' }}>
-                                      {formatUsd(vehicle.auction_current_bid / 100)}
-                                    </span>
-                                  ) : null}
-                                  {vehicle.vehicle_location && (
-                                    <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                                      {vehicle.vehicle_location}
-                                    </span>
-                                  )}
-                                  {hasTelemetry && (
-                                    <span style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
-                                      SIGNAL {signal.score}
-                                    </span>
-                                  )}
                                 </div>
-                              </div>
-
-                              {/* Actions */}
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedInquiryVehicle({
-                                      id: vehicle.vehicle_id,
-                                      name: title
-                                    });
-                                    setShowVehicleInquiry(true);
-                                  }}
-                                  className="button button-primary button-small"
-                                  style={{ fontSize: '8pt', padding: '4px 10px', whiteSpace: 'nowrap' }}
-                                >
-                                  Inquire
-                                </button>
                               </div>
                             </div>
                           </div>
