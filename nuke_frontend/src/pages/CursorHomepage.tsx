@@ -605,14 +605,49 @@ const CursorHomepage: React.FC = () => {
         return;
       }
 
+      // Batch-load live auction bids (fixes: BaT cards showing EST/— instead of current bid).
+      // Best-effort only: if RLS blocks external_listings for anon, we keep the old behavior.
+      const auctionByVehicleId = new Map<string, any>();
+      try {
+        const ids = Array.from(new Set((vehicles || []).map((v: any) => String(v?.id || '')).filter(Boolean)));
+        if (ids.length > 0) {
+          const { data: listings, error: listErr } = await supabase
+            .from('external_listings')
+            .select('vehicle_id, platform, listing_status, current_bid, final_price, updated_at')
+            .in('vehicle_id', ids)
+            .order('updated_at', { ascending: false })
+            .limit(2000);
+          if (!listErr && Array.isArray(listings)) {
+            for (const row of listings as any[]) {
+              const vid = String(row?.vehicle_id || '');
+              if (!vid) continue;
+              if (auctionByVehicleId.has(vid)) continue;
+              auctionByVehicleId.set(vid, row);
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+
       // Process vehicles with lightweight image data (vehicles table fields only).
       // This is the biggest feed perf win: avoid pulling 1000+ vehicle_images rows during homepage load.
       const processed = (vehicles || []).map((v: any) => {
         const salePrice = v.sale_price ? Number(v.sale_price) : 0;
         const askingPrice = v.asking_price ? Number(v.asking_price) : 0;
         const currentValue = v.current_value ? Number(v.current_value) : 0;
+        const listing = auctionByVehicleId.get(String(v?.id || '')) || null;
+        const listingStatus = String((listing as any)?.listing_status || '').toLowerCase();
+        const isLive = listingStatus === 'active' || listingStatus === 'live';
+        const liveBid = typeof (listing as any)?.current_bid === 'number' ? (listing as any).current_bid : Number((listing as any)?.current_bid || 0);
+        const finalPrice = typeof (listing as any)?.final_price === 'number' ? (listing as any).final_price : Number((listing as any)?.final_price || 0);
 
-        const displayPrice = salePrice > 0 ? salePrice : askingPrice > 0 ? askingPrice : currentValue;
+        const displayPrice =
+          salePrice > 0 ? salePrice :
+          (isLive && Number.isFinite(liveBid) && liveBid > 0) ? liveBid :
+          (Number.isFinite(finalPrice) && finalPrice > 0) ? finalPrice :
+          askingPrice > 0 ? askingPrice :
+          currentValue;
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
 
         const primaryImageUrl =

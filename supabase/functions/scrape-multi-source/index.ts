@@ -808,6 +808,9 @@ Return ONLY valid JSON in this format:
         /href="([^"]*\/fiche\/[^"]+)"/gi,
         // Beverly Hills Car Club: listing detail pages end with -c-<id>.htm (no /inventory/ segment)
         /href="([^"]*-c-\d+\.htm)"/gi,
+        // Facebook Marketplace listing pages
+        /href="([^"]*\/marketplace\/item\/\d+[^"]*)"/gi,
+        /href="([^"]*facebook\.com\/marketplace\/item\/\d+[^"]*)"/gi,
         /href="([^"]*\/inventory\/[^"]+)"/gi,
         /href="([^"]*\/cars\/[^"]+)"/gi,
         /href="([^"]*\/trucks\/[^"]+)"/gi,
@@ -828,14 +831,34 @@ Return ONLY valid JSON in this format:
           // Filter out non-vehicle URLs
           if (
             url.match(/\/(vehicle|listing|inventory|cars|trucks|detail|detail\.aspx|fiche|auctions)\b/i) ||
-            url.match(/-c-\d+\.htm$/i)
+            url.match(/-c-\d+\.htm$/i) ||
+            url.includes('/marketplace/item/')
           ) {
             foundUrls.add(url);
           }
         }
       }
       
-      listings = Array.from(foundUrls).slice(0, maxListingsToProcess).map(url => ({
+      // Normalize Facebook Marketplace listing URLs to canonical /marketplace/item/<id>/ form for dedupe.
+      const baseHost = (() => {
+        try { return new URL(source_url).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; }
+      })();
+      const normalizeFacebookItemUrl = (raw: string): string | null => {
+        try {
+          const u = new URL(raw);
+          const m1 = u.pathname.match(/\/marketplace\/item\/(\d{5,})/i);
+          const id = m1?.[1] || u.searchParams.get('item_id') || null;
+          if (!id) return null;
+          return `https://www.facebook.com/marketplace/item/${id}/`;
+        } catch {
+          return null;
+        }
+      };
+
+      const normalizedUrls = Array.from(foundUrls)
+        .map((u) => (baseHost.endsWith('facebook.com') ? (normalizeFacebookItemUrl(u) || u) : u));
+
+      listings = normalizedUrls.slice(0, maxListingsToProcess).map(url => ({
         url,
         title: null,
         price: null,
@@ -879,6 +902,20 @@ Return ONLY valid JSON in this format:
         // Classic.com: enumerate listing detail URLs from seller pages.
         // We keep this conservative: only pick /l/ links and normalize to the current origin.
         const baseHost = baseUrl.hostname.replace(/^www\./, '').toLowerCase();
+        if (baseHost.endsWith('facebook.com')) {
+          // Facebook Marketplace: collect item detail links and normalize for dedupe.
+          const fbHref = /href="([^"]*\/marketplace\/item\/\d+[^"]*)"/gi;
+          let fm: RegExpExecArray | null;
+          while ((fm = fbHref.exec(html)) !== null) {
+            const raw = (fm[1] || '').trim();
+            if (!raw) continue;
+            const abs = raw.startsWith('http') ? raw : `${baseUrl.origin}${raw.startsWith('/') ? '' : '/'}${raw}`;
+            const m1 = abs.match(/\/marketplace\/item\/(\d{5,})/i);
+            const id = m1?.[1] || null;
+            if (!id) continue;
+            found.add(`https://www.facebook.com/marketplace/item/${id}/`);
+          }
+        }
         if (baseHost === 'classic.com') {
           const anyClassicListingHref = /href="([^"]*\/l\/[^"]+)"/gi;
           while ((m = anyClassicListingHref.exec(html)) !== null) {

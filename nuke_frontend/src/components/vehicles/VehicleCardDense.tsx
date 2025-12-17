@@ -118,10 +118,12 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const liveBid = typeof liveBidRaw === 'number'
       ? liveBidRaw
       : Number(String(liveBidRaw || '').replace(/[^\d.]/g, ''));
+    const currentBid = typeof v.current_bid === 'number' ? v.current_bid : Number(String(v.current_bid || '').replace(/[^\d.]/g, ''));
 
     const priceValue =
       (typeof v.display_price === 'number' && Number.isFinite(v.display_price) && v.display_price > 0) ? v.display_price :
       (typeof v.sale_price === 'number' && v.sale_price > 0) ? v.sale_price :
+      (Number.isFinite(currentBid) && currentBid > 0) ? currentBid :
       // Auction imports: store "current bid" in origin_metadata.live_metrics so feed cards can show it without extra joins.
       (Number.isFinite(liveBid) && liveBid > 0) ? liveBid :
       (typeof v.asking_price === 'number' && v.asking_price > 0) ? v.asking_price :
@@ -342,11 +344,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const metaLiveBid = typeof metaLiveBidRaw === 'number'
       ? metaLiveBidRaw
       : Number(String(metaLiveBidRaw || '').replace(/[^\d.]/g, ''));
+    const currentBid = typeof v.current_bid === 'number' ? v.current_bid : Number(String(v.current_bid || '').replace(/[^\d.]/g, ''));
     // Prefer canonical auction fields if present (newer schema)
     const highBid =
       (typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0 ? v.sale_price : null) ??
       (typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0 ? v.winning_bid : null) ??
       (typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0 ? v.high_bid : null) ??
+      (Number.isFinite(currentBid) && currentBid > 0 ? currentBid : null) ??
       (Number.isFinite(metaLiveBid) && metaLiveBid > 0 ? metaLiveBid : null);
     if (typeof highBid === 'number' && Number.isFinite(highBid) && highBid > 0) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(highBid);
@@ -437,7 +441,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     }
 
     // Live auction: show the amount if we have it, otherwise a compact placeholder.
-    return auctionHighBidText || 'BID';
+    return auctionHighBidText || (displayPrice && displayPrice !== '—' ? displayPrice : null) || 'BID';
   }, [isAuctionSource, displayPrice, vehicle, auctionHighBidText]);
 
   // LIST VIEW: Cursor-style - compact, dense, single row
