@@ -10,31 +10,6 @@ const corsHeaders = {
   'Expires': '0',
 }
 
-function isFacebookUrl(url: string): boolean {
-  try {
-    const u = new URL(url)
-    const host = u.hostname.toLowerCase()
-    return host === 'facebook.com' || host.endsWith('.facebook.com')
-  } catch {
-    return false
-  }
-}
-
-function isFacebookMarketplaceUrl(url: string): boolean {
-  const s = String(url || '')
-  if (!isFacebookUrl(s)) return false
-  return s.includes('/marketplace') || s.includes('/share/')
-}
-
-function parseFacebookListingId(url: string): string | null {
-  const s = String(url || '')
-  const m1 = s.match(/\/marketplace\/item\/(\d{5,})/i)
-  if (m1?.[1]) return m1[1]
-  const m2 = s.match(/[?&]item_id=(\d{5,})/i)
-  if (m2?.[1]) return m2[1]
-  return null
-}
-
 // Robust identity cleanup (prevents saving listing junk into make/model downstream).
 function cleanModelName(raw: any): string | null {
   if (!raw) return null
@@ -276,45 +251,6 @@ function parseNumberLoose(raw: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function parseYearFromText(raw: string): number | null {
-  const m = String(raw || '').match(/\b(19|20)\d{2}\b/)
-  if (!m?.[0]) return null
-  const y = parseInt(m[0], 10)
-  return Number.isFinite(y) ? y : null
-}
-
-function parseYmmFromTitleLike(raw: string): { year: number | null; make: string | null; model: string | null } {
-  const cleaned = String(raw || '').replace(/\s+/g, ' ').trim()
-  const m = cleaned.match(/^(\d{4})\s+(.+)$/)
-  if (!m) return { year: null, make: null, model: null }
-
-  const y = parseInt(m[1], 10)
-  const rest = (m[2] || '').trim()
-  if (!rest) return { year: Number.isFinite(y) ? y : null, make: null, model: null }
-
-  const MULTIWORD_MAKES = ['Mercedes-Benz', 'Alfa Romeo', 'Aston Martin', 'Rolls-Royce', 'Land Rover', 'Range Rover']
-  for (const candidate of MULTIWORD_MAKES) {
-    if (rest.toLowerCase().startsWith(candidate.toLowerCase() + ' ')) {
-      const mm = rest.slice(candidate.length).trim()
-      return {
-        year: Number.isFinite(y) ? y : null,
-        make: cleanMakeName(candidate),
-        model: cleanModelName(mm),
-      }
-    }
-  }
-
-  const parts = rest.split(/\s+/).filter(Boolean)
-  if (parts.length < 2) return { year: Number.isFinite(y) ? y : null, make: cleanMakeName(rest), model: null }
-  const mk = parts[0]
-  const mdl = parts.slice(1).join(' ')
-  return {
-    year: Number.isFinite(y) ? y : null,
-    make: cleanMakeName(mk),
-    model: cleanModelName(mdl),
-  }
-}
-
 function splitLinesFromHtml(html: string): string[] {
   return (html || '')
     .replace(/\r/g, '')
@@ -460,7 +396,7 @@ function parseLartFiche(html: string, url: string): any {
   }
 }
 
-async function tryFirecrawl(url: string, waitForMs: number = 4000): Promise<any | null> {
+async function tryFirecrawl(url: string): Promise<any | null> {
   const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY')
   if (!FIRECRAWL_API_KEY) return null
 
@@ -498,7 +434,7 @@ async function tryFirecrawl(url: string, waitForMs: number = 4000): Promise<any 
         formats: ['extract', 'html'],
         extract: { schema: extractionSchema },
         onlyMainContent: false,
-        waitFor: waitForMs,
+        waitFor: 4000,
       }),
     })
 
@@ -539,10 +475,10 @@ serve(async (req) => {
       )
     }
 
-    console.log('Scraping URL:', url)
+    console.log('🔍 Scraping URL:', url)
 
     // Robust path: Firecrawl structured extraction first (works better on JS-heavy dealer sites).
-    const firecrawlExtract = await tryFirecrawl(url, isFacebookMarketplaceUrl(url) ? 10000 : 4000)
+    const firecrawlExtract = await tryFirecrawl(url)
 
     let html = ''
     let doc: any = null
@@ -552,17 +488,6 @@ serve(async (req) => {
     // because the page contains hi-res image URLs in data attributes.
     const needsHtmlParse = url.includes('lartdelautomobile.com') || url.includes('beverlyhillscarclub.com')
     if (!firecrawlExtract || needsHtmlParse) {
-      if (isFacebookMarketplaceUrl(url) && !firecrawlExtract) {
-        const hasKey = Boolean(Deno.env.get('FIRECRAWL_API_KEY'))
-        const msg = hasKey
-          ? 'Facebook Marketplace scraping failed via Firecrawl (no extract returned).'
-          : 'Facebook Marketplace scraping requires FIRECRAWL_API_KEY to be set for this edge function.'
-        return new Response(JSON.stringify({ success: false, error: msg, data: null }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        })
-      }
-
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -595,14 +520,12 @@ serve(async (req) => {
       asking_price: null,
       location: null,
       thumbnail_url: null,
-      platform: isFacebookMarketplaceUrl(url) ? 'facebook_marketplace' : null,
-      listing_id: isFacebookMarketplaceUrl(url) ? parseFacebookListingId(url) : null,
       _function_version: firecrawlExtract ? '2.1-firecrawl' : '2.1-html'  // Debug version identifier
     }
 
     // If Firecrawl returned structured fields, use them as the primary truth.
     if (firecrawlExtract) {
-      data.source = isFacebookMarketplaceUrl(url) ? 'Facebook Marketplace' : 'Firecrawl'
+      data.source = 'Firecrawl'
       data.year = typeof firecrawlExtract.year === 'number' ? firecrawlExtract.year : null
       data.make = cleanMakeName(firecrawlExtract.make) || null
       data.model = cleanModelName(firecrawlExtract.model) || null
@@ -707,7 +630,7 @@ serve(async (req) => {
       const match = html ? html.match(pattern) : null
       if (match && match[1] && match[1].length === 17 && !/[IOQ]/.test(match[1])) {
         data.vin = match[1].toUpperCase()
-        console.log(`VIN extracted: ${data.vin}`)
+        console.log(`✅ VIN extracted: ${data.vin}`)
         break
       }
     }
@@ -776,7 +699,7 @@ serve(async (req) => {
         }
       }
 
-      console.log('Craigslist extraction results:', {
+      console.log('🔍 Craigslist extraction results:', {
         title: data.title,
         year: data.year,
         make: data.make,
@@ -789,21 +712,6 @@ serve(async (req) => {
     // Final normalization pass (regardless of source)
     data.make = cleanMakeName(data.make) || data.make
     data.model = cleanModelName(data.model) || data.model
-
-    // Facebook Marketplace: best-effort title/description parsing if Firecrawl fields are sparse.
-    if (isFacebookMarketplaceUrl(url)) {
-      data.source = data.source === 'Unknown' ? 'Facebook Marketplace' : data.source
-      if ((!data.year || !data.make || !data.model) && data.title) {
-        const titleNoPrice = String(data.title).replace(/\s*-\s*\$[\d,]+(?:\.\d{2})?.*$/i, '').trim()
-        const parsed = parseYmmFromTitleLike(titleNoPrice)
-        data.year = data.year || parsed.year
-        data.make = data.make || parsed.make
-        data.model = data.model || parsed.model
-      }
-      if (!data.year && data.description) {
-        data.year = parseYearFromText(data.description)
-      }
-    }
 
     // Worldwide Vintage Autos detection and parsing
     if (url.includes('worldwidevintageautos.com')) {
@@ -886,7 +794,7 @@ serve(async (req) => {
         }
       }
 
-      console.log('Worldwide Vintage Autos extraction results:', {
+      console.log('🔍 Worldwide Vintage Autos extraction results:', {
         title: data.title,
         year: data.year,
         make: data.make,
@@ -900,32 +808,10 @@ serve(async (req) => {
       })
     }
 
-    // Return BOTH shapes for compatibility:
-    // - Legacy scrape-vehicle: { success: true, ...fields }
-    // - Some scripts: { success: true, data: {...fields} }
-    // Also include success inside nested data so existing frontend shim continues to work.
-    const responseBody = {
-      ...data,
-      data: { ...data },
-      _metadata: {
-        firecrawlUsed: Boolean(firecrawlExtract),
-        htmlLength: html ? html.length : 0,
-        fetchMethod: firecrawlExtract ? 'firecrawl' : html ? 'direct' : 'none',
-      },
-    }
-
-    console.log('scrape-vehicle response summary:', {
-      success: responseBody.success,
-      source: responseBody.source,
-      year: responseBody.year,
-      make: responseBody.make,
-      model: responseBody.model,
-      imageCount: Array.isArray(responseBody.images) ? responseBody.images.length : 0,
-      platform: responseBody.platform,
-    })
+    console.log(`✅ Final data structure being returned:`, data)
 
     return new Response(
-      JSON.stringify(responseBody),
+      JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
 
@@ -934,8 +820,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error?.message || String(error),
-        data: null,
+        error: error?.message || String(error)
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
