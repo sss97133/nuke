@@ -443,3 +443,5 @@ $$;
 GRANT EXECUTE ON FUNCTION calculate_vehicle_authority_for_me(UUID) TO authenticated;
 
 
+
+
