@@ -119,27 +119,10 @@ function extractGalleryImagesFromHtml(html: string): { urls: string[]; method: s
     // fall through
   }
 
-  // 2) Regex fallback (still deterministic)
-  const abs =
-    h.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || [];
-  const protoRel =
-    h.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || [];
-  const rel =
-    h.match(/\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || [];
-
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const raw of [...abs, ...protoRel, ...rel]) {
-    let u = raw;
-    if (u.startsWith('//')) u = 'https:' + u;
-    if (u.startsWith('/')) u = 'https://bringatrailer.com' + u;
-    const nu = normalize(u);
-    if (!isOk(nu)) continue;
-    if (seen.has(nu)) continue;
-    seen.add(nu);
-    out.push(nu);
-  }
-  return { urls: out, method: out.length ? 'regex:wp-content/uploads' : 'none' };
+  // 2) Regex fallback REMOVED: It was too greedy and captured images from related/recommended auctions.
+  // If data-gallery-items parsing fails, return empty array rather than risking contamination.
+  // This forces us to fix parsing issues rather than silently falling back to incorrect data.
+  return { urls: [], method: 'none' };
 }
 
 function extractEssentialsKV(doc: any): Record<string, string> {
