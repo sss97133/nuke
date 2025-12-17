@@ -231,7 +231,6 @@ export class OrganizationIntelligenceService {
             badge: dataSignals.vehicles.service
           });
         }
-      }
       } else if (effectiveType === 'auction_house') {
         // Explicitly an auction house (BaT, Cars & Bids, etc.)
         // Auctions is the core product; hide irrelevant tabs by default.

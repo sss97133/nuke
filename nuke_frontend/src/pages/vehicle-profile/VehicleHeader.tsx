@@ -91,6 +91,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [listingSourceOpen, setListingSourceOpen] = useState(false);
   const listingSourceRef = useRef<HTMLDivElement | null>(null);
 
+  // Shared helper (must be in outer scope; used by multiple helpers below)
+  const escapeRegExp = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
   const { summary: vinProofSummary } = useVINProofs(vehicle?.id);
   // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
   // (VIN plate/stamping photo OCR, title OCR, etc). Manual entry alone is not enough.
@@ -1097,9 +1100,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   // Example: "1985 GMC K10 Wagon" -> "1985 GMC K10" (no body style, include series/trim if available)
   // Prefer normalized_model over raw model
   const displayModel = (vehicle as any)?.normalized_model || vehicle?.model;
-
-  // Shared helper (must be in outer scope; used by multiple helpers below)
-  const escapeRegExp = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   const extractMileageFromText = (text: string | null | undefined): number | null => {
     if (!text) return null;
