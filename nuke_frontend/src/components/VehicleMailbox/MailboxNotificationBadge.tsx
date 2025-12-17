@@ -205,7 +205,7 @@ const MailboxNotificationBadge: React.FC<MailboxNotificationBadgeProps> = ({
 
       {showText && (
         <div className="flex flex-col">
-          <span className="text-sm font-medium">
+          <span className="text-sm font-medium" style={{ fontSize: '9px' }}>
             Mailbox
           </span>
           {totalUnread > 0 && (

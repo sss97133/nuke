@@ -10,6 +10,7 @@ import VehicleOrganizationToolbar from '../components/vehicles/VehicleOrganizati
 import VehicleConfirmationQuestions from '../components/vehicles/VehicleConfirmationQuestions';
 import TitleTransferApproval from '../components/ownership/TitleTransferApproval';
 import { MyOrganizationsService, type MyOrganization } from '../services/myOrganizationsService';
+import { usePageTitle } from '../hooks/usePageTitle';
 import '../design-system.css';
 
 interface Vehicle {
@@ -67,6 +68,8 @@ type VehiclesTab =
   | 'previously_owned';
 
 const VehiclesInner: React.FC = () => {
+  usePageTitle('Vehicles');
+  
   const [vehicleRelationships, setVehicleRelationships] = useState<{
     owned: VehicleRelationship[];
     contributing: VehicleRelationship[];

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ForgotPasswordForm from '../auth/ForgotPasswordForm';
-import BypassLogin from './BypassLogin';
 import '../../design-system.css';
 
 const Login = () => {

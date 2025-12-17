@@ -1318,23 +1318,39 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       style={{
         background: 'var(--surface)',
         borderBottom: '1px solid var(--border)',
-        padding: '3px 8px',
+        padding: '0px 8px',
         margin: 0,
+        marginTop: 0,
+        marginBottom: 0,
         marginLeft: 'calc(-1 * var(--space-2))',
         marginRight: 'calc(-1 * var(--space-2))',
-        position: 'sticky',
-        top: '48px',
-        // Avoid `100vw` here — it includes the scrollbar width and can cause horizontal overflow
-        // (page "pans" sideways and the background looks too wide).
-        width: '100%',
+        position: 'static',
+        width: '100px',
+        height: '30px',
         zIndex: 97,
         boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+        gap: '0px',
         boxSizing: 'border-box'
       }}
     >
-      <div style={{ display: 'flex', flexWrap: 'nowrap', justifyContent: 'space-between', alignItems: 'center', gap: '6px', width: '100%' }}>
+      <div style={{ 
+        display: 'flex', 
+        flexWrap: 'wrap', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        gap: '0px', 
+        width: '100px',
+        height: '30px',
+        marginTop: 0,
+        marginBottom: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+        position: 'static'
+      }}>
         <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', overflow: 'hidden' }}>
           <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {identityLabel}

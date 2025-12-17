@@ -120,12 +120,3 @@
   padding: 8px;
 }
 
-@media (max-width: 768px) {
-  .mobile-menu-button {
-    display: block;
-  }
-  
-  .desktop-nav {
-    display: none;
-  }
-}

@@ -428,17 +428,3 @@
   display: flex;
   flex-direction: column;
 }
-
-/* Responsive adjustments */
-@media (max-width: 640px) {
-  .win95-tag-panel {
-    min-width: 150px;
-    max-width: 250px;
-  }
-
-  .win95-tag-dot {
-    width: 20px;
-    height: 20px;
-    font-size: 10px;
-  }
-}

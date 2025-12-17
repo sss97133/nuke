@@ -437,17 +437,6 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
         .grid-3 { grid-template-columns: repeat(3, 1fr); }
         .grid-4 { grid-template-columns: repeat(4, 1fr); }
 
-        @media (max-width: 768px) {
-          .grid-2, .grid-3, .grid-4 {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        @media (min-width: 769px) and (max-width: 1024px) {
-          .grid-3, .grid-4 {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
       `}</style>
     </div>
   );

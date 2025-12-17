@@ -302,7 +302,22 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
             <div className="page-header-left">
               {showBackButton && (
                 <button 
-                  onClick={() => navigate(-1)} 
+                  onClick={() => {
+                    // Safe back navigation: check if we can go back in history
+                    // If history is empty or would navigate to external/404, go to homepage
+                    if (window.history.length > 1) {
+                      // Try to go back, but catch any errors
+                      try {
+                        navigate(-1);
+                      } catch (error) {
+                        // Fallback to homepage if back navigation fails
+                        navigate('/');
+                      }
+                    } else {
+                      // No history, go to homepage
+                      navigate('/');
+                    }
+                  }} 
                   className="button button-secondary back-button"
                 >
                   ← Back

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { UserInteractionService } from '../services/userInteractionService';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface HypeVehicle {
   id: string;
@@ -297,6 +298,7 @@ const classifySource = (v: any): SourceKind => {
 };
 
 const CursorHomepage: React.FC = () => {
+  usePageTitle('n-zero');
   const [feedVehicles, setFeedVehicles] = useState<HypeVehicle[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<HypeVehicle[]>([]);
   const [loading, setLoading] = useState(true);
