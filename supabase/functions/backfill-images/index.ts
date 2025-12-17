@@ -164,11 +164,17 @@ serve(async (req) => {
     // Dedupe: skip images already linked by source_url for this vehicle
     const { data: existingRows } = await supabase
       .from('vehicle_images')
-      .select('source_url, is_primary')
+      .select('id, source_url, is_primary, position')
       .eq('vehicle_id', vehicle_id)
       .not('source_url', 'is', null)
       .limit(5000);
-    const existingSourceUrls = new Set((existingRows || []).map((r: any) => String(r.source_url)));
+    const existingBySourceUrl = new Map<string, any>();
+    for (const r of (existingRows || []) as any[]) {
+      const u = String(r?.source_url || '');
+      if (!u) continue;
+      if (!existingBySourceUrl.has(u)) existingBySourceUrl.set(u, r);
+    }
+    const existingSourceUrls = new Set(Array.from(existingBySourceUrl.keys()));
     const hasPrimaryAlready = (existingRows || []).some((r: any) => r?.is_primary === true);
 
     const normalizedInput = image_urls
@@ -201,6 +207,20 @@ serve(async (req) => {
       const rawUrl = uniqueUrls[i];
       processed++;
       if (existingSourceUrls.has(rawUrl)) {
+        // Self-heal ordering: older backfills didn't set position. If we have a row with NULL position,
+        // set it using the gallery index so profiles become stable without requiring re-upload.
+        try {
+          const existing = existingBySourceUrl.get(rawUrl);
+          if (existing?.id && (existing?.position === null || existing?.position === undefined)) {
+            await supabase
+              .from('vehicle_images')
+              .update({ position: i })
+              .eq('id', existing.id)
+              .catch(() => null);
+          }
+        } catch {
+          // ignore
+        }
         results.skipped++;
         continue;
       }

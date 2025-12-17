@@ -8,6 +8,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function isFacebookUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    return host === 'facebook.com' || host.endsWith('.facebook.com');
+  } catch {
+    return false;
+  }
+}
+
+function isFacebookMarketplaceUrl(url: string): boolean {
+  const s = String(url || '');
+  if (!isFacebookUrl(s)) return false;
+  return s.includes('/marketplace') || s.includes('/share/');
+}
+
+function parseFacebookListingId(url: string): string | null {
+  const s = String(url || '');
+  const m1 = s.match(/\/marketplace\/item\/(\d{5,})/i);
+  if (m1?.[1]) return m1[1];
+  const m2 = s.match(/[?&]item_id=(\d{5,})/i);
+  if (m2?.[1]) return m2[1];
+  return null;
+}
+
 // Production-safe debug logging (DB) + local ingest (if reachable).
 const debugSupabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -436,9 +461,12 @@ serve(async (req) => {
   }
 
   try {
+    const sessionId = 'process-import-queue';
+    const runId = crypto.randomUUID?.() || String(Date.now());
+
     debugLog({
-      sessionId: 'debug-session',
-      runId: 'pre-fix',
+      sessionId,
+      runId,
       hypothesisId: 'H5',
       location: 'supabase/functions/process-import-queue/index.ts:entry',
       message: 'process-import-queue invoked',
@@ -460,8 +488,8 @@ serve(async (req) => {
       skip_image_upload = false,
     } = body;
     debugLog({
-      sessionId: 'debug-session',
-      runId: 'pre-fix',
+      sessionId,
+      runId,
       hypothesisId: 'H5',
       location: 'supabase/functions/process-import-queue/index.ts:parsed_body',
       message: 'Parsed request body',
@@ -496,8 +524,8 @@ serve(async (req) => {
 
     console.log(`Processing ${queueItems.length} queue items`);
     debugLog({
-      sessionId: 'debug-session',
-      runId: 'pre-fix',
+      sessionId,
+      runId,
       hypothesisId: 'H5',
       location: 'supabase/functions/process-import-queue/index.ts:process_start',
       message: 'Fetched import_queue items',
@@ -515,8 +543,8 @@ serve(async (req) => {
     for (const item of queueItems) {
       try {
         debugLog({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
+          sessionId,
+          runId,
           hypothesisId: 'H1',
           location: 'supabase/functions/process-import-queue/index.ts:item_start',
           message: 'Start processing queue item',
@@ -542,16 +570,54 @@ serve(async (req) => {
             existingVehicleByUrl.ownership_verified === true || !!existingVehicleByUrl.ownership_verification_id;
         }
 
-        // Scrape vehicle data - try Firecrawl first, then direct fetch
+        // Scrape vehicle data - Firecrawl/HTML for normal sites, but Facebook Marketplace must go through scrape-vehicle.
         console.log('🔍 Scraping URL:', item.listing_url);
         
+        const isFacebookMarketplace = isFacebookMarketplaceUrl(item.listing_url);
         let html = '';
         let scrapeSuccess = false;
         const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+        let scrapeData: any = null;
+
+        if (isFacebookMarketplace) {
+          const { data: fbResp, error: fbErr } = await supabase.functions.invoke('scrape-vehicle', {
+            body: { url: item.listing_url }
+          });
+
+          if (fbErr) {
+            throw new Error(`scrape-vehicle invoke failed for Facebook Marketplace: ${fbErr.message}`);
+          }
+          if (!fbResp?.success) {
+            throw new Error(`Facebook Marketplace scrape failed: ${fbResp?.error || 'Unknown error'}`);
+          }
+
+          const fbData = fbResp?.data || fbResp;
+          scrapeData = {
+            success: true,
+            data: {
+              source: fbData?.source || 'Facebook Marketplace',
+              listing_url: item.listing_url,
+              discovery_url: item.listing_url,
+              title: fbData?.title || '',
+              description: fbData?.description || '',
+              images: Array.isArray(fbData?.images) ? fbData.images : [],
+              timestamp: new Date().toISOString(),
+              year: fbData?.year ?? null,
+              make: fbData?.make ?? null,
+              model: fbData?.model ?? null,
+              asking_price: fbData?.asking_price ?? fbData?.price ?? null,
+              location: fbData?.location ?? null,
+              vin: fbData?.vin ?? null,
+              platform: 'facebook_marketplace',
+              listing_id: parseFacebookListingId(item.listing_url),
+              raw: fbData || null,
+            }
+          };
+        }
         
         // Try Firecrawl first if API key is available (bypasses bot protection)
         // Use timeout to prevent hanging
-        if (firecrawlApiKey) {
+        if (!isFacebookMarketplace && firecrawlApiKey) {
           try {
             console.log('🔥 Attempting Firecrawl scrape...');
             const firecrawlController = new AbortController();
@@ -599,7 +665,7 @@ serve(async (req) => {
         }
         
         // Fallback to direct fetch if Firecrawl didn't work
-        if (!scrapeSuccess) {
+        if (!isFacebookMarketplace && !scrapeSuccess) {
           console.log('📡 Using direct fetch (fallback)');
           const fetchController = new AbortController();
           const fetchTimeout = setTimeout(() => fetchController.abort(), 10000); // 10s timeout
@@ -629,6 +695,11 @@ serve(async (req) => {
             throw fetchError;
           }
         }
+
+        if (isFacebookMarketplace) {
+          // Facebook Marketplace has no HTML parsing path (auth gated).
+          // scrapeData is already populated via scrape-vehicle above.
+        } else {
         // Remove "Pending Organization Assignments" HTML blocks before parsing
         html = html.replace(/<div[^>]*style="[^"]*padding:\s*12px[^"]*background:\s*rgb\(254,\s*243,\s*199\)[^"]*"[^>]*>[\s\S]*?REJECT<\/div>/gi, '');
         
@@ -640,7 +711,7 @@ serve(async (req) => {
         const doc = new DOMParser().parseFromString(html, 'text/html');
 
         // Basic data extraction
-        const scrapeData: any = {
+        scrapeData = {
           success: true,
           data: {
             source: 'Unknown',
@@ -657,6 +728,7 @@ serve(async (req) => {
             location: null,
           }
         };
+        }
 
         // L'Art de L'Automobile: use the dedicated `scrape-vehicle` extractor for /fiche/ pages.
         // This is critical for: hi-res image set, structured options/service history, mileage/price.
@@ -1509,8 +1581,8 @@ serve(async (req) => {
         }
 
         debugLog({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
+          sessionId,
+          runId,
           hypothesisId: 'H2',
           location: 'supabase/functions/process-import-queue/index.ts:after_extract',
           message: 'Scraped + normalized vehicle identity fields',
@@ -2195,8 +2267,8 @@ serve(async (req) => {
         }
 
         debugLog({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
+          sessionId,
+          runId,
           hypothesisId: 'H4',
           location: 'supabase/functions/process-import-queue/index.ts:vehicle_inserted',
           message: 'Inserted vehicles row (initial form baseline)',
@@ -2657,8 +2729,8 @@ serve(async (req) => {
         });
 
         debugLog({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
+          sessionId,
+          runId,
           hypothesisId: 'H1',
           location: 'supabase/functions/process-import-queue/index.ts:forensic_rpc',
           message: 'Forensic processing result',
@@ -2958,8 +3030,8 @@ serve(async (req) => {
         );
 
         debugLog({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
+          sessionId,
+          runId,
           hypothesisId: 'H3',
           location: 'supabase/functions/process-import-queue/index.ts:quality_gate',
           message: 'validate_vehicle_before_public result',
@@ -3026,6 +3098,19 @@ serve(async (req) => {
             vehicle_id: newVehicle.id,
             processed_at: new Date().toISOString(),
             error_message: null,
+            raw_data: {
+              ...(item.raw_data || {}),
+              last_run_id: runId,
+              last_worker_id: workerId,
+              last_result: {
+                status: 'complete',
+                vehicle_id: newVehicle.id,
+                source: scrapeData?.data?.source || null,
+                platform: scrapeData?.data?.platform || null,
+                listing_id: scrapeData?.data?.listing_id || null,
+                image_count: Array.isArray(scrapeData?.data?.images) ? scrapeData.data.images.length : null,
+              },
+            },
             locked_at: null,
             locked_by: null,
             next_attempt_at: null,
@@ -3172,8 +3257,8 @@ serve(async (req) => {
       } catch (error) {
         console.error(`Failed to process ${item.listing_url}:`, error);
         debugLog({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
+          sessionId,
+          runId,
           hypothesisId: 'H1',
           location: 'supabase/functions/process-import-queue/index.ts:item_error',
           message: 'Queue item processing failed',
@@ -3187,6 +3272,13 @@ serve(async (req) => {
             status: (Number(item.attempts || 0) >= 3) ? 'failed' : 'pending',
             error_message: (error as any)?.message || String(error),
             processed_at: new Date().toISOString(),
+            raw_data: {
+              ...(item.raw_data || {}),
+              last_run_id: runId,
+              last_worker_id: workerId,
+              last_error_message: (error as any)?.message || String(error),
+              last_error_at: new Date().toISOString(),
+            },
             locked_at: null,
             locked_by: null,
             next_attempt_at: (Number(item.attempts || 0) >= 3)
@@ -3212,8 +3304,8 @@ serve(async (req) => {
   } catch (error) {
     console.error('Process queue error:', error);
     debugLog({
-      sessionId: 'debug-session',
-      runId: 'pre-fix',
+      sessionId,
+      runId,
       hypothesisId: 'H5',
       location: 'supabase/functions/process-import-queue/index.ts:outer_error',
       message: 'Top-level handler error',
