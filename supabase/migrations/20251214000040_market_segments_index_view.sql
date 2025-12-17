@@ -44,3 +44,5 @@ COMMENT ON VIEW public.market_segments_index IS 'Market segments + optional fund
 COMMIT;
 
 
+
+
