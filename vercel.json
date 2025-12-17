@@ -3,15 +3,14 @@
   "outputDirectory": "nuke_frontend/dist",
   "installCommand": "cd nuke_frontend && npm install",
   "framework": "vite",
-  "routes": [
-    { "handle": "filesystem" },
+  "rewrites": [
     {
-      "src": "^/api/(.*)",
-      "dest": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/$1"
+      "source": "/api/:path*",
+      "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path*"
     },
     {
-      "src": "^/(?!assets/)(.*)$",
-      "dest": "/"
+      "source": "/((?!assets/).*)",
+      "destination": "/index.html"
     }
   ],
   "cleanUrls": true,
