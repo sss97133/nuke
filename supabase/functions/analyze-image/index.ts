@@ -311,9 +311,61 @@ serve(async (req) => {
 
     // 5. Save Everything
     // Update image metadata with appraiser result, SPID data, and VIN tag data
+    // Try to extract a more specific angle from appraiser result or labels
+    let detectedAngle = context || null
+    if (appraiserResult?.angle) {
+      detectedAngle = appraiserResult.angle
+    } else if (context === 'interior') {
+      // Try to be more specific for interior images
+      const labelText = (rekognitionData.Labels || []).map((l: any) => l.Name.toLowerCase()).join(' ')
+      if (labelText.includes('door') && (labelText.includes('panel') || labelText.includes('interior'))) {
+        // Try to determine which door
+        if (labelText.includes('driver') || labelText.includes('left')) {
+          detectedAngle = 'interior_door_driver'
+        } else if (labelText.includes('passenger') || labelText.includes('right')) {
+          detectedAngle = 'interior_door_passenger'
+        } else {
+          detectedAngle = 'interior_door'
+        }
+      } else if (labelText.includes('dashboard') || labelText.includes('dash')) {
+        detectedAngle = 'interior_dash_full'
+      } else if (labelText.includes('seat')) {
+        if (labelText.includes('driver') || labelText.includes('left')) {
+          detectedAngle = 'interior_driver_seat'
+        } else if (labelText.includes('passenger') || labelText.includes('right')) {
+          detectedAngle = 'interior_passenger_seat'
+        } else {
+          detectedAngle = 'interior_seats'
+        }
+      }
+    }
+    
+    // Extract subject from labels or appraiser result
+    let detectedSubject = null
+    if (appraiserResult?.subject) {
+      detectedSubject = appraiserResult.subject
+    } else {
+      const labelText = (rekognitionData.Labels || []).map((l: any) => l.Name.toLowerCase()).join(' ')
+      if (labelText.includes('door') && labelText.includes('panel')) {
+        detectedSubject = 'door_panel'
+      } else if (labelText.includes('dashboard') || labelText.includes('dash')) {
+        detectedSubject = 'dashboard'
+      } else if (labelText.includes('engine')) {
+        detectedSubject = 'engine'
+      } else if (labelText.includes('seat')) {
+        detectedSubject = 'seat'
+      } else if (labelText.includes('frame') || labelText.includes('chassis')) {
+        detectedSubject = 'frame'
+      }
+    }
+    
     const tier1Compat = {
       category: context || 'general',
-      angle: context || null,
+      angle: detectedAngle,
+      subject: detectedSubject,
+      is_full_vehicle: false, // Will be determined by angle classification
+      is_interior: context === 'interior',
+      is_exterior: context === 'exterior',
       condition_glance: appraiserResult?.condition_glance
         ?? appraiserResult?.condition
         ?? appraiserResult?.appraisal?.condition
@@ -565,11 +617,32 @@ serve(async (req) => {
 
 function determineAppraiserContext(rekognitionData: any): string | null {
   const labels = rekognitionData.Labels?.map((l: any) => l.Name.toLowerCase()) || []
+  const labelText = labels.join(' ')
   
-  if (labels.includes('engine') || labels.includes('engine control unit')) return 'engine'
-  if (labels.includes('interior') || labels.includes('seat') || labels.includes('dashboard')) return 'interior'
-  if (labels.includes('undercarriage') || labels.includes('suspension') || labels.includes('chassis')) return 'undercarriage'
-  if (labels.includes('vehicle') || labels.includes('car') || labels.includes('truck')) return 'exterior'
+  // Check for engine bay first
+  if (labels.includes('engine') || labels.includes('engine control unit') || 
+      labelText.includes('engine bay') || labelText.includes('motor')) return 'engine'
+  
+  // Check for interior - be more comprehensive
+  // Door interiors: door panel, door handle, window controls, armrest, interior door
+  // Also check for upholstery, fabric, leather, vinyl which are interior materials
+  if (labels.includes('interior') || labels.includes('seat') || labels.includes('dashboard') ||
+      labels.includes('door panel') || labels.includes('door handle') || 
+      labels.includes('armrest') || labels.includes('upholstery') ||
+      labels.includes('fabric') || labels.includes('leather') || labels.includes('vinyl') ||
+      labelText.includes('interior door') || labelText.includes('door interior') ||
+      labelText.includes('window control') || labelText.includes('door card')) return 'interior'
+  
+  // Check for undercarriage
+  if (labels.includes('undercarriage') || labels.includes('suspension') || 
+      labels.includes('chassis') || labels.includes('frame') || labels.includes('axle')) return 'undercarriage'
+  
+  // Only classify as exterior if we see full vehicle context
+  // Don't default to exterior for close-ups or partial views
+  if ((labels.includes('vehicle') || labels.includes('car') || labels.includes('truck')) &&
+      (labels.includes('exterior') || labelText.includes('full vehicle') || 
+       labelText.includes('side view') || labelText.includes('front view') || 
+       labelText.includes('rear view'))) return 'exterior'
   
   return null
 }
@@ -718,9 +791,19 @@ async function runAppraiserBrain(imageUrl: string, context: string, supabaseClie
   "category": "engine_bay",
   "model": "gpt-4o-mini"
 }`,
-    interior: `Analyze this interior image. Return a JSON object with:
+    interior: `Analyze this interior image. Your PRIMARY task is to accurately identify the SUBJECT and ANGLE.
+
+CRITICAL: 
+- If this is a door panel (interior side of a door), you MUST identify it as such
+- Distinguish between: door_panel, dashboard, seat, headliner, carpet, console, etc.
+- Specify driver vs passenger side when applicable
+- Use specific angle taxonomy: interior_door_driver, interior_door_passenger, interior_dash_full, etc.
+
+Return a JSON object with:
 {
-  "description": "One detailed sentence (e.g., Original bench seat interior with column shifter and AM/FM radio)",
+  "subject": "door_panel|dashboard|seat|headliner|carpet|console|other",
+  "angle": "interior_door_driver|interior_door_passenger|interior_dash_full|interior_driver_seat|etc",
+  "description": "One detailed sentence (e.g., Driver side interior door panel showing armrest, window controls, and speaker cover)",
   "seats_good_condition": true or false,
   "dash_cracks": true or false,
   "stock_radio": true or false,

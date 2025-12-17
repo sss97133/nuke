@@ -569,24 +569,6 @@ body {
   color: var(--rh-text-primary);
 }
 
-/* ================================================
-   RESPONSIVE
-   ================================================ */
-
-@media (max-width: 768px) {
-  .rh-value-price {
-    font-size: 32px;
-  }
-  
-  .rh-spec-key {
-    width: 100px;
-    font-size: 12px;
-  }
-  
-  .rh-spec-value {
-    font-size: 12px;
-  }
-}
 
 /* ================================================
    ANIMATIONS (Smooth, not flashy)

@@ -88,18 +88,3 @@
   font-weight: 600;
   letter-spacing: 0.5px;
 }
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .image-grid .grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 12px;
-    padding: 12px;
-  }
-
-  .loading-container,
-  .error-container {
-    min-height: 300px;
-    padding: 1rem;
-  }
-}

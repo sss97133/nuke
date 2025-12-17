@@ -1829,12 +1829,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               padding: '6px 8px',
                               border: '1px solid rgba(255,255,255,0.1)'
                             }}>
-                              <DataRow label="image_category" value={imageMetadata.image_category} mono />
-                              <DataRow label="category" value={imageMetadata.category} mono />
-                              <DataRow label="source" value={imageMetadata.source} mono />
-                              <DataRow label="taken_at" value={imageMetadata.taken_at ? new Date(imageMetadata.taken_at).toISOString() : null} mono />
-                              <DataRow label="is_primary" value={imageMetadata.is_primary} mono />
-                              <DataRow label="angle" value={imageMetadata.angle} mono />
+                              <DataRow label="Image Category" value={imageMetadata.image_category} mono />
+                              <DataRow label="Category" value={imageMetadata.category} mono />
+                              <DataRow label="Source" value={imageMetadata.source} mono />
+                              <DataRow label="Taken At" value={imageMetadata.taken_at ? new Date(imageMetadata.taken_at).toISOString() : null} mono />
+                              <DataRow label="Primary Image" value={imageMetadata.is_primary} mono />
+                              <DataRow label="Angle" value={imageMetadata.angle} mono />
                             </div>
                           </div>
                         )}
@@ -1854,10 +1854,14 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               padding: '6px 8px',
                               border: '1px solid rgba(255,255,255,0.1)'
                             }}>
-                              <DataRow label="angle" value={tier1Analysis.angle} mono />
-                              <DataRow label="category" value={tier1Analysis.category} mono />
-                              <DataRow label="condition_glance" value={tier1Analysis.condition_glance} mono />
-                              <DataRow label="components_visible" value={tier1Analysis.components_visible} mono />
+                              <DataRow label="Subject" value={tier1Analysis.subject} mono />
+                              <DataRow label="Angle" value={tier1Analysis.angle} mono />
+                              <DataRow label="Category" value={tier1Analysis.category} mono />
+                              <DataRow label="Is Interior" value={tier1Analysis.is_interior} mono />
+                              <DataRow label="Is Exterior" value={tier1Analysis.is_exterior} mono />
+                              <DataRow label="Is Full Vehicle" value={tier1Analysis.is_full_vehicle} mono />
+                              <DataRow label="Condition Glance" value={tier1Analysis.condition_glance} mono />
+                              <DataRow label="Components Visible" value={tier1Analysis.components_visible} mono />
                             </div>
                           </div>
                         )}
@@ -1877,12 +1881,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               padding: '6px 8px',
                               border: '1px solid rgba(255,255,255,0.1)'
                             }}>
-                              <DataRow label="overall_score" value={`${tier1Analysis.image_quality.overall_score}/10`} mono />
-                              <DataRow label="focus" value={tier1Analysis.image_quality.focus} mono />
-                              <DataRow label="lighting" value={tier1Analysis.image_quality.lighting} mono />
-                              <DataRow label="resolution" value={tier1Analysis.image_quality.estimated_resolution} mono />
-                              <DataRow label="suitable_for_expert" value={tier1Analysis.image_quality.suitable_for_expert} mono />
-                              <DataRow label="sufficient_for_detail" value={tier1Analysis.image_quality.sufficient_for_detail} mono />
+                              <DataRow label="Overall Score" value={`${tier1Analysis.image_quality.overall_score}/10`} mono />
+                              <DataRow label="Focus" value={tier1Analysis.image_quality.focus} mono />
+                              <DataRow label="Lighting" value={tier1Analysis.image_quality.lighting} mono />
+                              <DataRow label="Resolution" value={tier1Analysis.image_quality.estimated_resolution} mono />
+                              <DataRow label="Suitable for Expert" value={tier1Analysis.image_quality.suitable_for_expert} mono />
+                              <DataRow label="Sufficient for Detail" value={tier1Analysis.image_quality.sufficient_for_detail} mono />
                             </div>
                           </div>
                         )}
@@ -1925,8 +1929,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               padding: '6px 8px',
                               border: '1px solid rgba(255,255,255,0.1)'
                             }}>
-                              <DataRow label="scanned_at" value={imageMetadata.ai_scan_metadata.scanned_at} mono />
-                              <DataRow label="tier_reached" value={imageMetadata.ai_scan_metadata.processing_tier_reached} mono />
+                              <DataRow label="Scanned At" value={imageMetadata.ai_scan_metadata.scanned_at} mono />
+                              <DataRow label="Tier Reached" value={imageMetadata.ai_scan_metadata.processing_tier_reached} mono />
                             </div>
                           </div>
                         )}
@@ -1946,8 +1950,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               padding: '6px 8px',
                               border: '1px solid rgba(255,255,255,0.1)'
                             }}>
-                              <DataRow label="model" value={appraiser.model} mono />
-                              <DataRow label="angle" value={appraiser.angle} mono />
+                              <DataRow label="Model" value={appraiser.model} mono />
+                              <DataRow label="Angle" value={appraiser.angle} mono />
                               {appraiser.description && (
                                 <div style={{ marginTop: '4px', fontSize: '8pt', color: 'white', lineHeight: '1.4' }}>
                                   {appraiser.description}
@@ -1972,12 +1976,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                               padding: '6px 8px',
                               border: '1px solid rgba(34,197,94,0.3)'
                             }}>
-                              <DataRow label="confidence" value={`${imageMetadata.ai_scan_metadata.spid_data.confidence}%`} mono />
+                              <DataRow label="Confidence" value={`${imageMetadata.ai_scan_metadata.spid_data.confidence}%`} mono />
                               {imageMetadata.ai_scan_metadata.spid_data.extracted_data && (
                                 <>
-                                  <DataRow label="vin" value={imageMetadata.ai_scan_metadata.spid_data.extracted_data.vin} mono />
-                                  <DataRow label="paint_code" value={imageMetadata.ai_scan_metadata.spid_data.extracted_data.paint_code_exterior} mono />
-                                  <DataRow label="rpo_codes" value={imageMetadata.ai_scan_metadata.spid_data.extracted_data.rpo_codes} mono />
+                                  <DataRow label="VIN" value={imageMetadata.ai_scan_metadata.spid_data.extracted_data.vin} mono />
+                                  <DataRow label="Paint Code" value={imageMetadata.ai_scan_metadata.spid_data.extracted_data.paint_code_exterior} mono />
+                                  <DataRow label="RPO Codes" value={imageMetadata.ai_scan_metadata.spid_data.extracted_data.rpo_codes} mono />
                                 </>
                               )}
                             </div>

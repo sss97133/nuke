@@ -33,6 +33,7 @@ import AddOrganizationRelationship from '../components/vehicle/AddOrganizationRe
 import ValuationCitations from '../components/vehicle/ValuationCitations';
 import { PartsQuoteGenerator } from '../components/PartsQuoteGenerator';
 import WiringQueryContextBar from '../components/wiring/WiringQueryContextBar';
+import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
 import LiveAuctionBanner from '../components/auction/LiveAuctionBanner';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
@@ -428,6 +429,9 @@ const VehicleProfile: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // PAGE TITLE MANAGEMENT
+  usePageTitle(() => getVehicleTitle(vehicle));
 
   // URL-driven claim flow fallback: /vehicle/:id?claim=1 opens the ownership modal
   // This makes "Claim this vehicle" work even if onClick handlers are flaky on some devices.
@@ -2575,7 +2579,7 @@ const VehicleProfile: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <button
                   className="button button-secondary"
-                  style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}
+                  style={{ fontSize: '9px', fontWeight: 100, whiteSpace: 'nowrap' }}
                   onClick={() => navigate(`/vehicle/${vehicle.id}/mailbox`)}
                 >
                   Open Mailbox

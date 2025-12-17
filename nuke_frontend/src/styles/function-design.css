@@ -213,20 +213,4 @@ body {
   transform: translateY(-1px);
 }
 
-/* ================================================
-   RESPONSIVE
-   ================================================ */
-
-/* Keep dense even on mobile */
-@media (max-width: 768px) {
-  .grid-4 {
-    grid-template-columns: repeat(3, 1fr); /* Still dense on mobile */
-  }
-}
-
-@media (max-width: 480px) {
-  .grid-4 {
-    grid-template-columns: repeat(2, 1fr); /* Minimum 2 columns */
-  }
-}
 

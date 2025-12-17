@@ -689,8 +689,8 @@ defmodule NukeApiWeb.ImageController do
         _ -> false
       end
     else
-      # Allow anonymous access when authentication is not working (development mode)
-      true
+      # Explicitly deny access if not authenticated (security fix: removed anonymous access bypass)
+      false
     end
   end
 

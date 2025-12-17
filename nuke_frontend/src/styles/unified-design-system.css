@@ -548,20 +548,4 @@ select:focus {
 
 .uppercase { text-transform: uppercase; }
 
-/* ================================================
-   RESPONSIVE
-   ================================================ */
-
-@media (max-width: 768px) {
-  .container {
-    padding: 0 8px;
-  }
-  
-  input[type="text"],
-  input[type="number"],
-  input[type="email"],
-  input[type="password"] {
-    font-size: 16px; /* Prevents iOS zoom */
-  }
-}
 

@@ -179,82 +179,8 @@
 }
 
 /* ============================================================================
-   MOBILE RESPONSIVE
+   MOBILE RESPONSIVE - REMOVED
    ============================================================================ */
-
-@media (max-width: 768px) {
-  .header-content {
-    padding: 0 4px;
-    height: auto;
-    min-height: 40px;
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 4px;
-  }
-
-  /* Switch to content-driven layout on small screens */
-  .header-slot-left { flex: 0 0 auto; min-width: auto; }
-  .header-spacer { flex: 0 0 4px; min-width: 4px; }
-  .header-slot-center { flex: 1 1 auto; }
-  .header-slot-right { flex: 0 0 auto; min-width: auto; }
-
-  .header-left {
-    gap: 4px;
-    overflow: visible;
-  }
-
-  .main-nav {
-    gap: 2px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .main-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .nav-link {
-    padding: 4px 6px;
-    font-size: 8pt;
-    flex-shrink: 0;
-  }
-
-  .header-right { gap: 4px; }
-}
-
-@media (max-width: 480px) {
-  .header-content {
-    height: auto;
-    padding: 4px;
-  }
-
-  .logo-text {
-    padding: 2px 6px;
-    font-size: 8pt;
-  }
-
-  .nav-link {
-    padding: 2px 4px;
-    font-size: 7pt;
-  }
-
-  /* Stack header if needed */
-  .main-nav {
-    flex-wrap: nowrap;
-    overflow-x: scroll;
-  }
-
-  /* Hide agent input on very small screens */
-  .header-slot-center {
-    display: none;
-  }
-
-  .header-spacer {
-    display: none;
-  }
-}
 
 /* ============================================================================
    Z-INDEX HIERARCHY (from highest to lowest)

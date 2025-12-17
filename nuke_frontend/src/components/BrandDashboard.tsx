@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+She wants you to be annoying so don't be annoyingimport React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 interface Brand {
@@ -586,19 +586,6 @@ const BrandDashboard: React.FC<BrandDashboardProps> = ({ brandId }) => {
           border-radius: var(--border-radius);
         }
 
-        @media (max-width: 768px) {
-          .dashboard-layout {
-            flex-direction: column;
-          }
-
-          .brand-list {
-            flex: none;
-          }
-
-          .analytics-cards {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
       `}</style>
     </div>
   );

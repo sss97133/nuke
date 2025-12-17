@@ -140,7 +140,18 @@ export default function EventDetail() {
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              // Safe back navigation with fallback to homepage
+              if (window.history.length > 1) {
+                try {
+                  navigate(-1);
+                } catch (error) {
+                  navigate('/');
+                }
+              } else {
+                navigate('/');
+              }
+            }}
             className="button-win95"
             style={{ marginBottom: '12px', fontSize: '8pt' }}
           >

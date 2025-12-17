@@ -398,15 +398,6 @@ const AdminDashboard: React.FC = () => {
           100% { transform: rotate(360deg); }
         }
 
-        @media (max-width: 768px) {
-          .dashboard-sections {
-            grid-template-columns: 1fr;
-          }
-
-          .stats-grid {
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-          }
-        }
       `}</style>
 
       <div className="dashboard-header">

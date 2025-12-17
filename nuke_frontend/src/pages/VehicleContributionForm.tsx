@@ -335,7 +335,18 @@ const VehicleContributionForm: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  // Safe back navigation with fallback to homepage
+                  if (window.history.length > 1) {
+                    try {
+                      navigate(-1);
+                    } catch (error) {
+                      navigate('/');
+                    }
+                  } else {
+                    navigate('/');
+                  }
+                }}
                 className="btn btn-secondary"
               >
                 Cancel
