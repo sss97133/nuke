@@ -2100,7 +2100,11 @@ export default function OrganizationProfile() {
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                                   <a
                                     href={`/vehicle/${vehicle.vehicle_id}`}
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      navigate(`/vehicle/${vehicle.vehicle_id}`);
+                                    }}
                                     style={{
                                       fontSize: '11pt',
                                       fontWeight: 700,
