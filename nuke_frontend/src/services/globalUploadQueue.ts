@@ -79,7 +79,6 @@ class GlobalUploadQueue {
             this.uploadedFingerprints.add(fingerprint);
           }
         });
-        console.log(`Loaded ${this.uploadedFingerprints.size} uploaded file fingerprints for duplicate detection`);
       }
     } catch (error) {
       console.error('Failed to load uploaded fingerprints:', error);
