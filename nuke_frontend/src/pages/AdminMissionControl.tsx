@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, getSupabaseFunctionsUrl } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
 interface SystemStats {
@@ -11,6 +11,15 @@ interface SystemStats {
   investmentOpportunities: number;
   todayUploads: number;
   activeProcessing: number;
+}
+
+interface ImageRadarRow {
+  kind: string;
+  key: string;
+  n: number;
+  vehicles: number;
+  sample_url: string | null;
+  sample_vehicle_id: string | null;
 }
 
 const AdminMissionControl: React.FC = () => {
@@ -37,6 +46,8 @@ const AdminMissionControl: React.FC = () => {
   const [batRepairRunning, setBatRepairRunning] = useState(false);
   const [batRepairBatchSize, setBatRepairBatchSize] = useState(10);
   const [batRepairLastResult, setBatRepairLastResult] = useState<any | null>(null);
+  const [batCleanupRunning, setBatCleanupRunning] = useState(false);
+  const [batCleanupLastResult, setBatCleanupLastResult] = useState<any | null>(null);
   const [batDomHealthRunning, setBatDomHealthRunning] = useState(false);
   const [batDomHealthBatchSize, setBatDomHealthBatchSize] = useState(50);
   const [batDomHealthLastResult, setBatDomHealthLastResult] = useState<any | null>(null);
@@ -46,6 +57,15 @@ const AdminMissionControl: React.FC = () => {
   const [angleBackfillBatchSize, setAngleBackfillBatchSize] = useState(25);
   const [angleBackfillMinConfidence, setAngleBackfillMinConfidence] = useState(80);
   const [angleBackfillLastResult, setAngleBackfillLastResult] = useState<any | null>(null);
+  const [imageRadarKind, setImageRadarKind] = useState<'normalized_url' | 'file_hash' | 'perceptual_hash' | 'dhash'>('normalized_url');
+  const [imageRadarSource, setImageRadarSource] = useState<string>('');
+  const [imageRadarMinCount, setImageRadarMinCount] = useState<number>(25);
+  const [imageRadarLimit, setImageRadarLimit] = useState<number>(50);
+  const [imageRadarRows, setImageRadarRows] = useState<ImageRadarRow[]>([]);
+  const [imageRadarLoading, setImageRadarLoading] = useState<boolean>(false);
+  const [imageRadarError, setImageRadarError] = useState<string | null>(null);
+  const imageRadarInFlightRef = useRef(false);
+  const [imageRadarLastUpdatedAt, setImageRadarLastUpdatedAt] = useState<Date | null>(null);
   const loadInFlightRef = useRef(false);
   const mountedRef = useRef(true);
 
@@ -58,6 +78,52 @@ const AdminMissionControl: React.FC = () => {
       clearInterval(interval);
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      if (cancelled) return;
+      await loadImageRadar();
+    };
+
+    load();
+    const interval = setInterval(load, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [imageRadarKind, imageRadarSource, imageRadarMinCount, imageRadarLimit]);
+
+  const loadImageRadar = async () => {
+    if (imageRadarInFlightRef.current) return;
+    imageRadarInFlightRef.current = true;
+    setImageRadarLoading(true);
+    setImageRadarError(null);
+    try {
+      const { data, error } = await supabase.rpc('admin_image_radar', {
+        p_kind: imageRadarKind,
+        p_source: imageRadarSource ? imageRadarSource : null,
+        p_min_count: imageRadarMinCount,
+        p_limit: imageRadarLimit,
+      });
+
+      if (error) {
+        setImageRadarError(error.message || 'Failed to load image radar');
+        setImageRadarRows([]);
+        return;
+      }
+
+      setImageRadarRows((Array.isArray(data) ? data : []) as ImageRadarRow[]);
+      setImageRadarLastUpdatedAt(new Date());
+    } catch (e: any) {
+      setImageRadarError(e?.message || 'Failed to load image radar');
+      setImageRadarRows([]);
+    } finally {
+      imageRadarInFlightRef.current = false;
+      setImageRadarLoading(false);
+    }
+  };
 
   const loadDashboard = async () => {
     // Prevent overlapping polls (if one refresh takes >5s, they can stack up and feel "slow")
@@ -171,7 +237,8 @@ const AdminMissionControl: React.FC = () => {
   const runAnalysis = async (orgId: string) => {
     setProcessing(orgId);
     try {
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/analyze-organization-images`, {
+      const functionsUrl = getSupabaseFunctionsUrl();
+      const response = await fetch(`${functionsUrl}/analyze-organization-images`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -201,7 +268,9 @@ const AdminMissionControl: React.FC = () => {
         return;
       }
 
-      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-backfill-origin-images`, {
+      const functionsUrl = getSupabaseFunctionsUrl();
+
+      const resp = await fetch(`${functionsUrl}/admin-backfill-origin-images`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -248,7 +317,9 @@ const AdminMissionControl: React.FC = () => {
         return;
       }
 
-      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/admin-backfill-bat-missing-images`, {
+      const functionsUrl = getSupabaseFunctionsUrl();
+
+      const resp = await fetch(`${functionsUrl}/admin-backfill-bat-missing-images`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -291,7 +362,9 @@ const AdminMissionControl: React.FC = () => {
         return;
       }
 
-      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/bat-dom-map-health-runner`, {
+      const functionsUrl = getSupabaseFunctionsUrl();
+
+      const resp = await fetch(`${functionsUrl}/bat-dom-map-health-runner`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -336,7 +409,9 @@ const AdminMissionControl: React.FC = () => {
         return;
       }
 
-      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/bat-make-profiles-correct-runner`, {
+      const functionsUrl = getSupabaseFunctionsUrl();
+
+      const resp = await fetch(`${functionsUrl}/bat-make-profiles-correct-runner`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -380,7 +455,9 @@ const AdminMissionControl: React.FC = () => {
         return;
       }
 
-      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/cleanup-bat-image-contamination`, {
+      const functionsUrl = getSupabaseFunctionsUrl();
+
+      const resp = await fetch(`${functionsUrl}/cleanup-bat-image-contamination`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -423,7 +500,9 @@ const AdminMissionControl: React.FC = () => {
         return;
       }
 
-      const resp = await fetch(`${supabase.supabaseUrl}/functions/v1/backfill-image-angles`, {
+      const functionsUrl = getSupabaseFunctionsUrl();
+
+      const resp = await fetch(`${functionsUrl}/backfill-image-angles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -964,6 +1043,145 @@ const AdminMissionControl: React.FC = () => {
           ))}
             </div>
           </div>
+
+      {/* Image Fingerprint Radar */}
+      <div style={{ marginBottom: '24px' }}>
+        <h2 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          IMAGE FINGERPRINT RADAR (DUPES + CONTAMINATION)
+        </h2>
+        <div style={{ border: '2px solid #000', background: '#fff', padding: '12px' }}>
+          <div style={{ fontSize: '8pt', color: '#666', marginBottom: 10 }}>
+            Finds image keys that appear many times across vehicles. This is the fastest way to detect BaT "chrome" images and cross-post reuse.
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Kind
+              <select
+                value={imageRadarKind}
+                onChange={(e) => setImageRadarKind(e.target.value as any)}
+                style={{ marginLeft: 8, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              >
+                <option value="normalized_url">normalized_url</option>
+                <option value="file_hash">file_hash</option>
+                <option value="perceptual_hash">perceptual_hash</option>
+                <option value="dhash">dhash</option>
+              </select>
+            </label>
+
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Source (optional)
+              <input
+                type="text"
+                value={imageRadarSource}
+                onChange={(e) => setImageRadarSource(e.target.value)}
+                placeholder="bat_import / organization_import / ..."
+                style={{ marginLeft: 8, width: 220, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Min count
+              <input
+                type="number"
+                value={imageRadarMinCount}
+                min={2}
+                max={1000000}
+                onChange={(e) => setImageRadarMinCount(Number(e.target.value || 25))}
+                style={{ marginLeft: 8, width: 110, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Limit
+              <input
+                type="number"
+                value={imageRadarLimit}
+                min={1}
+                max={500}
+                onChange={(e) => setImageRadarLimit(Number(e.target.value || 50))}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+
+            <button
+              className="button button-secondary"
+              onClick={loadImageRadar}
+              disabled={imageRadarLoading}
+              style={{ fontSize: '9pt' }}
+            >
+              {imageRadarLoading ? 'Loading…' : 'Refresh'}
+            </button>
+
+            <div style={{ fontSize: '8pt', color: '#666' }}>
+              {imageRadarLastUpdatedAt ? `Updated: ${imageRadarLastUpdatedAt.toLocaleString()}` : ''}
+            </div>
+          </div>
+
+          {imageRadarError && (
+            <div style={{ marginTop: 10, padding: 10, border: '2px solid #ef4444', background: '#fef2f2', fontSize: '8pt' }}>
+              {imageRadarError}
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, border: '1px solid var(--border)', overflow: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+              <thead>
+                <tr style={{ background: 'var(--grey-100)' }}>
+                  <th style={{ textAlign: 'right', padding: 8, borderBottom: '1px solid var(--border)' }}>COUNT</th>
+                  <th style={{ textAlign: 'right', padding: 8, borderBottom: '1px solid var(--border)' }}>VEHICLES</th>
+                  <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>SAMPLE</th>
+                  <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>KEY</th>
+                  <th style={{ textAlign: 'left', padding: 8, borderBottom: '1px solid var(--border)' }}>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(imageRadarRows || []).map((r) => (
+                  <tr key={`${r.kind}:${r.key}`}>
+                    <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right', fontWeight: 700 }}>{Number(r.n || 0).toLocaleString()}</td>
+                    <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right' }}>{Number(r.vehicles || 0).toLocaleString()}</td>
+                    <td style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
+                      {r.sample_url ? (
+                        <img src={r.sample_url} style={{ width: 72, height: 54, objectFit: 'cover', border: '1px solid var(--border)' }} />
+                      ) : (
+                        <span style={{ color: '#999' }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: '1px solid var(--border)', fontFamily: 'monospace', maxWidth: 520, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.key}>
+                      {r.key}
+                    </td>
+                    <td style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {r.sample_url ? (
+                          <a className="button button-secondary" style={{ fontSize: '8pt' }} href={r.sample_url} target="_blank" rel="noreferrer">
+                            Open image
+                          </a>
+                        ) : null}
+                        {r.sample_vehicle_id ? (
+                          <button
+                            className="button button-secondary"
+                            style={{ fontSize: '8pt' }}
+                            onClick={() => navigate(`/vehicle/${r.sample_vehicle_id}`)}
+                          >
+                            Open vehicle
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {(!imageRadarRows || imageRadarRows.length === 0) && (
+                  <tr>
+                    <td colSpan={5} style={{ padding: 10, color: '#666' }}>
+                      {imageRadarLoading ? 'Loading…' : 'No rows (try lowering Min count, or remove Source filter).'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
       {/* Inventory Data Completeness */}
       <div style={{ marginBottom: '24px' }}>
