@@ -67,6 +67,8 @@ const AdminMissionControl: React.FC = () => {
   const imageRadarInFlightRef = useRef(false);
   const [imageRadarLastUpdatedAt, setImageRadarLastUpdatedAt] = useState<Date | null>(null);
   const loadInFlightRef = useRef(false);
+  const angleCoverageMetricsDisabledRef = useRef(false);
+  const batDomFieldBreakdownDisabledRef = useRef(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -130,23 +132,7 @@ const AdminMissionControl: React.FC = () => {
     if (loadInFlightRef.current) return;
     loadInFlightRef.current = true;
     try {
-      const [
-        vehiclesCount,
-        imagesCount,
-        orgsCount,
-        usersCount,
-        queueData,
-        opportunitiesCount,
-        todayData,
-        recentData,
-        vehicleQueueData,
-        scanProgressData,
-        imageScanData,
-        completenessData,
-        angleCoverageData,
-        batHealthSummaryData,
-        batHealthFieldBreakdownData
-      ] = await Promise.all([
+      const results = await Promise.allSettled([
         supabase.from('vehicles').select('id', { count: 'exact', head: true }),
         supabase.from('vehicle_images').select('id', { count: 'exact', head: true }),
         supabase.from('organization_inventory').select('organization_id', { count: 'exact', head: true }),
@@ -183,41 +169,78 @@ const AdminMissionControl: React.FC = () => {
           p_profile_origins: null,
           p_inventory_only: true,
         }),
-        supabase.rpc('get_inventory_angle_coverage_metrics', {
-          p_min_angle_confidence: 0.6,
-          p_required_angles: ['front','front_3_4','rear','rear_3_4','side_driver','side_passenger','interior_front','interior_rear','engine_bay','odometer'],
-          p_statuses: ['active', 'pending'],
-          p_profile_origins: null,
-          p_inventory_only: true,
-        })
-        ,
+        angleCoverageMetricsDisabledRef.current
+          ? Promise.resolve({ data: null, error: null })
+          : supabase.rpc('get_inventory_angle_coverage_metrics', {
+              p_min_angle_confidence: 0.6,
+              p_required_angles: ['front','front_3_4','rear','rear_3_4','side_driver','side_passenger','interior_front','interior_rear','engine_bay','odometer'],
+              p_statuses: ['active', 'pending'],
+              p_profile_origins: null,
+              p_inventory_only: true,
+            }),
         supabase.rpc('get_bat_dom_health_summary', { p_hours: 24 * 14 }),
-        supabase.rpc('get_bat_dom_health_field_breakdown', { p_hours: 24 * 14 })
+        batDomFieldBreakdownDisabledRef.current
+          ? Promise.resolve({ data: null, error: null })
+          : supabase.rpc('get_bat_dom_health_field_breakdown', { p_hours: 24 * 14 })
       ]);
+
+      const getFulfilled = <T,>(idx: number): T | null => {
+        const r = results[idx];
+        if (!r || r.status !== 'fulfilled') return null;
+        return r.value as T;
+      };
+
+      const vehiclesCount = getFulfilled<any>(0);
+      const imagesCount = getFulfilled<any>(1);
+      const orgsCount = getFulfilled<any>(2);
+      const usersCount = getFulfilled<any>(3);
+      const queueData = getFulfilled<any>(4);
+      const opportunitiesCount = getFulfilled<any>(5);
+      const todayData = getFulfilled<any>(6);
+      const recentData = getFulfilled<any>(7);
+      const vehicleQueueData = getFulfilled<any>(8);
+      const scanProgressData = getFulfilled<any>(9);
+      const imageScanData = getFulfilled<any>(10);
+      const completenessData = getFulfilled<any>(11);
+      const angleCoverageData = getFulfilled<any>(12);
+      const batHealthSummaryData = getFulfilled<any>(13);
+      const batHealthFieldBreakdownData = getFulfilled<any>(14);
 
       if (!mountedRef.current) return;
 
+      if (!angleCoverageMetricsDisabledRef.current && angleCoverageData?.error) {
+        angleCoverageMetricsDisabledRef.current = true;
+      }
+
+      if (!batDomFieldBreakdownDisabledRef.current && batHealthFieldBreakdownData?.error) {
+        const msg = String(batHealthFieldBreakdownData.error?.message || '').toLowerCase();
+        const code = String(batHealthFieldBreakdownData.error?.code || '').toLowerCase();
+        if (msg.includes('could not find') || msg.includes('not found') || code.includes('pgrst')) {
+          batDomFieldBreakdownDisabledRef.current = true;
+        }
+      }
+
       setStats({
-        totalVehicles: vehiclesCount.count || 0,
-        totalImages: imagesCount.count || 0,
-        totalOrganizations: orgsCount.count || 0,
-        totalUsers: usersCount.count || 0,
-        pendingAnalysis: queueData.data?.reduce((sum, q) => sum + q.pending_count, 0) || 0,
-        investmentOpportunities: opportunitiesCount.count || 0,
-        todayUploads: todayData.count || 0,
+        totalVehicles: vehiclesCount?.count || 0,
+        totalImages: imagesCount?.count || 0,
+        totalOrganizations: orgsCount?.count || 0,
+        totalUsers: usersCount?.count || 0,
+        pendingAnalysis: queueData?.data?.reduce((sum: number, q: any) => sum + q.pending_count, 0) || 0,
+        investmentOpportunities: opportunitiesCount?.count || 0,
+        todayUploads: todayData?.count || 0,
         activeProcessing: 0
       });
 
-      setAnalysisQueue(queueData.data || []);
-      setRecentActivity(recentData.data || []);
-      setScanProgress(scanProgressData.data);
-      setImageScanStats(imageScanData.data);
-      setInventoryCompleteness(completenessData.data || null);
-      setAngleCoverage(angleCoverageData.data || null);
-      setBatDomHealthSummary(batHealthSummaryData.data || null);
-      setBatDomFieldBreakdown(Array.isArray(batHealthFieldBreakdownData.data) ? batHealthFieldBreakdownData.data : null);
+      setAnalysisQueue(queueData?.data || []);
+      setRecentActivity(recentData?.data || []);
+      setScanProgress(scanProgressData?.data);
+      setImageScanStats(imageScanData?.data);
+      setInventoryCompleteness(completenessData?.data || null);
+      setAngleCoverage(angleCoverageData?.data || null);
+      setBatDomHealthSummary(batHealthSummaryData?.data || null);
+      setBatDomFieldBreakdown(Array.isArray(batHealthFieldBreakdownData?.data) ? batHealthFieldBreakdownData.data : null);
       
-      const vehicleGroups = (vehicleQueueData.data || []).reduce((acc: any, img: any) => {
+      const vehicleGroups = (vehicleQueueData?.data || []).reduce((acc: any, img: any) => {
         if (!acc[img.vehicle_id]) {
           acc[img.vehicle_id] = { vehicle_id: img.vehicle_id, count: 0 };
         }
