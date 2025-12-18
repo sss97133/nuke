@@ -21,7 +21,7 @@ export interface ImageUploadResult {
 }
 
 export class ImageUploadService {
-  private static readonly STORAGE_BUCKET = 'vehicle-images';
+  private static readonly STORAGE_BUCKET = 'vehicle-data';
   private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   private static readonly COMPRESS_THRESHOLD = 5 * 1024 * 1024; // Compress files larger than 5MB
 
@@ -363,9 +363,32 @@ export class ImageUploadService {
       const fileExt = file.name.split('.').pop() || (isImage ? 'jpg' : 'pdf');
       const uniqueId = crypto.randomUUID();
       const fileName = `${uniqueId}.${fileExt}`;
-      const storagePath = vehicleId 
-        ? `${vehicleId}/${fileName}`
-        : `${user.id}/unorganized/${fileName}`; // Personal library
+      const safeCategory = String(category || 'general')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9_-]+/g, '_')
+        .replace(/^_+|_+$/g, '') || 'general';
+
+      // Detect document type early since storage routing depends on it.
+      // IMPORTANT: If the caller explicitly uploads as a document, force document classification.
+      // Relying on filename keywords alone is unreliable (camera rolls are "IMG_1234.jpg").
+      const docDetection = category === 'document'
+        ? {
+            type: 'other_document' as const,
+            confidence: 1.0,
+            suggestedRoute: 'documents' as const,
+            reasoning: 'User selected document upload'
+          }
+        : DocumentTypeDetector.detectFromFile(file);
+      const isDocument = docDetection.type !== 'vehicle_photo';
+      const documentCategory = isDocument ? this.mapDocumentTypeToCategory(docDetection.type) : null;
+      const storageFolder = isDocument ? 'documents' : 'images';
+
+      const storagePath = vehicleId === 'title-scan-temp'
+        ? `temp/title-scan/${user.id}/${fileName}`
+        : vehicleId
+          ? `vehicles/${vehicleId}/${storageFolder}/${safeCategory}/${fileName}`
+          : `users/${user.id}/unorganized/${fileName}`; // Personal library
 
       // Use photo date if available, otherwise use current time or file modified date
       const photoDate = listingCapturedAt 
@@ -398,9 +421,11 @@ export class ImageUploadService {
         console.log('Uploading image variants...');
 
         for (const [sizeName, blob] of Object.entries(optimizationResult.variantBlobs)) {
-          const variantPath = vehicleId 
-            ? `${vehicleId}/${uniqueId}_${sizeName}.jpg`
-            : `${user.id}/unorganized/${uniqueId}_${sizeName}.jpg`;
+          const variantPath = vehicleId === 'title-scan-temp'
+            ? `temp/title-scan/${user.id}/${uniqueId}_${sizeName}.jpg`
+            : vehicleId
+              ? `vehicles/${vehicleId}/${storageFolder}/${safeCategory}/${uniqueId}_${sizeName}.jpg`
+              : `users/${user.id}/unorganized/${uniqueId}_${sizeName}.jpg`;
 
           const { data: variantUpload, error: variantError } = await supabase.storage
             .from(this.STORAGE_BUCKET)
@@ -441,20 +466,6 @@ export class ImageUploadService {
           .eq('vehicle_id', vehicleId);
         count = result.count || 0;
       }
-
-      // Detect document type
-      // IMPORTANT: If the caller explicitly uploads as a document, force document classification.
-      // Relying on filename keywords alone is unreliable (camera rolls are "IMG_1234.jpg").
-      const docDetection = category === 'document'
-        ? {
-            type: 'other_document' as const,
-            confidence: 1.0,
-            suggestedRoute: 'documents' as const,
-            reasoning: 'User selected document upload'
-          }
-        : DocumentTypeDetector.detectFromFile(file);
-      const isDocument = docDetection.type !== 'vehicle_photo';
-      const documentCategory = isDocument ? this.mapDocumentTypeToCategory(docDetection.type) : null;
 
       // Reverse geocode location if GPS coordinates exist (await to ensure it's in payload)
       let locationWithAddress = metadata.location;
@@ -570,9 +581,11 @@ export class ImageUploadService {
         // Add variant paths to cleanup list
         if (optimizationResult.success && optimizationResult.variantBlobs) {
           for (const sizeName of Object.keys(optimizationResult.variantBlobs)) {
-            const variantPath = vehicleId 
-              ? `${vehicleId}/${uniqueId}_${sizeName}.jpg`
-              : `${user.id}/unorganized/${uniqueId}_${sizeName}.jpg`;
+            const variantPath = vehicleId === 'title-scan-temp'
+              ? `temp/title-scan/${user.id}/${uniqueId}_${sizeName}.jpg`
+              : vehicleId
+                ? `vehicles/${vehicleId}/${isDocument ? 'documents' : 'images'}/${safeCategory}/${uniqueId}_${sizeName}.jpg`
+                : `users/${user.id}/unorganized/${uniqueId}_${sizeName}.jpg`;
             pathsToClean.push(variantPath);
           }
         }

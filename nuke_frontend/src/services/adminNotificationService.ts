@@ -61,14 +61,26 @@ export class AdminNotificationService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
+      // Primary: explicit admin allowlist table.
+      // Use maybeSingle so missing rows are not treated as hard errors.
       const { data, error } = await supabase
         .from('admin_users')
         .select('id')
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      return !error && !!data;
+      if (!error && !!data?.id) return true;
+
+      // Fallback: profile-based privilege check (covers environments where admin_users isn't populated).
+      try {
+        const { data: allowed, error: rpcErr } = await supabase.rpc('is_admin_or_moderator');
+        if (!rpcErr && allowed === true) return true;
+      } catch {
+        // ignore
+      }
+
+      return false;
     } catch (error) {
       console.error('Error checking admin status:', error);
       return false;
