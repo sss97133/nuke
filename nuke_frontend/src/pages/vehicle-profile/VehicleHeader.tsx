@@ -1147,6 +1147,42 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       if (mk) s = s.replace(new RegExp(`^\\s*${escapeRegExp(mk)}\\s+`, 'i'), '').trim();
     }
 
+    // Remove contaminated listing patterns: "Model - COLOR - $Price (Location)"
+    if (s.includes(' - $') || (s.includes(' - ') && s.match(/\$[\d,]+/))) {
+      const parts = s.split(/\s*-\s*(?=\$|\([A-Z])/);
+      if (parts.length > 0) {
+        s = parts[0].trim();
+      }
+    }
+    
+    // Remove color patterns that might still be present
+    s = s.replace(/\s*-\s*(BLACK|WHITE|RED|BLUE|GREEN|SILVER|GRAY|GREY|YELLOW|ORANGE|PURPLE|BROWN|BEIGE|TAN)\s*$/i, '').trim();
+    
+    // Remove location patterns like "(Torrance)", "(Los Angeles)"
+    s = s.replace(/\s*\([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\)\s*$/g, '').trim();
+
+    // Collapse whitespace + trim dangling separators.
+    s = s.replace(/\s+/g, ' ').trim();
+    s = s.replace(/[-–—]\s*$/g, '').trim();
+
+    // Guardrails: if it's still a paragraph, treat as unusable.
+    if (s.length > 80) return '';
+    return s;
+
+    // Remove contaminated listing patterns: "Model - COLOR - $Price (Location)"
+    if (s.includes(' - $') || (s.includes(' - ') && s.match(/\$[\d,]+/))) {
+      const parts = s.split(/\s*-\s*(?=\$|\([A-Z])/);
+      if (parts.length > 0) {
+        s = parts[0].trim();
+      }
+    }
+    
+    // Remove color patterns that might still be present
+    s = s.replace(/\s*-\s*(BLACK|WHITE|RED|BLUE|GREEN|SILVER|GRAY|GREY|YELLOW|ORANGE|PURPLE|BROWN|BEIGE|TAN)\s*$/i, '').trim();
+    
+    // Remove location patterns like "(Torrance)", "(Los Angeles)"
+    s = s.replace(/\s*\([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\)\s*$/g, '').trim();
+
     // Collapse whitespace
     s = s.replace(/\s+/g, ' ').trim();
     // Trim trailing separators from previous removals
@@ -1339,28 +1375,29 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       <div style={{ 
         display: 'flex', 
         flexWrap: 'wrap', 
-        justifyContent: 'center', 
+        justifyContent: 'flex-start', 
         alignItems: 'center', 
-        gap: '0px', 
-        width: '100px',
-        height: '30px',
+        gap: '8px', 
+        flex: '1 1 auto',
+        minWidth: 0,
+        height: '31px',
         marginTop: 0,
         marginBottom: 0,
         paddingTop: 0,
         paddingBottom: 0,
         position: 'static'
       }}>
-        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', overflow: 'visible' }}>
-          <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {/* 1. Title */}
+        <div style={{ flex: '0 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
             {identityLabel}
           </span>
+        </div>
+
+        {/* 2. Badges Section */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', flexShrink: 0 }}>
           {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
             <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
-          ) : null}
-          {listingLocation ? (
-            <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Listing location">
-              {String(listingLocation)}
-            </span>
           ) : null}
           {listingUrl ? (
             <div ref={listingSourceRef} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
