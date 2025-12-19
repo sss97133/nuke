@@ -656,7 +656,7 @@ export default function AIDataIngestionSearch() {
             minWidth: '80px',
             maxWidth: 'none',
             height: '100%',
-            padding: 0
+            padding: '0 4px'
           }}
         />
 
@@ -665,12 +665,17 @@ export default function AIDataIngestionSearch() {
           onClick={() => setActionsOpen((v) => !v)}
           className="button-win95"
           style={{
-            padding: '2px 6px',
+            flexShrink: 0,
+            padding: '2px 4px',
             fontSize: '8pt',
             height: '20px',
-            minWidth: '26px',
+            width: '20px',
             opacity: 1,
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginLeft: '2px'
           }}
           title={actionsOpen ? 'Hide actions' : 'Show actions'}
         >

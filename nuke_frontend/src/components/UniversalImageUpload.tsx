@@ -28,9 +28,10 @@ interface MobilePhotoDumpProps {
   onClose: () => void;
   session: any;
   vehicleId?: string;  // Pre-select vehicle if on vehicle page
+  prefillFiles?: File[];
 }
 
-export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhotoDumpProps) {
+export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles }: MobilePhotoDumpProps) {
   const user = session?.user;
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [sessions, setSessions] = useState<PhotoSession[]>([]);
@@ -43,6 +44,12 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
   React.useEffect(() => {
     loadVehicles();
   }, []);
+
+  useEffect(() => {
+    if (!prefillFiles || prefillFiles.length === 0) return;
+    if (photos.length > 0) return;
+    void processFiles(prefillFiles);
+  }, [prefillFiles]);
 
   // ESC key handler to close
   useEffect(() => {
@@ -69,19 +76,17 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
     }
   };
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
+  const processFiles = async (files: File[]) => {
     if (files.length === 0) return;
 
     setLoading(true);
     setAnalyzing(true);
 
     try {
-      // Extract EXIF data from all photos
       const photoPromises = files.map(async (file) => {
         const preview = URL.createObjectURL(file);
         const exif = await extractEXIF(file);
-        
+
         return {
           file,
           preview,
@@ -94,17 +99,16 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
       const loadedPhotos = await Promise.all(photoPromises);
       setPhotos(loadedPhotos);
 
-      // Cluster into sessions
       const clusteredSessions = await clusterPhotosIntoSessions(loadedPhotos);
-      
-      // Analyze each session for vehicle matching
+
       const analyzedSessions = await Promise.all(
-        clusteredSessions.map(session => analyzeSession(session))
+        clusteredSessions.map((session) => analyzeSession(session))
       );
-      
-      // If vehicleId provided, auto-assign to that vehicle
+
       if (vehicleId) {
-        analyzedSessions.forEach(s => s.manualVehicleId = vehicleId);
+        analyzedSessions.forEach((s) => {
+          s.manualVehicleId = vehicleId;
+        });
       }
 
       setSessions(analyzedSessions);
@@ -115,6 +119,11 @@ export function UniversalImageUpload({ onClose, session, vehicleId }: MobilePhot
       setLoading(false);
       setAnalyzing(false);
     }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    await processFiles(files);
   };
 
   const extractEXIF = async (file: File): Promise<any> => {
