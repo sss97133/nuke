@@ -27,6 +27,7 @@ import DatabaseAudit from '../../../pages/DatabaseAudit';
 import DataDiagnostic from '../../../pages/DataDiagnostic';
 import TestContributions from '../../../pages/TestContributions';
 import AdminPendingVehicles from '../../../pages/AdminPendingVehicles';
+import HoverCardDemo from '../../../pages/admin/HoverCardDemo';
 
 const AdminModuleRoutes = () => {
   return (
@@ -65,6 +66,7 @@ const AdminModuleRoutes = () => {
         <Route path="database-audit" element={<DatabaseAudit />} />
         <Route path="data-diagnostic" element={<DataDiagnostic />} />
         <Route path="test-contributions" element={<TestContributions />} />
+        <Route path="hover-demo" element={<HoverCardDemo />} />
       </Route>
     </Routes>
   );
