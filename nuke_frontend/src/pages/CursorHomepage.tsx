@@ -391,6 +391,23 @@ const CursorHomepage: React.FC = () => {
     locationFilters: false,
   });
 
+  const hasActiveFilters = useMemo(() => {
+    if (filters.yearMin || filters.yearMax) return true;
+    if (filters.priceMin || filters.priceMax) return true;
+    if ((filters.makes?.length || 0) > 0) return true;
+    if (filters.zipCode && filters.radiusMiles > 0) return true;
+    if (filters.forSale) return true;
+    if (filters.hideSold) return true;
+    if (filters.showPending) return true;
+    if (filters.hideDealerListings) return true;
+    if (filters.hideCraigslist) return true;
+    if (filters.hideDealerSites) return true;
+    if (filters.hideKsl) return true;
+    if (filters.hideBat) return true;
+    if (filters.hideClassic) return true;
+    return false;
+  }, [filters]);
+
 
   useEffect(() => {
     loadSession();
@@ -1280,11 +1297,15 @@ const CursorHomepage: React.FC = () => {
     
     // Price range
     if (filters.priceMin || filters.priceMax) {
-      const priceLabel = filters.priceMin && filters.priceMax
-        ? `$${filters.priceMin.toLocaleString()}-$${filters.priceMax.toLocaleString()}`
-        : filters.priceMin
-        ? `$${filters.priceMin.toLocaleString()}+`
-        : `-$${filters.priceMax.toLocaleString()}`;
+      const min = filters.priceMin;
+      const max = filters.priceMax;
+      const priceLabel = (min != null && max != null)
+        ? `$${min.toLocaleString()}-$${max.toLocaleString()}`
+        : (min != null)
+        ? `$${min.toLocaleString()}+`
+        : (max != null)
+        ? `-$${max.toLocaleString()}`
+        : '';
       badges.push({
         label: `Price: ${priceLabel}`,
         onRemove: () => setFilters({ ...filters, priceMin: null, priceMax: null })
@@ -1352,8 +1373,6 @@ const CursorHomepage: React.FC = () => {
     
     return badges;
   }, [filters]);
-  
-  const hasActiveFilters = getActiveFilterBadges.length > 0;
 
   const handleTimePeriodChange = async (period: TimePeriod) => {
     setTimePeriod(period);
