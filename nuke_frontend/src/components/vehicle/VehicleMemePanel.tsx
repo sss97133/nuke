@@ -236,7 +236,102 @@ export default function VehicleMemePanel({
           {loading ? <div style={{ color: '#757575' }}>Loading...</div> : null}
 
           {!loading && !hasAnyPacks ? (
-            <div style={{ color: '#757575' }}>No packs available.</div>
+            <div style={{ color: '#757575' }}>
+              No packs available. Browse all memes below or check back later.
+            </div>
+          ) : null}
+
+          {!loading && actions.length > 0 ? (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 12,
+              marginTop: hasAnyPacks ? 0 : 12 
+            }}>
+              <div style={{ 
+                fontSize: '9pt', 
+                fontWeight: 700, 
+                color: '#374151',
+                borderBottom: '1px solid var(--border)',
+                paddingBottom: '6px'
+              }}>
+                Meme Library Index ({actions.length} memes)
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(92px, 1fr))',
+                  gap: 8,
+                  maxHeight: '400px',
+                  overflowY: 'auto',
+                  padding: '8px',
+                  background: 'var(--bg)',
+                  borderRadius: '4px',
+                  border: '1px solid var(--border)'
+                }}
+              >
+                {actions.map((a) => {
+                  const pack = packs.find((p) => p.id === a.pack_id);
+                  const isOwned = pack ? myPackIds.has(pack.id) : false;
+                  const isSending = sendingActionId === a.id;
+                  const hasImage = !!a.image_url;
+                  return (
+                    <button
+                      key={a.id}
+                      className="button button-secondary"
+                      style={{
+                        fontSize: '8pt',
+                        padding: hasImage ? '6px' : '10px 8px',
+                        minHeight: 44,
+                        whiteSpace: 'normal',
+                        lineHeight: 1.1,
+                        opacity: !isOwned ? 0.5 : 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                        position: 'relative',
+                        cursor: isOwned ? 'pointer' : 'not-allowed',
+                      }}
+                      disabled={!canInteract || !isOwned || isSending}
+                      title={`${a.title}${pack ? ` (${pack.name})` : ''}${!isOwned ? ' - Locked' : ''}`}
+                      onPointerDown={() => isOwned && onActionPointerDown(a)}
+                      onPointerUp={() => isOwned && onActionPointerUp(a)}
+                      onPointerCancel={() => clearHoldTimer()}
+                      onPointerLeave={() => clearHoldTimer()}
+                    >
+                      {!isOwned && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          fontSize: '7pt',
+                          background: 'rgba(0,0,0,0.7)',
+                          color: 'white',
+                          padding: '2px 4px',
+                          borderRadius: '2px'
+                        }}>
+                          🔒
+                        </div>
+                      )}
+                      {hasImage ? (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: 54,
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            background: `url(${a.image_url}) center/cover`,
+                            opacity: isOwned ? 1 : 0.6,
+                          }}
+                        />
+                      ) : null}
+                      <div style={{ width: '100%', textAlign: 'left' }}>
+                        {isSending ? 'SENDING...' : a.title}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           ) : null}
 
           {!loading && hasAnyPacks ? (
@@ -345,9 +440,6 @@ export default function VehicleMemePanel({
             </div>
           ) : null}
 
-          {!loading && user?.id && !hasAnyOwned ? (
-            <div style={{ color: '#757575', fontSize: '8pt' }}>No owned packs yet. Buy one to unlock drops.</div>
-          ) : null}
 
           {!loading && user?.id && disabled ? (
             <div style={{ color: '#757575', fontSize: '8pt' }}>This vehicle is private. Drops are disabled.</div>

@@ -66,6 +66,8 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
   const [editingVehicle, setEditingVehicle] = useState<DealerVehicle | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [showAddVehiclesModal, setShowAddVehiclesModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50; // Show 50 vehicles per page to improve performance
   const reloadTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -363,6 +365,17 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
       }
     });
 
+  // Pagination logic
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedVehicles = filteredAndSorted.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [category, sortBy, searchTerm]);
+
   // Calculate category counts using smart categorization
   const counts = {
     current: vehicles.filter(v => {
@@ -450,6 +463,11 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           <h2 style={{ fontSize: '14pt', fontWeight: 700, margin: 0 }}>Inventory</h2>
           <span style={{ fontSize: '10pt', color: 'var(--text-muted)' }}>
             {filteredAndSorted.length} vehicles
+            {filteredAndSorted.length > itemsPerPage && (
+              <span style={{ marginLeft: '8px' }}>
+                (Page {currentPage} of {totalPages}, showing {paginatedVehicles.length})
+              </span>
+            )}
           </span>
         </div>
         {canEdit && (
@@ -677,7 +695,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
               gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
               gap: '16px'
             }}>
-              {filteredAndSorted.map(v => {
+              {paginatedVehicles.map(v => {
                 const displayCategory = getDisplayCategory(v);
                 const badge = getStatusBadge(displayCategory);
                 const profit = v.sale_price && v.cost_basis ? v.sale_price - v.cost_basis : null;
@@ -911,7 +929,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
           {/* List View */}
           {viewMode === 'list' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {filteredAndSorted.map(v => {
+              {paginatedVehicles.map(v => {
                 const displayCategory = getDisplayCategory(v);
                 const badge = getStatusBadge(displayCategory);
                 const isSelected = selectedVehicles.has(v.id);
@@ -1068,7 +1086,7 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredAndSorted.map(v => {
+                    {paginatedVehicles.map(v => {
                       const displayCategory = getDisplayCategory(v);
                       const badge = getStatusBadge(displayCategory);
                       const isSelected = selectedVehicles.has(v.id);
@@ -1150,6 +1168,59 @@ const EnhancedDealerInventory: React.FC<Props> = ({ organizationId, userId, canE
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {filteredAndSorted.length > itemsPerPage && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: '24px',
+              padding: '16px',
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '4px'
+            }}>
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                Showing {startIndex + 1} - {Math.min(endIndex, filteredAndSorted.length)} of {filteredAndSorted.length} vehicles
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '8pt',
+                    border: '1px solid var(--border)',
+                    background: currentPage === 1 ? 'var(--grey-100)' : 'white',
+                    color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text)',
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                    borderRadius: '4px'
+                  }}
+                >
+                  ← Previous
+                </button>
+                <div style={{ fontSize: '9pt', color: 'var(--text)' }}>
+                  Page {currentPage} of {totalPages}
+                </div>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '8pt',
+                    border: '1px solid var(--border)',
+                    background: currentPage === totalPages ? 'var(--grey-100)' : 'white',
+                    color: currentPage === totalPages ? 'var(--text-muted)' : 'var(--text)',
+                    cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                    borderRadius: '4px'
+                  }}
+                >
+                  Next →
+                </button>
               </div>
             </div>
           )}
