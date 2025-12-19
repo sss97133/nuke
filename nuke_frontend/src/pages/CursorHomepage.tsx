@@ -330,6 +330,8 @@ const CursorHomepage: React.FC = () => {
   const [orgWebsitesById, setOrgWebsitesById] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
+  const infiniteObserverRef = useRef<IntersectionObserver | null>(null);
+
 
   useEffect(() => {
     loadSession();
@@ -763,12 +765,33 @@ const CursorHomepage: React.FC = () => {
     }
   };
 
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
     if (loading || loadingMore) return;
     if (!hasMore) return;
     const nextPage = page + 1;
     await loadHypeFeed(nextPage, true);
-  };
+  }, [hasMore, loading, loadingMore, page]);
+
+  const infiniteSentinelRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading || loadingMore) return;
+    if (infiniteObserverRef.current) infiniteObserverRef.current.disconnect();
+
+    infiniteObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          void loadMore();
+        }
+      },
+      {
+        // Prefetch before the user hits the exact bottom.
+        root: null,
+        rootMargin: '600px',
+        threshold: 0.01,
+      }
+    );
+
+    if (node) infiniteObserverRef.current.observe(node);
+  }, [hasMore, loadMore, loading, loadingMore]);
 
   const applyFiltersAndSort = () => {
     let result = [...feedVehicles];
@@ -1960,6 +1983,7 @@ const CursorHomepage: React.FC = () => {
                 key={vehicle.id}
                 vehicle={vehicle}
                 viewMode="grid"
+                cardSizePx={cardMinWidth}
                 infoDense={infoDense}
                 viewerUserId={session?.user?.id}
                 sourceStampUrl={
@@ -1971,25 +1995,12 @@ const CursorHomepage: React.FC = () => {
         </div>
         )}
 
-        {/* Pagination */}
+        {/* Infinite scroll sentinel */}
         {!error && filteredVehicles.length > 0 && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-            {hasMore ? (
-              <button
-                onClick={loadMore}
-                disabled={loadingMore}
-                style={{
-                  background: 'var(--white)',
-                  border: '1px solid var(--border)',
-                  padding: '8px 12px',
-                  fontSize: '9pt',
-                  cursor: loadingMore ? 'wait' : 'pointer',
-                  opacity: loadingMore ? 0.6 : 1,
-                }}
-              >
-                {loadingMore ? 'Loading…' : 'Load more'}
-              </button>
-            ) : (
+            <div ref={infiniteSentinelRef} style={{ width: '1px', height: '1px' }} />
+            {loadingMore && <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Loading…</div>}
+            {!hasMore && !loadingMore && (
               <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>End of results</div>
             )}
           </div>

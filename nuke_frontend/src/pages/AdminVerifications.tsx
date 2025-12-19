@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { secureDocumentService, type SecureDocument, type PIIAuditLog } from '../services/secureDocumentService';
+import { ImageHoverPreview } from '../components/admin/ImageHoverPreview';
 
 const AdminVerifications: React.FC = () => {
   const [pending, setPending] = useState<SecureDocument[]>([]);
@@ -404,19 +405,25 @@ const AdminVerifications: React.FC = () => {
                             </div>
                             {isImg ? (
                               thumb ? (
-                                <img
-                                  src={thumb}
-                                  alt={d.document_type}
-                                  style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 4, marginBottom: 8, cursor: 'zoom-in' }}
-                                  onClick={() => viewDocument(d)}
-                                />
+                                <ImageHoverPreview
+                                  imageUrl={thumb}
+                                  imageId={d.id}
+                                  vehicleId={d.vehicle_id}
+                                >
+                                  <img
+                                    src={thumb}
+                                    alt={d.document_type}
+                                    style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 0, marginBottom: 8, cursor: 'zoom-in' }}
+                                    onClick={() => viewDocument(d)}
+                                  />
+                                </ImageHoverPreview>
                               ) : (
-                                <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 4, marginBottom: 8 }}>
+                                <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 0, marginBottom: 8 }}>
                                   Loading preview…
                                 </div>
                               )
                             ) : (
-                              <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 4, marginBottom: 8 }}>
+                              <div className="text-small text-muted" style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', borderRadius: 0, marginBottom: 8 }}>
                                 {d.mime_type || 'Document'}
                               </div>
                             )}

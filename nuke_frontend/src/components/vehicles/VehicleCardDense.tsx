@@ -68,6 +68,8 @@ interface VehicleCardDenseProps {
   sourceStampUrl?: string;
   /** When present, we can log identity-part telemetry for training contextual identity selection. */
   viewerUserId?: string;
+  /** Optional: card size hint (used to scale typography in grid mode). */
+  cardSizePx?: number;
 }
 
 const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
@@ -79,7 +81,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showDetailOverlay = true,
   infoDense = false,
   sourceStampUrl,
-  viewerUserId
+  viewerUserId,
+  cardSizePx
 }) => {
   // Local CSS for badge animations. We scope keyframes to avoid collisions
   // (the design system defines multiple `@keyframes pulse` variations).
@@ -141,6 +144,35 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
   const identity = React.useMemo(() => getVehicleIdentityTokens(vehicle as any), [vehicle]);
   const loggedKeysRef = React.useRef<Set<string>>(new Set());
+
+  const vehicleTitle = React.useMemo(() => {
+    const primary = identity.primary.map((t) => t.value).join(' ').trim();
+    const diffs = identity.differentiators.map((t) => t.value).join(' ').trim();
+    const combined = [primary, diffs].filter(Boolean).join(' ').trim();
+    return combined || 'Vehicle';
+  }, [identity.primary, identity.differentiators]);
+
+  const gridTypography = React.useMemo(() => {
+    const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+    if (!cardSizePx || !Number.isFinite(cardSizePx)) {
+      return {
+        title: '9pt',
+        meta: '7pt',
+        badge: '8pt',
+      };
+    }
+
+    // Map 140px -> 6pt, 260px -> 9pt.
+    const t = clamp((cardSizePx - 140) / 120, 0, 1);
+    const titlePt = 6 + t * 3;
+    const metaPt = 5.5 + t * 2;
+    const badgePt = 6.5 + t * 2;
+    return {
+      title: `${titlePt.toFixed(1)}pt`,
+      meta: `${metaPt.toFixed(1)}pt`,
+      badge: `${badgePt.toFixed(1)}pt`,
+    };
+  }, [cardSizePx]);
 
   const logIdentityToken = React.useCallback((kind: string, value: string, position: number) => {
     if (!viewerUserId) return;
@@ -449,6 +481,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return (
       <Link
         to={`/vehicle/${vehicle.id}`}
+        state={{ vehicleTitle }}
         style={{
           display: 'grid',
           gridTemplateColumns: '60px 2fr 1fr 1fr 80px 60px',
@@ -507,7 +540,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         {/* Vehicle - single line */}
         <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           <span style={{ fontWeight: 700, fontSize: '9pt' }}>
-            {vehicle.year} {vehicle.make} {vehicle.model}
+            {vehicleTitle}
           </span>
           <span style={{ color: 'var(--text-muted)', marginLeft: '8px' }}>
             {vehicle.uploader_name && `by ${vehicle.uploader_name}`}
@@ -567,6 +600,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return (
       <Link
         to={`/vehicle/${vehicle.id}`}
+        state={{ vehicleTitle }}
         style={{
           display: 'block',
           background: 'rgba(0, 0, 0, 0.9)',
@@ -676,7 +710,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   marginBottom: '4px',
                 }}
               >
-                {vehicle.year} {vehicle.make} {vehicle.model}
+                {vehicleTitle}
               </div>
 
               {/* Metadata row - clean by default; infoDense adds extras */}
@@ -741,7 +775,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   <span>{vehicle.view_count.toLocaleString()} {vehicle.view_count === 1 ? 'view' : 'views'}</span>
                 )}
 
-                {infoDense && vehicle.active_viewers > 0 && (
+                {infoDense && typeof vehicle.active_viewers === 'number' && vehicle.active_viewers > 0 && (
                   <span>{vehicle.active_viewers.toLocaleString()} watching</span>
                 )}
 
@@ -778,7 +812,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           )}
 
           {/* Active viewers - small pill above overlay */}
-          {vehicle.active_viewers > 0 && (
+          {typeof vehicle.active_viewers === 'number' && vehicle.active_viewers > 0 && (
             <div
               style={{
                 position: 'absolute',
@@ -933,16 +967,16 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             {isAuctionSource && auctionBidderDisplay ? (
               <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '160px' }}>
                 <div style={{ display: 'flex', width: '200%', animation: 'nuke-badge-ticker 6s ease-in-out infinite' }}>
-                  <div style={{ width: '50%', paddingRight: '10px', fontSize: '8pt', fontWeight: 800 }}>
+                  <div style={{ width: '50%', paddingRight: '10px', fontSize: gridTypography.badge, fontWeight: 800 }}>
                     {badgeMainText}
                   </div>
-                  <div style={{ width: '50%', paddingRight: '10px', fontSize: '8pt', fontWeight: 700, opacity: 0.95 }}>
+                  <div style={{ width: '50%', paddingRight: '10px', fontSize: gridTypography.badge, fontWeight: 700, opacity: 0.95 }}>
                     {auctionBidderDisplay}
                   </div>
                 </div>
               </div>
             ) : (
-              <div style={{ fontSize: '8pt', fontWeight: 800 }}>
+              <div style={{ fontSize: gridTypography.badge, fontWeight: 800 }}>
                 {badgeMainText}
               </div>
             )}
@@ -967,7 +1001,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           {/* Vehicle name */}
           <div
             style={{
-              fontSize: '9pt',
+              fontSize: gridTypography.title,
               fontWeight: 700,
               lineHeight: 1.1,
               marginBottom: '4px',
@@ -1047,7 +1081,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               <span>{vehicle.view_count.toLocaleString()} {vehicle.view_count === 1 ? 'view' : 'views'}</span>
             )}
 
-            {infoDense && vehicle.active_viewers > 0 && (
+            {infoDense && typeof vehicle.active_viewers === 'number' && vehicle.active_viewers > 0 && (
               <span>{vehicle.active_viewers.toLocaleString()} watching</span>
             )}
 
