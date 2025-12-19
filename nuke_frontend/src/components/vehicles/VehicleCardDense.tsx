@@ -87,6 +87,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   cardSizePx,
   thermalPricing = false
 }) => {
+  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  const [touchStart, setTouchStart] = React.useState(0);
+
   // Local CSS for badge animations. We scope keyframes to avoid collisions
   // (the design system defines multiple `@keyframes pulse` variations).
   React.useEffect(() => {
@@ -126,14 +129,19 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       : Number(String(liveBidRaw || '').replace(/[^\d.]/g, ''));
     const currentBid = typeof v.current_bid === 'number' ? v.current_bid : Number(String(v.current_bid || '').replace(/[^\d.]/g, ''));
 
+    const winningBid = typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0 ? v.winning_bid : null;
+    const highBid = typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0 ? v.high_bid : null;
+    const asking = (typeof v.asking_price === 'number' && v.asking_price > 0 && (v.is_for_sale === true || String(v.sale_status || '').toLowerCase() === 'for_sale'))
+      ? v.asking_price
+      : null;
+
     const priceValue =
       (typeof v.display_price === 'number' && Number.isFinite(v.display_price) && v.display_price > 0) ? v.display_price :
       (typeof v.sale_price === 'number' && v.sale_price > 0) ? v.sale_price :
+      (winningBid ?? highBid) ??
       (Number.isFinite(currentBid) && currentBid > 0) ? currentBid :
-      // Auction imports: store "current bid" in origin_metadata.live_metrics so feed cards can show it without extra joins.
       (Number.isFinite(liveBid) && liveBid > 0) ? liveBid :
-      (typeof v.asking_price === 'number' && v.asking_price > 0) ? v.asking_price :
-      null;
+      asking;
 
     const formatted = priceValue ? new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -731,14 +739,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               position: 'absolute',
               bottom: showDetailOverlay ? '52px' : '8px', // Above detail overlay if visible
               left: '8px',
-              background: 'rgba(0, 0, 0, 0.75)',
-              backdropFilter: 'blur(6px)',
-              padding: '4px 6px',
-              borderRadius: '4px',
+              background: 'transparent',
+              padding: 0,
+              borderRadius: 0,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid rgba(255,255,255,0.18)',
+              border: 'none',
               zIndex: 10,
             }}>
               <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} />
@@ -893,8 +900,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
   // GRID VIEW: Mobile-optimized card with horizontal swipeable image carousel
   // Shows multiple images in a grid that user can swipe through
-  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
-  const [touchStart, setTouchStart] = React.useState(0);
   
   // For grid view, prioritize smaller image variants (thumbnail/medium) for performance
   // Grid cards are small (180px default), so we don't need full-size images
@@ -906,12 +911,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // Filter obvious non-image URLs that sometimes sneak in via metadata/link scraping.
     if (u.includes('linkedin.com/shareArticle')) return false;
     if (u.includes('shareArticle?mini=true')) return false;
-    // Accept common image extensions.
-    if (/\.(png|jpg|jpeg|webp|gif)(\?|#|$)/i.test(u)) return true;
-    // Accept Supabase public storage objects (often no extension).
-    if (u.includes('/storage/v1/object/public/')) return true;
-    // Accept CDN-style image endpoints with width/quality params.
-    if (/(image|img|thumb|thumbnail|media)/i.test(u) && /^https?:\/\//i.test(u)) return true;
+    if (u.startsWith('https://') || u.startsWith('http://') || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('/')) return true;
     return false;
   };
   
@@ -1098,14 +1098,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           position: 'absolute',
           bottom: showDetailOverlay ? '52px' : '8px', // Above detail overlay if visible
           left: '8px',
-          background: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(6px)',
-          padding: '4px 6px',
-          borderRadius: '4px',
+          background: 'transparent',
+          padding: 0,
+          borderRadius: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          border: '1px solid rgba(255,255,255,0.18)',
+          border: 'none',
           zIndex: 10,
         }}>
           <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} />

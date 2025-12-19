@@ -844,7 +844,7 @@ const CursorHomepage: React.FC = () => {
           id, year, make, model, normalized_model, series, trim, transmission, transmission_model, title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
-          auction_outcome, high_bid, winning_bid, bid_count,
+          auction_outcome, high_bid, winning_bid, bid_count, current_bid,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin
         `)
@@ -973,6 +973,7 @@ const CursorHomepage: React.FC = () => {
         const purchasePrice = v.purchase_price ? Number(v.purchase_price) : null;
         const winningBid = v.winning_bid ? Number(v.winning_bid) : null;
         const highBid = v.high_bid ? Number(v.high_bid) : null;
+        const currentBid = v.current_bid ? Number(v.current_bid) : null;
         const listing = auctionByVehicleId.get(String(v?.id || '')) || null;
         const listingStatus = String((listing as any)?.listing_status || '').toLowerCase();
         const isLive = listingStatus === 'active' || listingStatus === 'live';
@@ -984,16 +985,18 @@ const CursorHomepage: React.FC = () => {
         // 2. Winning bid (auction result)
         // 3. High bid (RNM auctions)
         // 4. Live bid from external_listings
-        // 5. Final price from listing
-        // 6. Asking price (user intent)
+        // 5. Current bid from vehicle
+        // 6. Final price from listing
+        // 7. Asking price (only if actually for sale)
         // 7. DO NOT fall back to current_value - only show if explicitly set as asking
         const displayPrice =
           (salePrice && salePrice > 0) ? salePrice :
           (winningBid && winningBid > 0) ? winningBid :
           (highBid && highBid > 0) ? highBid :
           (isLive && Number.isFinite(listingLiveBid) && listingLiveBid > 0) ? listingLiveBid :
+          (currentBid && currentBid > 0) ? currentBid :
           (Number.isFinite(finalPrice) && finalPrice > 0) ? finalPrice :
-          (askingPrice && askingPrice > 0) ? askingPrice :
+          ((askingPrice && askingPrice > 0) && (v.is_for_sale === true || String(v.sale_status || '').toLowerCase() === 'for_sale')) ? askingPrice :
           null; // Don't show a price if we don't have actual pricing data
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
 
