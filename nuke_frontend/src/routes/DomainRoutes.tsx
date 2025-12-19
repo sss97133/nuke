@@ -23,6 +23,7 @@ const DropboxCallback = React.lazy(() => import('../pages/DropboxCallback'));
 
 // Legacy pages (still used by navigation components)
 const Profile = React.lazy(() => import('../pages/Profile'));
+const Capture = React.lazy(() => import('../pages/Capture'));
 const Capsule = React.lazy(() => import('../pages/Capsule'));
 const Library = React.lazy(() => import('../pages/Library'));
 const AuctionMarketplace = React.lazy(() => import('../pages/AuctionMarketplace'));
@@ -65,6 +66,7 @@ export const DomainRoutes = () => {
         <Route path="/test-contributions" element={<Navigate to="/admin/test-contributions" replace />} />
 
         {/* Legacy user pages (used by header nav / profile capsule) */}
+        <Route path="/capture" element={<Capture />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/:userId" element={<Profile />} />
         <Route path="/capsule" element={<Capsule />} />

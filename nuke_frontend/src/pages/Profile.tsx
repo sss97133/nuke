@@ -36,6 +36,7 @@ import ProfessionalToolbox from '../components/profile/ProfessionalToolbox';
 import VehicleCollection from '../components/profile/VehicleCollection';
 import PublicImageGallery from '../components/profile/PublicImageGallery';
 import KnowledgeLibrary from '../components/profile/KnowledgeLibrary';
+import ActivityTimeline from '../components/profile/ActivityTimeline';
 import { ProfileVerification } from '../components/ProfileVerification';
 import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import DatabaseDiagnostic from '../components/debug/DatabaseDiagnostic';
@@ -58,7 +59,18 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'collection' | 'gallery' | 'professional' | 'organizations' | 'auctions'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' |
+    'collection' |
+    'gallery' |
+    'professional' |
+    'organizations' |
+    'auctions' |
+    'photos' |
+    'financials' |
+    'duplicates' |
+    'settings'
+  >('overview');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
@@ -535,8 +547,9 @@ const Profile: React.FC = () => {
             { key: 'gallery', label: 'Gallery', public: true },
             { key: 'professional', label: 'Professional' },
             { key: 'organizations', label: 'My Organizations' },
-            { key: 'auctions', label: 'My Auctions' }
-          ].filter(tab => tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations' || tab.key === 'auctions').map((tab) => (
+            { key: 'auctions', label: 'My Auctions' },
+            { key: 'settings', label: 'Settings' }
+          ].filter(tab => tab.key === 'settings' ? isOwnProfile : (tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations' || tab.key === 'auctions')).map((tab) => (
             <button
               key={tab.key}
               className="text-small"
@@ -662,6 +675,15 @@ const Profile: React.FC = () => {
             
             {activeTab === 'settings' && isOwnProfile && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="text font-bold" style={{ fontSize: '8pt' }}>History</h3>
+                  </div>
+                  <div className="card-body">
+                    <ActivityTimeline scope="user" id={profile.id} limit={200} />
+                  </div>
+                </div>
+
                 {/* Verification Section */}
                 <div className="card">
                   <div className="card-header">
