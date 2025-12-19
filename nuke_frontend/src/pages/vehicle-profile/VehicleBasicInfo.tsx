@@ -191,7 +191,10 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     return extra
       .filter(({ key }) => v && typeof v[key] !== 'undefined' && v[key] !== null && v[key] !== '')
       .map(({ label, key, formatter }) => {
-        const value = formatter ? formatter(v[key]) : String(v[key]);
+        let value = formatter ? formatter(v[key]) : String(v[key]);
+        // Sanitize the value to clean up contaminated/scraped data
+        value = sanitizeInlineValue(value);
+        if (!value || value.length === 0) return null; // Skip empty values
         const showCraigslistFlag = isCraigslistListing && CRAIGSLIST_FIELD_KEYS.has(key);
 
         return (
@@ -243,8 +246,29 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     const s = (val ?? '').toString();
     // Guard against contaminated imports (e.g. CSS blobs accidentally scraped into a field)
     if (!s) return '';
-    if (s.length > 80) return '';
+    if (s.length > 200) return s.substring(0, 197) + '...'; // Truncate very long values instead of hiding
     if (s.includes('{') || s.includes('}') || s.includes(';') || s.includes('}.') || s.includes('/*') || s.includes('*/')) return '';
+    
+    // Clean up concatenated listing-style strings that got scraped into a single field
+    // Pattern: "(Series) Engine Info (Production#) - $Price (Mileage)"
+    // If it looks like a full listing description, try to extract just the meaningful part
+    if (s.includes(' - $') && (s.includes('Original Miles') || s.includes('of'))) {
+      // This looks like a contaminated listing title/description in a field
+      // Try to extract just the first meaningful part before the price
+      const priceMatch = s.match(/(.+?)\s*-\s*\$/);
+      if (priceMatch && priceMatch[1]) {
+        // Get the part before price, but clean it up
+        let cleaned = priceMatch[1].trim();
+        // Remove parenthetical production numbers if they're at the end
+        cleaned = cleaned.replace(/\s*\(\d+of\d+\)\s*$/i, '').trim();
+        // Remove trailing dashes
+        cleaned = cleaned.replace(/[-–—]\s*$/, '').trim();
+        if (cleaned.length > 0 && cleaned.length < s.length) {
+          return cleaned;
+        }
+      }
+    }
+    
     return s;
   };
 
@@ -371,7 +395,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 }}
                 style={{ cursor: 'pointer' }}
               >
-                {vehicle.engine}
+                {sanitizeInlineValue(vehicle.engine)}
               </span>
             </div>
           )}
@@ -419,7 +443,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 }}
                 style={{ cursor: 'pointer' }}
               >
-                {(vehicle as any).series}
+                {sanitizeInlineValue((vehicle as any).series)}
               </span>
             </div>
           )}
@@ -435,7 +459,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 }}
                 style={{ cursor: 'pointer' }}
               >
-                {vehicle.trim}
+                {sanitizeInlineValue(vehicle.trim)}
               </span>
             </div>
           )}

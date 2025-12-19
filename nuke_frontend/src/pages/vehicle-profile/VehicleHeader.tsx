@@ -1350,7 +1350,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         paddingBottom: 0,
         position: 'static'
       }}>
-        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', overflow: 'hidden' }}>
+        <div style={{ flex: '1 1 auto', minWidth: 0, color: baseTextColor, display: 'flex', flexDirection: 'row', gap: 6, alignItems: 'center', overflow: 'visible' }}>
           <span style={{ fontSize: '8pt', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {identityLabel}
           </span>
@@ -1398,7 +1398,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     boxShadow: '0 12px 24px rgba(15, 23, 42, 0.15)',
                     padding: 10,
                     minWidth: 260,
-                    zIndex: 200,
+                    zIndex: 950,
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -1708,7 +1708,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
                       padding: 12,
                       width: 320,
-                      zIndex: 50,
+                      zIndex: 950,
                       maxHeight: '400px',
                       overflowY: 'auto'
                     }}
@@ -1800,7 +1800,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                     onClick={async () => {
                                       if (confirm(`Merge this vehicle into "${similar.year} ${similar.make} ${similar.model}"? This will combine all data.`)) {
                                         try {
-                                          await VehicleDeduplicationService.mergeVehicles(similar.id, vehicle.id);
+                                          const userId = session?.user?.id ? String(session.user.id) : '';
+                                          if (!userId) {
+                                            toast.error('You must be signed in to merge vehicles');
+                                            return;
+                                          }
+                                          await VehicleDeduplicationService.mergeVehicles(similar.id, vehicle.id, userId);
                                           toast.success('Vehicles merged successfully');
                                           window.location.reload();
                                         } catch (error: any) {
@@ -2052,7 +2057,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   boxShadow: '0 8px 20px rgba(15, 23, 42, 0.18)',
                   padding: 12,
                   width: 260,
-                  zIndex: 50
+                  zIndex: 950
                 }}
                 onClick={(event) => event.stopPropagation()}
               >
@@ -2346,7 +2351,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 fontSize: '8pt',
                 color: baseTextColor,
                 width: '280px',
-                zIndex: 100
+                zIndex: 950
               }}
             >
               <div style={{ fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>

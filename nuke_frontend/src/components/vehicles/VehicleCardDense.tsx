@@ -70,6 +70,8 @@ interface VehicleCardDenseProps {
   viewerUserId?: string;
   /** Optional: card size hint (used to scale typography in grid mode). */
   cardSizePx?: number;
+  /** Enable thermal pricing color coding (purple=bad price, red=good deal) */
+  thermalPricing?: boolean;
 }
 
 const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
@@ -82,7 +84,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   infoDense = false,
   sourceStampUrl,
   viewerUserId,
-  cardSizePx
+  cardSizePx,
+  thermalPricing = false
 }) => {
   // Local CSS for badge animations. We scope keyframes to avoid collisions
   // (the design system defines multiple `@keyframes pulse` variations).
@@ -417,6 +420,41 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return !!(vehicle as any)?.bid_broke_record;
   }, [vehicle]);
 
+  // Calculate thermal pricing color (good deal = red, bad price = purple)
+  const thermalPriceColor = React.useMemo(() => {
+    if (!thermalPricing) return undefined;
+    
+    const v: any = vehicle as any;
+    const displayPriceValue =
+      (typeof v.display_price === 'number' && Number.isFinite(v.display_price) && v.display_price > 0) ? v.display_price :
+      (typeof v.sale_price === 'number' && v.sale_price > 0) ? v.sale_price :
+      (typeof v.asking_price === 'number' && v.asking_price > 0) ? v.asking_price :
+      null;
+    
+    if (!displayPriceValue) return undefined;
+    
+    // Compare against current_value or similar vehicles' sale prices
+    const currentValue = typeof v.current_value === 'number' && v.current_value > 0 ? v.current_value : null;
+    const purchasePrice = typeof v.purchase_price === 'number' && v.purchase_price > 0 ? v.purchase_price : null;
+    
+    // Good deal: asking_price is less than current_value or purchase_price
+    // Bad price: asking_price is significantly higher
+    if (currentValue) {
+      const ratio = displayPriceValue / currentValue;
+      // Good deal: < 1.0 (red), Bad price: > 1.2 (purple), Neutral: in between
+      if (ratio < 0.95) return '#ef4444'; // Red - good deal
+      if (ratio > 1.2) return '#a855f7'; // Purple - bad price
+    }
+    
+    if (purchasePrice && purchasePrice > 0) {
+      const ratio = displayPriceValue / purchasePrice;
+      if (ratio < 0.95) return '#ef4444'; // Red - good deal
+      if (ratio > 1.3) return '#a855f7'; // Purple - bad price
+    }
+    
+    return undefined; // Neutral/no color
+  }, [thermalPricing, vehicle]);
+
   const badgeStyle = React.useMemo((): React.CSSProperties => {
     const base: React.CSSProperties = {
       position: 'absolute',
@@ -424,14 +462,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       right: '6px',
       background: 'rgba(0, 0, 0, 0.75)',
       backdropFilter: 'blur(6px)',
-      color: 'white',
+      color: thermalPriceColor || 'white',
       padding: '4px 8px',
       borderRadius: '6px',
       display: 'inline-flex',
       alignItems: 'center',
       gap: '6px',
       maxWidth: '85%',
-      border: '1px solid rgba(255,255,255,0.18)',
+      border: thermalPriceColor ? `1px solid ${thermalPriceColor}80` : '1px solid rgba(255,255,255,0.18)',
       transformOrigin: 'center',
     };
 
@@ -659,10 +697,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             </div>
           )}
 
-          {/* Combined Source + Price/Bid badge */}
+          {/* Price/Bid badge (no favicon here) */}
           {showPriceOverlay && badgeMainText !== '—' && (
             <div style={{ ...badgeStyle, top: '8px', right: '8px' }}>
-              {effectiveSourceStampUrl ? <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} /> : null}
               {isAuctionSource && auctionBidderDisplay ? (
                 <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '220px' }}>
                   <div
@@ -685,6 +722,26 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   {badgeMainText}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Favicon in bottom-left corner (positioned relative to card, above overlay) */}
+          {effectiveSourceStampUrl && (
+            <div style={{
+              position: 'absolute',
+              bottom: showDetailOverlay ? '52px' : '8px', // Above detail overlay if visible
+              left: '8px',
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(6px)',
+              padding: '4px 6px',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid rgba(255,255,255,0.18)',
+              zIndex: 10,
+            }}>
+              <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} />
             </div>
           )}
 
@@ -839,8 +896,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [touchStart, setTouchStart] = React.useState(0);
   
-  // Use SAME simple logic as VehicleProfile - just use image_url directly
-  // VehicleProfile uses: imageRecords.map((r: any) => r.image_url) (line 1151)
+  // For grid view, prioritize smaller image variants (thumbnail/medium) for performance
+  // Grid cards are small (180px default), so we don't need full-size images
   const vehicleImages: string[] = [];
 
   const isLikelyImageUrl = (url: string) => {
@@ -858,23 +915,36 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return false;
   };
   
-  // Use all_images array (which now contains image_url directly)
-  if (vehicle.all_images && vehicle.all_images.length > 0) {
-    const urls = vehicle.all_images.map(img => img.url).filter((u) => !!u && isLikelyImageUrl(String(u)));
-    vehicleImages.push(...urls);
+  // Prioritize image variants for grid performance (thumbnail -> medium -> full)
+  // This significantly improves load times since we load ~200px images instead of full-size
+  if (vehicle.image_variants) {
+    if (vehicle.image_variants.thumbnail && isLikelyImageUrl(vehicle.image_variants.thumbnail)) {
+      vehicleImages.push(vehicle.image_variants.thumbnail);
+    }
+    if (vehicle.image_variants.medium && isLikelyImageUrl(vehicle.image_variants.medium)) {
+      vehicleImages.push(vehicle.image_variants.medium);
+    }
   }
   
-  // Fallback to primary_image_url (which is set using large_url || image_url like VehicleProfile)
+  // Use all_images array as fallback (already contains optimized URLs from homepage)
+  if (vehicle.all_images && vehicle.all_images.length > 0) {
+    const urls = vehicle.all_images
+      .map(img => img.url || (img as any).thumbnail_url || (img as any).medium_url)
+      .filter((u) => !!u && isLikelyImageUrl(String(u)));
+    vehicleImages.push(...urls.filter(url => !vehicleImages.includes(url)));
+  }
+  
+  // Fallback to primary_image_url (prefer medium/thumbnail if available)
   if (vehicle.primary_image_url && isLikelyImageUrl(vehicle.primary_image_url) && !vehicleImages.includes(vehicle.primary_image_url)) {
     vehicleImages.push(vehicle.primary_image_url);
   }
   
-  // Fallback to image_url
+  // Last resort: image_url
   if (vehicle.image_url && isLikelyImageUrl(vehicle.image_url) && !vehicleImages.includes(vehicle.image_url)) {
     vehicleImages.push(vehicle.image_url);
   }
   
-  // Get current image URL
+  // Get current image URL (prefer thumbnail/medium for grid)
   let currentImageUrl = vehicleImages[currentImageIndex] || vehicleImages[0] || null;
   
   // CRITICAL FIX: If still no URL, check imageUrl from getImageUrl() as last resort
@@ -960,10 +1030,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           </div>
         )}
 
-        {/* Combined Source + Price/Bid badge */}
+        {/* Price/Bid badge (no favicon here) */}
         {showPriceOverlay && badgeMainText !== '—' && (
           <div style={badgeStyle}>
-            {effectiveSourceStampUrl ? <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} /> : null}
             {isAuctionSource && auctionBidderDisplay ? (
               <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '160px' }}>
                 <div style={{ display: 'flex', width: '200%', animation: 'nuke-badge-ticker 6s ease-in-out infinite' }}>
@@ -982,8 +1051,28 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             )}
           </div>
         )}
-        
+
       </div>
+
+      {/* Favicon in bottom-left corner (positioned relative to card, above overlay) */}
+      {effectiveSourceStampUrl && (
+        <div style={{
+          position: 'absolute',
+          bottom: showDetailOverlay ? '52px' : '8px', // Above detail overlay if visible
+          left: '8px',
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(6px)',
+          padding: '4px 6px',
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid rgba(255,255,255,0.18)',
+          zIndex: 10,
+        }}>
+          <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} />
+        </div>
+      )}
       
       {/* Detail overlay on image instead of separate panel */}
       {showDetailOverlay && (
@@ -998,14 +1087,19 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             color: '#fff',
           }}
         >
-          {/* Vehicle name */}
+          {/* Vehicle name - with truncation */}
           <div
             style={{
               fontSize: gridTypography.title,
               fontWeight: 700,
               lineHeight: 1.1,
               marginBottom: '4px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: '100%',
             }}
+            title={vehicleTitle}
           >
             {identity.primary.map((t, idx) => (
               <span
@@ -1020,7 +1114,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             {identity.differentiators.length > 0 ? (
               <span>
                 {' '}
-                {identity.differentiators.map((t, j) => (
+                {identity.differentiators.slice(0, 2).map((t, j) => (
                   <span
                     key={`d-${t.kind}-${j}`}
                     title={t.kind.toUpperCase()}

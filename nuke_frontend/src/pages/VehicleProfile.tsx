@@ -1952,7 +1952,10 @@ const VehicleProfile: React.FC = () => {
           const h = Number(String(hRaw).replace(/[^0-9.]/g, ''));
           if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
             const squareish = Math.abs(w - h) <= 8;
-            if (squareish && Math.max(w, h) <= 512 && (s.endsWith('.png') || s.endsWith('.svg'))) return true;
+            // More aggressive: filter square images with small dimensions (likely logos/badges)
+            if (squareish && Math.max(w, h) <= 600 && (s.endsWith('.png') || s.endsWith('.svg'))) return true;
+            // Filter very small images (icons)
+            if (Math.max(w, h) <= 200 && (s.endsWith('.png') || s.endsWith('.svg') || s.endsWith('.jpg') || s.endsWith('.jpeg'))) return true;
           }
         }
         const sizeParam =
@@ -1967,6 +1970,14 @@ const VehicleProfile: React.FC = () => {
       } catch {
         // ignore URL parsing errors; fall back to substring filters above
       }
+      
+      // Additional checks for Framer/CDN hosted logos and UI elements
+      if (s.includes('framerusercontent.com') && (
+        s.includes('logo') || 
+        s.includes('icon') || 
+        s.includes('badge') ||
+        s.match(/width=\d+.*height=\d+.*[&=](width|height)=\d{1,3}/) // Small square with width/height params
+      )) return true;
 
       return false;
     };
@@ -2206,7 +2217,56 @@ const VehicleProfile: React.FC = () => {
 
         // Load all images using public URLs (fast) and de-dupe (storage/variants can create repeats)
         const raw = Array.from(new Set((imageRecords || []).map((r: any) => normalizeUrl(r?.image_url)).filter(Boolean)));
-        images = filterProfileImages(raw, vehicle);
+        
+        // Cross-reference with origin_metadata to identify noisy URLs that were imported
+        const { images: originImages } = getOriginImages(vehicle);
+        
+        // Identify noisy patterns from origin_metadata (logos, icons, small UI elements)
+        const originNoiseHashes = new Set<string>();
+        originImages.forEach((origUrl: string) => {
+          const normalized = normalizeUrl(origUrl).toLowerCase();
+          // Check for SVG files, small square images with width/height params, logos
+          if (normalized.includes('.svg') || 
+              normalized.includes('logo') ||
+              normalized.includes('icon') ||
+              /width=\d+.*height=\d+/.test(normalized)) {
+            // Extract a hash/fingerprint from the URL to match stored images
+            // For framerusercontent.com URLs, the hash is in the filename
+            const hashMatch = normalized.match(/([a-f0-9]{32,})/i);
+            if (hashMatch) {
+              originNoiseHashes.add(hashMatch[1]);
+            }
+            // Also check for small dimension indicators
+            const wMatch = normalized.match(/width=(\d+)/i);
+            const hMatch = normalized.match(/height=(\d+)/i);
+            if (wMatch && hMatch) {
+              const w = parseInt(wMatch[1], 10);
+              const h = parseInt(hMatch[1], 10);
+              // If it's a small or very wide/short image (likely a header/logo), mark as noise
+              if (w <= 600 || h <= 200 || (w > h * 3)) {
+                originNoiseHashes.add(`${w}x${h}`);
+              }
+            }
+          }
+        });
+        
+        // Filter stored images that came from noisy origin URLs
+        // Check storage paths for hash matches
+        const preFiltered = raw.filter((url: string) => {
+          // Skip filtering if no noise detected
+          if (originNoiseHashes.size === 0) return true;
+          
+          // Check if the storage path contains a hash that matches a noisy origin
+          const urlLower = url.toLowerCase();
+          for (const noiseHash of originNoiseHashes) {
+            if (urlLower.includes(noiseHash.toLowerCase())) {
+              return false; // Filter out this image
+            }
+          }
+          return true;
+        });
+        
+        images = filterProfileImages(preFiltered.length > 0 ? preFiltered : raw, vehicle);
 
         // If this is a Classic.com scraped vehicle, prefer the origin_metadata gallery over contaminated imports.
         // Keep any non-imported images (e.g., manual uploads) in front.
@@ -2539,6 +2599,9 @@ const VehicleProfile: React.FC = () => {
 
                   {/* 2b. Structured listing data (Options / Service records / etc.) */}
                   <VehicleStructuredListingDataCard vehicle={vehicle} />
+                  
+                  {/* 2c. External Listings */}
+                  <ExternalListingCard vehicleId={vehicle.id} />
                   
                   {/* 3. Comments */}
               <VehicleCommentsCard
