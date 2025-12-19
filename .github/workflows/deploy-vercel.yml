@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: nuke_frontend/package-lock.json
 
@@ -43,83 +43,14 @@ jobs:
         run: npm install --global vercel@49.2.0
 
       - name: Deploy to Vercel Production
-        working-directory: ./nuke_frontend
         run: |
           echo "🚀 Deploying to Vercel production..."
-          
-          # Check if dist/ exists
-          if [ ! -d "dist" ]; then
-            echo "❌ dist/ directory not found! Build must have failed."
-            exit 1
-          fi
-          
-          echo "✅ dist/ directory found"
-          echo "📦 Contents:"
-          ls -la dist/ | head -10
 
-          # IMPORTANT: We deploy from dist/ to avoid `vercel pull` in CI.
-          # Repo-root vercel.json includes build/install commands (expects nuke_frontend/), which will FAIL when deploying dist/.
-          # Instead, generate a minimal dist/vercel.json that only includes SPA rewrites + headers.
-          echo "📄 Writing dist/vercel.json (SPA rewrites + cache headers)..."
-          cat > dist/vercel.json << 'EOF'
-          {
-            "rewrites": [
-              {
-                "source": "/api/:path*",
-                "destination": "https://qkgaybvrernstplzjaam.functions.supabase.co/mailbox/:path*"
-              },
-              {
-                "source": "/(.*)",
-                "destination": "/index.html"
-              }
-            ],
-            "cleanUrls": true,
-            "trailingSlash": false,
-            "headers": [
-              {
-                "source": "/assets/(.*)",
-                "headers": [
-                  {
-                    "key": "Cache-Control",
-                    "value": "public, max-age=31536000, immutable"
-                  }
-                ]
-              },
-              {
-                "source": "/",
-                "headers": [
-                  {
-                    "key": "Cache-Control",
-                    "value": "no-store"
-                  }
-                ]
-              },
-              {
-                "source": "/(.*)",
-                "headers": [
-                  {
-                    "key": "X-Content-Type-Options",
-                    "value": "nosniff"
-                  },
-                  {
-                    "key": "X-Frame-Options",
-                    "value": "DENY"
-                  },
-                  {
-                    "key": "X-XSS-Protection",
-                    "value": "1; mode=block"
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
-
-          # Deploy from built artifacts (static dist/) without relying on `vercel pull`.
-          # This avoids the "Could not retrieve Project Settings" failure mode in CI.
+          # Deploy to the Vercel project that owns the custom domain (n-zero.dev).
+          # IMPORTANT: Deploying from dist/ creates/targets a separate "dist" project and does NOT update n-zero.dev.
+          # Deploy from repo root and explicitly target the "nuke" project so repo-root vercel.json (build/install/rewrites) applies.
           set +e
-          cd dist
-          DEPLOY_OUTPUT=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} 2>&1)
+          DEPLOY_OUTPUT=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} --scope nzero --name nuke 2>&1)
           DEPLOY_EXIT=$?
           set -e
 
