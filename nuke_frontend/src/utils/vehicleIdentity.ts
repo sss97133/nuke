@@ -70,6 +70,23 @@ export function sanitizeIdentityToken(raw: unknown, ctx?: { year?: number | null
     s = s.replace(new RegExp(`^\\s*${escapeRegExp(make)}\\s+`, 'i'), '').trim();
   }
 
+  // Remove common listing contamination patterns:
+  // "Model - COLOR - $Price (Location)" -> "Model"
+  // "Model - $Price" -> "Model"
+  if (s.includes(' - $') || (s.includes(' - ') && s.match(/\$[\d,]+/))) {
+    // Split on " - $" or " - " followed by price pattern
+    const parts = s.split(/\s*-\s*(?=\$|\([A-Z])/);
+    if (parts.length > 0) {
+      s = parts[0].trim();
+    }
+  }
+  
+  // Remove color patterns that might still be present
+  s = s.replace(/\s*-\s*(BLACK|WHITE|RED|BLUE|GREEN|SILVER|GRAY|GREY|YELLOW|ORANGE|PURPLE|BROWN|BEIGE|TAN)\s*$/i, '').trim();
+  
+  // Remove location patterns like "(Torrance)", "(Los Angeles)"
+  s = s.replace(/\s*\([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\)\s*$/g, '').trim();
+  
   // Collapse whitespace + trim dangling separators.
   s = s.replace(/\s+/g, ' ').trim();
   s = s.replace(/[-–—]\s*$/g, '').trim();

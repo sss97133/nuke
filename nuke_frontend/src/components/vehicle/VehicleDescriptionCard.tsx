@@ -243,9 +243,100 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+            {/* Normalized description display */}
+            <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: rawListingDescriptions.length > 0 ? '8px' : '0' }}>
               {description}
             </div>
+            
+            {/* Raw listing descriptions - button with hover */}
+            {rawListingDescriptions.length > 0 && (
+              <div style={{ marginTop: '8px' }}>
+                <button
+                  type="button"
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '8pt',
+                    border: '1px solid var(--border)',
+                    background: 'var(--white)',
+                    color: 'var(--text)',
+                    cursor: 'pointer',
+                    borderRadius: '3px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => {
+                    const popup = document.getElementById('raw-description-popup');
+                    if (popup) {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      popup.style.display = 'block';
+                      popup.style.top = `${rect.bottom + 8}px`;
+                      popup.style.left = `${rect.left}px`;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const popup = document.getElementById('raw-description-popup');
+                    if (popup) {
+                      const popupRect = popup.getBoundingClientRect();
+                      const buttonRect = e.currentTarget.getBoundingClientRect();
+                      // Only hide if mouse isn't over popup
+                      if (!(e.clientX >= popupRect.left && e.clientX <= popupRect.right &&
+                            e.clientY >= popupRect.top && e.clientY <= popupRect.bottom)) {
+                        popup.style.display = 'none';
+                      }
+                    }
+                  }}
+                >
+                  <span>Raw Listing Descriptions ({rawListingDescriptions.length})</span>
+                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>ⓘ</span>
+                </button>
+                <div
+                  id="raw-description-popup"
+                  style={{
+                    display: 'none',
+                    position: 'fixed',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '6px',
+                    padding: '12px',
+                    maxWidth: '500px',
+                    maxHeight: '400px',
+                    overflowY: 'auto',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    fontSize: '8pt',
+                    lineHeight: 1.5
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.display = 'block';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '9pt' }}>
+                    Original Listing Descriptions
+                  </div>
+                  {rawListingDescriptions.map((row, idx) => (
+                    <div key={idx} style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: idx < rawListingDescriptions.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                        {row.extracted_at ? `Extracted ${new Date(row.extracted_at).toLocaleDateString()}` : 'Extracted date unknown'}
+                        {row.source_url ? ' • ' : ''}
+                        {row.source_url ? (
+                          <a href={row.source_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>
+                            Source
+                          </a>
+                        ) : null}
+                      </div>
+                      <div style={{ whiteSpace: 'pre-wrap', fontSize: '8pt' }}>
+                        {row.text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {rawListingDescriptions.length > 0 && (
               <div style={{ marginTop: '12px' }}>
