@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import SearchFiltersComponent from './SearchFilters';
 import ContentCard from './ContentCard';
 import type { FeedItem, DiscoveryFeedProps, SearchFilters } from './types';
+import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
 import '../../design-system.css';
 
 const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocation }: DiscoveryFeedProps) => {
@@ -96,6 +97,9 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
             year,
             make,
             model,
+            normalized_model,
+            series,
+            trim,
             vin,
             color,
             description,
@@ -133,9 +137,13 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
 
         if (!vehiclesError && vehicles) {
           const vehicleItems: FeedItem[] = vehicles.map(vehicle => ({
+            ...(null as any),
             id: vehicle.id,
             type: 'vehicle',
-            title: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
+            title: (() => {
+              const identity = getVehicleIdentityParts(vehicle as any);
+              return [...identity.primary, ...identity.differentiators].join(' ').trim();
+            })(),
             description: vehicle.description || `${vehicle.color} ${vehicle.make} ${vehicle.model}`,
             image_url: (vehicle.vehicle_images as any)?.[0]?.image_url,
             images: Array.isArray((vehicle as any).vehicle_images)

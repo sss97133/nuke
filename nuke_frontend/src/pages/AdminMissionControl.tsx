@@ -573,7 +573,7 @@ const AdminMissionControl: React.FC = () => {
     <div style={{ padding: '24px', maxWidth: '1600px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: '32px', borderBottom: '2px solid var(--border)', paddingBottom: '16px' }}>
-        <h1 style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '4px' }}>
+        <h1 style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           ADMIN MISSION CONTROL
         </h1>
         <p style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
@@ -587,7 +587,7 @@ const AdminMissionControl: React.FC = () => {
           <span>Image Backfill: origin_metadata → vehicle_images</span>
           <button
             className="button button-primary"
-            style={{ fontSize: '9pt' }}
+            style={{ fontSize: '8pt' }}
             disabled={originBackfillRunning}
             onClick={runOriginImageBackfill}
           >

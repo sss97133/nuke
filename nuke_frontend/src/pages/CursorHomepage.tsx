@@ -35,7 +35,7 @@ interface HypeVehicle {
   discovery_source?: string | null;
   profile_origin?: string | null;
   origin_organization_id?: string | null;
-  listing_start_date?: string | null;
+  listing_start_date?: string;
 }
 
 type TimePeriod = 'ALL' | 'AT' | '1Y' | 'Q' | 'W' | 'D' | 'RT';
@@ -302,6 +302,9 @@ const CursorHomepage: React.FC = () => {
   const [feedVehicles, setFeedVehicles] = useState<HypeVehicle[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<HypeVehicle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [session, setSession] = useState<any>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('AT');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -388,7 +391,9 @@ const CursorHomepage: React.FC = () => {
     
     // Load feed for all users (authenticated and unauthenticated)
     // Public vehicles (is_public=true) are visible to everyone
-    loadHypeFeed();
+    setPage(0);
+    setHasMore(true);
+    loadHypeFeed(0, false);
     
     return () => clearInterval(statsInterval);
   }, [timePeriod, filters.showPending]);
@@ -396,7 +401,9 @@ const CursorHomepage: React.FC = () => {
   // Also reload when session changes (user logs in/out)
   useEffect(() => {
     if (session !== null) {
-      loadHypeFeed();
+      setPage(0);
+      setHasMore(true);
+      loadHypeFeed(0, false);
     }
   }, [session]);
 
@@ -544,11 +551,19 @@ const CursorHomepage: React.FC = () => {
     }
   };
 
-  const loadHypeFeed = async () => {
+  const PAGE_SIZE = 200;
+
+  const loadHypeFeed = async (pageNum: number, append: boolean) => {
     try {
-      setLoading(true);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
       setDebugInfo(null);
+
+      const offset = pageNum * PAGE_SIZE;
 
       // Get vehicles for feed (keep payload small; avoid heavy origin_metadata + bulk image joins here).
       // NOTE: Do NOT select `listing_start_date` here. It is not a real column in the DB and will cause
@@ -556,7 +571,7 @@ const CursorHomepage: React.FC = () => {
       let query = supabase
         .from('vehicles')
         .select(`
-          id, year, make, model, title, vin, created_at, updated_at,
+          id, year, make, model, normalized_model, series, trim, transmission, transmission_model, title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
           auction_outcome, high_bid, winning_bid, bid_count,
@@ -565,7 +580,7 @@ const CursorHomepage: React.FC = () => {
         `)
         .eq('is_public', true)
         .order('updated_at', { ascending: false })
-        .limit(200);
+        .range(offset, offset + PAGE_SIZE - 1);
 
       if (!filters.showPending) {
         query = query.neq('status', 'pending');
@@ -603,7 +618,10 @@ const CursorHomepage: React.FC = () => {
       }
 
       if (!vehicles || vehicles.length === 0) {
-        setFeedVehicles([]);
+        if (!append) {
+          setFeedVehicles([]);
+        }
+        setHasMore(false);
         return;
       }
 
@@ -693,7 +711,19 @@ const CursorHomepage: React.FC = () => {
       });
 
       const sorted = processed.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
-      setFeedVehicles(sorted);
+      setHasMore((vehicles || []).length >= PAGE_SIZE);
+      setPage(pageNum);
+
+      if (append) {
+        setFeedVehicles((prev) => {
+          const map = new Map<string, any>();
+          prev.forEach((v: any) => { if (v?.id) map.set(String(v.id), v); });
+          sorted.forEach((v: any) => { if (v?.id) map.set(String(v.id), v); });
+          return Array.from(map.values()) as any;
+        });
+      } else {
+        setFeedVehicles(sorted);
+      }
 
       // Batch-load organization websites for favicon stamps (no per-card calls).
       try {
@@ -729,7 +759,15 @@ const CursorHomepage: React.FC = () => {
       setFeedVehicles([]);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const loadMore = async () => {
+    if (loading || loadingMore) return;
+    if (!hasMore) return;
+    const nextPage = page + 1;
+    await loadHypeFeed(nextPage, true);
   };
 
   const applyFiltersAndSort = () => {
@@ -1931,6 +1969,30 @@ const CursorHomepage: React.FC = () => {
               />
           ))}
         </div>
+        )}
+
+        {/* Pagination */}
+        {!error && filteredVehicles.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+            {hasMore ? (
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                style={{
+                  background: 'var(--white)',
+                  border: '1px solid var(--border)',
+                  padding: '8px 12px',
+                  fontSize: '9pt',
+                  cursor: loadingMore ? 'wait' : 'pointer',
+                  opacity: loadingMore ? 0.6 : 1,
+                }}
+              >
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </button>
+            ) : (
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>End of results</div>
+            )}
+          </div>
         )}
 
         {/* Error Display */}
