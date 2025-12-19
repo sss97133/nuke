@@ -865,11 +865,29 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
     const metaSeller = String((vehicle as any)?.origin_metadata?.bat_seller || (vehicle as any)?.origin_metadata?.seller || '').trim();
     if (metaSeller) {
-      return { label: metaSeller, logo_url: null, relationship: 'seller' };
+      const slug = metaSeller
+        .trim()
+        .replace(/^@/, '')
+        .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
+        .replace(/\/+$/, '');
+      const href = slug ? `https://bringatrailer.com/member/${slug}/` : null;
+      return { label: metaSeller, logo_url: null, relationship: 'seller', href, kind: 'bat_user' };
     }
 
     return null;
   }, [organizationLinks, vehicle]);
+
+  const batMemberLink = useMemo(() => {
+    const metaSeller = String((vehicle as any)?.origin_metadata?.bat_seller || (vehicle as any)?.origin_metadata?.seller || '').trim();
+    if (!metaSeller) return null;
+    const slug = metaSeller
+      .trim()
+      .replace(/^@/, '')
+      .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
+      .replace(/\/+$/, '');
+    if (!slug) return null;
+    return { label: metaSeller, href: `https://bringatrailer.com/member/${slug}/` };
+  }, [vehicle]);
 
   const formatRelationship = (relationship?: string | null) => {
     if (!relationship) return 'Partner';
@@ -1488,18 +1506,34 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
           {/* Seller visibility (do not hide the seller behind tiny icons) */}
           {sellerBadge?.label ? (
-            <span
-              className="badge badge-secondary"
-              title={sellerBadge.relationship === 'consigner' ? 'Consigner' : 'Seller'}
-              style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 280 }}
-            >
-              {sellerBadge.logo_url ? (
-                <img src={sellerBadge.logo_url} alt="" style={{ width: 14, height: 14, borderRadius: 3, objectFit: 'cover' }} />
-              ) : null}
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {sellerBadge.label}
+            (sellerBadge as any)?.href ? (
+              <a
+                href={String((sellerBadge as any).href)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="badge badge-secondary"
+                title={sellerBadge.relationship === 'consigner' ? 'Consigner' : 'Seller'}
+                style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 280, textDecoration: 'none', color: 'inherit' }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {sellerBadge.label}
+                </span>
+              </a>
+            ) : (
+              <span
+                className="badge badge-secondary"
+                title={sellerBadge.relationship === 'consigner' ? 'Consigner' : 'Seller'}
+                style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 280 }}
+              >
+                {sellerBadge.logo_url ? (
+                  <img src={sellerBadge.logo_url} alt="" style={{ width: 14, height: 14, borderRadius: 3, objectFit: 'cover' }} />
+                ) : null}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {sellerBadge.label}
+                </span>
               </span>
-            </span>
+            )
           ) : null}
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
           {auctionPulse?.listing_url && auctionStatusForBadge && (
@@ -2142,7 +2176,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           </div>
           {visibleOrganizations.length > 0 && (
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {visibleOrganizations.map((org) => (
+              {visibleOrganizations
+                .filter((org) => {
+                  const name = String(org?.business_name || '').toLowerCase();
+                  const origin = String((vehicle as any)?.profile_origin || '').toLowerCase();
+                  const hasBatMember = !!batMemberLink;
+                  // For BaT imports, don't show the generic BaT org bubble when we have a concrete seller identity.
+                  if (hasBatMember && (origin.includes('bat') || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com'))) {
+                    if (name.includes('bring a trailer') || name === 'bat' || name.includes('ba t')) return false;
+                  }
+                  return true;
+                })
+                .map((org) => (
                 <Link
                   key={org.id}
                   to={`/org/${org.organization_id}`}
