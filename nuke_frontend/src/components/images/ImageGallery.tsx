@@ -209,16 +209,87 @@ const ImageGallery = ({
   };
 
   const filterBatNoiseRows = (rows: any[], meta: any = vehicleMeta): any[] => {
-    const needle = buildBatImageNeedle(meta);
-    if (!needle) return rows;
-    const keep = (rows || []).filter((img: any) => {
+    if (!rows || rows.length === 0) return rows;
+    
+    // Never filter out non-BaT URLs (user uploads, Supabase storage, etc.)
+    const nonBat = (rows || []).filter((img: any) => {
       const url = String(img?.image_url || '');
-      if (!url) return false;
-      // Never filter out non-BaT URLs (user uploads, Supabase storage, etc.)
-      if (!url.includes('bringatrailer.com/wp-content/uploads/')) return true;
-      return url.toLowerCase().includes(needle.toLowerCase());
+      return url && !url.includes('bringatrailer.com/wp-content/uploads/');
     });
-    return keep.length > 0 ? keep : rows;
+    
+    const batRows = (rows || []).filter((img: any) => {
+      const url = String(img?.image_url || '');
+      return url && url.includes('bringatrailer.com/wp-content/uploads/');
+    });
+    
+    if (batRows.length === 0) return rows;
+    
+    // First: Filter known BaT page noise
+    const isKnownNoise = (url: string) => {
+      const f = url.toLowerCase();
+      return (
+        f.includes('qotw') || f.includes('winner-template') || f.includes('weekly-weird') ||
+        f.includes('mile-marker') || f.includes('podcast') || f.includes('merch') ||
+        f.includes('dec-merch') || f.includes('podcast-graphic') ||
+        f.includes('site-post-') || f.includes('thumbnail-template') ||
+        f.includes('screenshot-') || f.includes('countries/') ||
+        f.includes('themes/') || f.includes('assets/img/') ||
+        /\/web-\d{3,}-/i.test(f)
+      );
+    };
+    
+    let filtered = batRows.filter((img: any) => {
+      const url = String(img?.image_url || '');
+      return !isKnownNoise(url);
+    });
+    
+    // Second: Try pattern matching by vehicle (year_make_model)
+    const needle = buildBatImageNeedle(meta);
+    if (needle && filtered.length > 0) {
+      const patternMatched = filtered.filter((img: any) => {
+        const url = String(img?.image_url || '').toLowerCase();
+        return url.includes(needle.toLowerCase());
+      });
+      // Only use pattern matching if we get at least 3 matches
+      if (patternMatched.length >= 3) {
+        filtered = patternMatched;
+      }
+    }
+    
+    // Third: Date bucket clustering
+    if (filtered.length > 0) {
+      const bucketKey = (url: string) => {
+        const m = url.match(/\/wp-content\/uploads\/(\d{4})\/(\d{2})\//);
+        return m ? `${m[1]}/${m[2]}` : '';
+      };
+      const bucketCounts = new Map<string, number>();
+      for (const img of filtered) {
+        const url = String(img?.image_url || '');
+        const k = bucketKey(url);
+        if (k) bucketCounts.set(k, (bucketCounts.get(k) || 0) + 1);
+      }
+      let bestBucket = '';
+      let bestCount = 0;
+      for (const [k, c] of bucketCounts.entries()) {
+        if (c > bestCount) {
+          bestBucket = k;
+          bestCount = c;
+        }
+      }
+      // If we have a clear dominant bucket (>=8 images and >=50% of total), use it
+      if (bestBucket && bestCount >= 8 && bestCount >= Math.floor(filtered.length * 0.5)) {
+        filtered = filtered.filter((img: any) => {
+          const url = String(img?.image_url || '');
+          return bucketKey(url) === bestBucket;
+        });
+      }
+    }
+    
+    // Combine filtered BaT rows with non-BaT rows
+    const result = [...nonBat, ...filtered];
+    
+    // Safety: if we filtered everything out, keep at least the non-BaT rows
+    return result.length > 0 ? result : (nonBat.length > 0 ? nonBat : rows);
   };
 
   // When vehicle meta arrives, re-filter any already-loaded images so the UI doesn't briefly show

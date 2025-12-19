@@ -158,10 +158,26 @@ const VehicleProfile: React.FC = () => {
             const raw = String(rawUrl || '').trim();
             if (!raw || !raw.startsWith('http')) return false;
             const s = raw.toLowerCase();
+            
+            // Filter out icons and UI elements
             if (s.includes('gstatic.com/faviconv2')) return false;
             if (s.includes('favicon.ico') || s.includes('/favicon')) return false;
             if (s.includes('apple-touch-icon')) return false;
             if (s.endsWith('.ico')) return false;
+            
+            // Filter out known BaT non-vehicle content
+            if (s.includes('bringatrailer.com/wp-content/uploads/')) {
+              if (s.includes('qotw') || s.includes('winner-template') || s.includes('weekly-weird') ||
+                  s.includes('mile-marker') || s.includes('podcast') || s.includes('merch') ||
+                  s.includes('dec-merch') || s.includes('podcast-graphic') ||
+                  s.includes('site-post-') || s.includes('thumbnail-template') ||
+                  s.includes('screenshot-') || s.includes('countries/') ||
+                  s.includes('themes/') || s.includes('assets/img/') ||
+                  /\/web-\d{3,}-/i.test(s)) {
+                return false;
+              }
+            }
+            
             try {
               const u = new URL(raw);
               const sizeParam = u.searchParams.get('size') || u.searchParams.get('sz') || u.searchParams.get('w') || u.searchParams.get('width');
@@ -1417,6 +1433,12 @@ const VehicleProfile: React.FC = () => {
       const processedVehicle = { ...vehicleData, isPublic: vehicleData.is_public ?? vehicleData.isPublic };
       setVehicle(processedVehicle);
       setIsPublic(vehicleData.is_public ?? true);
+      
+      // Initialize leadImageUrl from primary_image_url if available
+      const primaryImg = (vehicleData as any)?.primary_image_url || (vehicleData as any)?.primaryImageUrl || (vehicleData as any)?.image_url;
+      if (primaryImg && !leadImageUrl) {
+        setLeadImageUrl(primaryImg);
+      }
 
       // Derive auction pulse for header (prefer external_listings over stale vehicles.* fields)
       try {
@@ -1957,17 +1979,84 @@ const VehicleProfile: React.FC = () => {
     };
 
     const filterBatNoise = (urls: string[], v: any): string[] => {
+      const cleaned = (urls || []).map(u => normalizeUrl(u)).filter(Boolean);
+      
+      // Never filter out non-BaT URLs (user uploads, Supabase storage, etc.)
+      const nonBat = cleaned.filter(u => !u.includes('bringatrailer.com/wp-content/uploads/'));
+      const batUrls = cleaned.filter(u => u.includes('bringatrailer.com/wp-content/uploads/'));
+      
+      if (batUrls.length === 0) return cleaned;
+      
+      // First: Filter known BaT page noise that frequently appears but isn't vehicle images
+      const isKnownNoise = (u: string) => {
+        const f = u.toLowerCase();
+        return (
+          f.includes('qotw') ||
+          f.includes('winner-template') ||
+          f.includes('weekly-weird') ||
+          f.includes('mile-marker') ||
+          f.includes('podcast') ||
+          f.includes('merch') ||
+          f.includes('dec-merch') ||
+          f.includes('podcast-graphic') ||
+          // Generic editorial "Web-#####-" images
+          /\/web-\d{3,}-/i.test(f) ||
+          // Homepage/featured content that appears on listing pages
+          f.includes('site-post-') ||
+          f.includes('thumbnail-template') ||
+          // Screenshots of listings (not the actual listing)
+          f.includes('screenshot-') ||
+          // Social media images
+          f.includes('countries/') ||
+          f.includes('themes/') ||
+          f.includes('assets/img/')
+        );
+      };
+      
+      let filtered = batUrls.filter(u => !isKnownNoise(u));
+      
+      // Second: Try to match by vehicle pattern (year_make_model in filename)
       const needle = buildBatImageNeedle(v);
-      if (!needle) return urls;
-      const keep = (urls || []).filter((u) => {
-        const s = normalizeUrl(u);
-        if (!s) return false;
-        // Never filter out non-BaT URLs (user uploads, Supabase storage, etc.)
-        if (!s.includes('bringatrailer.com/wp-content/uploads/')) return true;
-        return s.toLowerCase().includes(needle.toLowerCase());
-      });
-      // Safety: if we filtered everything out, keep the originals rather than showing nothing.
-      return keep.length > 0 ? keep : urls;
+      if (needle && filtered.length > 0) {
+        const patternMatched = filtered.filter(u => 
+          u.toLowerCase().includes(needle.toLowerCase())
+        );
+        // Only use pattern matching if we get at least 3 matches (prevents false positives)
+        if (patternMatched.length >= 3) {
+          filtered = patternMatched;
+        }
+      }
+      
+      // Third: Use date bucket clustering (images from same YYYY/MM upload tend to be from same listing)
+      if (filtered.length > 0) {
+        const bucketKey = (u: string) => {
+          const m = u.match(/\/wp-content\/uploads\/(\d{4})\/(\d{2})\//);
+          return m ? `${m[1]}/${m[2]}` : '';
+        };
+        const bucketCounts = new Map<string, number>();
+        for (const u of filtered) {
+          const k = bucketKey(u);
+          if (k) bucketCounts.set(k, (bucketCounts.get(k) || 0) + 1);
+        }
+        let bestBucket = '';
+        let bestCount = 0;
+        for (const [k, c] of bucketCounts.entries()) {
+          if (c > bestCount) {
+            bestBucket = k;
+            bestCount = c;
+          }
+        }
+        // If we have a clear dominant bucket (>=8 images and >=50% of total), use it
+        if (bestBucket && bestCount >= 8 && bestCount >= Math.floor(filtered.length * 0.5)) {
+          filtered = filtered.filter(u => bucketKey(u) === bestBucket);
+        }
+      }
+      
+      // Combine filtered BaT URLs with non-BaT URLs
+      const result = [...nonBat, ...filtered];
+      
+      // Safety: if we filtered everything out, keep at least the non-BaT URLs
+      return result.length > 0 ? result : (nonBat.length > 0 ? nonBat : urls);
     };
 
     const filterClassicNoise = (urls: string[], v: any): string[] => {
@@ -2234,8 +2323,13 @@ const VehicleProfile: React.FC = () => {
       null;
     if (primaryUrl && typeof primaryUrl === 'string' && !images.includes(primaryUrl) && !isIconUrl(primaryUrl)) {
       images = [primaryUrl, ...images];
-      // Fallback for lead image
+      // Fallback for lead image - ensure it's set from primary
       if (!leadImageUrl) setLeadImageUrl(primaryUrl);
+    }
+    
+    // Ensure leadImageUrl is always set if we have images but no lead yet
+    if (!leadImageUrl && images.length > 0) {
+      setLeadImageUrl(images[0]);
     }
 
     setVehicleImages(images);
@@ -2352,9 +2446,7 @@ const VehicleProfile: React.FC = () => {
     });
   }
 
-  const readinessScore = typeof readinessSnapshot?.readiness_score === 'number'
-    ? readinessSnapshot.readiness_score
-    : null;
+  // readinessScore removed - was computed but never used in render
 
   const renderWorkspaceContent = () => {
     if (!vehicle) {
@@ -2500,12 +2592,12 @@ const VehicleProfile: React.FC = () => {
                   </div>
                   
                   {/* Image Tagging (for owners/contributors only) */}
-                  {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && vehicle.hero_image && (
+                  {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && (leadImageUrl || (vehicle as any)?.primary_image_url || (vehicle as any)?.primaryImageUrl) && (
                     <div className="card">
                       <div className="card-header">Image Tagging & AI Validation</div>
                       <div className="card-body">
                         <EnhancedImageTagger
-                          imageUrl={vehicle.hero_image}
+                          imageUrl={leadImageUrl || (vehicle as any)?.primary_image_url || (vehicle as any)?.primaryImageUrl}
                           vehicleId={vehicle.id}
                           onTagAdded={() => {
                             window.dispatchEvent(new CustomEvent('tags_updated', { detail: { vehicleId: vehicle.id } }));
