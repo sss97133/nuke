@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
@@ -42,6 +42,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { vehicleTabs, activeVehicleId, openVehicleTab, closeVehicleTab, setActiveVehicleTab } = useAppLayoutContext();
+  const headerWrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const m = location.pathname.match(/^\/vehicle\/([^/]+)/i);
@@ -86,6 +87,42 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       cancelled = true;
     };
   }, [activeVehicleId, vehicleTabs, openVehicleTab]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!headerWrapperRef.current) return;
+
+    const updateHeaderHeight = () => {
+      const el = headerWrapperRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const heightPx = Math.max(0, Math.round(rect.bottom));
+      document.documentElement.style.setProperty('--header-height', `${heightPx}px`);
+    };
+
+    updateHeaderHeight();
+
+    const onScroll = () => updateHeaderHeight();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', updateHeaderHeight);
+
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => updateHeaderHeight()) : null;
+    if (ro) ro.observe(headerWrapperRef.current);
+
+    const mo = typeof MutationObserver !== 'undefined'
+      ? new MutationObserver(() => updateHeaderHeight())
+      : null;
+    if (mo && document?.body) {
+      mo.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
+    }
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', updateHeaderHeight);
+      if (ro) ro.disconnect();
+      if (mo) mo.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     // Close menu when clicking outside
@@ -207,7 +244,7 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
       <UploadStatusBar />
       
       {/* Main Navigation Header */}
-      <div className="header-wrapper">
+      <div className="header-wrapper" ref={headerWrapperRef}>
         <div className="header-content">
           {/* 8%: n-zero button (dropdown is popup so doesn't affect layout) */}
           <div className="header-slot-left">
@@ -346,85 +383,92 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
           style={{
             background: 'var(--surface)',
             borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            gap: '2px',
-            padding: '4px 6px',
-            overflowX: 'auto',
-            alignItems: 'center',
           }}
         >
-          {vehicleTabs.map((t) => {
-            const isActive = !!activeVehicleId && t.vehicleId === activeVehicleId;
-            return (
-              <div
-                key={t.vehicleId}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  border: '1px solid var(--border)',
-                  background: isActive ? 'var(--grey-600)' : 'var(--white)',
-                  color: isActive ? 'var(--white)' : 'var(--text)',
-                  height: '24px',
-                  maxWidth: '240px',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveVehicleTab(t.vehicleId);
-                    navigate(`/vehicle/${t.vehicleId}`);
-                  }}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'inherit',
-                    cursor: 'pointer',
-                    fontSize: '8pt',
-                    padding: '0 8px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    maxWidth: '210px',
-                    textAlign: 'left',
-                  }}
-                  title={t.title}
-                >
-                  {t.title}
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const wasActive = t.vehicleId === activeVehicleId;
-                    const nextId = wasActive ? (vehicleTabs.find((x) => x.vehicleId !== t.vehicleId)?.vehicleId || '') : '';
-                    closeVehicleTab(t.vehicleId);
-                    if (wasActive) {
-                      if (nextId) {
-                        setActiveVehicleTab(nextId);
-                        navigate(`/vehicle/${nextId}`);
-                      } else {
-                        setActiveVehicleTab(undefined);
-                        navigate('/');
-                      }
-                    }
-                  }}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'inherit',
-                    cursor: 'pointer',
-                    fontSize: '9pt',
-                    padding: '0 6px',
-                    height: '100%',
-                  }}
-                  aria-label="Close tab"
-                  title="Close"
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })}
+          <div className="content-container">
+            <div
+              style={{
+                display: 'flex',
+                gap: '2px',
+                padding: '4px 0',
+                overflowX: 'auto',
+                alignItems: 'center',
+              }}
+            >
+              {vehicleTabs.map((t) => {
+                const isActive = !!activeVehicleId && t.vehicleId === activeVehicleId;
+                return (
+                  <div
+                    key={t.vehicleId}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      border: '1px solid var(--border)',
+                      background: isActive ? 'var(--grey-600)' : 'var(--white)',
+                      color: isActive ? 'var(--white)' : 'var(--text)',
+                      height: '24px',
+                      maxWidth: '240px',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveVehicleTab(t.vehicleId);
+                        navigate(`/vehicle/${t.vehicleId}`);
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'inherit',
+                        cursor: 'pointer',
+                        fontSize: '8pt',
+                        padding: '0 8px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '210px',
+                        textAlign: 'left',
+                      }}
+                      title={t.title}
+                    >
+                      {t.title}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const wasActive = t.vehicleId === activeVehicleId;
+                        const nextId = wasActive ? (vehicleTabs.find((x) => x.vehicleId !== t.vehicleId)?.vehicleId || '') : '';
+                        closeVehicleTab(t.vehicleId);
+                        if (wasActive) {
+                          if (nextId) {
+                            setActiveVehicleTab(nextId);
+                            navigate(`/vehicle/${nextId}`);
+                          } else {
+                            setActiveVehicleTab(undefined);
+                            navigate('/');
+                          }
+                        }
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'inherit',
+                        cursor: 'pointer',
+                        fontSize: '9pt',
+                        padding: '0 6px',
+                        height: '100%',
+                      }}
+                      aria-label="Close tab"
+                      title="Close"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
