@@ -57,6 +57,19 @@ jobs:
           echo "📦 Contents:"
           ls -la dist/ | head -10
 
+          # IMPORTANT: We deploy from dist/ to avoid `vercel pull` in CI.
+          # When deploying a subdirectory, Vercel will NOT see repo-root `vercel.json` unless we copy it in.
+          # Without the SPA rewrite (/(.*) -> /index.html), deep links like /capture and /vehicle/:id will 404.
+          if [ -f "../vercel.json" ]; then
+            echo "📄 Copying repo vercel.json into dist/ for SPA rewrites..."
+            cp ../vercel.json dist/vercel.json
+          elif [ -f "../../vercel.json" ]; then
+            echo "📄 Copying repo vercel.json into dist/ for SPA rewrites..."
+            cp ../../vercel.json dist/vercel.json
+          else
+            echo "⚠️  vercel.json not found at expected path; deep-link routes may 404"
+          fi
+
           # Deploy from built artifacts (static dist/) without relying on `vercel pull`.
           # This avoids the "Could not retrieve Project Settings" failure mode in CI.
           set +e

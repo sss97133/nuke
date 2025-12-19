@@ -326,7 +326,7 @@ const CursorHomepage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [session, setSession] = useState<any>(null);
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>('AT');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('ALL'); // Default to ALL - no time filtering
   const [viewMode, setViewMode] = useState<ViewMode>('grid'); // Always grid mode
   const [sortBy, setSortBy] = useState<SortBy>(() => {
     try {
@@ -344,16 +344,10 @@ const CursorHomepage: React.FC = () => {
       return 'desc';
     }
   });
-  const [showFilters, setShowFilters] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('nuke_homepage_showFilters');
-      return saved === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [showFilters, setShowFilters] = useState<boolean>(false); // Always hidden by default - NO preselected filters
   const [generativeFilters, setGenerativeFilters] = useState<string[]>([]); // Track active generative filters
-  const [filters, setFilters] = useState<FilterState>(() => loadSavedFilters() || DEFAULT_FILTERS);
+  // Start with completely clean filters - no saved state, no defaults
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [searchText, setSearchText] = useState<string>(() => {
     try {
       return localStorage.getItem('nuke_homepage_searchText') || '';
@@ -1297,146 +1291,66 @@ const CursorHomepage: React.FC = () => {
             {filteredVehicles.length} vehicles
           </div>
 
-          {/* Thermal Pricing Toggle */}
-          <button
-            onClick={() => setThermalPricing(!thermalPricing)}
-            style={{
-              padding: '4px 8px',
-              fontSize: '8pt',
-              border: '1px solid var(--border)',
-              background: thermalPricing ? 'var(--grey-600)' : 'var(--white)',
-              color: thermalPricing ? 'var(--white)' : 'var(--text)',
-              cursor: 'pointer',
-              borderRadius: '2px',
-              transition: 'all 0.12s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-            title="Thermal Pricing: Red = Good Deal, Purple = Bad Price"
-          >
-            <span>🔥</span>
-            <span>Thermal</span>
-          </button>
-          
-          {/* Year Quick Filter Buttons */}
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-            {[
-              { label: '64-91', min: 1964, max: 1991 },
-              { label: '73-87', min: 1973, max: 1987 },
-              { label: '67-72', min: 1967, max: 1972 },
-              { label: '87-00', min: 1987, max: 2000 },
-              { label: '60s', min: 1960, max: 1969 },
-              { label: '70s', min: 1970, max: 1979 },
-              { label: '80s', min: 1980, max: 1989 },
-              { label: '90s', min: 1990, max: 1999 },
-            ].map(range => {
-              const isActive = filters.yearMin === range.min && filters.yearMax === range.max;
-              return (
-                <button
-                  key={range.label}
-                  onClick={() => {
-                    if (isActive) {
-                      setFilters({ ...filters, yearMin: null, yearMax: null });
-                    } else {
-                      setFilters({ ...filters, yearMin: range.min, yearMax: range.max });
-                    }
-                  }}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '8pt',
-                    border: '1px solid var(--border)',
-                    background: isActive ? 'var(--grey-600)' : 'var(--white)',
-                    color: isActive ? 'var(--white)' : 'var(--text)',
-                    cursor: 'pointer',
-                    borderRadius: '2px',
-                    transition: 'all 0.12s'
-                  }}
-                >
-                  {range.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Generative Filters Button */}
-          <button
-            onClick={() => {
-              generateRandomFilters();
-            }}
-            style={{
-              padding: '4px 8px',
-              fontSize: '8pt',
-              border: '1px solid var(--grey-600)',
-              background: 'var(--white)',
-              color: 'var(--text)',
-              cursor: 'pointer',
-              borderRadius: '2px',
-              transition: 'all 0.12s',
-              fontWeight: 'bold'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--grey-100)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--white)';
-            }}
-          >
-            Generate Filters ✨
-          </button>
-
-          {/* Show active generative filters */}
-          {generativeFilters.length > 0 && (
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', fontSize: '8pt' }}>
-              {generativeFilters.map((filter, idx) => (
-                <span
-                  key={idx}
-                  style={{
-                    padding: '2px 6px',
-                    background: 'var(--grey-100)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '2px',
-                    color: 'var(--text-muted)'
-                  }}
-                >
-                  {filter}
-                </span>
-              ))}
+          {/* Minimal controls - only show when filters are toggled on */}
+          {showFilters && (
+            <>
+              {/* Thermal Pricing Toggle */}
               <button
-                onClick={() => {
-                  setGenerativeFilters([]);
-                  setFilters(DEFAULT_FILTERS);
-                  setSearchText('');
-                }}
+                onClick={() => setThermalPricing(!thermalPricing)}
                 style={{
-                  padding: '2px 6px',
+                  padding: '4px 8px',
                   fontSize: '8pt',
                   border: '1px solid var(--border)',
-                  background: 'var(--white)',
-                  cursor: 'pointer'
+                  background: thermalPricing ? 'var(--grey-600)' : 'var(--white)',
+                  color: thermalPricing ? 'var(--white)' : 'var(--text)',
+                  cursor: 'pointer',
+                  borderRadius: '2px',
+                  transition: 'all 0.12s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title="Thermal Pricing: Red = Good Deal, Purple = Bad Price"
+              >
+                <span>🔥</span>
+                <span>Thermal</span>
+              </button>
+              
+              {/* Toggle Filters Button */}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '8pt',
+                  border: '1px solid var(--border)',
+                  background: 'var(--grey-600)',
+                  color: 'var(--white)',
+                  cursor: 'pointer',
+                  borderRadius: '2px'
                 }}
               >
-                Clear All
+                Hide Filters
               </button>
-            </div>
+            </>
           )}
 
-          {/* Toggle Filters Button */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            style={{
-              padding: '4px 8px',
-              fontSize: '8pt',
-              border: '1px solid var(--border)',
-              background: showFilters ? 'var(--grey-600)' : 'var(--white)',
-              color: showFilters ? 'var(--white)' : 'var(--text)',
-              cursor: 'pointer',
-              borderRadius: '2px',
-              marginLeft: 'auto'
-            }}
-          >
-            {showFilters ? 'Hide Filters' : 'Show Filters'}
-          </button>
+          {/* Show Filters Button - only visible when filters are hidden */}
+          {!showFilters && (
+            <button
+              onClick={() => setShowFilters(true)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '8pt',
+                border: '1px solid var(--border)',
+                background: 'var(--white)',
+                color: 'var(--text)',
+                cursor: 'pointer',
+                borderRadius: '2px'
+              }}
+            >
+              Show Filters
+            </button>
+          )}
         </div>
 
         {/* Show loading indicator inline if still loading */}

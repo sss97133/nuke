@@ -2218,10 +2218,8 @@ const VehicleProfile: React.FC = () => {
         // Load all images using public URLs (fast) and de-dupe (storage/variants can create repeats)
         const raw = Array.from(new Set((imageRecords || []).map((r: any) => normalizeUrl(r?.image_url)).filter(Boolean)));
         
-        // Cross-reference with origin_metadata to identify noisy URLs that were imported
-        const { images: originImages } = getOriginImages(vehicle);
-        
         // Identify noisy patterns from origin_metadata (logos, icons, small UI elements)
+        // Note: originImages already declared above at line 2186
         const originNoiseHashes = new Set<string>();
         originImages.forEach((origUrl: string) => {
           const normalized = normalizeUrl(origUrl).toLowerCase();
@@ -2303,7 +2301,7 @@ const VehicleProfile: React.FC = () => {
       } else {
         // No DB rows: try origin_metadata images first (from scraping)
         try {
-          const { images: originImages } = getOriginImages(vehicle);
+          // Note: originImages already declared above at line 2186
 
           if (originImages.length > 0) {
             images = originImages;

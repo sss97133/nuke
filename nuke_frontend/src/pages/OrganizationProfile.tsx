@@ -682,67 +682,45 @@ export default function OrganizationProfile() {
       // STEP 1: Load basic organization data - SIMPLE, no timeout complexity
       console.log('[OrgProfile] Executing query for:', organizationId);
       
+      // Use maybeSingle() instead of single() to avoid throwing on RLS/permission errors
       const { data: org, error: orgError } = await supabase
         .from('businesses')
         .select('*')
         .eq('id', organizationId)
-        .single();
+        .maybeSingle();
       
-      console.log('[OrgProfile] Query completed - org:', org ? 'found' : 'null', 'error:', orgError?.message || 'none');
+      console.log('[OrgProfile] Query completed - org:', org ? 'found' : 'null', 'error:', orgError?.message || 'none', 'code:', (orgError as any)?.code);
 
-      if (orgError || !org) {
-        // Handle Supabase/PostgREST errors gracefully
-        let errorMessage = 'Failed to load organization. It may be private or not exist.';
+      if (orgError) {
+        // Log full error for debugging
+        console.error('[OrgProfile] Supabase error:', {
+          code: (orgError as any)?.code,
+          message: orgError.message,
+          details: (orgError as any)?.details,
+          hint: (orgError as any)?.hint
+        });
+        
+        // For now, if there's an error, try to continue anyway (might be RLS issue that resolves)
+        // Don't block the page - let it try to render with null org which shows proper error UI
+      }
+      
+      if (!org) {
+        // Organization not found or blocked by RLS
+        let errorMessage = 'Organization not found or not accessible.';
         
         if (orgError) {
-          // Check for specific error codes
-          const errorCode = (orgError as any)?.code;
-          const errorDetails = (orgError as any)?.details;
-          const errorHint = (orgError as any)?.hint;
           const rawMessage = orgError.message || String(orgError);
-          
-          console.error('[OrgProfile] Full error:', {
-            code: errorCode,
-            message: rawMessage,
-            details: errorDetails,
-            hint: errorHint,
-            fullError: orgError
-          });
-          
-          // Handle PostgREST error codes
-          if (errorCode === 'PGRST116' || rawMessage?.includes('NOT_FOUND') || rawMessage?.includes('No rows') || rawMessage?.includes('No rows returned')) {
-            errorMessage = 'This organization does not exist or has been removed.';
-          } else if (errorCode === 'PGRST301' || errorCode === '42501' || rawMessage?.includes('permission') || rawMessage?.includes('row-level security') || rawMessage?.includes('new row violates row-level security')) {
-            errorMessage = 'You do not have permission to view this organization. It may be private or you may need to log in.';
-          } else if (errorCode === 'PGRST202' || rawMessage?.includes('JWT')) {
-            errorMessage = 'Authentication error. Please try logging in again.';
-          } else {
-            // Clean up Supabase error messages - remove technical codes and IDs
-            let cleanMessage = rawMessage;
-            
-            // Remove Supabase error IDs (iad1::...)
-            cleanMessage = cleanMessage.replace(/iad\d+::[^\s]+/g, '');
-            
-            // Remove PGRST codes
-            cleanMessage = cleanMessage.replace(/PGRST\d+/g, '');
-            
-            // Remove "Code:" prefix if present
-            cleanMessage = cleanMessage.replace(/Code:\s*[^\s]+/g, '');
-            
-            // Clean up extra whitespace
-            cleanMessage = cleanMessage.replace(/\s+/g, ' ').trim();
-            
-            // If we have a clean message, use it, otherwise use default
-            if (cleanMessage && cleanMessage.length > 0 && !cleanMessage.match(/^404:|NOT_FOUND$/i)) {
-              errorMessage = cleanMessage;
-            }
+          // Check if it's an RLS/permission issue
+          if (rawMessage.includes('row-level security') || rawMessage.includes('permission') || (orgError as any)?.code === '42501') {
+            errorMessage = 'This organization may be private. Try logging in to view it.';
+          } else if (rawMessage.includes('NOT_FOUND') || rawMessage.includes('No rows')) {
+            errorMessage = 'This organization does not exist.';
           }
         }
         
-        console.error('[OrgProfile] Setting error:', errorMessage);
         setLoadError(errorMessage);
         setLoading(false);
-        setOrganization(null); // Ensure organization is null so error UI shows
+        setOrganization(null);
         return;
       }
       
