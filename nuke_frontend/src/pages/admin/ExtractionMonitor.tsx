@@ -6,8 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import '../../design-system.css';
-import { ImageHoverPreview } from '../../components/admin/ImageHoverPreview';
-import { AnalysisModelPopup } from '../../components/admin/AnalysisModelPopup';
+import { ImageHoverPreview, IDHoverCard, AutoIDWrapper } from '../../components/admin';
 
 const ExtractionMonitor: React.FC = () => {
   const [stats, setStats] = useState({
@@ -526,13 +525,9 @@ const ExtractionMonitor: React.FC = () => {
                   marginTop: '4px',
                   wordBreak: 'break-all'
                 }}>
-                  <ImageHoverPreview
-                    imageUrl={image.image_url}
-                    imageId={image.id}
-                    vehicleId={image.vehicle_id}
-                  >
+                  <IDHoverCard id={image.id} type="image">
                     {image.id.substring(0, 8)}...
-                  </ImageHoverPreview>
+                  </IDHoverCard>
                 </div>
                 {info.models.length > 1 && (
                   <div style={{ 
@@ -610,28 +605,26 @@ const ExtractionMonitor: React.FC = () => {
                     wordBreak: 'break-all',
                     fontFamily: 'monospace'
                   }}>
-                    <ImageHoverPreview
-                      imageUrl={failure.image_url}
-                      imageId={failure.id}
-                      vehicleId={failure.vehicle_id}
-                    >
+                    <IDHoverCard id={failure.id} type="image">
                       {failure.id.substring(0, 8)}...
-                    </ImageHoverPreview>
+                    </IDHoverCard>
                   </div>
                   {failure.vehicle_id && (
                     <div style={{ marginTop: '4px' }}>
-                      <a 
-                        href={`/vehicle/${failure.vehicle_id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ 
-                          fontSize: '9px', 
-                          color: '#3b82f6',
-                          textDecoration: 'underline'
-                        }}
-                      >
-                        View Vehicle →
-                      </a>
+                      <IDHoverCard id={failure.vehicle_id} type="vehicle">
+                        <a 
+                          href={`/vehicle/${failure.vehicle_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ 
+                            fontSize: '8pt', 
+                            color: 'var(--accent)',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          View Vehicle →
+                        </a>
+                      </IDHoverCard>
                     </div>
                   )}
                   <div style={{ 

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { secureDocumentService, type SecureDocument, type PIIAuditLog } from '../services/secureDocumentService';
-import { ImageHoverPreview } from '../components/admin/ImageHoverPreview';
+import { ImageHoverPreview, IDHoverCard } from '../components/admin';
 
 const AdminVerifications: React.FC = () => {
   const [pending, setPending] = useState<SecureDocument[]>([]);
@@ -429,7 +429,14 @@ const AdminVerifications: React.FC = () => {
                             )}
                             <div className="vehicle-details">
                               <div className="vehicle-detail"><span>Document</span><span className="text-small">{d.document_type}</span></div>
-                              <div className="vehicle-detail"><span>User</span><span className="text-small">{d.user_id}</span></div>
+                              <div className="vehicle-detail">
+                                <span>User</span>
+                                <span className="text-small">
+                                  <IDHoverCard id={d.user_id} type="user">
+                                    {d.user_id.substring(0, 8)}...
+                                  </IDHoverCard>
+                                </span>
+                              </div>
                               {dup && (
                                 <div className="vehicle-detail" style={{ alignItems: 'flex-start' }}>
                                   <span>Duplicates</span>

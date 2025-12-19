@@ -38,6 +38,7 @@ const tools: AdminNavItem[] = [
   { label: 'Database Audit', to: '/admin/database-audit' },
   { label: 'Data Diagnostic', to: '/admin/data-diagnostic' },
   { label: 'Test Contributions', to: '/admin/test-contributions' },
+  { label: 'Hover Card Demo', to: '/admin/hover-demo', description: 'See what hover cards look like' },
 ];
 
 function Section({ title, items }: { title: string; items: AdminNavItem[] }) {
