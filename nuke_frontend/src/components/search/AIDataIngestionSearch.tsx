@@ -73,6 +73,18 @@ export default function AIDataIngestionSearch() {
     );
   };
 
+  const looksLikeNaturalLanguageSearch = (text: string) => {
+    const t = (text || '').trim().toLowerCase();
+    if (!t) return false;
+
+    if (t.includes('?')) return true;
+    if (/^(what|why|how|when|where|who|which|are|is|do|does|did|can|should|could|would)\b/i.test(t)) return true;
+    if (/\b(show|find|search|look|see|browse|list)\b/i.test(t)) return true;
+    if (/\b(i\s+want\s+to\s+see|i\s+wanna\s+see|i\s+want\s+to|i\s+wanna)\b/i.test(t)) return true;
+    if (/\b(all\s+the|all)\b/i.test(t) && t.split(/\s+/).length <= 8) return true;
+    return false;
+  };
+
   const runWiringWorkbench = async (userText: string) => {
     const vid = vehicleIdFromRoute || currentVehicleData?.id;
     if (!vid) {
@@ -286,6 +298,17 @@ export default function AIDataIngestionSearch() {
       setInput('');
       setWiringMessages((prev) => [...prev, { role: 'user', text: msg }]);
       await runWiringWorkbench(msg);
+      return;
+    }
+
+    if (!attachedImage && looksLikeNaturalLanguageSearch(input.trim())) {
+      const searchQuery = input.trim();
+      setInput('');
+      setShowPreview(false);
+      setExtractionPreview(null);
+      setActionsOpen(false);
+      setError(null);
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
       return;
     }
 

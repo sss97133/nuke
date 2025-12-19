@@ -365,6 +365,30 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         </div>
       </main>
 
+      <nav className="mobile-bottom-nav" aria-label="Primary">
+        <Link
+          to="/"
+          className={`mobile-bottom-nav-item ${location.pathname === '/' ? 'active' : ''}`}
+          onClick={() => setNZeroMenuOpen(false)}
+        >
+          Home
+        </Link>
+        <Link
+          to="/capture"
+          className={`mobile-bottom-nav-item ${location.pathname === '/capture' ? 'active' : ''}`}
+          onClick={() => setNZeroMenuOpen(false)}
+        >
+          +
+        </Link>
+        <Link
+          to="/profile"
+          className={`mobile-bottom-nav-item ${location.pathname.startsWith('/profile') ? 'active' : ''}`}
+          onClick={() => setNZeroMenuOpen(false)}
+        >
+          Profile
+        </Link>
+      </nav>
+
       {/* Notifications Flyout */}
       <NotificationCenter isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
 

@@ -1418,6 +1418,52 @@ body {
   padding: 0 0 var(--space-4) 0; /* Flush with header on top */
 }
 
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+  }
+
+  .mobile-bottom-nav-item {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9pt;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border: none;
+    background: transparent;
+  }
+
+  .mobile-bottom-nav-item.active {
+    color: var(--text);
+    font-weight: bold;
+  }
+
+  .main-content {
+    padding-bottom: calc(var(--space-4) + 56px);
+  }
+
+  .app-footer {
+    padding-bottom: calc(var(--space-4) + 56px);
+  }
+}
+
 .content-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -3453,7 +3499,6 @@ body {
     font-size: 14px !important;
     line-height: 1.2 !important;
   }
-}
 
 /* ============================================
    CURSOR IDE DESIGN PATTERNS
