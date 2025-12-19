@@ -3543,3 +3543,14 @@ button:focus-visible {
   transition: all 0.12s ease;
 }
 
+/* Admin Navigation Hover States */
+.admin-nav-inactive:hover {
+  background-color: var(--grey-50) !important;
+  color: var(--text) !important;
+}
+
+.admin-nav-active {
+  background-color: var(--grey-100) !important;
+  color: var(--text) !important;
+}
+

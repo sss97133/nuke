@@ -1,16 +1,21 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import VehicleThumbnail from '../VehicleThumbnail';
+import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
 import '../../design-system.css';
 
 interface VehicleData {
   id: string;
   make?: string | null;
   model?: string | null;
+  normalized_model?: string | null;
+  series?: string | null;
+  trim?: string | null;
   year?: number | null;
   vin?: string | null;
   created_at?: string;
   sale_price?: number | null;
+  asking_price?: number | null;
   current_value?: number | null;
   is_for_sale?: boolean | null;
   uploaded_by?: string;
@@ -24,6 +29,12 @@ interface ShopVehicleCardProps {
 }
 
 const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, denseMode = false }) => {
+  const title = (() => {
+    const identity = getVehicleIdentityParts(vehicle as any);
+    const v = [...identity.primary, ...identity.differentiators].join(' ').trim();
+    return v || `${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim();
+  })();
+
   const getUserDisplay = () => {
     if (vehicle.profiles?.full_name) return vehicle.profiles.full_name;
     if (vehicle.profiles?.username) return vehicle.profiles.username;
@@ -68,7 +79,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         {/* Content */}
         <div style={{ padding: '8px' }}>
           <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
-            {vehicle.year} {vehicle.make} {vehicle.model}
+            {title}
           </h3>
           {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
             <div className="text" style={{ fontSize: '8pt', color: '#3b82f6', fontWeight: 'bold' }}>
@@ -105,7 +116,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         <div style={{ padding: '8px' }}>
           {/* Title */}
           <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
-            {vehicle.year} {vehicle.make} {vehicle.model}
+            {title}
           </h3>
           
           {/* Owner */}
@@ -156,7 +167,7 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Title */}
           <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
-            {vehicle.year} {vehicle.make} {vehicle.model}
+            {title}
           </h3>
           
           {/* VIN */}

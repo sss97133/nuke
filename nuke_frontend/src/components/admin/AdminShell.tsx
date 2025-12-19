@@ -42,23 +42,42 @@ const tools: AdminNavItem[] = [
 
 function Section({ title, items }: { title: string; items: AdminNavItem[] }) {
   return (
-    <div className="mb-6">
-      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{title}</div>
-      <div className="space-y-1">
+    <div style={{ marginBottom: 'var(--space-6)' }}>
+      <div style={{ 
+        fontSize: '8pt', 
+        fontWeight: 600, 
+        color: 'var(--text-muted)', 
+        textTransform: 'uppercase', 
+        letterSpacing: '0.5px',
+        marginBottom: 'var(--space-2)'
+      }}>{title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         {items.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            className={({ isActive }) =>
-              `block rounded-md px-3 py-2 text-sm transition-colors ${
-                isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`
-            }
+            style={({ isActive }) => ({
+              display: 'block',
+              padding: 'var(--space-2) var(--space-3)',
+              fontSize: '8pt',
+              borderRadius: '0px',
+              backgroundColor: isActive ? 'var(--grey-100)' : 'transparent',
+              color: isActive ? 'var(--text)' : 'var(--text-muted)',
+              transition: 'all 0.12s ease',
+              textDecoration: 'none'
+            })}
+            className={({ isActive }) => isActive ? 'admin-nav-active' : 'admin-nav-inactive'}
             title={item.description}
             end={item.to === '/admin'}
           >
-            <div className="font-medium">{item.label}</div>
-            {item.description ? <div className="text-xs text-gray-500 mt-0.5">{item.description}</div> : null}
+            <div style={{ fontWeight: 500 }}>{item.label}</div>
+            {item.description ? (
+              <div style={{ 
+                fontSize: '8pt', 
+                color: 'var(--text-muted)', 
+                marginTop: '2px' 
+              }}>{item.description}</div>
+            ) : null}
           </NavLink>
         ))}
       </div>
@@ -80,16 +99,22 @@ export default function AdminShell() {
   }, [isAdmin, loading, location.pathname, navigate]);
 
   if (loading) {
-    return <div className="p-6 text-sm text-gray-600">Loading admin…</div>;
+    return <div style={{ padding: 'var(--space-6)', fontSize: '8pt', color: 'var(--text-muted)' }}>Loading admin…</div>;
   }
 
   if (!isAdmin) {
     return (
-      <div className="p-6">
-        <div className="max-w-xl border border-gray-200 rounded-lg p-4 bg-white">
-          <div className="text-lg font-semibold text-gray-900">Access denied</div>
-          <div className="text-sm text-gray-600 mt-1">Admin privileges are required to view this area.</div>
-          <div className="mt-4 flex gap-2">
+      <div style={{ padding: 'var(--space-6)' }}>
+        <div style={{
+          maxWidth: '36rem',
+          border: '2px solid var(--border-light)',
+          borderRadius: '0px',
+          padding: 'var(--space-4)',
+          backgroundColor: 'var(--white)'
+        }}>
+          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>Access denied</div>
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Admin privileges are required to view this area.</div>
+          <div style={{ marginTop: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)' }}>
             <button className="button button-secondary" onClick={() => navigate('/org/dashboard')}>
               Return to dashboard
             </button>
@@ -103,19 +128,24 @@ export default function AdminShell() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-64px)]">
-      <aside className="w-72 border-r border-gray-200 bg-white p-4">
-        <div className="mb-4">
-          <div className="text-sm font-semibold text-gray-900">Admin</div>
-          <div className="text-xs text-gray-500 mt-1">Central admin hub</div>
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 64px)' }}>
+      <aside style={{
+        width: '18rem',
+        borderRight: '2px solid var(--border-light)',
+        backgroundColor: 'var(--white)',
+        padding: 'var(--space-4)'
+      }}>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Admin</div>
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Central admin hub</div>
         </div>
         <Section title="Primary" items={primary} />
         <Section title="Operations" items={operations} />
         <Section title="Tools" items={tools} />
       </aside>
 
-      <main className="flex-1 bg-gray-50">
-        <div className="p-6">
+      <main style={{ flex: 1, backgroundColor: 'var(--grey-100)' }}>
+        <div style={{ padding: 'var(--space-6)' }}>
           <Outlet />
         </div>
       </main>

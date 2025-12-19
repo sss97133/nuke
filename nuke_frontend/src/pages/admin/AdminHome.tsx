@@ -42,35 +42,59 @@ export default function AdminHome() {
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-4">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
         <div>
-          <div className="text-2xl font-semibold text-gray-900">Admin</div>
-          <div className="text-sm text-gray-600 mt-1">Everything admin lives here.</div>
+          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Admin</div>
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>Everything admin lives here.</div>
         </div>
-        <div className="text-right">
-          <div className="text-xs text-gray-500">Pending</div>
-          <div className="text-lg font-semibold text-gray-900">
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Pending</div>
+          <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>
             {loading ? '…' : String(stats?.total_pending_notifications ?? 0)}
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-6">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: 'var(--space-4)',
+        marginTop: 'var(--space-6)'
+      }}>
         {cards.map((c) => (
           <Link
             key={c.to}
             to={c.to}
-            className="block rounded-lg border border-gray-200 bg-white p-4 hover:bg-gray-50 transition-colors"
+            style={{
+              display: 'block',
+              borderRadius: '0px',
+              border: '2px solid var(--border-light)',
+              backgroundColor: 'var(--white)',
+              padding: 'var(--space-4)',
+              transition: 'all 0.12s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--grey-50)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--white)';
+            }}
           >
-            <div className="text-sm font-semibold text-gray-900">{c.title}</div>
-            <div className="text-sm text-gray-600 mt-1">{c.description}</div>
+            <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>{c.title}</div>
+            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>{c.description}</div>
           </Link>
         ))}
       </div>
 
-      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-4">
-        <div className="text-sm font-semibold text-gray-900">Quick links</div>
-        <div className="text-sm text-gray-600 mt-2 flex flex-wrap gap-2">
+      <div style={{
+        marginTop: 'var(--space-6)',
+        borderRadius: '0px',
+        border: '2px solid var(--border-light)',
+        backgroundColor: 'var(--white)',
+        padding: 'var(--space-4)'
+      }}>
+        <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>Quick links</div>
+        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
           <Link className="button button-secondary" to="/admin/legacy-dashboard">
             Legacy dashboard
           </Link>

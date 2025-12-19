@@ -6,6 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import '../../design-system.css';
+import { ImageHoverPreview } from '../../components/admin/ImageHoverPreview';
+import { AnalysisModelPopup } from '../../components/admin/AnalysisModelPopup';
 
 const ExtractionMonitor: React.FC = () => {
   const [stats, setStats] = useState({
@@ -49,27 +51,39 @@ const ExtractionMonitor: React.FC = () => {
 
   const loadStats = async () => {
     try {
-      // Get total images
-      const { count: totalCount } = await supabase
-        .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
-        .not('is_document', 'is', true)
-        .not('image_url', 'is', null);
+      // OPTIMIZED: Run all queries in parallel, only fetch what we need
+      const [totalResult, extractedResult, unextractedResult] = await Promise.allSettled([
+        // Total count only
+        supabase
+          .from('vehicle_images')
+          .select('id', { count: 'exact', head: true })
+          .not('is_document', 'is', true)
+          .not('image_url', 'is', null),
+        
+        // Recent extracted images only (limit to 100 for performance)
+        supabase
+          .from('vehicle_images')
+          .select('ai_scan_metadata, id, image_url, created_at, vehicle_id')
+          .not('is_document', 'is', true)
+          .not('image_url', 'is', null)
+          .not('ai_scan_metadata', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        
+        // Recent unextracted images only (limit to 50)
+        supabase
+          .from('vehicle_images')
+          .select('id, image_url, created_at, vehicle_id, ai_scan_metadata')
+          .not('is_document', 'is', true)
+          .not('image_url', 'is', null)
+          .or('ai_scan_metadata.is.null,ai_scan_metadata.eq.{}')
+          .order('created_at', { ascending: false })
+          .limit(50)
+      ]);
 
-      // Get images with extractions
-      const { data: extractedImages } = await supabase
-        .from('vehicle_images')
-        .select('ai_scan_metadata, id, image_url, created_at, vehicle_id')
-        .not('is_document', 'is', true)
-        .not('image_url', 'is', null);
-
-      // Get images without extractions (potential failures or pending)
-      const { data: unextractedImages } = await supabase
-        .from('vehicle_images')
-        .select('id, image_url, created_at, vehicle_id, ai_scan_metadata')
-        .not('is_document', 'is', true)
-        .not('image_url', 'is', null)
-        .or('ai_scan_metadata.is.null,ai_scan_metadata.eq.{}');
+      const totalCount = totalResult.status === 'fulfilled' ? totalResult.value.count : 0;
+      const extractedImages = extractedResult.status === 'fulfilled' ? (extractedResult.value.data || []) : [];
+      const unextractedImages = unextractedResult.status === 'fulfilled' ? (unextractedResult.value.data || []) : [];
 
       // Count by model
       const modelCounts = new Map<string, number>();
@@ -415,8 +429,19 @@ const ExtractionMonitor: React.FC = () => {
           <div style={{ fontSize: '32px', fontWeight: 'bold' }}>
             {stats.models.length}
           </div>
-          <div style={{ fontSize: '10px', marginTop: '4px', opacity: 0.7 }}>
-            {stats.models.join(', ')}
+          <div style={{ fontSize: '8pt', marginTop: '4px', color: 'var(--text-muted)' }}>
+            {stats.models.length > 0 ? (
+              stats.models.map((model, idx) => (
+                <React.Fragment key={model}>
+                  <AnalysisModelPopup modelName={model}>
+                    {model}
+                  </AnalysisModelPopup>
+                  {idx < stats.models.length - 1 && ', '}
+                </React.Fragment>
+              ))
+            ) : (
+              'No models used yet'
+            )}
           </div>
         </div>
       </div>
@@ -490,16 +515,24 @@ const ExtractionMonitor: React.FC = () => {
                     {info.angle}
                   </span>
                   <span style={{ opacity: 0.7 }}>
-                    {info.model}
+                    <AnalysisModelPopup modelName={info.model}>
+                      {info.model}
+                    </AnalysisModelPopup>
                   </span>
                 </div>
                 <div style={{ 
-                  fontSize: '9px', 
-                  opacity: 0.6,
+                  fontSize: '8pt', 
+                  color: 'var(--text-muted)',
                   marginTop: '4px',
                   wordBreak: 'break-all'
                 }}>
-                  {image.id.substring(0, 8)}...
+                  <ImageHoverPreview
+                    imageUrl={image.image_url}
+                    imageId={image.id}
+                    vehicleId={image.vehicle_id}
+                  >
+                    {image.id.substring(0, 8)}...
+                  </ImageHoverPreview>
                 </div>
                 {info.models.length > 1 && (
                   <div style={{ 
@@ -571,13 +604,19 @@ const ExtractionMonitor: React.FC = () => {
                     </span>
                   </div>
                   <div style={{ 
-                    fontSize: '9px', 
-                    opacity: 0.6,
+                    fontSize: '8pt', 
+                    color: 'var(--text-muted)',
                     marginTop: '4px',
                     wordBreak: 'break-all',
                     fontFamily: 'monospace'
                   }}>
-                    {failure.id.substring(0, 8)}...
+                    <ImageHoverPreview
+                      imageUrl={failure.image_url}
+                      imageId={failure.id}
+                      vehicleId={failure.vehicle_id}
+                    >
+                      {failure.id.substring(0, 8)}...
+                    </ImageHoverPreview>
                   </div>
                   {failure.vehicle_id && (
                     <div style={{ marginTop: '4px' }}>
