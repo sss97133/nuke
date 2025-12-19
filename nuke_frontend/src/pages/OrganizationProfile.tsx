@@ -691,8 +691,58 @@ export default function OrganizationProfile() {
       console.log('[OrgProfile] Query completed - org:', org ? 'found' : 'null', 'error:', orgError?.message || 'none');
 
       if (orgError || !org) {
-        setLoadError(orgError?.message || 'Failed to load organization. It may be private or not exist.');
+        // Handle Supabase/PostgREST errors gracefully
+        let errorMessage = 'Failed to load organization. It may be private or not exist.';
+        
+        if (orgError) {
+          // Check for specific error codes
+          const errorCode = (orgError as any)?.code;
+          const errorDetails = (orgError as any)?.details;
+          const errorHint = (orgError as any)?.hint;
+          const rawMessage = orgError.message || String(orgError);
+          
+          console.error('[OrgProfile] Full error:', {
+            code: errorCode,
+            message: rawMessage,
+            details: errorDetails,
+            hint: errorHint,
+            fullError: orgError
+          });
+          
+          // Handle PostgREST error codes
+          if (errorCode === 'PGRST116' || rawMessage?.includes('NOT_FOUND') || rawMessage?.includes('No rows') || rawMessage?.includes('No rows returned')) {
+            errorMessage = 'This organization does not exist or has been removed.';
+          } else if (errorCode === 'PGRST301' || errorCode === '42501' || rawMessage?.includes('permission') || rawMessage?.includes('row-level security') || rawMessage?.includes('new row violates row-level security')) {
+            errorMessage = 'You do not have permission to view this organization. It may be private or you may need to log in.';
+          } else if (errorCode === 'PGRST202' || rawMessage?.includes('JWT')) {
+            errorMessage = 'Authentication error. Please try logging in again.';
+          } else {
+            // Clean up Supabase error messages - remove technical codes and IDs
+            let cleanMessage = rawMessage;
+            
+            // Remove Supabase error IDs (iad1::...)
+            cleanMessage = cleanMessage.replace(/iad\d+::[^\s]+/g, '');
+            
+            // Remove PGRST codes
+            cleanMessage = cleanMessage.replace(/PGRST\d+/g, '');
+            
+            // Remove "Code:" prefix if present
+            cleanMessage = cleanMessage.replace(/Code:\s*[^\s]+/g, '');
+            
+            // Clean up extra whitespace
+            cleanMessage = cleanMessage.replace(/\s+/g, ' ').trim();
+            
+            // If we have a clean message, use it, otherwise use default
+            if (cleanMessage && cleanMessage.length > 0 && !cleanMessage.match(/^404:|NOT_FOUND$/i)) {
+              errorMessage = cleanMessage;
+            }
+          }
+        }
+        
+        console.error('[OrgProfile] Setting error:', errorMessage);
+        setLoadError(errorMessage);
         setLoading(false);
+        setOrganization(null); // Ensure organization is null so error UI shows
         return;
       }
       
@@ -1382,20 +1432,36 @@ export default function OrganizationProfile() {
 
   if (!organization) {
     return (
-      <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-        <div className="text">Organization not found</div>
+      <div style={{ padding: 'var(--space-8)', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
+        <div className="text" style={{ fontSize: '14pt', fontWeight: 700, marginBottom: 'var(--space-3)' }}>
+          Organization Not Found
+        </div>
         {loadError && (
-          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '8pt' }}>
+          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '9pt', marginBottom: 'var(--space-4)' }}>
             {loadError}
           </div>
         )}
-        <button
-          onClick={() => navigate('/organizations')}
-          className="button button-secondary"
-          style={{ marginTop: 'var(--space-3)', fontSize: '9pt' }}
-        >
-          Back to Organizations
-        </button>
+        {!loadError && (
+          <div className="text text-muted" style={{ marginTop: 'var(--space-2)', fontSize: '9pt', marginBottom: 'var(--space-4)' }}>
+            The organization you're looking for doesn't exist or has been removed.
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => navigate('/org')}
+            className="button button-secondary"
+            style={{ fontSize: '9pt', padding: '8px 16px' }}
+          >
+            Browse Organizations
+          </button>
+          <button
+            onClick={() => navigate(-1)}
+            className="button button-primary"
+            style={{ fontSize: '9pt', padding: '8px 16px' }}
+          >
+            Go Back
+          </button>
+        </div>
       </div>
     );
   }
