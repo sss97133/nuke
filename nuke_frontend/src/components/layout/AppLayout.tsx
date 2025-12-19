@@ -6,7 +6,8 @@ import { ProfileBalancePill } from './ProfileBalancePill';
 import { UploadStatusBar } from './UploadStatusBar';
 import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
 import NotificationCenter from '../notifications/NotificationCenter';
-import { AppLayoutProvider, usePreventDoubleLayout } from './AppLayoutContext';
+import { AppLayoutProvider, useAppLayoutContext, usePreventDoubleLayout } from './AppLayoutContext';
+import { getVehicleIdentityParts } from '../../utils/vehicleIdentity';
 import '../../design-system.css';
 
 interface AppLayoutProps {
@@ -40,6 +41,51 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { vehicleTabs, activeVehicleId, openVehicleTab, closeVehicleTab, setActiveVehicleTab } = useAppLayoutContext();
+
+  useEffect(() => {
+    const m = location.pathname.match(/^\/vehicle\/([^/]+)/i);
+    const maybeId = m?.[1] ? String(m[1]).trim() : '';
+    if (!maybeId || maybeId === 'list' || maybeId === 'add') return;
+
+    const stateTitle = (location.state as any)?.vehicleTitle;
+    const title = typeof stateTitle === 'string' ? stateTitle.trim() : '';
+    openVehicleTab({ vehicleId: maybeId, title });
+  }, [location.pathname, location.state, openVehicleTab]);
+
+  useEffect(() => {
+    if (!activeVehicleId) return;
+    const tab = vehicleTabs.find((t) => t.vehicleId === activeVehicleId);
+    if (!tab) return;
+
+    // If we already have a meaningful title, don't fetch.
+    const existing = String(tab.title || '').trim();
+    if (existing && existing !== 'Vehicle') return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select('id, year, make, model, normalized_model, series, trim, transmission, transmission_model')
+          .eq('id', activeVehicleId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (error || !data) return;
+
+        const identity = getVehicleIdentityParts(data as any);
+        const nextTitle = [...identity.primary, ...identity.differentiators].join(' ').trim();
+        if (!nextTitle) return;
+        openVehicleTab({ vehicleId: activeVehicleId, title: nextTitle });
+      } catch {
+        // ignore
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeVehicleId, vehicleTabs, openVehicleTab]);
 
   useEffect(() => {
     // Close menu when clicking outside
@@ -294,6 +340,93 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
           </div>
         </div>
       </div>
+
+      {vehicleTabs.length > 0 && (
+        <div
+          style={{
+            background: 'var(--surface)',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            gap: '2px',
+            padding: '4px 6px',
+            overflowX: 'auto',
+            alignItems: 'center',
+          }}
+        >
+          {vehicleTabs.map((t) => {
+            const isActive = !!activeVehicleId && t.vehicleId === activeVehicleId;
+            return (
+              <div
+                key={t.vehicleId}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  border: '1px solid var(--border)',
+                  background: isActive ? 'var(--grey-600)' : 'var(--white)',
+                  color: isActive ? 'var(--white)' : 'var(--text)',
+                  height: '24px',
+                  maxWidth: '240px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveVehicleTab(t.vehicleId);
+                    navigate(`/vehicle/${t.vehicleId}`);
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                    fontSize: '8pt',
+                    padding: '0 8px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '210px',
+                    textAlign: 'left',
+                  }}
+                  title={t.title}
+                >
+                  {t.title}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const wasActive = t.vehicleId === activeVehicleId;
+                    const nextId = wasActive ? (vehicleTabs.find((x) => x.vehicleId !== t.vehicleId)?.vehicleId || '') : '';
+                    closeVehicleTab(t.vehicleId);
+                    if (wasActive) {
+                      if (nextId) {
+                        setActiveVehicleTab(nextId);
+                        navigate(`/vehicle/${nextId}`);
+                      } else {
+                        setActiveVehicleTab(undefined);
+                        navigate('/');
+                      }
+                    }
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'inherit',
+                    cursor: 'pointer',
+                    fontSize: '9pt',
+                    padding: '0 6px',
+                    height: '100%',
+                  }}
+                  aria-label="Close tab"
+                  title="Close"
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Page Header with Title and Actions */}
       {(title || breadcrumbs || showBackButton || primaryAction) && (

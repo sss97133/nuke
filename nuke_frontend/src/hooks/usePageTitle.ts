@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
 
 /**
  * Hook to manage page titles dynamically
@@ -26,38 +27,19 @@ export function getVehicleTitle(vehicle: {
   year?: number | null;
   make?: string | null;
   model?: string | null;
+  normalized_model?: string | null;
   trim?: string | null;
   series?: string | null;
+  transmission?: string | null;
+  transmission_model?: string | null;
 } | null): string {
   if (!vehicle) {
     return 'Vehicle Profile';
   }
 
-  const parts: string[] = [];
-  
-  if (vehicle.year) {
-    parts.push(String(vehicle.year));
-  }
-  
-  if (vehicle.make) {
-    parts.push(vehicle.make);
-  }
-  
-  if (vehicle.model) {
-    parts.push(vehicle.model);
-  }
-  
-  if (vehicle.trim) {
-    parts.push(vehicle.trim);
-  } else if (vehicle.series) {
-    parts.push(vehicle.series);
-  }
-
-  if (parts.length === 0) {
-    return 'Vehicle Profile';
-  }
-
-  return parts.join(' ');
+  const identity = getVehicleIdentityParts(vehicle as any);
+  const title = [...identity.primary, ...identity.differentiators].join(' ').trim();
+  return title || 'Vehicle Profile';
 }
 
 /**

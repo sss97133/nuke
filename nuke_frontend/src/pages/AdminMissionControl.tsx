@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, getSupabaseFunctionsUrl } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { ImageHoverPreview, AnalysisModelPopup } from '../components/admin';
 
 interface SystemStats {
   totalVehicles: number;
@@ -864,7 +865,7 @@ const AdminMissionControl: React.FC = () => {
         <div className="card-body">
           <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
             Tags images with a precise angle taxonomy and writes pose signals directly onto `vehicle_images` (`ai_detected_angle`, confidence, and `yaw_deg` when applicable).
-            Uses a cheaper model and processes only images missing `ai_detected_angle`.
+            Uses a <AnalysisModelPopup modelName="gemini-1.5-flash">cheaper model</AnalysisModelPopup> and processes only images missing `ai_detected_angle`.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
@@ -1165,7 +1166,9 @@ const AdminMissionControl: React.FC = () => {
                     <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right' }}>{Number(r.vehicles || 0).toLocaleString()}</td>
                     <td style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
                       {r.sample_url ? (
-                        <img src={r.sample_url} style={{ width: 72, height: 54, objectFit: 'cover', border: '1px solid var(--border)' }} />
+                        <ImageHoverPreview imageUrl={r.sample_url} vehicleId={r.sample_vehicle_id}>
+                          <img src={r.sample_url} style={{ width: 72, height: 54, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
+                        </ImageHoverPreview>
                       ) : (
                         <span style={{ color: '#999' }}>—</span>
                       )}
@@ -1176,9 +1179,11 @@ const AdminMissionControl: React.FC = () => {
                     <td style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {r.sample_url ? (
-                          <a className="button button-secondary" style={{ fontSize: '8pt' }} href={r.sample_url} target="_blank" rel="noreferrer">
-                            Open image
-                          </a>
+                          <ImageHoverPreview imageUrl={r.sample_url} vehicleId={r.sample_vehicle_id}>
+                            <a className="button button-secondary" style={{ fontSize: '8pt' }} href={r.sample_url} target="_blank" rel="noreferrer">
+                              Open image
+                            </a>
+                          </ImageHoverPreview>
                         ) : null}
                         {r.sample_vehicle_id ? (
                           <button
