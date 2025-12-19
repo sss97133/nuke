@@ -230,22 +230,18 @@ const DEFAULT_FILTERS: FilterState = {
   makes: [],
   priceMin: null,
   priceMax: null,
-  // PERF/UX: Default to showing the feed even if images are missing.
-  // Many imported vehicles may not have `primary_image_url` populated yet; users can toggle "Has Images" on.
   hasImages: false,
   forSale: false,
-  // Homepage should focus on active listings; sold inventory can be toggled back on.
-  hideSold: true,
-  // Dealer/source defaults:
-  // Craigslist is typically the noisiest dealer channel; default to hiding it.
+  // NO preselected filters - let users choose what they want to see
+  hideSold: false,
   hideDealerListings: false,
-  hideCraigslist: true,
+  hideCraigslist: false,
   hideDealerSites: false,
   hideKsl: false,
   hideBat: false,
   hideClassic: false,
   zipCode: '',
-  radiusMiles: 50,
+  radiusMiles: 0, // No default radius - user must explicitly set location
   showPending: false
 };
 
