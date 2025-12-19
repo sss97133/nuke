@@ -1280,78 +1280,6 @@ const CursorHomepage: React.FC = () => {
         padding: '0 16px'
       }}>
         {/* Minimal header with year quick filters and generative filters */}
-        <div style={{
-          marginBottom: '16px',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-          alignItems: 'center'
-        }}>
-          <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-            {filteredVehicles.length} vehicles
-          </div>
-
-          {/* Minimal controls - only show when filters are toggled on */}
-          {showFilters && (
-            <>
-              {/* Thermal Pricing Toggle */}
-              <button
-                onClick={() => setThermalPricing(!thermalPricing)}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '8pt',
-                  border: '1px solid var(--border)',
-                  background: thermalPricing ? 'var(--grey-600)' : 'var(--white)',
-                  color: thermalPricing ? 'var(--white)' : 'var(--text)',
-                  cursor: 'pointer',
-                  borderRadius: '2px',
-                  transition: 'all 0.12s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                title="Thermal Pricing: Red = Good Deal, Purple = Bad Price"
-              >
-                <span>🔥</span>
-                <span>Thermal</span>
-              </button>
-              
-              {/* Toggle Filters Button */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '8pt',
-                  border: '1px solid var(--border)',
-                  background: 'var(--grey-600)',
-                  color: 'var(--white)',
-                  cursor: 'pointer',
-                  borderRadius: '2px'
-                }}
-              >
-                Hide Filters
-              </button>
-            </>
-          )}
-
-          {/* Show Filters Button - only visible when filters are hidden */}
-          {!showFilters && (
-            <button
-              onClick={() => setShowFilters(true)}
-              style={{
-                padding: '4px 8px',
-                fontSize: '8pt',
-                border: '1px solid var(--border)',
-                background: 'var(--white)',
-                color: 'var(--text)',
-                cursor: 'pointer',
-                borderRadius: '2px'
-              }}
-            >
-              Show Filters
-            </button>
-          )}
-        </div>
 
         {/* Show loading indicator inline if still loading */}
         {loading && filteredVehicles.length === 0 && (
@@ -1360,15 +1288,7 @@ const CursorHomepage: React.FC = () => {
           </div>
         )}
 
-        {/* Filter Panel - Show when enabled */}
-        {showFilters && (
-          <div style={{
-            background: 'var(--white)',
-            border: '1px solid var(--border)',
-            padding: '12px',
-            marginBottom: '16px',
-            fontSize: '8pt'
-          }}>
+        {/* Filter Panel - REMOVED - no filters on homepage */}
             {/* Year Quick Filters - Collapsible (also in filter panel) */}
             <div style={{ marginBottom: '12px' }}>
               <div 
@@ -1784,10 +1704,6 @@ const CursorHomepage: React.FC = () => {
                   Reset
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
         {/* Technical View with Sortable Columns */}
         {viewMode === 'technical' && (
           <div style={{ 

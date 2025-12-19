@@ -517,19 +517,64 @@ const ImageGallery = ({
   const dedupeFetchedImages = (images: any[]): any[] => {
     // Defensive UI de-dupe: older rows may not have is_duplicate populated,
     // or multiple rows may point at the same underlying file/variant.
+    
+    // Extract hash from filename for better duplicate detection
+    // e.g., external_import_60f9ebbff43d9892e42fd3c0e8d72eac3bc3900b.jpg -> 60f9ebbff43d9892e42fd3c0e8d72eac3bc3900b
+    const extractHashFromUrl = (url: string | null | undefined): string | null => {
+      if (!url) return null;
+      try {
+        const filename = url.split('/').pop() || '';
+        // Match hash patterns in filenames: external_import_HASH, bat_import_HASH, etc.
+        const hashMatch = filename.match(/(?:external_import_|bat_import_|organization_import_|import_queue_)([a-f0-9]{20,})/i);
+        if (hashMatch && hashMatch[1]) {
+          return hashMatch[1].toLowerCase();
+        }
+      } catch {
+        // ignore
+      }
+      return null;
+    };
+    
     const keyFor = (img: any): string => {
-      return (
-        img?.file_hash ||
-        img?.storage_path ||
-        img?.variants?.full ||
-        img?.variants?.large ||
-        img?.image_url ||
-        img?.large_url ||
-        img?.medium_url ||
-        img?.thumbnail_url ||
-        img?.id ||
-        ''
-      );
+      // Priority 1: file_hash (most reliable)
+      if (img?.file_hash) return `hash:${String(img.file_hash).toLowerCase()}`;
+      
+      // Priority 2: Extract hash from storage_path or image_url
+      const hashFromPath = extractHashFromUrl(img?.storage_path);
+      if (hashFromPath) return `path_hash:${hashFromPath}`;
+      
+      const hashFromUrl = extractHashFromUrl(img?.image_url);
+      if (hashFromUrl) return `url_hash:${hashFromUrl}`;
+      
+      // Priority 3: storage_path (normalized)
+      if (img?.storage_path) {
+        const normalized = String(img.storage_path).toLowerCase().split('?')[0].split('#')[0];
+        if (normalized) return `path:${normalized}`;
+      }
+      
+      // Priority 4: variants
+      if (img?.variants?.full) {
+        const hash = extractHashFromUrl(img.variants.full);
+        if (hash) return `variant_full_hash:${hash}`;
+        return `variant_full:${String(img.variants.full).toLowerCase().split('?')[0]}`;
+      }
+      if (img?.variants?.large) {
+        const hash = extractHashFromUrl(img.variants.large);
+        if (hash) return `variant_large_hash:${hash}`;
+        return `variant_large:${String(img.variants.large).toLowerCase().split('?')[0]}`;
+      }
+      
+      // Priority 5: image URLs (normalized, extract hash if possible)
+      const urls = [img?.image_url, img?.large_url, img?.medium_url, img?.thumbnail_url].filter(Boolean);
+      for (const url of urls) {
+        const hash = extractHashFromUrl(url);
+        if (hash) return `url_hash:${hash}`;
+        const normalized = String(url).toLowerCase().split('?')[0].split('#')[0];
+        if (normalized && normalized.length > 20) return `url:${normalized}`;
+      }
+      
+      // Fallback: use ID (but this won't catch duplicates with different IDs)
+      return `id:${img?.id || ''}`;
     };
 
     const prioritized = [...(images || [])].sort((a: any, b: any) => {
@@ -1093,13 +1138,53 @@ const ImageGallery = ({
   };
 
   const getDisplayDate = (image: any) => {
-    // Use taken_at (when photo was taken) if available, otherwise fall back to created_at (when uploaded)
-    const displayDate = image.taken_at || image.created_at;
+    // Priority order for date display:
+    // 1. taken_at (when photo was actually taken)
+    // 2. Auction/listing date from exif_data (for imported images)
+    // 3. created_at (when uploaded) - but label as "Uploaded" for imported images
+    
+    let displayDate: string | null = null;
+    let dateLabel = '';
+    
+    // Check for taken_at first (actual photo date)
+    if (image.taken_at) {
+      displayDate = image.taken_at;
+      dateLabel = '';
+    } else {
+      // For imported images, try to get auction/listing date from exif_data
+      const exif = image.exif_data || {};
+      const isImported = image.source === 'external_import' || image.source === 'bat_import' || image.source === 'organization_import' || image.is_external;
+      
+      if (isImported) {
+        // Check for auction dates in exif_data
+        const auctionStart = exif.auction_start_date || exif.listed_date || exif.start_date;
+        const auctionEnd = exif.auction_end_date || exif.end_date;
+        
+        // Prefer start date (when auction went live) over end date
+        if (auctionStart) {
+          displayDate = auctionStart;
+          dateLabel = ' (Auction)';
+        } else if (auctionEnd) {
+          displayDate = auctionEnd;
+          dateLabel = ' (Auction End)';
+        } else {
+          // Fallback to created_at but indicate it's an upload date
+          displayDate = image.created_at;
+          dateLabel = ' (Uploaded)';
+        }
+      } else {
+        // For non-imported images, use created_at
+        displayDate = image.created_at;
+      }
+    }
+    
     if (!displayDate) return 'No date';
+    
     try {
       const date = new Date(displayDate);
       if (isNaN(date.getTime())) return 'Invalid date';
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return formatted + dateLabel;
     } catch (e) {
       return 'Invalid date';
     }
