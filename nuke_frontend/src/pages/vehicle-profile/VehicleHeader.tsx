@@ -36,6 +36,7 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
   isOwner,
+  canEdit,
   session,
   permissions,
   responsibleName,
@@ -1314,8 +1315,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
   return (
     <div
-        className="vehicle-price-header"
+      className="vehicle-price-header"
       style={{
+        position: 'sticky',
+        top: 'var(--header-height, 40px)',
+        zIndex: 900,
         background: 'var(--surface)',
         borderBottom: '1px solid var(--border)',
         padding: '0px 8px',
@@ -1324,17 +1328,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         marginBottom: 0,
         marginLeft: 'calc(-1 * var(--space-2))',
         marginRight: 'calc(-1 * var(--space-2))',
-        position: 'static',
-        width: '100px',
-        height: '30px',
-        zIndex: 97,
-        boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexWrap: 'wrap',
         gap: '0px',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
       }}
     >
       <div style={{ 
@@ -1783,7 +1782,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                               </div>
                               <div style={{ display: 'flex', gap: '6px' }}>
                                 <button
-                                  onClick={() => window.open(`/vehicle/${similar.id}`, '_blank')}
+                                  onClick={() => window.open(`/vehicle/${similar.id}`, '_blank', 'noopener,noreferrer')}
                                   style={{
                                     background: 'transparent',
                                     border: '1px solid var(--border)',
@@ -1796,7 +1795,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                                 >
                                   View
                                 </button>
-                                {permissions?.canEdit && (
+                                {canEdit && (
                                   <button
                                     onClick={async () => {
                                       if (confirm(`Merge this vehicle into "${similar.year} ${similar.make} ${similar.model}"? This will combine all data.`)) {
