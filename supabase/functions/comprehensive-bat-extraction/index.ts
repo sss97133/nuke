@@ -25,6 +25,9 @@ interface ComprehensiveBaTData {
   bid_count?: number;
   view_count?: number;
   watcher_count?: number;
+  comment_count?: number;
+  reserve_not_met?: boolean;
+  high_bid?: number;
   
   // Technical specs from essentials
   engine?: string;
@@ -606,8 +609,27 @@ function extractAuctionMetrics(html: string): {
   view_count?: number;
   watcher_count?: number;
   reserve_price?: number;
+  comment_count?: number;
 } {
   const metrics: any = {};
+  
+  // Extract comment count - look for "200Comments" or similar patterns
+  const commentPatterns = [
+    /<a[^>]*class="comments-anchor-link"[^>]*>(\d+)\s*Comments?<\/a>/i,
+    /(\d+)\s*Comments?/i,
+    /comment[^>]*>(\d+)/i,
+  ];
+  
+  for (const pattern of commentPatterns) {
+    const match = html.match(pattern);
+    if (match) {
+      const commentCount = parseInt(match[1].replace(/,/g, ''));
+      if (commentCount > 0 && commentCount < 100000) {
+        metrics.comment_count = commentCount;
+        break;
+      }
+    }
+  }
   
   // Extract bid count - look for actual bid count, not random numbers
   // Look for patterns like "X bids" in stats sections
@@ -970,13 +992,47 @@ async function extractComprehensiveBaTData(html: string, batUrl: string): Promis
     }
   }
   
-  // Extract auction dates
+  // Extract auction dates (improved to catch "on 12/12/25" pattern)
   const dates = extractAuctionDates(html);
   data.auction_start_date = dates.start_date;
   data.auction_end_date = dates.end_date;
   data.sale_date = dates.sale_date;
   
-  // Extract sale price - prioritize actual sale prices, then current bids
+  // Also check for "on MM/DD/YY" pattern in listing-available-info (common format)
+  const dateOnMatch = html.match(/on\s+(\d{1,2}\/\d{1,2}\/\d{2})/i);
+  if (dateOnMatch && !data.auction_end_date) {
+    try {
+      const parts = dateOnMatch[1].split('/');
+      if (parts.length === 3) {
+        let month = parseInt(parts[0]);
+        let day = parseInt(parts[1]);
+        let year = parseInt(parts[2]);
+        if (year < 100) {
+          year = year < 50 ? 2000 + year : 1900 + year;
+        }
+        const date = new Date(year, month - 1, day);
+        if (!isNaN(date.getTime())) {
+          data.auction_end_date = date.toISOString().split('T')[0];
+          // Calculate start date (BaT auctions are typically 7 days)
+          const startDate = new Date(date);
+          startDate.setDate(startDate.getDate() - 7);
+          if (!data.auction_start_date) {
+            data.auction_start_date = startDate.toISOString().split('T')[0];
+          }
+        }
+      }
+    } catch (e) {
+      console.log('Error parsing "on" date:', e);
+    }
+  }
+  
+  // Extract sale price and RNM status - prioritize actual sale prices, then current bids, then RNM
+  // Check for RNM (Reserve Not Met) status first
+  const rnmMatch = html.match(/Reserve\s+not\s+met/i) || 
+                   html.match(/RNM/i) ||
+                   html.match(/did\s+not\s+meet\s+reserve/i);
+  const isRNM = !!rnmMatch;
+  
   // Look for "Sold for" first (completed auctions)
   const soldPriceMatch = html.match(/Sold for[:\s]*USD\s*\$([0-9,]+)/i) ||
                          html.match(/Sold for[:\s]*\$([0-9,]+)/i) ||
@@ -989,18 +1045,121 @@ async function extractComprehensiveBaTData(html: string, batUrl: string): Promis
     // Sanity check - sale prices should be at least $1000
     if (price >= 1000) {
       data.sale_price = price;
+      if (isRNM) {
+        (data as any).reserve_not_met = true;
+      }
     }
   } else {
-    // For active auctions, look for current bid in listing-available-info
-    const bidInfoMatch = html.match(/<div[^>]*class="listing-available-info"[^>]*>[\s\S]*?Bid to USD \$([0-9,]+)/i) ||
-                            html.match(/Bid to USD \$([0-9,]+)/i) ||
-                            html.match(/Bid to \$([0-9,]+)/i);
+    // For active auctions or RNM, look for price in listing-available-info or listing-sticky
+    // Priority: listing-sticky section first (contains current bid/price info)
+    let priceFound = false;
     
-    if (bidInfoMatch) {
-      const bid = parseInt(bidInfoMatch[1].replace(/,/g, ''));
-      // Sanity check - bids should be at least $1000
-      if (bid >= 1000) {
-        data.sale_price = bid; // Store as sale_price for active auctions (current bid)
+    // Extract listing-sticky section
+    const stickyStart = html.search(/<div[^>]*class="listing-sticky"[^>]*>/i);
+    let stickyHTML = '';
+    if (stickyStart !== -1) {
+      let depth = 0;
+      let pos = stickyStart;
+      let stickyEnd = -1;
+      
+      while (pos < html.length) {
+        const nextOpen = html.indexOf('<div', pos);
+        const nextClose = html.indexOf('</div>', pos);
+        
+        if (nextClose === -1) break;
+        
+        if (nextOpen !== -1 && nextOpen < nextClose) {
+          depth++;
+          pos = nextOpen + 4;
+        } else {
+          depth--;
+          pos = nextClose + 6;
+          if (depth === 0) {
+            stickyEnd = nextClose;
+            break;
+          }
+        }
+      }
+      
+      if (stickyEnd > stickyStart) {
+        stickyHTML = html.substring(stickyStart, stickyEnd + 6);
+      }
+    }
+    
+    // Extract listing-available-info section
+    const infoStart = html.search(/<div[^>]*class="listing-available-info"[^>]*>/i);
+    let infoHTML = '';
+    if (infoStart !== -1) {
+      let depth = 0;
+      let pos = infoStart;
+      let infoEnd = -1;
+      
+      while (pos < html.length) {
+        const nextOpen = html.indexOf('<div', pos);
+        const nextClose = html.indexOf('</div>', pos);
+        
+        if (nextClose === -1) break;
+        
+        if (nextOpen !== -1 && nextOpen < nextClose) {
+          depth++;
+          pos = nextOpen + 4;
+        } else {
+          depth--;
+          pos = nextClose + 6;
+          if (depth === 0) {
+            infoEnd = nextClose;
+            break;
+          }
+        }
+      }
+      
+      if (infoEnd > infoStart) {
+        infoHTML = html.substring(infoStart, infoEnd + 6);
+      }
+    }
+    
+    // Try patterns in priority order: sticky section, info section, then full HTML
+    const pricePatterns = [
+      /USD\s*\$([0-9,]+)/i,
+      /\$([0-9,]+)/i,
+    ];
+    
+    const searchOrder = [stickyHTML, infoHTML, html].filter(Boolean);
+    
+    for (const searchHTML of searchOrder) {
+      if (priceFound) break;
+      
+      for (const pattern of pricePatterns) {
+        const match = searchHTML.match(pattern);
+        if (match) {
+          const price = parseInt(match[1].replace(/,/g, ''));
+          // Sanity check - prices should be at least $1000 and less than $100M
+          if (price >= 1000 && price < 100000000) {
+            if (isRNM) {
+              (data as any).reserve_not_met = true;
+              (data as any).high_bid = price; // For RNM, this is the high bid, not sale price
+              // Don't set sale_price for RNM - it didn't sell
+            } else {
+              data.sale_price = price; // For active auctions, this is current bid
+            }
+            priceFound = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Also try bid patterns for active auctions
+    if (!priceFound) {
+      const bidInfoMatch = html.match(/<div[^>]*class="listing-available-info"[^>]*>[\s\S]*?Bid to USD \$([0-9,]+)/i) ||
+                              html.match(/Bid to USD \$([0-9,]+)/i) ||
+                              html.match(/Bid to \$([0-9,]+)/i);
+      
+      if (bidInfoMatch) {
+        const bid = parseInt(bidInfoMatch[1].replace(/,/g, ''));
+        if (bid >= 1000) {
+          data.sale_price = bid; // Store as sale_price for active auctions (current bid)
+        }
       }
     }
   }
@@ -1011,6 +1170,7 @@ async function extractComprehensiveBaTData(html: string, batUrl: string): Promis
   data.view_count = metrics.view_count;
   data.watcher_count = metrics.watcher_count;
   data.reserve_price = metrics.reserve_price;
+  data.comment_count = metrics.comment_count;
   
   // Extract technical specs
   const specs = extractTechnicalSpecs(html);
@@ -1075,18 +1235,70 @@ async function extractComprehensiveBaTData(html: string, batUrl: string): Promis
     data.lot_number = lotMatch[1];
   }
   
-  // Extract description from multiple sources
-  const descPatterns = [
-    /<div[^>]*class="card-body"[^>]*>([\s\S]{100,2000})<\/div>/i,
-    /<div[^>]*class="post-content"[^>]*>([\s\S]{100,2000})<\/div>/i,
-    /<p[^>]*>([^<]{100,500})<\/p>/,
-  ];
+  // Extract description from post-excerpt div (PRIORITY) and other sources
+  // The post-excerpt div contains the full listing description
+  const postExcerptStart = html.search(/<div[^>]*class="post-excerpt"[^>]*>/i);
+  let postExcerptHTML = '';
+  let postExcerptText = '';
   
-  for (const pattern of descPatterns) {
-    const match = html.match(pattern);
-    if (match) {
-      data.description = match[1].replace(/<[^>]+>/g, ' ').trim().substring(0, 1000);
-      break;
+  if (postExcerptStart !== -1) {
+    // Find matching closing tag by counting divs
+    let depth = 0;
+    let pos = postExcerptStart;
+    let postExcerptEnd = -1;
+    
+    while (pos < html.length) {
+      const nextOpen = html.indexOf('<div', pos);
+      const nextClose = html.indexOf('</div>', pos);
+      
+      if (nextClose === -1) break;
+      
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth++;
+        pos = nextOpen + 4;
+      } else {
+        depth--;
+        pos = nextClose + 6;
+        if (depth === 0) {
+          postExcerptEnd = nextClose;
+          break;
+        }
+      }
+    }
+    
+    if (postExcerptEnd > postExcerptStart) {
+      postExcerptHTML = html.substring(postExcerptStart, postExcerptEnd + 6);
+      // Strip HTML but preserve paragraph breaks
+      postExcerptText = postExcerptHTML
+        .replace(/<p[^>]*>/gi, '\n\n')
+        .replace(/<\/p>/gi, '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/\n\s*\n/g, '\n\n')
+        .trim();
+      
+      if (postExcerptText.length > 100) {
+        // Keep full description but limit to 5000 chars for storage
+        data.description = postExcerptText.substring(0, 5000);
+      }
+    }
+  }
+  
+  // Fallback to other description sources if post-excerpt not found
+  if (!data.description || data.description.length < 100) {
+    const descPatterns = [
+      /<div[^>]*class="card-body"[^>]*>([\s\S]{100,2000})<\/div>/i,
+      /<div[^>]*class="post-content"[^>]*>([\s\S]{100,2000})<\/div>/i,
+      /<p[^>]*>([^<]{100,500})<\/p>/,
+    ];
+    
+    for (const pattern of descPatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        data.description = match[1].replace(/<[^>]+>/g, ' ').trim().substring(0, 1000);
+        break;
+      }
     }
   }
   
@@ -1425,20 +1637,29 @@ serve(async (req) => {
           : null;
         const highBidder = highestBid?.bidder ? String(highestBid.bidder).trim() : null;
         
+        // Determine listing status based on RNM and sale price
+        let listingStatus = 'ended';
+        if ((extractedData as any).reserve_not_met) {
+          listingStatus = 'reserve_not_met';
+        } else if (extractedData.sale_price) {
+          listingStatus = 'sold';
+        }
+        
         // Update existing listing
         await supabase
           .from('external_listings')
           .update({
             start_date: extractedData.auction_start_date ? new Date(extractedData.auction_start_date).toISOString() : null,
             end_date: extractedData.auction_end_date ? new Date(extractedData.auction_end_date).toISOString() : null,
-            current_bid: extractedData.sale_price || null,
-            final_price: extractedData.sale_price || null,
+            current_bid: (extractedData as any).reserve_not_met ? ((extractedData as any).high_bid || extractedData.sale_price) : (extractedData.sale_price || null),
+            final_price: (extractedData as any).reserve_not_met ? null : (extractedData.sale_price || null),
             reserve_price: extractedData.reserve_price || null,
             bid_count: extractedData.bid_count || 0,
             view_count: extractedData.view_count || 0,
             watcher_count: extractedData.watcher_count || 0,
-            sold_at: extractedData.sale_date ? new Date(extractedData.sale_date).toISOString() : null,
-            listing_status: extractedData.sale_price ? 'sold' : 'ended',
+            comment_count: extractedData.comment_count || null,
+            sold_at: (extractedData as any).reserve_not_met ? null : (extractedData.sale_date ? new Date(extractedData.sale_date).toISOString() : null),
+            listing_status: listingStatus,
             metadata: {
               ...(existingListing as any)?.metadata,
               lot_number: extractedData.lot_number,
@@ -1447,6 +1668,10 @@ serve(async (req) => {
               seller_username: extractedData.seller,
               buyer_username: extractedData.buyer,
               high_bidder: highBidder,
+              reserve_not_met: (extractedData as any).reserve_not_met || false,
+              high_bid: (extractedData as any).reserve_not_met ? ((extractedData as any).high_bid || extractedData.sale_price) : null,
+              comment_count: extractedData.comment_count || null,
+              description: extractedData.description || null,
               seller_bat_user_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.id || null) : null,
               buyer_bat_user_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.id || null) : null,
               seller_external_identity_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.external_identity_id || null) : null,
@@ -1475,6 +1700,14 @@ serve(async (req) => {
         
         const orgId = orgs && orgs.length > 0 ? orgs[0].organization_id : null;
         
+        // Determine listing status based on RNM and sale price
+        let listingStatus = 'ended';
+        if ((extractedData as any).reserve_not_met) {
+          listingStatus = 'reserve_not_met';
+        } else if (extractedData.sale_price) {
+          listingStatus = 'sold';
+        }
+        
         const { data: newListing } = await supabase
           .from('external_listings')
           .insert({
@@ -1485,14 +1718,15 @@ serve(async (req) => {
             listing_id: extractedData.lot_number || undefined,
             start_date: extractedData.auction_start_date ? new Date(extractedData.auction_start_date).toISOString() : null,
             end_date: extractedData.auction_end_date ? new Date(extractedData.auction_end_date).toISOString() : null,
-            current_bid: extractedData.sale_price || null,
-            final_price: extractedData.sale_price || null,
+            current_bid: (extractedData as any).reserve_not_met ? ((extractedData as any).high_bid || extractedData.sale_price) : (extractedData.sale_price || null),
+            final_price: (extractedData as any).reserve_not_met ? null : (extractedData.sale_price || null),
             reserve_price: extractedData.reserve_price || null,
             bid_count: extractedData.bid_count || 0,
             view_count: extractedData.view_count || 0,
             watcher_count: extractedData.watcher_count || 0,
-            sold_at: extractedData.sale_date ? new Date(extractedData.sale_date).toISOString() : null,
-            listing_status: extractedData.sale_price ? 'sold' : 'ended',
+            comment_count: extractedData.comment_count || null,
+            sold_at: (extractedData as any).reserve_not_met ? null : (extractedData.sale_date ? new Date(extractedData.sale_date).toISOString() : null),
+            listing_status: listingStatus,
             metadata: {
               lot_number: extractedData.lot_number,
               seller: extractedData.seller,
@@ -1502,6 +1736,10 @@ serve(async (req) => {
               high_bidder: Array.isArray(extractedData.bid_history) && extractedData.bid_history.length > 0
                 ? ([...extractedData.bid_history].sort((a, b) => (b.amount || 0) - (a.amount || 0))[0]?.bidder || null)
                 : null,
+              reserve_not_met: (extractedData as any).reserve_not_met || false,
+              high_bid: (extractedData as any).reserve_not_met ? ((extractedData as any).high_bid || extractedData.sale_price) : null,
+              comment_count: extractedData.comment_count || null,
+              description: extractedData.description || null,
               seller_bat_user_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.id || null) : null,
               buyer_bat_user_id: extractedData.buyer ? (batIdentityByUsername.get(String(extractedData.buyer).trim())?.id || null) : null,
               seller_external_identity_id: extractedData.seller ? (batIdentityByUsername.get(String(extractedData.seller).trim())?.external_identity_id || null) : null,
