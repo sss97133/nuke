@@ -53,6 +53,14 @@ export default function AIDataIngestionSearch() {
     return m ? m[1] : null;
   }, [location.pathname]);
 
+  // Auto-dismiss preview when on vehicle profile page
+  useEffect(() => {
+    if (vehicleIdFromRoute && showPreview) {
+      setShowPreview(false);
+      setExtractionPreview(null);
+    }
+  }, [vehicleIdFromRoute, showPreview]);
+
   const isWiringIntent = (text: string) => {
     const t = (text || '').toLowerCase();
     if (!t) return false;
@@ -429,7 +437,10 @@ export default function AIDataIngestionSearch() {
                 matchResult: matchResult,
                 existingVehicleId: matchingVehicleId
               });
-              setShowPreview(true);
+              // Don't show preview automatically on vehicle profile pages
+              if (!vehicleIdFromRoute) {
+                setShowPreview(true);
+              }
               setIsProcessing(false);
               return;
             }
@@ -452,7 +463,10 @@ export default function AIDataIngestionSearch() {
             result: extractionResult,
             operationPlan
           });
-          setShowPreview(true);
+          // Don't show preview automatically on vehicle profile pages
+          if (!vehicleIdFromRoute) {
+            setShowPreview(true);
+          }
           setIsProcessing(false);
           return;
         } catch (err: any) {
@@ -488,7 +502,10 @@ export default function AIDataIngestionSearch() {
         result: extractionResult,
         operationPlan
       });
-      setShowPreview(true);
+      // Don't show preview automatically on vehicle profile pages - user is just browsing
+      if (!vehicleIdFromRoute) {
+        setShowPreview(true);
+      }
     } catch (err: any) {
       console.error('Processing error:', err);
       // If AI services are down (Gateway/edge function), still allow basic search for text-only input.
@@ -815,8 +832,8 @@ export default function AIDataIngestionSearch() {
         </div>
       )}
 
-      {/* Extraction Preview */}
-      {showPreview && extractionPreview && (
+      {/* Extraction Preview - Hidden on vehicle profile pages */}
+      {showPreview && extractionPreview && !vehicleIdFromRoute && (
         <div style={{
           position: 'absolute',
           top: '100%',

@@ -249,6 +249,30 @@ const DEFAULT_FILTERS: FilterState = {
   showPending: false
 };
 
+const STORAGE_KEY = 'nuke_homepage_filters_v1';
+
+// Load filters from localStorage
+const loadSavedFilters = (): FilterState | null => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    // Validate structure and merge with defaults for safety
+    return { ...DEFAULT_FILTERS, ...parsed };
+  } catch {
+    return null;
+  }
+};
+
+// Save filters to localStorage
+const saveFilters = (filters: FilterState) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+  } catch (err) {
+    console.warn('Failed to save filters to localStorage:', err);
+  }
+};
+
 type SourceKind = 'craigslist' | 'dealer_site' | 'ksl' | 'bat' | 'classic' | 'user' | 'unknown';
 
 const normalizeHost = (url: string | null | undefined): string => {
@@ -307,16 +331,52 @@ const CursorHomepage: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [session, setSession] = useState<any>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('AT');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [sortBy, setSortBy] = useState<SortBy>('newest');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [showFilters, setShowFilters] = useState(true);
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [searchText, setSearchText] = useState<string>('');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid'); // Always grid mode
+  const [sortBy, setSortBy] = useState<SortBy>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_homepage_sortBy');
+      return (saved as SortBy) || 'newest';
+    } catch {
+      return 'newest';
+    }
+  });
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_homepage_sortDirection');
+      return (saved as SortDirection) || 'desc';
+    } catch {
+      return 'desc';
+    }
+  });
+  const [showFilters, setShowFilters] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_homepage_showFilters');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [generativeFilters, setGenerativeFilters] = useState<string[]>([]); // Track active generative filters
+  const [filters, setFilters] = useState<FilterState>(() => loadSavedFilters() || DEFAULT_FILTERS);
+  const [searchText, setSearchText] = useState<string>(() => {
+    try {
+      return localStorage.getItem('nuke_homepage_searchText') || '';
+    } catch {
+      return '';
+    }
+  });
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [infoDense, setInfoDense] = useState<boolean>(false);
-  const [cardMinWidth, setCardMinWidth] = useState<number>(200); // grid density control
+  const [cardMinWidth, setCardMinWidth] = useState<number>(180); // Smaller default cards
+  const [thermalPricing, setThermalPricing] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_homepage_thermalPricing');
+      return saved === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [stats, setStats] = useState({
     totalBuilds: 0,
     totalValue: 0,
@@ -331,6 +391,15 @@ const CursorHomepage: React.FC = () => {
   const navigate = useNavigate();
 
   const infiniteObserverRef = useRef<IntersectionObserver | null>(null);
+
+  // Collapsible filter sections
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    yearQuickFilters: false,
+    sourceFilters: true, // Source filters collapsed by default
+    priceFilters: false,
+    statusFilters: false,
+    locationFilters: false,
+  });
 
 
   useEffect(() => {
@@ -365,6 +434,52 @@ const CursorHomepage: React.FC = () => {
     };
   }, [showFilters]);
 
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    saveFilters(filters);
+  }, [filters]);
+
+  // Save other filter-related state
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_homepage_searchText', searchText);
+    } catch (err) {
+      console.warn('Failed to save search text:', err);
+    }
+  }, [searchText]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_homepage_sortBy', sortBy);
+    } catch (err) {
+      console.warn('Failed to save sortBy:', err);
+    }
+  }, [sortBy]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_homepage_sortDirection', sortDirection);
+    } catch (err) {
+      console.warn('Failed to save sortDirection:', err);
+    }
+  }, [sortDirection]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_homepage_showFilters', String(showFilters));
+    } catch (err) {
+      console.warn('Failed to save showFilters:', err);
+    }
+  }, [showFilters]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_homepage_thermalPricing', String(thermalPricing));
+    } catch (err) {
+      console.warn('Failed to save thermalPricing:', err);
+    }
+  }, [thermalPricing]);
+
   // Debounce search to avoid clanky re-filtering on every keystroke.
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearchText(searchText.trim()), 150);
@@ -386,19 +501,11 @@ const CursorHomepage: React.FC = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
   useEffect(() => {
-    // Load accurate stats from database
-    loadAccurateStats();
-    // Refresh stats every 30 seconds
-    const statsInterval = setInterval(loadAccurateStats, 30000);
-    
-    // Load feed for all users (authenticated and unauthenticated)
-    // Public vehicles (is_public=true) are visible to everyone
+    // Load feed immediately - most recent vehicles, no filters
     setPage(0);
     setHasMore(true);
     loadHypeFeed(0, false);
-    
-    return () => clearInterval(statsInterval);
-  }, [timePeriod, filters.showPending]);
+  }, []); // Load once on mount - no filters, no dependencies
 
   // Also reload when session changes (user logs in/out)
   useEffect(() => {
@@ -409,11 +516,164 @@ const CursorHomepage: React.FC = () => {
     }
   }, [session]);
 
+  // Apply filters and sorting function - defined before useEffect
+  const applyFiltersAndSort = useCallback(() => {
+    let result = [...feedVehicles];
+    
+    // Global search (year/make/model/title/vin). Space-separated terms must all match.
+    if (debouncedSearchText) {
+      const terms = debouncedSearchText
+        .toLowerCase()
+        .split(/\s+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+
+      result = result.filter((v: any) => {
+        const hay = [
+          v.year,
+          v.make,
+          v.model,
+          v.title,
+          v.vin,
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        return terms.every((t) => hay.includes(t));
+      });
+    }
+
+    // Apply filters
+    if (filters.yearMin) {
+      result = result.filter(v => (v.year || 0) >= filters.yearMin!);
+    }
+    if (filters.yearMax) {
+      result = result.filter(v => (v.year || 0) <= filters.yearMax!);
+    }
+    if (filters.makes.length > 0) {
+      result = result.filter(v => filters.makes.some(m => 
+        v.make?.toLowerCase().includes(m.toLowerCase())
+      ));
+    }
+    if (filters.priceMin) {
+      result = result.filter(v => (v.display_price || 0) >= filters.priceMin!);
+    }
+    if (filters.priceMax) {
+      result = result.filter(v => (v.display_price || 0) <= filters.priceMax!);
+    }
+    if (filters.hasImages) {
+      result = result.filter(v => (v.image_count || 0) > 0);
+    }
+    if (filters.forSale) {
+      result = result.filter(v => v.is_for_sale);
+    }
+    if (filters.hideSold) {
+      result = result.filter(v => {
+        const salePrice = Number((v as any).sale_price || 0) || 0;
+        const saleDate = (v as any).sale_date;
+        const saleStatus = String((v as any).sale_status || '').toLowerCase();
+        const outcome = String((v as any).auction_outcome || '').toLowerCase();
+        const isAuctionResult =
+          ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) ||
+          ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(saleStatus);
+        const isSold = salePrice > 0 || Boolean(saleDate) || saleStatus === 'sold' || isAuctionResult;
+        return !isSold;
+      });
+    }
+
+    // Source / dealer-ish filtering
+    if (
+      filters.hideDealerListings ||
+      filters.hideCraigslist ||
+      filters.hideDealerSites ||
+      filters.hideKsl ||
+      filters.hideBat ||
+      filters.hideClassic
+    ) {
+      result = result.filter((v: any) => {
+        const src = classifySource(v);
+
+        if (filters.hideDealerListings) {
+          if (src === 'craigslist' || src === 'dealer_site' || src === 'ksl') return false;
+        }
+
+        if (filters.hideCraigslist && src === 'craigslist') return false;
+        if (filters.hideDealerSites && src === 'dealer_site') return false;
+        if (filters.hideKsl && src === 'ksl') return false;
+        if (filters.hideBat && src === 'bat') return false;
+        if (filters.hideClassic && src === 'classic') return false;
+
+        return true;
+      });
+    }
+    
+    if (filters.zipCode && filters.zipCode.length === 5) {
+      result = result.filter(v => {
+        const vehicleZip = (v as any).zip_code || (v as any).location_zip;
+        return vehicleZip === filters.zipCode;
+      });
+    }
+    
+    // Apply sorting with direction - default to newest (created_at DESC)
+    const dir = sortDirection === 'desc' ? 1 : -1;
+    switch (sortBy) {
+      case 'year':
+        result.sort((a, b) => dir * ((b.year || 0) - (a.year || 0)));
+        break;
+      case 'make':
+        result.sort((a, b) => dir * (a.make || '').localeCompare(b.make || ''));
+        break;
+      case 'model':
+        result.sort((a, b) => dir * (a.model || '').localeCompare(b.model || ''));
+        break;
+      case 'mileage':
+        result.sort((a, b) => dir * ((b.mileage || 0) - (a.mileage || 0)));
+        break;
+      case 'newest':
+        result.sort((a, b) => {
+          const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
+          const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
+          return dir * (bTime - aTime);
+        });
+        break;
+      case 'oldest':
+        result.sort((a, b) => 
+          dir * (new Date(a.updated_at || a.created_at || 0).getTime() - 
+          new Date(b.updated_at || b.created_at || 0).getTime())
+        );
+        break;
+      case 'price_high':
+        result.sort((a, b) => dir * ((b.display_price || 0) - (a.display_price || 0)));
+        break;
+      case 'price_low':
+        result.sort((a, b) => dir * ((a.display_price || 0) - (b.display_price || 0)));
+        break;
+      case 'volume':
+        result.sort((a, b) => 0);
+        break;
+      case 'images':
+        result.sort((a, b) => dir * ((b.image_count || 0) - (a.image_count || 0)));
+        break;
+      case 'events':
+        result.sort((a, b) => dir * ((b.event_count || 0) - (a.event_count || 0)));
+        break;
+      case 'views':
+        result.sort((a, b) => dir * ((b.view_count || 0) - (a.view_count || 0)));
+        break;
+      default:
+        // Default: newest first (created_at DESC)
+        result.sort((a, b) => {
+          const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
+          const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
+          return bTime - aTime;
+        });
+    }
+    
+    setFilteredVehicles(result);
+  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText]);
 
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
     applyFiltersAndSort();
-  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText]);
+  }, [applyFiltersAndSort]);
 
   const activeFilterCount = useMemo(() => {
     // Count only "filtering" fields; exclude purely visual toggles.
@@ -570,7 +830,8 @@ const CursorHomepage: React.FC = () => {
       // Get vehicles for feed (keep payload small; avoid heavy origin_metadata + bulk image joins here).
       // NOTE: Do NOT select `listing_start_date` here. It is not a real column in the DB and will cause
       // PostgREST 400 errors if included in the `select()` list.
-      let query = supabase
+      // Simple query: most recent vehicles first, no filters
+      const { data: vehicles, error } = await supabase
         .from('vehicles')
         .select(`
           id, year, make, model, normalized_model, series, trim, transmission, transmission_model, title, vin, created_at, updated_at,
@@ -581,20 +842,9 @@ const CursorHomepage: React.FC = () => {
           discovery_url, discovery_source, profile_origin
         `)
         .eq('is_public', true)
-        .order('updated_at', { ascending: false })
+        .neq('status', 'pending')
+        .order('created_at', { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
-
-      if (!filters.showPending) {
-        query = query.neq('status', 'pending');
-      }
-
-      // Server-side time filtering (avoid fetching 200 then filtering in JS).
-      const timeFilter = getTimePeriodFilter();
-      if (timeFilter) {
-        query = query.gte('updated_at', timeFilter);
-      }
-
-      const { data: vehicles, error } = await query;
 
       if (error) {
         // Supabase/PostgREST errors often include a useful `details` / `hint` payload.
@@ -652,8 +902,63 @@ const CursorHomepage: React.FC = () => {
         // ignore
       }
 
-      // Process vehicles with lightweight image data (vehicles table fields only).
-      // This is the biggest feed perf win: avoid pulling 1000+ vehicle_images rows during homepage load.
+      // Batch-load thumbnail/medium image variants for optimal grid performance
+      const thumbnailByVehicleId = new Map<string, string | null>();
+      const mediumByVehicleId = new Map<string, string | null>();
+      try {
+        const vehicleIds = Array.from(new Set((vehicles || []).map((v: any) => String(v?.id || '')).filter(Boolean)));
+        if (vehicleIds.length > 0) {
+          // Process in chunks to avoid URL size limits
+          const chunkSize = 75;
+          for (let i = 0; i < vehicleIds.length; i += chunkSize) {
+            const chunk = vehicleIds.slice(i, i + chunkSize);
+            const { data: imgs, error: imgErr } = await supabase
+              .from('vehicle_images')
+              .select('vehicle_id, thumbnail_url, medium_url, image_url, variants')
+              .in('vehicle_id', chunk)
+              .order('is_primary', { ascending: false })
+              .order('created_at', { ascending: true });
+            
+            if (imgErr) {
+              // Non-fatal: continue without thumbnails
+              console.warn('Failed to fetch thumbnail chunk:', imgErr);
+              continue;
+            }
+            
+            const imageRecords = Array.isArray(imgs) ? imgs : [];
+            
+            // Group by vehicle_id and take first (primary or oldest)
+            const seenVehicleIds = new Set<string>();
+            for (const img of imageRecords) {
+              const vid = String(img?.vehicle_id || '');
+              if (!vid || seenVehicleIds.has(vid)) continue;
+              seenVehicleIds.add(vid);
+              
+              const variants = (img?.variants && typeof img.variants === 'object') ? img.variants : {};
+              
+              // Prioritize thumbnail, then medium, then full image
+              const thumbnail = variants?.thumbnail || img?.thumbnail_url || null;
+              const medium = variants?.medium || img?.medium_url || null;
+              
+              // Normalize URLs (convert signed to public if needed)
+              const normalizedThumbnail = thumbnail ? normalizeSupabaseStorageUrl(thumbnail) : null;
+              const normalizedMedium = medium ? normalizeSupabaseStorageUrl(medium) : null;
+              
+              if (normalizedThumbnail) {
+                thumbnailByVehicleId.set(vid, normalizedThumbnail);
+              }
+              if (normalizedMedium) {
+                mediumByVehicleId.set(vid, normalizedMedium);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Error loading image variants:', err);
+        // Non-fatal: continue with fallback images
+      }
+
+      // Process vehicles with optimized image data (use thumbnails for grid performance)
       const processed = (vehicles || []).map((v: any) => {
         const salePrice = v.sale_price ? Number(v.sale_price) : 0;
         const askingPrice = v.asking_price ? Number(v.asking_price) : 0;
@@ -672,13 +977,28 @@ const CursorHomepage: React.FC = () => {
           currentValue;
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
 
-        const primaryImageUrl =
+        const vehicleId = String(v?.id || '');
+        
+        // Prioritize thumbnail/medium variants for grid performance
+        const thumbnailUrl = thumbnailByVehicleId.get(vehicleId) || null;
+        const mediumUrl = mediumByVehicleId.get(vehicleId) || null;
+        
+        // Fallback chain: thumbnail -> medium -> primary_image_url -> image_url
+        const optimalImageUrl = thumbnailUrl || mediumUrl || 
           normalizeSupabaseStorageUrl(v.primary_image_url) ||
           normalizeSupabaseStorageUrl(v.image_url) ||
           null;
 
-        const allImages = primaryImageUrl
-          ? [{ id: `row-${v.id}-0`, url: primaryImageUrl, is_primary: true }]
+        // Store both thumbnail and full-size for different use cases
+        const allImages = optimalImageUrl
+          ? [{ 
+              id: `row-${v.id}-0`, 
+              url: optimalImageUrl, 
+              is_primary: true,
+              thumbnail_url: thumbnailUrl,
+              medium_url: mediumUrl,
+              full_url: normalizeSupabaseStorageUrl(v.primary_image_url) || normalizeSupabaseStorageUrl(v.image_url) || optimalImageUrl
+            }]
           : [];
 
         // Keep display fields simple; feed should stay fast.
@@ -698,32 +1018,42 @@ const CursorHomepage: React.FC = () => {
           make: displayMake || v.make,
           model: displayModel || v.model,
           display_price: displayPrice,
-          image_count: allImages?.length || (primaryImageUrl ? 1 : 0),
+          image_count: allImages?.length || (optimalImageUrl ? 1 : 0),
           view_count: 0,
           event_count: 0,
           activity_7d: 0,
           hype_score: hypeScore,
           hype_reason: hypeReason,
-          primary_image_url: primaryImageUrl,
-          image_url: primaryImageUrl,
-          all_images: allImages || (primaryImageUrl ? [{ id: `fallback-${v.id}-0`, url: primaryImageUrl, is_primary: true }] : []),
+          primary_image_url: optimalImageUrl,
+          image_url: optimalImageUrl,
+          // Store image variants for VehicleCardDense to use
+          image_variants: {
+            thumbnail: thumbnailUrl || undefined,
+            medium: mediumUrl || undefined,
+            large: mediumUrl || optimalImageUrl || undefined,
+          },
+          all_images: allImages || (optimalImageUrl ? [{ id: `fallback-${v.id}-0`, url: optimalImageUrl, is_primary: true }] : []),
           tier: 'C',
           tier_label: 'Tier C'
         };
       });
 
-      const sorted = processed.sort((a, b) => (b.hype_score || 0) - (a.hype_score || 0));
+      // Keep original order (most recent first) - no hype score sorting
+      const sorted = processed;
       setHasMore((vehicles || []).length >= PAGE_SIZE);
       setPage(pageNum);
 
       if (append) {
+        // Append to bottom - preserve existing order, add new vehicles at end
+        // This prevents jumping as new vehicles load
         setFeedVehicles((prev) => {
-          const map = new Map<string, any>();
-          prev.forEach((v: any) => { if (v?.id) map.set(String(v.id), v); });
-          sorted.forEach((v: any) => { if (v?.id) map.set(String(v.id), v); });
-          return Array.from(map.values()) as any;
+          const existingIds = new Set(prev.map((v: any) => String(v?.id || '')));
+          const newVehicles = sorted.filter((v: any) => !existingIds.has(String(v?.id || '')));
+          // Maintain insertion order - existing vehicles stay in place, new ones append
+          return [...prev, ...newVehicles];
         });
       } else {
+        // Initial load - set fresh
         setFeedVehicles(sorted);
       }
 
@@ -793,162 +1123,6 @@ const CursorHomepage: React.FC = () => {
     if (node) infiniteObserverRef.current.observe(node);
   }, [hasMore, loadMore, loading, loadingMore]);
 
-  const applyFiltersAndSort = () => {
-    let result = [...feedVehicles];
-    
-    // Global search (year/make/model/title/vin). Space-separated terms must all match.
-    if (debouncedSearchText) {
-      const terms = debouncedSearchText
-        .toLowerCase()
-        .split(/\s+/)
-        .map(t => t.trim())
-        .filter(Boolean);
-
-      result = result.filter((v: any) => {
-        const hay = [
-          v.year,
-          v.make,
-          v.model,
-          v.title,
-          v.vin,
-        ].filter(Boolean).join(' ').toLowerCase();
-
-        return terms.every((t) => hay.includes(t));
-      });
-    }
-
-    // Apply filters
-    if (filters.yearMin) {
-      result = result.filter(v => (v.year || 0) >= filters.yearMin!);
-    }
-    if (filters.yearMax) {
-      result = result.filter(v => (v.year || 0) <= filters.yearMax!);
-    }
-    if (filters.makes.length > 0) {
-      result = result.filter(v => filters.makes.some(m => 
-        v.make?.toLowerCase().includes(m.toLowerCase())
-      ));
-    }
-    if (filters.priceMin) {
-      result = result.filter(v => (v.display_price || 0) >= filters.priceMin!);
-    }
-    if (filters.priceMax) {
-      result = result.filter(v => (v.display_price || 0) <= filters.priceMax!);
-    }
-    if (filters.hasImages) {
-      result = result.filter(v => (v.image_count || 0) > 0);
-    }
-    if (filters.forSale) {
-      result = result.filter(v => v.is_for_sale);
-    }
-    if (filters.hideSold) {
-      result = result.filter(v => {
-        const salePrice = Number((v as any).sale_price || 0) || 0;
-        const saleDate = (v as any).sale_date;
-        const saleStatus = String((v as any).sale_status || '').toLowerCase();
-        const outcome = String((v as any).auction_outcome || '').toLowerCase();
-        const isAuctionResult =
-          ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) ||
-          ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(saleStatus);
-        const isSold = salePrice > 0 || Boolean(saleDate) || saleStatus === 'sold' || isAuctionResult;
-        return !isSold;
-      });
-    }
-
-    // Source / dealer-ish filtering
-    if (
-      filters.hideDealerListings ||
-      filters.hideCraigslist ||
-      filters.hideDealerSites ||
-      filters.hideKsl ||
-      filters.hideBat ||
-      filters.hideClassic
-    ) {
-      result = result.filter((v: any) => {
-        const src = classifySource(v);
-
-        // Master toggle: remove the "dealer-ish" channels, but keep auctions/classic by default.
-        if (filters.hideDealerListings) {
-          if (src === 'craigslist' || src === 'dealer_site' || src === 'ksl') return false;
-        }
-
-        // Per-source toggles
-        if (filters.hideCraigslist && src === 'craigslist') return false;
-        if (filters.hideDealerSites && src === 'dealer_site') return false;
-        if (filters.hideKsl && src === 'ksl') return false;
-        if (filters.hideBat && src === 'bat') return false;
-        if (filters.hideClassic && src === 'classic') return false;
-
-        return true;
-      });
-    }
-    
-    // Location filter (ZIP code + radius)
-    // Note: This requires vehicles to have zip_code or GPS coordinates stored
-    if (filters.zipCode && filters.zipCode.length === 5) {
-      // For now, filter by exact ZIP match
-      // TODO: Implement haversine distance calculation with GPS coordinates
-      result = result.filter(v => {
-        const vehicleZip = (v as any).zip_code || (v as any).location_zip;
-        return vehicleZip === filters.zipCode;
-      });
-    }
-    
-    // Apply sorting with direction
-    const dir = sortDirection === 'desc' ? 1 : -1;
-    switch (sortBy) {
-      case 'year':
-        result.sort((a, b) => dir * ((b.year || 0) - (a.year || 0)));
-        break;
-      case 'make':
-        result.sort((a, b) => dir * (a.make || '').localeCompare(b.make || ''));
-        break;
-      case 'model':
-        result.sort((a, b) => dir * (a.model || '').localeCompare(b.model || ''));
-        break;
-      case 'mileage':
-        result.sort((a, b) => dir * ((b.mileage || 0) - (a.mileage || 0)));
-        break;
-      case 'newest':
-        // Sort by created_at first (newest vehicles), then updated_at as fallback
-        result.sort((a, b) => {
-          const aTime = new Date(a.created_at || a.updated_at || 0).getTime();
-          const bTime = new Date(b.created_at || b.updated_at || 0).getTime();
-          return dir * (bTime - aTime); // Descending: newest first
-        });
-        break;
-      case 'oldest':
-        result.sort((a, b) => 
-          dir * (new Date(a.updated_at || a.created_at || 0).getTime() - 
-          new Date(b.updated_at || b.created_at || 0).getTime())
-        );
-        break;
-      case 'price_high':
-        result.sort((a, b) => dir * ((b.display_price || 0) - (a.display_price || 0)));
-        break;
-      case 'price_low':
-        result.sort((a, b) => dir * ((a.display_price || 0) - (b.display_price || 0)));
-        break;
-      case 'volume':
-        // TODO: Add trading volume data from share_holdings table
-        result.sort((a, b) => 0); // Placeholder until we have volume data
-        break;
-      case 'images':
-        result.sort((a, b) => dir * ((b.image_count || 0) - (a.image_count || 0)));
-        break;
-      case 'events':
-        result.sort((a, b) => dir * ((b.event_count || 0) - (a.event_count || 0)));
-        break;
-      case 'views':
-        result.sort((a, b) => dir * ((b.view_count || 0) - (a.view_count || 0)));
-        break;
-      default:
-        // Hype score (default)
-        result.sort((a, b) => dir * ((b.hype_score || 0) - (a.hype_score || 0)));
-    }
-    
-    setFilteredVehicles(result);
-  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -956,6 +1130,128 @@ const CursorHomepage: React.FC = () => {
       currency: 'USD',
       maximumFractionDigits: 0
     }).format(value);
+  };
+
+  // Generative filters - create 10 random filters
+  const generateRandomFilters = () => {
+    const allVehicles = feedVehicles;
+    if (allVehicles.length === 0) {
+      alert('Load vehicles first');
+      return;
+    }
+
+    // Collect available data for randomization
+    const makes = Array.from(new Set(allVehicles.map(v => v.make).filter(Boolean))) as string[];
+    const colors = ['red', 'blue', 'black', 'white', 'green', 'yellow', 'orange', 'silver', 'gray', 'brown'];
+    const conditions = ['excellent', 'good', 'fair', 'creampuff', 'mint', 'pristine', 'survivor'];
+    const areas = ['California', 'Texas', 'Florida', 'New York', 'Arizona', 'Nevada', 'Oregon'];
+    const priceRanges = [
+      { min: 5000, max: 15000, label: '$5k-$15k' },
+      { min: 15000, max: 30000, label: '$15k-$30k' },
+      { min: 30000, max: 50000, label: '$30k-$50k' },
+      { min: 50000, max: 100000, label: '$50k-$100k' },
+    ];
+
+    const randomFilters: string[] = [];
+    const newFilters: FilterState = { ...DEFAULT_FILTERS };
+
+    // Generate 10 random filters (pick 2-3 to apply)
+    const filterTypes: Array<() => void> = [
+      // Make filter
+      () => {
+        if (makes.length > 0) {
+          const make = makes[Math.floor(Math.random() * makes.length)];
+          randomFilters.push(`Only ${make}`);
+          newFilters.makes = [make];
+        }
+      },
+      // Price range
+      () => {
+        const range = priceRanges[Math.floor(Math.random() * priceRanges.length)];
+        randomFilters.push(`Only ${range.label}`);
+        newFilters.priceMin = range.min;
+        newFilters.priceMax = range.max;
+      },
+      // Year range
+      () => {
+        const yearMin = 1960 + Math.floor(Math.random() * 40);
+        const yearMax = Math.min(yearMin + Math.floor(Math.random() * 15) + 5, new Date().getFullYear());
+        randomFilters.push(`Only ${yearMin}-${yearMax}`);
+        newFilters.yearMin = yearMin;
+        newFilters.yearMax = yearMax;
+      },
+      // Color + make combo
+      () => {
+        if (makes.length > 0) {
+          const color = colors[Math.floor(Math.random() * colors.length)];
+          const make = makes[Math.floor(Math.random() * makes.length)];
+          randomFilters.push(`Only ${color} ${make}`);
+          newFilters.makes = [make];
+        }
+      },
+      // Condition/quality
+      () => {
+        const condition = conditions[Math.floor(Math.random() * conditions.length)];
+        randomFilters.push(`Only ${condition} condition`);
+        newFilters.hasImages = true; // Assume creampuffs have images
+      },
+      // Location-based (would need location data)
+      () => {
+        const area = areas[Math.floor(Math.random() * areas.length)];
+        randomFilters.push(`Only ${area}`);
+        // Note: Would need location data in vehicles table
+      },
+      // Price floor
+      () => {
+        const minPrice = [5000, 10000, 20000, 30000, 50000][Math.floor(Math.random() * 5)];
+        randomFilters.push(`Only $${(minPrice / 1000)}k+`);
+        newFilters.priceMin = minPrice;
+      },
+      // For sale only
+      () => {
+        randomFilters.push(`Only for sale`);
+        newFilters.forSale = true;
+      },
+      // Has images
+      () => {
+        randomFilters.push(`Only with images`);
+        newFilters.hasImages = true;
+      },
+      // Specific decade
+      () => {
+        const decades = [
+          { label: '60s', min: 1960, max: 1969 },
+          { label: '70s', min: 1970, max: 1979 },
+          { label: '80s', min: 1980, max: 1989 },
+          { label: '90s', min: 1990, max: 1999 },
+          { label: '2000s', min: 2000, max: 2009 },
+        ];
+        const decade = decades[Math.floor(Math.random() * decades.length)];
+        randomFilters.push(`Only ${decade.label}`);
+        newFilters.yearMin = decade.min;
+        newFilters.yearMax = decade.max;
+      },
+    ];
+
+    // Pick 2-3 random filters to apply
+    const numFilters = 2 + Math.floor(Math.random() * 2); // 2 or 3 filters
+    const selected = new Set<number>();
+    while (selected.size < numFilters && selected.size < filterTypes.length) {
+      selected.add(Math.floor(Math.random() * filterTypes.length));
+    }
+
+    selected.forEach(idx => filterTypes[idx]());
+
+    setGenerativeFilters(randomFilters);
+    setFilters(newFilters);
+    setShowFilters(true); // Show filters when generative filters are applied
+  };
+
+  const toggleCollapsedSection = (section: string) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
   const handleTimePeriodChange = async (period: TimePeriod) => {
@@ -984,283 +1280,254 @@ const CursorHomepage: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
-        <div className="text">Loading...</div>
-      </div>
-    );
-  }
-
+  // Show grid immediately - no loading state blocking
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      {/* Stats Bar */}
-      {stats.totalBuilds > 0 && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => navigate('/market/segments')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') navigate('/market/segments');
-          }}
-          title="Open Market Segments"
-          style={{
-          background: 'var(--white)',
-          borderBottom: '2px solid var(--border)',
-          padding: '12px var(--space-4)',
-          display: 'flex',
-          gap: '32px',
-          justifyContent: 'center',
-          fontSize: '9pt',
-          color: 'var(--text-muted)',
-          cursor: 'pointer'
-        }}>
-          <span><strong>{stats.totalBuilds.toLocaleString()}</strong> active builds</span>
-          <span><strong>{formatCurrency(stats.totalValue)}</strong> in play</span>
-          {stats.activeToday > 0 && <span><strong>{stats.activeToday.toLocaleString()}</strong> updated today</span>}
-        </div>
-      )}
-
-      {/* Feed Section */}
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: '16px' }}>
+      {/* Feed Section - No stats, no filters, just vehicles */}
       <div style={{
-        maxWidth: '1400px',
+        maxWidth: '1600px',
         margin: '0 auto',
-        padding: 'var(--space-4)'
+        padding: '0 16px'
       }}>
-        {/* Unified Header */}
+        {/* Minimal header with year quick filters and generative filters */}
         <div style={{
-          background: 'var(--white)',
-          border: '2px solid var(--border)',
-          padding: 'var(--space-3)',
-          marginBottom: 'var(--space-4)'
+          marginBottom: '16px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          alignItems: 'center'
         }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 'var(--space-3)',
-            flexWrap: 'wrap',
-            gap: '12px'
-          }}>
-            <h2 style={{ fontSize: '12pt', fontWeight: 'bold', margin: 0 }}>
-              <span style={{
-                transition: 'opacity 0.3s ease',
-                display: 'inline-block',
-                minWidth: '80px'
-              }}>
-                <StaticVerbText />
-              </span>
-              {' '}
-              <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 'normal' }}>
-                {filteredVehicles.length} vehicles
-              </span>
-            </h2>
-            
-            {/* Metrics Row */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '16px',
-              flexWrap: 'wrap',
-              fontSize: '8pt',
-              color: 'var(--text-muted)',
-              marginLeft: 'auto'
-            }}>
-              {(() => {
-                const totalValue = filteredVehicles.reduce((sum, v) => sum + (v.display_price || 0), 0);
-                const avgValue = filteredVehicles.length > 0 ? totalValue / filteredVehicles.length : 0;
-                const forSaleCount = filteredVehicles.filter(v => v.is_for_sale).length;
-                
-                return (
-                  <>
-                    {/* Only show these in Info-dense view so the default header stays clean. */}
-                    {infoDense && totalValue > 0 && (
-                      <span>
-                        <strong style={{ color: 'var(--text)' }}>{formatCurrency(totalValue)}</strong> total value
-                      </span>
-                    )}
-                    {infoDense && avgValue > 0 && filteredVehicles.length > 1 && (
-                      <span>
-                        <strong style={{ color: 'var(--text)' }}>{formatCurrency(avgValue)}</strong> avg
-                      </span>
-                    )}
-                    {infoDense && forSaleCount > 0 && (
-                      <span>
-                        <strong style={{ color: 'var(--text)' }}>{forSaleCount}</strong> for sale
-                      </span>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
+          <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+            {filteredVehicles.length} vehicles
           </div>
-            
-          {/* Controls Row */}
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '12px', 
-            flexWrap: 'wrap',
-            borderTop: '1px solid var(--border)',
-            paddingTop: 'var(--space-2)'
-          }}>
-            {/* View Mode Switcher */}
-            <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-              {(['gallery', 'grid', 'technical'] as ViewMode[]).map(mode => (
+
+          {/* Thermal Pricing Toggle */}
+          <button
+            onClick={() => setThermalPricing(!thermalPricing)}
+            style={{
+              padding: '4px 8px',
+              fontSize: '8pt',
+              border: '1px solid var(--border)',
+              background: thermalPricing ? 'var(--grey-600)' : 'var(--white)',
+              color: thermalPricing ? 'var(--white)' : 'var(--text)',
+              cursor: 'pointer',
+              borderRadius: '2px',
+              transition: 'all 0.12s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+            title="Thermal Pricing: Red = Good Deal, Purple = Bad Price"
+          >
+            <span>🔥</span>
+            <span>Thermal</span>
+          </button>
+          
+          {/* Year Quick Filter Buttons */}
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {[
+              { label: '64-91', min: 1964, max: 1991 },
+              { label: '73-87', min: 1973, max: 1987 },
+              { label: '67-72', min: 1967, max: 1972 },
+              { label: '87-00', min: 1987, max: 2000 },
+              { label: '60s', min: 1960, max: 1969 },
+              { label: '70s', min: 1970, max: 1979 },
+              { label: '80s', min: 1980, max: 1989 },
+              { label: '90s', min: 1990, max: 1999 },
+            ].map(range => {
+              const isActive = filters.yearMin === range.min && filters.yearMax === range.max;
+              return (
                 <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
+                  key={range.label}
+                  onClick={() => {
+                    if (isActive) {
+                      setFilters({ ...filters, yearMin: null, yearMax: null });
+                    } else {
+                      setFilters({ ...filters, yearMin: range.min, yearMax: range.max });
+                    }
+                  }}
                   style={{
-                    background: viewMode === mode ? 'var(--grey-600)' : 'var(--white)',
-                    color: viewMode === mode ? 'var(--white)' : 'var(--text)',
-                    border: '1px solid var(--border)',
                     padding: '4px 8px',
                     fontSize: '8pt',
+                    border: '1px solid var(--border)',
+                    background: isActive ? 'var(--grey-600)' : 'var(--white)',
+                    color: isActive ? 'var(--white)' : 'var(--text)',
                     cursor: 'pointer',
-                    fontWeight: viewMode === mode ? 'bold' : 'normal',
+                    borderRadius: '2px',
                     transition: 'all 0.12s'
                   }}
                 >
-                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  {range.label}
                 </button>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
-            {/* Card Density Slider */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '8pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Card size</span>
-              <input
-                type="range"
-                min={140}
-                max={260}
-                step={10}
-                value={cardMinWidth}
-                onChange={(e) => setCardMinWidth(parseInt(e.target.value, 10))}
-                style={{ width: '160px' }}
-                aria-label="Card size"
-              />
-            </div>
+          {/* Generative Filters Button */}
+          <button
+            onClick={() => {
+              generateRandomFilters();
+            }}
+            style={{
+              padding: '4px 8px',
+              fontSize: '8pt',
+              border: '1px solid var(--grey-600)',
+              background: 'var(--white)',
+              color: 'var(--text)',
+              cursor: 'pointer',
+              borderRadius: '2px',
+              transition: 'all 0.12s',
+              fontWeight: 'bold'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--grey-100)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--white)';
+            }}
+          >
+            Generate Filters ✨
+          </button>
 
-            {/* Global Search */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1 1 260px', minWidth: 220 }}>
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder="Search year, make, model, VIN (press /)"
-                style={{
-                  width: '100%',
-                  padding: '4px 8px',
-                  border: '1px solid var(--border)',
-                  fontSize: '8pt',
-                  background: 'var(--white)'
-                }}
-              />
-              {searchText.trim().length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSearchText('')}
+          {/* Show active generative filters */}
+          {generativeFilters.length > 0 && (
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', fontSize: '8pt' }}>
+              {generativeFilters.map((filter, idx) => (
+                <span
+                  key={idx}
                   style={{
+                    padding: '2px 6px',
+                    background: 'var(--grey-100)',
                     border: '1px solid var(--border)',
-                    background: 'var(--white)',
-                    padding: '4px 8px',
-                    fontSize: '8pt',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
+                    borderRadius: '2px',
+                    color: 'var(--text-muted)'
                   }}
                 >
-                  Clear
-                </button>
+                  {filter}
+                </span>
+              ))}
+              <button
+                onClick={() => {
+                  setGenerativeFilters([]);
+                  setFilters(DEFAULT_FILTERS);
+                  setSearchText('');
+                }}
+                style={{
+                  padding: '2px 6px',
+                  fontSize: '8pt',
+                  border: '1px solid var(--border)',
+                  background: 'var(--white)',
+                  cursor: 'pointer'
+                }}
+              >
+                Clear All
+              </button>
+            </div>
+          )}
+
+          {/* Toggle Filters Button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            style={{
+              padding: '4px 8px',
+              fontSize: '8pt',
+              border: '1px solid var(--border)',
+              background: showFilters ? 'var(--grey-600)' : 'var(--white)',
+              color: showFilters ? 'var(--white)' : 'var(--text)',
+              cursor: 'pointer',
+              borderRadius: '2px',
+              marginLeft: 'auto'
+            }}
+          >
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
+        </div>
+
+        {/* Show loading indicator inline if still loading */}
+        {loading && filteredVehicles.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+            Loading vehicles...
+          </div>
+        )}
+
+        {/* Filter Panel - Show when enabled */}
+        {showFilters && (
+          <div style={{
+            background: 'var(--white)',
+            border: '1px solid var(--border)',
+            padding: '12px',
+            marginBottom: '16px',
+            fontSize: '8pt'
+          }}>
+            {/* Year Quick Filters - Collapsible (also in filter panel) */}
+            <div style={{ marginBottom: '12px' }}>
+              <div 
+                onClick={() => toggleCollapsedSection('yearQuickFilters')}
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  marginBottom: '8px',
+                  paddingBottom: '4px',
+                  borderBottom: '1px solid var(--border)'
+                }}
+              >
+                <span>Year Quick Filters</span>
+                <span>{collapsedSections.yearQuickFilters ? '▼' : '▲'}</span>
+              </div>
+              {!collapsedSections.yearQuickFilters && (
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                  {[
+                    { label: '64-91', min: 1964, max: 1991 },
+                    { label: '73-87', min: 1973, max: 1987 },
+                    { label: '67-72', min: 1967, max: 1972 },
+                    { label: '87-00', min: 1987, max: 2000 },
+                    { label: '60s', min: 1960, max: 1969 },
+                    { label: '70s', min: 1970, max: 1979 },
+                    { label: '80s', min: 1980, max: 1989 },
+                    { label: '90s', min: 1990, max: 1999 },
+                  ].map(range => {
+                    const isActive = filters.yearMin === range.min && filters.yearMax === range.max;
+                    return (
+                      <button
+                        key={range.label}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isActive) {
+                            setFilters({ ...filters, yearMin: null, yearMax: null });
+                          } else {
+                            setFilters({ ...filters, yearMin: range.min, yearMax: range.max });
+                          }
+                        }}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '8pt',
+                          border: '1px solid var(--border)',
+                          background: isActive ? 'var(--grey-600)' : 'var(--white)',
+                          color: isActive ? 'var(--white)' : 'var(--text)',
+                          cursor: 'pointer',
+                          borderRadius: '2px'
+                        }}
+                      >
+                        {range.label}
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
-            {/* Filters Toggle */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              style={{
-                background: showFilters ? 'var(--grey-600)' : 'var(--white)',
-                color: showFilters ? 'var(--white)' : 'var(--text)',
-                border: '1px solid var(--border)',
-                padding: '4px 8px',
-                fontSize: '8pt',
-                cursor: 'pointer',
-                fontWeight: showFilters ? 'bold' : 'normal',
-                transition: 'background 0.12s, color 0.12s'
-              }}
-            >
-              Filters {activeFilterCount > 0 && '●'}
-            </button>
-          </div>
-        </div>
-
-        {/* Filter Panel - Sticky with minimize */}
-        {showFilters && (
-          <div style={{ 
-            position: 'sticky',
-            top: 0,
-            background: filterBarMinimized ? 'var(--surface-glass)' : 'var(--surface)',
-            backdropFilter: filterBarMinimized ? 'blur(10px)' : 'none',
-            border: '1px solid var(--border)',
-            padding: filterBarMinimized ? '8px 12px' : '12px',
-            marginBottom: '12px',
-            zIndex: 100,
-            boxShadow: filterBarMinimized ? '0 2px 8px rgba(0,0,0,0.18)' : 'none',
-            transition: 'padding 0.2s ease, background 0.2s ease',
-            opacity: 1
-          }}>
-            {/* Collapsible header bar */}
-            <div 
-              onClick={() => setFilterBarMinimized(!filterBarMinimized)}
-              style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                cursor: 'pointer',
-                fontSize: '8pt',
-                fontWeight: 'bold',
-                marginBottom: filterBarMinimized ? 0 : '8px',
-                paddingBottom: filterBarMinimized ? 0 : '4px',
-                borderBottom: filterBarMinimized ? 'none' : '1px solid var(--border)'
-              }}
-            >
-              <span>Filters {filterBarMinimized && `Active (${activeFilterCount})`}</span>
-              <span style={{ fontSize: '10pt' }}>{filterBarMinimized ? '▲' : '▼'}</span>
-            </div>
-            
             {/* Full filter controls */}
             <div style={{ 
-              display: filterBarMinimized ? 'none' : 'grid', 
+              display: 'grid', 
               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '12px', 
-              fontSize: '8pt' 
+              gap: '12px'
             }}>
-              {/* Updated / Recency */}
+              {/* Year Range - Manual Input */}
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Updated</label>
-                <select
-                  value={timePeriod}
-                  onChange={(e) => handleTimePeriodChange(e.target.value as TimePeriod)}
-                  style={{
-                    width: '100%',
-                    padding: '4px 6px',
-                    border: '1px solid var(--border)',
-                    fontSize: '8pt'
-                  }}
-                >
-                  <option value="AT">Active</option>
-                  <option value="ALL">All Time</option>
-                  <option value="1Y">Last Year</option>
-                  <option value="Q">Last Quarter</option>
-                  <option value="W">Last Week</option>
-                  <option value="D">Last Day</option>
-                  <option value="RT">Live (Last Hour)</option>
-                </select>
-              </div>
-
-              {/* Year Range */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Year Range</label>
+                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Year Range (Manual)</label>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <input
                     type="text"
@@ -1294,9 +1561,24 @@ const CursorHomepage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Price Range */}
+              {/* Price Range - Collapsible */}
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Price Range</label>
+                <div 
+                  onClick={() => toggleCollapsedSection('priceFilters')}
+                  style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    marginBottom: '4px'
+                  }}
+                >
+                  <label style={{ margin: 0, cursor: 'pointer' }}>Price Range</label>
+                  <span style={{ fontSize: '8pt' }}>{collapsedSections.priceFilters ? '▼' : '▲'}</span>
+                </div>
+                {!collapsedSections.priceFilters && (
+                  <>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <input
                     type="text"
@@ -1328,11 +1610,28 @@ const CursorHomepage: React.FC = () => {
                     }}
                   />
                 </div>
+                  </>
+                )}
               </div>
 
-              {/* Location Filter */}
+              {/* Location Filter - Collapsible */}
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Location</label>
+                <div 
+                  onClick={() => toggleCollapsedSection('locationFilters')}
+                  style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    marginBottom: '4px'
+                  }}
+                >
+                  <label style={{ margin: 0, cursor: 'pointer' }}>Location</label>
+                  <span style={{ fontSize: '8pt' }}>{collapsedSections.locationFilters ? '▼' : '▲'}</span>
+                </div>
+                {!collapsedSections.locationFilters && (
+                  <>
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '4px' }}>
                   <input
                     type="text"
@@ -1365,6 +1664,8 @@ const CursorHomepage: React.FC = () => {
                     <option value="500">500 mi</option>
                   </select>
                 </div>
+                  </>
+                )}
               </div>
 
               {/* Make Filter */}
@@ -1387,9 +1688,24 @@ const CursorHomepage: React.FC = () => {
                 />
               </div>
 
-              {/* Status & Display Toggles */}
+              {/* Status & Display Toggles - Collapsible */}
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Status</label>
+                <div 
+                  onClick={() => toggleCollapsedSection('statusFilters')}
+                  style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    marginBottom: '4px'
+                  }}
+                >
+                  <label style={{ margin: 0, cursor: 'pointer' }}>Status</label>
+                  <span style={{ fontSize: '8pt' }}>{collapsedSections.statusFilters ? '▼' : '▲'}</span>
+                </div>
+                {!collapsedSections.statusFilters && (
+                  <>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
                   <input
                     type="checkbox"
@@ -1416,58 +1732,79 @@ const CursorHomepage: React.FC = () => {
                   />
                   <span>Show Pending Vehicles</span>
                 </label>
+                  </>
+                )}
 
-                <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
-                  <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Source Filters</label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                    <input
-                      type="checkbox"
-                      checked={filters.hideDealerListings}
-                      onChange={(e) => setFilters({ ...filters, hideDealerListings: e.target.checked })}
-                    />
-                    <span>Hide dealer listings (CL + dealer sites + KSL)</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                    <input
-                      type="checkbox"
-                      checked={filters.hideCraigslist}
-                      onChange={(e) => setFilters({ ...filters, hideCraigslist: e.target.checked })}
-                    />
-                    <span>Hide Craigslist (CL)</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                    <input
-                      type="checkbox"
-                      checked={filters.hideDealerSites}
-                      onChange={(e) => setFilters({ ...filters, hideDealerSites: e.target.checked })}
-                    />
-                    <span>Hide dealer websites</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                    <input
-                      type="checkbox"
-                      checked={filters.hideKsl}
-                      onChange={(e) => setFilters({ ...filters, hideKsl: e.target.checked })}
-                    />
-                    <span>Hide KSL</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                    <input
-                      type="checkbox"
-                      checked={filters.hideBat}
-                      onChange={(e) => setFilters({ ...filters, hideBat: e.target.checked })}
-                    />
-                    <span>Hide BaT</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={filters.hideClassic}
-                      onChange={(e) => setFilters({ ...filters, hideClassic: e.target.checked })}
-                    />
-                    <span>Hide Classic.com</span>
-                  </label>
+              {/* Source Filters - Collapsible Section */}
+              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', gridColumn: '1 / -1' }}>
+                <div 
+                  onClick={() => toggleCollapsedSection('sourceFilters')}
+                  style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    marginBottom: '8px',
+                    paddingBottom: '4px'
+                  }}
+                >
+                  <span>Source Filters</span>
+                  <span>{collapsedSections.sourceFilters ? '▼' : '▲'}</span>
                 </div>
+                {!collapsedSections.sourceFilters && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.hideDealerListings}
+                        onChange={(e) => setFilters({ ...filters, hideDealerListings: e.target.checked })}
+                      />
+                      <span>Hide dealer listings (CL + dealer sites + KSL)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.hideCraigslist}
+                        onChange={(e) => setFilters({ ...filters, hideCraigslist: e.target.checked })}
+                      />
+                      <span>Hide Craigslist (CL)</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.hideDealerSites}
+                        onChange={(e) => setFilters({ ...filters, hideDealerSites: e.target.checked })}
+                      />
+                      <span>Hide dealer websites</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.hideKsl}
+                        onChange={(e) => setFilters({ ...filters, hideKsl: e.target.checked })}
+                      />
+                      <span>Hide KSL</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.hideBat}
+                        onChange={(e) => setFilters({ ...filters, hideBat: e.target.checked })}
+                      />
+                      <span>Hide BaT</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.hideClassic}
+                        onChange={(e) => setFilters({ ...filters, hideClassic: e.target.checked })}
+                      />
+                      <span>Hide Classic.com</span>
+                    </label>
+                  </div>
+                )}
+              </div>
 
                 <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
@@ -1962,6 +2299,7 @@ const CursorHomepage: React.FC = () => {
                   viewMode="gallery"
                   infoDense={infoDense}
                   viewerUserId={session?.user?.id}
+                  thermalPricing={thermalPricing}
                   sourceStampUrl={
                     (vehicle as any)?.discovery_url ||
                     ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
@@ -1971,12 +2309,12 @@ const CursorHomepage: React.FC = () => {
           </div>
         )}
 
-        {/* Grid View - Instagram-style with zero spacing */}
+        {/* Grid View - Small cards side-by-side, lazy loaded */}
         {viewMode === 'grid' && (
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinWidth}px, 1fr))`,
-            gap: '0'
+            gap: '8px'
         }}>
             {filteredVehicles.map((vehicle) => (
               <VehicleCardDense
@@ -1984,8 +2322,9 @@ const CursorHomepage: React.FC = () => {
                 vehicle={vehicle}
                 viewMode="grid"
                 cardSizePx={cardMinWidth}
-                infoDense={infoDense}
+                infoDense={false}
                 viewerUserId={session?.user?.id}
+                thermalPricing={thermalPricing}
                 sourceStampUrl={
                   (vehicle as any)?.discovery_url ||
                   ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)

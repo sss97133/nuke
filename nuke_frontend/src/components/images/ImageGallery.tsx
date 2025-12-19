@@ -208,21 +208,48 @@ const ImageGallery = ({
     }
   };
 
+  // Helper to detect icon/logo images
+  const isIconOrLogo = (url: string): boolean => {
+    const s = url.toLowerCase();
+    if (s.includes('.svg')) return true;
+    if (s.includes('logo') || s.includes('icon') || s.includes('badge') || s.includes('avatar')) return true;
+    if (s.includes('framerusercontent.com')) {
+      // Check for small square images or images with width/height params indicating UI elements
+      if (/width=\d+.*height=\d+/.test(s)) {
+        const wMatch = s.match(/width=(\d+)/i);
+        const hMatch = s.match(/height=(\d+)/i);
+        if (wMatch && hMatch) {
+          const w = parseInt(wMatch[1], 10);
+          const h = parseInt(hMatch[1], 10);
+          // Filter small images or very wide banners (likely headers/logos)
+          if (w <= 600 || h <= 200 || (w > h * 3)) return true;
+        }
+      }
+    }
+    return false;
+  };
+
   const filterBatNoiseRows = (rows: any[], meta: any = vehicleMeta): any[] => {
     if (!rows || rows.length === 0) return rows;
     
+    // Filter out icon/logo images first
+    const withoutIcons = (rows || []).filter((img: any) => {
+      const url = String(img?.image_url || '');
+      return url && !isIconOrLogo(url);
+    });
+    
     // Never filter out non-BaT URLs (user uploads, Supabase storage, etc.)
-    const nonBat = (rows || []).filter((img: any) => {
+    const nonBat = withoutIcons.filter((img: any) => {
       const url = String(img?.image_url || '');
       return url && !url.includes('bringatrailer.com/wp-content/uploads/');
     });
     
-    const batRows = (rows || []).filter((img: any) => {
+    const batRows = withoutIcons.filter((img: any) => {
       const url = String(img?.image_url || '');
       return url && url.includes('bringatrailer.com/wp-content/uploads/');
     });
     
-    if (batRows.length === 0) return rows;
+    if (batRows.length === 0) return withoutIcons.length > 0 ? withoutIcons : rows;
     
     // First: Filter known BaT page noise
     const isKnownNoise = (url: string) => {
