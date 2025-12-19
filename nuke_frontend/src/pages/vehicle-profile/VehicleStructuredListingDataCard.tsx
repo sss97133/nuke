@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Vehicle } from './types';
+import { FaviconIcon } from '../../components/common/FaviconIcon';
 
 function parseOptionRow(raw: string): { code: string | null; label: string } {
   const s = (raw || '').replace(/\s+/g, ' ').trim();
@@ -15,13 +16,40 @@ function parseOptionRow(raw: string): { code: string | null; label: string } {
 
 export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = ({ vehicle }) => {
   const lart = (vehicle as any)?.origin_metadata?.lart || null;
+  const originMeta = (vehicle as any)?.origin_metadata || {};
 
   const options: string[] = Array.isArray(lart?.options) ? lart.options : [];
   const infoBullets: string[] = Array.isArray(lart?.info_bullets) ? lart.info_bullets : [];
   const serviceHistory: string[] = Array.isArray(lart?.service_history) ? lart.service_history : [];
 
+  // Extract Craigslist attributes from origin_metadata
+  const craigslistAttrs: Array<{ label: string; value: string | number }> = [];
+  if (originMeta.condition) craigslistAttrs.push({ label: 'Condition', value: String(originMeta.condition) });
+  if (originMeta.drivetrain || originMeta.drive) craigslistAttrs.push({ label: 'Drive', value: String(originMeta.drivetrain || originMeta.drive) });
+  if (originMeta.fuel_type || originMeta.fuel) craigslistAttrs.push({ label: 'Fuel', value: String(originMeta.fuel_type || originMeta.fuel) });
+  if (originMeta.mileage || originMeta.odometer) {
+    const odo = typeof (originMeta.mileage || originMeta.odometer) === 'number' 
+      ? (originMeta.mileage || originMeta.odometer)
+      : parseInt(String(originMeta.mileage || originMeta.odometer || '').replace(/,/g, ''));
+    if (odo > 0) craigslistAttrs.push({ label: 'Odometer', value: odo.toLocaleString() });
+  }
+  if (originMeta.color || originMeta.paint_color) craigslistAttrs.push({ label: 'Paint Color', value: String(originMeta.color || originMeta.paint_color) });
+  if (originMeta.title_status) craigslistAttrs.push({ label: 'Title Status', value: String(originMeta.title_status) });
+  if (originMeta.transmission) craigslistAttrs.push({ label: 'Transmission', value: String(originMeta.transmission) });
+  if (originMeta.body_style || originMeta.type) craigslistAttrs.push({ label: 'Type', value: String(originMeta.body_style || originMeta.type) });
+  if (originMeta.cylinders) craigslistAttrs.push({ label: 'Cylinders', value: String(originMeta.cylinders) });
+
+  // Extract location/lat/lng if available
+  const locationData = (() => {
+    const lat = originMeta.latitude || originMeta.lat || (originMeta.location?.latitude);
+    const lng = originMeta.longitude || originMeta.lng || (originMeta.location?.longitude);
+    const locationStr = originMeta.location || originMeta.listing_location;
+    return { lat, lng, location: locationStr };
+  })();
+
   const sourceUrl = (vehicle as any)?.discovery_url || null;
-  const isEmpty = options.length === 0 && infoBullets.length === 0 && serviceHistory.length === 0;
+  const isCraigslist = sourceUrl?.includes('craigslist');
+  const isEmpty = options.length === 0 && infoBullets.length === 0 && serviceHistory.length === 0 && craigslistAttrs.length === 0 && !locationData.lat;
 
   if (isEmpty) return null;
 
@@ -43,6 +71,61 @@ export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = 
       </div>
 
       <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {/* Craigslist Attributes Table */}
+        {craigslistAttrs.length > 0 && (
+          <details open>
+            <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {isCraigslist && <FaviconIcon url={sourceUrl || 'https://craigslist.org'} size={12} preserveAspectRatio={true} />}
+              Listing Attributes ({craigslistAttrs.length})
+            </summary>
+            <div style={{ marginTop: '8px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8pt' }}>
+                <tbody>
+                  {craigslistAttrs.map((attr, idx) => (
+                    <tr key={idx} style={{ borderBottom: idx < craigslistAttrs.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <td style={{ padding: '4px 8px', fontWeight: 700, color: 'var(--text-muted)', width: '35%', textTransform: 'capitalize' }}>
+                        {attr.label}:
+                      </td>
+                      <td style={{ padding: '4px 8px', color: 'var(--text)' }}>
+                        {typeof attr.value === 'number' ? attr.value.toLocaleString() : String(attr.value)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        )}
+
+        {/* Location / Map Data */}
+        {(locationData.lat || locationData.location) && (
+          <details>
+            <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700 }}>
+              Last Known Location
+            </summary>
+            <div style={{ marginTop: '8px', fontSize: '8pt', lineHeight: 1.5 }}>
+              {locationData.location && (
+                <div style={{ marginBottom: '4px' }}>
+                  <strong>Location:</strong> {String(locationData.location)}
+                </div>
+              )}
+              {locationData.lat && locationData.lng && (
+                <div>
+                  <strong>Coordinates:</strong>{' '}
+                  <a
+                    href={`https://www.google.com/maps?q=${locationData.lat},${locationData.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--link-color)', textDecoration: 'underline' }}
+                  >
+                    {Number(locationData.lat).toFixed(6)}, {Number(locationData.lng).toFixed(6)}
+                  </a>
+                </div>
+              )}
+            </div>
+          </details>
+        )}
+
         {infoBullets.length > 0 && (
           <details>
             <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700 }}>Information</summary>

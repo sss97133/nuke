@@ -250,8 +250,40 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     if (s.includes('{') || s.includes('}') || s.includes(';') || s.includes('}.') || s.includes('/*') || s.includes('*/')) return '';
     
     // Clean up concatenated listing-style strings that got scraped into a single field
-    // Pattern: "(Series) Engine Info (Production#) - $Price (Mileage)"
-    // If it looks like a full listing description, try to extract just the meaningful part
+    // Patterns:
+    // 1. "Model - COLOR - $Price (Location)"
+    // 2. "(Series) Engine Info (Production#) - $Price (Mileage)"
+    // 3. "Model - $Price (Location)"
+    // Extract just the model/meaningful part
+    
+    // Pattern 1: "Benz 300SD - BLACK - $8,000 (Torrance)" -> "Benz 300SD"
+    // Pattern 2: "Model - $Price (Location)" -> "Model"
+    if (s.includes(' - $') || (s.includes(' - ') && s.match(/\$[\d,]+/))) {
+      // Split on " - $" or " - " followed by price/location
+      const parts = s.split(/\s*-\s*(?=\$|\()/);
+      if (parts.length > 0) {
+        let cleaned = parts[0].trim();
+        
+        // Remove parenthetical production numbers if they're at the end
+        cleaned = cleaned.replace(/\s*\(\d+of\d+\)\s*$/i, '').trim();
+        
+        // Remove trailing dashes
+        cleaned = cleaned.replace(/[-–—]\s*$/, '').trim();
+        
+        // Remove color patterns like " - BLACK" if it's still there
+        cleaned = cleaned.replace(/\s*-\s*(BLACK|WHITE|RED|BLUE|GREEN|SILVER|GRAY|GREY|YELLOW|ORANGE|PURPLE|BROWN|BEIGE|TAN)\s*$/i, '').trim();
+        
+        // Remove location patterns like "(Torrance)" at the end
+        cleaned = cleaned.replace(/\s*\([A-Z][a-z]+\)\s*$/, '').trim();
+        
+        // Final check: if we successfully cleaned it and it's shorter, use it
+        if (cleaned.length > 0 && cleaned.length < s.length && cleaned.length < 60) {
+          return cleaned;
+        }
+      }
+    }
+    
+    // Legacy pattern check for completeness
     if (s.includes(' - $') && (s.includes('Original Miles') || s.includes('of'))) {
       // This looks like a contaminated listing title/description in a field
       // Try to extract just the first meaningful part before the price
@@ -376,11 +408,24 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                handleDataPointClick(e, 'model', vehicle.model || '', 'Model');
+                // Use normalized_model if available, otherwise model, but sanitize both
+                const modelValue = (vehicle as any)?.normalized_model || vehicle.model || '';
+                handleDataPointClick(e, 'model', modelValue, 'Model');
               }}
               style={{ cursor: 'pointer' }}
             >
-              {sanitizeInlineValue(vehicle.model) || 'Not specified'}
+              {(() => {
+                // Prefer normalized_model if available (already cleaned)
+                const modelValue = (vehicle as any)?.normalized_model || vehicle.model || '';
+                const cleaned = sanitizeInlineValue(modelValue);
+                // If sanitization removed everything suspicious, try the identity token sanitizer
+                if (!cleaned && modelValue) {
+                  const { sanitizeIdentityToken } = require('../../utils/vehicleIdentity');
+                  const identityCleaned = sanitizeIdentityToken(modelValue, { year: vehicle.year, make: vehicle.make });
+                  if (identityCleaned) return identityCleaned;
+                }
+                return cleaned || 'Not specified';
+              })()}
             </span>
           </div>
           {vehicle.engine && (
