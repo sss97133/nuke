@@ -407,9 +407,9 @@ const CursorHomepage: React.FC = () => {
         const shouldShowScrollTop = currentScrollY > 500;
         setShowScrollTop((prev) => (prev === shouldShowScrollTop ? prev : shouldShowScrollTop));
 
-        // Minimize filter bar after scrolling down 200px (if filters are shown)
-        // Only auto-minimize, don't auto-expand (let user control expansion)
-        if (showFilters && currentScrollY > 200 && !filterBarMinimized) {
+        // Auto-minimize filter bar after scrolling down 200px (if filters are shown and active)
+        // Only auto-minimize when there are active filters, don't auto-expand (let user control expansion)
+        if (showFilters && hasActiveFilters && currentScrollY > 200 && !filterBarMinimized) {
           setFilterBarMinimized(true);
         }
       });
@@ -422,7 +422,7 @@ const CursorHomepage: React.FC = () => {
         window.cancelAnimationFrame(rafId);
       }
     };
-  }, [showFilters]);
+  }, [showFilters, hasActiveFilters, filterBarMinimized]);
 
   // Save filters to localStorage whenever they change
   useEffect(() => {
@@ -827,7 +827,7 @@ const CursorHomepage: React.FC = () => {
           id, year, make, model, normalized_model, series, trim, transmission, transmission_model, title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
-          auction_outcome, high_bid, winning_bid, bid_count,
+          auction_outcome, high_bid, winning_bid, bid_count, current_bid,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin
         `)
@@ -950,21 +950,38 @@ const CursorHomepage: React.FC = () => {
 
       // Process vehicles with optimized image data (use thumbnails for grid performance)
       const processed = (vehicles || []).map((v: any) => {
-        const salePrice = v.sale_price ? Number(v.sale_price) : 0;
-        const askingPrice = v.asking_price ? Number(v.asking_price) : 0;
-        const currentValue = v.current_value ? Number(v.current_value) : 0;
+        const salePrice = v.sale_price ? Number(v.sale_price) : null;
+        const askingPrice = v.asking_price ? Number(v.asking_price) : null;
+        const currentValue = v.current_value ? Number(v.current_value) : null;
+        const purchasePrice = v.purchase_price ? Number(v.purchase_price) : null;
+        const winningBid = v.winning_bid ? Number(v.winning_bid) : null;
+        const highBid = v.high_bid ? Number(v.high_bid) : null;
+        const currentBid = v.current_bid ? Number(v.current_bid) : null;
+        
         const listing = auctionByVehicleId.get(String(v?.id || '')) || null;
         const listingStatus = String((listing as any)?.listing_status || '').toLowerCase();
         const isLive = listingStatus === 'active' || listingStatus === 'live';
-        const liveBid = typeof (listing as any)?.current_bid === 'number' ? (listing as any).current_bid : Number((listing as any)?.current_bid || 0);
+        const listingLiveBid = typeof (listing as any)?.current_bid === 'number' ? (listing as any).current_bid : Number((listing as any)?.current_bid || 0);
         const finalPrice = typeof (listing as any)?.final_price === 'number' ? (listing as any).final_price : Number((listing as any)?.final_price || 0);
 
+        // Priority order for display price:
+        // 1. Sale price (actual sold price)
+        // 2. Winning bid (auction result)
+        // 3. High bid (RNM auctions)
+        // 4. Live bid from external_listings
+        // 5. Current bid from vehicle
+        // 6. Final price from listing
+        // 7. Asking price (user intent)
+        // 8. DO NOT fall back to current_value - only show if explicitly set as asking
         const displayPrice =
-          salePrice > 0 ? salePrice :
-          (isLive && Number.isFinite(liveBid) && liveBid > 0) ? liveBid :
+          (salePrice && salePrice > 0) ? salePrice :
+          (winningBid && winningBid > 0) ? winningBid :
+          (highBid && highBid > 0) ? highBid :
+          (isLive && Number.isFinite(listingLiveBid) && listingLiveBid > 0) ? listingLiveBid :
+          (currentBid && currentBid > 0) ? currentBid :
           (Number.isFinite(finalPrice) && finalPrice > 0) ? finalPrice :
-          askingPrice > 0 ? askingPrice :
-          currentValue;
+          (askingPrice && askingPrice > 0) ? askingPrice :
+          null; // Don't show a price if we don't have actual pricing data
         const age_hours = (Date.now() - new Date(v.created_at).getTime()) / (1000 * 60 * 60);
 
         const vehicleId = String(v?.id || '');
@@ -1244,6 +1261,100 @@ const CursorHomepage: React.FC = () => {
     }));
   };
 
+  // Get active filter badges for sticky bar display
+  const getActiveFilterBadges = useMemo(() => {
+    const badges: Array<{ label: string; onRemove?: () => void }> = [];
+    
+    // Year range
+    if (filters.yearMin || filters.yearMax) {
+      const yearLabel = filters.yearMin && filters.yearMax
+        ? `${filters.yearMin}-${filters.yearMax}`
+        : filters.yearMin
+        ? `${filters.yearMin}+`
+        : `-${filters.yearMax}`;
+      badges.push({
+        label: `Year: ${yearLabel}`,
+        onRemove: () => setFilters({ ...filters, yearMin: null, yearMax: null })
+      });
+    }
+    
+    // Price range
+    if (filters.priceMin || filters.priceMax) {
+      const priceLabel = filters.priceMin && filters.priceMax
+        ? `$${filters.priceMin.toLocaleString()}-$${filters.priceMax.toLocaleString()}`
+        : filters.priceMin
+        ? `$${filters.priceMin.toLocaleString()}+`
+        : `-$${filters.priceMax.toLocaleString()}`;
+      badges.push({
+        label: `Price: ${priceLabel}`,
+        onRemove: () => setFilters({ ...filters, priceMin: null, priceMax: null })
+      });
+    }
+    
+    // Makes
+    if (filters.makes.length > 0) {
+      badges.push({
+        label: `Make: ${filters.makes.join(', ')}`,
+        onRemove: () => setFilters({ ...filters, makes: [] })
+      });
+    }
+    
+    // Location
+    if (filters.zipCode && filters.radiusMiles > 0) {
+      badges.push({
+        label: `Location: ${filters.zipCode} (${filters.radiusMiles}mi)`,
+        onRemove: () => setFilters({ ...filters, zipCode: '', radiusMiles: 0 })
+      });
+    }
+    
+    // Status filters
+    if (filters.forSale) {
+      badges.push({
+        label: 'For Sale',
+        onRemove: () => setFilters({ ...filters, forSale: false })
+      });
+    }
+    if (filters.hideSold) {
+      badges.push({
+        label: 'Hide Sold',
+        onRemove: () => setFilters({ ...filters, hideSold: false })
+      });
+    }
+    if (filters.showPending) {
+      badges.push({
+        label: 'Show Pending',
+        onRemove: () => setFilters({ ...filters, showPending: false })
+      });
+    }
+    
+    // Source filters
+    const sourceFilters: string[] = [];
+    if (filters.hideCraigslist) sourceFilters.push('Hide CL');
+    if (filters.hideBat) sourceFilters.push('Hide BaT');
+    if (filters.hideKsl) sourceFilters.push('Hide KSL');
+    if (filters.hideClassic) sourceFilters.push('Hide Classic');
+    if (filters.hideDealerSites) sourceFilters.push('Hide Dealers');
+    if (filters.hideDealerListings) sourceFilters.push('Hide Dealer Listings');
+    if (sourceFilters.length > 0) {
+      badges.push({
+        label: sourceFilters.join(', '),
+        onRemove: () => setFilters({
+          ...filters,
+          hideCraigslist: false,
+          hideBat: false,
+          hideKsl: false,
+          hideClassic: false,
+          hideDealerSites: false,
+          hideDealerListings: false
+        })
+      });
+    }
+    
+    return badges;
+  }, [filters]);
+  
+  const hasActiveFilters = getActiveFilterBadges.length > 0;
+
   const handleTimePeriodChange = async (period: TimePeriod) => {
     setTimePeriod(period);
     
@@ -1279,17 +1390,186 @@ const CursorHomepage: React.FC = () => {
         margin: '0 auto',
         padding: '0 16px'
       }}>
-        {/* Minimal header with year quick filters and generative filters */}
-
-        {/* Show loading indicator inline if still loading */}
-        {loading && filteredVehicles.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px', fontSize: '9pt', color: 'var(--text-muted)' }}>
-            Loading vehicles...
+        {/* Sticky Filter Bar - Shows when filters are active and minimized */}
+        {hasActiveFilters && filterBarMinimized && (
+          <div style={{
+            position: 'sticky',
+            top: 0,
+            background: 'var(--surface)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid var(--border)',
+            padding: '8px 12px',
+            marginBottom: '12px',
+            zIndex: 100,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '6px',
+            alignItems: 'center'
+          }}>
+            <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--text)', marginRight: '4px' }}>
+              {filteredVehicles.length} vehicles
+            </div>
+            {getActiveFilterBadges.map((badge, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 6px',
+                  background: 'var(--grey-200)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '2px',
+                  fontSize: '7pt',
+                  fontFamily: '"MS Sans Serif", sans-serif'
+                }}
+              >
+                <span>{badge.label}</span>
+                {badge.onRemove && (
+                  <button
+                    onClick={badge.onRemove}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '0',
+                      margin: 0,
+                      cursor: 'pointer',
+                      fontSize: '8pt',
+                      lineHeight: 1,
+                      color: 'var(--text-muted)',
+                      fontWeight: 'bold'
+                    }}
+                    title="Remove filter"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                setFilterBarMinimized(false);
+                setShowFilters(true);
+              }}
+              style={{
+                marginLeft: 'auto',
+                padding: '2px 6px',
+                fontSize: '7pt',
+                border: '1px solid var(--border)',
+                background: 'var(--grey-200)',
+                color: 'var(--text)',
+                cursor: 'pointer',
+                borderRadius: '2px',
+                fontFamily: '"MS Sans Serif", sans-serif'
+              }}
+            >
+              Show Filters
+            </button>
           </div>
         )}
 
-        {/* Filter Panel - REMOVED - no filters on homepage */}
-            {/* Year Quick Filters - Collapsible (also in filter panel) */}
+        {/* Show Filters Button - only when filters are hidden and no active filters */}
+        {!showFilters && !hasActiveFilters && (
+          <div style={{
+            marginBottom: '16px',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            alignItems: 'center'
+          }}>
+            <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+              {filteredVehicles.length} vehicles
+            </div>
+            <button
+              onClick={() => setShowFilters(true)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '8pt',
+                border: '1px solid var(--border)',
+                background: 'var(--white)',
+                color: 'var(--text)',
+                cursor: 'pointer',
+                borderRadius: '2px',
+                fontFamily: '"MS Sans Serif", sans-serif'
+              }}
+            >
+              Show Filters
+            </button>
+          </div>
+        )}
+
+        {/* Filter Panel - Collapsible with integrated header */}
+        {showFilters && (
+          <div style={{
+            background: 'var(--white)',
+            border: '1px solid var(--border)',
+            padding: '12px',
+            marginBottom: '16px',
+            fontSize: '8pt'
+          }}>
+            {/* Header with vehicle count and controls */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px',
+              alignItems: 'center',
+              marginBottom: '12px',
+              paddingBottom: '8px',
+              borderBottom: '1px solid var(--border)'
+            }}>
+              <div style={{ fontSize: '9pt', fontWeight: 700, color: 'var(--text)' }}>
+                {filteredVehicles.length} vehicles
+              </div>
+              
+              {/* Thermal Pricing Toggle */}
+              <button
+                onClick={() => setThermalPricing(!thermalPricing)}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '8pt',
+                  border: '1px solid var(--border)',
+                  background: thermalPricing ? 'var(--grey-600)' : 'var(--white)',
+                  color: thermalPricing ? 'var(--white)' : 'var(--text)',
+                  cursor: 'pointer',
+                  borderRadius: '2px',
+                  transition: 'all 0.12s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontFamily: '"MS Sans Serif", sans-serif'
+                }}
+                title="Thermal Pricing: Red = Good Deal, Purple = Bad Price"
+              >
+                <span>🔥</span>
+                <span>Thermal</span>
+              </button>
+              
+              {/* Hide Filters Button */}
+              <button
+                onClick={() => {
+                  setShowFilters(false);
+                  if (hasActiveFilters) {
+                    setFilterBarMinimized(true);
+                  }
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '8pt',
+                  border: '1px solid var(--border)',
+                  background: 'var(--grey-600)',
+                  color: 'var(--white)',
+                  cursor: 'pointer',
+                  borderRadius: '2px',
+                  fontFamily: '"MS Sans Serif", sans-serif',
+                  marginLeft: 'auto'
+                }}
+              >
+                Hide Filters
+              </button>
+            </div>
+            
+            {/* Year Quick Filters - Collapsible */}
             <div style={{ marginBottom: '12px' }}>
               <div 
                 onClick={() => toggleCollapsedSection('yearQuickFilters')}
@@ -1338,7 +1618,8 @@ const CursorHomepage: React.FC = () => {
                           background: isActive ? 'var(--grey-600)' : 'var(--white)',
                           color: isActive ? 'var(--white)' : 'var(--text)',
                           cursor: 'pointer',
-                          borderRadius: '2px'
+                          borderRadius: '2px',
+                          fontFamily: '"MS Sans Serif", sans-serif'
                         }}
                       >
                         {range.label}
@@ -1370,7 +1651,8 @@ const CursorHomepage: React.FC = () => {
                       width: '70px',
                       padding: '4px 6px',
                       border: '1px solid var(--border)',
-                      fontSize: '8pt'
+                      fontSize: '8pt',
+                      fontFamily: '"MS Sans Serif", sans-serif'
                     }}
                   />
                   <span>–</span>
@@ -1385,7 +1667,8 @@ const CursorHomepage: React.FC = () => {
                       width: '70px',
                       padding: '4px 6px',
                       border: '1px solid var(--border)',
-                      fontSize: '8pt'
+                      fontSize: '8pt',
+                      fontFamily: '"MS Sans Serif", sans-serif'
                     }}
                   />
                 </div>
@@ -1408,39 +1691,39 @@ const CursorHomepage: React.FC = () => {
                   <span style={{ fontSize: '8pt' }}>{collapsedSections.priceFilters ? '▼' : '▲'}</span>
                 </div>
                 {!collapsedSections.priceFilters && (
-                  <>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="Min"
-                    value={filters.priceMin || ''}
-                    onChange={(e) => setFilters({...filters, priceMin: e.target.value ? parseInt(e.target.value) : null})}
-                    style={{
-                      width: '80px',
-                      padding: '4px 6px',
-                      border: '1px solid var(--border)',
-                      fontSize: '8pt'
-                    }}
-                  />
-                  <span>–</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="Max"
-                    value={filters.priceMax || ''}
-                    onChange={(e) => setFilters({...filters, priceMax: e.target.value ? parseInt(e.target.value) : null})}
-                    style={{
-                      width: '80px',
-                      padding: '4px 6px',
-                      border: '1px solid var(--border)',
-                      fontSize: '8pt'
-                    }}
-                  />
-                </div>
-                  </>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="Min"
+                      value={filters.priceMin || ''}
+                      onChange={(e) => setFilters({...filters, priceMin: e.target.value ? parseInt(e.target.value) : null})}
+                      style={{
+                        width: '80px',
+                        padding: '4px 6px',
+                        border: '1px solid var(--border)',
+                        fontSize: '8pt',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    />
+                    <span>–</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="Max"
+                      value={filters.priceMax || ''}
+                      onChange={(e) => setFilters({...filters, priceMax: e.target.value ? parseInt(e.target.value) : null})}
+                      style={{
+                        width: '80px',
+                        padding: '4px 6px',
+                        border: '1px solid var(--border)',
+                        fontSize: '8pt',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    />
+                  </div>
                 )}
               </div>
 
@@ -1461,40 +1744,40 @@ const CursorHomepage: React.FC = () => {
                   <span style={{ fontSize: '8pt' }}>{collapsedSections.locationFilters ? '▼' : '▲'}</span>
                 </div>
                 {!collapsedSections.locationFilters && (
-                  <>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '4px' }}>
-                  <input
-                    type="text"
-                    placeholder="ZIP code"
-                    value={filters.zipCode}
-                    onChange={(e) => setFilters({...filters, zipCode: e.target.value})}
-                    maxLength={5}
-                    style={{
-                      width: '70px',
-                      padding: '4px 6px',
-                      border: '1px solid var(--border)',
-                      fontSize: '8pt'
-                    }}
-                  />
-                  <span>within</span>
-                  <select
-                    value={filters.radiusMiles}
-                    onChange={(e) => setFilters({...filters, radiusMiles: parseInt(e.target.value)})}
-                    style={{
-                      padding: '4px 6px',
-                      border: '1px solid var(--border)',
-                      fontSize: '8pt'
-                    }}
-                  >
-                    <option value="10">10 mi</option>
-                    <option value="25">25 mi</option>
-                    <option value="50">50 mi</option>
-                    <option value="100">100 mi</option>
-                    <option value="250">250 mi</option>
-                    <option value="500">500 mi</option>
-                  </select>
-                </div>
-                  </>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '4px' }}>
+                    <input
+                      type="text"
+                      placeholder="ZIP code"
+                      value={filters.zipCode}
+                      onChange={(e) => setFilters({...filters, zipCode: e.target.value})}
+                      maxLength={5}
+                      style={{
+                        width: '70px',
+                        padding: '4px 6px',
+                        border: '1px solid var(--border)',
+                        fontSize: '8pt',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    />
+                    <span>within</span>
+                    <select
+                      value={filters.radiusMiles}
+                      onChange={(e) => setFilters({...filters, radiusMiles: parseInt(e.target.value)})}
+                      style={{
+                        padding: '4px 6px',
+                        border: '1px solid var(--border)',
+                        fontSize: '8pt',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    >
+                      <option value="10">10 mi</option>
+                      <option value="25">25 mi</option>
+                      <option value="50">50 mi</option>
+                      <option value="100">100 mi</option>
+                      <option value="250">250 mi</option>
+                      <option value="500">500 mi</option>
+                    </select>
+                  </div>
                 )}
               </div>
 
@@ -1513,7 +1796,8 @@ const CursorHomepage: React.FC = () => {
                     width: '100%',
                     padding: '4px 6px',
                     border: '1px solid var(--border)',
-                    fontSize: '8pt'
+                    fontSize: '8pt',
+                    fontFamily: '"MS Sans Serif", sans-serif'
                   }}
                 />
               </div>
@@ -1536,34 +1820,35 @@ const CursorHomepage: React.FC = () => {
                 </div>
                 {!collapsedSections.statusFilters && (
                   <>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                  <input
-                    type="checkbox"
-                    checked={filters.forSale}
-                    onChange={(e) => setFilters({...filters, forSale: e.target.checked})}
-                  />
-                  <span>For Sale Only</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                  <input
-                    type="checkbox"
-                    checked={filters.hideSold}
-                    onChange={(e) => setFilters({ ...filters, hideSold: e.target.checked })}
-                  />
-                  <span>Hide Sold</span>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                  <input
-                    type="checkbox"
-                    checked={filters.showPending}
-                    onChange={(e) => {
-                      setFilters({...filters, showPending: e.target.checked});
-                    }}
-                  />
-                  <span>Show Pending Vehicles</span>
-                </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.forSale}
+                        onChange={(e) => setFilters({...filters, forSale: e.target.checked})}
+                      />
+                      <span>For Sale Only</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.hideSold}
+                        onChange={(e) => setFilters({ ...filters, hideSold: e.target.checked })}
+                      />
+                      <span>Hide Sold</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
+                      <input
+                        type="checkbox"
+                        checked={filters.showPending}
+                        onChange={(e) => {
+                          setFilters({...filters, showPending: e.target.checked});
+                        }}
+                      />
+                      <span>Show Pending Vehicles</span>
+                    </label>
                   </>
                 )}
+              </div>
 
               {/* Source Filters - Collapsible Section */}
               <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', gridColumn: '1 / -1' }}>
@@ -1636,16 +1921,16 @@ const CursorHomepage: React.FC = () => {
                 )}
               </div>
 
-                <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={infoDense}
-                      onChange={(e) => setInfoDense(e.target.checked)}
-                    />
-                    <span>Info-dense</span>
-                  </label>
-                </div>
+              {/* Info-dense toggle */}
+              <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={infoDense}
+                    onChange={(e) => setInfoDense(e.target.checked)}
+                  />
+                  <span>Info-dense</span>
+                </label>
               </div>
 
               {/* Sort By */}
@@ -1659,7 +1944,8 @@ const CursorHomepage: React.FC = () => {
                     padding: '4px 6px',
                     border: '1px solid var(--border)',
                     fontSize: '8pt',
-                    marginBottom: '4px'
+                    marginBottom: '4px',
+                    fontFamily: '"MS Sans Serif", sans-serif'
                   }}
                 >
                   <option value="newest">Newest First</option>
@@ -1688,7 +1974,7 @@ const CursorHomepage: React.FC = () => {
               {/* Clear Filters */}
               <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                 <button
-                    onClick={() => {
+                  onClick={() => {
                     setFilters(DEFAULT_FILTERS);
                     setSearchText('');
                   }}
@@ -1698,12 +1984,24 @@ const CursorHomepage: React.FC = () => {
                     border: '1px solid var(--border)',
                     cursor: 'pointer',
                     fontSize: '8pt',
-                    fontWeight: 'bold'
+                    fontWeight: 'bold',
+                    fontFamily: '"MS Sans Serif", sans-serif'
                   }}
                 >
                   Reset
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Show loading indicator inline if still loading */}
+        {loading && filteredVehicles.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+            Loading vehicles...
+          </div>
+        )}
+
         {/* Technical View with Sortable Columns */}
         {viewMode === 'technical' && (
           <div style={{ 

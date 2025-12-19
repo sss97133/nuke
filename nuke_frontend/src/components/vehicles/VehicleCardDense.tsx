@@ -999,18 +999,56 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       }}
     >
       {/* Horizontal swipeable image grid (1:1 ratio) */}
-      <div 
+      <div
         style={{
           width: '100%',
           paddingBottom: '100%',
-          background: hasValidImage ? `url(${currentImageUrl}) center/cover no-repeat` : 'transparent',
-          backgroundSize: hasValidImage ? 'cover' : 'auto',
-          backgroundColor: 'transparent',
+          backgroundColor: 'var(--bg)', // Fallback background
           position: 'relative',
+          overflow: 'hidden',
         }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
+        {hasValidImage && currentImageUrl && (
+          <ResilientImage
+            sources={[
+              ...vehicleImages, // All available images for carousel
+              vehicle?.image_variants?.thumbnail,
+              vehicle?.image_variants?.medium,
+              vehicle?.image_variants?.large,
+              primaryFromAllImages,
+              imageUrl,
+              vehicle.primary_image_url,
+              vehicle.image_url,
+            ]}
+            alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
+            fill={true}
+            objectFit="cover"
+            placeholderSrc="/n-zero.png"
+            placeholderOpacity={0.25}
+          />
+        )}
+        {!hasValidImage && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-muted)',
+              fontSize: '9pt',
+              background: 'var(--grey-100)',
+              border: '1px dashed var(--border)'
+            }}
+          >
+            No Image
+          </div>
+        )}
         {/* LIVE badge (kept separate) */}
         {vehicle.is_streaming && (
           <div style={{
