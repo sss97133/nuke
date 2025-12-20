@@ -25,35 +25,20 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
     }
   };
 
-  // Validate leadImageUrl - ensure it's a valid non-empty string
+  // Get the source URL - just use it if it exists
   const src = leadImageUrl ? String(leadImageUrl).trim() : '';
   
-  // Return null if no valid URL (empty, null, undefined, or invalid strings)
-  // This prevents rendering an empty container when there's no image
-  if (!src || 
-      src === 'undefined' || 
-      src === 'null' || 
-      src.length === 0 ||
-      !src.startsWith('http')) {
-    // Don't render anything if no valid image URL - this prevents empty containers
+  // Only return null if we have absolutely nothing
+  if (!src || src === 'undefined' || src === 'null' || src.length === 0) {
     return null;
   }
   
-  // Validate it's actually a URL by trying to construct a URL object
-  try {
-    new URL(src);
-  } catch {
-    // Invalid URL format - don't render
-    return null;
-  }
-  
+  // Build sources array - try to get render URL, fallback to original
   const renderFallback = getSupabaseRenderUrl(src, 1600, 85);
   const sources = [renderFallback, src].filter(Boolean) as string[];
   
-  // Ensure we have at least one valid source
-  if (sources.length === 0) {
-    return null;
-  }
+  // Use the original src if we have no sources (shouldn't happen, but be safe)
+  const finalSources = sources.length > 0 ? sources : [src];
 
   return (
     <>
@@ -76,7 +61,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
           }}
         >
           <ResilientImage
-            sources={sources}
+            sources={finalSources}
             alt="Vehicle hero image"
             fill={true}
             objectFit="contain"

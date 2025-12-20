@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VehicleDataQualityRating from '../../components/VehicleDataQualityRating';
 import URLDataDrop from '../../components/vehicle/URLDataDrop';
@@ -7,6 +7,7 @@ import { BATListingManager } from '../../components/vehicle/BATListingManager';
 import { FaviconIcon } from '../../components/common/FaviconIcon';
 import type { VehicleBasicInfoProps} from './types';
 import { useToast } from '../../components/ui/Toast';
+import { supabase } from '../../lib/supabase';
 
 const CRAIGSLIST_FIELD_KEYS = new Set([
   'fuel_type',
@@ -42,6 +43,57 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       console.error('[VehicleBasicInfo] Error in handleDataPointClick:', error, { fieldName, fieldValue, fieldLabel });
     }
   }, [safeOnDataPointClick]);
+
+  // Check for VIN in image analysis data if vehicle.vin is not set
+  const [vinFromImages, setVinFromImages] = useState<string | null>(null);
+  useEffect(() => {
+    if (vehicle?.vin || !vehicle?.id) {
+      setVinFromImages(null);
+      return;
+    }
+    
+    // Fetch VIN from image analysis metadata
+    const fetchVinFromImages = async () => {
+      try {
+        const { data: images, error } = await supabase
+          .from('vehicle_images')
+          .select('ai_scan_metadata')
+          .eq('vehicle_id', vehicle.id)
+          .not('ai_scan_metadata', 'is', null)
+          .limit(50);
+
+        if (error) return;
+
+        // Look through ai_scan_metadata for VIN
+        for (const img of images || []) {
+          const metadata = img.ai_scan_metadata;
+          if (!metadata) continue;
+
+          // Check vin_tag
+          if (metadata.vin_tag?.vin) {
+            setVinFromImages(metadata.vin_tag.vin);
+            return;
+          }
+
+          // Check spid_data
+          if (metadata.spid_data?.extracted_data?.vin) {
+            setVinFromImages(metadata.spid_data.extracted_data.vin);
+            return;
+          }
+
+          // Check appraiser analysis
+          if (metadata.appraiser?.extracted_data?.vin) {
+            setVinFromImages(metadata.appraiser.extracted_data.vin);
+            return;
+          }
+        }
+      } catch (error) {
+        // Silently fail - this is a nice-to-have
+      }
+    };
+
+    fetchVinFromImages();
+  }, [vehicle?.id, vehicle?.vin]);
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { isVerifiedOwner, hasContributorAccess, contributorRole } = permissions;
@@ -359,11 +411,16 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                handleDataPointClick(e, 'vin', vehicle.vin || '', 'VIN');
+                handleDataPointClick(e, 'vin', vehicle.vin || vinFromImages || '', 'VIN');
               }}
               style={{ cursor: 'pointer' }}
             >
-              {vehicle.vin || 'Not provided'}
+              {vehicle.vin || vinFromImages || 'Not provided'}
+              {vinFromImages && !vehicle.vin && (
+                <span style={{ fontSize: '6pt', color: 'var(--text-muted)', marginLeft: '4px', fontStyle: 'italic' }}>
+                  (from image analysis*)
+                </span>
+              )}
             </span>
           </div>
           <div style={{

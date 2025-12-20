@@ -786,7 +786,9 @@ const VehicleTimeline: React.FC<{
                                     : [];
                                   
                                   // Include activity for this day (photos + auction activity)
-                                  const activityCount = photoDates.get(dayYmd) || 0;
+                                  // Only count photo dates from the target year to prevent cross-year contamination
+                                  const photoYear = yearFromDateOnly(dayYmd);
+                                  const activityCount = (photoYear === targetYear ? photoDates.get(dayYmd) : 0) || 0;
                                   const hours = hoursForDay(dayEvents) + (activityCount > 0 ? Math.min(2, activityCount / 10) : 0);
                                   const clickable = dayEvents.length > 0 || activityCount > 0;
                                   return (
