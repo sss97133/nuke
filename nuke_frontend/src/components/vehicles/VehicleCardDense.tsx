@@ -920,13 +920,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   // Shows multiple images in a grid that user can swipe through
   
   // Fetch images from database if not available in vehicle prop
-  const { primaryImage: dbPrimaryImage, images: dbImages } = useVehicleImages(vehicle.id);
+  const { primaryImage: dbPrimaryImage, images: dbImages, loading: dbImagesLoading } = useVehicleImages(vehicle.id);
   
-  // For grid view, prioritize smaller image variants (thumbnail/medium) for performance
-  // Grid cards are small (180px default), so we don't need full-size images
-  const vehicleImages: string[] = [];
-
-  const isLikelyImageUrl = (url: string) => {
+  // Helper functions
+  const isLikelyImageUrl = React.useCallback((url: string) => {
     const u = String(url || '').trim();
     if (!u) return false;
     // Filter obvious non-image URLs that sometimes sneak in via metadata/link scraping.
@@ -934,10 +931,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     if (u.includes('shareArticle?mini=true')) return false;
     if (u.startsWith('https://') || u.startsWith('http://') || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('/')) return true;
     return false;
-  };
+  }, []);
   
   // Helper to extract URLs from image data objects
-  const extractImageUrls = (imgData: any): string[] => {
+  const extractImageUrls = React.useCallback((imgData: any): string[] => {
     if (!imgData) return [];
     const urls: string[] = [];
     if (imgData.variants?.thumbnail) urls.push(imgData.variants.thumbnail);
@@ -948,64 +945,76 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     if (imgData.medium_url) urls.push(imgData.medium_url);
     if (imgData.large_url) urls.push(imgData.large_url);
     return urls.filter(u => u && isLikelyImageUrl(u));
-  };
+  }, [isLikelyImageUrl]);
   
-  // Prioritize image variants for grid performance (thumbnail -> medium -> full)
-  // This significantly improves load times since we load ~200px images instead of full-size
-  if (vehicle.image_variants) {
-    if (vehicle.image_variants.thumbnail && isLikelyImageUrl(vehicle.image_variants.thumbnail)) {
-      vehicleImages.push(vehicle.image_variants.thumbnail);
+  // Build vehicle images array reactively - recalculates when hook data changes
+  const vehicleImages = React.useMemo(() => {
+    const images: string[] = [];
+    
+    // Prioritize image variants for grid performance (thumbnail -> medium -> full)
+    // This significantly improves load times since we load ~200px images instead of full-size
+    if (vehicle.image_variants) {
+      if (vehicle.image_variants.thumbnail && isLikelyImageUrl(vehicle.image_variants.thumbnail)) {
+        images.push(vehicle.image_variants.thumbnail);
+      }
+      if (vehicle.image_variants.medium && isLikelyImageUrl(vehicle.image_variants.medium)) {
+        images.push(vehicle.image_variants.medium);
+      }
     }
-    if (vehicle.image_variants.medium && isLikelyImageUrl(vehicle.image_variants.medium)) {
-      vehicleImages.push(vehicle.image_variants.medium);
-    }
-  }
-  
-  // Use all_images array as fallback (already contains optimized URLs from homepage)
-  if (vehicle.all_images && vehicle.all_images.length > 0) {
-    const urls = vehicle.all_images
-      .map(img => img.url || (img as any).thumbnail_url || (img as any).medium_url)
-      .filter((u) => !!u && isLikelyImageUrl(String(u)));
-    vehicleImages.push(...urls.filter(url => !vehicleImages.includes(url)));
-  }
-  
-  // Add images from database hook (primary first, then others)
-  if (dbPrimaryImage) {
-    const dbUrls = extractImageUrls(dbPrimaryImage);
-    dbUrls.forEach(url => {
-      if (!vehicleImages.includes(url)) vehicleImages.push(url);
-    });
-  }
-  
-  // Add other database images
-  if (dbImages && dbImages.length > 0) {
-    dbImages.forEach(img => {
-      const dbUrls = extractImageUrls(img);
-      dbUrls.forEach(url => {
-        if (!vehicleImages.includes(url)) vehicleImages.push(url);
+    
+    // Use all_images array as fallback (already contains optimized URLs from homepage)
+    if (vehicle.all_images && vehicle.all_images.length > 0) {
+      const urls = vehicle.all_images
+        .map(img => img.url || (img as any).thumbnail_url || (img as any).medium_url)
+        .filter((u) => !!u && isLikelyImageUrl(String(u)));
+      urls.forEach(url => {
+        if (!images.includes(url)) images.push(url);
       });
-    });
-  }
+    }
+    
+    // Add images from database hook (primary first, then others)
+    // This is reactive - will update when hook finishes loading
+    if (dbPrimaryImage) {
+      const dbUrls = extractImageUrls(dbPrimaryImage);
+      dbUrls.forEach(url => {
+        if (!images.includes(url)) images.push(url);
+      });
+    }
+    
+    // Add other database images
+    if (dbImages && dbImages.length > 0) {
+      dbImages.forEach(img => {
+        const dbUrls = extractImageUrls(img);
+        dbUrls.forEach(url => {
+          if (!images.includes(url)) images.push(url);
+        });
+      });
+    }
+    
+    // Fallback to primary_image_url (prefer medium/thumbnail if available)
+    if (vehicle.primary_image_url && isLikelyImageUrl(vehicle.primary_image_url) && !images.includes(vehicle.primary_image_url)) {
+      images.push(vehicle.primary_image_url);
+    }
+    
+    // Last resort: image_url
+    if (vehicle.image_url && isLikelyImageUrl(vehicle.image_url) && !images.includes(vehicle.image_url)) {
+      images.push(vehicle.image_url);
+    }
+    
+    return images;
+  }, [vehicle.image_variants, vehicle.all_images, vehicle.primary_image_url, vehicle.image_url, dbPrimaryImage, dbImages, isLikelyImageUrl, extractImageUrls]);
   
-  // Fallback to primary_image_url (prefer medium/thumbnail if available)
-  if (vehicle.primary_image_url && isLikelyImageUrl(vehicle.primary_image_url) && !vehicleImages.includes(vehicle.primary_image_url)) {
-    vehicleImages.push(vehicle.primary_image_url);
-  }
-  
-  // Last resort: image_url
-  if (vehicle.image_url && isLikelyImageUrl(vehicle.image_url) && !vehicleImages.includes(vehicle.image_url)) {
-    vehicleImages.push(vehicle.image_url);
-  }
-  
-  // Get current image URL (prefer thumbnail/medium for grid)
-  let currentImageUrl = vehicleImages[currentImageIndex] || vehicleImages[0] || null;
-  
-  // CRITICAL FIX: If still no URL, check imageUrl from getImageUrl() as last resort
-  if (!currentImageUrl) {
-    currentImageUrl = imageUrl && isLikelyImageUrl(imageUrl) ? imageUrl : null;
-  }
+  // Get current image URL (prefer thumbnail/medium for grid) - reactive to vehicleImages changes
+  const currentImageUrl = React.useMemo(() => {
+    const url = vehicleImages[currentImageIndex] || vehicleImages[0] || null;
+    if (url) return url;
+    // CRITICAL FIX: If still no URL, check imageUrl from getImageUrl() as last resort
+    return imageUrl && isLikelyImageUrl(imageUrl) ? imageUrl : null;
+  }, [vehicleImages, currentImageIndex, imageUrl, isLikelyImageUrl]);
 
-  const hasValidImage = !!(currentImageUrl && isLikelyImageUrl(currentImageUrl));
+  const hasValidImage = React.useMemo(() => {
+    return !!(currentImageUrl && isLikelyImageUrl(currentImageUrl));
+  }, [currentImageUrl, isLikelyImageUrl]);
   
   
   
@@ -1063,10 +1072,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {hasValidImage && currentImageUrl && (
+        {(hasValidImage || vehicleImages.length > 0 || dbImagesLoading) && (
           <ResilientImage
             sources={[
-              ...vehicleImages, // All available images for carousel (includes DB images)
+              ...vehicleImages, // All available images for carousel (includes DB images, reactive)
               // Additional fallbacks
               vehicle?.image_variants?.thumbnail,
               vehicle?.image_variants?.medium,
@@ -1075,7 +1084,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               imageUrl,
               vehicle.primary_image_url,
               vehicle.image_url,
-              // Database images as explicit fallbacks
+              // Database images as explicit fallbacks (reactive)
               ...(dbPrimaryImage ? extractImageUrls(dbPrimaryImage) : []),
               ...(dbImages || []).flatMap(img => extractImageUrls(img)),
             ]}
@@ -1086,7 +1095,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             placeholderOpacity={0.25}
           />
         )}
-        {!hasValidImage && (
+        {!hasValidImage && !dbImagesLoading && vehicleImages.length === 0 && (
           <div
             style={{
               position: 'absolute',

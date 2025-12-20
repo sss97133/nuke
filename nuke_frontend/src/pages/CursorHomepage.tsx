@@ -706,6 +706,33 @@ const CursorHomepage: React.FC = () => {
     return n;
   }, [filters, debouncedSearchText]);
 
+  // Calculate filtered vehicle statistics
+  const filteredStats = useMemo(() => {
+    const totalVehicles = filteredVehicles.length;
+    const totalValue = filteredVehicles.reduce((sum, v) => {
+      const value = v.current_value || v.display_price || 0;
+      return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+    }, 0);
+    const salesVolume = filteredVehicles
+      .filter(v => v.is_for_sale)
+      .reduce((sum, v) => {
+        const price = v.display_price || v.asking_price || v.sale_price || 0;
+        return sum + (typeof price === 'number' && Number.isFinite(price) ? price : 0);
+      }, 0);
+    
+    return { totalVehicles, totalValue, salesVolume };
+  }, [filteredVehicles]);
+
+  // Format currency values for display
+  const formatCurrency = (value: number): string => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(0)}K`;
+    }
+    return `$${value.toLocaleString()}`;
+  };
+
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
     setSession(currentSession);
@@ -1523,7 +1550,7 @@ const CursorHomepage: React.FC = () => {
             marginBottom: '16px',
             fontSize: '8pt'
           }}>
-            {/* Header with vehicle count and controls */}
+            {/* Header with vehicle stats and controls */}
             <div style={{
               display: 'flex',
               flexWrap: 'wrap',
@@ -1533,32 +1560,27 @@ const CursorHomepage: React.FC = () => {
               paddingBottom: '8px',
               borderBottom: '1px solid var(--border)'
             }}>
-              <div style={{ fontSize: '9pt', fontWeight: 700, color: 'var(--text)' }}>
-                {filteredVehicles.length} vehicles
-              </div>
-              
-              {/* Thermal Pricing Toggle */}
-              <button
-                onClick={() => setThermalPricing(!thermalPricing)}
+              <div
+                onClick={() => navigate('/market/movement')}
                 style={{
-                  padding: '4px 8px',
-                  fontSize: '8pt',
-                  border: '1px solid var(--border)',
-                  background: thermalPricing ? 'var(--grey-600)' : 'var(--white)',
-                  color: thermalPricing ? 'var(--white)' : 'var(--text)',
+                  fontSize: '9pt',
+                  fontWeight: 700,
+                  color: 'var(--text)',
                   cursor: 'pointer',
-                  borderRadius: '2px',
-                  transition: 'all 0.12s',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontFamily: '"MS Sans Serif", sans-serif'
+                  flexDirection: 'column',
+                  gap: '2px'
                 }}
-                title="Thermal Pricing: Red = Good Deal, Purple = Bad Price"
+                title="Click to view market movement page"
               >
-                <span>🔥</span>
-                <span>Thermal</span>
-              </button>
+                <div>{filteredStats.totalVehicles.toLocaleString()} vehicles</div>
+                <div style={{ fontSize: '8pt', fontWeight: 400, color: 'var(--text-muted)' }}>
+                  {formatCurrency(filteredStats.totalValue)} total value
+                </div>
+                <div style={{ fontSize: '8pt', fontWeight: 400, color: 'var(--text-muted)' }}>
+                  {formatCurrency(filteredStats.salesVolume)} sales volume
+                </div>
+              </div>
               
               {/* Hide Filters Button */}
               <button
@@ -1936,15 +1958,23 @@ const CursorHomepage: React.FC = () => {
                 )}
               </div>
 
-              {/* Info-dense toggle */}
+              {/* Display Toggles */}
               <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
                   <input
                     type="checkbox"
                     checked={infoDense}
                     onChange={(e) => setInfoDense(e.target.checked)}
                   />
                   <span>Info-dense</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={thermalPricing}
+                    onChange={(e) => setThermalPricing(e.target.checked)}
+                  />
+                  <span>Thermal Pricing</span>
                 </label>
               </div>
 
