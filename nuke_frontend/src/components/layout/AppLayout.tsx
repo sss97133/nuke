@@ -75,8 +75,63 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
         if (error || !data) return;
 
         const identity = getVehicleIdentityParts(data as any);
-        const nextTitle = [...identity.primary, ...identity.differentiators].join(' ').trim();
-        if (!nextTitle) return;
+        let nextTitle = [...identity.primary, ...identity.differentiators].join(' ').trim();
+        
+        // Final sanitization pass to remove any remaining BaT contamination
+        if (nextTitle) {
+          // Remove BaT listing patterns that might have slipped through
+          nextTitle = nextTitle.replace(/\s*for sale on BaT Auctions?\s*/gi, ' ').trim();
+          nextTitle = nextTitle.replace(/\s*sold for \$[\d,]+ on [A-Z][a-z]+ \d{1,2}, \d{4}\s*/gi, ' ').trim();
+          nextTitle = nextTitle.replace(/\s*\(Lot\s*#[\d,]+\s*\)\s*/gi, ' ').trim();
+          nextTitle = nextTitle.replace(/\s*\|\s*Bring a Trailer\s*/gi, ' ').trim();
+          nextTitle = nextTitle.replace(/\s*on bringatrailer\.com\s*/gi, ' ').trim();
+          
+          // Remove "Euro" prefix that's often contamination
+          nextTitle = nextTitle.replace(/^\s*Euro\s+/i, ' ').trim();
+          
+          // Remove duplicate year/make/model patterns
+          // Pattern: "1973 BMW 3.0CSi ... Euro 1973 BMW 3.0CSi" -> "1973 BMW 3.0CSi"
+          const year = data.year ? String(data.year) : null;
+          const make = String(data.make || '').trim();
+          if (year && make) {
+            // Look for duplicate YMM pattern
+            const escapedMake = make.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const ymmRegex = new RegExp(`\\b${year}\\s+${escapedMake}\\b`, 'gi');
+            const matches = Array.from(nextTitle.matchAll(ymmRegex));
+            if (matches.length > 1) {
+              // Find where the first YMM pattern ends and check if there's a duplicate after
+              const firstMatchEnd = matches[0].index + matches[0][0].length;
+              const afterFirstYMM = nextTitle.slice(firstMatchEnd).trim();
+              // If there's another year+make pattern after, remove everything from that point
+              if (afterFirstYMM.match(ymmRegex)) {
+                // Keep only the first YMM + model (everything up to but not including the duplicate)
+                const secondMatchIndex = nextTitle.indexOf(matches[1][0], firstMatchEnd);
+                if (secondMatchIndex > 0) {
+                  nextTitle = nextTitle.slice(0, secondMatchIndex).trim();
+                }
+              }
+            }
+          }
+          
+          // Remove any remaining "for sale" or "sold for" patterns at the end
+          nextTitle = nextTitle.replace(/\s*-\s*sold for.*$/i, '').trim();
+          nextTitle = nextTitle.replace(/\s+for sale.*$/i, '').trim();
+          nextTitle = nextTitle.replace(/\s+-\s+.*$/i, '').trim(); // Remove any trailing " - " patterns
+          
+          // Collapse whitespace
+          nextTitle = nextTitle.replace(/\s+/g, ' ').trim();
+          
+          // If title is still suspiciously long (>50 chars) and contains price/sale patterns, truncate aggressively
+          if (nextTitle.length > 50 && (nextTitle.includes('$') || nextTitle.toLowerCase().includes('sold'))) {
+            // Try to find a clean break point (end of model name)
+            const cleanBreak = nextTitle.search(/\s+(?:for sale|sold|-\s*\$\d|\(Lot)/i);
+            if (cleanBreak > 0 && cleanBreak < nextTitle.length) {
+              nextTitle = nextTitle.slice(0, cleanBreak).trim();
+            }
+          }
+        }
+        
+        if (!nextTitle || nextTitle.length < 3) return;
         openVehicleTab({ vehicleId: activeVehicleId, title: nextTitle });
       } catch {
         // ignore

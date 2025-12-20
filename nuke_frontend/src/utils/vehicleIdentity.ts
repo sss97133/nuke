@@ -100,7 +100,10 @@ export function sanitizeIdentityToken(raw: unknown, ctx?: { year?: number | null
   if (s.length > 80) return '';
   // If it still contains listing contamination keywords, return empty
   if (s.toLowerCase().includes('for sale') && s.toLowerCase().includes('sold for')) return '';
+  if (s.toLowerCase().includes('for sale') && s.match(/\$\d+/)) return ''; // "for sale" + price = contaminated
   if (s.toLowerCase().includes('auction') && (s.includes('$') || s.match(/Lot\s*#/i))) return '';
+  // Remove "Euro" prefix that's often part of BaT contamination
+  s = s.replace(/^\s*Euro\s+/i, '').trim();
   return s;
 }
 
