@@ -29,10 +29,21 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
   const src = leadImageUrl ? String(leadImageUrl).trim() : '';
   
   // Return null if no valid URL (empty, null, undefined, or invalid strings)
-  if (!src || src === 'undefined' || src === 'null' || !src.startsWith('http')) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[VehicleHeroImage] Invalid leadImageUrl, not rendering:', { leadImageUrl, src });
-    }
+  // This prevents rendering an empty container when there's no image
+  if (!src || 
+      src === 'undefined' || 
+      src === 'null' || 
+      src.length === 0 ||
+      !src.startsWith('http')) {
+    // Don't render anything if no valid image URL - this prevents empty containers
+    return null;
+  }
+  
+  // Validate it's actually a URL by trying to construct a URL object
+  try {
+    new URL(src);
+  } catch {
+    // Invalid URL format - don't render
     return null;
   }
   
