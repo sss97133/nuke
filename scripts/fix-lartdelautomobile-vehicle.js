@@ -121,7 +121,7 @@ async function getExistingImageUrls() {
 /**
  * Import missing images
  */
-async function importImages(imageUrls, _importUserId) {
+async function importImages(imageUrls, importUserId) {
   console.log(`\n📥 Importing ${imageUrls.length} images...`);
   
   const existingUrls = await getExistingImageUrls();
@@ -201,19 +201,18 @@ async function importImages(imageUrls, _importUserId) {
       return { imported, skipped: imageUrls.length - newImages.length, failed };
     }
     
-    // If bulk import failed completely, try fallback
+    // If bulk import failed, log and continue to fallback
     if (imported === 0 && failed > 0) {
-      console.log(`   ⚠️  Bulk import failed (likely schema issue), trying individual import fallback...`);
-      // Continue to fallback code below
-    } else {
-      return { imported, skipped: imageUrls.length - newImages.length, failed };
+      console.log(`   ⚠️  Bulk import failed, trying individual import fallback...`);
     }
   } catch (error) {
     console.error(`   ❌ Error during bulk import: ${error.message}`);
-    console.error(`   📋 Error details:`, error);
     console.log(`   🔄 Falling back to individual import...`);
-    
-    // Fallback: import individually
+  }
+  
+  // Fallback: import individually (runs if bulk import failed or threw error)
+  if (imported === 0 && newImages.length > 0) {
+    console.log(`   📥 Starting individual image import (${newImages.length} images)...`);
     for (let i = 0; i < newImages.length; i++) {
       const url = newImages[i];
       try {
@@ -247,20 +246,27 @@ async function importImages(imageUrls, _importUserId) {
           .from('vehicle-images')
           .getPublicUrl(storagePath);
 
-        // Create image record (user_id can be null for external imports)
+        // Create image record
+        // Note: approval_status has a default value, so we don't need to set it
         const { error: insertError } = await supabase
           .from('vehicle_images')
           .insert({
             vehicle_id: VEHICLE_ID,
             image_url: publicUrl,
             source_url: url,
-            user_id: null, // External imports don't require user_id (backfill-images handles this)
+            user_id: importUserId || null, // Use system user ID if available
             is_primary: i === 0 && imported === 0,
             source: 'lartdelautomobile',
-            taken_at: new Date().toISOString()
+            taken_at: new Date().toISOString(),
+            storage_path: storagePath,
+            filename: fileName,
+            mime_type: response.headers.get('content-type') || 'image/jpeg',
+            file_size: buffer.byteLength
           });
 
         if (insertError) {
+          console.log(`      ❌ Insert error ${i + 1}/${newImages.length}: ${insertError.message}`);
+          console.log(`      📋 Error code: ${insertError.code}, details: ${insertError.details || 'none'}`);
           failed++;
         } else {
           imported++;
@@ -421,8 +427,13 @@ async function main() {
   }
 
   // Step 2: Import missing images
-  // Note: backfill-images doesn't require user_id (can be null for external imports)
-  const importResult = await importImages(images, null);
+  // Get system user ID for imports (user_id is required)
+  const importUserId = await getImportUserId();
+  if (!importUserId) {
+    console.error(`❌ Could not find system user ID for imports`);
+    console.log(`   Attempting import anyway (may fail due to user_id constraint)...`);
+  }
+  const importResult = await importImages(images, importUserId);
   console.log(`\n📊 Import Summary:`);
   console.log(`   Total images available: ${images.length}`);
   console.log(`   Already had: ${importResult.skipped}`);
