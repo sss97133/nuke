@@ -30,6 +30,9 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
   
   // Return null if no valid URL (empty, null, undefined, or invalid strings)
   if (!src || src === 'undefined' || src === 'null' || !src.startsWith('http')) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[VehicleHeroImage] Invalid leadImageUrl, not rendering:', { leadImageUrl, src });
+    }
     return null;
   }
   
