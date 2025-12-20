@@ -414,13 +414,43 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
   const getAutoDisplay = () => {
     if (!vehicle) return { amount: null as number | null, label: '' };
-    // Prefer live auction telemetry (external_listings pulse) when present.
+    
+    // CORRECT PRIORITY ORDER (DO NOT USE current_value):
+    // 1. sale_price (actual sold price)
+    // 2. winning_bid (auction result)
+    // 3. high_bid (RNM auctions)
+    // 4. Live bid (from external_listings/auctionPulse for active auctions)
+    // 5. Current bid (from vehicle, if no external listing)
+    // 6. Asking price (only if for sale)
+    
+    const v = vehicle as any;
+    
+    // 1. Sale price (actual sold price) - highest truth
+    if (typeof vehicle.sale_price === 'number' && vehicle.sale_price > 0) {
+      const outcome = v.auction_outcome;
+      if (outcome === 'sold') {
+        return { amount: vehicle.sale_price, label: 'SOLD FOR' };
+      } else {
+        return { amount: vehicle.sale_price, label: 'Sold for' };
+      }
+    }
+    
+    // 2. Winning bid (auction result)
+    if (typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0) {
+      return { amount: v.winning_bid, label: 'Winning Bid' };
+    }
+    
+    // 3. High bid (RNM auctions)
+    if (typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0) {
+      return { amount: v.high_bid, label: 'High Bid' };
+    }
+    
+    // 4. Live bid from auction telemetry (external_listings pulse)
     try {
       if (auctionPulse?.listing_url) {
         const status = String(auctionPulse.listing_status || '').toLowerCase();
         const isLive = status === 'active' || status === 'live';
         const isSold = status === 'sold';
-        const reserveNotMet = (auctionPulse as any)?.metadata?.reserve_not_met === true;
 
         if (isSold && typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) {
           return { amount: (auctionPulse as any).final_price, label: 'SOLD FOR' };
@@ -428,71 +458,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         if (isLive && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
           return { amount: auctionPulse.current_bid, label: 'Current Bid' };
         }
-        // Ended but not sold: show the high bid when we have it (more truthful than showing an estimate).
-        if (!isLive && !isSold && reserveNotMet) {
-          const hb = typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) ? auctionPulse.current_bid : null;
-          return { amount: hb, label: hb ? 'High Bid' : 'Reserve Not Met' };
-        }
       }
     } catch {
       // ignore
     }
-    // Auction current bid
-    if (vehicle.auction_source && vehicle.bid_count && typeof vehicle.current_bid === 'number') {
+    
+    // 5. Current bid from vehicle (if no external listing)
+    if (typeof vehicle.current_bid === 'number' && Number.isFinite(vehicle.current_bid) && vehicle.current_bid > 0) {
       return { amount: vehicle.current_bid, label: 'Current Bid' };
     }
-    // Asking - allow without source (user-provided intent)
-    if (typeof vehicle.asking_price === 'number') {
+    
+    // 6. Asking price (only if for sale)
+    if (typeof vehicle.asking_price === 'number' && vehicle.asking_price > 0 && (v.is_for_sale === true || String(v.sale_status || '').toLowerCase() === 'for_sale')) {
       return { amount: vehicle.asking_price, label: 'Asking' };
     }
-    // Sold - FACT-BASED: Only show if has verified source (e.g., BAT auction)
-    if (typeof vehicle.sale_price === 'number') {
-      // Check if sale_price has a verified source or BAT URL (BAT URLs are considered verified)
-      const hasVerifiedSource = priceSources.sale_price || !!(vehicle as any).bat_auction_url;
-      
-      if (!hasVerifiedSource) {
-        // No verified source - don't show unverified prices
-        return { amount: null, label: '' };
-      }
-      
-      const outcome = (vehicle as any).auction_outcome;
-      if (outcome === 'sold') {
-        return { amount: vehicle.sale_price, label: 'SOLD FOR' };
-      } else if (outcome === 'reserve_not_met') {
-        // Don't show price for RNM
-        return { amount: null, label: 'Reserve Not Met' };
-      } else {
-        return { amount: vehicle.sale_price, label: 'Sold for' };
-      }
-    }
-    // Reserve Not Met with no sale price
-    if ((vehicle as any).auction_outcome === 'reserve_not_met') {
+    
+    // Reserve Not Met with no price
+    if (v.auction_outcome === 'reserve_not_met') {
       return { amount: null, label: 'Reserve Not Met' };
     }
-    // Estimate - prefer valuation service if available (includes modifications)
-    if (valuation && typeof valuation.estimatedValue === 'number' && valuation.estimatedValue > 0) {
-      return { amount: valuation.estimatedValue, label: 'Estimated Value' };
-    }
-    // Fallback to database current_value - FACT-BASED: Only if has verified source
-    if (typeof vehicle.current_value === 'number') {
-      if (!priceSources.current_value) {
-        // No verified source - don't show unverified estimates
-        return { amount: null, label: '' };
-      }
-      return { amount: vehicle.current_value, label: 'Estimated Value' };
-    }
-    // Purchase - FACT-BASED: Only if has verified source (e.g., receipt)
-    if (typeof vehicle.purchase_price === 'number') {
-      if (!priceSources.purchase_price) {
-        // No verified source - don't show unverified purchase prices
-        return { amount: null, label: '' };
-      }
-      return { amount: vehicle.purchase_price, label: 'Purchase Price' };
-    }
-    // MSRP - manufacturer data is considered verified
-    if (typeof vehicle.msrp === 'number') {
-      return { amount: vehicle.msrp, label: 'Original MSRP' };
-    }
+    
+    // No price available - DO NOT fall back to current_value, purchase_price, msrp, or estimates
     return { amount: null, label: '' };
   };
 
