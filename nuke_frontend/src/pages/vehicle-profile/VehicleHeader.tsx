@@ -1185,9 +1185,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     // Fix numeric model designations like "3 0csi" -> "3.0 CSi"
     // Pattern: single digit, space, digit, lowercase letters (e.g., "3 0csi", "5 30si")
     s = s.replace(/\b(\d)\s+(\d)([a-z]+)\b/gi, (match, d1, d2, suffix) => {
-      // Preserve original case of suffix, but ensure proper capitalization
-      const upperSuffix = suffix.charAt(0).toUpperCase() + suffix.slice(1);
-      return `${d1}.${d2} ${upperSuffix}`;
+      // Handle special BMW model suffixes: "CSi" should have CS uppercase, i lowercase
+      // Other common patterns: "CSI" -> "CSi", "csi" -> "CSi"
+      let formattedSuffix = suffix.toLowerCase();
+      if (formattedSuffix === 'csi') {
+        formattedSuffix = 'CSi';
+      } else {
+        // For other suffixes, capitalize first letter (default behavior)
+        formattedSuffix = suffix.charAt(0).toUpperCase() + suffix.slice(1);
+      }
+      return `${d1}.${d2} ${formattedSuffix}`;
     });
     s = s.replace(/\bending\b[\s\S]*$/i, '').trim();
 
