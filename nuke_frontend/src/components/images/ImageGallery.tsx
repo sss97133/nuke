@@ -114,6 +114,53 @@ const getImportedSourceDomain = (image: any): string | null => {
   }
 };
 
+const parseBatUploadMonth = (url: string): string | null => {
+  try {
+    const m = url.match(/\/wp-content\/uploads\/(\d{4})\/(\d{2})\//);
+    if (!m?.[1] || !m?.[2]) return null;
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    if (!Number.isFinite(y) || !Number.isFinite(mo) || y < 1990 || y > 2100 || mo < 1 || mo > 12) return null;
+    const d = new Date(Date.UTC(y, mo - 1, 1, 0, 0, 0));
+    return d.toISOString();
+  } catch {
+    return null;
+  }
+};
+
+const getEffectiveImageDate = (image: any): { iso: string | null; label: string } => {
+  const createdAt = typeof image?.created_at === 'string' ? image.created_at : null;
+  const takenAt = typeof image?.taken_at === 'string' ? image.taken_at : null;
+  const exif = image?.exif_data || {};
+  const isImported = image?.source === 'external_import' || image?.source === 'bat_import' || image?.source === 'organization_import' || image?.is_external;
+
+  const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
+  const takenMs = takenAt ? new Date(takenAt).getTime() : NaN;
+  const takenLooksSynthetic = Number.isFinite(createdMs) && Number.isFinite(takenMs) && Math.abs(createdMs - takenMs) < 60_000;
+
+  if (takenAt && !isImported) return { iso: takenAt, label: '' };
+
+  if (isImported) {
+    const auctionStart = exif.auction_start_date || exif.listed_date || exif.start_date;
+    const auctionEnd = exif.auction_end_date || exif.end_date;
+    if (auctionStart) return { iso: String(auctionStart), label: ' (Auction)' };
+    if (auctionEnd) return { iso: String(auctionEnd), label: ' (Auction End)' };
+
+    const url = String(image?.image_url || image?.variants?.full || image?.variants?.large || '').trim();
+    if (url.includes('bringatrailer.com/wp-content/uploads/')) {
+      const derived = parseBatUploadMonth(url);
+      if (derived) return { iso: derived, label: ' (BaT)' };
+    }
+
+    if (takenAt && !takenLooksSynthetic) return { iso: takenAt, label: '' };
+    if (createdAt) return { iso: createdAt, label: ' (Uploaded)' };
+    return { iso: null, label: '' };
+  }
+
+  if (takenAt) return { iso: takenAt, label: '' };
+  return { iso: createdAt, label: '' };
+};
+
 const ImageGallery = ({ 
   vehicleId, 
   onImagesUpdated, 

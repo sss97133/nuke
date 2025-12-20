@@ -122,26 +122,43 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   // Use the already-available vehicle fields (or precomputed display_price) to render pricing synchronously.
   const { displayPrice } = React.useMemo(() => {
     const v: any = vehicle as any;
-    const liveBidRaw =
-      (v?.origin_metadata?.live_metrics?.current_bid ?? v?.origin_metadata?.live_metrics?.currentBid ?? null);
-    const liveBid = typeof liveBidRaw === 'number'
-      ? liveBidRaw
-      : Number(String(liveBidRaw || '').replace(/[^\d.]/g, ''));
-    const currentBid = typeof v.current_bid === 'number' ? v.current_bid : Number(String(v.current_bid || '').replace(/[^\d.]/g, ''));
-
+    
+    // Extract all price fields with proper validation
+    const salePrice = typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0 ? v.sale_price : null;
     const winningBid = typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0 ? v.winning_bid : null;
     const highBid = typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0 ? v.high_bid : null;
+    
+    // Live bid from external_listings (already in vehicle data from homepage query)
+    const listingLiveBid = typeof (v as any)?.external_listings?.[0]?.current_bid === 'number' 
+      ? (v as any).external_listings[0].current_bid 
+      : null;
+    const listingStatus = String((v as any)?.external_listings?.[0]?.listing_status || '').toLowerCase();
+    const isLive = listingStatus === 'active' || listingStatus === 'live';
+    const liveBid = (isLive && listingLiveBid && listingLiveBid > 0) ? listingLiveBid : null;
+    
+    // Current bid from vehicle (fallback if no external listing)
+    const currentBid = typeof v.current_bid === 'number' && Number.isFinite(v.current_bid) && v.current_bid > 0 ? v.current_bid : null;
+    
+    // Asking price (only if for sale)
     const asking = (typeof v.asking_price === 'number' && v.asking_price > 0 && (v.is_for_sale === true || String(v.sale_status || '').toLowerCase() === 'for_sale'))
       ? v.asking_price
       : null;
 
+    // CORRECT PRIORITY ORDER (DO NOT USE current_value):
+    // 1. Sale price (actual sold price)
+    // 2. Winning bid (auction result)
+    // 3. High bid (RNM auctions)
+    // 4. Live bid (from external_listings for active auctions)
+    // 5. Current bid (from vehicle, if no external listing)
+    // 6. Asking price (only if for sale)
     const priceValue =
-      (typeof v.display_price === 'number' && Number.isFinite(v.display_price) && v.display_price > 0) ? v.display_price :
-      (typeof v.sale_price === 'number' && v.sale_price > 0) ? v.sale_price :
-      (winningBid ?? highBid) ??
-      (Number.isFinite(currentBid) && currentBid > 0) ? currentBid :
-      (Number.isFinite(liveBid) && liveBid > 0) ? liveBid :
-      asking;
+      salePrice ??
+      winningBid ??
+      highBid ??
+      liveBid ??
+      currentBid ??
+      asking ??
+      null;
 
     const formatted = priceValue ? new Intl.NumberFormat('en-US', {
       style: 'currency',
