@@ -121,7 +121,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         // Check external_listings for comprehensive auction data
         const { data: listing } = await supabase
           .from('external_listings')
-          .select('sold_at, metadata, bid_count, view_count, watcher_count')
+          .select('sold_at, metadata, bid_count, view_count, watcher_count, listing_id')
           .eq('vehicle_id', vehicleId)
           .eq('platform', 'bat')
           .order('sold_at', { ascending: false, nullsLast: true })
@@ -140,10 +140,16 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         
         const saleDate = listing?.sold_at || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date;
         
+        // Extract lot number from multiple possible sources
+        const lotNumber = listing?.metadata?.lot_number || 
+                         listing?.listing_id || 
+                         saleEvent?.metadata?.lot_number ||
+                         null;
+        
         if (listing || saleEvent || saleDate) {
           batAuctionInfo = {
             url: vehicle.bat_auction_url || vehicle?.discovery_url,
-            lot_number: listing?.metadata?.lot_number || saleEvent?.metadata?.lot_number,
+            lot_number: lotNumber,
             sale_date: saleDate
           };
           
@@ -462,8 +468,17 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 {(() => {
                   // Prefer explicit platform label when auction telemetry is present.
                   const platform = String(context?.platform || '').toLowerCase();
-                  if (platform === 'bat') return 'Bring a Trailer';
-                  return provenance ? getSourceLabel(provenance.source) : 'Unknown';
+                  if (platform === 'bat') {
+                    const lotNumber = provenance?.lot_number || batAuctionInfo?.lot_number;
+                    return lotNumber ? `Bring a Trailer (Lot #${lotNumber})` : 'Bring a Trailer';
+                  }
+                  // Check if provenance source already includes lot number
+                  const sourceText = provenance ? getSourceLabel(provenance.source) : 'Unknown';
+                  // If it's a BaT source and we have lot number, ensure it's included
+                  if ((sourceText.includes('Bring a Trailer') || provenance?.source?.includes('Bring a Trailer')) && provenance?.lot_number && !sourceText.includes('Lot #')) {
+                    return `Bring a Trailer (Lot #${provenance.lot_number})`;
+                  }
+                  return sourceText;
                 })()}
               </span>
             </div>
