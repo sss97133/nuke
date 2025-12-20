@@ -14,6 +14,7 @@
 import React, { useState, useEffect } from 'react';
 import { useVehicleImages } from '../hooks/useVehicleImages';
 import { supabase } from '../lib/supabase';
+import ResilientImage from './images/ResilientImage';
 
 interface VehicleThumbnailProps {
   vehicleId: string;
@@ -47,6 +48,46 @@ const getOptimalImageUrl = (imageData: any, size: 'small' | 'medium' | 'large'):
   return imageData.image_url || null;
 };
 
+const buildCandidateUrls = (imageData: any, size: 'small' | 'medium' | 'large'): string[] => {
+  if (!imageData) return [];
+
+  const out: string[] = [];
+  const add = (v: any) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    if (!s) return;
+    if (!out.includes(s)) out.push(s);
+  };
+
+  const variants = imageData?.variants && typeof imageData.variants === 'object' ? imageData.variants : null;
+  if (variants) {
+    if (size === 'small') {
+      add(variants.thumbnail);
+      add(variants.medium);
+      add(variants.large);
+      add(variants.full);
+    } else if (size === 'medium') {
+      add(variants.medium);
+      add(variants.large);
+      add(variants.full);
+      add(variants.thumbnail);
+    } else {
+      add(variants.large);
+      add(variants.full);
+      add(variants.medium);
+      add(variants.thumbnail);
+    }
+  }
+
+  add(imageData.thumbnail_url);
+  add(imageData.medium_url);
+  add(imageData.large_url);
+  add(imageData.image_url);
+
+  // Preserve existing helper's best guess as a last prioritization hint.
+  add(getOptimalImageUrl(imageData, size));
+  return out;
+};
+
 const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
   vehicleId,
   vehicleName = 'Vehicle',
@@ -74,7 +115,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
       // Always fetch vehicle fallback data
       const { data: vehicleData } = await supabase
         .from('vehicles')
-        .select('primary_image_url')
+        .select('primary_image_url, image_url')
         .eq('id', vehicleId)
         .single();
 
@@ -129,6 +170,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
     borderRadius: '4px',
     overflow: 'hidden',
     cursor: onClick ? 'pointer' : 'default',
+    position: 'relative' as const,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'
@@ -138,6 +180,7 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
     borderRadius: '4px',
     overflow: 'hidden',
     cursor: onClick ? 'pointer' : 'default',
+    position: 'relative' as const,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -151,6 +194,29 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
     ? simpleImageUrl || vehicleData?.primary_image_url
     : getOptimalImageUrl(primaryImage, size) || vehicleData?.primary_image_url;
 
+  const candidateUrls = React.useMemo(() => {
+    const urls: string[] = [];
+    const add = (v: any) => {
+      const s = typeof v === 'string' ? v.trim() : '';
+      if (!s) return;
+      if (!urls.includes(s)) urls.push(s);
+    };
+
+    // 1) Primary image (from hook)
+    buildCandidateUrls(primaryImage, size).forEach(add);
+    // 2) A few other recent images (from hook)
+    (images || []).slice(0, 8).forEach((img: any) => {
+      buildCandidateUrls(img, size).forEach(add);
+    });
+    // 3) Simple-mode resolved URL
+    add(simpleImageUrl);
+    // 4) Vehicle record fallbacks
+    add(vehicleData?.primary_image_url);
+    add(vehicleData?.image_url);
+
+    return urls;
+  }, [primaryImage, images, simpleImageUrl, vehicleData?.primary_image_url, vehicleData?.image_url, size]);
+
   if (loading) {
     return (
       <div className={className} style={containerStyle}>
@@ -161,25 +227,17 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
     );
   }
   
-  if (imageUrl) {
+  if (imageUrl || candidateUrls.length > 0) {
     console.log('Rendering image:', imageUrl);
     return (
       <div className={className} style={containerStyle} onClick={onClick}>
-        <img
-          src={imageUrl}
+        <ResilientImage
+          sources={candidateUrls}
           alt={vehicleName}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover'
-          }}
-          onError={(e) => {
-            console.error('Image failed to load:', imageUrl);
-            console.error('Error event:', e);
-          }}
-          onLoad={() => {
-            console.log('Image loaded successfully:', imageUrl);
-          }}
+          fill={true}
+          objectFit="cover"
+          placeholderSrc="/n-zero.png"
+          placeholderOpacity={0.3}
         />
       </div>
     );
