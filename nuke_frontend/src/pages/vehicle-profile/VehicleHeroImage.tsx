@@ -33,12 +33,11 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
     return null;
   }
   
-  // Build sources array - try to get render URL, fallback to original
+  // Build sources array - try to get render URL first for optimization, but always include original as fallback
   const renderFallback = getSupabaseRenderUrl(src, 1600, 85);
-  const sources = [renderFallback, src].filter(Boolean) as string[];
-  
-  // Use the original src if we have no sources (shouldn't happen, but be safe)
-  const finalSources = sources.length > 0 ? sources : [src];
+  // Always include original URL as fallback - ResilientImage will try render URL first, then fall back to original
+  const sources = renderFallback ? [renderFallback, src] : [src];
+  const finalSources = sources.filter(Boolean) as string[];
 
   return (
     <>
