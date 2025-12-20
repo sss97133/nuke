@@ -53,7 +53,7 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
   const current = !failed ? (sourceList[idx] || '') : '';
 
   const baseContainerStyle: React.CSSProperties = fill
-    ? { position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden' }
+    ? { position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }
     : {};
 
   const baseImgStyle: React.CSSProperties = fill
