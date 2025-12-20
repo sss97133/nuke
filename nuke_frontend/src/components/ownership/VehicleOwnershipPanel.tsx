@@ -82,10 +82,20 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
   const [claimProgress, setClaimProgress] = useState<number>(0);
   const [claimSuccessMessage, setClaimSuccessMessage] = useState<string>('');
   const ownershipUploadId = `ownership-upload-${vehicle.id}`;
+  const [buyerInfo, setBuyerInfo] = useState<{ username: string; profileUrl: string; externalIdentityId: string | null } | null>(null);
 
   useEffect(() => {
     loadOwnershipData();
   }, [vehicle.id]);
+
+  // Check for buyer data when claim form opens
+  useEffect(() => {
+    if (showOwnershipForm && session?.user?.id) {
+      loadBuyerInfo();
+    } else {
+      setBuyerInfo(null);
+    }
+  }, [showOwnershipForm, vehicle.id, session?.user?.id]);
 
   const loadOwnershipData = async () => {
     try {
@@ -126,6 +136,81 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
     } catch (error) {
       console.error('Error loading ownership data:', error);
       setModeratorStatus('Error loading');
+    }
+  };
+
+  const loadBuyerInfo = async () => {
+    try {
+      // Try to get buyer username from multiple sources
+      let buyerUsername: string | null = null;
+      let buyerProfileUrl: string | null = null;
+
+      // 1. Check external_listings metadata
+      const { data: listing } = await supabase
+        .from('external_listings')
+        .select('metadata')
+        .eq('vehicle_id', vehicle.id)
+        .eq('platform', 'bat')
+        .order('sold_at', { ascending: false, nullsLast: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (listing?.metadata) {
+        buyerUsername = listing.metadata.buyer_username || listing.metadata.buyer || null;
+        buyerProfileUrl = listing.metadata.buyer_profile_url || 
+                         (buyerUsername ? `https://bringatrailer.com/member/${buyerUsername}/` : null);
+      }
+
+      // 2. Fallback to vehicle origin_metadata
+      if (!buyerUsername && (vehicle as any)?.origin_metadata) {
+        const meta = (vehicle as any).origin_metadata;
+        buyerUsername = meta.bat_buyer || meta.buyer || meta.bat_buyer_username || null;
+        buyerProfileUrl = meta.bat_buyer_profile_url || 
+                         (buyerUsername ? `https://bringatrailer.com/member/${buyerUsername}/` : null);
+      }
+
+      // 3. Check timeline events
+      if (!buyerUsername) {
+        const { data: saleEvent } = await supabase
+          .from('timeline_events')
+          .select('metadata')
+          .eq('vehicle_id', vehicle.id)
+          .in('event_type', ['auction_sale', 'ownership_transfer', 'sold'])
+          .order('event_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (saleEvent?.metadata) {
+          buyerUsername = saleEvent.metadata.buyer_username || saleEvent.metadata.buyer || null;
+        }
+      }
+
+      if (!buyerUsername) {
+        setBuyerInfo(null);
+        return;
+      }
+
+      // Check if external_identity exists and is not claimed by current user
+      const { data: externalIdentity } = await supabase
+        .from('external_identities')
+        .select('id, claimed_by_user_id')
+        .eq('platform', 'bat')
+        .eq('handle', buyerUsername)
+        .maybeSingle();
+
+      // Only show prompt if identity exists and is not claimed by current user
+      if (externalIdentity && externalIdentity.claimed_by_user_id !== session?.user?.id) {
+        setBuyerInfo({
+          username: buyerUsername,
+          profileUrl: buyerProfileUrl || `https://bringatrailer.com/member/${buyerUsername}/`,
+          externalIdentityId: externalIdentity.id
+        });
+      } else {
+        setBuyerInfo(null);
+      }
+    } catch (error) {
+      console.error('Error loading buyer info:', error);
+      setBuyerInfo(null);
     }
   };
 
@@ -566,6 +651,69 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
                 <div className="modal-title">Claim Ownership</div>
               </div>
               <div className="modal-body">
+              {buyerInfo && (
+                <div style={{
+                  marginBottom: '16px',
+                  padding: '12px',
+                  backgroundColor: 'var(--grey-100)',
+                  border: '2px solid var(--accent)',
+                  borderRadius: '4px',
+                  fontSize: '9pt'
+                }}>
+                  <div style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--text)' }}>
+                    Also claim your Bring a Trailer profile?
+                  </div>
+                  <div style={{ marginBottom: '8px', color: 'var(--text-secondary)' }}>
+                    This vehicle was purchased by BaT user <strong>{buyerInfo.username}</strong>. 
+                    If that's you, you can claim your BaT profile to link your auction history and activity.
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <a
+                      href={`/claim-identity?platform=bat&handle=${encodeURIComponent(buyerInfo.username)}&profileUrl=${encodeURIComponent(buyerInfo.profileUrl)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: 'var(--accent)',
+                        color: 'white',
+                        textDecoration: 'none',
+                        borderRadius: '3px',
+                        fontSize: '8pt',
+                        fontWeight: 700,
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'inline-block'
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
+                      Claim BaT Profile
+                    </a>
+                    <a
+                      href={buyerInfo.profileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: 'transparent',
+                        color: 'var(--text-secondary)',
+                        textDecoration: 'underline',
+                        fontSize: '8pt',
+                        border: '1px solid var(--border)',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        display: 'inline-block'
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                    >
+                      View on BaT
+                    </a>
+                  </div>
+                </div>
+              )}
 
               <form onSubmit={async (e) => {
                 e.preventDefault();
