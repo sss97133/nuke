@@ -1141,10 +1141,18 @@ serve(async (req) => {
             image_urls: images,
             image_count: images.length,
           };
-          const primary = images[0] || null;
+          // ROBUST PRIMARY IMAGE SELECTION WITH FALLBACKS
+          // Priority: 1) First valid image from gallery, 2) Existing primary, 3) null (will be set by backfill-images)
+          const primary = images[0] || vrow?.primary_image_url || null;
           const updates: any = { origin_metadata: nextOm, updated_at: new Date().toISOString() };
-          if (!vrow?.primary_image_url && primary) updates.primary_image_url = primary;
-          if (!vrow?.image_url && primary) updates.image_url = primary;
+          
+          // Only set primary if we have a new one and existing is missing
+          // This allows for dynamic primary updates while preventing overwrites of user-set primaries
+          if (primary && !vrow?.primary_image_url) {
+            updates.primary_image_url = primary;
+            updates.image_url = primary;
+          }
+          
           await supabase.from('vehicles').update(updates).eq('id', vehicleId);
         } catch {
           // swallow (non-blocking)

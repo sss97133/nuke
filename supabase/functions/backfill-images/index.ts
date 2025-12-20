@@ -413,6 +413,34 @@ serve(async (req) => {
         results.uploaded++;
         console.log(`Uploaded image ${i + 1}/${image_urls.length}: ${filename}`);
 
+        // UPDATE: Ensure vehicle has primary_image_url set (robust fallback)
+        // After first successful image upload, ensure vehicle.primary_image_url is set
+        if (results.uploaded === 1 && imageRecord?.id) {
+          try {
+            const { data: vehicleCheck } = await supabase
+              .from('vehicles')
+              .select('primary_image_url, image_url')
+              .eq('id', vehicleId)
+              .maybeSingle();
+            
+            // If vehicle has no primary image, set it from this upload
+            if (!vehicleCheck?.primary_image_url) {
+              await supabase
+                .from('vehicles')
+                .update({
+                  primary_image_url: publicUrl,
+                  image_url: publicUrl,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', vehicleId);
+              console.log(`✅ Set vehicle primary_image_url to first uploaded image`);
+            }
+          } catch (updateErr) {
+            // Non-fatal - log but continue
+            console.log(`⚠️  Failed to update vehicle primary_image_url: ${updateErr.message}`);
+          }
+        }
+
         // Run vision analysis if requested
         if (run_analysis && imageRecord) {
           try {

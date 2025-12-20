@@ -96,6 +96,28 @@ function extractGalleryImagesFromHtml(html: string): { urls: string[]; method: s
     );
   };
 
+  // Enhanced noise detection - reject any images that match known BaT noise patterns
+  const isNoise = (u: string): boolean => {
+    const f = u.toLowerCase();
+    return (
+      f.includes('qotw') ||
+      f.includes('winner-template') ||
+      f.includes('weekly-weird') ||
+      f.includes('mile-marker') ||
+      f.includes('podcast') ||
+      f.includes('merch') ||
+      f.includes('dec-merch') ||
+      f.includes('podcast-graphic') ||
+      f.includes('site-post-') ||
+      f.includes('thumbnail-template') ||
+      f.includes('screenshot-') ||
+      f.includes('countries/') ||
+      f.includes('themes/') ||
+      f.includes('assets/img/') ||
+      /\/web-\d{3,}-/i.test(f)
+    );
+  };
+
   // 1) Most reliable: embedded JSON gallery attribute (quote-safe).
   try {
     const m = h.match(/data-gallery-items=(?:"([^"]+)"|'([^']+)')/i);
@@ -109,7 +131,13 @@ function extractGalleryImagesFromHtml(html: string): { urls: string[]; method: s
           const u = it?.large?.url || it?.small?.url;
           if (typeof u !== 'string' || !u.trim()) continue;
           const nu = normalize(u);
-          if (isOk(nu)) urls.push(nu);
+          if (!isOk(nu)) continue;
+          // CRITICAL: Filter noise even from data-gallery-items (defense in depth)
+          if (isNoise(nu)) {
+            console.log(`[batDomMap] Filtered noise image from gallery: ${nu}`);
+            continue;
+          }
+          urls.push(nu);
         }
         const unique = [...new Set(urls)];
         if (unique.length) return { urls: unique, method: 'attr:data-gallery-items' };
