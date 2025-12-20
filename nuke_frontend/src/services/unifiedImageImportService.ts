@@ -237,7 +237,7 @@ function fileToBlob(file: File | Blob | Buffer | Uint8Array): Blob {
  * - External scrapers
  */
 export class UnifiedImageImportService {
-  private static readonly STORAGE_BUCKET = 'vehicle-images';
+  private static readonly STORAGE_BUCKET = 'vehicle-data';
   private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   /**
@@ -339,7 +339,7 @@ export class UnifiedImageImportService {
       let storagePath = customStoragePath;
       if (!storagePath) {
         if (vehicleId) {
-          storagePath = `${vehicleId}/${uniqueId}.${fileExt}`;
+          storagePath = `vehicles/${vehicleId}/${category}/${uniqueId}.${fileExt}`;
         } else if (photographerId) {
           storagePath = `${photographerId}/unorganized/${uniqueId}.${fileExt}`;
         } else {
@@ -372,7 +372,7 @@ export class UnifiedImageImportService {
           if (optimizationResult.success && optimizationResult.variantBlobs) {
             for (const [sizeName, blob] of Object.entries(optimizationResult.variantBlobs)) {
               const variantPath = vehicleId 
-                ? `${vehicleId}/${uniqueId}_${sizeName}.jpg`
+                ? `vehicles/${vehicleId}/${category}/${uniqueId}_${sizeName}.jpg`
                 : `${photographerId}/unorganized/${uniqueId}_${sizeName}.jpg`;
 
               const { error: variantError } = await supabase.storage
