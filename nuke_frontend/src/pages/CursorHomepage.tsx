@@ -232,7 +232,6 @@ const DEFAULT_FILTERS: FilterState = {
   priceMax: null,
   hasImages: false,
   forSale: false,
-  // NO preselected filters - let users choose what they want to see
   hideSold: false,
   hideDealerListings: false,
   hideCraigslist: false,
@@ -241,7 +240,7 @@ const DEFAULT_FILTERS: FilterState = {
   hideBat: false,
   hideClassic: false,
   zipCode: '',
-  radiusMiles: 0, // No default radius - user must explicitly set location
+  radiusMiles: 50, // Default to 50 miles as requested
   showPending: false
 };
 
@@ -344,7 +343,7 @@ const CursorHomepage: React.FC = () => {
       return 'desc';
     }
   });
-  const [showFilters, setShowFilters] = useState<boolean>(false); // Always hidden by default - NO preselected filters
+  const [showFilters, setShowFilters] = useState<boolean>(true); // Visible by default
   const [generativeFilters, setGenerativeFilters] = useState<string[]>([]); // Track active generative filters
   // Start with completely clean filters - no saved state, no defaults
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
@@ -389,6 +388,7 @@ const CursorHomepage: React.FC = () => {
     priceFilters: false,
     statusFilters: false,
     locationFilters: false,
+    advancedFilters: true, // Advanced filters collapsed by default
   });
 
   const hasActiveFilters = useMemo(() => {
@@ -722,6 +722,73 @@ const CursorHomepage: React.FC = () => {
     
     return { totalVehicles, totalValue, salesVolume };
   }, [filteredVehicles]);
+
+  // Add state for database-wide stats (around line 370, after existing stats state)
+  const [dbStats, setDbStats] = useState({
+    totalVehicles: 0,
+    totalValue: 0,
+    salesVolume: 0
+  });
+  const [dbStatsLoading, setDbStatsLoading] = useState(true);
+
+  // Add function to load database-wide stats (around line 726, before loadSession)
+  const loadDatabaseStats = async () => {
+    try {
+      setDbStatsLoading(true);
+      
+      // Get total vehicle count
+      const { count: totalCount } = await supabase
+        .from('vehicles')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_public', true)
+        .neq('status', 'pending');
+      
+      // Get total value - we'll need to fetch vehicles with values to calculate
+      const { data: allVehicles } = await supabase
+        .from('vehicles')
+        .select('current_value, display_price, sale_price, asking_price, is_for_sale')
+        .eq('is_public', true)
+        .neq('status', 'pending');
+      
+      const totalValue = (allVehicles || []).reduce((sum, v) => {
+        const value = v.current_value || v.display_price || 0;
+        return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+      }, 0);
+      
+      const salesVolume = (allVehicles || [])
+        .filter(v => v.is_for_sale)
+        .reduce((sum, v) => {
+          const price = v.display_price || v.asking_price || v.sale_price || 0;
+          return sum + (typeof price === 'number' && Number.isFinite(price) ? price : 0);
+        }, 0);
+      
+      setDbStats({
+        totalVehicles: totalCount || 0,
+        totalValue,
+        salesVolume
+      });
+    } catch (error) {
+      console.error('Error loading database stats:', error);
+    } finally {
+      setDbStatsLoading(false);
+    }
+  };
+
+  // Update useEffect to load DB stats on mount (around line 510, add to existing useEffect or create new one)
+  useEffect(() => {
+    loadDatabaseStats();
+  }, []);
+
+  // Update filteredStats to show DB stats when no filters, filtered stats when filters active
+  const displayStats = useMemo(() => {
+    if (!hasActiveFilters && !debouncedSearchText) {
+      // Show database-wide stats when no filters
+      return dbStats;
+    } else {
+      // Show filtered stats when filters are active
+      return filteredStats;
+    }
+  }, [hasActiveFilters, debouncedSearchText, dbStats, filteredStats]);
 
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
