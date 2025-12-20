@@ -385,13 +385,21 @@ const EditVehicle: React.FC = () => {
       delete updateData.documentId;
 
       // Update vehicle directly using Supabase (consistent with other components)
-      const { error: updateError } = await supabase
+      const { data: updated, error: updateError } = await supabase
         .from('vehicles')
         .update(updateData)
-        .eq('id', vehicleId);
+        .eq('id', vehicleId)
+        .select('id')
+        .maybeSingle();
 
       if (updateError) {
         throw new Error(updateError.message || 'Failed to update vehicle');
+      }
+
+      // When RLS blocks an update, PostgREST can return 0 rows updated.
+      // Treat this as "not found or no permission" to avoid confusing 404s.
+      if (!updated?.id) {
+        throw new Error('Vehicle not found or access denied');
       }
 
       // Create timeline event for the edit
@@ -420,6 +428,8 @@ const EditVehicle: React.FC = () => {
       // Provide more helpful error messages
       if (err.message?.includes('network') || err.message?.includes('Network')) {
         setError('Unable to connect to the server. Please check your internet connection and try again.');
+      } else if (String(err.message || '').toLowerCase().includes('vehicle_images') && String(err.message || '').toLowerCase().includes('does not exist')) {
+        setError('This environment is missing the image tables required by the vehicle pipeline (vehicle_images). Saving is blocked until migrations are applied.');
       } else if (err.message?.includes('permission') || err.message?.includes('denied')) {
         setError('You do not have permission to edit this vehicle.');
       } else {
