@@ -8,8 +8,6 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
   
-  if (!leadImageUrl) return null;
-
   const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality: number = 80): string | null => {
     try {
       const url = String(publicObjectUrl || '').trim();
@@ -27,9 +25,21 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
     }
   };
 
-  const src = String(leadImageUrl || '').trim();
+  // Validate leadImageUrl - ensure it's a valid non-empty string
+  const src = leadImageUrl ? String(leadImageUrl).trim() : '';
+  
+  // Return null if no valid URL (empty, null, undefined, or invalid strings)
+  if (!src || src === 'undefined' || src === 'null' || !src.startsWith('http')) {
+    return null;
+  }
+  
   const renderFallback = getSupabaseRenderUrl(src, 1600, 85);
   const sources = [renderFallback, src].filter(Boolean) as string[];
+  
+  // Ensure we have at least one valid source
+  if (sources.length === 0) {
+    return null;
+  }
 
   return (
     <>

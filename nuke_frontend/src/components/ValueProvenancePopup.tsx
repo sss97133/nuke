@@ -45,6 +45,10 @@ interface Provenance {
   bat_url?: string;
   lot_number?: string;
   sale_date?: string;
+  buyer_name?: string;
+  bid_count?: number;
+  view_count?: number;
+  watcher_count?: number;
 }
 
 export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
@@ -61,6 +65,26 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   const [newValue, setNewValue] = useState(value);
   const [evidence, setEvidence] = useState<any[]>([]);
   const [batAuctionInfo, setBatAuctionInfo] = useState<{ url?: string; lot_number?: string; sale_date?: string } | null>(null);
+  
+  // Helper to calculate days/years since sale
+  const calculateTimeSinceSale = (saleDate: string | null | undefined): string | null => {
+    if (!saleDate) return null;
+    try {
+      const sale = new Date(saleDate);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - sale.getTime());
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays >= 365) {
+        const years = Math.floor(diffDays / 365);
+        const remainingDays = diffDays % 365;
+        return remainingDays > 0 ? `${years} year${years > 1 ? 's' : ''}, ${remainingDays} day${remainingDays !== 1 ? 's' : ''}` : `${years} year${years > 1 ? 's' : ''}`;
+      }
+      return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+    } catch {
+      return null;
+    }
+  };
 
   useEffect(() => {
     loadProvenance();
@@ -89,9 +113,22 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
       
-      // Check timeline_events for sale_price from BAT auctions
+      // Check external_listings and auction_events for sale_price from BAT auctions
       let batAuctionInfo: any = null;
+      let auctionMetrics: { buyer_name?: string; bid_count?: number; view_count?: number; watcher_count?: number } = {};
+      
       if (field === 'sale_price' && (vehicle?.bat_auction_url || vehicle?.discovery_url)) {
+        // Check external_listings for comprehensive auction data
+        const { data: listing } = await supabase
+          .from('external_listings')
+          .select('sold_at, metadata, bid_count, view_count, watcher_count')
+          .eq('vehicle_id', vehicleId)
+          .eq('platform', 'bat')
+          .order('sold_at', { ascending: false, nullsLast: true })
+          .limit(1)
+          .maybeSingle();
+        
+        // Also check timeline_events for sale event
         const { data: saleEvent } = await supabase
           .from('timeline_events')
           .select('event_date, cost_amount, metadata')
@@ -101,11 +138,21 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           .limit(1)
           .maybeSingle();
         
-        if (saleEvent) {
+        const saleDate = listing?.sold_at || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date;
+        
+        if (listing || saleEvent || saleDate) {
           batAuctionInfo = {
             url: vehicle.bat_auction_url || vehicle?.discovery_url,
-            lot_number: saleEvent.metadata?.lot_number,
-            sale_date: saleEvent.event_date || vehicle.bat_sale_date || vehicle.sale_date
+            lot_number: listing?.metadata?.lot_number || saleEvent?.metadata?.lot_number,
+            sale_date: saleDate
+          };
+          
+          // Extract buyer name from metadata
+          auctionMetrics = {
+            buyer_name: listing?.metadata?.buyer || saleEvent?.metadata?.buyer || saleEvent?.metadata?.buyer_username,
+            bid_count: listing?.bid_count,
+            view_count: listing?.view_count,
+            watcher_count: listing?.watcher_count
           };
         }
       }
@@ -129,7 +176,11 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           can_edit: user?.id === latest.profiles?.id,
           bat_url: batAuctionInfo?.url,
           lot_number: batAuctionInfo?.lot_number,
-          sale_date: batAuctionInfo?.sale_date
+          sale_date: batAuctionInfo?.sale_date,
+          buyer_name: auctionMetrics.buyer_name,
+          bid_count: auctionMetrics.bid_count,
+          view_count: auctionMetrics.view_count,
+          watcher_count: auctionMetrics.watcher_count
         });
         if (batAuctionInfo) setBatAuctionInfo(batAuctionInfo);
       } else if (batAuctionInfo && field === 'sale_price') {
@@ -144,7 +195,11 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           can_edit: false,
           bat_url: batAuctionInfo.url,
           lot_number: batAuctionInfo.lot_number,
-          sale_date: batAuctionInfo.sale_date
+          sale_date: batAuctionInfo.sale_date,
+          buyer_name: auctionMetrics.buyer_name,
+          bid_count: auctionMetrics.bid_count,
+          view_count: auctionMetrics.view_count,
+          watcher_count: auctionMetrics.watcher_count
         });
         setBatAuctionInfo(batAuctionInfo);
         // Add BAT info as evidence
@@ -428,20 +483,77 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             </div>
           </div>
 
-          {/* Inserted By */}
+          {/* Inserted By - Show only inserter name, rest in hover */}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
               Inserted By
             </div>
-            <div style={{ fontSize: '9pt' }}>
+            <div 
+              style={{ fontSize: '9pt' }}
+              title={(() => {
+                const parts: string[] = [];
+                const inserterName = context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown';
+                if (insertedAtLabel) parts.push(insertedAtLabel);
+                if (!provenance?.can_edit && inserterName) {
+                  parts.push(`Only ${inserterName} can edit this value`);
+                }
+                return parts.length > 0 ? parts.join('\n') : undefined;
+              })()}
+            >
               {context?.inserted_by_name || provenance?.inserted_by_name || 'Unknown'}
-              {insertedAtLabel ? (
-                <span style={{ fontSize: '7pt', color: '#999', marginLeft: '8px' }}>
-                  {insertedAtLabel}
-                </span>
-              ) : null}
             </div>
           </div>
+
+          {/* Sale Date & Buyer (only for sale_price with BaT data) */}
+          {field === 'sale_price' && provenance?.sale_date && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+                Date Sold
+              </div>
+              <div style={{ fontSize: '9pt', fontWeight: 600 }}>
+                {new Date(provenance.sale_date).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                })}
+                {(() => {
+                  const timeSince = calculateTimeSinceSale(provenance.sale_date);
+                  return timeSince ? ` (${timeSince} ago)` : '';
+                })()}
+              </div>
+              {provenance.buyer_name && (
+                <div style={{ fontSize: '9pt', marginTop: '4px', color: 'var(--text-muted)' }}>
+                  To: {provenance.buyer_name}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Auction Metrics (bids, views, watchers) */}
+          {field === 'sale_price' && (provenance?.bid_count !== undefined || provenance?.view_count !== undefined || provenance?.watcher_count !== undefined) && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+                Auction Metrics
+              </div>
+              <div style={{ fontSize: '9pt', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {provenance.bid_count !== undefined && (
+                  <span>
+                    <strong>{provenance.bid_count.toLocaleString()}</strong> {provenance.bid_count === 1 ? 'bid' : 'bids'}
+                  </span>
+                )}
+                {provenance.view_count !== undefined && (
+                  <span>
+                    <strong>{provenance.view_count.toLocaleString()}</strong> {provenance.view_count === 1 ? 'view' : 'views'}
+                  </span>
+                )}
+                {provenance.watcher_count !== undefined && (
+                  <span>
+                    <strong>{provenance.watcher_count.toLocaleString()}</strong> {provenance.watcher_count === 1 ? 'watcher' : 'watchers'}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Evidence (at minimum, the listing URL counts as evidence for auction telemetry) */}
           {(context?.evidence_url || provenance?.bat_url) && (
@@ -592,19 +704,6 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             </div>
           )}
 
-          {/* Read-only for others */}
-          {!provenance?.can_edit && (
-            <div style={{
-              borderTop: '1px solid #e0e0e0',
-              paddingTop: '16px',
-              marginTop: '16px',
-              fontSize: '7pt',
-              color: '#999',
-              fontStyle: 'italic'
-            }}>
-              Only {provenance?.inserted_by_name} can edit this value
-            </div>
-          )}
         </div>
       </div>
     </div>
