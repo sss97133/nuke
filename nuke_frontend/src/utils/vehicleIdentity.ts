@@ -44,14 +44,19 @@ export function sanitizeIdentityToken(raw: unknown, ctx?: { year?: number | null
   s = s.split('|')[0].trim();
 
   // Remove common BaT boilerplate and auction-result tails.
+  s = s.replace(/\bfor sale on BaT Auctions?\b/gi, '').trim();
   s = s.replace(/\bon\s+BaT\s+Auctions\b/gi, '').trim();
   s = s.replace(/\bBaT\s+Auctions\b/gi, '').trim();
   s = s.replace(/\bBring\s+a\s+Trailer\b/gi, '').trim();
   s = s.replace(/\bAuction\s+Result\b/gi, '').trim();
+  s = s.replace(/\bsold for \$[\d,]+ on [A-Z][a-z]+ \d{1,2}, \d{4}\b/gi, '').trim();
   s = s.replace(/\bending\b[\s\S]*$/i, '').trim();
 
   // Remove lot number parenthetical.
   s = s.replace(/\(\s*Lot\s*#.*?\)\s*/gi, ' ').trim();
+  
+  // Remove "| Bring a Trailer" pattern
+  s = s.replace(/\s*\|\s*Bring a Trailer\s*/gi, ' ').trim();
 
   // Remove leading mileage words like "42k-mile".
   s = s.replace(/^\s*\d{1,3}(?:,\d{3})?\s*[kK]\s*[-\s]*mile\s+/i, '').trim();
@@ -91,8 +96,11 @@ export function sanitizeIdentityToken(raw: unknown, ctx?: { year?: number | null
   s = s.replace(/\s+/g, ' ').trim();
   s = s.replace(/[-–—]\s*$/g, '').trim();
 
-  // Guardrails: if it's still a paragraph, treat as unusable.
+  // Guardrails: if it's still a paragraph or contains listing keywords, treat as unusable.
   if (s.length > 80) return '';
+  // If it still contains listing contamination keywords, return empty
+  if (s.toLowerCase().includes('for sale') && s.toLowerCase().includes('sold for')) return '';
+  if (s.toLowerCase().includes('auction') && (s.includes('$') || s.match(/Lot\s*#/i))) return '';
   return s;
 }
 
