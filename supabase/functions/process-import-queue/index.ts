@@ -2347,7 +2347,6 @@ serve(async (req) => {
           }
           const immediateImageUrls = imageUrls.slice(0, MAX_IMAGES_IMMEDIATE);
           const deferredImageUrlsBase = imageUrls.slice(MAX_IMAGES_IMMEDIATE);
-          const failedImmediateUrls: string[] = [];
 
           console.log(`  📸 Processing ${immediateImageUrls.length}/${imageUrls.length} images immediately...`);
           let imagesUploaded = 0;
@@ -2375,105 +2374,50 @@ serve(async (req) => {
             const { data: { user } } = await supabase.auth.getUser();
             importUserId = user?.id || null;
           }
-          
-          for (let i = 0; i < immediateImageUrls.length; i++) {
-            let imageUrl = immediateImageUrls[i];
-            if (typeof imageUrl === 'string' && imageUrl.startsWith('http://res.cloudinary.com/')) {
-              imageUrl = 'https://' + imageUrl.slice('http://'.length);
-            }
+
+          // Delegate image ingestion to backfill-images so storage paths + DB inserts are deterministic and deduped.
+          // This reduces drift (multiple ingestion paths) and prevents partial failures from leaving orphaned storage objects.
+          if (immediateImageUrls.length > 0 && !skip_image_upload) {
             try {
-              // Download image
-              const imageResponse = await fetch(imageUrl, {
-                signal: AbortSignal.timeout(10000)
-              });
-              
-              if (!imageResponse.ok) {
-                console.warn(`    ⚠️ Failed to download image ${i + 1}: HTTP ${imageResponse.status}`);
-                failedImmediateUrls.push(imageUrl);
-                continue;
-              }
-              
-              const imageBlob = await imageResponse.blob();
-              const arrayBuffer = await imageBlob.arrayBuffer();
-              const uint8Array = new Uint8Array(arrayBuffer);
-              
-              // Generate filename
-              const ext = imageUrl.match(/\.(jpg|jpeg|png|webp)$/i)?.[1] || 'jpg';
-              const fileName = `import_queue_${Date.now()}_${i}.${ext}`;
-              const storagePath = `${newVehicle.id}/${fileName}`;
-              
-              // Upload to Supabase Storage
-              const { error: uploadError } = await supabase.storage
-                .from('vehicle-images')
-                .upload(storagePath, uint8Array, {
-                  contentType: `image/${ext}`,
-                  cacheControl: '3600',
-                  upsert: false
-                });
-              
-              if (uploadError) {
-                console.warn(`    ⚠️ Upload error for image ${i + 1}: ${uploadError.message}`);
-                failedImmediateUrls.push(imageUrl);
-                continue;
-              }
-              
-              // Get public URL
-              const { data: { publicUrl } } = supabase.storage
-                .from('vehicle-images')
-                .getPublicUrl(storagePath);
-
-              // Track uploaded URLs so we can run VIN OCR on a small sample if needed.
-              // (Declared later in scope where imageUrls is available.)
-              
-              // Create vehicle_images record immediately
-              const { data: imageData, error: imageInsertError } = await supabase
-                .from('vehicle_images')
-                .insert({
+              await supabase.functions.invoke('backfill-images', {
+                body: {
                   vehicle_id: newVehicle.id,
-                  image_url: publicUrl, // CRITICAL: Set image_url field
-                  user_id: importUserId,
-                  is_primary: i === 0, // First image is primary
-                  // IMPORTANT: `vehicle_images_attribution_check` requires either user_id/ghost_user_id/imported_by
-                  // OR a whitelisted `source`. Edge Functions often have no auth user context, so importUserId can be null.
-                  // Use a whitelisted source to prevent inserts from silently failing.
+                  image_urls: immediateImageUrls,
                   source: organizationId ? 'organization_import' : 'external_import',
-                  source_url: imageUrl,
-                  storage_path: storagePath,
-                  taken_at: new Date().toISOString(),
-                  exif_data: {
-                    source_url: imageUrl,
-                    discovery_url: item.listing_url,
-                    imported_by_user_id: importUserId,
-                    imported_at: new Date().toISOString(),
-                    queue_id: item.id,
-                    listing_status: isSoldListing ? 'sold' : 'in_stock',
-                    dealer_inventory_status: isSoldListing ? 'sold' : 'in_stock',
-                    organization_id: organizationId || null
-                  }
-                })
-                .select('id')
-                .single();
-              
-              if (imageInsertError) {
-                console.warn(`    ⚠️ Failed to create image record ${i + 1}: ${imageInsertError.message}`);
-                failedImmediateUrls.push(imageUrl);
-                continue;
-              }
-
-              uploadedPublicUrls.push(publicUrl);
-              
-              imagesUploaded++;
-              console.log(`    ✅ Uploaded image ${i + 1}/${immediateImageUrls.length}`);
-              
-              // Small delay to avoid rate limiting
-              await new Promise(resolve => setTimeout(resolve, 200));
-              
-            } catch (imgError: any) {
-              console.warn(`    ⚠️ Error processing image ${i + 1}: ${imgError.message}`);
-              continue;
+                  run_analysis: false,
+                  max_images: immediateImageUrls.length,
+                  continue: false,
+                  sleep_ms: isLartFiche ? 150 : 200,
+                  max_runtime_ms: 25000,
+                }
+              });
+            } catch (bfErr: any) {
+              console.warn(`⚠️ Immediate backfill-images failed (non-blocking): ${bfErr.message}`);
             }
           }
-          
+
+          // Pull a small ordered sample of uploaded images for VIN OCR (best-effort).
+          // Rely on position ordering so repeated runs are stable.
+          if (!skip_image_upload && immediateImageUrls.length > 0) {
+            try {
+              const { data: imgRows, error: imgErr } = await supabase
+                .from('vehicle_images')
+                .select('image_url')
+                .eq('vehicle_id', newVehicle.id)
+                .order('position', { ascending: true })
+                .limit(immediateImageUrls.length);
+              if (!imgErr && Array.isArray(imgRows)) {
+                for (const r of imgRows as any[]) {
+                  const u = String(r?.image_url || '').trim();
+                  if (u) uploadedPublicUrls.push(u);
+                }
+                imagesUploaded = uploadedPublicUrls.length;
+              }
+            } catch (e: any) {
+              console.warn(`⚠️ Failed to read uploaded images for VIN OCR (non-blocking): ${e.message}`);
+            }
+          }
+
           console.log(`  ✅ Successfully uploaded ${imagesUploaded}/${immediateImageUrls.length} images`);
 
           // VIN OCR from images (critical for dealer sites that omit VIN in text)
@@ -2544,16 +2488,18 @@ serve(async (req) => {
             console.warn(`⚠️ VIN OCR step failed (non-blocking): ${vinOcrErr.message}`);
           }
 
-          const deferredImageUrls = [...failedImmediateUrls, ...deferredImageUrlsBase].filter(Boolean);
+          const deferredImageUrls = [...deferredImageUrlsBase].filter(Boolean);
 
           // Defer remaining images to background backfill (best-effort).
-          if (deferredImageUrls.length > 0) {
+          if (!skip_image_upload && (deferredImageUrls.length > 0 || immediateImageUrls.length > 0)) {
             try {
+              // Re-submit the full list to backfill-images; it is dedupe-safe via source_url,
+              // so it will skip what we already inserted and retry any failures.
               await supabase.functions.invoke('backfill-images', {
                 body: {
                   vehicle_id: newVehicle.id,
-                  image_urls: deferredImageUrls,
-                  source: 'organization_import',
+                  image_urls: imageUrls,
+                  source: organizationId ? 'organization_import' : 'external_import',
                   run_analysis: false,
                   max_images: 0,
                   continue: true,

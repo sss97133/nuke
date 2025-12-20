@@ -216,7 +216,9 @@ function fileToBlob(file: File | Blob | Buffer | Uint8Array): Blob {
   }
   
   if (file instanceof Buffer || file instanceof Uint8Array) {
-    return new Blob([file], { type: 'image/jpeg' });
+    // Copy into a new Uint8Array backed by an ArrayBuffer (avoid SharedArrayBuffer typing issues).
+    const bytes = Uint8Array.from(file as any);
+    return new Blob([bytes], { type: 'image/jpeg' });
   }
   
   throw new Error('Unsupported file type');
@@ -286,7 +288,7 @@ export class UnifiedImageImportService {
       if (!photographerId) {
         // Try to get authenticated user
         const { data: { user } } = await supabase.auth.getUser();
-        photographerId = user?.id || null;
+        photographerId = user?.id || undefined;
       }
 
       // Step 3: Check if EXIF suggests different photographer (ghost user)
@@ -434,37 +436,50 @@ export class UnifiedImageImportService {
       }
 
       // Step 11: Insert into database
-      const thumbUrl = (variants?.thumbnail || variants?.small || variants?.medium || urlData.publicUrl) as string;
-      const mediumUrl = (variants?.medium || variants?.large || urlData.publicUrl) as string;
-      const largeUrl = (variants?.large || variants?.full || urlData.publicUrl) as string;
+      const insertBase: any = {
+        vehicle_id: vehicleId || null,
+        user_id: photographerId, // Photographer (ghost user or real user)
+        image_url: urlData.publicUrl,
+        storage_path: storagePath,
+        category: category,
+        is_primary: isPrimary || false,
+        // Explicitly mark as non-document to keep legacy NULL rows from disappearing in galleries.
+        is_document: false,
+        is_duplicate: false,
+        taken_at: photoDate.toISOString(),
+        source: source,
+        source_url: sourceUrl || null,
+        exif_data: exifPayload,
+        variants: variants,
+      };
 
-      const { data: dbResult, error: dbError } = await supabase
-        .from('vehicle_images')
-        .insert({
-          vehicle_id: vehicleId || null,
-          user_id: photographerId, // Photographer (ghost user or real user)
-          image_url: urlData.publicUrl,
-          thumbnail_url: thumbUrl,
-          medium_url: mediumUrl,
-          large_url: largeUrl,
-          storage_path: storagePath,
-          category: category,
-          file_size: fileBlob.size,
-          mime_type: fileBlob.type || 'image/jpeg',
-          is_primary: isPrimary || false,
-          // Explicitly mark as non-document to keep legacy NULL rows from disappearing in galleries.
-          is_document: false,
-          is_duplicate: false,
-          taken_at: photoDate.toISOString(),
-          source: source,
-          source_url: sourceUrl || null,
-          exif_data: exifPayload,
-          variants: variants,
-          process_stage: stage || null,
-          ai_processing_status: 'pending'
-        })
-        .select('id')
-        .single();
+      // Optional columns may drift across environments; try once with extras, then retry without them if needed.
+      const insertWithOptional: any = {
+        ...insertBase,
+        file_size: fileBlob.size,
+        mime_type: fileBlob.type || 'image/jpeg',
+        process_stage: stage || null,
+        ai_processing_status: 'pending',
+      };
+
+      const doInsert = async (payload: any) => {
+        return supabase
+          .from('vehicle_images')
+          .insert(payload)
+          .select('id')
+          .single();
+      };
+
+      let dbResult: any = null;
+      let dbError: any = null;
+      ({ data: dbResult, error: dbError } = await doInsert(insertWithOptional));
+      if (dbError) {
+        const msg = String(dbError?.message || '');
+        const looksLikeMissingColumn = msg.toLowerCase().includes('schema cache') || msg.toLowerCase().includes('column') && msg.toLowerCase().includes('does not exist');
+        if (looksLikeMissingColumn) {
+          ({ data: dbResult, error: dbError } = await doInsert(insertBase));
+        }
+      }
 
       if (dbError) {
         // Cleanup storage on database failure
@@ -478,13 +493,17 @@ export class UnifiedImageImportService {
       // Best-effort: failures here shouldn't block the upload/import.
       if (vehicleId && (isPrimary === true)) {
         try {
+          const v = (variants && typeof variants === 'object') ? variants : {};
+          const bestLarge = String((v as any)?.large || (v as any)?.full || urlData.publicUrl);
+          const bestMedium = String((v as any)?.medium || (v as any)?.large || urlData.publicUrl);
+          const bestThumb = String((v as any)?.thumbnail || (v as any)?.medium || urlData.publicUrl);
           const vehicleUpdates: any = {
-            primary_image_url: largeUrl || urlData.publicUrl,
-            image_url: largeUrl || urlData.publicUrl,
+            primary_image_url: bestLarge,
+            image_url: bestLarge,
             image_variants: {
-              thumbnail: thumbUrl || urlData.publicUrl,
-              medium: mediumUrl || urlData.publicUrl,
-              large: largeUrl || urlData.publicUrl,
+              thumbnail: bestThumb,
+              medium: bestMedium,
+              large: bestLarge,
             },
             updated_at: new Date().toISOString(),
           };

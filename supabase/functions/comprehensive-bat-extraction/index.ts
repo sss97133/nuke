@@ -60,6 +60,9 @@ interface ComprehensiveBaTData {
   
   // Bid history
   bid_history?: Array<{ amount: number; timestamp?: string; bidder?: string }>;
+  
+  // Features and equipment
+  features?: string[];
 }
 
 /**
@@ -598,6 +601,90 @@ function extractTechnicalSpecs(html: string): {
   }
   
   return specs;
+}
+
+/**
+ * Extract features and equipment from BaT listing
+ * Parses equipment lists and feature bullets
+ */
+function extractFeaturesAndEquipment(html: string): string[] {
+  const features: string[] = [];
+  
+  // Pattern 1: Extract from "Equipment includes" text in description
+  const equipmentMatch = html.match(/Equipment\s+includes[^<]{0,800}/i);
+  if (equipmentMatch) {
+    const equipmentText = equipmentMatch[0]
+      .replace(/Equipment\s+includes[:\s]*/i, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+    
+    // Split by common delimiters (commas, periods, "and", newlines)
+    const items = equipmentText
+      .split(/[,.]|(?:\s+and\s+)|(?:\r?\n)/i)
+      .map(item => item.trim())
+      .filter(item => {
+        // Filter out noise
+        return item.length > 3 && 
+               item.length < 150 &&
+               !item.toLowerCase().includes('view all') &&
+               !item.toLowerCase().includes('notify me') &&
+               !item.match(/^\d+$/);
+      });
+    
+    features.push(...items);
+  }
+  
+  // Pattern 2: Look for structured feature lists (ul/li elements in specific sections)
+  // BaT often has features in list format
+  const listPatterns = [
+    /<ul[^>]*class="[^"]*features[^"]*"[^>]*>([\s\S]*?)<\/ul>/i,
+    /<div[^>]*class="[^"]*equipment[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+  ];
+  
+  for (const pattern of listPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      // Extract list items
+      const liMatches = match[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi);
+      for (const liMatch of liMatches) {
+        if (liMatch[1]) {
+          const text = liMatch[1]
+            .replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .trim();
+          
+          if (text.length > 3 && text.length < 150) {
+            features.push(text);
+          }
+        }
+      }
+    }
+  }
+  
+  // Pattern 3: Extract from description text that has bullet-style features
+  // Look for patterns like "Features include:" followed by text with commas/bullets
+  const featuresIncludeMatch = html.match(/Features?\s+include[:\s]*([^<]{50,500})/i);
+  if (featuresIncludeMatch) {
+    const featureText = featuresIncludeMatch[1]
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+    
+    const items = featureText
+      .split(/[,•\n]/)
+      .map(item => item.trim())
+      .filter(item => item.length > 3 && item.length < 150);
+    
+    features.push(...items);
+  }
+  
+  // Deduplicate and limit
+  const unique = [...new Set(features.map(f => f.trim()))]
+    .filter(f => f.length > 0)
+    .slice(0, 30); // Limit to 30 features
+  
+  return unique;
 }
 
 /**
@@ -1176,6 +1263,12 @@ async function extractComprehensiveBaTData(html: string, batUrl: string): Promis
   const specs = extractTechnicalSpecs(html);
   Object.assign(data, specs);
   
+  // Extract features and equipment
+  const features = extractFeaturesAndEquipment(html);
+  if (features.length > 0) {
+    data.features = features;
+  }
+  
   // Extract bid history for auction timeline
   const bidHistory = extractBidHistory(html);
   if (bidHistory.length > 0) {
@@ -1268,14 +1361,34 @@ async function extractComprehensiveBaTData(html: string, batUrl: string): Promis
     
     if (postExcerptEnd > postExcerptStart) {
       postExcerptHTML = html.substring(postExcerptStart, postExcerptEnd + 6);
-      // Strip HTML but preserve paragraph breaks
+      
+      // IMPROVED: Better text extraction that preserves structure
+      // First, convert lists to readable format
+      postExcerptHTML = postExcerptHTML
+        .replace(/<ul[^>]*>/gi, '\n')
+        .replace(/<\/ul>/gi, '')
+        .replace(/<li[^>]*>/gi, '• ')
+        .replace(/<\/li>/gi, '\n');
+      
+      // Then strip HTML but preserve paragraph breaks
       postExcerptText = postExcerptHTML
         .replace(/<p[^>]*>/gi, '\n\n')
         .replace(/<\/p>/gi, '')
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
         .replace(/\s+/g, ' ')
         .replace(/\n\s*\n/g, '\n\n')
+        .trim();
+      
+      // Clean up the text - remove common BaT footer text
+      postExcerptText = postExcerptText
+        .replace(/This\s+.*?\s+got\s+away.*?more\s+like\s+it\s+here\./i, '')
+        .replace(/View\s+all\s+listings.*?Notify\s+me.*?new\s+listings/gi, '')
         .trim();
       
       if (postExcerptText.length > 100) {
@@ -1287,17 +1400,40 @@ async function extractComprehensiveBaTData(html: string, batUrl: string): Promis
   
   // Fallback to other description sources if post-excerpt not found
   if (!data.description || data.description.length < 100) {
-    const descPatterns = [
-      /<div[^>]*class="card-body"[^>]*>([\s\S]{100,2000})<\/div>/i,
-      /<div[^>]*class="post-content"[^>]*>([\s\S]{100,2000})<\/div>/i,
-      /<p[^>]*>([^<]{100,500})<\/p>/,
-    ];
+    // Try card-body (often contains description)
+    const cardBodyMatch = html.match(/<div[^>]*class="card-body"[^>]*>([\s\S]{200,3000})<\/div>/i);
+    if (cardBodyMatch) {
+      let desc = cardBodyMatch[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Remove common noise
+      desc = desc
+        .replace(/This\s+.*?\s+got\s+away.*?more\s+like\s+it\s+here\./i, '')
+        .replace(/View\s+all\s+listings/gi, '')
+        .trim();
+      
+      if (desc.length > 100) {
+        data.description = desc.substring(0, 5000);
+      }
+    }
     
-    for (const pattern of descPatterns) {
-      const match = html.match(pattern);
-      if (match) {
-        data.description = match[1].replace(/<[^>]+>/g, ' ').trim().substring(0, 1000);
-        break;
+    // Last resort: try post-content
+    if (!data.description || data.description.length < 100) {
+      const postContentMatch = html.match(/<div[^>]*class="post-content"[^>]*>([\s\S]{200,2000})<\/div>/i);
+      if (postContentMatch) {
+        data.description = postContentMatch[1]
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .substring(0, 1000);
       }
     }
   }
@@ -1516,6 +1652,25 @@ serve(async (req) => {
       if (extractedData.seller) vehicleUpdates.bat_seller = extractedData.seller;
       if (extractedData.bid_count !== undefined) vehicleUpdates.bat_bids = extractedData.bid_count;
       if (extractedData.view_count !== undefined) vehicleUpdates.bat_views = extractedData.view_count;
+      
+      // Store features in origin_metadata
+      if (extractedData.features && Array.isArray(extractedData.features) && extractedData.features.length > 0) {
+        // Get existing origin_metadata
+        const { data: currentVehicle } = await supabase
+          .from('vehicles')
+          .select('origin_metadata')
+          .eq('id', vehicleId)
+          .maybeSingle();
+        
+        const currentOm = (currentVehicle?.origin_metadata && typeof currentVehicle.origin_metadata === 'object') 
+          ? currentVehicle.origin_metadata 
+          : {};
+        
+        vehicleUpdates.origin_metadata = {
+          ...currentOm,
+          bat_features: extractedData.features,
+        };
+      }
       
       console.log('Updating vehicle with:', JSON.stringify(vehicleUpdates, null, 2));
       
