@@ -5,6 +5,7 @@ import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
 import { UserInteractionService } from '../../services/userInteractionService';
 import ResilientImage from '../images/ResilientImage';
 import { OdometerBadge } from '../vehicle/OdometerBadge';
+import { useVehicleImages } from '../../hooks/useVehicleImages';
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -918,6 +919,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   // GRID VIEW: Mobile-optimized card with horizontal swipeable image carousel
   // Shows multiple images in a grid that user can swipe through
   
+  // Fetch images from database if not available in vehicle prop
+  const { primaryImage: dbPrimaryImage, images: dbImages } = useVehicleImages(vehicle.id);
+  
   // For grid view, prioritize smaller image variants (thumbnail/medium) for performance
   // Grid cards are small (180px default), so we don't need full-size images
   const vehicleImages: string[] = [];
@@ -930,6 +934,20 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     if (u.includes('shareArticle?mini=true')) return false;
     if (u.startsWith('https://') || u.startsWith('http://') || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('/')) return true;
     return false;
+  };
+  
+  // Helper to extract URLs from image data objects
+  const extractImageUrls = (imgData: any): string[] => {
+    if (!imgData) return [];
+    const urls: string[] = [];
+    if (imgData.variants?.thumbnail) urls.push(imgData.variants.thumbnail);
+    if (imgData.variants?.medium) urls.push(imgData.variants.medium);
+    if (imgData.variants?.large) urls.push(imgData.variants.large);
+    if (imgData.image_url) urls.push(imgData.image_url);
+    if (imgData.thumbnail_url) urls.push(imgData.thumbnail_url);
+    if (imgData.medium_url) urls.push(imgData.medium_url);
+    if (imgData.large_url) urls.push(imgData.large_url);
+    return urls.filter(u => u && isLikelyImageUrl(u));
   };
   
   // Prioritize image variants for grid performance (thumbnail -> medium -> full)
@@ -949,6 +967,24 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       .map(img => img.url || (img as any).thumbnail_url || (img as any).medium_url)
       .filter((u) => !!u && isLikelyImageUrl(String(u)));
     vehicleImages.push(...urls.filter(url => !vehicleImages.includes(url)));
+  }
+  
+  // Add images from database hook (primary first, then others)
+  if (dbPrimaryImage) {
+    const dbUrls = extractImageUrls(dbPrimaryImage);
+    dbUrls.forEach(url => {
+      if (!vehicleImages.includes(url)) vehicleImages.push(url);
+    });
+  }
+  
+  // Add other database images
+  if (dbImages && dbImages.length > 0) {
+    dbImages.forEach(img => {
+      const dbUrls = extractImageUrls(img);
+      dbUrls.forEach(url => {
+        if (!vehicleImages.includes(url)) vehicleImages.push(url);
+      });
+    });
   }
   
   // Fallback to primary_image_url (prefer medium/thumbnail if available)
@@ -1030,7 +1066,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         {hasValidImage && currentImageUrl && (
           <ResilientImage
             sources={[
-              ...vehicleImages, // All available images for carousel
+              ...vehicleImages, // All available images for carousel (includes DB images)
+              // Additional fallbacks
               vehicle?.image_variants?.thumbnail,
               vehicle?.image_variants?.medium,
               vehicle?.image_variants?.large,
@@ -1038,6 +1075,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               imageUrl,
               vehicle.primary_image_url,
               vehicle.image_url,
+              // Database images as explicit fallbacks
+              ...(dbPrimaryImage ? extractImageUrls(dbPrimaryImage) : []),
+              ...(dbImages || []).flatMap(img => extractImageUrls(img)),
             ]}
             alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
             fill={true}
