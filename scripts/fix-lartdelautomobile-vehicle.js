@@ -152,6 +152,7 @@ async function importImages(imageUrls, _importUserId) {
 
   // Use the backfill-images edge function for bulk import
   try {
+    console.log(`   📡 Calling backfill-images edge function...`);
     const { data: backfillData, error: backfillError } = await supabase.functions.invoke('backfill-images', {
       body: {
         vehicle_id: VEHICLE_ID,
@@ -162,18 +163,48 @@ async function importImages(imageUrls, _importUserId) {
     });
 
     if (backfillError) {
+      console.log(`   ⚠️  Backfill function error: ${backfillError.message}`);
       throw new Error(`Backfill failed: ${backfillError.message}`);
     }
 
-    imported = backfillData?.imported || 0;
-    failed = backfillData?.failed || 0;
+    if (!backfillData) {
+      throw new Error('Backfill returned no data');
+    }
 
-    console.log(`   ✅ Imported ${imported} images`);
+    imported = backfillData.uploaded || backfillData.imported || 0;
+    failed = backfillData.failed || 0;
+    const skipped = backfillData.skipped || 0;
+    
+    console.log(`   📊 Backfill result: uploaded=${imported}, failed=${failed}, skipped=${skipped}`);
+    
+    // Log errors if available
+    if (backfillData.errors && backfillData.errors.length > 0) {
+      console.log(`   ⚠️  Errors: ${backfillData.errors.slice(0, 3).join(', ')}`);
+      if (backfillData.errors.length > 3) {
+        console.log(`   ... and ${backfillData.errors.length - 3} more errors`);
+      }
+    }
+
+    if (imported > 0) {
+      console.log(`   ✅ Imported ${imported} images via backfill-images`);
+    }
     if (failed > 0) {
       console.log(`   ⚠️  Failed to import ${failed} images`);
     }
+    if (imported === 0 && failed === 0 && skipped > 0) {
+      console.log(`   ℹ️  All images were skipped (likely duplicates)`);
+      return { imported: 0, skipped: imageUrls.length, failed: 0 };
+    }
+    
+    // If bulk import failed completely, try fallback
+    if (imported === 0 && failed > 0) {
+      console.log(`   ⚠️  Bulk import failed, trying individual import fallback...`);
+    } else {
+      return { imported, skipped: imageUrls.length - newImages.length, failed };
+    }
   } catch (error) {
     console.error(`   ❌ Error during bulk import: ${error.message}`);
+    console.error(`   📋 Error details:`, error);
     console.log(`   🔄 Falling back to individual import...`);
     
     // Fallback: import individually
