@@ -1837,7 +1837,6 @@ serve(async (req) => {
             bid_count: extractedData.bid_count || 0,
             view_count: extractedData.view_count || 0,
             watcher_count: extractedData.watcher_count || 0,
-            comment_count: extractedData.comment_count || null,
             sold_at: (extractedData as any).reserve_not_met ? null : (extractedData.sale_date ? new Date(extractedData.sale_date).toISOString() : null),
             listing_status: listingStatus,
             metadata: {
@@ -1904,7 +1903,6 @@ serve(async (req) => {
             bid_count: extractedData.bid_count || 0,
             view_count: extractedData.view_count || 0,
             watcher_count: extractedData.watcher_count || 0,
-            comment_count: extractedData.comment_count || null,
             sold_at: (extractedData as any).reserve_not_met ? null : (extractedData.sale_date ? new Date(extractedData.sale_date).toISOString() : null),
             listing_status: listingStatus,
             metadata: {

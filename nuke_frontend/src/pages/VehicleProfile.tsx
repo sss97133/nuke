@@ -1979,6 +1979,17 @@ const VehicleProfile: React.FC = () => {
         s.match(/width=\d+.*height=\d+.*[&=](width|height)=\d{1,3}/) // Small square with width/height params
       )) return true;
 
+      // Flag/banner/site chrome frequently leaks into naive scrapes and even imports.
+      // Treat these as noise so they can never become the computed hero/primary.
+      // Keep this conservative: only match explicit "flag"/"flags"/"banner" URL tokens.
+      if (
+        /(?:^|\/|\-|_)(flag|flags|banner)(?:$|\/|\-|_|\.)/i.test(s) ||
+        s.includes('stars-and-stripes') ||
+        s.includes('american-flag') ||
+        s.includes('us-flag') ||
+        s.includes('usa-flag')
+      ) return true;
+
       return false;
     };
 

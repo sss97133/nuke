@@ -43,22 +43,57 @@ function getBaTUrl(vehicle) {
 }
 
 /**
- * Call comprehensive-bat-extraction edge function
+ * Call comprehensive-bat-extraction edge function with retry logic
  */
-async function extractComprehensiveData(batUrl, vehicleId) {
-  try {
-    const { data, error } = await supabase.functions.invoke('comprehensive-bat-extraction', {
-      body: { batUrl, vehicleId }
-    });
-    
-    if (error) {
-      return { success: false, error: error.message };
+async function extractComprehensiveData(batUrl, vehicleId, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`   ⚠️  Retry attempt ${attempt + 1}/${retries + 1}...`);
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
+      }
+      
+      const { data, error } = await supabase.functions.invoke('comprehensive-bat-extraction', {
+        body: { batUrl, vehicleId }
+      });
+      
+      if (error) {
+        // Check if it's a retryable error
+        const errorMsg = error.message || JSON.stringify(error);
+        if (attempt < retries && (errorMsg.includes('timeout') || errorMsg.includes('ECONNRESET') || errorMsg.includes('503'))) {
+          continue; // Retry
+        }
+        console.error(`   ⚠️  Function invoke error:`, error);
+        return { success: false, error: errorMsg };
+      }
+      
+      // The function returns { success: true, data: ... } or { error: ... }
+      if (!data) {
+        if (attempt < retries) continue; // Retry
+        return { success: false, error: 'No response data from function' };
+      }
+      
+      if (data.error) {
+        // Don't retry on application errors (like 404, invalid data)
+        return { success: false, error: data.error, nonRetryable: true };
+      }
+      
+      if (data.success === false) {
+        return { success: false, error: data.error || 'Extraction failed (success: false)' };
+      }
+      
+      // Success case
+      return { success: true, data: data.data || data };
+    } catch (error) {
+      if (attempt < retries && (error.message?.includes('timeout') || error.message?.includes('ECONNRESET'))) {
+        continue; // Retry on network errors
+      }
+      console.error(`   ⚠️  Exception in extractComprehensiveData:`, error);
+      return { success: false, error: error.message || String(error) };
     }
-    
-    return { success: true, data };
-  } catch (error) {
-    return { success: false, error: error.message };
   }
+  
+  return { success: false, error: 'Max retries exceeded' };
 }
 
 /**
@@ -88,10 +123,17 @@ async function processVehicle(vehicle, index, total) {
   
   if (!result.success) {
     console.log(`   ❌ Extraction failed: ${result.error}`);
+    console.log(`   🔍 Full error details:`, JSON.stringify(result, null, 2));
     return { success: false, error: result.error };
   }
   
   console.log(`   ✅ Extraction complete`);
+  
+  // Log what was extracted (summary)
+  if (result.data) {
+    const extracted = result.data;
+    console.log(`   📋 Extracted: ${extracted.description ? 'desc' : ''} ${extracted.features?.length ? `features(${extracted.features.length})` : ''} ${extracted.sale_price ? `$${extracted.sale_price.toLocaleString()}` : ''} ${extracted.bid_count ? `${extracted.bid_count} bids` : ''}`.trim() || 'No data extracted');
+  }
   
   // Wait a bit and verify update
   await new Promise(resolve => setTimeout(resolve, 2000));
