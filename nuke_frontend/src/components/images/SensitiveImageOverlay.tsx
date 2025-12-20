@@ -14,6 +14,7 @@ interface SensitiveImageOverlayProps {
   isSensitive: boolean;
   sensitiveType?: string;
   onRequestAccess?: () => void;
+  objectFit?: 'cover' | 'contain';
 }
 
 export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
@@ -22,7 +23,8 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
   imageUrl,
   isSensitive,
   sensitiveType,
-  onRequestAccess
+  onRequestAccess,
+  objectFit = 'cover'
 }) => {
   const [hasAccess, setHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,7 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
       <img 
         src={imageUrl} 
         alt="Vehicle image"
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        style={{ width: '100%', height: '100%', objectFit }}
         onError={() => {
           // Image load error handled silently
         }}
@@ -99,7 +101,7 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
         <img 
           src={imageUrl} 
           alt="Sensitive document"
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          style={{ width: '100%', height: '100%', objectFit }}
           onError={() => {
             // Image load error handled silently
           }}
