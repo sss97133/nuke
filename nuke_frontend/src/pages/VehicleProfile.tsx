@@ -53,7 +53,6 @@ import type { Session } from '@supabase/supabase-js';
 import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
 import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
 import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel';
-import MailboxNotificationBadge from '../components/VehicleMailbox/MailboxNotificationBadge';
 import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 
 const WORKSPACE_TABS = [
@@ -2770,28 +2769,6 @@ const VehicleProfile: React.FC = () => {
             auctionPulse={auctionPulse}
           />
         </React.Suspense>
-
-        {/* Vehicle Mailbox entry point */}
-        {vehicle && (
-          <div className="card" style={{ marginTop: '8px' }}>
-            <div className="card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-              <div>
-                <div className="text-small text-muted">Mailbox</div>
-                <div className="text" style={{ fontWeight: 600 }}>Vehicle messages & alerts</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button
-                  className="button button-secondary"
-                  style={{ fontSize: '9px', fontWeight: 100, whiteSpace: 'nowrap' }}
-                  onClick={() => navigate(`/vehicle/${vehicle.id}/mailbox`)}
-                >
-                  Open Mailbox
-                </button>
-                <MailboxNotificationBadge vehicleId={vehicle.id} showIcon showText />
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Live Auction Banner - Show if vehicle has active auction */}
         {vehicle && (

@@ -12,7 +12,7 @@ import { ValueProvenancePopup } from '../../components/ValueProvenancePopup';
 import DataValidationPopup from '../../components/vehicle/DataValidationPopup';
 import { useVINProofs } from '../../hooks/useVINProofs';
 import { FaviconIcon } from '../../components/common/FaviconIcon';
-import { AuctionPlatformBadge, AuctionStatusBadge } from '../../components/auction/AuctionBadges';
+import { AuctionPlatformBadge } from '../../components/auction/AuctionBadges';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 import vinDecoderService from '../../services/vinDecoder';
 
@@ -89,8 +89,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [showProvenancePopup, setShowProvenancePopup] = useState(false);
   const [priceSources, setPriceSources] = useState<Record<string, boolean>>({});
   const [showVinValidation, setShowVinValidation] = useState(false);
-  const [listingSourceOpen, setListingSourceOpen] = useState(false);
-  const listingSourceRef = useRef<HTMLDivElement | null>(null);
 
   const { summary: vinProofSummary } = useVINProofs(vehicle?.id);
   // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
@@ -745,36 +743,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return 4200;
   }, [auctionPulse?.listing_url, auctionPulse?.end_date, auctionNow, isAuctionLive]);
 
-  const auctionStatusForBadge = useMemo(() => {
-    const status = String(auctionPulse?.listing_status || '').toLowerCase();
-    if (!auctionPulse?.listing_url) return null;
-    if (status === 'sold') return 'sold' as const;
-    if (status === 'reserve_not_met') return 'reserve_not_met' as const;
-    if (status === 'active' || status === 'live') {
-      // "Ending soon" when under 1h
-      if (auctionPulse?.end_date) {
-        const end = new Date(auctionPulse.end_date).getTime();
-        if (Number.isFinite(end)) {
-          const mins = Math.floor((end - auctionNow) / 60000);
-          if (mins <= 60 && mins > 0) return 'ending_soon' as const;
-        }
-      }
-      return 'active' as const;
-    }
-    if (status === 'pending') return 'pending' as const;
-    if (status === 'ended') return 'ended' as const;
-    // Unknown status: infer from end_date if available (common right after backfill).
-    if (auctionPulse?.end_date) {
-      const end = new Date(auctionPulse.end_date).getTime();
-      if (Number.isFinite(end)) {
-        const mins = Math.floor((end - auctionNow) / 60000);
-        if (mins > 0 && mins <= 60) return 'ending_soon' as const;
-        if (mins > 0) return 'active' as const;
-        return 'ended' as const;
-      }
-    }
-    return 'ended' as const;
-  }, [auctionPulse, auctionNow]);
 
   // Header org pills are tiny; if the same org is linked multiple times (e.g. legacy `consigner` + `sold_by`),
   // we should display a single pill with the "best" relationship to avoid duplicates.
@@ -1409,17 +1377,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
   }, [showPendingDetails]);
 
-  // Close listing source popover when clicking outside
-  useEffect(() => {
-    const handler = (event: MouseEvent) => {
-      if (!listingSourceOpen) return;
-      if (listingSourceRef.current && !listingSourceRef.current.contains(event.target as Node)) {
-        setListingSourceOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [listingSourceOpen]);
 
   return (
     <div
@@ -1471,92 +1428,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
             <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
           ) : null}
-          {listingUrl ? (
-            <div ref={listingSourceRef} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-              <button
-                type="button"
-                className="badge badge-secondary"
-                title="Listing source (click)"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setListingSourceOpen((v) => !v);
-                }}
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 700,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  cursor: 'pointer',
-                  background: 'var(--grey-50)',
-                }}
-              >
-                <FaviconIcon url={String(listingUrl)} size={14} preserveAspectRatio={true} />
-              </button>
-
-              {listingSourceOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 6px)',
-                    left: 0,
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 6,
-                    boxShadow: '0 12px 24px rgba(15, 23, 42, 0.15)',
-                    padding: 10,
-                    minWidth: 260,
-                    zIndex: 950,
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div style={{ fontWeight: 800, fontSize: '10px', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                    Listing source
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: '10px', fontWeight: 700, color: baseTextColor }}>
-                    {listingHost || listingSourceLabel || 'External listing'}
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: '9px', color: mutedTextColor, wordBreak: 'break-all' }}>
-                    {String(listingUrl)}
-                  </div>
-                  <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
-                    <button
-                      type="button"
-                      className="button button-small"
-                      onClick={() => {
-                        try {
-                          window.open(String(listingUrl), '_blank', 'noopener,noreferrer');
-                        } catch {
-                          // ignore
-                        } finally {
-                          setListingSourceOpen(false);
-                        }
-                      }}
-                      style={{ fontSize: '8pt' }}
-                    >
-                      OPEN
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-small"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(String(listingUrl));
-                          toast.success('Link copied', { duration: 1200 });
-                        } catch {
-                          toast.error('Copy failed', { duration: 1200 });
-                        }
-                      }}
-                      style={{ fontSize: '8pt' }}
-                    >
-                      COPY
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : null}
 
           {/* Seller visibility (do not hide the seller behind tiny icons) */}
           {sellerBadge?.label && (() => {
@@ -1598,7 +1469,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             );
           })()}
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
-          {auctionPulse?.listing_url && auctionStatusForBadge && (
+          {auctionPulse?.listing_url && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               {/* Only show platform badge if consigner badge and origin badge aren't already showing BaT */}
               {(() => {
@@ -1613,10 +1484,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   />
                 ) : null;
               })()}
-              <AuctionStatusBadge
-                status={auctionStatusForBadge as any}
-                title={isAuctionLive ? 'Live auction telemetry' : 'Auction status'}
-              />
               {auctionPulse.updated_at ? (
                 <span
                   className="badge badge-secondary"
@@ -2161,9 +2028,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 );
               })()
             ) : (
-              auctionPulse?.listing_url ? null : (
+              // Show claim button for vehicles not in a live auction and not already owned by current user
+              !isAuctionLive && !isOwner && session?.user?.id ? (
                 <a
                   href={claimHref}
+                  onClick={(e) => {
+                    if (onClaimClick) {
+                      e.preventDefault();
+                      onClaimClick();
+                    }
+                  }}
                   style={{
                     border: '1px solid var(--primary)',
                     background: 'var(--surface)',
@@ -2180,7 +2054,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 >
                   Claim This Vehicle
                 </a>
-              )
+              ) : null
             )}
             {responsibleName && showOwnerCard && ownerProfile && (
               <div

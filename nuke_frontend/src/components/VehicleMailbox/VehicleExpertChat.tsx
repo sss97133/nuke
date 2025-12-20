@@ -3,11 +3,12 @@
  * AI agent gated specifically to help with the user's vehicle
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { supabase } from '../../lib/supabase'
 import { MessageCircle, Send, Loader } from 'lucide-react'
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader'
 import { ModelHarnessAnnotator } from '../wiring/ModelHarnessAnnotator'
+import ErrorBoundary from '../ErrorBoundary'
 
 interface Message {
   id: string
@@ -983,7 +984,17 @@ export const VehicleExpertChat: React.FC<VehicleExpertChatProps> = ({
               hide
             </button>
           </div>
-          <ModelHarnessAnnotator vehicleId={vehicleId} defaultImportUrl={activeModelSignedUrl} autoImportOnLoad={true} />
+          <ErrorBoundary
+            fallback={
+              <div style={{ padding: '20px', textAlign: 'center', fontSize: '8pt', color: '#666', border: '1px solid var(--border)', borderRadius: '4px' }}>
+                3D model viewer unavailable
+              </div>
+            }
+          >
+            <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', fontSize: '8pt', color: '#666' }}>Loading 3D model...</div>}>
+              <ModelHarnessAnnotator vehicleId={vehicleId} defaultImportUrl={activeModelSignedUrl} autoImportOnLoad={true} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
 
