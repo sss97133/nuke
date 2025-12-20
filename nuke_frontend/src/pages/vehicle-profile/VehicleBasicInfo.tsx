@@ -774,4 +774,3 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
 };
 
 export default VehicleBasicInfo;
-export default VehicleBasicInfo;
