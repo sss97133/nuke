@@ -358,14 +358,16 @@ const CursorHomepage: React.FC = () => {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [infoDense, setInfoDense] = useState<boolean>(false);
   const [cardMinWidth, setCardMinWidth] = useState<number>(180); // Smaller default cards
-  const [thermalPricing, setThermalPricing] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('nuke_homepage_thermalPricing');
-      return saved === 'true';
-    } catch {
-      return false;
-    }
-  });
+  // ARCHIVED: Thermal pricing - disabled until we're more capable of handling it
+  // const [thermalPricing, setThermalPricing] = useState<boolean>(() => {
+  //   try {
+  //     const saved = localStorage.getItem('nuke_homepage_thermalPricing');
+  //     return saved === 'true';
+  //   } catch {
+  //     return false;
+  //   }
+  // });
+  const thermalPricing = false; // Always disabled
   const [stats, setStats] = useState({
     totalBuilds: 0,
     totalValue: 0,
@@ -479,13 +481,14 @@ const CursorHomepage: React.FC = () => {
     }
   }, [showFilters]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('nuke_homepage_thermalPricing', String(thermalPricing));
-    } catch (err) {
-      console.warn('Failed to save thermalPricing:', err);
-    }
-  }, [thermalPricing]);
+  // ARCHIVED: Thermal pricing localStorage
+  // useEffect(() => {
+  //   try {
+  //     localStorage.setItem('nuke_homepage_thermalPricing', String(thermalPricing));
+  //   } catch (err) {
+  //     console.warn('Failed to save thermalPricing:', err);
+  //   }
+  // }, [thermalPricing]);
 
   // Debounce search to avoid clanky re-filtering on every keystroke.
   useEffect(() => {
@@ -2033,6 +2036,7 @@ const CursorHomepage: React.FC = () => {
                   />
                   <span>Info-dense</span>
                 </label>
+                {/* ARCHIVED: Thermal Pricing checkbox - disabled until we're more capable of handling it
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
@@ -2041,6 +2045,7 @@ const CursorHomepage: React.FC = () => {
                   />
                   <span>Thermal Pricing</span>
                 </label>
+                */}
               </div>
 
               {/* Sort By */}
@@ -2533,7 +2538,7 @@ const CursorHomepage: React.FC = () => {
                   viewMode="gallery"
                   infoDense={infoDense}
                   viewerUserId={session?.user?.id}
-                  thermalPricing={thermalPricing}
+                  thermalPricing={false} // ARCHIVED: Always disabled
                   sourceStampUrl={
                     (vehicle as any)?.discovery_url ||
                     ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)

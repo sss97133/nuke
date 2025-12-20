@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import ResilientImage from './images/ResilientImage';
 
 interface LeadImageDebugProps {
   vehicleId: string;
@@ -9,7 +10,7 @@ interface ImageDebugInfo {
   id: string;
   image_url: string;
   is_primary: boolean;
-  filename?: string;
+  variants?: any;
   created_at: string;
   storage_path?: string;
 }
@@ -19,6 +20,38 @@ const LeadImageDebug: React.FC<LeadImageDebugProps> = ({ vehicleId }) => {
   const [loading, setLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const buildCandidateUrls = (img: any): string[] => {
+    const out: string[] = [];
+    const add = (v: any) => {
+      const s = typeof v === 'string' ? v.trim() : '';
+      if (!s) return;
+      if (!out.includes(s)) out.push(s);
+    };
+
+    const variants = img?.variants && typeof img.variants === 'object' ? img.variants : null;
+    add(variants?.large);
+    add(variants?.medium);
+    add(variants?.thumbnail);
+    add(variants?.full);
+    add(img?.image_url);
+
+    const storagePathRaw = typeof img?.storage_path === 'string' ? img.storage_path : '';
+    const storagePath = storagePathRaw.replace(/^\/+/, '').trim();
+    if (storagePath) {
+      const m = storagePath.match(/^(vehicle-data|vehicle-images)\/(.+)$/i);
+      if (m && m[1] && m[2]) {
+        const bucket = String(m[1]);
+        const objectPath = String(m[2]);
+        add(supabase.storage.from(bucket).getPublicUrl(objectPath).data.publicUrl);
+      } else {
+        add(supabase.storage.from('vehicle-data').getPublicUrl(storagePath).data.publicUrl);
+        add(supabase.storage.from('vehicle-images').getPublicUrl(storagePath).data.publicUrl);
+      }
+    }
+
+    return out;
+  };
+
   const loadImageDebugInfo = async () => {
     if (!vehicleId) return;
     
@@ -26,7 +59,7 @@ const LeadImageDebug: React.FC<LeadImageDebugProps> = ({ vehicleId }) => {
     try {
       const { data, error } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, is_primary, filename, created_at, storage_path')
+        .select('id, image_url, is_primary, variants, created_at, storage_path')
         .eq('vehicle_id', vehicleId)
         .order('created_at', { ascending: false });
 
@@ -146,23 +179,24 @@ const LeadImageDebug: React.FC<LeadImageDebugProps> = ({ vehicleId }) => {
               {primaryImages.map(image => (
                 <div key={image.id} className="bg-green-50 border border-green-200 rounded p-2">
                   <div className="flex items-center gap-3">
-                    <img 
-                      src={image.image_url} 
-                      alt="" 
-                      className="w-12 h-12 object-cover rounded"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
+                    <div className="w-12 h-12 rounded" style={{ overflow: 'hidden' }}>
+                      <ResilientImage
+                        sources={buildCandidateUrls(image)}
+                        alt=""
+                        fill={true}
+                        objectFit="cover"
+                        placeholderOpacity={0.15}
+                      />
+                    </div>
                     <div className="flex-1 text-xs">
                       <div className="font-medium">ID: {image.id.slice(0, 8)}...</div>
-                      <div className="text-gray-600">File: {image.filename || 'Unknown'}</div>
                       <div className="text-gray-600">Created: {new Date(image.created_at).toLocaleDateString()}</div>
                       <div className="text-green-600 font-medium">✅ PRIMARY</div>
+                      <div className="text-gray-600 break-all">{buildCandidateUrls(image)[0] || ''}</div>
                     </div>
                     <div className="text-xs">
                       <a 
-                        href={image.image_url} 
+                        href={buildCandidateUrls(image)[0] || image.image_url} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:underline"
@@ -185,17 +219,18 @@ const LeadImageDebug: React.FC<LeadImageDebugProps> = ({ vehicleId }) => {
               {nonPrimaryImages.slice(0, 5).map(image => (
                 <div key={image.id} className="bg-gray-50 border border-gray-200 rounded p-2">
                   <div className="flex items-center gap-3">
-                    <img 
-                      src={image.image_url} 
-                      alt="" 
-                      className="w-10 h-10 object-cover rounded"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
+                    <div className="w-10 h-10 rounded" style={{ overflow: 'hidden' }}>
+                      <ResilientImage
+                        sources={buildCandidateUrls(image)}
+                        alt=""
+                        fill={true}
+                        objectFit="cover"
+                        placeholderOpacity={0.15}
+                      />
+                    </div>
                     <div className="flex-1 text-xs">
                       <div className="font-medium">ID: {image.id.slice(0, 8)}...</div>
-                      <div className="text-gray-600">File: {image.filename || 'Unknown'}</div>
+                      <div className="text-gray-600 break-all">{buildCandidateUrls(image)[0] || ''}</div>
                     </div>
                     <button
                       onClick={() => fixLeadImage(image.id)}
