@@ -1476,24 +1476,32 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    // Debug logging helper (DB + localhost if reachable)
+    // Debug logging helper (DB + localhost if reachable) - fire and forget, never throw
     const debugLog = (payload: { location: string; message: string; data: Record<string, any> }) => {
-      const fullPayload = { ...payload, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' };
-      // Localhost (may not work from Supabase servers)
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fullPayload)}).catch(()=>{});
-      // DB-based (always works)
-      (async () => {
-        try {
-          await supabase.from('debug_runtime_logs').insert({
-            source: 'comprehensive-bat-extraction',
-            run_id: fullPayload.runId,
-            hypothesis_id: fullPayload.hypothesisId,
-            location: fullPayload.location,
-            message: fullPayload.message,
-            data: fullPayload.data,
-          });
-        } catch { /* swallow */ }
-      })();
+      try {
+        const fullPayload = { ...payload, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' };
+        // Localhost (may not work from Supabase servers) - fire and forget
+        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fullPayload)}).catch(()=>{});
+        // DB-based (always works) - fire and forget
+        (async () => {
+          try {
+            await supabase.from('debug_runtime_logs').insert({
+              source: 'comprehensive-bat-extraction',
+              run_id: fullPayload.runId,
+              hypothesis_id: fullPayload.hypothesisId,
+              location: fullPayload.location,
+              message: fullPayload.message,
+              data: fullPayload.data,
+            }).catch(() => {}); // Double-catch to be extra safe
+          } catch (e) {
+            // Swallow all errors - debug logging should never break execution
+            console.warn('Debug log insert failed (non-critical):', e);
+          }
+        })();
+      } catch (e) {
+        // Swallow all errors - debug logging should never break execution
+        console.warn('Debug log failed (non-critical):', e);
+      }
     };
 
     // Ensure BaT participant identities exist (seller/buyer/bidders) so we can map actions over time.
@@ -1766,12 +1774,30 @@ serve(async (req) => {
         }
       });
       
+      // Update vehicle - use update with select to get updated row, but handle errors gracefully
       const { data: updatedVehicle, error: updateError } = await supabase
         .from('vehicles')
         .update(vehicleUpdates)
         .eq('id', vehicleId)
-        .select()
+        .select('bat_comments, bat_bids, bat_views, sale_price, sale_date, auction_end_date, description, vin, year, make, model')
         .single();
+      
+      // Even if select fails, the update might have succeeded - verify by fetching separately
+      let verifiedVehicle: any = updatedVehicle;
+      if (updateError && updatedVehicle === null) {
+        console.warn('Update select failed, but update may have succeeded. Verifying...', updateError);
+        // Fetch separately to verify update actually persisted
+        const { data: fetchedVehicle, error: fetchError } = await supabase
+          .from('vehicles')
+          .select('bat_comments, bat_bids, bat_views, sale_price, sale_date, auction_end_date, description, vin, year, make, model')
+          .eq('id', vehicleId)
+          .single();
+        
+        if (!fetchError && fetchedVehicle) {
+          verifiedVehicle = fetchedVehicle;
+          console.log('Update verified - vehicle was updated successfully');
+        }
+      }
       
       debugLog({
         location: 'comprehensive-bat-extraction/index.ts:1718',
@@ -1783,16 +1809,17 @@ serve(async (req) => {
           errorMessage: updateError?.message,
           errorDetails: updateError?.details,
           errorHint: updateError?.hint,
-          hasUpdatedVehicle: !!updatedVehicle,
-          updatedVehicleFields: updatedVehicle ? Object.keys(updatedVehicle) : null,
-          updatedVehicleSample: updatedVehicle ? {
-            bat_comments: updatedVehicle.bat_comments,
-            bat_bids: updatedVehicle.bat_bids,
-            bat_views: updatedVehicle.bat_views,
-            sale_price: updatedVehicle.sale_price,
-            sale_date: updatedVehicle.sale_date,
-            auction_end_date: updatedVehicle.auction_end_date,
-            description: updatedVehicle.description ? `[${updatedVehicle.description.length} chars]` : null,
+          hasUpdatedVehicle: !!verifiedVehicle,
+          updatedVehicleFields: verifiedVehicle ? Object.keys(verifiedVehicle) : null,
+          updatedVehicleSample: verifiedVehicle ? {
+            bat_comments: verifiedVehicle.bat_comments,
+            bat_bids: verifiedVehicle.bat_bids,
+            bat_views: verifiedVehicle.bat_views,
+            sale_price: verifiedVehicle.sale_price,
+            sale_date: verifiedVehicle.sale_date,
+            auction_end_date: verifiedVehicle.auction_end_date,
+            description: verifiedVehicle.description ? `[${verifiedVehicle.description.length} chars]` : null,
+            vin: verifiedVehicle.vin,
           } : null,
         }
       });
@@ -1853,10 +1880,10 @@ serve(async (req) => {
           .catch(err => console.error('Failed to create source attribution:', err));
       }
       
-      if (updateError) {
+      if (updateError && !verifiedVehicle) {
         debugLog({
-          location: 'comprehensive-bat-extraction/index.ts:1773',
-          message: 'UPDATE ERROR detected',
+          location: 'comprehensive-bat-extraction/index.ts:1825',
+          message: 'UPDATE ERROR detected - update may have failed',
           data: {
             vehicleId,
             errorCode: updateError?.code,
@@ -1866,54 +1893,41 @@ serve(async (req) => {
             fullError: JSON.stringify(updateError),
           }
         });
-        console.error('Error updating vehicle:', updateError);
-        console.error('Update error details:', JSON.stringify(updateError, null, 2));
-        
-        // Try using RPC function as fallback for VIN update
-        if (extractedData.vin) {
-          console.log('Attempting VIN update via RPC...');
-          const { data: rpcData, error: rpcError } = await supabase.rpc('update_vehicle_vin_safe', {
-            p_vehicle_id: vehicleId,
-            p_vin: extractedData.vin
-          });
-          
-          if (rpcError) {
-            console.error('RPC update also failed:', rpcError);
-          } else {
-            console.log('RPC update succeeded:', rpcData);
-          }
-        }
+        console.error('Update error - vehicle was NOT updated:', JSON.stringify(updateError, null, 2));
       } else {
         debugLog({
-          location: 'comprehensive-bat-extraction/index.ts:1804',
-          message: 'UPDATE SUCCESS - verifying persistence',
+          location: 'comprehensive-bat-extraction/index.ts:1840',
+          message: 'UPDATE SUCCESS - vehicle updated',
           data: {
             vehicleId,
             updatedFields: Object.keys(vehicleUpdates),
-            updatedVehicleVin: updatedVehicle?.vin,
-            updatedVehicleBatComments: updatedVehicle?.bat_comments,
-            updatedVehicleBatBids: updatedVehicle?.bat_bids,
-            updatedVehicleSalePrice: updatedVehicle?.sale_price,
-            updatedVehicleSaleDate: updatedVehicle?.sale_date,
-            updatedVehicleAuctionEndDate: updatedVehicle?.auction_end_date,
-            updatedVehicleDescription: updatedVehicle?.description ? `[${updatedVehicle.description.length} chars]` : null,
+            verifiedVehicleVin: verifiedVehicle?.vin,
+            verifiedVehicleBatComments: verifiedVehicle?.bat_comments,
+            verifiedVehicleBatBids: verifiedVehicle?.bat_bids,
+            verifiedVehicleSalePrice: verifiedVehicle?.sale_price,
+            verifiedVehicleSaleDate: verifiedVehicle?.sale_date,
+            verifiedVehicleAuctionEndDate: verifiedVehicle?.auction_end_date,
+            verifiedVehicleDescription: verifiedVehicle?.description ? `[${verifiedVehicle.description.length} chars]` : null,
+            updateErrorWasPresent: !!updateError,
           }
         });
         
-        console.log('Vehicle updated successfully');
-        console.log('Updated VIN:', updatedVehicle?.vin || 'VIN not in response');
-        console.log('Updated fields:', Object.keys(vehicleUpdates).join(', '));
+        console.log('✅ Vehicle updated successfully');
+        console.log('✅ Verified VIN:', verifiedVehicle?.vin || 'VIN not in response');
+        console.log('✅ Updated fields:', Object.keys(vehicleUpdates).join(', '));
         
         // Verify VIN was actually saved
-        if (extractedData.vin && !updatedVehicle?.vin) {
-          console.warn('WARNING: VIN was in update payload but not in response!');
-          // Try direct RPC call
+        if (extractedData.vin && !verifiedVehicle?.vin) {
+          console.warn('WARNING: VIN was in update payload but not verified in response!');
+          // Try direct RPC call as fallback
           const { error: directError } = await supabase.rpc('update_vehicle_vin_safe', {
             p_vehicle_id: vehicleId,
             p_vin: extractedData.vin
           });
           if (directError) {
             console.error('Direct RPC call failed:', directError);
+          } else {
+            console.log('✅ VIN updated via RPC fallback');
           }
         }
       }
