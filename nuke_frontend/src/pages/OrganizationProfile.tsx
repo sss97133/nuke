@@ -1482,6 +1482,14 @@ export default function OrganizationProfile() {
                 }}
               />
             )}
+            {/* Favicon from website - show if no logo or as additional identifier */}
+            {organization.website && (
+              <FaviconIcon 
+                url={organization.website} 
+                size={20}
+                style={{ flexShrink: 0 }}
+              />
+            )}
             <h1 style={{ 
               fontSize: '20pt', 
               fontWeight: 700, 

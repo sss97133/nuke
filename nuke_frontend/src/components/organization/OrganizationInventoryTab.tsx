@@ -42,7 +42,7 @@ const OrganizationInventoryTab: React.FC<Props> = ({ organizationId, isOwner }) 
   const loadInventory = async () => {
     setLoading(true);
     try {
-      // Load only in_stock and consignment vehicles (active inventory)
+      // Load inventory vehicles - include in_stock, consignment, and seller (dealers often use 'seller' instead of 'in_stock')
       const { data, error } = await supabase
         .from('organization_vehicles')
         .select(`
@@ -64,7 +64,8 @@ const OrganizationInventoryTab: React.FC<Props> = ({ organizationId, isOwner }) 
           )
         `)
         .eq('organization_id', organizationId)
-        .in('relationship_type', ['in_stock', 'consignment'])
+        .in('relationship_type', ['in_stock', 'consignment', 'seller', 'consigner'])
+        .eq('status', 'active')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

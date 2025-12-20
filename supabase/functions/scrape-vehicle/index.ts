@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,6 +94,301 @@ function extractBhccStockNoFromHtml(html: string): number | null {
   if (!m?.[1]) return null
   const n = parseInt(m[1], 10)
   return Number.isFinite(n) ? n : null
+}
+
+/**
+ * Extract data from sidebar structure (Classic.com, Hagerty, etc.)
+ * Handles: .sidebar .price .price-amount, .condition, .at-a-glance .odomoter, .transmission
+ */
+function extractSidebarData(doc: any): {
+  price: number | null;
+  condition: string | null;
+  mileage: number | null;
+  transmission: string | null;
+} {
+  const result = {
+    price: null as number | null,
+    condition: null as string | null,
+    mileage: null as number | null,
+    transmission: null as string | null,
+  };
+
+  // Extract price from .price .price-amount
+  const priceEl = doc.querySelector('.sidebar .price .price-amount, .price .price-amount');
+  if (priceEl) {
+    const priceText = priceEl.textContent?.trim() || '';
+    // Remove currency symbol and parse
+    const priceMatch = priceText.match(/[\d,]+\.?\d*/);
+    if (priceMatch) {
+      const price = parseInt(priceMatch[0].replace(/,/g, ''), 10);
+      if (price > 0 && price < 100000000) {
+        result.price = price;
+      }
+    }
+  }
+
+  // Extract condition from .price .condition
+  const conditionEl = doc.querySelector('.sidebar .price .condition, .price .condition');
+  if (conditionEl) {
+    const condition = conditionEl.textContent?.trim();
+    if (condition) {
+      result.condition = condition;
+    }
+  }
+
+  // Extract mileage from .at-a-glance .odomoter (note: typo in HTML class)
+  const odometerEl = doc.querySelector('.sidebar .at-a-glance .odomoter, .at-a-glance .odomoter');
+  if (odometerEl) {
+    const odoText = odometerEl.textContent?.trim() || '';
+    // Match patterns like "13,796 mi" or "13,796 miles"
+    const odoMatch = odoText.match(/([\d,]+)\s*(?:mi|miles|mile)/i);
+    if (odoMatch) {
+      const mileage = parseInt(odoMatch[1].replace(/,/g, ''), 10);
+      if (mileage > 0 && mileage < 10000000) {
+        result.mileage = mileage;
+      }
+    }
+  }
+
+  // Extract transmission from .at-a-glance .transmission
+  const transEl = doc.querySelector('.sidebar .at-a-glance .transmission, .at-a-glance .transmission');
+  if (transEl) {
+    const transText = transEl.textContent?.trim() || '';
+    // Clean up common prefixes like icons
+    const trans = transText.replace(/^[^\w]*/, '').trim();
+    if (trans) {
+      result.transmission = trans;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract data from description text (rich vehicle details)
+ * Parses free-form description for color, interior, engine, features, etc.
+ */
+function extractDescriptionData(description: string): {
+  exteriorColor: string | null;
+  interiorColor: string | null;
+  engine: string | null;
+  features: string[];
+  originalMsrp: number | null;
+  ownership: string | null;
+  condition: string | null;
+} {
+  const result = {
+    exteriorColor: null as string | null,
+    interiorColor: null as string | null,
+    engine: null as string | null,
+    features: [] as string[],
+    originalMsrp: null as number | null,
+    ownership: null as string | null,
+    condition: null as string | null,
+  };
+
+  if (!description) return result;
+
+  const desc = description.toLowerCase();
+
+  // Extract exterior color - patterns like "GT Silver Metallic", "finished in [Color]"
+  const colorPatterns = [
+    /finished in ([A-Z][A-Za-z\s]+(?:Metallic|Pearl|Mica|Paint)?)/i,
+    /([A-Z][A-Za-z\s]+(?:Metallic|Pearl|Mica))\s+over/i,
+    /color[:\s]+([A-Z][A-Za-z\s]+(?:Metallic|Pearl|Mica)?)/i,
+  ];
+  for (const pattern of colorPatterns) {
+    const match = description.match(pattern);
+    if (match) {
+      result.exteriorColor = match[1].trim();
+      break;
+    }
+  }
+
+  // Extract interior color - patterns like "Black Leather", "over [Color] interior"
+  const interiorPatterns = [
+    /over\s+([A-Z][A-Za-z\s]+(?:Leather|Cloth|Vinyl|Suede)?)\s+interior/i,
+    /interior[:\s]+([A-Z][A-Za-z\s]+(?:Leather|Cloth|Vinyl|Suede)?)/i,
+    /([A-Z][A-Za-z\s]+(?:Leather|Cloth|Vinyl|Suede))\s+interior/i,
+  ];
+  for (const pattern of interiorPatterns) {
+    const match = description.match(pattern);
+    if (match) {
+      result.interiorColor = match[1].trim();
+      break;
+    }
+  }
+
+  // Extract engine - patterns like "twin-turbo 3.0 liter", "3.0L V6", etc.
+  const enginePatterns = [
+    /(twin-turbo|turbocharged|supercharged)\s+([\d.]+)\s*(?:liter|L)/i,
+    /([\d.]+)\s*(?:liter|L)\s*(?:twin-turbo|turbocharged|supercharged)?\s*(?:flat|inline|V)?\s*\d+/i,
+    /engine[:\s]+([^.,]+(?:liter|L|V\d+|inline))/i,
+  ];
+  for (const pattern of enginePatterns) {
+    const match = description.match(pattern);
+    if (match) {
+      result.engine = match[0].trim();
+      break;
+    }
+  }
+
+  // Extract original MSRP - patterns like "over $161k", "original sticker price over $161k"
+  const msrpPatterns = [
+    /original\s+(?:sticker\s+)?price\s+(?:over|was|is)\s+\$?([\d,]+(?:k|K)?)/i,
+    /msrp[:\s]+\$?([\d,]+(?:k|K)?)/i,
+    /sticker[:\s]+\$?([\d,]+(?:k|K)?)/i,
+  ];
+  for (const pattern of msrpPatterns) {
+    const match = description.match(pattern);
+    if (match) {
+      let msrpStr = match[1].replace(/,/g, '');
+      if (msrpStr.toLowerCase().endsWith('k')) {
+        msrpStr = msrpStr.slice(0, -1) + '000';
+      }
+      const msrp = parseInt(msrpStr, 10);
+      if (msrp > 0 && msrp < 10000000) {
+        result.originalMsrp = msrp;
+      }
+      break;
+    }
+  }
+
+  // Extract ownership info - "One Owner", "Two Owner", etc.
+  const ownershipMatch = description.match(/(\d+|one|two|three|four|five)\s+owner/i);
+  if (ownershipMatch) {
+    result.ownership = ownershipMatch[0].trim();
+  }
+
+  // Extract condition - "Clean Carfax", "Excellent Condition", etc.
+  const conditionPatterns = [
+    /clean\s+carfax/i,
+    /excellent\s+condition/i,
+    /mint\s+condition/i,
+    /pristine\s+condition/i,
+  ];
+  for (const pattern of conditionPatterns) {
+    if (pattern.test(description)) {
+      result.condition = pattern.source.replace(/[\\^$.*+?()[\]{}|]/g, '').replace(/i$/, '').trim();
+      break;
+    }
+  }
+
+  // Extract features (common equipment/options)
+  const featureKeywords = [
+    'Front Axle Lift', 'Rear Axle Steering', 'Power Steering Plus',
+    'LED-Matrix Headlights', 'Burmester', 'Surround Sound',
+    '18-way Seats', 'Memory Seats', 'extended range', 'fuel tank',
+    'Sport Chrono', 'PASM', 'PDK', 'Manual Transmission',
+  ];
+  for (const keyword of featureKeywords) {
+    if (description.includes(keyword)) {
+      result.features.push(keyword);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract data from table-based listings (Cantech Automotive, etc.)
+ * Handles: .table.table-striped with th/td pairs in Details and Specifications tabs
+ */
+function extractTableData(doc: any): {
+  price: number | null;
+  mileage: number | null;
+  transmission: string | null;
+  driveType: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  seats: number | null;
+  doors: number | null;
+  fuelType: string | null;
+} {
+  const result = {
+    price: null as number | null,
+    mileage: null as number | null,
+    transmission: null as string | null,
+    driveType: null as string | null,
+    year: null as number | null,
+    make: null as string | null,
+    model: null as string | null,
+    seats: null as number | null,
+    doors: null as number | null,
+    fuelType: null as string | null,
+  };
+
+  // Find all tables with class "table table-striped"
+  const tables = Array.from(doc.querySelectorAll('.table.table-striped, table.table-striped')) || [];
+  
+  for (const table of tables) {
+    const rows = Array.from(table.querySelectorAll('tbody tr, tr')) || [];
+    
+    for (const row of rows as any[]) {
+      const th = row.querySelector('th');
+      const td = row.querySelector('td');
+      
+      if (!th || !td) continue;
+      
+      const label = (th.textContent || '').trim().toLowerCase();
+      const value = (td.textContent || '').trim();
+      
+      if (!label || !value) continue;
+      
+      // Details tab fields
+      if (label === 'price') {
+        // Extract price from .price-amount or direct text
+        const priceEl = td.querySelector('.price-amount');
+        const priceText = priceEl ? (priceEl.textContent || '').trim() : value;
+        const priceMatch = priceText.match(/[\d,]+\.?\d*/);
+        if (priceMatch) {
+          const price = parseInt(priceMatch[0].replace(/,/g, ''), 10);
+          if (price > 0 && price < 100000000) {
+            result.price = price;
+          }
+        }
+      } else if (label === 'miles' || label === 'mileage') {
+        const mileageMatch = value.match(/([\d,]+)\s*(?:mi|miles|mile)?/i);
+        if (mileageMatch) {
+          const mileage = parseInt(mileageMatch[1].replace(/,/g, ''), 10);
+          if (mileage > 0 && mileage < 10000000) {
+            result.mileage = mileage;
+          }
+        }
+      } else if (label === 'transmission' || label === 'transmission type') {
+        result.transmission = value;
+      } else if (label === 'drive type') {
+        result.driveType = value.toLowerCase();
+      }
+      
+      // Specifications tab fields
+      if (label === 'year') {
+        const year = parseInt(value, 10);
+        if (year >= 1885 && year <= new Date().getFullYear() + 1) {
+          result.year = year;
+        }
+      } else if (label === 'make') {
+        result.make = cleanMakeName(value) || value;
+      } else if (label === 'model') {
+        result.model = cleanModelName(value) || value;
+      } else if (label === 'seats') {
+        const seats = parseInt(value, 10);
+        if (seats > 0 && seats <= 20) {
+          result.seats = seats;
+        }
+      } else if (label === 'doors') {
+        const doors = parseInt(value, 10);
+        if (doors > 0 && doors <= 10) {
+          result.doors = doors;
+        }
+      } else if (label === 'fuel type') {
+        result.fuelType = value.toLowerCase();
+      }
+    }
+  }
+
+  return result;
 }
 
 function parseBeverlyHillsCarClubListing(html: string, url: string): any {
@@ -522,6 +818,11 @@ serve(async (req) => {
 
     console.log('🔍 Scraping URL:', url)
 
+    // Initialize Supabase client for schema lookup
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
     // Robust path: Firecrawl structured extraction first (works better on JS-heavy dealer sites).
     const firecrawlExtract = await tryFirecrawl(url)
 
@@ -549,6 +850,35 @@ serve(async (req) => {
       doc = new DOMParser().parseFromString(html, 'text/html')
     }
 
+    // Check for registered extraction patterns for this domain
+    const domain = new URL(url).hostname.replace(/^www\./, '');
+    let registeredSchema = null;
+    try {
+      const schemaResponse = await supabase
+        .from('dealer_site_schemas')
+        .select('schema_data, site_name')
+        .eq('domain', domain)
+        .single();
+      if (schemaResponse.data) {
+        registeredSchema = schemaResponse.data;
+        console.log(`📋 Found registered schema for ${domain}: ${registeredSchema.site_name}`);
+      }
+    } catch (e) {
+      // Non-critical - continue with generic extraction
+      console.log(`No registered schema for ${domain}, using generic extraction`);
+    }
+
+    // Extract sidebar data if doc is available (Classic.com, Hagerty, etc.)
+    const sidebarData = doc ? extractSidebarData(doc) : null
+    
+    // Extract table data if doc is available (Cantech Automotive, etc.)
+    const tableData = doc ? extractTableData(doc) : null
+    
+    // Extract description text for rich parsing
+    const descriptionEl = doc?.querySelector('.description, [class*="description"], .listing-description, .vehicle-description');
+    const descriptionText = descriptionEl?.textContent?.trim() || '';
+    const descriptionData = descriptionText ? extractDescriptionData(descriptionText) : null
+
     // Basic data extraction (normalized output shape)
     const data: any = {
       success: true,
@@ -559,10 +889,23 @@ serve(async (req) => {
       description: '', // Initialize with empty string to prevent undefined
       images: [],
       timestamp: new Date().toISOString(),
-      year: null,
-      make: null,
-      model: null,
-      asking_price: null,
+      year: tableData?.year || null,
+      make: tableData?.make || null,
+      model: tableData?.model || null,
+      asking_price: tableData?.price || sidebarData?.price || null,
+      mileage: tableData?.mileage || sidebarData?.mileage || null,
+      transmission: tableData?.transmission || sidebarData?.transmission || null,
+      drivetrain: tableData?.driveType || null,
+      seats: tableData?.seats || null,
+      doors: tableData?.doors || null,
+      fuel_type: tableData?.fuelType || null,
+      color: descriptionData?.exteriorColor || null,
+      interior_color: descriptionData?.interiorColor || null,
+      engine: descriptionData?.engine || null,
+      msrp: descriptionData?.originalMsrp || null,
+      features: descriptionData?.features || [],
+      condition: descriptionData?.condition || sidebarData?.condition || null,
+      description: descriptionText || '',
       location: null,
       thumbnail_url: null,
       _function_version: firecrawlExtract ? '2.1-firecrawl' : '2.1-html'  // Debug version identifier
@@ -580,7 +923,16 @@ serve(async (req) => {
           ? firecrawlExtract.asking_price
           : typeof firecrawlExtract.price === 'number'
             ? firecrawlExtract.price
-            : null
+            : tableData?.price || sidebarData?.price || null
+      data.year = typeof firecrawlExtract.year === 'number' ? firecrawlExtract.year : tableData?.year || data.year
+      data.make = cleanMakeName(firecrawlExtract.make) || tableData?.make || data.make
+      data.model = cleanModelName(firecrawlExtract.model) || tableData?.model || data.model
+      data.mileage = typeof firecrawlExtract.mileage === 'number' ? firecrawlExtract.mileage : tableData?.mileage || sidebarData?.mileage || null
+      data.transmission = firecrawlExtract.transmission ? String(firecrawlExtract.transmission).trim() : tableData?.transmission || sidebarData?.transmission || null
+      data.drivetrain = firecrawlExtract.drivetrain ? String(firecrawlExtract.drivetrain).trim() : tableData?.driveType || data.drivetrain
+      data.seats = typeof firecrawlExtract.seats === 'number' ? firecrawlExtract.seats : tableData?.seats || data.seats
+      data.doors = typeof firecrawlExtract.doors === 'number' ? firecrawlExtract.doors : tableData?.doors || data.doors
+      data.fuel_type = firecrawlExtract.fuel_type ? String(firecrawlExtract.fuel_type).trim() : tableData?.fuelType || data.fuel_type
       data.location = firecrawlExtract.location ? String(firecrawlExtract.location).trim() : null
       data.description = firecrawlExtract.description ? String(firecrawlExtract.description).trim() : ''
       data.thumbnail_url = firecrawlExtract.thumbnail_url ? String(firecrawlExtract.thumbnail_url).trim() : null

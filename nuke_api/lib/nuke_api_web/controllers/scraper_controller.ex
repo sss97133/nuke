@@ -51,6 +51,7 @@ defmodule NukeApiWeb.ScraperController do
       "Facebook Marketplace" -> extract_facebook_data(html, url)
       "Hagerty" -> extract_hagerty_data(html)
       "Classic.com" -> extract_classic_data(html)
+      "Cantech Automotive" -> extract_classic_data(html)  # Uses same table structure
       _ -> extract_generic_data(html)
     end
     
@@ -330,6 +331,7 @@ defmodule NukeApiWeb.ScraperController do
       String.contains?(url, "facebook.com/marketplace") -> "Facebook Marketplace"
       String.contains?(url, "hagerty.com") -> "Hagerty"
       String.contains?(url, "classic.com") -> "Classic.com"
+      String.contains?(url, "cantechautomotive.com") -> "Cantech Automotive"
       String.contains?(url, "cars.com") -> "Cars.com"
       String.contains?(url, "autotrader.com") -> "AutoTrader"
       String.contains?(url, "craigslist.org") -> "Craigslist"
@@ -590,11 +592,150 @@ defmodule NukeApiWeb.ScraperController do
     title = Floki.find(doc, ".listing-title, h1") |> Floki.text() |> String.trim()
     {year, make, model} = parse_vehicle_title(title)
     
+    # Extract sidebar data (price, condition, mileage, transmission)
+    price = extract_sidebar_price(doc)
+    condition = extract_sidebar_condition(doc)
+    mileage = extract_sidebar_mileage(doc)
+    transmission = extract_sidebar_transmission(doc)
+    
+    # Extract table data (Cantech Automotive, etc.) - takes precedence if found
+    table_data = extract_table_data(doc)
+    
     %{
-      year: year,
-      make: make,
-      model: model
+      year: table_data[:year] || year,
+      make: table_data[:make] || make,
+      model: table_data[:model] || model,
+      sale_price: table_data[:price] || price,
+      condition: condition,
+      mileage: table_data[:mileage] || mileage,
+      transmission: table_data[:transmission] || transmission,
+      drivetrain: table_data[:drivetrain],
+      seats: table_data[:seats],
+      doors: table_data[:doors],
+      fuel_type: table_data[:fuel_type]
     }
+  end
+
+  defp extract_sidebar_price(doc) do
+    price_text = Floki.find(doc, ".sidebar .price .price-amount, .price .price-amount")
+                   |> Floki.text()
+                   |> String.trim()
+    
+    case Regex.run(~r/([\d,]+\.?\d*)/, price_text) do
+      [_, price_str] ->
+        price_str
+        |> String.replace(",", "")
+        |> String.to_integer()
+      _ -> nil
+    end
+  end
+
+  defp extract_sidebar_condition(doc) do
+    Floki.find(doc, ".sidebar .price .condition, .price .condition")
+    |> Floki.text()
+    |> String.trim()
+    |> case do
+      "" -> nil
+      condition -> condition
+    end
+  end
+
+  defp extract_sidebar_mileage(doc) do
+    odo_text = Floki.find(doc, ".sidebar .at-a-glance .odomoter, .at-a-glance .odomoter")
+                |> Floki.text()
+                |> String.trim()
+    
+    case Regex.run(~r/([\d,]+)\s*(?:mi|miles|mile)/i, odo_text) do
+      [_, mileage_str] ->
+        mileage_str
+        |> String.replace(",", "")
+        |> String.to_integer()
+      _ -> nil
+    end
+  end
+
+  defp extract_sidebar_transmission(doc) do
+    trans_text = Floki.find(doc, ".sidebar .at-a-glance .transmission, .at-a-glance .transmission")
+                  |> Floki.text()
+                  |> String.trim()
+                  |> String.replace(~r/^[^\w]*/, "")
+                  |> String.trim()
+    
+    case trans_text do
+      "" -> nil
+      trans -> trans
+    end
+  end
+
+  # Extract data from table-based listings (Cantech Automotive, etc.)
+  defp extract_table_data(doc) do
+    tables = Floki.find(doc, ".table.table-striped, table.table-striped")
+    result = %{}
+    
+    Enum.reduce(tables, result, fn table, acc ->
+      rows = Floki.find(table, "tbody tr, tr")
+      
+      Enum.reduce(rows, acc, fn row, row_acc ->
+        th = Floki.find(row, "th") |> Floki.text() |> String.trim() |> String.downcase()
+        td = Floki.find(row, "td") |> Floki.text() |> String.trim()
+        
+        cond do
+          th == "price" ->
+            price_text = Floki.find(row, "td .price-amount") |> Floki.text() |> String.trim()
+            price_str = if price_text == "", do: td, else: price_text
+            case Regex.run(~r/([\d,]+\.?\d*)/, price_str) do
+              [_, price_val] ->
+                price = price_val |> String.replace(",", "") |> String.to_integer()
+                if price > 0 and price < 100_000_000, do: Map.put(row_acc, :price, price), else: row_acc
+              _ -> row_acc
+            end
+            
+          th in ["miles", "mileage"] ->
+            case Regex.run(~r/([\d,]+)\s*(?:mi|miles|mile)?/i, td) do
+              [_, mileage_str] ->
+                mileage = mileage_str |> String.replace(",", "") |> String.to_integer()
+                if mileage > 0 and mileage < 10_000_000, do: Map.put(row_acc, :mileage, mileage), else: row_acc
+              _ -> row_acc
+            end
+            
+          th in ["transmission", "transmission type"] ->
+            Map.put(row_acc, :transmission, td)
+            
+          th == "drive type" ->
+            Map.put(row_acc, :drivetrain, String.downcase(td))
+            
+          th == "year" ->
+            case Integer.parse(td) do
+              {y, _} when y >= 1885 and y <= Date.utc_today().year + 1 -> Map.put(row_acc, :year, y)
+              _ -> row_acc
+            end
+            
+          th == "make" ->
+            Map.put(row_acc, :make, td)
+            
+          th == "model" ->
+            Map.put(row_acc, :model, td)
+            
+          th == "seats" ->
+            case Integer.parse(td) do
+              {s, _} when s > 0 and s <= 20 -> Map.put(row_acc, :seats, s)
+              _ -> row_acc
+            end
+            
+          th == "doors" ->
+            case Integer.parse(td) do
+              {d, _} when d > 0 and d <= 10 -> Map.put(row_acc, :doors, d)
+              _ -> row_acc
+            end
+            
+          th == "fuel type" ->
+            Map.put(row_acc, :fuel_type, String.downcase(td))
+            
+          true ->
+            row_acc
+        end
+      end)
+    end)
   end
 
   defp extract_generic_data(html) do
