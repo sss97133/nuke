@@ -592,10 +592,13 @@ const ImageGallery = ({
     for (const img of prioritized) {
       const k = keyFor(img);
       if (!k) {
-        out.push(img);
+        // Skip images without any identifying key - likely invalid
         continue;
       }
-      if (seen.has(k)) continue;
+      if (seen.has(k)) {
+        // Skip duplicates
+        continue;
+      }
       seen.add(k);
       out.push(img);
     }
