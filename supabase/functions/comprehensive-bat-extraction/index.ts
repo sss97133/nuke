@@ -1475,6 +1475,26 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    
+    // Debug logging helper (DB + localhost if reachable)
+    const debugLog = (payload: { location: string; message: string; data: Record<string, any> }) => {
+      const fullPayload = { ...payload, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' };
+      // Localhost (may not work from Supabase servers)
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fullPayload)}).catch(()=>{});
+      // DB-based (always works)
+      (async () => {
+        try {
+          await supabase.from('debug_runtime_logs').insert({
+            source: 'comprehensive-bat-extraction',
+            run_id: fullPayload.runId,
+            hypothesis_id: fullPayload.hypothesisId,
+            location: fullPayload.location,
+            message: fullPayload.message,
+            data: fullPayload.data,
+          });
+        } catch { /* swallow */ }
+      })();
+    };
 
     // Ensure BaT participant identities exist (seller/buyer/bidders) so we can map actions over time.
     // This does NOT create N-Zero auth users; it populates `bat_users` (public auction identities).
@@ -1585,6 +1605,28 @@ serve(async (req) => {
 
     // If vehicleId provided, update vehicle and create timeline events
     if (vehicleId) {
+      debugLog({
+        location: 'comprehensive-bat-extraction/index.ts:1595',
+        message: 'Starting vehicle update - extracted data check',
+        data: {
+          vehicleId,
+          batUrl,
+          hasVin: !!extractedData.vin,
+          hasSalePrice: !!extractedData.sale_price,
+          salePrice: extractedData.sale_price,
+          hasBidCount: extractedData.bid_count !== undefined,
+          bidCount: extractedData.bid_count,
+          hasViewCount: extractedData.view_count !== undefined,
+          viewCount: extractedData.view_count,
+          hasCommentCount: extractedData.comment_count !== undefined,
+          commentCount: extractedData.comment_count,
+          hasDescription: !!extractedData.description,
+          descriptionLength: extractedData.description?.length,
+          hasFeatures: !!(extractedData.features?.length),
+          featureCount: extractedData.features?.length,
+        }
+      });
+      
       // Update vehicle with extracted data
       const vehicleUpdates: any = {
         bat_auction_url: batUrl,
@@ -1699,12 +1741,61 @@ serve(async (req) => {
       
       console.log('Updating vehicle with:', JSON.stringify(vehicleUpdates, null, 2));
       
+      debugLog({
+        location: 'comprehensive-bat-extraction/index.ts:1704',
+        message: 'BEFORE update - vehicleUpdates payload',
+        data: {
+          vehicleId,
+          vehicleUpdatesKeys: Object.keys(vehicleUpdates),
+          vehicleUpdatesCount: Object.keys(vehicleUpdates).length,
+          vehicleUpdates: vehicleUpdates, // Full payload
+          extractedDataSample: {
+            hasSalePrice: !!extractedData.sale_price,
+            salePrice: extractedData.sale_price,
+            hasBidCount: extractedData.bid_count !== undefined,
+            bidCount: extractedData.bid_count,
+            hasViewCount: extractedData.view_count !== undefined,
+            viewCount: extractedData.view_count,
+            hasCommentCount: extractedData.comment_count !== undefined,
+            commentCount: extractedData.comment_count,
+            hasDescription: !!extractedData.description,
+            descriptionLength: extractedData.description?.length,
+            hasAuctionEndDate: !!extractedData.auction_end_date,
+            auctionEndDate: extractedData.auction_end_date,
+          }
+        }
+      });
+      
       const { data: updatedVehicle, error: updateError } = await supabase
         .from('vehicles')
         .update(vehicleUpdates)
         .eq('id', vehicleId)
         .select()
         .single();
+      
+      debugLog({
+        location: 'comprehensive-bat-extraction/index.ts:1718',
+        message: 'AFTER update - result',
+        data: {
+          vehicleId,
+          hasError: !!updateError,
+          errorCode: updateError?.code,
+          errorMessage: updateError?.message,
+          errorDetails: updateError?.details,
+          errorHint: updateError?.hint,
+          hasUpdatedVehicle: !!updatedVehicle,
+          updatedVehicleFields: updatedVehicle ? Object.keys(updatedVehicle) : null,
+          updatedVehicleSample: updatedVehicle ? {
+            bat_comments: updatedVehicle.bat_comments,
+            bat_bids: updatedVehicle.bat_bids,
+            bat_views: updatedVehicle.bat_views,
+            sale_price: updatedVehicle.sale_price,
+            sale_date: updatedVehicle.sale_date,
+            auction_end_date: updatedVehicle.auction_end_date,
+            description: updatedVehicle.description ? `[${updatedVehicle.description.length} chars]` : null,
+          } : null,
+        }
+      });
 
       // Best-effort: record time-series location observation for this listing.
       try {
@@ -1763,6 +1854,18 @@ serve(async (req) => {
       }
       
       if (updateError) {
+        debugLog({
+          location: 'comprehensive-bat-extraction/index.ts:1773',
+          message: 'UPDATE ERROR detected',
+          data: {
+            vehicleId,
+            errorCode: updateError?.code,
+            errorMessage: updateError?.message,
+            errorDetails: updateError?.details,
+            errorHint: updateError?.hint,
+            fullError: JSON.stringify(updateError),
+          }
+        });
         console.error('Error updating vehicle:', updateError);
         console.error('Update error details:', JSON.stringify(updateError, null, 2));
         
@@ -1781,6 +1884,22 @@ serve(async (req) => {
           }
         }
       } else {
+        debugLog({
+          location: 'comprehensive-bat-extraction/index.ts:1804',
+          message: 'UPDATE SUCCESS - verifying persistence',
+          data: {
+            vehicleId,
+            updatedFields: Object.keys(vehicleUpdates),
+            updatedVehicleVin: updatedVehicle?.vin,
+            updatedVehicleBatComments: updatedVehicle?.bat_comments,
+            updatedVehicleBatBids: updatedVehicle?.bat_bids,
+            updatedVehicleSalePrice: updatedVehicle?.sale_price,
+            updatedVehicleSaleDate: updatedVehicle?.sale_date,
+            updatedVehicleAuctionEndDate: updatedVehicle?.auction_end_date,
+            updatedVehicleDescription: updatedVehicle?.description ? `[${updatedVehicle.description.length} chars]` : null,
+          }
+        });
+        
         console.log('Vehicle updated successfully');
         console.log('Updated VIN:', updatedVehicle?.vin || 'VIN not in response');
         console.log('Updated fields:', Object.keys(vehicleUpdates).join(', '));
