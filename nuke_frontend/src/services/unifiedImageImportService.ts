@@ -215,7 +215,8 @@ function fileToBlob(file: File | Blob | Buffer | Uint8Array): Blob {
     return file;
   }
   
-  if (file instanceof Buffer || file instanceof Uint8Array) {
+  const hasBuffer = typeof Buffer !== 'undefined';
+  if ((hasBuffer && file instanceof Buffer) || file instanceof Uint8Array) {
     // Copy into a new Uint8Array backed by an ArrayBuffer (avoid SharedArrayBuffer typing issues).
     const bytes = Uint8Array.from(file as any);
     return new Blob([bytes], { type: 'image/jpeg' });
@@ -331,7 +332,9 @@ export class UnifiedImageImportService {
 
       // Step 4: Generate storage path
       const fileExt = (file instanceof File ? file.name.split('.').pop() : 'jpg') || 'jpg';
-      const uniqueId = crypto.randomUUID();
+      const uniqueId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
       
       let storagePath = customStoragePath;
       if (!storagePath) {
