@@ -2121,80 +2121,104 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               </div>
             )}
           </div>
-          {visibleOrganizations.length > 0 && (
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {visibleOrganizations
-                .filter((org) => {
-                  const name = String(org?.business_name || '').toLowerCase();
-                  const origin = String((vehicle as any)?.profile_origin || '').toLowerCase();
-                  const hasBatMember = !!batMemberLink;
-                  // For BaT imports, don't show the generic BaT org bubble when we have a concrete seller identity.
-                  if (hasBatMember && (origin.includes('bat') || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com'))) {
-                    if (name.includes('bring a trailer') || name === 'bat' || name.includes('ba t')) return false;
-                  }
-                  return true;
-                })
-                .map((org) => (
-                <Link
-                  key={org.id}
-                  to={`/org/${org.organization_id}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    toast.success(
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div style={{ fontWeight: 'bold', fontSize: '11px' }}>{org.business_name}</div>
-                        <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
-                          {formatRelationship(org.relationship_type)}
-                        </div>
-                      </div>,
-                      { 
-                        duration: 3000, 
-                        position: 'top-right',
-                        style: {
-                          borderRadius: '4px',
-                          padding: '8px 12px',
-                          fontSize: '10px'
-                        }
-                      }
+          {(() => {
+            // Separate seller/consigner orgs from other orgs, prioritize sellers
+            const sellerOrgs = visibleOrganizations.filter((org) => {
+              const rel = String(org?.relationship_type || '').toLowerCase();
+              return ['sold_by', 'seller', 'consigner'].includes(rel);
+            });
+            const otherOrgs = visibleOrganizations.filter((org) => {
+              const rel = String(org?.relationship_type || '').toLowerCase();
+              return !['sold_by', 'seller', 'consigner'].includes(rel);
+            });
+            const allDisplayOrgs = [...sellerOrgs, ...otherOrgs];
+            
+            if (allDisplayOrgs.length === 0) return null;
+            
+            return (
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {allDisplayOrgs
+                  .filter((org) => {
+                    const name = String(org?.business_name || '').toLowerCase();
+                    const origin = String((vehicle as any)?.profile_origin || '').toLowerCase();
+                    const hasBatMember = !!batMemberLink;
+                    // For BaT imports, don't show the generic BaT org bubble when we have a concrete seller identity.
+                    if (hasBatMember && (origin.includes('bat') || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com'))) {
+                      if (name.includes('bring a trailer') || name === 'bat' || name.includes('ba t')) return false;
+                    }
+                    return true;
+                  })
+                  .map((org) => {
+                    const orgName = String(org?.business_name || '');
+                    const isBatOrg = orgName.toLowerCase().includes('bring a trailer') || orgName.toLowerCase() === 'bat' || orgName.toLowerCase().includes('ba t');
+                    const batUrl = 'https://bringatrailer.com';
+                    
+                    return (
+                      <Link
+                        key={org.id}
+                        to={`/org/${org.organization_id}`}
+                        data-discover="true"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          toast.success(
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ fontWeight: 'bold', fontSize: '11px' }}>{org.business_name}</div>
+                              <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+                                {formatRelationship(org.relationship_type)}
+                              </div>
+                            </div>,
+                            { 
+                              duration: 3000, 
+                              position: 'top-right',
+                              style: {
+                                borderRadius: '4px',
+                                padding: '8px 12px',
+                                fontSize: '10px'
+                              }
+                            }
+                          );
+                          setTimeout(() => navigate(`/org/${org.organization_id}`), 100);
+                        }}
+                        title={`${org.business_name} (${formatRelationship(org.relationship_type)})`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '22px',
+                          height: '22px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '50%',
+                          background: 'var(--surface)',
+                          color: baseTextColor,
+                          textDecoration: 'none',
+                          fontSize: '10px',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          transition: 'transform 0.1s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        {org.logo_url ? (
+                          <img src={org.logo_url} alt={org.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : isBatOrg ? (
+                          <FaviconIcon url={batUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+                        ) : (
+                          org.business_name.charAt(0).toUpperCase()
+                        )}
+                      </Link>
                     );
-                    setTimeout(() => navigate(`/org/${org.organization_id}`), 100);
-                  }}
-                  title={`${org.business_name} (${formatRelationship(org.relationship_type)})`}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '20px',
-                    height: '20px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '50%',
-                    background: 'var(--surface)',
-                    color: baseTextColor,
-                    textDecoration: 'none',
-                    fontSize: '10px',
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    transition: 'transform 0.1s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  {org.logo_url ? (
-                    <img src={org.logo_url} alt={org.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    org.business_name.charAt(0).toUpperCase()
-                  )}
-                </Link>
-              ))}
-              {extraOrgCount > 0 && (
-                <span style={{ fontSize: '8px', color: mutedTextColor }}>+{extraOrgCount}</span>
-              )}
-            </div>
-          )}
+                  })}
+                {extraOrgCount > 0 && (
+                  <span style={{ fontSize: '8px', color: mutedTextColor }}>+{extraOrgCount}</span>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <div ref={priceMenuRef} style={{ flex: '0 0 auto', textAlign: 'right', position: 'relative' }}>
