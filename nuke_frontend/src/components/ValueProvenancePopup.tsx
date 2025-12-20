@@ -46,6 +46,8 @@ interface Provenance {
   lot_number?: string;
   sale_date?: string;
   buyer_name?: string;
+  seller_username?: string;
+  seller_profile_url?: string;
   bid_count?: number;
   view_count?: number;
   watcher_count?: number;
@@ -115,7 +117,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       
       // Check external_listings and auction_events for sale_price from BAT auctions
       let batAuctionInfo: any = null;
-      let auctionMetrics: { buyer_name?: string; bid_count?: number; view_count?: number; watcher_count?: number } = {};
+      let auctionMetrics: { buyer_name?: string; seller_username?: string; seller_profile_url?: string; bid_count?: number; view_count?: number; watcher_count?: number } = {};
       
       if (field === 'sale_price' && (vehicle?.bat_auction_url || vehicle?.discovery_url)) {
         // Check external_listings for comprehensive auction data
@@ -146,6 +148,23 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                          saleEvent?.metadata?.lot_number ||
                          null;
         
+        // Extract seller username from multiple sources
+        const sellerUsername = listing?.metadata?.seller_username || 
+                              listing?.metadata?.seller ||
+                              saleEvent?.metadata?.seller_username ||
+                              saleEvent?.metadata?.seller ||
+                              (vehicle as any)?.origin_metadata?.bat_seller_username ||
+                              (vehicle as any)?.bat_seller ||
+                              null;
+        
+        // Construct seller profile URL if we have username
+        const sellerProfileUrl = sellerUsername 
+          ? `https://bringatrailer.com/member/${sellerUsername}/`
+          : (listing?.metadata?.seller_profile_url || 
+             saleEvent?.metadata?.seller_profile_url ||
+             (vehicle as any)?.origin_metadata?.bat_seller_profile_url ||
+             null);
+        
         if (listing || saleEvent || saleDate) {
           batAuctionInfo = {
             url: vehicle.bat_auction_url || vehicle?.discovery_url,
@@ -153,9 +172,11 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             sale_date: saleDate
           };
           
-          // Extract buyer name from metadata
+          // Extract buyer name and seller info from metadata
           auctionMetrics = {
             buyer_name: listing?.metadata?.buyer || saleEvent?.metadata?.buyer || saleEvent?.metadata?.buyer_username,
+            seller_username: sellerUsername,
+            seller_profile_url: sellerProfileUrl,
             bid_count: listing?.bid_count,
             view_count: listing?.view_count,
             watcher_count: listing?.watcher_count
@@ -184,6 +205,8 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           lot_number: batAuctionInfo?.lot_number,
           sale_date: batAuctionInfo?.sale_date,
           buyer_name: auctionMetrics.buyer_name,
+          seller_username: auctionMetrics.seller_username,
+          seller_profile_url: auctionMetrics.seller_profile_url,
           bid_count: auctionMetrics.bid_count,
           view_count: auctionMetrics.view_count,
           watcher_count: auctionMetrics.watcher_count
@@ -203,6 +226,8 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           lot_number: batAuctionInfo.lot_number,
           sale_date: batAuctionInfo.sale_date,
           buyer_name: auctionMetrics.buyer_name,
+          seller_username: auctionMetrics.seller_username,
+          seller_profile_url: auctionMetrics.seller_profile_url,
           bid_count: auctionMetrics.bid_count,
           view_count: auctionMetrics.view_count,
           watcher_count: auctionMetrics.watcher_count
@@ -482,6 +507,33 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 })()}
               </span>
             </div>
+            {/* Seller Username with BaT Profile Link */}
+            {provenance?.seller_username && (
+              <div style={{ marginTop: '8px', fontSize: '8pt', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Seller:</span>
+                <a
+                  href={provenance.seller_profile_url || `https://bringatrailer.com/member/${provenance.seller_username}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ 
+                    color: 'var(--primary)', 
+                    textDecoration: 'underline',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontWeight: 600
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FaviconIcon 
+                    url={provenance.seller_profile_url || `https://bringatrailer.com/member/${provenance.seller_username}/`} 
+                    size={12} 
+                    preserveAspectRatio={true} 
+                  />
+                  {provenance.seller_username}
+                </a>
+              </div>
+            )}
           </div>
 
           {/* Confidence */}
