@@ -1341,28 +1341,38 @@ serve(async (req) => {
       console.log('Timeline sale event insert failed (non-fatal):', e?.message || String(e));
     }
     
-    // Call comprehensive extraction to get full auction data and create timeline events
+    // ALWAYS call comprehensive extraction to get full auction data and create timeline events
+    // This ensures all BaT vehicles get complete data (comments, features, dates, etc.)
     try {
+      console.log('🔄 Calling comprehensive BaT extraction...');
       const { data: comprehensiveData, error: comprehensiveError } = await supabase.functions.invoke('comprehensive-bat-extraction', {
         body: { batUrl, vehicleId }
       });
       
-      if (!comprehensiveError && comprehensiveData?.success) {
-        console.log('Comprehensive extraction completed:', {
-          vin: comprehensiveData.data.vin,
+      if (comprehensiveError) {
+        console.error('❌ Comprehensive extraction error:', comprehensiveError);
+        // Don't fail the import, but log the error
+      } else if (comprehensiveData?.success) {
+        console.log('✅ Comprehensive extraction completed:', {
+          vin: comprehensiveData.data?.vin,
           auction_dates: {
-            start: comprehensiveData.data.auction_start_date,
-            end: comprehensiveData.data.auction_end_date,
-            sale: comprehensiveData.data.sale_date
+            start: comprehensiveData.data?.auction_start_date,
+            end: comprehensiveData.data?.auction_end_date,
+            sale: comprehensiveData.data?.sale_date
           },
           metrics: {
-            bids: comprehensiveData.data.bid_count,
-            views: comprehensiveData.data.view_count
-          }
+            bids: comprehensiveData.data?.bid_count,
+            views: comprehensiveData.data?.view_count,
+            comments: comprehensiveData.data?.comment_count
+          },
+          features: comprehensiveData.data?.features?.length || 0
         });
+      } else {
+        console.warn('⚠️ Comprehensive extraction returned failure:', comprehensiveData?.error);
       }
-    } catch (err) {
-      console.log('Comprehensive extraction not available, using basic extraction only');
+    } catch (err: any) {
+      console.error('❌ Comprehensive extraction exception:', err.message || String(err));
+      // Don't fail the import, but log the error
     }
 
     // Import ALL BaT listing images by scraping URLs then calling backfill-images in batches.

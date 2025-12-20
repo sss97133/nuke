@@ -86,9 +86,52 @@ BaT URL: `https://bringatrailer.com/listing/2008-tesla-roadster-54/`
 
 ## Next Steps
 
-Create and run a batch script to:
-1. Fetch all 128 BaT vehicles with their `bat_auction_url`
-2. For each vehicle, call `comprehensive-bat-extraction` Edge Function
-3. Verify data is correctly stored in database after extraction
-4. Check for any missing `external_listings` records and create them
+### Execution Script
+
+A comprehensive backfill script already exists at: `scripts/fix-all-bat-vehicles-comprehensive.js`
+
+### To Run the Backfill:
+
+```bash
+cd /Users/skylar/nuke
+node scripts/fix-all-bat-vehicles-comprehensive.js
+```
+
+### What the Script Does:
+
+1. ✅ Fetches all BaT vehicles (currently 128 vehicles)
+2. ✅ Filters to vehicles missing critical data (description, features, sale_date, comments)
+3. ✅ For each vehicle, calls `comprehensive-bat-extraction` Edge Function
+4. ✅ Updates database with extracted data:
+   - `vehicles.bat_comments` (comment_count)
+   - `vehicles.origin_metadata.bat_features` (features array)
+   - `vehicles.auction_end_date` (auction end date)
+   - `vehicles.description` (full description)
+   - `vehicles.sale_date`, `vehicles.sale_price`, etc.
+   - Creates/updates `external_listings` records with metadata
+5. ✅ Processes in batches (10 at a time) with rate limiting
+6. ✅ Includes retry logic for transient failures
+
+### Expected Results:
+
+- All 128 BaT vehicles will have:
+  - ✅ Comment counts (`bat_comments`)
+  - ✅ Features array (`origin_metadata.bat_features`)
+  - ✅ Auction end dates (`auction_end_date`)
+  - ✅ External listings records with full metadata
+
+### Verification After Running:
+
+```sql
+-- Check data completeness after backfill
+SELECT 
+  COUNT(*) as total_bat_vehicles,
+  COUNT(CASE WHEN bat_comments IS NOT NULL THEN 1 END) as with_bat_comments,
+  COUNT(CASE WHEN origin_metadata->>'bat_features' IS NOT NULL THEN 1 END) as with_features,
+  COUNT(CASE WHEN auction_end_date IS NOT NULL THEN 1 END) as with_auction_end_date
+FROM vehicles
+WHERE bat_auction_url IS NOT NULL;
+```
+
+All counts should equal the total (128 vehicles).
 
