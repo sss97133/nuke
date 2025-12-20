@@ -723,16 +723,6 @@ const CursorHomepage: React.FC = () => {
     return { totalVehicles, totalValue, salesVolume };
   }, [filteredVehicles]);
 
-  // Format currency values for display
-  const formatCurrency = (value: number): string => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `$${(value / 1000).toFixed(0)}K`;
-    }
-    return `$${value.toLocaleString()}`;
-  };
-
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
     setSession(currentSession);
@@ -1171,10 +1161,12 @@ const CursorHomepage: React.FC = () => {
   }, [hasMore, loadMore, loading, loadingMore]);
 
 
-  const formatCurrency = (value: number) => {
+  // Format currency values for display (exact numbers with commas)
+  const formatCurrency = (value: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
+      minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(value);
   };

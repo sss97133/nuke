@@ -70,6 +70,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   const [evidence, setEvidence] = useState<any[]>([]);
   const [batAuctionInfo, setBatAuctionInfo] = useState<{ url?: string; lot_number?: string; sale_date?: string } | null>(null);
   const [buyerProfileLink, setBuyerProfileLink] = useState<{ url: string; isExternal: boolean } | null>(null);
+  const [marketData, setMarketData] = useState<{ prices: number[]; mean: number; stdDev: number } | null>(null);
   
   // Helper to calculate days/years since sale
   const calculateTimeSinceSale = (saleDate: string | null | undefined): string | null => {
@@ -93,7 +94,68 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
 
   useEffect(() => {
     loadProvenance();
+    loadMarketData();
   }, []);
+
+  const loadMarketData = async () => {
+    try {
+      // Load vehicle details to find comparables
+      const { data: vehicle } = await supabase
+        .from('vehicles')
+        .select('year, make, model')
+        .eq('id', vehicleId)
+        .single();
+      
+      if (!vehicle?.year || !vehicle?.make || !vehicle?.model) return;
+      
+      // Find comparable sales (same make/model, +/- 3 years, with sale_price)
+      const { data: comparables } = await supabase
+        .from('vehicles')
+        .select('sale_price, current_value')
+        .eq('make', vehicle.make)
+        .eq('model', vehicle.model)
+        .gte('year', vehicle.year - 3)
+        .lte('year', vehicle.year + 3)
+        .neq('id', vehicleId)
+        .not('sale_price', 'is', null)
+        .limit(50);
+      
+      if (!comparables || comparables.length < 3) {
+        // Try with current_value if not enough sale_price data
+        const { data: valueComparables } = await supabase
+          .from('vehicles')
+          .select('current_value')
+          .eq('make', vehicle.make)
+          .eq('model', vehicle.model)
+          .gte('year', vehicle.year - 3)
+          .lte('year', vehicle.year + 3)
+          .neq('id', vehicleId)
+          .not('current_value', 'is', null)
+          .limit(50);
+        
+        if (valueComparables && valueComparables.length >= 3) {
+          const prices = valueComparables.map(v => v.current_value).filter((p): p is number => typeof p === 'number' && p > 0);
+          if (prices.length >= 3) {
+            const mean = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+            const variance = prices.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / prices.length;
+            const stdDev = Math.sqrt(variance);
+            setMarketData({ prices, mean, stdDev });
+          }
+        }
+        return;
+      }
+      
+      const prices = comparables.map(v => v.sale_price || v.current_value).filter((p): p is number => typeof p === 'number' && p > 0);
+      if (prices.length >= 3) {
+        const mean = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+        const variance = prices.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / prices.length;
+        const stdDev = Math.sqrt(variance);
+        setMarketData({ prices, mean, stdDev });
+      }
+    } catch (error) {
+      console.error('Error loading market data:', error);
+    }
+  };
 
   const loadProvenance = async () => {
     try {
@@ -123,10 +185,20 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       let auctionMetrics: { buyer_name?: string; seller_username?: string; seller_profile_url?: string; bid_count?: number; view_count?: number; watcher_count?: number } = {};
       
       if (field === 'sale_price' && (vehicle?.bat_auction_url || vehicle?.discovery_url)) {
+        // Check auction_events first (most reliable source for BaT lot numbers)
+        const { data: auctionEvent } = await supabase
+          .from('auction_events')
+          .select('metadata, auction_end_at')
+          .eq('vehicle_id', vehicleId)
+          .eq('platform', 'bat')
+          .order('auction_end_at', { ascending: false, nullsLast: true })
+          .limit(1)
+          .maybeSingle();
+        
         // Check external_listings for comprehensive auction data
         const { data: listing } = await supabase
           .from('external_listings')
-          .select('sold_at, metadata, bid_count, view_count, watcher_count, listing_id')
+          .select('sold_at, metadata, bid_count, view_count, watcher_count')
           .eq('vehicle_id', vehicleId)
           .eq('platform', 'bat')
           .order('sold_at', { ascending: false, nullsLast: true })
@@ -146,9 +218,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         const saleDate = listing?.sold_at || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date;
         
         // Extract lot number from multiple possible sources (prioritize metadata.lot_number which has full number)
-        const lotNumber = listing?.metadata?.lot_number || 
+        // DO NOT use listing_id as fallback - it's an internal ID, not the BaT lot number
+        const lotNumber = auctionEvent?.metadata?.lot_number ||
+                         listing?.metadata?.lot_number || 
                          saleEvent?.metadata?.lot_number ||
-                         (listing?.listing_id ? String(listing.listing_id) : null) ||
                          null;
         
         // Extract seller username from multiple sources
@@ -440,8 +513,8 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: '8px',
-          minWidth: '500px',
-          maxWidth: '640px',
+          minWidth: '700px',
+          maxWidth: '900px',
           fontFamily: 'Arial, sans-serif',
           boxShadow: '0 20px 40px rgba(0,0,0,0.25)'
         }}
@@ -487,8 +560,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           </button>
         </div>
 
-        {/* Provenance Info */}
-        <div style={{ padding: '16px' }}>
+        {/* Two-column layout: Provenance Info (left) and Bell Curve (right) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 0 }}>
+          {/* Provenance Info - Left Column */}
+          <div style={{ padding: '16px', borderRight: '1px solid var(--border)' }}>
           {/* Trend (what we think it’s worth based on price signal) */}
           {typeof context?.trend_pct === 'number' && Number.isFinite(context.trend_pct) ? (
             <div style={{ marginBottom: '16px' }}>
@@ -807,13 +882,13 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             </div>
           )}
 
-          {/* Edit Section (only if user has permission) */}
-          {provenance?.can_edit && (
-            <div style={{
-              borderTop: '1px solid #e0e0e0',
-              paddingTop: '16px',
-              marginTop: '16px'
-            }}>
+            {/* Edit Section (only if user has permission) */}
+            {provenance?.can_edit && (
+              <div style={{
+                borderTop: '1px solid #e0e0e0',
+                paddingTop: '16px',
+                marginTop: '16px'
+              }}>
               {!editing ? (
                 <button
                   onClick={() => setEditing(true)}
@@ -885,8 +960,230 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             </div>
           )}
 
+          </div>
+
+          {/* Bell Curve Chart - Right Column */}
+          <div style={{ padding: '16px', background: 'var(--bg)' }}>
+            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.6px', fontWeight: 700 }}>
+              Market Distribution
+            </div>
+            {marketData && marketData.prices.length >= 3 ? (
+              <BellCurveChart 
+                value={value}
+                mean={marketData.mean}
+                stdDev={marketData.stdDev}
+                prices={marketData.prices}
+              />
+            ) : (
+              <div style={{ 
+                padding: '20px', 
+                textAlign: 'center', 
+                color: 'var(--text-muted)', 
+                fontSize: '8pt',
+                fontStyle: 'italic'
+              }}>
+                Insufficient market data<br/>for comparable vehicles
+              </div>
+            )}
+          </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Bell Curve Chart Component
+const BellCurveChart: React.FC<{ value: number; mean: number; stdDev: number; prices: number[] }> = ({ 
+  value, 
+  mean, 
+  stdDev,
+  prices 
+}) => {
+  const width = 280;
+  const height = 180;
+  const padding = { top: 20, right: 20, bottom: 40, left: 40 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  // Calculate price range (mean ± 3 standard deviations)
+  const minPrice = Math.max(0, mean - 3 * stdDev);
+  const maxPrice = mean + 3 * stdDev;
+  const priceRange = maxPrice - minPrice;
+
+  // Generate bell curve points
+  const generateBellCurve = (steps: number = 100) => {
+    const points: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= steps; i++) {
+      const price = minPrice + (priceRange * i) / steps;
+      const z = (price - mean) / stdDev;
+      // Normal distribution PDF: (1 / (stdDev * sqrt(2π))) * exp(-0.5 * z^2)
+      const density = (1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * z * z);
+      points.push({ x: price, y: density });
+    }
+    return points;
+  };
+
+  const curvePoints = generateBellCurve();
+  const maxDensity = Math.max(...curvePoints.map(p => p.y));
+
+  // Scale to chart coordinates
+  const scaleX = (price: number) => padding.left + ((price - minPrice) / priceRange) * chartWidth;
+  const scaleY = (density: number) => padding.top + chartHeight - (density / maxDensity) * chartHeight;
+
+  // Create SVG path for bell curve
+  const curvePath = curvePoints
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(p.x)} ${scaleY(p.y)}`)
+    .join(' ');
+
+  // Calculate z-score for current value
+  const zScore = (value - mean) / stdDev;
+  const valueX = scaleX(value);
+
+  // Create histogram from actual prices
+  const bins = 20;
+  const binSize = priceRange / bins;
+  const histogram: number[] = new Array(bins).fill(0);
+  prices.forEach(price => {
+    if (price >= minPrice && price <= maxPrice) {
+      const binIndex = Math.min(Math.floor((price - minPrice) / binSize), bins - 1);
+      histogram[binIndex]++;
+    }
+  });
+  const maxCount = Math.max(...histogram);
+
+  return (
+    <div>
+      <svg width={width} height={height} style={{ display: 'block' }}>
+        {/* Grid lines */}
+        {[0, 0.5, 1].map(factor => {
+          const price = minPrice + priceRange * factor;
+          const x = scaleX(price);
+          return (
+            <line
+              key={factor}
+              x1={x}
+              y1={padding.top}
+              x2={x}
+              y2={height - padding.bottom}
+              stroke="var(--border)"
+              strokeWidth="0.5"
+              opacity={0.3}
+            />
+          );
+        })}
+
+        {/* Histogram bars */}
+        {histogram.map((count, i) => {
+          const binStart = minPrice + i * binSize;
+          const binEnd = binStart + binSize;
+          const x = scaleX(binStart);
+          const barWidth = scaleX(binEnd) - x;
+          const barHeight = count > 0 ? (count / maxCount) * chartHeight * 0.3 : 0;
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={height - padding.bottom - barHeight}
+              width={barWidth}
+              height={barHeight}
+              fill="#0ea5e9"
+              opacity={0.2}
+            />
+          );
+        })}
+
+        {/* Bell curve */}
+        <path
+          d={curvePath}
+          fill="none"
+          stroke="#0ea5e9"
+          strokeWidth="2"
+        />
+
+        {/* Current value line */}
+        <line
+          x1={valueX}
+          y1={padding.top}
+          x2={valueX}
+          y2={height - padding.bottom}
+          stroke="#dc2626"
+          strokeWidth="2"
+          strokeDasharray="4 4"
+        />
+        <circle
+          cx={valueX}
+          cy={scaleY((1 / (stdDev * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * zScore * zScore))}
+          r="4"
+          fill="#dc2626"
+        />
+
+        {/* Labels */}
+        <text
+          x={width / 2}
+          y={height - 5}
+          textAnchor="middle"
+          fontSize="7pt"
+          fill="var(--text-muted)"
+        >
+          Price
+        </text>
+        <text
+          x={padding.left - 5}
+          y={height / 2}
+          textAnchor="middle"
+          fontSize="7pt"
+          fill="var(--text-muted)"
+          transform={`rotate(-90 ${padding.left - 5} ${height / 2})`}
+        >
+          Density
+        </text>
+
+        {/* Value label */}
+        <text
+          x={valueX}
+          y={padding.top - 5}
+          textAnchor="middle"
+          fontSize="7pt"
+          fill="#dc2626"
+          fontWeight="bold"
+        >
+          ${value.toLocaleString()}
+        </text>
+
+        {/* Stats */}
+        <text
+          x={padding.left}
+          y={padding.top + 15}
+          fontSize="7pt"
+          fill="var(--text-muted)"
+        >
+          Mean: ${mean.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        </text>
+        <text
+          x={padding.left}
+          y={padding.top + 27}
+          fontSize="7pt"
+          fill="var(--text-muted)"
+        >
+          σ: ${stdDev.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        </text>
+        <text
+          x={padding.left}
+          y={padding.top + 39}
+          fontSize="7pt"
+          fill="var(--text-muted)"
+        >
+          Z: {zScore.toFixed(2)}
+        </text>
+        <text
+          x={padding.left}
+          y={padding.top + 51}
+          fontSize="7pt"
+          fill="var(--text-muted)"
+        >
+          n: {prices.length}
+        </text>
+      </svg>
     </div>
   );
 };
