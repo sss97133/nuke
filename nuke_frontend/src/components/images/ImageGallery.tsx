@@ -374,7 +374,7 @@ const ImageGallery = ({
     const nextAll = filterBatNoiseRows(allImages);
     if (nextAll.length === allImages.length) return;
     setAllImages(nextAll);
-    setDisplayedImages(nextAll.slice(0, Math.min(50, nextAll.length)));
+    setDisplayedImages(sortRows(nextAll, sortBy).slice(0, Math.min(50, nextAll.length)));
     // Do not toggle usingFallback here; we only filter the current view.
   }, [vehicleMeta]); // intentionally not depending on allImages to avoid loops
 
@@ -462,7 +462,7 @@ const ImageGallery = ({
       const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
       setUsingFallback(false);
       setAllImages(images);
-      setDisplayedImages(images.slice(0, Math.min(50, images.length)));
+      setDisplayedImages(sortRows(images, sortBy).slice(0, Math.min(50, images.length)));
       setShowImages(true);
       onImagesUpdated?.();
     } catch (err) {
@@ -533,8 +533,10 @@ const ImageGallery = ({
         if (catA !== catB) return catB - catA;
 
         // Within same category, newer first
-        const dateA = new Date(a.taken_at || a.created_at).getTime();
-        const dateB = new Date(b.taken_at || b.created_at).getTime();
+        const effA = getEffectiveImageDate(a);
+        const effB = getEffectiveImageDate(b);
+        const dateA = effA.iso ? new Date(effA.iso).getTime() : 0;
+        const dateB = effB.iso ? new Date(effB.iso).getTime() : 0;
 
         if (dateA !== dateB) return dateB - dateA;
 
@@ -549,8 +551,10 @@ const ImageGallery = ({
       if (a.is_primary && !b.is_primary) return -1;
       if (!a.is_primary && b.is_primary) return 1;
 
-      const dateA = new Date(a.taken_at || a.created_at).getTime();
-      const dateB = new Date(b.taken_at || b.created_at).getTime();
+      const effA = getEffectiveImageDate(a);
+      const effB = getEffectiveImageDate(b);
+      const dateA = effA.iso ? new Date(effA.iso).getTime() : 0;
+      const dateB = effB.iso ? new Date(effB.iso).getTime() : 0;
 
       if (dateA !== dateB) return (dateA - dateB) * dir;
       return (a.id || '').localeCompare(b.id || '');
@@ -1190,53 +1194,13 @@ const ImageGallery = ({
   };
 
   const getDisplayDate = (image: any) => {
-    // Priority order for date display:
-    // 1. taken_at (when photo was actually taken)
-    // 2. Auction/listing date from exif_data (for imported images)
-    // 3. created_at (when uploaded) - but label as "Uploaded" for imported images
-    
-    let displayDate: string | null = null;
-    let dateLabel = '';
-    
-    // Check for taken_at first (actual photo date)
-    if (image.taken_at) {
-      displayDate = image.taken_at;
-      dateLabel = '';
-    } else {
-      // For imported images, try to get auction/listing date from exif_data
-      const exif = image.exif_data || {};
-      const isImported = image.source === 'external_import' || image.source === 'bat_import' || image.source === 'organization_import' || image.is_external;
-      
-      if (isImported) {
-        // Check for auction dates in exif_data
-        const auctionStart = exif.auction_start_date || exif.listed_date || exif.start_date;
-        const auctionEnd = exif.auction_end_date || exif.end_date;
-        
-        // Prefer start date (when auction went live) over end date
-        if (auctionStart) {
-          displayDate = auctionStart;
-          dateLabel = ' (Auction)';
-        } else if (auctionEnd) {
-          displayDate = auctionEnd;
-          dateLabel = ' (Auction End)';
-        } else {
-          // Fallback to created_at but indicate it's an upload date
-          displayDate = image.created_at;
-          dateLabel = ' (Uploaded)';
-        }
-      } else {
-        // For non-imported images, use created_at
-        displayDate = image.created_at;
-      }
-    }
-    
-    if (!displayDate) return 'No date';
-    
+    const eff = getEffectiveImageDate(image);
+    if (!eff.iso) return 'No date';
     try {
-      const date = new Date(displayDate);
+      const date = new Date(eff.iso);
       if (isNaN(date.getTime())) return 'Invalid date';
       const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      return formatted + dateLabel;
+      return formatted + (eff.label || '');
     } catch (e) {
       return 'Invalid date';
     }
