@@ -244,8 +244,8 @@ function parseBeverlyHillsCarClubListing(html: string, url: string): any {
 function parseNumberLoose(raw: string): number | null {
   const s = (raw || '').replace(/\u00a0/g, ' ').trim()
   if (!s) return null
-  // Remove currency/units and keep digits.
-  const digits = s.replace(/[^\d]/g, '')
+  // Remove currency/units and keep digits (including spaces that might be in formatted numbers like "53 171 km").
+  const digits = s.replace(/[^\d]/g, '').replace(/\s+/g, '')
   if (!digits) return null
   const n = parseInt(digits, 10)
   return Number.isFinite(n) ? n : null
@@ -264,6 +264,23 @@ function parseLartFiche(html: string, url: string): any {
   const brand = doc?.querySelector('.carDetails-brand')?.textContent?.trim() || ''
   const modelRaw = doc?.querySelector('.carDetails-model')?.textContent?.trim() || ''
   const title = [brand, modelRaw].filter(Boolean).join(' ').trim()
+
+  // Extract year from model name (e.g. "911 2.0L 1965" -> year: 1965, model: "911 2.0L")
+  // Also try to extract from URL slug or registration date
+  let year: number | null = null
+  let cleanedModel = modelRaw
+  
+  // Try to extract year from model name (look for 4-digit year at the end)
+  const yearMatch = modelRaw.match(/\b(19|20)\d{2}\b/)
+  if (yearMatch) {
+    year = parseInt(yearMatch[0], 10)
+    if (Number.isFinite(year) && year >= 1885 && year <= new Date().getFullYear() + 1) {
+      // Remove year from model name
+      cleanedModel = modelRaw.replace(/\s*\b(19|20)\d{2}\b\s*$/, '').trim()
+    } else {
+      year = null
+    }
+  }
 
   // Listing status: on sold listings, L'Art renders a badge (e.g. "Sold" / "Vendu")
   // inside the price block. This is more reliable than URL patterns.
@@ -331,6 +348,33 @@ function parseLartFiche(html: string, url: string): any {
   const transmissionText = ddByLabel.get('boîte de vitesse')?.textContent || ddByLabel.get('boite de vitesse')?.textContent || ''
   const regDateText = ddByLabel.get('date de mise en circulation')?.textContent || ''
 
+  // If year not extracted from model, try to extract from registration date (e.g. "28/09/65" -> 1965)
+  if (!year && regDateText) {
+    // Handle DD/MM/YY or DD/MM/YYYY formats
+    const dateMatch = regDateText.match(/\/(\d{2,4})$/)
+    if (dateMatch) {
+      let yearCandidate = parseInt(dateMatch[1], 10)
+      if (yearCandidate < 100) {
+        // Two-digit year: assume 1900s for years > 50, 2000s for years <= 50
+        yearCandidate = yearCandidate > 50 ? 1900 + yearCandidate : 2000 + yearCandidate
+      }
+      if (Number.isFinite(yearCandidate) && yearCandidate >= 1885 && yearCandidate <= new Date().getFullYear() + 1) {
+        year = yearCandidate
+      }
+    }
+  }
+
+  // Also try extracting year from URL slug (e.g. "porsche-911-2-0l-1965")
+  if (!year) {
+    const urlYearMatch = url.match(/-(\d{4})(?:[\/\?]|$)/)
+    if (urlYearMatch) {
+      const urlYear = parseInt(urlYearMatch[1], 10)
+      if (Number.isFinite(urlYear) && urlYear >= 1885 && urlYear <= new Date().getFullYear() + 1) {
+        year = urlYear
+      }
+    }
+  }
+
   const optionsDd = ddByLabel.get('options')
   const optionsHtml = optionsDd?.innerHTML || ''
   const options = splitLinesFromHtml(optionsHtml)
@@ -369,8 +413,9 @@ function parseLartFiche(html: string, url: string): any {
   return {
     source: "lartdelautomobile",
     title,
+    year: year || null,
     make: cleanMakeName(brand) || brand || null,
-    model: cleanModelName(modelRaw) || modelRaw || null,
+    model: cleanModelName(cleanedModel) || cleanedModel || null,
     // Status flags used by import queue to correctly tag dealer_inventory + org relationships
     listing_status: isSold ? 'sold' : 'in_stock',
     status: isSold ? 'sold' : null,
@@ -557,6 +602,7 @@ serve(async (req) => {
       const parsed = parseLartFiche(html, url)
       data.source = parsed.source
       data.title = parsed.title || data.title
+      data.year = parsed.year ?? data.year
       data.make = parsed.make || data.make
       data.model = parsed.model || data.model
       data.asking_price = parsed.asking_price ?? data.asking_price

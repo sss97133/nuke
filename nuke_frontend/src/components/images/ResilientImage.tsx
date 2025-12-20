@@ -41,9 +41,6 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
   placeholderOpacity = 0.3,
 }) => {
   const sourceList = React.useMemo(() => normalizeSources(sources), [sources]);
-  // #region agent log
-  React.useEffect(()=>{if(sourceList.length>0){fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ResilientImage.tsx:43',message:'ResilientImage sources initialized',data:{sourceCount:sourceList.length,sources:sourceList,alt},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});}},[sourceList.join('|'),alt]);
-  // #endregion
   const [idx, setIdx] = React.useState(0);
   const [failed, setFailed] = React.useState(false);
 
@@ -80,20 +77,11 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
         alt={alt}
         style={{ ...baseImgStyle, ...imgStyle, opacity: finalOpacity }}
         onError={() => {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ResilientImage.tsx:79',message:'Image load error',data:{currentSrc:current,idx,failed,sourceListLength:sourceList.length,allSources:sourceList},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
-          // #endregion
           if (showPlaceholder) return;
           const next = idx + 1;
           if (next < sourceList.length) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ResilientImage.tsx:85',message:'Trying next source',data:{nextIdx:next,totalSources:sourceList.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
-            // #endregion
             setIdx(next);
           } else {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ResilientImage.tsx:89',message:'All sources failed',data:{sourceList},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
-            // #endregion
             setFailed(true);
           }
         }}

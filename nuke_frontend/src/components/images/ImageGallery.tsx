@@ -296,10 +296,6 @@ const ImageGallery = ({
       return url && url.includes('bringatrailer.com/wp-content/uploads/');
     });
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:297',message:'Filter step: icon removal',data:{originalCount:rows.length,withoutIconsCount:withoutIcons.length,nonBatCount:nonBat.length,batCount:batRows.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
-    
     if (batRows.length === 0) return withoutIcons.length > 0 ? withoutIcons : rows;
     
     // First: Filter known BaT page noise
@@ -319,14 +315,8 @@ const ImageGallery = ({
     let filtered = batRows.filter((img: any) => {
       const url = String(img?.image_url || '');
       const isNoise = isKnownNoise(url);
-      // #region agent log
-      if(isNoise){fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:315',message:'Filtered BaT noise',data:{url,imgId:img?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});}
-      // #endregion
       return !isNoise;
     });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:321',message:'Filter step: noise removal',data:{batRowsCount:batRows.length,filteredCount:filtered.length,removedNoise:batRows.length-filtered.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
     
     // Second: Try pattern matching by vehicle (year_make_model)
     const needle = buildBatImageNeedle(meta);
@@ -694,25 +684,16 @@ const ImageGallery = ({
     for (const img of prioritized) {
       const k = keyFor(img);
       if (!k) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:592',message:'Skipping image without key',data:{imgId:img?.id,imageUrl:img?.image_url,storagePath:img?.storage_path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
         skippedNoKey++;
         continue;
       }
       if (seen.has(k)) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:599',message:'Skipping duplicate',data:{key:k,imgId:img?.id,imageUrl:img?.image_url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
         skippedDuplicate++;
         continue;
       }
       seen.add(k);
       out.push(img);
     }
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:608',message:'Deduplication summary',data:{inputCount:prioritized.length,outputCount:out.length,skippedNoKey,skippedDuplicate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
     return out;
   };
 
@@ -907,17 +888,8 @@ const ImageGallery = ({
           .order('created_at', { ascending: true });
 
         if (error) throw error;
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:849',message:'Raw images from DB',data:{vehicleId,rawImageCount:(rawImages||[]).length,rawImageUrls:(rawImages||[]).slice(0,5).map((r:any)=>r?.image_url)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
         const deduped = dedupeFetchedImages(rawImages || []);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:852',message:'After deduplication',data:{dedupedCount:deduped.length,removedByDedup:(rawImages||[]).length-deduped.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
         const images = filterBatNoiseRows(deduped, meta);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:855',message:'After filtering',data:{finalCount:images.length,removedByFilter:deduped.length-images.length,meta:meta?{year:meta.year,make:meta.make,model:meta.model,origin:meta.profile_origin}:null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
-        // #endregion
 
         // If DB is empty, show fallback URLs (scraped listing images) to avoid empty profiles.
         const fallback = normalizeFallbackUrls(fallbackImageUrls);
@@ -1806,13 +1778,7 @@ const ImageGallery = ({
                 <SensitiveImageOverlay
                   imageId={image.id}
                   vehicleId={vehicleId}
-                  imageUrl={(()=>{
-                    const url=getOptimalImageUrl(image,'medium');
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ImageGallery.tsx:1773',message:'Image URL selected for rendering',data:{imgId:image.id,selectedUrl:url,hasThumbnail:!!image.thumbnail_url,hasMedium:!!image.medium_url,hasLarge:!!image.large_url,hasVariants:!!image.variants,imageUrl:image.image_url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H5'})}).catch(()=>{});
-                    // #endregion
-                    return url;
-                  })()}
+                  imageUrl={getOptimalImageUrl(image,'medium')}
                   isSensitive={image.is_sensitive || false}
                   sensitiveType={image.sensitive_type}
                 />

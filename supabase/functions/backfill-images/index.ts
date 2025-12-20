@@ -70,6 +70,39 @@ function isKnownNoiseUrl(url: string): boolean {
   return false;
 }
 
+function isTinyBatTransform(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (!/bringatrailer\.com$/i.test(u.hostname)) return false;
+    if (!u.pathname.toLowerCase().startsWith('/wp-content/uploads/')) return false;
+    const fit = u.searchParams.get('fit');
+    const resize = u.searchParams.get('resize');
+    if (fit) {
+      const v = fit.replace(/\s+/g, '').toLowerCase();
+      if (v === '144,96') return true;
+    }
+    if (resize) {
+      const v = resize.replace(/\s+/g, '').toLowerCase();
+      if (v === '235,159') return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function batCanonicalUploadKey(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!/bringatrailer\.com$/i.test(u.hostname)) return null;
+    const path = u.pathname.toLowerCase();
+    if (!path.startsWith('/wp-content/uploads/')) return null;
+    return `${u.hostname}${u.pathname}`;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeSourceUrl(raw: string): string {
   let imageUrl = raw
     .replace(/&#038;/g, '&')
@@ -228,10 +261,26 @@ serve(async (req: Request) => {
       .filter((u) => !isKnownNoiseUrl(u))
       .filter((u) => !isProbablyThumbnail(u));
 
+    // BaT: keep tiny resize/fit variants ONLY if we also saw the same underlying upload path
+    // somewhere else in the batch. This preserves fast-loading thumbs for real listing photos,
+    // while dropping sidebar/editorial cross-listing thumbs.
+    const batUploadKeyCounts = new Map<string, number>();
+    for (const u of normalizedInput) {
+      const key = batCanonicalUploadKey(u);
+      if (!key) continue;
+      batUploadKeyCounts.set(key, (batUploadKeyCounts.get(key) || 0) + 1);
+    }
+    const filteredInput = normalizedInput.filter((u) => {
+      if (!isTinyBatTransform(u)) return true;
+      const key = batCanonicalUploadKey(u);
+      if (!key) return true;
+      return (batUploadKeyCounts.get(key) || 0) > 1;
+    });
+
     // Keep input order but remove exact duplicates
     const uniqueUrls: string[] = [];
     const seen = new Set<string>();
-    for (const u of normalizedInput) {
+    for (const u of filteredInput) {
       if (seen.has(u)) continue;
       seen.add(u);
       uniqueUrls.push(u);

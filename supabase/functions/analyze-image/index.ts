@@ -174,7 +174,14 @@ serve(async (req) => {
           // Normalize + validate VIN before we write anything to core tables.
           const raw = String(vinTagResponse?.extracted_data?.vin || '').toUpperCase().trim()
           const normalizedVin = raw.replace(/[^A-Z0-9]/g, '')
-          const isValidVin = /^[A-HJ-NPR-Z0-9]{17}$/.test(normalizedVin)
+          
+          // Modern VINs are 17 characters, but pre-1981 vehicles (like early Porsches) may have shorter chassis numbers
+          // Accept both 17-char modern VINs and shorter pre-1981 chassis numbers (6-16 chars)
+          const isModernVin = /^[A-HJ-NPR-Z0-9]{17}$/.test(normalizedVin)
+          const isPre1981Chassis = /^[A-HJ-NPR-Z0-9]{6,16}$/.test(normalizedVin) && 
+                                   (vinTagResponse.extracted_data?.vin_format === 'pre_1981' || 
+                                    vinTagResponse.extracted_data?.vin_format === 'porsche_f_number')
+          const isValidVin = isModernVin || isPre1981Chassis
 
           vinTagData = {
             ...(vinTagResponse.extracted_data || {}),
@@ -692,7 +699,15 @@ VIN tags/plates are metal or plastic plates typically found:
 - On the firewall/engine bay
 - On the frame/chassis
 
-A VIN is EXACTLY 17 characters, alphanumeric (no I, O, or Q), and follows ISO 3779 format.
+SPECIAL NOTES FOR PORSCHE VEHICLES:
+- Porsche VIN tags from 1965-1981 (like early 911s) may have a different format or be stamped/etched rather than on a plate
+- Look for "Fahrgestellnummer" (German for chassis number) labels or stamps
+- Early Porsche VINs may appear as "F" followed by numbers (e.g., F300001 format)
+- VINs on door jamb plates may be preceded by text like "Fahrgestell-Nr" or "Chassis No"
+- Check engine bay firewall plates, door jamb stickers, and under-hood labels
+- Some early Porsches have the VIN stamped directly into metal surfaces
+
+A VIN is EXACTLY 17 characters (for post-1981 vehicles) OR may be shorter for pre-1981 vehicles. Modern VINs are alphanumeric (no I, O, or Q), and follow ISO 3779 format. For pre-1981 vehicles, extract whatever chassis/identification number is visible.
 
 Your task:
 1. Determine if this image shows a VIN tag/plate
@@ -705,13 +720,14 @@ Return a JSON object with:
   "is_vin_tag": boolean,
   "confidence": number (0-100),
   "extracted_data": {
-    "vin": string | null (17-character VIN if found),
-    "vin_location": string | null ("dashboard", "door_jamb", "firewall", "frame", "unknown"),
+    "vin": string | null (VIN/chassis number if found - may be 17 characters for modern vehicles or shorter for pre-1981 vehicles),
+    "vin_location": string | null ("dashboard", "door_jamb", "firewall", "frame", "engine_bay", "unknown"),
     "condition": string | null ("excellent", "good", "fair", "poor", "illegible"),
     "authenticity_concerns": string[] (empty if none, e.g. ["replacement_rivets", "paint_over", "tampering"]),
-    "readability": string | null ("clear", "partial", "difficult", "illegible")
+    "readability": string | null ("clear", "partial", "difficult", "illegible"),
+    "vin_format": string | null ("modern_17_char", "pre_1981", "porsche_f_number", "unknown")
   },
-  "raw_text": string (any visible text in the image)
+  "raw_text": string (any visible text in the image, including German labels like "Fahrgestellnummer")
 }
 
 Be very careful to extract the EXACT VIN - check each character carefully. VINs are critical for vehicle identification.`

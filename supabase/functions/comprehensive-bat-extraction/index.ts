@@ -1461,12 +1461,50 @@ serve(async (req) => {
 
     console.log(`Fetching comprehensive BaT data: ${batUrl}`);
     
-    const response = await fetch(batUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch BaT URL: ${response.status}`);
+    // Use Firecrawl first (BaT is JS-driven, needs rendering)
+    let html = '';
+    const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
+    if (firecrawlApiKey) {
+      try {
+        const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${firecrawlApiKey}`,
+          },
+          body: JSON.stringify({
+            url: batUrl,
+            formats: ['html', 'markdown'],
+            onlyMainContent: false,
+            waitFor: 6500, // Give JS time to render
+          }),
+          signal: (() => {
+            const controller = new AbortController();
+            setTimeout(() => controller.abort(), 30000);
+            return controller.signal;
+          })(),
+        });
+        if (firecrawlResponse.ok) {
+          const firecrawlData = await firecrawlResponse.json();
+          if (firecrawlData?.success) {
+            html = String(firecrawlData?.data?.html || '');
+            console.log('✅ Got HTML via Firecrawl');
+          }
+        }
+      } catch (e) {
+        console.warn('Firecrawl failed, trying direct fetch:', e);
+      }
     }
     
-    const html = await response.text();
+    // Fallback to direct fetch
+    if (!html) {
+      const response = await fetch(batUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch BaT URL: ${response.status}`);
+      }
+      html = await response.text();
+      console.log('✅ Got HTML via direct fetch');
+    }
     const extractedData = await extractComprehensiveBaTData(html, batUrl);
 
     console.log('Extracted data:', JSON.stringify(extractedData, null, 2));
