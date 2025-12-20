@@ -51,7 +51,7 @@ jobs:
           # IMPORTANT: Deploying from dist/ creates/targets a separate "dist" project and does NOT update n-zero.dev.
           # Deploy from the frontend subdirectory so Vercel uses nuke_frontend/vercel.json (SPA rewrites) and the correct dist output.
           set +e
-          DEPLOY_OUTPUT=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }} --scope nzero --name nuke 2>&1)
+          DEPLOY_OUTPUT=$(vercel deploy --prod --force --yes --token=${{ secrets.VERCEL_TOKEN }} --scope nzero --name nuke 2>&1)
           DEPLOY_EXIT=$?
           set -e
 
