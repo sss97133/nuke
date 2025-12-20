@@ -1035,9 +1035,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           : null;
         if (askingPrice) return formatCurrency(askingPrice);
         
-        // Last resort: show "Ended" or "RNM"
+        // For ended auctions without price, don't show "Auction" - show status or nothing
         if (status === 'reserve_not_met') return 'RNM';
-        return 'Ended';
+        // Don't show "Ended" or "Auction" - fall through to show price from primaryAmount if available
       }
       
       // Unknown status: fall through to primary amount
@@ -1530,8 +1530,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           ) : null}
 
           {/* Seller visibility (do not hide the seller behind tiny icons) */}
-          {sellerBadge?.label ? (
-            (sellerBadge as any)?.href ? (
+          {sellerBadge?.label && (() => {
+            // Don't show "Bring a Trailer" consigner badge if we're already showing BaT platform badge
+            const isBatConsigner = sellerBadge.label?.toLowerCase().includes('bring a trailer') || sellerBadge.label?.toLowerCase().includes('bat');
+            const isBatPulse = auctionPulse?.listing_url && String(auctionPulse.platform || '').toLowerCase() === 'bat';
+            if (isBatConsigner && isBatPulse) return null;
+            
+            return (sellerBadge as any)?.href ? (
               <a
                 href={String((sellerBadge as any).href)}
                 target="_blank"
@@ -1558,16 +1563,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   {sellerBadge.label}
                 </span>
               </span>
-            )
-          ) : null}
+            );
+          })()}
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
           {auctionPulse?.listing_url && auctionStatusForBadge && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              <AuctionPlatformBadge
-                platform={auctionPulse.platform}
-                urlForFavicon={auctionPulse.listing_url}
-                label={auctionPulse.platform === 'bat' ? 'BaT' : undefined}
-              />
+              {/* Only show platform badge if consigner badge isn't already showing BaT */}
+              {(() => {
+                const sellerBadge = computeSellerBadge();
+                const isBatConsigner = sellerBadge && (sellerBadge.label?.toLowerCase().includes('bring a trailer') || sellerBadge.label?.toLowerCase().includes('bat'));
+                return !isBatConsigner ? (
+                  <AuctionPlatformBadge
+                    platform={auctionPulse.platform}
+                    urlForFavicon={auctionPulse.listing_url}
+                    label={auctionPulse.platform === 'bat' ? 'BaT' : undefined}
+                  />
+                ) : null;
+              })()}
               <AuctionStatusBadge
                 status={auctionStatusForBadge as any}
                 title={isAuctionLive ? 'Live auction telemetry' : 'Auction status'}
@@ -1968,7 +1980,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       return `Sold: ${formatCurrency((auctionPulse as any).final_price)}`;
                     }
                     if (isSoldStatus) return 'SOLD';
-                    if (status === 'ended') return 'Auction ended';
+                    if (status === 'ended') {
+                      // Show price if available, otherwise just "Ended"
+                      const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
+                        ? (auctionPulse as any).final_price
+                        : null;
+                      const v = vehicle as any;
+                      const salePrice = typeof v?.sale_price === 'number' && v.sale_price > 0 ? v.sale_price : null;
+                      const winBid = typeof v?.winning_bid === 'number' && v.winning_bid > 0 ? v.winning_bid : null;
+                      const hBid = typeof v?.high_bid === 'number' && v.high_bid > 0 ? v.high_bid : null;
+                      if (finalPrice || salePrice || winBid || hBid) {
+                        return formatCurrency(finalPrice || salePrice || winBid || hBid);
+                      }
+                      return 'Ended';
+                    }
                     return 'View auction';
                   })();
                   return (
