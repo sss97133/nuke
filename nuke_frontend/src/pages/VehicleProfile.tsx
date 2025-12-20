@@ -2199,7 +2199,7 @@ const VehicleProfile: React.FC = () => {
       setVehicleImages(images);
       // Pick lead image from the filtered list to avoid BaT homepage noise becoming the hero.
       const leadFromRpc = rpcData.images.find((img: any) => img.is_primary) || rpcData.images[0];
-      const leadCandidate = leadFromRpc?.large_url || leadFromRpc?.image_url;
+      const leadCandidate = resolveDbImageUrl(leadFromRpc) || leadFromRpc?.image_url;
       const leadOk = leadCandidate && filterProfileImages([leadCandidate], vehicle).length > 0;
       const lead = leadOk ? leadCandidate : (images[0] || null);
       if (lead) {
@@ -2256,7 +2256,7 @@ const VehicleProfile: React.FC = () => {
         const shouldHealPrimary = (!hasPrimary && imageRecords[0]) || (hasPrimary && !primaryOk);
         if (shouldHealPrimary && session?.user?.id) {
           const isValidForPrimary = (r: any) => {
-            const url = r?.large_url || r?.image_url;
+            const url = resolveDbImageUrl(r) || r?.image_url;
             return url && filterProfileImages([url], vehicle).length > 0;
           };
           // Prefer Supabase-hosted images to avoid hotlink/403 issues on external sources.

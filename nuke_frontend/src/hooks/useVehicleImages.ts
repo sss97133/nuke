@@ -78,7 +78,17 @@ export const useVehicleImages = (vehicleId?: string) => {
         const status = (fetchError as any)?.status ?? (fetchError as any)?.statusCode;
         const code = String((fetchError as any)?.code || '').toUpperCase();
         const msg = String((fetchError as any)?.message || '').toLowerCase();
-        const missing = status === 404 || code === 'PGRST116' || code === 'PGRST301' || code === '42P01' || msg.includes('does not exist') || msg.includes('not found');
+        const isMissingColumn =
+          // Postgres "undefined_column" code
+          code === '42703' ||
+          (msg.includes('column') && msg.includes('does not exist'));
+
+        const missing =
+          // Postgres "undefined_table" code
+          code === '42P01' ||
+          // PostgREST returns 404 for missing relations (table/view) in many setups.
+          // Treat that as "table missing" unless we can tell it's a missing-column error.
+          (status === 404 && !isMissingColumn);
         if (missing) {
           try {
             if (hasWindow) window.localStorage.setItem(tableMissingKey, '1');

@@ -513,10 +513,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
     return {
       ...base,
-      border,
+      border: thermalPriceColor ? `1px solid ${thermalPriceColor}80` : border,
       animation: anim || undefined,
     };
-  }, [isAuctionSource, auctionProgress01, badgePulseSeconds, badgeExplode]);
+  }, [isAuctionSource, auctionProgress01, badgePulseSeconds, badgeExplode, thermalPriceColor]);
 
   const badgeMainText = React.useMemo(() => {
     if (!isAuctionSource) return displayPrice;
