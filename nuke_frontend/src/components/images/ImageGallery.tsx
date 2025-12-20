@@ -128,7 +128,7 @@ const parseBatUploadMonth = (url: string): string | null => {
   }
 };
 
-const getEffectiveImageDate = (image: any): { iso: string | null; label: string } => {
+const getEffectiveImageDate = (image: any, auctionStartDate: string | null = null): { iso: string | null; label: string; isApproximate: boolean } => {
   const createdAt = typeof image?.created_at === 'string' ? image.created_at : null;
   const takenAt = typeof image?.taken_at === 'string' ? image.taken_at : null;
   const exif = image?.exif_data || {};
@@ -138,27 +138,39 @@ const getEffectiveImageDate = (image: any): { iso: string | null; label: string 
   const takenMs = takenAt ? new Date(takenAt).getTime() : NaN;
   const takenLooksSynthetic = Number.isFinite(createdMs) && Number.isFinite(takenMs) && Math.abs(createdMs - takenMs) < 60_000;
 
-  if (takenAt && !isImported) return { iso: takenAt, label: '' };
+  if (takenAt && !isImported) return { iso: takenAt, label: '', isApproximate: false };
 
   if (isImported) {
+    // For BaT images, use auction start date (day vehicle was listed) as the base date
+    // All listing photos are from the auction start date (approximately)
+    if (auctionStartDate && (image?.source === 'bat_import' || image?.source === 'external_import')) {
+      return { iso: auctionStartDate, label: '', isApproximate: true };
+    }
+    
     const auctionStart = exif.auction_start_date || exif.listed_date || exif.start_date;
     const auctionEnd = exif.auction_end_date || exif.end_date;
-    if (auctionStart) return { iso: String(auctionStart), label: ' (Auction)' };
-    if (auctionEnd) return { iso: String(auctionEnd), label: ' (Auction End)' };
+    if (auctionStart) return { iso: String(auctionStart), label: ' (Auction)', isApproximate: true };
+    if (auctionEnd) {
+      // If we only have end date, approximate start as end - 7 days
+      const end = new Date(auctionEnd);
+      const start = new Date(end);
+      start.setDate(start.getDate() - 7);
+      return { iso: start.toISOString().split('T')[0], label: ' (Auction)', isApproximate: true };
+    }
 
     const url = String(image?.image_url || image?.variants?.full || image?.variants?.large || '').trim();
     if (url.includes('bringatrailer.com/wp-content/uploads/')) {
       const derived = parseBatUploadMonth(url);
-      if (derived) return { iso: derived, label: ' (BaT)' };
+      if (derived) return { iso: derived, label: ' (BaT)', isApproximate: true };
     }
 
-    if (takenAt && !takenLooksSynthetic) return { iso: takenAt, label: '' };
-    if (createdAt) return { iso: createdAt, label: ' (Uploaded)' };
-    return { iso: null, label: '' };
+    if (takenAt && !takenLooksSynthetic) return { iso: takenAt, label: '', isApproximate: false };
+    if (createdAt) return { iso: createdAt, label: ' (Uploaded)', isApproximate: false };
+    return { iso: null, label: '', isApproximate: false };
   }
 
-  if (takenAt) return { iso: takenAt, label: '' };
-  return { iso: createdAt, label: '' };
+  if (takenAt) return { iso: takenAt, label: '', isApproximate: false };
+  return { iso: createdAt, label: '', isApproximate: false };
 };
 
 const ImageGallery = ({ 
@@ -190,6 +202,12 @@ const ImageGallery = ({
   const [showFilters, setShowFilters] = useState(false);
   const [showImages, setShowImages] = useState(false);
   const [imagesPerPage] = useState(25);
+  // New sorting/grouping states
+  const [groupByCategory, setGroupByCategory] = useState(false);
+  const [chronologicalMode, setChronologicalMode] = useState<'off' | 'asc' | 'desc'>('off'); // off, ascending, descending
+  const [imagesPerRow, setImagesPerRow] = useState(3); // 1-10
+  const [preserveAspectRatio, setPreserveAspectRatio] = useState(false); // Original image ratio
+  const [auctionStartDate, setAuctionStartDate] = useState<string | null>(null); // For date calculations
   const [autoLoad, setAutoLoad] = useState(false);
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{total: number, completed: number, uploading: boolean}>({total: 0, completed: 0, uploading: false});
@@ -232,6 +250,36 @@ const ImageGallery = ({
         if (!error) setVehicleMeta(data || null);
       } catch {
         setVehicleMeta(null);
+      }
+    })();
+  }, [vehicleId]);
+
+  // Load auction start date for BaT vehicles (for date calculations)
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!vehicleId) { setAuctionStartDate(null); return; }
+        // Check external_listings for auction start date
+        const { data: listing } = await supabase
+          .from('external_listings')
+          .select('start_date, end_date')
+          .eq('vehicle_id', vehicleId)
+          .eq('platform', 'bat')
+          .maybeSingle();
+        
+        if (listing?.start_date) {
+          setAuctionStartDate(listing.start_date);
+        } else if (listing?.end_date) {
+          // Calculate start date as end_date - 7 days (typical BaT auction duration)
+          const endDate = new Date(listing.end_date);
+          const startDate = new Date(endDate);
+          startDate.setDate(startDate.getDate() - 7);
+          setAuctionStartDate(startDate.toISOString().split('T')[0]);
+        } else {
+          setAuctionStartDate(null);
+        }
+      } catch {
+        setAuctionStartDate(null);
       }
     })();
   }, [vehicleId]);
@@ -565,8 +613,8 @@ const ImageGallery = ({
         if (catA !== catB) return catB - catA;
 
         // Within same category, newer first
-        const effA = getEffectiveImageDate(a);
-        const effB = getEffectiveImageDate(b);
+        const effA = getEffectiveImageDate(a, auctionStartDate);
+        const effB = getEffectiveImageDate(b, auctionStartDate);
         const dateA = effA.iso ? new Date(effA.iso).getTime() : 0;
         const dateB = effB.iso ? new Date(effB.iso).getTime() : 0;
 
@@ -590,8 +638,8 @@ const ImageGallery = ({
       if (posA !== null && posB === null) return -1;
       if (posA === null && posB !== null) return 1;
 
-      const effA = getEffectiveImageDate(a);
-      const effB = getEffectiveImageDate(b);
+      const effA = getEffectiveImageDate(a, auctionStartDate);
+      const effB = getEffectiveImageDate(b, auctionStartDate);
       const dateA = effA.iso ? new Date(effA.iso).getTime() : 0;
       const dateB = effB.iso ? new Date(effB.iso).getTime() : 0;
 
@@ -601,7 +649,66 @@ const ImageGallery = ({
   };
 
   const getSortedImages = () => {
-    return sortRows(allImages, sortBy);
+    let sorted = sortRows(allImages, sortBy);
+    
+    // Apply grouping by category if enabled
+    if (groupByCategory) {
+      const grouped = new Map<string, any[]>();
+      for (const img of sorted) {
+        const category = img.category || 'general';
+        if (!grouped.has(category)) grouped.set(category, []);
+        grouped.get(category)!.push(img);
+      }
+      
+      // Within each group, sort chronologically if enabled
+      const dir = chronologicalMode === 'off' ? 0 : (chronologicalMode === 'asc' ? 1 : -1);
+      if (dir !== 0) {
+        for (const [category, images] of grouped.entries()) {
+          images.sort((a, b) => {
+            const effA = getEffectiveImageDate(a, auctionStartDate);
+            const effB = getEffectiveImageDate(b, auctionStartDate);
+            const dateA = effA.iso ? new Date(effA.iso).getTime() : 0;
+            const dateB = effB.iso ? new Date(effB.iso).getTime() : 0;
+            if (dateA !== dateB) return (dateA - dateB) * dir;
+            return (a.id || '').localeCompare(b.id || '');
+          });
+        }
+      }
+      
+      // Sort groups by category priority, then flatten
+      const catPriority: Record<string, number> = {
+        hero: 95,
+        interior: 80,
+        engine: 70,
+        engine_bay: 70,
+        undercarriage: 50,
+        detail: 40,
+        general: 30,
+        work: 10,
+        document: 5,
+        receipt: -10
+      };
+      sorted = Array.from(grouped.entries())
+        .sort((a, b) => {
+          const priA = catPriority[a[0].toLowerCase()] || 20;
+          const priB = catPriority[b[0].toLowerCase()] || 20;
+          return priB - priA;
+        })
+        .flatMap(([_, images]) => images);
+    } else if (chronologicalMode !== 'off') {
+      // If groups disabled but chronological enabled, sort all images chronologically
+      const dir = chronologicalMode === 'asc' ? 1 : -1;
+      sorted = [...sorted].sort((a, b) => {
+        const effA = getEffectiveImageDate(a, auctionStartDate);
+        const effB = getEffectiveImageDate(b, auctionStartDate);
+        const dateA = effA.iso ? new Date(effA.iso).getTime() : 0;
+        const dateB = effB.iso ? new Date(effB.iso).getTime() : 0;
+        if (dateA !== dateB) return (dateA - dateB) * dir;
+        return (a.id || '').localeCompare(b.id || '');
+      });
+    }
+    
+    return sorted;
   };
 
   const dedupeFetchedImages = (images: any[]): any[] => {
@@ -1234,7 +1341,7 @@ const ImageGallery = ({
   };
 
   const getDisplayDate = (image: any) => {
-    const eff = getEffectiveImageDate(image);
+    const eff = getEffectiveImageDate(image, auctionStartDate);
     if (!eff.iso) return 'No date';
     try {
       const date = new Date(eff.iso);
@@ -1650,21 +1757,81 @@ const ImageGallery = ({
             </button>
           </div>
 
-          {/* Sort Options */}
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              const newSort = e.target.value as any;
-              // Keep sorting deterministic; "Best First" uses AI when available and heuristics otherwise.
-              setSortBy(newSort);
+          {/* Image Count */}
+          <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>
+            {allImages.length} {allImages.length === 1 ? 'image' : 'images'}
+          </span>
+
+          {/* Toggle Buttons for Sorting */}
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            {/* Groups Toggle */}
+            <button
+              onClick={() => setGroupByCategory(!groupByCategory)}
+              className={groupByCategory ? 'button button-primary' : 'button'}
+              style={{ 
+                fontSize: '8pt', 
+                padding: '4px 8px', 
+                height: '24px', 
+                minHeight: '24px',
+                whiteSpace: 'nowrap'
+              }}
+              title="Group images by category"
+            >
+              Groups
+            </button>
+            
+            {/* Chronological Toggle (3-state: off -> asc -> desc -> off) */}
+            <button
+              onClick={() => {
+                if (chronologicalMode === 'off') setChronologicalMode('asc');
+                else if (chronologicalMode === 'asc') setChronologicalMode('desc');
+                else setChronologicalMode('off');
+              }}
+              className={chronologicalMode !== 'off' ? 'button button-primary' : 'button'}
+              style={{ 
+                fontSize: '8pt', 
+                padding: '4px 8px', 
+                height: '24px', 
+                minHeight: '24px',
+                whiteSpace: 'nowrap'
+              }}
+              title={`Chronological: ${chronologicalMode === 'off' ? 'Off' : chronologicalMode === 'asc' ? 'Ascending' : 'Descending'}`}
+            >
+              Chrono{chronologicalMode === 'asc' ? ' ↑' : chronologicalMode === 'desc' ? ' ↓' : ''}
+            </button>
+          </div>
+
+          {/* Images Per Row Slider */}
+          {viewMode === 'grid' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '120px' }}>
+              <span style={{ fontSize: '7pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{imagesPerRow}/row</span>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={imagesPerRow}
+                onChange={(e) => setImagesPerRow(parseInt(e.target.value, 10))}
+                style={{ flex: 1, height: '4px' }}
+                title={`${imagesPerRow} images per row`}
+              />
+            </div>
+          )}
+
+          {/* Original Ratio Toggle */}
+          <button
+            onClick={() => setPreserveAspectRatio(!preserveAspectRatio)}
+            className={preserveAspectRatio ? 'button button-primary' : 'button'}
+            style={{ 
+              fontSize: '8pt', 
+              padding: '4px 8px', 
+              height: '24px', 
+              minHeight: '24px',
+              whiteSpace: 'nowrap'
             }}
-            className="form-select"
-            style={{ fontSize: '8pt', padding: '4px 8px', height: '24px', minHeight: '24px' }}
+            title="Preserve original image aspect ratio"
           >
-            <option value="quality">Best First</option>
-            <option value="date_desc">Newest First</option>
-            <option value="date_asc">Oldest First</option>
-          </select>
+            Original Ratio
+          </button>
 
           {/* Upload Button */}
           {queueStats && (queueStats.pending > 0 || queueStats.failed > 0) && session?.user?.id && (
@@ -1726,7 +1893,7 @@ const ImageGallery = ({
 
       {/* Image Grid */}
       {viewMode === 'grid' && showImages && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: 0 }}>
           {displayedImages.map((image, index) => {
             const isSelected = selectMode && selectedImages?.has(image.id);
             return (
@@ -1737,8 +1904,9 @@ const ImageGallery = ({
                 position: 'relative', 
                 overflow: 'hidden', 
                 backgroundColor: 'var(--grey-100)',
-                aspectRatio: '1 / 1',
-                border: 'none'
+                aspectRatio: preserveAspectRatio ? undefined : '1 / 1',
+                border: 'none',
+                ...(preserveAspectRatio ? { height: 'auto' } : {})
               }}
               onClick={(e) => {
                 if (selectMode) {
@@ -1774,13 +1942,20 @@ const ImageGallery = ({
               )}
               
               {/* Image Container with Sensitive Content Protection */}
-              <div style={{ width: '100%', height: '100%', overflow: 'hidden', backgroundColor: 'var(--grey-100)' }}>
+              <div style={{ 
+                width: '100%', 
+                height: preserveAspectRatio ? 'auto' : '100%', 
+                overflow: 'hidden', 
+                backgroundColor: 'var(--grey-100)',
+                position: 'relative'
+              }}>
                 <SensitiveImageOverlay
                   imageId={image.id}
                   vehicleId={vehicleId}
                   imageUrl={getOptimalImageUrl(image,'medium')}
                   isSensitive={image.is_sensitive || false}
                   sensitiveType={image.sensitive_type}
+                  objectFit={preserveAspectRatio ? 'contain' : 'cover'}
                 />
               </div>
 
