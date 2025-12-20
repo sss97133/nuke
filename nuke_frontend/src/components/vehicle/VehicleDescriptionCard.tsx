@@ -245,7 +245,25 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
           <div>
             {/* Normalized description display */}
             <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: rawListingDescriptions.length > 0 ? '8px' : '0' }}>
-              {description}
+              {(() => {
+                // Sanitize description to remove BaT listing contamination
+                let cleaned = description;
+                if (cleaned) {
+                  // Remove BaT listing boilerplate patterns
+                  cleaned = cleaned.replace(/\s*for sale on BaT Auctions?\s*/gi, '');
+                  cleaned = cleaned.replace(/\s*sold for \$[\d,]+ on [A-Z][a-z]+ \d{1,2}, \d{4}\s*/gi, '');
+                  cleaned = cleaned.replace(/\s*\(Lot #[\d,]+\)\s*/gi, '');
+                  cleaned = cleaned.replace(/\s*\|\s*Bring a Trailer\s*/gi, '');
+                  cleaned = cleaned.replace(/\s*on bringatrailer\.com\s*/gi, '');
+                  // Remove leading/trailing whitespace and clean up multiple spaces
+                  cleaned = cleaned.trim().replace(/\s+/g, ' ');
+                  // If description is now empty or just whitespace, don't show it
+                  if (!cleaned || cleaned.length === 0) {
+                    return <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No description available</span>;
+                  }
+                }
+                return cleaned;
+              })()}
             </div>
             
             {/* Raw listing descriptions - button with hover */}
