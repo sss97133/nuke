@@ -1025,12 +1025,19 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       // Unknown status: fall through to primary amount
     }
 
+    // Check if vehicle is sold (sale_date exists or sale_status is 'sold')
+    const isSold = saleDate !== null || 
+                   String((vehicle as any)?.sale_status || '').toLowerCase() === 'sold' ||
+                   String((vehicle as any)?.auction_outcome || '').toLowerCase() === 'sold';
+
     // Fallback to primary amount or RNM high bid
     return primaryAmount !== null
       ? formatCurrency(primaryAmount)
       : (isRNM && highBid)
         ? formatCurrency(highBid)
-        : 'Set a price';
+        : isSold
+          ? 'SOLD'
+          : 'Set a price';
   })();
 
   const priceHoverText = (() => {
