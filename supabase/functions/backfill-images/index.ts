@@ -38,6 +38,38 @@ function isProbablyThumbnail(url: string): boolean {
   );
 }
 
+function isKnownNoiseUrl(url: string): boolean {
+  const s = String(url || '').toLowerCase().trim();
+  if (!s) return true;
+
+  // Hard block: analytics pixels / trackers masquerading as images
+  if (s.startsWith('https://www.facebook.com/tr') || s.startsWith('http://www.facebook.com/tr')) return true;
+  if (s.includes('facebook.com/tr?') || (s.includes('facebook.com/tr') && s.includes('noscript=1'))) return true;
+
+  // BaT site chrome / icons / UI assets
+  if (s.includes('bringatrailer.com/wp-content/themes/bringatrailer/assets/img/')) return true;
+  if (s.includes('bringatrailer.com/wp-content/themes/bringatrailer/assets/img/countries/')) return true;
+  if (s.includes('bringatrailer.com/wp-content/themes/bringatrailer/assets/img/listings/')) return true;
+  if (s.includes('bringatrailer.com/wp-content/themes/bringatrailer/assets/img/social-')) return true;
+  if (s.includes('bringatrailer.com/wp-content/themes/bringatrailer/assets/img/partial-load')) return true;
+
+  // BaT editorial/promotional content that leaks into scraping results
+  if (s.includes('dec-merch-site-post-')) return true;
+  if (s.includes('weekly-weird-wonderful')) return true;
+  if (s.includes('qotw-winner-template')) return true;
+  if (/\/web-\d{3,}-/i.test(s)) return true;
+  if (s.includes('site-post-')) return true;
+  if (s.includes('thumbnail-template')) return true;
+  if (s.includes('mile-marker')) return true;
+  if (s.includes('podcast')) return true;
+  if (s.includes('merch')) return true;
+  if (s.includes('countries/')) return true;
+  if (s.includes('themes/')) return true;
+  if (s.includes('assets/img/')) return true;
+
+  return false;
+}
+
 function normalizeSourceUrl(raw: string): string {
   let imageUrl = raw
     .replace(/&#038;/g, '&')
@@ -96,7 +128,16 @@ async function sha1Hex(input: string): Promise<string> {
   return arr.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-serve(async (req) => {
+async function sha256HexBytes(bytes: Uint8Array): Promise<string> {
+  // Digest must be computed over a concrete ArrayBuffer (avoid ArrayBufferLike/SharedArrayBuffer typing issues)
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', copy.buffer);
+  const arr = Array.from(new Uint8Array(digest));
+  return arr.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -164,15 +205,19 @@ serve(async (req) => {
     // Dedupe: skip images already linked by source_url for this vehicle
     const { data: existingRows } = await supabase
       .from('vehicle_images')
-      .select('id, source_url, is_primary, position')
+      .select('id, source_url, file_hash, is_primary, position')
       .eq('vehicle_id', vehicle_id)
       .not('source_url', 'is', null)
       .limit(5000);
     const existingBySourceUrl = new Map<string, any>();
+    const existingFileHashes = new Set<string>();
     for (const r of (existingRows || []) as any[]) {
       const u = String(r?.source_url || '');
       if (!u) continue;
       if (!existingBySourceUrl.has(u)) existingBySourceUrl.set(u, r);
+
+      const fh = String(r?.file_hash || '').trim();
+      if (fh) existingFileHashes.add(fh);
     }
     const existingSourceUrls = new Set(Array.from(existingBySourceUrl.keys()));
     const hasPrimaryAlready = (existingRows || []).some((r: any) => r?.is_primary === true);
@@ -180,6 +225,7 @@ serve(async (req) => {
     const normalizedInput = image_urls
       .map((u) => normalizeSourceUrl(String(u)))
       .filter((u) => u && u.startsWith('http'))
+      .filter((u) => !isKnownNoiseUrl(u))
       .filter((u) => !isProbablyThumbnail(u));
 
     // Keep input order but remove exact duplicates
@@ -242,7 +288,7 @@ serve(async (req) => {
         
         const candidates = candidateUrlsForSourceUrl(rawUrl);
         console.log(`Downloading image ${i + 1}/${uniqueUrls.length}: ${rawUrl.substring(0, 80)}...`);
-        let imageResponse: Response;
+        let imageResponse: Response | null = null;
         try {
           // Add timeout (30 seconds)
           const controller = new AbortController();
@@ -264,12 +310,18 @@ serve(async (req) => {
           }
           clearTimeout(timeoutId);
           if (!ok) {
-            imageResponse = last as Response;
+            imageResponse = last;
           }
         } catch (fetchError: any) {
           if (fetchError.name === 'AbortError') console.log(`Timeout fetching ${rawUrl}`);
           else console.log(`Fetch error for ${rawUrl}: ${fetchError.message || fetchError}`);
           results.errors.push(`fetch_error: ${rawUrl} :: ${fetchError?.name || 'Error'} :: ${fetchError?.message || String(fetchError)}`);
+          results.failed++;
+          continue;
+        }
+
+        if (!imageResponse) {
+          results.errors.push(`download_failed: ${rawUrl} :: no_response`);
           results.failed++;
           continue;
         }
@@ -327,6 +379,20 @@ serve(async (req) => {
           results.failed++;
           continue;
         }
+
+        // Identity hash (exact image match even if names/URLs differ)
+        let fileHash: string | null = null;
+        try {
+          fileHash = await sha256HexBytes(imageBytes);
+        } catch {
+          fileHash = null;
+        }
+
+        // If we already imported an identical image for this vehicle, skip creating a duplicate row.
+        if (fileHash && existingFileHashes.has(fileHash)) {
+          results.skipped++;
+          continue;
+        }
         
         console.log(`Image size: ${(imageBytes.length / 1024).toFixed(1)}KB, type: ${contentType}`);
         
@@ -382,6 +448,10 @@ serve(async (req) => {
             user_id: null,
             image_url: publicUrl,
             storage_path: storagePath,
+            file_hash: fileHash,
+            file_size: imageBytes.length,
+            mime_type: contentType,
+            filename,
             source: effectiveSource,
             source_url: rawUrl,
             // Preserve gallery order deterministically (fixes: profiles showing BaT galleries reversed/random).
@@ -420,9 +490,9 @@ serve(async (req) => {
             const { data: vehicleCheck } = await supabase
               .from('vehicles')
               .select('primary_image_url, image_url')
-              .eq('id', vehicleId)
+              .eq('id', vehicle_id)
               .maybeSingle();
-            
+
             // If vehicle has no primary image, set it from this upload
             if (!vehicleCheck?.primary_image_url) {
               await supabase
@@ -432,12 +502,12 @@ serve(async (req) => {
                   image_url: publicUrl,
                   updated_at: new Date().toISOString()
                 })
-                .eq('id', vehicleId);
+                .eq('id', vehicle_id);
               console.log(`✅ Set vehicle primary_image_url to first uploaded image`);
             }
           } catch (updateErr) {
             // Non-fatal - log but continue
-            console.log(`⚠️  Failed to update vehicle primary_image_url: ${updateErr.message}`);
+            console.log(`⚠️  Failed to update vehicle primary_image_url: ${(updateErr as any)?.message || String(updateErr)}`);
           }
         }
 
@@ -465,7 +535,7 @@ serve(async (req) => {
               results.analyzed++;
             }
           } catch (analysisError) {
-            console.log(`Analysis failed for image ${imageRecord.id}: ${analysisError.message}`);
+            console.log(`Analysis failed for image ${imageRecord.id}: ${(analysisError as any)?.message || String(analysisError)}`);
           }
         }
 
@@ -475,7 +545,7 @@ serve(async (req) => {
         }
 
       } catch (error) {
-        console.log(`Error processing ${rawUrl}: ${error.message}`);
+        console.log(`Error processing ${rawUrl}: ${(error as any)?.message || String(error)}`);
         results.failed++;
       }
     }
@@ -532,9 +602,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Backfill error:', error);
+    const err = error as any;
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: err?.message || String(err)
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
