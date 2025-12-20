@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { FaviconIcon } from './common/FaviconIcon';
 
@@ -61,12 +62,14 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   onClose,
   onUpdate
 }) => {
+  const navigate = useNavigate();
   const [provenance, setProvenance] = useState<Provenance | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [newValue, setNewValue] = useState(value);
   const [evidence, setEvidence] = useState<any[]>([]);
   const [batAuctionInfo, setBatAuctionInfo] = useState<{ url?: string; lot_number?: string; sale_date?: string } | null>(null);
+  const [buyerProfileLink, setBuyerProfileLink] = useState<{ url: string; isExternal: boolean } | null>(null);
   
   // Helper to calculate days/years since sale
   const calculateTimeSinceSale = (saleDate: string | null | undefined): string | null => {
@@ -142,10 +145,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         
         const saleDate = listing?.sold_at || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date;
         
-        // Extract lot number from multiple possible sources
+        // Extract lot number from multiple possible sources (prioritize metadata.lot_number which has full number)
         const lotNumber = listing?.metadata?.lot_number || 
-                         listing?.listing_id || 
                          saleEvent?.metadata?.lot_number ||
+                         (listing?.listing_id ? String(listing.listing_id) : null) ||
                          null;
         
         // Extract seller username from multiple sources
@@ -181,6 +184,27 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             view_count: listing?.view_count,
             watcher_count: listing?.watcher_count
           };
+          
+          // Check if buyer has linked N-Zero profile
+          if (auctionMetrics.buyer_name && field === 'sale_price') {
+            const { data: buyerIdentity } = await supabase
+              .from('external_identities')
+              .select('claimed_by_user_id, profile_url')
+              .eq('platform', 'bat')
+              .eq('handle', auctionMetrics.buyer_name)
+              .maybeSingle();
+            
+            if (buyerIdentity?.claimed_by_user_id) {
+              // They have a linked N-Zero profile
+              setBuyerProfileLink({ url: `/profile/${buyerIdentity.claimed_by_user_id}`, isExternal: false });
+            } else {
+              // Link to BaT profile
+              const batProfileUrl = buyerIdentity?.profile_url || `https://bringatrailer.com/member/${auctionMetrics.buyer_name}/`;
+              setBuyerProfileLink({ url: batProfileUrl, isExternal: true });
+            }
+          } else {
+            setBuyerProfileLink(null);
+          }
         }
       }
       
@@ -590,7 +614,31 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               </div>
               {provenance.buyer_name && (
                 <div style={{ fontSize: '9pt', marginTop: '4px', color: 'var(--text-muted)' }}>
-                  To: {provenance.buyer_name}
+                  To: {buyerProfileLink ? (
+                    <a
+                      href={buyerProfileLink.url}
+                      target={buyerProfileLink.isExternal ? '_blank' : undefined}
+                      rel={buyerProfileLink.isExternal ? 'noopener noreferrer' : undefined}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!buyerProfileLink.isExternal) {
+                          e.preventDefault();
+                          // Navigate internally
+                          navigate(buyerProfileLink.url);
+                        }
+                      }}
+                      style={{
+                        color: 'var(--primary)',
+                        textDecoration: 'underline',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {provenance.buyer_name}
+                    </a>
+                  ) : (
+                    provenance.buyer_name
+                  )}
                 </div>
               )}
             </div>
@@ -604,19 +652,85 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               </div>
               <div style={{ fontSize: '9pt', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                 {provenance.bid_count !== undefined && (
-                  <span>
+                  <a
+                    href={provenance.bat_url || context?.evidence_url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      color: 'var(--text)',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      padding: '2px 8px',
+                      borderRadius: '3px',
+                      background: 'var(--grey-100)',
+                      border: '1px solid var(--border)',
+                      fontWeight: 600,
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--grey-200)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'var(--grey-100)';
+                    }}
+                  >
                     <strong>{provenance.bid_count.toLocaleString()}</strong> {provenance.bid_count === 1 ? 'bid' : 'bids'}
-                  </span>
+                  </a>
                 )}
                 {provenance.view_count !== undefined && (
-                  <span>
+                  <a
+                    href={provenance.bat_url || context?.evidence_url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      color: 'var(--text)',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      padding: '2px 8px',
+                      borderRadius: '3px',
+                      background: 'var(--grey-100)',
+                      border: '1px solid var(--border)',
+                      fontWeight: 600,
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--grey-200)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'var(--grey-100)';
+                    }}
+                  >
                     <strong>{provenance.view_count.toLocaleString()}</strong> {provenance.view_count === 1 ? 'view' : 'views'}
-                  </span>
+                  </a>
                 )}
                 {provenance.watcher_count !== undefined && (
-                  <span>
+                  <a
+                    href={provenance.bat_url || context?.evidence_url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      color: 'var(--text)',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      padding: '2px 8px',
+                      borderRadius: '3px',
+                      background: 'var(--grey-100)',
+                      border: '1px solid var(--border)',
+                      fontWeight: 600,
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--grey-200)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'var(--grey-100)';
+                    }}
+                  >
                     <strong>{provenance.watcher_count.toLocaleString()}</strong> {provenance.watcher_count === 1 ? 'watcher' : 'watchers'}
-                  </span>
+                  </a>
                 )}
               </div>
             </div>
