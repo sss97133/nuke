@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts';
+import { extractBatDomMap } from '../_shared/batDomMap.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -2408,6 +2409,81 @@ serve(async (req) => {
           }, {
             onConflict: 'vehicle_id,field_name,source_type,source_url'
           });
+      }
+    }
+
+    // Extract and backfill images from BaT gallery using batDomMap
+    if (vehicleId && html) {
+      try {
+        console.log('📸 Extracting images from BaT gallery...');
+        const { extracted: domExtracted } = extractBatDomMap(html, batUrl);
+        const images = Array.isArray(domExtracted?.image_urls) ? domExtracted.image_urls : [];
+        
+        if (images.length > 0) {
+          console.log(`✅ Found ${images.length} gallery images, backfilling...`);
+          
+          // Call backfill-images to upload all gallery images
+          const { error: backfillError } = await supabase.functions.invoke('backfill-images', {
+            body: {
+              vehicle_id: vehicleId,
+              image_urls: images,
+              source: 'bat_comprehensive_extraction',
+              run_analysis: false,
+              max_images: 0, // Upload all images
+              continue: true,
+              sleep_ms: 150,
+              max_runtime_ms: 60000, // 60 seconds for large galleries
+            }
+          });
+
+          if (backfillError) {
+            console.error('❌ Image backfill error:', backfillError);
+          } else {
+            console.log(`✅ Successfully backfilled ${images.length} images`);
+          }
+
+          // Store image URLs in origin_metadata for provenance
+          try {
+            const { data: vrow } = await supabase
+              .from('vehicles')
+              .select('origin_metadata, primary_image_url')
+              .eq('id', vehicleId)
+              .maybeSingle();
+            
+            const om = (vrow?.origin_metadata && typeof vrow.origin_metadata === 'object') 
+              ? vrow.origin_metadata 
+              : {};
+            
+            const nextOm = {
+              ...om,
+              image_urls: images,
+              image_count: images.length,
+              bat_gallery_extracted_at: new Date().toISOString(),
+            };
+            
+            // Set primary image if missing
+            const primary = images[0] || vrow?.primary_image_url || null;
+            const updates: any = { 
+              origin_metadata: nextOm, 
+              updated_at: new Date().toISOString() 
+            };
+            
+            if (primary && !vrow?.primary_image_url) {
+              updates.primary_image_url = primary;
+              updates.image_url = primary;
+            }
+            
+            await supabase.from('vehicles').update(updates).eq('id', vehicleId);
+            console.log('✅ Stored image URLs in origin_metadata');
+          } catch (metadataError) {
+            console.warn('⚠️ Failed to update origin_metadata (non-blocking):', metadataError);
+          }
+        } else {
+          console.warn('⚠️ No images found in BaT gallery');
+        }
+      } catch (imageError) {
+        console.error('❌ Image extraction/backfill error (non-blocking):', imageError);
+        // Don't fail the entire extraction if images fail
       }
     }
 
