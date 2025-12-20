@@ -2172,6 +2172,24 @@ const VehicleProfile: React.FC = () => {
       return u.includes('/storage/v1/object/public/');
     };
 
+    const resolveDbImageUrl = (row: any): string | null => {
+      try {
+        const variantsRaw = (row as any)?.variants;
+        const variants = variantsRaw && typeof variantsRaw === 'object' ? variantsRaw : null;
+        return (
+          (variants as any)?.large ||
+          (variants as any)?.medium ||
+          (variants as any)?.full ||
+          (row as any)?.medium_url ||
+          (row as any)?.thumbnail_url ||
+          (row as any)?.image_url ||
+          null
+        );
+      } catch {
+        return (row as any)?.image_url || null;
+      }
+    };
+
     // Check if RPC data is available (avoid duplicate query)
     const rpcData = (window as any).__vehicleProfileRpcData;
     const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicle.id;
@@ -2197,7 +2215,7 @@ const VehicleProfile: React.FC = () => {
       const { data: imageRecords, error } = await supabase
         .from('vehicle_images')
         // Keep payload lean to reduce DB load/timeouts; we only need URLs + ordering fields here.
-        .select('id, vehicle_id, image_url, thumbnail_url, medium_url, large_url, is_primary, is_document, position, created_at, storage_path')
+        .select('id, vehicle_id, image_url, thumbnail_url, medium_url, variants, is_primary, is_document, position, created_at, storage_path')
         .eq('vehicle_id', vehicle.id)
         // Legacy rows may have is_document = NULL; treat that as "not a document"
         .not('is_document', 'is', true) // Filter out documents - they belong in a separate section
@@ -2220,11 +2238,11 @@ const VehicleProfile: React.FC = () => {
         };
 
         const primaryRow = imageRecords.find((r: any) => r?.is_primary === true) || null;
-        const primaryCandidate = primaryRow ? (primaryRow?.large_url || primaryRow?.image_url || null) : null;
+        const primaryCandidate = primaryRow ? (resolveDbImageUrl(primaryRow) || null) : null;
         const primaryOk = primaryCandidate && filterProfileImages([primaryCandidate], vehicle).length > 0;
 
         const fallbackPool = imageRecords
-          .map((r: any) => r?.large_url || r?.image_url)
+          .map((r: any) => resolveDbImageUrl(r))
           .filter(Boolean) as string[];
         const filteredPool = filterProfileImages([...fallbackPool, ...originImages], vehicle);
         const firstFiltered = filteredPool.find((u) => isSupabaseHostedImageUrl(u)) || filteredPool[0] || null;

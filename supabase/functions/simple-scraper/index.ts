@@ -83,6 +83,35 @@ serve(async (req) => {
       const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
       const title = titleMatch ? titleMatch[1].trim() : ''
 
+      // Best-effort VIN extraction (BaT often includes a VIN in the "Vehicle Details" section).
+      // We only accept strict 17-char VINs (no I/O/Q, must include at least one digit).
+      const sanitizeVin = (raw: any): string | null => {
+        if (!raw) return null
+        const s = String(raw).trim()
+        if (!s) return null
+        const cleaned = s.toUpperCase().replace(/[^A-Z0-9]/g, '')
+        if (cleaned.length !== 17) return null
+        if (/[IOQ]/.test(cleaned)) return null
+        if (!/\d/.test(cleaned)) return null
+        return cleaned
+      }
+
+      const extractVin = (html: string): string | null => {
+        try {
+          const h = String(html || '')
+          // Prefer context where the page explicitly labels VIN.
+          const labeled = /(?:\bVIN\b|Vehicle Identification Number)\D{0,80}([A-HJ-NPR-Z0-9]{17})/gi
+          let m: RegExpExecArray | null
+          while ((m = labeled.exec(h)) !== null) {
+            const v = sanitizeVin(m?.[1])
+            if (v) return v
+          }
+          return null
+        } catch {
+          return null
+        }
+      }
+
       // Extract price and convert to numeric
       const priceMatch = html.match(/\$[\d,]+/g)
       const priceString = priceMatch ? priceMatch[0] : ''
@@ -99,10 +128,14 @@ serve(async (req) => {
           images = gallery
         } else {
         // Capture absolute, protocol-relative, and relative gallery URLs.
-        // BaT pages often include many listing images as relative paths.
-        const abs = html.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
-        const protoRel = html.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
-        const rel = html.match(/\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
+        // IMPORTANT: Only scan within the listing photo gallery section to avoid pulling images
+        // from related/recommended auctions elsewhere on the page.
+        const galleryIndex = html.indexOf('bat_listing_page_photo_gallery')
+        const scanHtml = galleryIndex >= 0 ? html.slice(galleryIndex, galleryIndex + 200000) : ''
+
+        const abs = scanHtml.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
+        const protoRel = scanHtml.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
+        const rel = scanHtml.match(/\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
 
         const batImageMatches = [...abs, ...protoRel, ...rel]
         if (batImageMatches.length > 0) {
@@ -149,6 +182,7 @@ serve(async (req) => {
 
       // Extract basic vehicle info from title
       let year, make, model
+      const vin = url.includes('bringatrailer.com') ? extractVin(html) : null
       const yearMatch = title.match(/\b(19|20)\d{2}\b/)
       if (yearMatch) {
         year = parseInt(yearMatch[0])
@@ -220,6 +254,7 @@ serve(async (req) => {
         year,
         make,
         model: model || 'Unknown',  // Database requires non-empty string
+        vin,
         images,
         source: url.includes('bringatrailer.com') ? 'Bring a Trailer' : 
                 url.includes('craigslist.org') ? 'Craigslist' : 
