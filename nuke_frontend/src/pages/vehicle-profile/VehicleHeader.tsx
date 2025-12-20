@@ -1181,6 +1181,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     s = s.replace(/\bon\s+BaT\s+Auctions\b/gi, '').trim();
     s = s.replace(/\bBaT\s+Auctions\b/gi, '').trim();
     s = s.replace(/\bBring\s+a\s+Trailer\b/gi, '').trim();
+    
+    // Fix numeric model designations like "3 0csi" -> "3.0 CSi"
+    // Pattern: single digit, space, digit, lowercase letters (e.g., "3 0csi", "5 30si")
+    s = s.replace(/\b(\d)\s+(\d)([a-z]+)\b/gi, (match, d1, d2, suffix) => {
+      // Preserve original case of suffix, but ensure proper capitalization
+      const upperSuffix = suffix.charAt(0).toUpperCase() + suffix.slice(1);
+      return `${d1}.${d2} ${upperSuffix}`;
+    });
     s = s.replace(/\bending\b[\s\S]*$/i, '').trim();
 
     // Remove lot number parenthetical
@@ -1546,9 +1554,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {/* Seller visibility (do not hide the seller behind tiny icons) */}
           {sellerBadge?.label && (() => {
             // Don't show "Bring a Trailer" consigner badge if we're already showing BaT platform badge
+            // Also check for origin badge showing BaT
             const isBatConsigner = sellerBadge.label?.toLowerCase().includes('bring a trailer') || sellerBadge.label?.toLowerCase().includes('bat');
             const isBatPulse = auctionPulse?.listing_url && String(auctionPulse.platform || '').toLowerCase() === 'bat';
-            if (isBatConsigner && isBatPulse) return null;
+            const isBatOrigin = (vehicle as any)?.profile_origin === 'bat_import' || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com');
+            // Hide seller badge if BaT platform badge OR origin badge is showing BaT
+            if (isBatConsigner && (isBatPulse || isBatOrigin)) return null;
             
             return (sellerBadge as any)?.href ? (
               <a
@@ -1582,10 +1593,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
           {auctionPulse?.listing_url && auctionStatusForBadge && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              {/* Only show platform badge if consigner badge isn't already showing BaT */}
+              {/* Only show platform badge if consigner badge and origin badge aren't already showing BaT */}
               {(() => {
                 const isBatConsigner = sellerBadge && (sellerBadge.label?.toLowerCase().includes('bring a trailer') || sellerBadge.label?.toLowerCase().includes('bat'));
-                return !isBatConsigner ? (
+                const isBatOrigin = (vehicle as any)?.profile_origin === 'bat_import' || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com');
+                // Hide platform badge if BaT is already shown elsewhere
+                return !isBatConsigner && !isBatOrigin ? (
                   <AuctionPlatformBadge
                     platform={auctionPulse.platform}
                     urlForFavicon={auctionPulse.listing_url}
@@ -1979,72 +1992,55 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 );
                 
                 // During a live auction, deprioritize claim CTA and foreground auction telemetry + BID.
+                // Don't show link for sold auctions (user requested removal of SOLD link button)
                 if (auctionPulse?.listing_url) {
                   const status = String(auctionPulse.listing_status || '').toLowerCase();
                   const isLiveStatus = status === 'active' || status === 'live';
                   const isSoldStatus = status === 'sold';
-                  const label = (() => {
-                    if (isLiveStatus) {
-                      return typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0
-                        ? `Bid: ${formatCurrency(auctionPulse.current_bid)}`
-                        : 'BID';
-                    }
-                    if (isSoldStatus && typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) {
-                      return `Sold: ${formatCurrency((auctionPulse as any).final_price)}`;
-                    }
-                    if (isSoldStatus) return 'SOLD';
-                    if (status === 'ended') {
-                      // Show price if available, otherwise just "Ended"
-                      const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
-                        ? (auctionPulse as any).final_price
-                        : null;
-                      const v = vehicle as any;
-                      const salePrice = typeof v?.sale_price === 'number' && v.sale_price > 0 ? v.sale_price : null;
-                      const winBid = typeof v?.winning_bid === 'number' && v.winning_bid > 0 ? v.winning_bid : null;
-                      const hBid = typeof v?.high_bid === 'number' && v.high_bid > 0 ? v.high_bid : null;
-                      if (finalPrice || salePrice || winBid || hBid) {
-                        return formatCurrency(finalPrice || salePrice || winBid || hBid);
-                      }
-                      return 'Ended';
-                    }
-                    return 'View auction';
-                  })();
-                  return (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                      <a
-                        href={auctionPulse.listing_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          border: '2px solid var(--border)',
-                          background: 'var(--white)',
-                          color: 'var(--text)',
-                          fontWeight: 700,
-                          padding: '4px 8px',
-                          cursor: 'pointer',
-                          fontSize: '8pt',
-                          borderRadius: '3px',
-                          transition: 'all 0.12s ease',
-                          textDecoration: 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
-                        }}
-                        className={auctionPulseMs && isLiveStatus ? 'auction-cta-pulse' : undefined}
-                        onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
-                          (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
-                          (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
-                        }}
-                        title="Open live auction (place bids on the auction platform)"
-                      >
-                        {label}
-                      </a>
-                    </span>
-                  );
+                  
+                  // Only show link for live auctions, not sold ones
+                  if (isLiveStatus) {
+                    const label = typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0
+                      ? `Bid: ${formatCurrency(auctionPulse.current_bid)}`
+                      : 'BID';
+                    return (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                        <a
+                          href={auctionPulse.listing_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            border: '2px solid var(--border)',
+                            background: 'var(--white)',
+                            color: 'var(--text)',
+                            fontWeight: 700,
+                            padding: '4px 8px',
+                            cursor: 'pointer',
+                            fontSize: '8pt',
+                            borderRadius: '3px',
+                            transition: 'all 0.12s ease',
+                            textDecoration: 'none',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            ...(auctionPulseMs ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
+                          }}
+                          className={auctionPulseMs && isLiveStatus ? 'auction-cta-pulse' : undefined}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
+                            (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
+                            (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
+                          }}
+                          title="Open live auction (place bids on the auction platform)"
+                        >
+                          {label}
+                        </a>
+                      </span>
+                    );
+                  }
+                  // For sold/ended auctions, don't show the link button
                 }
 
                 if (isDiscoveredVehicle) {

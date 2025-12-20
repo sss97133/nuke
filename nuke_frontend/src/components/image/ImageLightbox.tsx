@@ -269,22 +269,38 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       // Single tap - could toggle UI or other actions
       // Already handled by other logic
     } else {
-      // Determine gesture type: horizontal (navigate) or vertical (info panel)
+      // Determine gesture type: horizontal (navigate or sidebar) or vertical (info panel)
+      const isMobile = window.innerWidth < 640; // sm breakpoint
+      
       if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        // Horizontal swipe - navigate (increased threshold to prevent accidental navigation)
-        if (Math.abs(deltaX) > 120) {
-          if (deltaX > 0 && onPrev) {
-            onPrev();
-          } else if (deltaX < 0 && onNext) {
-            onNext();
+        // Horizontal swipe
+        if (isMobile && touchStart && touchStart.x < 50) {
+          // Swipe from left edge on mobile - control sidebar
+          if (deltaX > 80) {
+            // Swipe right from left edge - open sidebar
+            setShowSidebar(true);
+          } else if (deltaX < -80 && showSidebar) {
+            // Swipe left - close sidebar
+            setShowSidebar(false);
+          }
+        } else {
+          // Horizontal swipe in center - navigate between images
+          if (Math.abs(deltaX) > 120) {
+            if (deltaX > 0 && onPrev) {
+              onPrev();
+            } else if (deltaX < 0 && onNext) {
+              onNext();
+            }
           }
         }
       } else {
-        // Vertical swipe - info panel
+        // Vertical swipe - info panel control
         if (Math.abs(deltaY) > 50) {
           if (deltaY < -50) {
-            // Swipe up - show info panel
+            // Swipe up - show comments tab (user requested)
             setShowInfoPanel(true);
+            setActiveTab('comments');
+            setShowSidebar(true);
           } else if (deltaY > 50 && showInfoPanel) {
             // Swipe down - hide info panel
             setShowInfoPanel(false);
@@ -1288,7 +1304,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           ))}
         </div>
 
-        {/* Sidebar - Cursor Style - Fixed width, doesn't shrink */}
+        {/* Sidebar - Cursor Style - Fixed width, doesn't shrink, collapsible on desktop, swipeable on mobile */}
         {showSidebar && (
           <div 
             ref={sidebarRef}
@@ -1298,7 +1314,10 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               flexShrink: 0,
               minWidth: '256px',
               maxWidth: '256px',
-              minHeight: 0
+              minHeight: 0,
+              transition: 'transform 0.3s ease-out',
+              // On mobile, allow swipe gestures on the sidebar itself
+              touchAction: 'pan-y'
             }}
           >
             {/* Tabs - Cursor Style */}

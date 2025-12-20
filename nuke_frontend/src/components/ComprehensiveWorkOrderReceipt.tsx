@@ -15,6 +15,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
+import { FaviconIcon } from './common/FaviconIcon';
 
 interface ComprehensiveWorkOrderReceiptProps {
   eventId: string;
@@ -28,6 +29,7 @@ interface WorkOrder {
   description?: string;
   event_date: string;
   vehicle_id?: string;
+  event_type?: string;
   duration_hours?: number;
   cost_amount?: number;
   
@@ -152,6 +154,16 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
     overhead: Overhead
   } | null>(null);
   const [adjacentEvents, setAdjacentEvents] = useState<{ prev: string | null, next: string | null }>({ prev: null, next: null });
+  const [auctionData, setAuctionData] = useState<{
+    seller?: string;
+    seller_username?: string;
+    seller_profile_url?: string;
+    buyer?: string;
+    buyer_username?: string;
+    buyer_profile_url?: string;
+    lot_number?: string;
+    sale_price?: number;
+  } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -190,6 +202,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           title: eventData.title,
           description: eventData.description,
           event_date: eventData.event_date,
+          event_type: (eventData as any).event_type,
           duration_hours: eventData.duration_hours,
           cost_amount: eventData.cost_amount,
           service_provider_name: eventData.service_provider_name,
@@ -201,13 +214,60 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           // Set defaults for computed fields
           parts_count: 0,
           labor_tasks_count: 0,
-          calculated_total: eventData.cost_amount || 0
+          calculated_total: eventData.cost_amount || 0,
+          // Preserve metadata for auction events
+          calculation_metadata: (eventData as any).metadata
         } as WorkOrder;
       } else {
         wo = viewData;
       }
       
       setWorkOrder(wo);
+
+      // 1b. Extract auction data if this is an auction_sold event
+      if (wo.event_type === 'auction_sold' || wo.title?.includes('sold') || wo.title?.includes('Auction')) {
+        const metadata = wo.calculation_metadata || (wo as any).metadata;
+        if (metadata) {
+          setAuctionData({
+            seller: metadata.seller || metadata.seller_username,
+            seller_username: metadata.seller_username || metadata.seller,
+            seller_profile_url: metadata.seller_profile_url,
+            buyer: metadata.buyer || metadata.buyer_username,
+            buyer_username: metadata.buyer_username || metadata.buyer,
+            buyer_profile_url: metadata.buyer_profile_url,
+            lot_number: metadata.lot_number,
+            sale_price: wo.cost_amount || metadata.sale_price || metadata.final_price
+          });
+        }
+        
+        // Also try to get from external_listings if we have vehicle_id
+        if (wo.vehicle_id) {
+          const { data: listing } = await supabase
+            .from('external_listings')
+            .select('metadata, final_price')
+            .eq('vehicle_id', wo.vehicle_id)
+            .eq('platform', 'bat')
+            .order('sold_at', { ascending: false, nullsLast: true })
+            .limit(1)
+            .maybeSingle();
+          
+          if (listing?.metadata) {
+            const sellerUsername = listing.metadata?.seller_username || listing.metadata?.seller;
+            const buyerUsername = listing.metadata?.buyer_username || listing.metadata?.buyer;
+            setAuctionData(prev => ({
+              ...prev,
+              seller: prev?.seller || sellerUsername,
+              seller_username: prev?.seller_username || sellerUsername,
+              seller_profile_url: prev?.seller_profile_url || listing.metadata?.seller_profile_url || (sellerUsername ? `https://bringatrailer.com/member/${sellerUsername}/` : undefined),
+              buyer: prev?.buyer || buyerUsername,
+              buyer_username: prev?.buyer_username || buyerUsername,
+              buyer_profile_url: prev?.buyer_profile_url || listing.metadata?.buyer_profile_url || (buyerUsername ? `https://bringatrailer.com/member/${buyerUsername}/` : undefined),
+              lot_number: prev?.lot_number || listing.metadata?.lot_number,
+              sale_price: prev?.sale_price || listing.final_price || listing.metadata?.sale_price
+            }));
+          }
+        }
+      }
 
       // 2. Get participants
       const { data: partsData } = await supabase
@@ -651,9 +711,71 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           )}
         </div>
 
-        {/* COST BREAKDOWN - Wireframe Table Format */}
-        {(costBreakdown?.parts?.items?.length > 0 || costBreakdown?.labor?.tasks?.length > 0 || workOrder.cost_amount) && (
+        {/* AUCTION RECEIPT FORMAT - Special format for auction_sold events */}
+        {((workOrder.event_type === 'auction_sold' || workOrder.event_type === 'sale') && auctionData?.sale_price) ? (
           <div style={{ padding: '12px', borderBottom: '2px solid #000' }}>
+            <div style={{ 
+              fontSize: '8pt', 
+              fontWeight: 'bold', 
+              marginBottom: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              AUCTION SALE RECEIPT
+            </div>
+
+            {/* Parties Section */}
+            <div style={{ marginBottom: '16px', padding: '8px', background: 'var(--bg)', border: '1px solid #ddd' }}>
+              <div style={{ fontSize: '7pt', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase', color: '#666' }}>
+                Parties
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '8pt' }}>
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>Seller</div>
+                  <div style={{ color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {auctionData.seller_profile_url ? (
+                      <a 
+                        href={auctionData.seller_profile_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--primary)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <FaviconIcon url={auctionData.seller_profile_url} size={12} preserveAspectRatio={true} />
+                        {auctionData.seller_username || auctionData.seller || 'Unknown'}
+                      </a>
+                    ) : (
+                      <span>{auctionData.seller_username || auctionData.seller || 'Unknown'}</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>Buyer</div>
+                  <div style={{ color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {auctionData.buyer_profile_url ? (
+                      <a 
+                        href={auctionData.buyer_profile_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--primary)', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <FaviconIcon url={auctionData.buyer_profile_url} size={12} preserveAspectRatio={true} />
+                        {auctionData.buyer_username || auctionData.buyer || 'Unknown'}
+                      </a>
+                    ) : (
+                      <span>{auctionData.buyer_username || auctionData.buyer || 'Unknown'}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop: '8px', fontSize: '7pt', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                Platform: 
+                <FaviconIcon url="https://bringatrailer.com" size={12} preserveAspectRatio={true} />
+                <strong>Bring a Trailer</strong>
+                {auctionData.lot_number && ` • Lot #${auctionData.lot_number}`}
+              </div>
+            </div>
+
+            {/* Financial Breakdown */}
             <div style={{ 
               fontSize: '8pt', 
               fontWeight: 'bold', 
@@ -661,8 +783,132 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               textTransform: 'uppercase',
               letterSpacing: '0.5px'
             }}>
-              COST BREAKDOWN
+              FINANCIAL BREAKDOWN
             </div>
+            
+            {/* Table Header */}
+            <div style={{ 
+              display: 'grid',
+              gridTemplateColumns: '2fr 120px',
+              gap: '8px',
+              paddingBottom: '4px',
+              borderBottom: '1px solid #000',
+              fontSize: '7pt',
+              fontWeight: 'bold',
+              marginBottom: '4px'
+            }}>
+              <div>Description</div>
+              <div style={{ textAlign: 'right' }}>Amount</div>
+            </div>
+
+            {/* Sale Price */}
+            <div style={{ 
+              display: 'grid',
+              gridTemplateColumns: '2fr 120px',
+              gap: '8px',
+              padding: '6px 0',
+              fontSize: '8pt',
+              borderBottom: '1px dotted #ddd'
+            }}>
+              <div style={{ fontWeight: 'bold' }}>Sale Price</div>
+              <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(auctionData.sale_price)}</div>
+            </div>
+
+            {/* Buyer's Fee (5% of sale price) */}
+            {auctionData.sale_price && (() => {
+              const buyerFee = auctionData.sale_price * 0.05;
+              return (
+                <div style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: '2fr 120px',
+                  gap: '8px',
+                  padding: '6px 0',
+                  fontSize: '8pt',
+                  borderBottom: '1px dotted #ddd'
+                }}>
+                  <div>
+                    Buyer's Fee (5% * est.)
+                    <span style={{ fontSize: '6pt', color: '#666', marginLeft: '4px' }}>*estimated</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>{formatCurrency(buyerFee)}</div>
+                </div>
+              );
+            })()}
+
+            {/* Buyer's Total */}
+            {auctionData.sale_price && (() => {
+              const buyerFee = auctionData.sale_price * 0.05;
+              const buyerTotal = auctionData.sale_price + buyerFee;
+              return (
+                <div style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: '2fr 120px',
+                  gap: '8px',
+                  padding: '8px 0',
+                  marginTop: '4px',
+                  borderTop: '1px solid #000',
+                  fontSize: '9pt',
+                  fontWeight: 'bold'
+                }}>
+                  <div>BUYER'S TOTAL</div>
+                  <div style={{ textAlign: 'right' }}>{formatCurrency(buyerTotal)}</div>
+                </div>
+              );
+            })()}
+
+            {/* Seller's Fee (BaT fee structure: 5% of first $5000, then 0%) */}
+            {auctionData.sale_price && (() => {
+              const sellerFee = Math.min(auctionData.sale_price, 5000) * 0.05;
+              const sellerNet = auctionData.sale_price - sellerFee;
+              return (
+                <>
+                  <div style={{ 
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 120px',
+                    gap: '8px',
+                    padding: '6px 0',
+                    marginTop: '12px',
+                    fontSize: '8pt',
+                    borderBottom: '1px dotted #ddd'
+                  }}>
+                    <div>
+                      Seller's Fee (BaT: 5% of first $5,000)
+                      <span style={{ fontSize: '6pt', color: '#666', marginLeft: '4px' }}>*estimated</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>{formatCurrency(sellerFee)}</div>
+                  </div>
+
+                  {/* Seller's Net */}
+                  <div style={{ 
+                    display: 'grid',
+                    gridTemplateColumns: '2fr 120px',
+                    gap: '8px',
+                    padding: '8px 0',
+                    marginTop: '4px',
+                    borderTop: '2px solid #000',
+                    fontSize: '9pt',
+                    fontWeight: 'bold'
+                  }}>
+                    <div>SELLER'S NET PROCEEDS</div>
+                    <div style={{ textAlign: 'right' }}>{formatCurrency(sellerNet)}</div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        ) : (
+          /* STANDARD COST BREAKDOWN - For non-auction events */
+          (costBreakdown?.parts?.items?.length > 0 || costBreakdown?.labor?.tasks?.length > 0 || workOrder.cost_amount) && (
+            <div style={{ padding: '12px', borderBottom: '2px solid #000' }}>
+              <div style={{ 
+                fontSize: '8pt', 
+                fontWeight: 'bold', 
+                marginBottom: '8px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                COST BREAKDOWN
+              </div>
             
             {/* Table Header */}
             <div style={{ 
@@ -789,6 +1035,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               </div>
             </div>
           </div>
+          )
         )}
 
 
