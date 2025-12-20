@@ -1252,7 +1252,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             src={imageUrl}
             alt="Vehicle"
             onLoad={() => setImageLoaded(true)}
-            className="object-contain select-none"
+            className="object-cover select-none"
             style={{ 
               pointerEvents: 'auto',
               transform: `rotate(${rotation}deg) scale(${zoom})`,
@@ -1260,11 +1260,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               display: 'block',
               filter: isSensitive ? 'blur(20px)' : 'none',
               cursor: zoom > 1 ? 'grab' : 'default',
-              maxWidth: '100%',
-              maxHeight: '100%',
-              width: 'auto',
-              height: 'auto',
-              objectFit: 'contain'
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover'
             }}
           />
 
