@@ -9,11 +9,10 @@ export interface VehicleImage {
   vehicle_id: string;
   image_url: string;
   file_name?: string;
-  file_path?: string;
   is_primary: boolean;
-  is_public: boolean;
   category?: string;
-  description?: string;
+  caption?: string;
+  taken_at?: string;
   variants?: {
     thumbnail?: string;
     medium?: string;
@@ -67,7 +66,7 @@ export const useVehicleImages = (vehicleId?: string) => {
       const { data, error: fetchError } = await supabase
         .from('vehicle_images')
         // Keep payload lean to reduce the chance of statement timeouts / 500s on large image tables
-        .select('id, vehicle_id, image_url, file_name, file_path, is_primary, is_public, category, description, variants, created_at')
+        .select('id, vehicle_id, image_url, file_name, caption, is_primary, category, variants, created_at, taken_at')
         .eq('vehicle_id', vehicleId)
         // Legacy rows may have is_document = NULL; treat that as "not a document"
         .not('is_document', 'is', true)
