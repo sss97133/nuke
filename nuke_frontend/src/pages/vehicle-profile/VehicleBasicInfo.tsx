@@ -44,7 +44,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     }
   }, [safeOnDataPointClick]);
 
-  // Check for VIN in image analysis data if vehicle.vin is not set
+  // Check for VIN in multiple sources if vehicle.vin is not set
   const [vinFromImages, setVinFromImages] = useState<string | null>(null);
   useEffect(() => {
     if (vehicle?.vin || !vehicle?.id) {
@@ -52,48 +52,96 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       return;
     }
     
-    // Fetch VIN from image analysis metadata
-    const fetchVinFromImages = async () => {
+    // Fetch VIN from multiple sources
+    const fetchVinFromMultipleSources = async () => {
       try {
-        const { data: images, error } = await supabase
+        // 1. Check vehicle_field_sources table first (most reliable)
+        const { data: fieldSources, error: fieldSourcesError } = await supabase
+          .from('vehicle_field_sources')
+          .select('field_value, confidence_score')
+          .eq('vehicle_id', vehicle.id)
+          .eq('field_name', 'vin')
+          .order('confidence_score', { ascending: false })
+          .limit(1);
+
+        if (!fieldSourcesError && fieldSources && fieldSources.length > 0) {
+          const vin = String(fieldSources[0].field_value || '').trim();
+          if (vin && vin.length >= 10) {
+            setVinFromImages(vin);
+            return;
+          }
+        }
+
+        // 2. Check vehicle_images ai_scan_metadata
+        const { data: images, error: imagesError } = await supabase
           .from('vehicle_images')
           .select('ai_scan_metadata')
           .eq('vehicle_id', vehicle.id)
           .not('ai_scan_metadata', 'is', null)
           .limit(50);
 
-        if (error) return;
+        if (!imagesError && images) {
+          // Look through ai_scan_metadata for VIN
+          for (const img of images) {
+            const metadata = img.ai_scan_metadata;
+            if (!metadata) continue;
 
-        // Look through ai_scan_metadata for VIN
-        for (const img of images || []) {
-          const metadata = img.ai_scan_metadata;
-          if (!metadata) continue;
+            // Check vin_tag
+            if (metadata.vin_tag?.vin) {
+              const vin = String(metadata.vin_tag.vin).trim();
+              if (vin && vin.length >= 10) {
+                setVinFromImages(vin);
+                return;
+              }
+            }
 
-          // Check vin_tag
-          if (metadata.vin_tag?.vin) {
-            setVinFromImages(metadata.vin_tag.vin);
-            return;
+            // Check spid_data
+            if (metadata.spid_data?.extracted_data?.vin) {
+              const vin = String(metadata.spid_data.extracted_data.vin).trim();
+              if (vin && vin.length >= 10) {
+                setVinFromImages(vin);
+                return;
+              }
+            }
+
+            // Check appraiser analysis
+            if (metadata.appraiser?.extracted_data?.vin) {
+              const vin = String(metadata.appraiser.extracted_data.vin).trim();
+              if (vin && vin.length >= 10) {
+                setVinFromImages(vin);
+                return;
+              }
+            }
           }
+        }
 
-          // Check spid_data
-          if (metadata.spid_data?.extracted_data?.vin) {
-            setVinFromImages(metadata.spid_data.extracted_data.vin);
-            return;
-          }
-
-          // Check appraiser analysis
-          if (metadata.appraiser?.extracted_data?.vin) {
-            setVinFromImages(metadata.appraiser.extracted_data.vin);
+        // 3. Check origin_metadata for VIN extraction data (from BaT scraping)
+        const originMeta = (vehicle as any)?.origin_metadata;
+        if (originMeta?.vin_extraction?.best_candidate?.value) {
+          const vin = String(originMeta.vin_extraction.best_candidate.value).trim();
+          if (vin && vin.length >= 10) {
+            setVinFromImages(vin);
             return;
           }
         }
+        if (originMeta?.vin) {
+          const vin = String(originMeta.vin).trim();
+          if (vin && vin.length >= 10) {
+            setVinFromImages(vin);
+            return;
+          }
+        }
+
+        // No VIN found
+        setVinFromImages(null);
       } catch (error) {
-        // Silently fail - this is a nice-to-have
+        console.error('[VehicleBasicInfo] Error fetching VIN from multiple sources:', error);
+        setVinFromImages(null);
       }
     };
 
-    fetchVinFromImages();
-  }, [vehicle?.id, vehicle?.vin]);
+    fetchVinFromMultipleSources();
+  }, [vehicle?.id, vehicle?.vin, (vehicle as any)?.origin_metadata]);
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { isVerifiedOwner, hasContributorAccess, contributorRole } = permissions;
@@ -301,6 +349,35 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     if (s.length > 200) return s.substring(0, 197) + '...'; // Truncate very long values instead of hiding
     if (s.includes('{') || s.includes('}') || s.includes(';') || s.includes('}.') || s.includes('/*') || s.includes('*/')) return '';
     
+    // Detect and remove BaT listing contamination patterns
+    // Patterns like: "for sale on BaT Auctions", "sold for $X on [Date]", "(Lot #XXX)", "| Bring a Trailer"
+    const batContaminationPatterns = [
+      /\s*for sale on BaT Auctions?\s*/gi,
+      /\s*sold for \$[\d,]+ on [A-Z][a-z]+ \d{1,2}, \d{4}\s*/gi,
+      /\s*\(Lot\s*#[\d,]+\s*\)\s*/gi,
+      /\s*\|\s*Bring a Trailer\s*/gi,
+      /\s*on bringatrailer\.com\s*/gi,
+    ];
+    
+    let cleaned = s;
+    let hasBatContamination = false;
+    for (const pattern of batContaminationPatterns) {
+      if (pattern.test(cleaned)) {
+        hasBatContamination = true;
+        cleaned = cleaned.replace(pattern, ' ');
+      }
+    }
+    
+    // If the entire string looks like a BaT listing description, return empty (don't render the field)
+    if (hasBatContamination && (cleaned.includes(' for sale') || cleaned.match(/sold for \$/i) || cleaned.match(/Lot\s*#/i))) {
+      // If after removing BaT patterns, what remains is still contaminated-looking, hide it
+      if (cleaned.trim().length === 0 || cleaned.length > 100) {
+        return '';
+      }
+    }
+    
+    cleaned = cleaned.trim().replace(/\s+/g, ' ');
+    
     // Clean up concatenated listing-style strings that got scraped into a single field
     // Patterns:
     // 1. "Model - COLOR - $Price (Location)"
@@ -310,50 +387,55 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     
     // Pattern 1: "Benz 300SD - BLACK - $8,000 (Torrance)" -> "Benz 300SD"
     // Pattern 2: "Model - $Price (Location)" -> "Model"
-    if (s.includes(' - $') || (s.includes(' - ') && s.match(/\$[\d,]+/))) {
+    if (cleaned.includes(' - $') || (cleaned.includes(' - ') && cleaned.match(/\$[\d,]+/))) {
       // Split on " - $" or " - " followed by price/location
-      const parts = s.split(/\s*-\s*(?=\$|\()/);
+      const parts = cleaned.split(/\s*-\s*(?=\$|\()/);
       if (parts.length > 0) {
-        let cleaned = parts[0].trim();
+        let partCleaned = parts[0].trim();
         
         // Remove parenthetical production numbers if they're at the end
-        cleaned = cleaned.replace(/\s*\(\d+of\d+\)\s*$/i, '').trim();
+        partCleaned = partCleaned.replace(/\s*\(\d+of\d+\)\s*$/i, '').trim();
         
         // Remove trailing dashes
-        cleaned = cleaned.replace(/[-–—]\s*$/, '').trim();
+        partCleaned = partCleaned.replace(/[-–—]\s*$/, '').trim();
         
         // Remove color patterns like " - BLACK" if it's still there
-        cleaned = cleaned.replace(/\s*-\s*(BLACK|WHITE|RED|BLUE|GREEN|SILVER|GRAY|GREY|YELLOW|ORANGE|PURPLE|BROWN|BEIGE|TAN)\s*$/i, '').trim();
+        partCleaned = partCleaned.replace(/\s*-\s*(BLACK|WHITE|RED|BLUE|GREEN|SILVER|GRAY|GREY|YELLOW|ORANGE|PURPLE|BROWN|BEIGE|TAN)\s*$/i, '').trim();
         
         // Remove location patterns like "(Torrance)" at the end
-        cleaned = cleaned.replace(/\s*\([A-Z][a-z]+\)\s*$/, '').trim();
+        partCleaned = partCleaned.replace(/\s*\([A-Z][a-z]+\)\s*$/, '').trim();
         
         // Final check: if we successfully cleaned it and it's shorter, use it
-        if (cleaned.length > 0 && cleaned.length < s.length && cleaned.length < 60) {
-          return cleaned;
+        if (partCleaned.length > 0 && partCleaned.length < cleaned.length && partCleaned.length < 60) {
+          cleaned = partCleaned;
         }
       }
     }
     
     // Legacy pattern check for completeness
-    if (s.includes(' - $') && (s.includes('Original Miles') || s.includes('of'))) {
+    if (cleaned.includes(' - $') && (cleaned.includes('Original Miles') || cleaned.includes('of'))) {
       // This looks like a contaminated listing title/description in a field
       // Try to extract just the first meaningful part before the price
-      const priceMatch = s.match(/(.+?)\s*-\s*\$/);
+      const priceMatch = cleaned.match(/(.+?)\s*-\s*\$/);
       if (priceMatch && priceMatch[1]) {
         // Get the part before price, but clean it up
-        let cleaned = priceMatch[1].trim();
+        let partCleaned = priceMatch[1].trim();
         // Remove parenthetical production numbers if they're at the end
-        cleaned = cleaned.replace(/\s*\(\d+of\d+\)\s*$/i, '').trim();
+        partCleaned = partCleaned.replace(/\s*\(\d+of\d+\)\s*$/i, '').trim();
         // Remove trailing dashes
-        cleaned = cleaned.replace(/[-–—]\s*$/, '').trim();
-        if (cleaned.length > 0 && cleaned.length < s.length) {
-          return cleaned;
+        partCleaned = partCleaned.replace(/[-–—]\s*$/, '').trim();
+        if (partCleaned.length > 0 && partCleaned.length < cleaned.length) {
+          cleaned = partCleaned;
         }
       }
     }
     
-    return s;
+    // Final check: if cleaned value is clearly a listing description (long, contains typical listing keywords), hide it
+    if (cleaned.length > 80 && (cleaned.toLowerCase().includes('for sale') || cleaned.toLowerCase().includes('auction') || cleaned.toLowerCase().includes('listing'))) {
+      return '';
+    }
+    
+    return cleaned;
   };
 
   return (
@@ -691,4 +773,5 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   );
 };
 
+export default VehicleBasicInfo;
 export default VehicleBasicInfo;
