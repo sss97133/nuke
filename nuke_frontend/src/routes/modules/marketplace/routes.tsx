@@ -10,6 +10,7 @@ import MarketExchange from '../../../pages/MarketExchange';
 import MarketFundDetail from '../../../pages/MarketFundDetail';
 import MarketSegments from '../../../pages/MarketSegments';
 import MarketSegmentDetail from '../../../pages/MarketSegmentDetail';
+import MarketMovement from '../../../pages/MarketMovement';
 
 const MarketplaceModuleRoutes = () => {
   return (
@@ -20,6 +21,7 @@ const MarketplaceModuleRoutes = () => {
       <Route path="/exchange/:symbol" element={<MarketFundDetail />} />
       <Route path="/segments" element={<MarketSegments />} />
       <Route path="/segments/:slug" element={<MarketSegmentDetail />} />
+      <Route path="/movement" element={<MarketMovement />} />
       <Route path="/investor/dashboard" element={<InvestorDashboardPage />} />
       <Route path="/portfolio" element={<Portfolio />} />
       <Route path="/portfolio/success" element={<CreditsSuccess />} />

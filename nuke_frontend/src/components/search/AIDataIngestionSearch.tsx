@@ -640,7 +640,7 @@ export default function AIDataIngestionSearch() {
       >
         <input
           type="text"
-          placeholder=""
+          placeholder="VIN, URL, search query, or image..."
           aria-label="AI input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
