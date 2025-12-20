@@ -97,24 +97,92 @@ serve(async (req) => {
     const auctionEndMatch = html.match(/Auction ended?[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i)
     const auctionEndDate = auctionEndMatch ? new Date(auctionEndMatch[1]) : new Date()
 
-    // Extract all comments
-    const commentElements = doc.querySelectorAll('.comment')
+    // Extract all comments - try multiple selectors for robustness
+    let commentElements = doc.querySelectorAll('.comment')
+    if (commentElements.length === 0) {
+      // Fallback: look for comment-like structures in comments-javascript-enabled
+      const commentsContainer = doc.querySelector('#comments-javascript-enabled')
+      if (commentsContainer) {
+        // Try to find individual comment blocks by looking for patterns
+        commentElements = commentsContainer.querySelectorAll('[data-cursor-element-id]')
+      }
+    }
+    
     const comments = []
     const authorSet = new Set<string>()
+    const authorProfileUrls = new Map<string, string>() // Map author username to profile URL
     
     for (let i = 0; i < commentElements.length; i++) {
       const el = commentElements[i]
       
-      // Extract fields
-      const dateText = el.querySelector('.comment-datetime')?.textContent?.trim() || ''
-      const authorEl = el.querySelector('[data-bind*="authorName"]')
-      const authorRaw = authorEl?.textContent?.trim() || 'Unknown'
-      // Normalize to a stable BaT handle key for attribution + future claiming.
-      const author = String(authorRaw).trim()
-      const textEl = el.querySelector('p')
-      const text = textEl?.textContent?.trim() || ''
+      // Extract fields - try multiple patterns
+      let dateText = el.querySelector('.comment-datetime')?.textContent?.trim() || ''
       
-      if (!text) continue // Skip empty
+      // Try to find author link first (most reliable)
+      const authorLink = el.querySelector('a[href*="/member/"]') as HTMLAnchorElement | null
+      let authorRaw = authorLink?.textContent?.trim() || ''
+      
+      // If no author link, try other selectors
+      if (!authorRaw) {
+        const authorEl = el.querySelector('[data-bind*="authorName"]') || el.querySelector('.comment-user-name')
+        authorRaw = authorEl?.textContent?.trim() || ''
+      }
+      
+      // If still no author, try to extract from text content patterns
+      const fullText = el.textContent || ''
+      if (!authorRaw && fullText) {
+        // Try patterns like "12/27/24 at 6:01 PM Username" or "Username This author's likes:"
+        const authorMatch = fullText.match(/(\d{1,2}\/\d{1,2}\/\d{2,4}\s+at\s+\d{1,2}:\d{2}\s+[AP]M)\s+([A-Za-z0-9_]+)/i)
+        if (authorMatch) {
+          dateText = authorMatch[1]
+          authorRaw = authorMatch[2]
+        } else {
+          // Fallback: look for username before "This author's likes:"
+          const authorMatch2 = fullText.match(/([A-Za-z0-9_]+)\s+This author's likes:/i)
+          if (authorMatch2) authorRaw = authorMatch2[1]
+        }
+      }
+      
+      // Clean up author name (remove "The Seller" suffix, etc) - but keep original for profile URL lookup
+      const authorClean = authorRaw.replace(/\s*\(The\s+Seller\)/i, '').trim()
+      
+      // Normalize to a stable BaT handle key for attribution + future claiming.
+      const author = String(authorClean).trim() || 'Unknown'
+      
+      // Extract profile URL from author link if available
+      if (authorLink && author && author !== 'Unknown' && author.length > 0) {
+        const href = authorLink.getAttribute('href') || ''
+        if (href) {
+          const profileUrl = href.startsWith('http') ? href : `https://bringatrailer.com${href}`
+          authorProfileUrls.set(author, profileUrl)
+          // Also map original if different and not empty
+          const originalTrimmed = authorRaw.trim()
+          if (originalTrimmed && originalTrimmed !== author) {
+            authorProfileUrls.set(originalTrimmed, profileUrl)
+          }
+        }
+      }
+      
+      // Extract text - try p tag first, then direct textContent
+      let text = el.querySelector('p')?.textContent?.trim() || ''
+      if (!text) {
+        // Try to extract just the comment text, excluding metadata
+        const textMatch = fullText.match(/This comment's likes:[\s\S]*?(.+?)(?:Flag as|$)/i)
+        if (textMatch) {
+          text = textMatch[1].trim()
+        } else {
+          // Last resort: use all text but remove common patterns
+          text = fullText
+            .replace(/\d{1,2}\/\d{1,2}\/\d{2,4}\s+at\s+\d{1,2}:\d{2}\s+[AP]M/gi, '')
+            .replace(/This author's likes:\s*\d+/gi, '')
+            .replace(/This comment's likes:\s*\d+/gi, '')
+            .replace(/Flag as not constructive/gi, '')
+            .replace(/Keep me in this conversation via email/gi, '')
+            .trim()
+        }
+      }
+      
+      if (!text || text.length < 3) continue // Skip empty or too short
       
       // Parse date (format: "Nov 21 at 3:38 PM")
       const posted_at = parseBaTDate(dateText, auctionEndDate)
@@ -187,18 +255,28 @@ serve(async (req) => {
 
     console.log(`Extracted ${comments.length} comments`)
 
-    // Upsert external identities (platform + handle) so later humans can claim/merge them.
+    // Upsert external identities (platform + handle) with profile URLs so later humans can claim/merge them.
     // NOTE: This function runs with service role key, so it can write to external_identities.
     const handleToExternalIdentityId = new Map<string, string>()
     if (authorSet.size > 0) {
       const nowIso = new Date().toISOString()
-      const rows = Array.from(authorSet).map((h) => ({
-        platform: 'bat',
-        // Use the handle as seen on BaT. (We keep it as-is for display; uniqueness is platform+handle.)
-        handle: h,
-        last_seen_at: nowIso,
-        updated_at: nowIso,
-      }))
+      const rows = Array.from(authorSet).map((h) => {
+        // Clean handle for URL lookup (remove "The Seller" suffix)
+        const cleanHandle = h.replace(/\s*\(The\s+Seller\)/i, '').trim()
+        // Try to find profile URL for this handle
+        const profileUrl = authorProfileUrls.get(h) || 
+                          authorProfileUrls.get(cleanHandle) ||
+                          `https://bringatrailer.com/member/${encodeURIComponent(cleanHandle)}`
+        
+        return {
+          platform: 'bat',
+          // Use the handle as seen on BaT. (We keep it as-is for display; uniqueness is platform+handle.)
+          handle: h,
+          profile_url: profileUrl,
+          last_seen_at: nowIso,
+          updated_at: nowIso,
+        }
+      })
 
       // Idempotent upsert
       const { data: upserted, error: upsertErr } = await supabase
@@ -223,11 +301,19 @@ serve(async (req) => {
 
     // Store comments
     if (comments.length > 0) {
-      const { error } = await supabase
+      console.log(`Attempting to upsert ${comments.length} comments...`)
+      const { data: inserted, error } = await supabase
         .from('auction_comments')
         .upsert(commentsWithIdentities, { onConflict: 'vehicle_id,content_hash' })
+        .select('id')
       
-      if (error) throw error
+      if (error) {
+        console.error('Upsert error:', error)
+        throw error
+      }
+      console.log(`Successfully saved ${inserted?.length || comments.length} comments`)
+    } else {
+      console.warn('No comments to save (comments array is empty)')
     }
 
     // Trigger AI analysis on comments (async, don't wait)
@@ -265,7 +351,18 @@ serve(async (req) => {
 })
 
 function parseBaTDate(dateStr: string, referenceDate: Date): Date {
-  // "Nov 21 at 3:38 PM" -> actual date
+  // Try "12/27/24 at 6:01 PM" format first
+  const dateTimeMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+at\s+(\d+):(\d+)\s+(AM|PM)/i)
+  if (dateTimeMatch) {
+    const [, month, day, year, hour, minute, ampm] = dateTimeMatch
+    const fullYear = year.length === 2 ? 2000 + parseInt(year) : parseInt(year)
+    const date = new Date(fullYear, parseInt(month) - 1, parseInt(day), 
+      parseInt(hour) + (ampm.toUpperCase() === 'PM' && hour !== '12' ? 12 : 0) + (ampm.toUpperCase() === 'AM' && hour === '12' ? -12 : 0), 
+      parseInt(minute))
+    if (!isNaN(date.getTime())) return date
+  }
+  
+  // Try "Nov 21 at 3:38 PM" format
   const match = dateStr.match(/([A-Za-z]+)\s+(\d+)\s+at\s+(\d+):(\d+)\s+(AM|PM)/)
   if (!match) return new Date()
   

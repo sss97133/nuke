@@ -154,6 +154,8 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
           return;
         }
 
+        // IMPORTANT: Separate bids from comments - don't combine them
+        let bidCount: number | null = typeof best?.bid_count === 'number' ? best.bid_count : null;
         let commentCount: number | null =
           typeof best?.metadata?.comment_count === 'number'
             ? best.metadata.comment_count
@@ -162,12 +164,23 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
         let lastCommentAt: string | null = null;
 
         try {
-          const [cCount, lastBid, lastComment] = await Promise.all([
+          // IMPORTANT: Separate bids from comments - don't combine them
+          const [bidCountResult, commentCountResult, lastBid, lastComment] = await Promise.all([
+            // Count only bids (where bid_amount is not null)
+            bidCount === null
+              ? supabase
+                  .from('auction_comments')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('vehicle_id', vehicleId)
+                  .not('bid_amount', 'is', null)
+              : Promise.resolve({ count: bidCount } as any),
+            // Count only non-bid comments (where bid_amount is null or comment_type != 'bid')
             commentCount === null
               ? supabase
                   .from('auction_comments')
                   .select('id', { count: 'exact', head: true })
                   .eq('vehicle_id', vehicleId)
+                  .or('bid_amount.is.null,comment_type.neq.bid')
               : Promise.resolve({ count: commentCount } as any),
             supabase
               .from('auction_comments')
@@ -181,11 +194,13 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
               .from('auction_comments')
               .select('posted_at')
               .eq('vehicle_id', vehicleId)
+              .or('bid_amount.is.null,comment_type.neq.bid')
               .order('posted_at', { ascending: false })
               .limit(1)
               .maybeSingle(),
           ]);
-          if (commentCount === null) commentCount = typeof (cCount as any)?.count === 'number' ? (cCount as any).count : null;
+          if (bidCount === null) bidCount = typeof (bidCountResult as any)?.count === 'number' ? (bidCountResult as any).count : null;
+          if (commentCount === null) commentCount = typeof (commentCountResult as any)?.count === 'number' ? (commentCountResult as any).count : null;
           lastBidAt = (lastBid as any)?.data?.posted_at || null;
           lastCommentAt = (lastComment as any)?.data?.posted_at || null;
         } catch {
@@ -199,10 +214,10 @@ export const VehiclePricingWidget: React.FC<VehiclePricingWidgetProps> = ({
             listing_status: String(best.listing_status || ''),
             end_date: best.end_date || null,
             current_bid: typeof best.current_bid === 'number' ? best.current_bid : null,
-            bid_count: typeof best.bid_count === 'number' ? best.bid_count : null,
+            bid_count: bidCount, // Use separated bid count
             watcher_count: typeof best.watcher_count === 'number' ? best.watcher_count : null,
             view_count: typeof best.view_count === 'number' ? best.view_count : null,
-            comment_count: commentCount,
+            comment_count: commentCount, // Only non-bid comments
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
             updated_at: best.updated_at || null,

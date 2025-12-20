@@ -1493,22 +1493,33 @@ const VehicleProfile: React.FC = () => {
 
         if (effective?.listing_url && effective?.platform) {
           // Lightweight comment telemetry (best-effort; table may not exist in some envs)
-          let commentCount: number | null = typeof (effective as any)?.comment_count === 'number' ? (effective as any).comment_count : null;
+          // IMPORTANT: Separate bids from comments - don't combine them
+          let bidCount: number | null = typeof (effective as any)?.bid_count === 'number' ? (effective as any).bid_count : null;
+          let commentCount: number | null = null; // Only non-bid comments
           let lastBidAt: string | null = null;
           let lastCommentAt: string | null = null;
 
           try {
             const [
-              cCount,
+              bidCountResult,
+              commentCountResult,
               lastBid,
               lastComment
             ] = await Promise.all([
-              commentCount === null
+              // Count only bids (where bid_amount is not null)
+              bidCount === null
                 ? supabase
                     .from('auction_comments')
                     .select('id', { count: 'exact', head: true })
                     .eq('vehicle_id', vehicleData.id)
-                : Promise.resolve({ count: commentCount } as any),
+                    .not('bid_amount', 'is', null)
+                : Promise.resolve({ count: bidCount } as any),
+              // Count only non-bid comments (where bid_amount is null or comment_type != 'bid')
+              supabase
+                .from('auction_comments')
+                .select('id', { count: 'exact', head: true })
+                .eq('vehicle_id', vehicleData.id)
+                .or('bid_amount.is.null,comment_type.neq.bid'),
               supabase
                 .from('auction_comments')
                 .select('posted_at')
@@ -1521,12 +1532,14 @@ const VehicleProfile: React.FC = () => {
                 .from('auction_comments')
                 .select('posted_at')
                 .eq('vehicle_id', vehicleData.id)
+                .or('bid_amount.is.null,comment_type.neq.bid')
                 .order('posted_at', { ascending: false })
                 .limit(1)
                 .maybeSingle(),
             ]);
 
-            if (commentCount === null) commentCount = typeof (cCount as any)?.count === 'number' ? (cCount as any).count : null;
+            if (bidCount === null) bidCount = typeof (bidCountResult as any)?.count === 'number' ? (bidCountResult as any).count : null;
+            commentCount = typeof (commentCountResult as any)?.count === 'number' ? (commentCountResult as any).count : null;
             lastBidAt = (lastBid as any)?.data?.posted_at || null;
             lastCommentAt = (lastComment as any)?.data?.posted_at || null;
           } catch {
@@ -1540,10 +1553,10 @@ const VehicleProfile: React.FC = () => {
             listing_status: String((effective as any).listing_status || ''),
             end_date: (effective as any).end_date || null,
             current_bid: typeof (effective as any).current_bid === 'number' ? (effective as any).current_bid : null,
-            bid_count: typeof (effective as any).bid_count === 'number' ? (effective as any).bid_count : null,
+            bid_count: bidCount, // Use separated bid count
             watcher_count: typeof (effective as any).watcher_count === 'number' ? (effective as any).watcher_count : null,
             view_count: typeof (effective as any).view_count === 'number' ? (effective as any).view_count : null,
-            comment_count: commentCount,
+            comment_count: commentCount, // Only non-bid comments
             final_price: typeof (effective as any).final_price === 'number' ? (effective as any).final_price : null,
             sold_at: (effective as any).sold_at || null,
             last_bid_at: lastBidAt,

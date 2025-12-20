@@ -39,19 +39,24 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
           className="hero-image"
           onClick={() => isMobile && setShowGallery(true)}
           style={{
-            height: '400px',
+            width: '100%',
+            minHeight: '400px',
             borderRadius: '0px',
             position: 'relative',
             cursor: isMobile ? 'pointer' : 'default',
             overflow: 'hidden',
-            backgroundColor: 'var(--bg)' // Fallback background
+            backgroundColor: 'var(--bg)', // Fallback background
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}
         >
           <ResilientImage
             sources={sources}
             alt="Vehicle hero image"
             fill={true}
-            objectFit="cover"
+            objectFit="contain"
+            style={{ objectPosition: 'center' }}
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
           />
