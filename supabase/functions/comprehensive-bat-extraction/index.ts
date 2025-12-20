@@ -2412,6 +2412,100 @@ serve(async (req) => {
       }
     }
 
+    // Create/update auction_event for bid history and comments tracking
+    let auctionEventId: string | null = null;
+    if (vehicleId) {
+      try {
+        const toIsoMidday = (dateYmd: string | null): string | null => {
+          if (!dateYmd) return null;
+          const d = new Date(`${dateYmd}T12:00:00.000Z`);
+          if (isNaN(d.getTime())) return null;
+          return d.toISOString();
+        };
+
+        const toIsoEndOfDay = (dateYmd: string | null): string | null => {
+          if (!dateYmd) return null;
+          const d = new Date(`${dateYmd}T23:59:59.999Z`);
+          if (isNaN(d.getTime())) return null;
+          return d.toISOString();
+        };
+
+        // Determine outcome
+        let outcome = 'ended';
+        if ((extractedData as any).reserve_not_met) {
+          outcome = 'reserve_not_met';
+        } else if (extractedData.sale_price) {
+          outcome = 'sold';
+        }
+
+        // Get high bid from bid history
+        const highBid = Array.isArray(extractedData.bid_history) && extractedData.bid_history.length > 0
+          ? [...extractedData.bid_history].sort((a, b) => (b.amount || 0) - (a.amount || 0))[0]?.amount
+          : (extractedData.sale_price || null);
+
+        const { data: auctionEvent, error: auctionEventError } = await supabase
+          .from('auction_events')
+          .upsert(
+            {
+              vehicle_id: vehicleId,
+              source: 'bat',
+              source_url: batUrl,
+              outcome,
+              high_bid: highBid,
+              auction_start_date: toIsoMidday(extractedData.auction_start_date || null),
+              auction_end_date: toIsoEndOfDay(extractedData.auction_end_date || null),
+              raw_data: {
+                lot_number: extractedData.lot_number || null,
+                seller: extractedData.seller || null,
+                buyer: extractedData.buyer || null,
+                bid_history: extractedData.bid_history || [],
+                comment_count: extractedData.comment_count || 0,
+                bid_count: extractedData.bid_count || 0,
+              },
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'vehicle_id,source_url' }
+          )
+          .select('id')
+          .single();
+
+        if (!auctionEventError && auctionEvent?.id) {
+          auctionEventId = auctionEvent.id;
+          console.log(`✅ Created/updated auction_event: ${auctionEventId}`);
+          
+          // Call extract-auction-comments to extract and store all comments and bids
+          try {
+            const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY');
+            if (serviceRoleKey) {
+              console.log('📝 Triggering comment and bid extraction...');
+              fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/extract-auction-comments`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${serviceRoleKey}`,
+                },
+                body: JSON.stringify({ 
+                  auction_url: batUrl, 
+                  auction_event_id: auctionEventId, 
+                  vehicle_id: vehicleId 
+                }),
+              })
+                .then(() => console.log('✅ extract-auction-comments triggered successfully'))
+                .catch((err) => console.warn('⚠️ Failed to trigger extract-auction-comments:', err));
+            } else {
+              console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY not available, skipping comment extraction');
+            }
+          } catch (commentError) {
+            console.warn('⚠️ Error triggering comment extraction (non-blocking):', commentError);
+          }
+        } else {
+          console.warn('⚠️ Failed to create auction_event:', auctionEventError);
+        }
+      } catch (auctionError) {
+        console.error('❌ Error creating auction_event (non-blocking):', auctionError);
+      }
+    }
+
     // Extract and backfill images from BaT gallery using batDomMap
     if (vehicleId && html) {
       try {
