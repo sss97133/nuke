@@ -786,7 +786,7 @@ const VehicleProfile: React.FC = () => {
                 .limit(20);
               const merged = buildAuctionPulseFromExternalListings(Array.isArray(data) ? data : [], vehicleIdForFilter);
               if (merged) {
-                setAuctionPulse((prev) => ({ ...(prev || {}), ...merged }));
+                setAuctionPulse((prev: any) => ({ ...(prev || {}), ...merged }));
               }
             } catch {
               // ignore
@@ -808,7 +808,7 @@ const VehicleProfile: React.FC = () => {
           // Only apply BaT table updates when the pulse is already BaT (or not set yet).
           if (auctionPulse?.platform && auctionPulse.platform !== 'bat') return;
 
-          setAuctionPulse((prev) => {
+          setAuctionPulse((prev: any) => {
             const p = prev || ({} as any);
             return {
               platform: 'bat',
@@ -839,7 +839,7 @@ const VehicleProfile: React.FC = () => {
           const row = (payload as any)?.new as any;
           const postedAt = row?.posted_at ? String(row.posted_at) : null;
           const isBid = row?.bid_amount !== null && row?.bid_amount !== undefined;
-          setAuctionPulse((prev) => {
+          setAuctionPulse((prev: any) => {
             if (!prev) return prev;
             const nextCommentCount = typeof prev.comment_count === 'number' ? prev.comment_count + 1 : 1;
             return {
@@ -1575,7 +1575,7 @@ const VehicleProfile: React.FC = () => {
                     .limit(10);
                   const merged = buildAuctionPulseFromExternalListings(Array.isArray(data) ? data : [], vehicleData.id);
                   if (merged) {
-                    setAuctionPulse((prev) => ({ ...(prev || {}), ...merged }));
+                    setAuctionPulse((prev: any) => ({ ...(prev || {}), ...merged }));
                   }
                 })
                 .catch(() => {});
@@ -2141,6 +2141,14 @@ const VehicleProfile: React.FC = () => {
       }
     };
 
+    const { images: originImages, declaredCount } = getOriginImages(vehicle);
+
+    const isSupabaseHostedImageUrl = (rawUrl: any): boolean => {
+      const u = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+      if (!u) return false;
+      return u.includes('/storage/v1/object/public/');
+    };
+
     // Check if RPC data is available (avoid duplicate query)
     const rpcData = (window as any).__vehicleProfileRpcData;
     const rpcMatchesThisVehicle = rpcData && rpcData.vehicle_id === vehicle.id;
@@ -2183,36 +2191,55 @@ const VehicleProfile: React.FC = () => {
         const discoveryUrl = String((vehicle as any)?.discovery_url || '');
         const isClassicScrape = origin === 'url_scraper' && discoveryUrl.includes('classic.com/veh/');
 
-        const { images: originImages, declaredCount } = getOriginImages(vehicle);
         const isImportedStoragePath = (p: any) => {
           const s = String(p || '').toLowerCase();
           return s.includes('external_import') || s.includes('organization_import') || s.includes('import_queue');
         };
 
-        // PERFORMANCE FIX: Load lead image immediately, don't wait for all signed URLs
-        const leadImage = imageRecords.find((r: any) => r.is_primary === true) || imageRecords[0];
-        const leadCandidate = leadImage?.large_url || leadImage?.image_url || null;
+        const primaryRow = imageRecords.find((r: any) => r?.is_primary === true) || null;
+        const primaryCandidate = primaryRow ? (primaryRow?.large_url || primaryRow?.image_url || null) : null;
+        const primaryOk = primaryCandidate && filterProfileImages([primaryCandidate], vehicle).length > 0;
 
-        // Set lead image URL immediately using public URL (fast)
-        if (leadImage) {
-          // Prefer large_url for hero image, fallback to image_url
-          const leadOk = leadCandidate && filterProfileImages([leadCandidate], vehicle).length > 0;
-          const fastFallbackPool = imageRecords
-            .map((r: any) => r?.large_url || r?.image_url)
-            .filter(Boolean) as string[];
-          const fastFallback = filterProfileImages([...fastFallbackPool, ...originImages], vehicle)[0] || null;
-          setLeadImageUrl(((leadOk ? leadCandidate : fastFallback) || null) as any);
+        const fallbackPool = imageRecords
+          .map((r: any) => r?.large_url || r?.image_url)
+          .filter(Boolean) as string[];
+        const filteredPool = filterProfileImages([...fallbackPool, ...originImages], vehicle);
+        const firstFiltered = filteredPool.find((u) => isSupabaseHostedImageUrl(u)) || filteredPool[0] || null;
 
-          // Signed URL upgrade disabled due to storage configuration issues
-          // Would generate 400 errors - using direct public URL instead
-        }
+        const lead = (primaryOk ? primaryCandidate : firstFiltered) || null;
+        if (lead) setLeadImageUrl(lead as any);
 
-        // Auto-set primary if none exists
-        if (!imageRecords.find((r: any) => r.is_primary === true) && imageRecords[0]) {
-          await supabase
-            .from('vehicle_images')
-            .update({ is_primary: true })
-            .eq('id', imageRecords[0].id);
+        // Auto-set primary if none exists OR if existing primary is filtered out.
+        // Only attempt when authenticated; otherwise just render using filtered lead.
+        const hasPrimary = !!primaryRow;
+        const shouldHealPrimary = (!hasPrimary && imageRecords[0]) || (hasPrimary && !primaryOk);
+        if (shouldHealPrimary && session?.user?.id) {
+          const isValidForPrimary = (r: any) => {
+            const url = r?.large_url || r?.image_url;
+            return url && filterProfileImages([url], vehicle).length > 0;
+          };
+          // Prefer Supabase-hosted images to avoid hotlink/403 issues on external sources.
+          const bestDbRow =
+            imageRecords.find((r: any) => isValidForPrimary(r) && (r?.storage_path || isSupabaseHostedImageUrl(r?.image_url))) ||
+            imageRecords.find((r: any) => isValidForPrimary(r)) ||
+            null;
+
+          if (bestDbRow?.id) {
+            try {
+              // Clear any existing primary first (best-effort)
+              await supabase
+                .from('vehicle_images')
+                .update({ is_primary: false } as any)
+                .eq('vehicle_id', vehicle.id)
+                .eq('is_primary', true);
+              await supabase
+                .from('vehicle_images')
+                .update({ is_primary: true } as any)
+                .eq('id', bestDbRow.id);
+            } catch {
+              // non-blocking
+            }
+          }
         }
 
         // Load all images using public URLs (fast) and de-dupe (storage/variants can create repeats)
@@ -2290,9 +2317,9 @@ const VehicleProfile: React.FC = () => {
         setVehicleImages(images);
 
         // If we filtered out a noisy lead image, ensure we still have a hero.
-        const leadStillOk = leadCandidate && filterProfileImages([leadCandidate], vehicle).length > 0;
-        if (!leadStillOk && images.length > 0) {
-          setLeadImageUrl(images[0]);
+        if (images.length > 0) {
+          const leadStillOk = lead && filterProfileImages([String(lead)], vehicle).length > 0;
+          if (!leadStillOk) setLeadImageUrl(images[0]);
         }
 
         // Signed URL generation disabled due to storage configuration issues
@@ -2301,8 +2328,6 @@ const VehicleProfile: React.FC = () => {
       } else {
         // No DB rows: try origin_metadata images first (from scraping)
         try {
-          // Note: originImages already declared above at line 2186
-
           if (originImages.length > 0) {
             images = originImages;
             setVehicleImages(images);
@@ -2379,7 +2404,8 @@ const VehicleProfile: React.FC = () => {
       (vehicle as any)?.primaryImageUrl ||
       (vehicle as any)?.image_url ||
       null;
-    if (primaryUrl && typeof primaryUrl === 'string' && !images.includes(primaryUrl) && !isIconUrl(primaryUrl)) {
+    const primaryOk = primaryUrl && typeof primaryUrl === 'string' && filterProfileImages([primaryUrl], vehicle).length > 0;
+    if (primaryOk && typeof primaryUrl === 'string' && !images.includes(primaryUrl)) {
       images = [primaryUrl, ...images];
       // Fallback for lead image - ensure it's set from primary
       if (!leadImageUrl) setLeadImageUrl(primaryUrl);

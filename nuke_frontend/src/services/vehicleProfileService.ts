@@ -17,7 +17,9 @@ export const fetchVehicleImages = async (vehicleId: string): Promise<string[]> =
     .from('vehicle_images')
     .select('image_url')
     .eq('vehicle_id', vehicleId)
-    .order('is_primary', { ascending: false });
+    .order('is_primary', { ascending: false })
+    .order('position', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
   return (data || []).map(d => d.image_url);

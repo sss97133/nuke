@@ -463,11 +463,13 @@ const ImageGallery = ({
       // Refresh DB-backed gallery view immediately
       const { data: refreshed, error: refreshErr } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
+        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
         .eq('vehicle_id', vehicleId)
         .not('is_document', 'is', true)
         .not('is_duplicate', 'is', true)
-        .order('is_primary', { ascending: false });
+        .order('is_primary', { ascending: false })
+        .order('position', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true });
       if (refreshErr) throw refreshErr;
 
       const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
@@ -507,6 +509,28 @@ const ImageGallery = ({
 
   // Define getSortedImages BEFORE loadMoreImages (which depends on it)
   const sortRows = (rows: any[], mode: 'quality' | 'date_desc' | 'date_asc') => {
+    // If the backend has provided explicit ordering (position), always respect it.
+    // This prevents any client-side “quality” heuristics from shuffling galleries.
+    const hasAnyPosition = (rows || []).some(
+      (r: any) => typeof r?.position === 'number' && Number.isFinite(r.position)
+    );
+    if (hasAnyPosition) {
+      return [...(rows || [])].sort((a, b) => {
+        if (a?.is_primary && !b?.is_primary) return -1;
+        if (!a?.is_primary && b?.is_primary) return 1;
+
+        const posA = (typeof a?.position === 'number' && Number.isFinite(a.position)) ? a.position : Number.POSITIVE_INFINITY;
+        const posB = (typeof b?.position === 'number' && Number.isFinite(b.position)) ? b.position : Number.POSITIVE_INFINITY;
+        if (posA !== posB) return posA - posB;
+
+        const ca = typeof a?.created_at === 'string' ? new Date(a.created_at).getTime() : 0;
+        const cb = typeof b?.created_at === 'string' ? new Date(b.created_at).getTime() : 0;
+        if (ca !== cb) return ca - cb;
+
+        return String(a?.id || '').localeCompare(String(b?.id || ''));
+      });
+    }
+
     if (mode === 'quality') {
       // Presentation sorting - best images first
       // Try AI-based sorting first, fallback to heuristics if no angle data
@@ -522,6 +546,13 @@ const ImageGallery = ({
         // Primary images always first
         if (a.is_primary && !b.is_primary) return -1;
         if (!a.is_primary && b.is_primary) return 1;
+
+        // If both rows have explicit positions, respect them to keep galleries stable.
+        const posA = (typeof a.position === 'number' && Number.isFinite(a.position)) ? a.position : null;
+        const posB = (typeof b.position === 'number' && Number.isFinite(b.position)) ? b.position : null;
+        if (posA !== null && posB !== null && posA !== posB) return posA - posB;
+        if (posA !== null && posB === null) return -1;
+        if (posA === null && posB !== null) return 1;
 
         // Category-based priority (exterior > interior > engine > other)
         const catPriority: Record<string, number> = {
@@ -561,6 +592,13 @@ const ImageGallery = ({
       // Primary images always first regardless of date ordering (stable UX)
       if (a.is_primary && !b.is_primary) return -1;
       if (!a.is_primary && b.is_primary) return 1;
+
+      // If both rows have explicit positions, respect them to keep galleries stable.
+      const posA = (typeof a.position === 'number' && Number.isFinite(a.position)) ? a.position : null;
+      const posB = (typeof b.position === 'number' && Number.isFinite(b.position)) ? b.position : null;
+      if (posA !== null && posB !== null && posA !== posB) return posA - posB;
+      if (posA !== null && posB === null) return -1;
+      if (posA === null && posB !== null) return 1;
 
       const effA = getEffectiveImageDate(a);
       const effB = getEffectiveImageDate(b);
@@ -856,7 +894,7 @@ const ImageGallery = ({
 
         const { data: rawImages, error } = await supabase
           .from('vehicle_images')
-          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
+          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
           .eq('vehicle_id', vehicleId)
           // Filter out documents (treat NULL as false for legacy rows)
           .not('is_document', 'is', true)
@@ -865,8 +903,8 @@ const ImageGallery = ({
           // Additional filtering: ensure we have valid image URLs
           .not('image_url', 'is', null)
           .order('is_primary', { ascending: false })
-          .order('taken_at', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false });
+          .order('position', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true });
 
         if (error) throw error;
         // #region agent log
@@ -944,11 +982,13 @@ const ImageGallery = ({
             console.log(`Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
             const { data: refreshedImages, error } = await supabase
               .from('vehicle_images')
-              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
+              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
               .eq('vehicle_id', vehicleId)
               .not('is_document', 'is', true)
               .not('is_duplicate', 'is', true)
-              .order('is_primary', { ascending: false });
+              .order('is_primary', { ascending: false })
+              .order('position', { ascending: true, nullsFirst: false })
+              .order('created_at', { ascending: true });
             
             if (!error && refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
@@ -982,10 +1022,13 @@ const ImageGallery = ({
       });
     };
     
-    window.addEventListener('image_processing_complete', handleImageProcessingComplete as EventListener);
+    const listener: EventListener = (evt) => {
+      handleImageProcessingComplete(evt as unknown as CustomEvent).catch(() => null);
+    };
+    window.addEventListener('image_processing_complete', listener);
     
     return () => {
-      window.removeEventListener('image_processing_complete', handleImageProcessingComplete as EventListener);
+      window.removeEventListener('image_processing_complete', listener);
     };
   }, [vehicleId, displayedImages.length, onImagesUpdated]);
 
@@ -1148,12 +1191,14 @@ const ImageGallery = ({
       // Refresh images and notify parent
       const { data: refreshedImages } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, is_primary, caption, created_at, taken_at, is_document, document_category')
+        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, is_document, document_category')
         .eq('vehicle_id', vehicleId)
         // Filter out documents (treat NULL as false)
         .not('is_document', 'is', true)
         .not('is_duplicate', 'is', true)
-        .order('is_primary', { ascending: false });
+        .order('is_primary', { ascending: false })
+        .order('position', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true });
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
       const refreshedFiltered = filterBatNoiseRows(refreshedDeduped);
@@ -1163,16 +1208,7 @@ const ImageGallery = ({
       setShowImages(true);
       
       // Refresh displayed images with the new uploads
-      const sortedImages = (refreshedFiltered || []).sort((a: any, b: any) => {
-        if (sortBy === 'primary') {
-          if (a.is_primary && !b.is_primary) return -1;
-          if (!a.is_primary && b.is_primary) return 1;
-          return 0;
-        }
-        const da = new Date(a.taken_at || a.created_at).getTime();
-        const db = new Date(b.taken_at || b.created_at).getTime();
-        return sortBy === 'date_desc' ? db - da : da - db;
-      });
+      const sortedImages = sortRows(refreshedFiltered || [], sortBy);
       
       setDisplayedImages(sortedImages.slice(0, Math.max(displayedImages.length, imagesPerPage)));
       

@@ -83,7 +83,7 @@ const VehicleImageViewer: React.FC<VehicleImageViewerProps> = ({
       
       let query = supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, created_at, is_primary, is_sensitive, sensitive_type, storage_path')
+        .select('id, image_url, thumbnail_url, created_at, is_primary, position, is_sensitive, sensitive_type, storage_path')
         .eq('vehicle_id', vehicleId);
 
     // Apply filters
@@ -93,12 +93,22 @@ const VehicleImageViewer: React.FC<VehicleImageViewerProps> = ({
     if (partFilter)  query = query.ilike('part', `%${partFilter}%`);
 
     // Apply ordering based on sortMode
+    // Default behavior must match vehicle profile ordering so images appear in the same places.
     if (sortMode === 'primary_newest') {
-      query = query.order('is_primary', { ascending: false }).order('created_at', { ascending: false });
+      query = query
+        .order('is_primary', { ascending: false })
+        .order('position', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true });
     } else if (sortMode === 'newest') {
-      query = query.order('created_at', { ascending: false });
+      query = query
+        .order('is_primary', { ascending: false })
+        .order('position', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: false });
     } else if (sortMode === 'oldest') {
-      query = query.order('created_at', { ascending: true });
+      query = query
+        .order('is_primary', { ascending: false })
+        .order('position', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true });
     }
 
     const { data, error } = await query;
