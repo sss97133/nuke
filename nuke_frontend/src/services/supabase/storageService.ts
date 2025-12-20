@@ -37,13 +37,13 @@ export const storageService = {
     // Create a unique file path
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
-    const filePath = `${vehicleId}/${fileName}`;
+    const filePath = `vehicles/${vehicleId}/images/general/${fileName}`;
 
     // Upload
-    await storageService.upload('vehicle-images', filePath, file);
+    await storageService.upload('vehicle-data', filePath, file);
 
     // Get URL
-    return storageService.getPublicUrl('vehicle-images', filePath);
+    return storageService.getPublicUrl('vehicle-data', filePath);
   },
 
   /**

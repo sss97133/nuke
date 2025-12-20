@@ -736,31 +736,36 @@ const CursorHomepage: React.FC = () => {
     try {
       setDbStatsLoading(true);
       
-      // Get total vehicle count
+      // Get total vehicle count (ALL vehicles in DB, no filters)
       const { count: totalCount } = await supabase
         .from('vehicles')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_public', true)
-        .neq('status', 'pending');
+        .select('*', { count: 'exact', head: true });
       
-      // Get total value - we'll need to fetch vehicles with values to calculate
+      // Get total value - fetch all vehicles with values to calculate
       const { data: allVehicles } = await supabase
         .from('vehicles')
-        .select('current_value, display_price, sale_price, asking_price, is_for_sale')
-        .eq('is_public', true)
-        .neq('status', 'pending');
+        .select('current_value, display_price');
       
       const totalValue = (allVehicles || []).reduce((sum, v) => {
         const value = v.current_value || v.display_price || 0;
         return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
       }, 0);
       
-      const salesVolume = (allVehicles || [])
-        .filter(v => v.is_for_sale)
-        .reduce((sum, v) => {
-          const price = v.display_price || v.asking_price || v.sale_price || 0;
-          return sum + (typeof price === 'number' && Number.isFinite(price) ? price : 0);
-        }, 0);
+      // Get sales volume in last 24 hours (vehicles sold today)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      const { data: recentSales } = await supabase
+        .from('vehicles')
+        .select('sale_price, sale_date')
+        .not('sale_price', 'is', null)
+        .gte('sale_date', todayISO);
+      
+      const salesVolume = (recentSales || []).reduce((sum, v) => {
+        const price = v.sale_price || 0;
+        return sum + (typeof price === 'number' && Number.isFinite(price) ? price : 0);
+      }, 0);
       
       setDbStats({
         totalVehicles: totalCount || 0,
@@ -1627,18 +1632,19 @@ const CursorHomepage: React.FC = () => {
                   color: 'var(--text)',
                   cursor: 'pointer',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px'
+                  flexDirection: 'row',
+                  gap: '12px',
+                  alignItems: 'center'
                 }}
                 title="Click to view market movement page"
               >
-                <div>{filteredStats.totalVehicles.toLocaleString()} vehicles</div>
-                <div style={{ fontSize: '8pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                  {formatCurrency(filteredStats.totalValue)} total value
-                </div>
-                <div style={{ fontSize: '8pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                  {formatCurrency(filteredStats.salesVolume)} sales volume
-                </div>
+                <span>{dbStats.totalVehicles.toLocaleString()} vehicles</span>
+                <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
+                  {formatCurrency(dbStats.totalValue)} total value
+                </span>
+                <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
+                  {formatCurrency(dbStats.salesVolume)} sales volume (24hrs)
+                </span>
               </div>
               
               {/* Hide Filters Button */}
