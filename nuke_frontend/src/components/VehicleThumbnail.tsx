@@ -48,6 +48,25 @@ const getOptimalImageUrl = (imageData: any, size: 'small' | 'medium' | 'large'):
   return imageData.image_url || null;
 };
 
+const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality: number = 70): string | null => {
+  try {
+    const url = String(publicObjectUrl || '').trim();
+    if (!url) return null;
+    const marker = '/storage/v1/object/public/';
+    const idx = url.indexOf(marker);
+    if (idx < 0) return null;
+    const base = url.slice(0, idx);
+    const path = url.slice(idx + marker.length);
+    if (!path) return null;
+    // Preserve only the storage path (strip query params) to avoid double-encoding.
+    const cleanPath = path.split('?')[0];
+    const renderUrl = `${base}/storage/v1/render/image/public/${cleanPath}?width=${encodeURIComponent(String(width))}&quality=${encodeURIComponent(String(quality))}`;
+    return renderUrl;
+  } catch {
+    return null;
+  }
+};
+
 const buildCandidateUrls = (imageData: any, size: 'small' | 'medium' | 'large'): string[] => {
   if (!imageData) return [];
 
@@ -59,6 +78,18 @@ const buildCandidateUrls = (imageData: any, size: 'small' | 'medium' | 'large'):
   };
 
   const variants = imageData?.variants && typeof imageData.variants === 'object' ? imageData.variants : null;
+  const hasRealVariants = !!(variants && Object.values(variants).some((v: any) => typeof v === 'string' && v.trim()));
+
+  // If variants are missing but the image is in Supabase public storage, derive sized URLs via the render endpoint.
+  // This mitigates the DB having many rows with variants='{}'.
+  if (!hasRealVariants) {
+    const src = String(imageData?.image_url || '').trim();
+    const thumbW = size === 'small' ? 220 : size === 'medium' ? 420 : 640;
+    const medW = 900;
+    add(getSupabaseRenderUrl(src, thumbW, 70));
+    add(getSupabaseRenderUrl(src, medW, 75));
+  }
+
   if (variants) {
     if (size === 'small') {
       add(variants.thumbnail);
