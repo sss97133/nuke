@@ -1634,7 +1634,30 @@ serve(async (req) => {
       if (extractedData.displacement) vehicleUpdates.displacement = extractedData.displacement;
       if (extractedData.description) vehicleUpdates.description = extractedData.description;
       if (extractedData.sale_price) vehicleUpdates.sale_price = extractedData.sale_price;
-      if (extractedData.sale_date) vehicleUpdates.sale_date = extractedData.sale_date;
+      // sale_date is DATE type - store as YYYY-MM-DD string (PostgreSQL accepts this)
+      if (extractedData.sale_date) {
+        // Ensure it's in YYYY-MM-DD format for DATE column
+        const saleDateStr = String(extractedData.sale_date);
+        if (saleDateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          vehicleUpdates.sale_date = saleDateStr;
+        }
+      }
+      // auction_end_date is TIMESTAMPTZ type - convert to ISO string
+      if (extractedData.auction_end_date) {
+        const endDateStr = String(extractedData.auction_end_date);
+        try {
+          // If it's already YYYY-MM-DD, convert to ISO timestamp (midday UTC)
+          if (endDateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const date = new Date(endDateStr + 'T12:00:00.000Z');
+            vehicleUpdates.auction_end_date = date.toISOString();
+          } else {
+            // Already a timestamp, use as-is
+            vehicleUpdates.auction_end_date = new Date(endDateStr).toISOString();
+          }
+        } catch (e) {
+          console.log('Error converting auction_end_date:', e);
+        }
+      }
       if (extractedData.location) {
         const loc = normalizeListingLocation(extractedData.location);
         if (loc.clean) {
@@ -1652,6 +1675,8 @@ serve(async (req) => {
       if (extractedData.seller) vehicleUpdates.bat_seller = extractedData.seller;
       if (extractedData.bid_count !== undefined) vehicleUpdates.bat_bids = extractedData.bid_count;
       if (extractedData.view_count !== undefined) vehicleUpdates.bat_views = extractedData.view_count;
+      // Store comment_count in bat_comments field
+      if (extractedData.comment_count !== undefined) vehicleUpdates.bat_comments = extractedData.comment_count;
       
       // Store features in origin_metadata
       if (extractedData.features && Array.isArray(extractedData.features) && extractedData.features.length > 0) {
