@@ -196,9 +196,15 @@ async function importImages(imageUrls, _importUserId) {
       return { imported: 0, skipped: imageUrls.length, failed: 0 };
     }
     
+    // If bulk import succeeded, return
+    if (imported > 0) {
+      return { imported, skipped: imageUrls.length - newImages.length, failed };
+    }
+    
     // If bulk import failed completely, try fallback
     if (imported === 0 && failed > 0) {
-      console.log(`   ⚠️  Bulk import failed, trying individual import fallback...`);
+      console.log(`   ⚠️  Bulk import failed (likely schema issue), trying individual import fallback...`);
+      // Continue to fallback code below
     } else {
       return { imported, skipped: imageUrls.length - newImages.length, failed };
     }
