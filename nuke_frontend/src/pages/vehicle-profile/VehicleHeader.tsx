@@ -1010,15 +1010,54 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       const status = String(auctionPulse.listing_status || '').toLowerCase();
       const isLive = status === 'active' || status === 'live';
       const isSold = status === 'sold';
+      const isEnded = status === 'ended' || status === 'reserve_not_met';
+      
+      // Live auction: show current bid
       if (isLive && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
         return `Bid: ${formatCurrency(auctionPulse.current_bid)}`;
       }
       if (isLive) return 'BID';
-      if (isSold) return 'SOLD';
-      if (status === 'ended') return 'Ended';
-      return 'Auction';
+      
+      // Sold: show final price or SOLD badge
+      if (isSold) {
+        const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
+          ? (auctionPulse as any).final_price
+          : (typeof (vehicle as any)?.sale_price === 'number' && (vehicle as any).sale_price > 0 ? (vehicle as any).sale_price : null);
+        if (finalPrice) {
+          return formatCurrency(finalPrice);
+        }
+        return 'SOLD';
+      }
+      
+      // Ended/RNM: show final price, high bid, or sale price if available
+      if (isEnded) {
+        const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
+          ? (auctionPulse as any).final_price
+          : null;
+        const salePrice = typeof (vehicle as any)?.sale_price === 'number' && (vehicle as any).sale_price > 0 ? (vehicle as any).sale_price : null;
+        const winBid = typeof (vehicle as any)?.winning_bid === 'number' && (vehicle as any).winning_bid > 0 ? (vehicle as any).winning_bid : null;
+        const hBid = typeof (vehicle as any)?.high_bid === 'number' && (vehicle as any).high_bid > 0 ? (vehicle as any).high_bid : null;
+        
+        if (finalPrice) return formatCurrency(finalPrice);
+        if (salePrice) return formatCurrency(salePrice);
+        if (winBid) return formatCurrency(winBid);
+        if (hBid) return formatCurrency(hBid);
+        
+        // If we have asking price and it's marked for sale, show it
+        const askingPrice = typeof (vehicle as any)?.asking_price === 'number' && (vehicle as any).asking_price > 0 && ((vehicle as any).is_for_sale === true || String((vehicle as any).sale_status || '').toLowerCase() === 'for_sale')
+          ? (vehicle as any).asking_price
+          : null;
+        if (askingPrice) return formatCurrency(askingPrice);
+        
+        // Last resort: show "Ended" or "RNM"
+        if (status === 'reserve_not_met') return 'RNM';
+        return 'Ended';
+      }
+      
+      // Unknown status: fall through to primary amount
     }
 
+    // Fallback to primary amount or RNM high bid
     return primaryAmount !== null
       ? formatCurrency(primaryAmount)
       : (isRNM && highBid)
@@ -2400,7 +2439,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 </span>
               )}
               
-              {/* External link icon (separate click target; does not open provenance popup) */}
+              {/* External link icon - move outside price display to avoid layout issues */}
               {auctionContext.link && (
                 <a
                   href={auctionContext.link}
@@ -2408,9 +2447,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
                   title={auctionContext.link.includes('bringatrailer') ? 'Open on Bring a Trailer' : 'Open original listing'}
-                  style={{ display: 'inline-flex', alignItems: 'center', color: 'inherit', opacity: 0.45, textDecoration: 'none' }}
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    color: 'inherit', 
+                    opacity: 0.6, 
+                    textDecoration: 'none',
+                    marginLeft: '4px',
+                    padding: '2px',
+                    borderRadius: '2px',
+                    transition: 'opacity 0.12s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                    e.currentTarget.style.background = 'var(--grey-100)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '0.6';
+                    e.currentTarget.style.background = 'transparent';
+                  }}
                 >
-                  <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
                     <path d="M10.5 1.5h-3v1.5h1.94L4.72 7.72l1.06 1.06L10.5 4.06V6h1.5V1.5zM10.5 10.5h-9v-9H6V0H1.5C.67 0 0 .67 0 1.5v9c0 .83.67 1.5 1.5 1.5h9c.83 0 1.5-.67 1.5-1.5V6h-1.5v4.5z"/>
                   </svg>
                 </a>

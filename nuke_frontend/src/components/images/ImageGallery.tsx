@@ -786,6 +786,8 @@ const ImageGallery = ({
           .not('is_document', 'is', true)
           // Hide duplicate rows by default (treat NULL as false for legacy rows)
           .not('is_duplicate', 'is', true)
+          // Additional filtering: ensure we have valid image URLs
+          .not('image_url', 'is', null)
           .order('is_primary', { ascending: false })
           .order('taken_at', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false });
