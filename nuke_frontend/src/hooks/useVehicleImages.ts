@@ -29,8 +29,27 @@ export const useVehicleImages = (vehicleId?: string) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const hasWindow = typeof window !== 'undefined';
+  const hostKey = hasWindow ? String(window.location?.host || '') : 'server';
+  const tableMissingKey = `table_missing_vehicle_images__${hostKey}`;
+
   const loadImages = async () => {
     if (!vehicleId) return;
+
+    // Environment guard: if this Supabase project doesn't have `vehicle_images`, treat as no images.
+    if (hasWindow) {
+      try {
+        if (window.localStorage.getItem(tableMissingKey) === '1') {
+          setImages([]);
+          setPrimaryImage(null);
+          setLoading(false);
+          setError(null);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    }
     
     // Skip database query for local storage vehicles (timestamp IDs)
     if (vehicleId.length < 20 || !vehicleId.includes('-')) {
@@ -57,6 +76,21 @@ export const useVehicleImages = (vehicleId?: string) => {
         .limit(250);
 
       if (fetchError) {
+        const status = (fetchError as any)?.status ?? (fetchError as any)?.statusCode;
+        const code = String((fetchError as any)?.code || '').toUpperCase();
+        const msg = String((fetchError as any)?.message || '').toLowerCase();
+        const missing = status === 404 || code === 'PGRST116' || code === 'PGRST301' || code === '42P01' || msg.includes('does not exist') || msg.includes('not found');
+        if (missing) {
+          try {
+            if (hasWindow) window.localStorage.setItem(tableMissingKey, '1');
+          } catch {
+            // ignore
+          }
+          setImages([]);
+          setPrimaryImage(null);
+          setError(null);
+          return;
+        }
         console.error('Supabase error:', fetchError);
         throw fetchError;
       }

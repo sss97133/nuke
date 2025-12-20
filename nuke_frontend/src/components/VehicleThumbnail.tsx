@@ -134,7 +134,11 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
             .limit(5);
 
           if (error) {
-            console.error('Simple mode database error:', error);
+            const status = (error as any)?.status ?? (error as any)?.statusCode;
+            const code = String((error as any)?.code || '').toUpperCase();
+            const msg = String((error as any)?.message || '').toLowerCase();
+            const missing = status === 404 || code === 'PGRST116' || code === 'PGRST301' || code === '42P01' || msg.includes('does not exist') || msg.includes('not found');
+            if (!missing) console.error('Simple mode database error:', error);
             setSimpleImageUrl(null);
           } else if (data && data.length > 0) {
             // Find primary image or use first one
