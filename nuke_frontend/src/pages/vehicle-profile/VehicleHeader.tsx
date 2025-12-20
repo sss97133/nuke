@@ -1570,7 +1570,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               {/* Only show platform badge if consigner badge isn't already showing BaT */}
               {(() => {
-                const sellerBadge = computeSellerBadge();
                 const isBatConsigner = sellerBadge && (sellerBadge.label?.toLowerCase().includes('bring a trailer') || sellerBadge.label?.toLowerCase().includes('bat'));
                 return !isBatConsigner ? (
                   <AuctionPlatformBadge
