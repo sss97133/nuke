@@ -85,6 +85,11 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
         src={imageUrl} 
         alt="Vehicle image"
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        onError={() => {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SensitiveImageOverlay.tsx:84',message:'Image load error (non-sensitive)',data:{imageId,imageUrl,vehicleId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+          // #endregion
+        }}
       />
     );
   }
@@ -97,6 +102,11 @@ export const SensitiveImageOverlay: React.FC<SensitiveImageOverlayProps> = ({
           src={imageUrl} 
           alt="Sensitive document"
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={() => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SensitiveImageOverlay.tsx:97',message:'Image load error (sensitive with access)',data:{imageId,imageUrl,vehicleId,isSensitive},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+            // #endregion
+          }}
         />
         <div
           style={{
