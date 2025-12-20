@@ -279,7 +279,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                   paddingBottom: '12px', 
                   borderBottom: '1px solid var(--border)',
                   paddingLeft: isBaT ? '8px' : '0',
-                  borderLeft: isBaT ? '3px solid #2563eb' : 'none'
+                  borderLeft: isBaT ? '3px solid var(--grey-300)' : 'none'
                 }}>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                     {comment.user_avatar && (
@@ -294,20 +294,20 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         }}
                       />
                     )}
-                    {!comment.user_avatar && isBaT && (
+                    {!comment.user_avatar && (
                       <div style={{
                         width: '24px',
                         height: '24px',
                         borderRadius: '50%',
-                        backgroundColor: '#2563eb',
-                        color: 'white',
+                        backgroundColor: 'var(--grey-300)',
+                        color: 'var(--text)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontSize: '8pt',
-                        fontWeight: 700
+                        fontWeight: 600
                       }}>
-                        BaT
+                        {(comment.user_name || comment.author_username || 'U').charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>

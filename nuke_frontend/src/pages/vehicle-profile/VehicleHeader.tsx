@@ -981,11 +981,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       .sort((a, b) => priority(a.id) - priority(b.id));
   }, [vehicle, valuation]);
 
-  const saleDate = (vehicle as any)?.sale_date || (vehicle as any)?.bat_sale_date || null;
+  const saleDate = (vehicle as any)?.sale_date || (vehicle as any)?.bat_sale_date || auctionPulse?.sold_at || null;
   const primaryPrice = getDisplayValue();
   const primaryAmount = typeof primaryPrice.amount === 'number' ? primaryPrice.amount : null;
   const primaryLabel = primaryPrice.label || 'Price pending';
   const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
+  
+  // Calculate days since sale validation (sale date)
+  const daysSinceSale = useMemo(() => {
+    if (!saleDate) return null;
+    try {
+      const sale = new Date(saleDate).getTime();
+      if (!Number.isFinite(sale)) return null;
+      const diffMs = Date.now() - sale;
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      return days >= 0 ? days : null;
+    } catch {
+      return null;
+    }
+  }, [saleDate]);
   
   // For RNM (Reserve Not Met), show blurred high bid instead of "Set a price"
   const isRNM = (vehicle as any)?.auction_outcome === 'reserve_not_met';
@@ -2359,33 +2373,19 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   }
                 }}
               >
-                {String(priceDisplay).toUpperCase() === 'SOLD' ? (
-                  <span
-                    style={{
-                      fontSize: '6pt',
-                      fontWeight: 800,
-                      color: '#22c55e',
-                      background: '#dcfce7',
-                      padding: '2px 6px',
-                      borderRadius: '3px',
-                      letterSpacing: '0.5px',
-                      lineHeight: 1,
-                      whiteSpace: 'nowrap',
-                      textDecoration: 'none',
-                    }}
-                  >
-                    SOLD
-                  </span>
-                ) : (
-                  priceDisplay
-                )}
+                {String(priceDisplay).toUpperCase() !== 'SOLD' && priceDisplay}
               </span>
               {priceWasCorrected && (
                 <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 500 }}>*</span>
               )}
+              {daysSinceSale !== null && daysSinceSale >= 0 && (
+                <span style={{ fontSize: '7pt', color: mutedTextColor, fontWeight: 500, marginLeft: '4px' }}>
+                  {daysSinceSale === 0 ? 'today' : `${daysSinceSale}d ago`}
+                </span>
+              )}
               
-              {/* Auction Outcome Badge */}
-              {auctionContext.badge && auctionContext.badge.text !== 'SOLD' && (
+              {/* Auction Outcome Badge - only show if not already showing SOLD in price */}
+              {auctionContext.badge && (
                 <span style={{
                   fontSize: '6pt',
                   fontWeight: 700,
@@ -2447,40 +2447,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 >
                   OWNERSHIP VERIFIED
                 </span>
-              )}
-              
-              {/* External link icon - move outside price display to avoid layout issues */}
-              {auctionContext.link && (
-                <a
-                  href={auctionContext.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  title={auctionContext.link.includes('bringatrailer') ? 'Open on Bring a Trailer' : 'Open original listing'}
-                  style={{ 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    color: 'inherit', 
-                    opacity: 0.6, 
-                    textDecoration: 'none',
-                    marginLeft: '4px',
-                    padding: '2px',
-                    borderRadius: '2px',
-                    transition: 'opacity 0.12s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = '1';
-                    e.currentTarget.style.background = 'var(--grey-100)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = '0.6';
-                    e.currentTarget.style.background = 'transparent';
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor">
-                    <path d="M10.5 1.5h-3v1.5h1.94L4.72 7.72l1.06 1.06L10.5 4.06V6h1.5V1.5zM10.5 10.5h-9v-9H6V0H1.5C.67 0 0 .67 0 1.5v9c0 .83.67 1.5 1.5 1.5h9c.83 0 1.5-.67 1.5-1.5V6h-1.5v4.5z"/>
-                  </svg>
-                </a>
               )}
             </div>
           </button>

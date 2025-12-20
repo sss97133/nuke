@@ -27,23 +27,43 @@ const LISTING_URL = 'https://www.lartdelautomobile.com/fiche/porsche-911-2-0l-19
 
 // Get import user ID (system user)
 async function getImportUserId() {
-  const { data, error } = await supabase
-    .from('auth.users')
-    .select('id')
-    .or('email.eq.system@n-zero.dev,email.eq.admin@n-zero.dev')
+  // Try to get user_id from an existing image for this vehicle
+  const { data: existingImage } = await supabase
+    .from('vehicle_images')
+    .select('user_id')
+    .eq('vehicle_id', VEHICLE_ID)
+    .not('user_id', 'is', null)
     .limit(1)
-    .single();
+    .maybeSingle();
   
-  if (data) return data.id;
+  if (existingImage?.user_id) {
+    return existingImage.user_id;
+  }
   
-  // Fallback: get first admin user
-  const { data: admin } = await supabase
-    .from('auth.users')
-    .select('id')
-    .limit(1)
-    .single();
+  // Try to get user_id from the vehicle itself
+  const { data: vehicle } = await supabase
+    .from('vehicles')
+    .select('user_id, uploaded_by')
+    .eq('id', VEHICLE_ID)
+    .maybeSingle();
   
-  return admin?.id || null;
+  if (vehicle?.user_id) return vehicle.user_id;
+  if (vehicle?.uploaded_by) return vehicle.uploaded_by;
+  
+  // Last resort: try to find any user from profiles
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1)
+      .maybeSingle();
+    
+    if (profile?.id) return profile.id;
+  } catch (err) {
+    // Profiles might not exist
+  }
+  
+  return null;
 }
 
 /**
@@ -219,6 +239,7 @@ async function importImages(imageUrls, importUserId) {
         // Download image
         const response = await fetch(url);
         if (!response.ok) {
+          console.log(`      ⚠️  Failed to download ${i + 1}/${newImages.length}: HTTP ${response.status}`);
           failed++;
           continue;
         }
@@ -237,8 +258,10 @@ async function importImages(imageUrls, importUserId) {
           });
 
         if (uploadError) {
-          failed++;
-          continue;
+          if (!uploadError.message.includes('already exists')) {
+            console.log(`      ⚠️  Storage upload failed ${i + 1}/${newImages.length}: ${uploadError.message}`);
+          }
+          // Continue anyway - might already exist, we still need DB record
         }
 
         // Get public URL
