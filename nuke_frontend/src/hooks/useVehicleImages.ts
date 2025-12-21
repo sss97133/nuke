@@ -66,7 +66,7 @@ export const useVehicleImages = (vehicleId?: string) => {
       const { data, error: fetchError } = await supabase
         .from('vehicle_images')
         // Keep payload lean to reduce the chance of statement timeouts / 500s on large image tables
-        .select('id, vehicle_id, image_url, is_primary, category, variants, created_at, taken_at')
+        .select('id, vehicle_id, image_url, file_name, caption, is_primary, category, variants, created_at, taken_at')
         .eq('vehicle_id', vehicleId)
         // Legacy rows may have is_document = NULL; treat that as "not a document"
         .not('is_document', 'is', true)
@@ -106,10 +106,16 @@ export const useVehicleImages = (vehicleId?: string) => {
 
       const vehicleImages = data || [];
       setImages(vehicleImages);
-      
-      // Find primary image or use first image
-      const primary = vehicleImages.find(img => img.is_primary) || vehicleImages[0] || null;
-      setPrimaryImage(primary);
+
+      // Find primary image with enhanced logic
+      let primary = vehicleImages.find(img => img.is_primary === true);
+
+      // If no explicit primary, use first non-document image
+      if (!primary && vehicleImages.length > 0) {
+        primary = vehicleImages.find(img => !img.category?.includes('document')) || vehicleImages[0];
+      }
+
+      setPrimaryImage(primary || null);
       
     } catch (err) {
       console.error('Error loading vehicle images:', err);

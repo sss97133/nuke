@@ -19,6 +19,8 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { batRateLimiter } from '../utils/rateLimiter';
+import { imageRetryManager } from '../utils/imageProcessingRetry';
 import { extractImageMetadata } from '../utils/imageMetadata';
 import { imageOptimizationService } from './imageOptimizationService';
 
