@@ -68,10 +68,15 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Check for vehicles missing auto_approved images (not just any images)
       const { count, error: cErr } = await admin
         .from("vehicle_images")
         .select("id", { count: "exact", head: true })
-        .eq("vehicle_id", v.id);
+        .eq("vehicle_id", v.id)
+        .eq("source", "bat_import")
+        .eq("approval_status", "auto_approved")
+        .is("is_duplicate", false)
+        .is("is_document", false);
       if (cErr) {
         out.failed++;
         if (out.sample.length < 10) out.sample.push({ vehicle_id: v.id, url, ok: false, error: cErr.message });

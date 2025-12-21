@@ -30,6 +30,14 @@ interface OrgData {
   tax_rate?: number;
   latitude?: number;
   longitude?: number;
+  // Neutral facts (human-readable)
+  inventory_numbers?: string;
+  market_share?: string;
+  branding?: string;
+  labeling?: string;
+  // Valuation
+  estimated_value?: number;
+  last_valuation_date?: string;
 }
 
 export default function OrganizationEditor({ organizationId, onSaved, onClose }: OrganizationEditorProps) {
@@ -73,7 +81,17 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
         labor_rate: data.labor_rate || null,
         tax_rate: data.tax_rate || null,
         latitude: data.latitude || null,
-        longitude: data.longitude || null
+        longitude: data.longitude || null,
+
+        // Neutral facts
+        inventory_numbers: data.inventory_numbers || '',
+        market_share: data.market_share || '',
+        branding: data.branding || '',
+        labeling: data.labeling || '',
+
+        // Valuation
+        estimated_value: typeof data.estimated_value === 'number' ? data.estimated_value : null,
+        last_valuation_date: data.last_valuation_date || ''
       });
     } catch (err: any) {
       console.error('Error loading organization:', err);
@@ -240,14 +258,18 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                   style={{ fontSize: '9pt', width: '100%' }}
                 >
                   <option value="">Select type...</option>
-                  <option value="dealer">Dealer</option>
-                  <option value="shop">Shop/Service Center</option>
-                  <option value="restorer">Restoration Shop</option>
-                  <option value="builder">Custom Builder</option>
-                  <option value="upholstery">Upholstery Shop</option>
-                  <option value="paint">Paint & Body</option>
-                  <option value="parts">Parts Supplier</option>
-                  <option value="storage">Storage Facility</option>
+                  <option value="garage">Garage</option>
+                  <option value="dealership">Dealership</option>
+                  <option value="restoration_shop">Restoration Shop</option>
+                  <option value="performance_shop">Performance Shop</option>
+                  <option value="body_shop">Body Shop</option>
+                  <option value="detailing">Detailing</option>
+                  <option value="mobile_service">Mobile Service</option>
+                  <option value="specialty_shop">Specialty Shop</option>
+                  <option value="parts_supplier">Parts Supplier</option>
+                  <option value="fabrication">Fabrication</option>
+                  <option value="racing_team">Racing Team</option>
+                  <option value="auction_house">Auction House</option>
                   <option value="other">Other</option>
                 </select>
               </div>
@@ -462,6 +484,106 @@ export default function OrganizationEditor({ organizationId, onSaved, onClose }:
                     value={formData.tax_rate || ''}
                     onChange={(e) => handleChange('tax_rate', e.target.value ? parseFloat(e.target.value) : null)}
                     placeholder="8.25"
+                    style={{ fontSize: '9pt', width: '100%' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Neutral Facts (human-readable) */}
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
+                Neutral Facts
+              </h4>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Inventory Numbers
+                </label>
+                <textarea
+                  className="form-input"
+                  value={formData.inventory_numbers || ''}
+                  onChange={(e) => handleChange('inventory_numbers', e.target.value)}
+                  rows={2}
+                  placeholder='e.g., "120 vehicles listed; 18 in-house; 6 lifts"'
+                  style={{ fontSize: '9pt', width: '100%' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Market Share
+                </label>
+                <textarea
+                  className="form-input"
+                  value={formData.market_share || ''}
+                  onChange={(e) => handleChange('market_share', e.target.value)}
+                  rows={2}
+                  placeholder='e.g., "8% of AZ restoration shops (as-of 2025-06, source: ...)"'
+                  style={{ fontSize: '9pt', width: '100%' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Branding
+                </label>
+                <textarea
+                  className="form-input"
+                  value={formData.branding || ''}
+                  onChange={(e) => handleChange('branding', e.target.value)}
+                  rows={2}
+                  placeholder='e.g., "Correct name: …; Tagline: …; Primary domain: …"'
+                  style={{ fontSize: '9pt', width: '100%' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Labeling
+                </label>
+                <textarea
+                  className="form-input"
+                  value={formData.labeling || ''}
+                  onChange={(e) => handleChange('labeling', e.target.value)}
+                  rows={2}
+                  placeholder='e.g., "auction_house; marketplace; service-first"'
+                  style={{ fontSize: '9pt', width: '100%' }}
+                />
+              </div>
+            </div>
+
+            {/* Valuation */}
+            <div style={{ marginBottom: '24px' }}>
+              <h4 style={{ fontSize: '10pt', fontWeight: 700, marginBottom: '12px', color: 'var(--text-muted)' }}>
+                Valuation
+              </h4>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Estimated Value (USD)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    className="form-input"
+                    value={formData.estimated_value ?? ''}
+                    onChange={(e) => handleChange('estimated_value', e.target.value ? parseFloat(e.target.value) : null)}
+                    placeholder="2500000"
+                    style={{ fontSize: '9pt', width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '9pt', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Last Valuation Date
+                  </label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={formData.last_valuation_date || ''}
+                    onChange={(e) => handleChange('last_valuation_date', e.target.value)}
                     style={{ fontSize: '9pt', width: '100%' }}
                   />
                 </div>

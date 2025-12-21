@@ -73,7 +73,11 @@ async function fetchTextWithTimeout(url: string, timeoutMs: number, label: strin
     const res = await fetch(url, {
       method: "GET",
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; NukeBot/1.0)",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": "https://www.mecum.com/",
       },
       signal: controller.signal,
     });
@@ -153,13 +157,30 @@ function extractMecumImagesFromHtml(html: string): string[] {
   const h = String(html || "");
   const urls = new Set<string>();
   
+  // Pattern 0: Extract from JSON in script tags (Mecum may embed gallery data)
+  const scriptJsonRe = /<script[^>]*>(.*?)<\/script>/gis;
+  let scriptMatch;
+  while ((scriptMatch = scriptJsonRe.exec(h)) !== null && urls.size < 50) {
+    const scriptContent = scriptMatch[1];
+    // Look for image URLs in JSON structures
+    const jsonImageRe = /["'](https?:\/\/images\.mecum\.com\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
+    let jsonMatch;
+    while ((jsonMatch = jsonImageRe.exec(scriptContent)) !== null) {
+      const u = String(jsonMatch[1] || "").trim();
+      const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
+      if (versionMatch) {
+        const [, version, auction, lot, imageId] = versionMatch;
+        const fullUrl = `https://images.mecum.com/image/upload/v${version}/auctions/${auction}/${lot}/${imageId}.jpg`;
+        urls.add(fullUrl);
+      }
+    }
+  }
+  
   // Pattern 1: Extract from pswp__img class (PhotoSwipe gallery images - full resolution)
-  // Format: <img class="pswp__img" src="https://images.mecum.com/.../v1761760377/auctions/FL26/1154889/728345.jpg?"
   const pswpImgRe = /<img[^>]*class=["'][^"']*pswp__img[^"']*["'][^>]*src=["'](https?:\/\/images\.mecum\.com\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
   let match;
   while ((match = pswpImgRe.exec(h)) !== null && urls.size < 50) {
     const u = String(match[1] || "").trim();
-    // Extract version path: /v{version}/auctions/{auction}/{lot}/{imageId}.jpg
     const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
     if (versionMatch) {
       const [, version, auction, lot, imageId] = versionMatch;
@@ -172,7 +193,6 @@ function extractMecumImagesFromHtml(html: string): string[] {
   const srcsetRe = /srcset=["']([^"']+)["']/gi;
   while ((match = srcsetRe.exec(h)) !== null && urls.size < 50) {
     const srcsetValue = match[1];
-    // Extract first URL from srcset (they're all the same image, different sizes)
     const firstUrlMatch = srcsetValue.match(/https?:\/\/images\.mecum\.com\/image\/upload\/[^"'\\s,>]+?\/auctions\/[^"'\\s,>]+?\/\d+\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s,>]*)?/i);
     if (firstUrlMatch) {
       const u = String(firstUrlMatch[0] || "").trim();
@@ -1178,41 +1198,143 @@ async function extractMecum(url: string, maxVehicles: number) {
   const urlsToProcess = urlsToScrape.slice(0, Math.max(1, maxVehicles));
   const scrapePromises = urlsToProcess.map(async (listingUrl: string) => {
     try {
-      const firecrawlData = await fetchJsonWithTimeout(
-        FIRECRAWL_SCRAPE_URL,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${firecrawlKey}`,
-            "Content-Type": "application/json",
+      // Extract lot ID from URL for fallback image construction
+      const lotIdMatch = listingUrl.match(/\/lots\/(\d+)\//);
+      const lotId = lotIdMatch ? lotIdMatch[1] : null;
+      
+      // STRATEGY: Multi-pronged approach for maximum image extraction
+      let html = "";
+      let markdown = "";
+      let images: string[] = [];
+      
+      // Step 1: Firecrawl with markdown format (often captures URLs even if HTML doesn't render)
+      try {
+        const firecrawlMarkdown = await fetchJsonWithTimeout(
+          FIRECRAWL_SCRAPE_URL,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${firecrawlKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              url: listingUrl,
+              formats: ["markdown", "html"],
+              onlyMainContent: false,
+              waitFor: 10000,
+            }),
           },
-          body: JSON.stringify({
-            url: listingUrl,
-            formats: ["extract", "html"],
-            onlyMainContent: false,
-            waitFor: 10000, // 10s wait for PhotoSwipe gallery to render (pswp__img images)
-            extract: { schema: listingSchema },
-          }),
-        },
-        FIRECRAWL_LISTING_TIMEOUT_MS,
-        "Firecrawl listing scrape",
-      );
-
-      const vehicle = firecrawlData?.data?.extract || {};
-      const html = String(firecrawlData?.data?.html || "");
-      
-      // Get images from schema extraction first
-      let images = Array.isArray(vehicle?.images) && vehicle.images.length > 0
-        ? vehicle.images
-        : [];
-      
-      // Always also parse HTML as backup (Mecum uses lazy-loaded galleries)
-      if (html) {
-        const htmlImages = extractMecumImagesFromHtml(html);
-        // Merge and dedupe
-        const allImages = [...images, ...htmlImages];
-        images = Array.from(new Set(allImages));
+          FIRECRAWL_LISTING_TIMEOUT_MS,
+          "Firecrawl markdown+html",
+        );
+        
+        markdown = String(firecrawlMarkdown?.data?.markdown || firecrawlMarkdown?.markdown || "");
+        html = String(firecrawlMarkdown?.data?.html || "");
+        
+        // Extract images from markdown (URLs often appear in markdown even if HTML doesn't render)
+        if (markdown) {
+          const markdownImages = extractMecumImagesFromHtml(markdown);
+          images = [...images, ...markdownImages];
+        }
+      } catch (e: any) {
+        console.warn(`Firecrawl markdown failed: ${e?.message || String(e)}`);
       }
+      
+      // Step 2: Extract from HTML if we got it
+      if (html && images.length === 0) {
+        const htmlImages = extractMecumImagesFromHtml(html);
+        images = [...images, ...htmlImages];
+      }
+      
+      // Step 3: Firecrawl structured extraction for vehicle data
+      let vehicle: any = {};
+      try {
+        const firecrawlData = await fetchJsonWithTimeout(
+          FIRECRAWL_SCRAPE_URL,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${firecrawlKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              url: listingUrl,
+              formats: ["extract"],
+              onlyMainContent: false,
+              waitFor: 5000,
+              extract: { schema: listingSchema },
+            }),
+          },
+          FIRECRAWL_LISTING_TIMEOUT_MS,
+          "Firecrawl structured extract",
+        );
+        vehicle = firecrawlData?.data?.extract || {};
+        
+        // Merge Firecrawl images if any
+        if (Array.isArray(vehicle?.images) && vehicle.images.length > 0) {
+          images = [...images, ...vehicle.images];
+        }
+      } catch (e: any) {
+        console.warn(`Firecrawl extraction failed: ${e?.message || String(e)}`);
+      }
+      
+      // Step 4: Try Firecrawl map API for image URL discovery
+      if (images.length === 0) {
+        try {
+          const mapData = await fetchJsonWithTimeout(
+            FIRECRAWL_MAP_URL,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${firecrawlKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                url: listingUrl,
+                search: "images.mecum.com",
+                limit: 100,
+              }),
+            },
+            15000,
+            "Firecrawl map for images",
+          );
+          
+          const mapUrls = mapData?.data?.urls || mapData?.urls || [];
+          const imageUrls = mapUrls
+            .filter((u: string) => u.includes('images.mecum.com') && u.includes('/auctions/'))
+            .map((u: string) => {
+              const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
+              if (versionMatch) {
+                const [, version, auction, lot, imageId] = versionMatch;
+                return `https://images.mecum.com/image/upload/v${version}/auctions/${auction}/${lot}/${imageId}.jpg`;
+              }
+              return u.split('?')[0];
+            })
+            .filter((u: string) => u.includes('/auctions/'));
+          
+          if (imageUrls.length > 0) {
+            images = [...images, ...imageUrls];
+          }
+        } catch (e: any) {
+          console.warn(`Map API failed: ${e?.message || String(e)}`);
+        }
+      }
+      
+      // Step 5: Direct fetch as last resort (often blocked by Cloudflare)
+      if (images.length === 0) {
+        try {
+          html = await fetchTextWithTimeout(listingUrl, 20000, "Direct Mecum page fetch");
+          if (html) {
+            const directImages = extractMecumImagesFromHtml(html);
+            images = [...images, ...directImages];
+          }
+        } catch (e: any) {
+          console.warn(`Direct fetch failed: ${e?.message || String(e)}`);
+        }
+      }
+      
+      // Dedupe
+      images = Array.from(new Set(images));
       
       // Filter out UI assets
       images = images.filter((img: string) => {

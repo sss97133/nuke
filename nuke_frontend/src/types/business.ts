@@ -18,6 +18,7 @@ export type BusinessType =
   | 'parts_supplier'
   | 'fabrication'
   | 'racing_team'
+  | 'auction_house'
   | 'other';
 
 export type BusinessStatus = 
@@ -134,6 +135,12 @@ export interface Business {
   
   // Metadata
   metadata: Record<string, any>;
+
+  // Neutral facts (human-readable)
+  inventory_numbers?: string;
+  market_share?: string;
+  branding?: string;
+  labeling?: string;
   
   // Timestamps
   created_at: string;
@@ -446,6 +453,7 @@ export const BUSINESS_TYPES: { value: BusinessType; label: string }[] = [
   { value: 'parts_supplier', label: 'Parts Supplier' },
   { value: 'fabrication', label: 'Fabrication Shop' },
   { value: 'racing_team', label: 'Racing Team' },
+  { value: 'auction_house', label: 'Auction House' },
   { value: 'sole_proprietorship', label: 'Sole Proprietorship' },
   { value: 'partnership', label: 'Partnership' },
   { value: 'llc', label: 'LLC' },

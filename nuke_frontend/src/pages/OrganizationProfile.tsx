@@ -52,12 +52,19 @@ interface Organization {
   is_tradable?: boolean;
   stock_symbol?: string;
   current_value?: number;
+  estimated_value?: number;
+  last_valuation_date?: string;
   total_vehicles?: number;
   total_images?: number;
   total_events?: number;
   discovered_by?: string;
   uploaded_by?: string;
   labor_rate?: number;
+  // Neutral facts (human-readable)
+  inventory_numbers?: string;
+  market_share?: string;
+  branding?: string;
+  labeling?: string;
   created_at: string;
   updated_at: string;
 }
@@ -2313,11 +2320,44 @@ export default function OrganizationProfile() {
                     <strong>Type:</strong> {organization.business_type}
                   </div>
                 )}
+                {(organization.estimated_value || organization.current_value) && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong>Estimated Value:</strong>{' '}
+                    {typeof organization.estimated_value === 'number'
+                      ? formatUsd(organization.estimated_value)
+                      : (typeof organization.current_value === 'number' ? formatUsd(organization.current_value) : '—')}
+                    {organization.last_valuation_date ? (
+                      <span style={{ marginLeft: '6px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        (as of {organization.last_valuation_date})
+                      </span>
+                    ) : null}
+                  </div>
+                )}
               {organization.description && (
                   <div style={{ marginBottom: '6px' }}>
                     <strong>Description:</strong> {organization.description}
                   </div>
               )}
+                {(organization.inventory_numbers || isOwner) && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong>Inventory Numbers:</strong> {organization.inventory_numbers || '—'}
+                  </div>
+                )}
+                {(organization.market_share || isOwner) && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong>Market Share:</strong> {organization.market_share || '—'}
+                  </div>
+                )}
+                {(organization.branding || isOwner) && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong>Branding:</strong> {organization.branding || '—'}
+                  </div>
+                )}
+                {(organization.labeling || isOwner) && (
+                  <div style={{ marginBottom: '6px' }}>
+                    <strong>Labeling:</strong> {organization.labeling || '—'}
+                  </div>
+                )}
                 {organization.address && (
                   <div style={{ marginBottom: '6px' }}>
                     <strong>Address:</strong> {organization.address}, {organization.city}, {organization.state} {organization.zip_code}
