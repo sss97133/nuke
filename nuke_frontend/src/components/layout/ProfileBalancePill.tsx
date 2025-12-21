@@ -301,6 +301,7 @@ export const ProfileBalancePill: React.FC<Props> = ({ session, userProfile, unre
                 { label: 'Vehicles', action: '/vehicle/list' },
                 { label: 'Auctions', action: '/auctions' },
                 { label: 'Organizations', action: '/org' },
+                { label: 'Market', action: '/market' },
                 { label: 'Photos', action: '/capsule?tab=photos' },
                 { label: 'Settings', action: '/capsule?tab=settings' },
                 ...(isAdmin ? [{ label: 'Admin', action: '/admin' }] : [])

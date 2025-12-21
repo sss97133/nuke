@@ -371,11 +371,24 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                         display: 'block',
                         padding: '8px 12px',
                         textDecoration: 'none',
-                        borderBottom: '1px solid #f0f0f0'
+                        borderBottom: '1px solid var(--border)'
                       }}
                       onClick={() => setNZeroMenuOpen(false)}
                     >
                       Organizations
+                    </Link>
+                    <Link
+                      to="/market"
+                      className={`nav-link ${isActivePage('/market') ? 'active' : ''}`}
+                      style={{
+                        display: 'block',
+                        padding: '8px 12px',
+                        textDecoration: 'none',
+                        borderBottom: '1px solid var(--border)'
+                      }}
+                      onClick={() => setNZeroMenuOpen(false)}
+                    >
+                      Market
                     </Link>
                     <a
                       href="https://n-zero.dev/"
