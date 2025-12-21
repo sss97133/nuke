@@ -1,0 +1,441 @@
+version: 1
+last_updated: "2025-12-21"
+notes:
+  - "Seed list: expand continuously. This file is the canonical inventory of online sources."
+  - "For each source, fill in access/compliance constraints before building extraction."
+  - "Do not assume scraping is permitted; capture ToS/robots/auth constraints in extraction_plan_status and access fields."
+
+sources:
+  # ---------------------------------------------------------------------------
+  # AUCTIONS (enthusiast + collector + salvage/wholesale)
+  # ---------------------------------------------------------------------------
+  - id: bringatrailer
+    name: "Bring a Trailer"
+    website: "https://bringatrailer.com"
+    kind: "auction"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "active"
+    monitoring_priority: "high"
+    typical_data:
+      - "listing"
+      - "photos"
+      - "bids"
+      - "comments"
+      - "result"
+    recommended_strategy: "source_specific_adapter"
+    notes:
+      - "Core pipeline source; comments and bid history are first-class."
+
+  - id: carsandbids
+    name: "Cars and Bids"
+    website: "https://carsandbids.com"
+    kind: "auction"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "planned"
+    monitoring_priority: "high"
+    typical_data: ["listing", "photos", "bids", "comments", "result"]
+    recommended_strategy: "firecrawl_schema_then_fallback"
+
+  - id: hemmings_auctions
+    name: "Hemmings Auctions"
+    website: "https://www.hemmings.com/auctions"
+    kind: "auction"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "planned"
+    monitoring_priority: "medium"
+    typical_data: ["listing", "photos", "bids", "result"]
+    recommended_strategy: "firecrawl_schema_then_fallback"
+
+  - id: mecum
+    name: "Mecum Auctions"
+    website: "https://www.mecum.com"
+    kind: "auction"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "medium"
+    typical_data: ["events", "lots", "results"]
+    recommended_strategy: "research_required"
+    notes:
+      - "Confirm permitted access patterns and whether results are public."
+
+  - id: barrett_jackson
+    name: "Barrett-Jackson"
+    website: "https://www.barrett-jackson.com"
+    kind: "auction"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "medium"
+    typical_data: ["events", "lots", "results"]
+    recommended_strategy: "research_required"
+
+  - id: rmsothebys
+    name: "RM Sotheby's"
+    website: "https://rmsothebys.com"
+    kind: "auction"
+    region: "global"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["events", "lots", "results"]
+    recommended_strategy: "research_required"
+
+  - id: gooding
+    name: "Gooding Christie's"
+    website: "https://www.goodingco.com"
+    kind: "auction"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["events", "lots", "results"]
+    recommended_strategy: "research_required"
+
+  - id: bonhams
+    name: "Bonhams"
+    website: "https://www.bonhams.com"
+    kind: "auction"
+    region: "global"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["events", "lots", "results"]
+    recommended_strategy: "research_required"
+
+  - id: copart
+    name: "Copart"
+    website: "https://www.copart.com"
+    kind: "auction"
+    region: "global"
+    access: "login_required"
+    extraction_plan_status: "research"
+    monitoring_priority: "high"
+    typical_data: ["inventory", "auction_events", "lot_details", "images"]
+    recommended_strategy: "partnership_or_compliant_access"
+    notes:
+      - "Treat as compliance-sensitive; prefer partnership/API if available."
+
+  - id: iaai
+    name: "IAA (Insurance Auto Auctions)"
+    website: "https://www.iaai.com"
+    kind: "auction"
+    region: "global"
+    access: "login_required"
+    extraction_plan_status: "research"
+    monitoring_priority: "high"
+    typical_data: ["inventory", "auction_events", "lot_details", "images"]
+    recommended_strategy: "partnership_or_compliant_access"
+
+  - id: manheim
+    name: "Manheim"
+    website: "https://www.manheim.com"
+    kind: "auction"
+    region: "US"
+    access: "login_required"
+    extraction_plan_status: "research"
+    monitoring_priority: "high"
+    typical_data: ["wholesale_inventory", "auction_events", "sale_results"]
+    recommended_strategy: "partnership_or_compliant_access"
+
+  - id: acv_auctions
+    name: "ACV Auctions"
+    website: "https://www.acvauctions.com"
+    kind: "auction"
+    region: "US"
+    access: "login_required"
+    extraction_plan_status: "research"
+    monitoring_priority: "high"
+    typical_data: ["wholesale_inventory", "auction_events", "sale_results"]
+    recommended_strategy: "partnership_or_compliant_access"
+
+  # ---------------------------------------------------------------------------
+  # MARKETPLACES / CLASSIFIEDS / DEALER INVENTORY AGGREGATORS
+  # ---------------------------------------------------------------------------
+  - id: facebook_marketplace
+    name: "Facebook Marketplace"
+    website: "https://www.facebook.com/marketplace"
+    kind: "marketplace"
+    region: "global"
+    access: "login_required"
+    extraction_plan_status: "compliance_required"
+    monitoring_priority: "high"
+    typical_data: ["listings", "seller_profiles", "photos", "price", "location"]
+    recommended_strategy: "meta_compliance_first"
+    notes:
+      - "Do not implement high-risk collection. Pursue compliant access or app approval path."
+
+  - id: craigslist
+    name: "Craigslist"
+    website: "https://www.craigslist.org"
+    kind: "classifieds"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "active"
+    monitoring_priority: "high"
+    typical_data: ["listings", "photos", "price", "location"]
+    recommended_strategy: "source_specific_adapter"
+
+  - id: ebay_motors
+    name: "eBay Motors"
+    website: "https://www.ebay.com/b/Auto-Parts-and-Vehicles/6000/bn_1865334"
+    kind: "marketplace"
+    region: "global"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "medium"
+    typical_data: ["listings", "photos", "price", "shipping"]
+    recommended_strategy: "research_required"
+
+  - id: autotrader
+    name: "AutoTrader"
+    website: "https://www.autotrader.com"
+    kind: "inventory_aggregator"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "medium"
+    typical_data: ["listings", "dealer_info", "price", "vin", "photos"]
+    recommended_strategy: "research_required"
+
+  - id: cars_com
+    name: "Cars.com"
+    website: "https://www.cars.com"
+    kind: "inventory_aggregator"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "medium"
+    typical_data: ["listings", "dealer_info", "price", "vin", "photos"]
+    recommended_strategy: "research_required"
+
+  - id: cargurus
+    name: "CarGurus"
+    website: "https://www.cargurus.com"
+    kind: "inventory_aggregator"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "medium"
+    typical_data: ["listings", "dealer_info", "price", "vin", "photos"]
+    recommended_strategy: "research_required"
+
+  - id: autotempest
+    name: "AutoTempest"
+    website: "https://www.autotempest.com"
+    kind: "inventory_aggregator"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["search_results", "redirects_to_sources"]
+    recommended_strategy: "research_required"
+
+  - id: ksl
+    name: "KSL Cars"
+    website: "https://cars.ksl.com"
+    kind: "classifieds"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "planned"
+    monitoring_priority: "medium"
+    typical_data: ["listings", "photos", "price", "location"]
+    recommended_strategy: "firecrawl_schema_then_fallback"
+
+  - id: offerup
+    name: "OfferUp"
+    website: "https://offerup.com"
+    kind: "marketplace"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "medium"
+    typical_data: ["listings", "photos", "price", "location"]
+    recommended_strategy: "research_required"
+
+  - id: nextdoor
+    name: "Nextdoor"
+    website: "https://nextdoor.com"
+    kind: "marketplace"
+    region: "US"
+    access: "login_required"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["listings", "photos", "price", "location"]
+    recommended_strategy: "research_required"
+
+  # ---------------------------------------------------------------------------
+  # DEALER WEBSITES (platform families) - these are “source types” used for adapters
+  # ---------------------------------------------------------------------------
+  - id: dealerfire_platform
+    name: "DealerFire (dealer website platform)"
+    website: "https://www.dealerfire.com"
+    kind: "dealer_platform"
+    region: "US"
+    access: "varies_by_dealer"
+    extraction_plan_status: "planned"
+    monitoring_priority: "high"
+    typical_data: ["dealer_inventory", "vdp_pages", "photos", "vin", "price"]
+    recommended_strategy: "platform_adapter"
+
+  - id: dealersocket_platform
+    name: "DealerSocket (dealer website platform)"
+    website: "https://www.dealersocket.com"
+    kind: "dealer_platform"
+    region: "US"
+    access: "varies_by_dealer"
+    extraction_plan_status: "planned"
+    monitoring_priority: "high"
+    typical_data: ["dealer_inventory", "vdp_pages", "photos", "vin", "price"]
+    recommended_strategy: "platform_adapter"
+
+  - id: dealercom_platform
+    name: "Dealer.com (dealer website platform)"
+    website: "https://www.dealer.com"
+    kind: "dealer_platform"
+    region: "US"
+    access: "varies_by_dealer"
+    extraction_plan_status: "planned"
+    monitoring_priority: "high"
+    typical_data: ["dealer_inventory", "vdp_pages", "photos", "vin", "price"]
+    recommended_strategy: "platform_adapter"
+
+  - id: dealerinspire_platform
+    name: "Dealer Inspire (dealer website platform)"
+    website: "https://www.dealerinspire.com"
+    kind: "dealer_platform"
+    region: "US"
+    access: "varies_by_dealer"
+    extraction_plan_status: "planned"
+    monitoring_priority: "high"
+    typical_data: ["dealer_inventory", "vdp_pages", "photos", "vin", "price"]
+    recommended_strategy: "platform_adapter"
+
+  # ---------------------------------------------------------------------------
+  # SUPPLIERS / PARTS / ACCESSORIES (automotive suppliers, catalogs, retailers)
+  # ---------------------------------------------------------------------------
+  - id: rockauto
+    name: "RockAuto"
+    website: "https://www.rockauto.com"
+    kind: "supplier"
+    region: "global"
+    access: "public"
+    extraction_plan_status: "planned"
+    monitoring_priority: "medium"
+    typical_data: ["parts_catalog", "fitment", "pricing"]
+    recommended_strategy: "firecrawl_schema_then_fallback"
+
+  - id: summit_racing
+    name: "Summit Racing"
+    website: "https://www.summitracing.com"
+    kind: "supplier"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "planned"
+    monitoring_priority: "medium"
+    typical_data: ["product_pages", "pricing", "fitment", "specs"]
+    recommended_strategy: "firecrawl_schema_then_fallback"
+
+  - id: jegs
+    name: "JEGS"
+    website: "https://www.jegs.com"
+    kind: "supplier"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "planned"
+    monitoring_priority: "medium"
+    typical_data: ["product_pages", "pricing", "specs"]
+    recommended_strategy: "firecrawl_schema_then_fallback"
+
+  - id: holley
+    name: "Holley"
+    website: "https://www.holley.com"
+    kind: "supplier"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "active"
+    monitoring_priority: "medium"
+    typical_data: ["product_pages", "pricing", "specs", "instructions"]
+    recommended_strategy: "source_specific_adapter"
+
+  - id: gm_parts
+    name: "GM Parts (official parts catalog)"
+    website: "https://parts.gm.com"
+    kind: "supplier"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["parts_catalog", "fitment"]
+    recommended_strategy: "research_required"
+
+  - id: ford_parts
+    name: "Ford Parts (official parts catalog)"
+    website: "https://parts.ford.com"
+    kind: "supplier"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["parts_catalog", "fitment"]
+    recommended_strategy: "research_required"
+
+  - id: mopar_parts
+    name: "Mopar Parts (official parts catalog)"
+    website: "https://store.mopar.com"
+    kind: "supplier"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["parts_catalog", "fitment"]
+    recommended_strategy: "research_required"
+
+  - id: napa
+    name: "NAPA Auto Parts"
+    website: "https://www.napaonline.com"
+    kind: "supplier"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["product_pages", "store_availability", "pricing"]
+    recommended_strategy: "research_required"
+
+  - id: oreilly
+    name: "O'Reilly Auto Parts"
+    website: "https://www.oreillyauto.com"
+    kind: "supplier"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["product_pages", "store_availability", "pricing"]
+    recommended_strategy: "research_required"
+
+  - id: autozone
+    name: "AutoZone"
+    website: "https://www.autozone.com"
+    kind: "supplier"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["product_pages", "store_availability", "pricing"]
+    recommended_strategy: "research_required"
+
+  - id: car_part
+    name: "Car-Part.com (salvage yards aggregator)"
+    website: "https://www.car-part.com"
+    kind: "supplier"
+    region: "US"
+    access: "mixed"
+    extraction_plan_status: "research"
+    monitoring_priority: "low"
+    typical_data: ["salvage_inventory", "fitment", "pricing"]
+    recommended_strategy: "research_required"
+
+
