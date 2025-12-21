@@ -116,6 +116,30 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
         }))
         .filter((r: any) => r.text && r.text.trim().length > 0);
 
+      // Also check for BaT listing data
+      const { data: batListing } = await supabase
+        .from('bat_listings')
+        .select('id, bat_listing_title, bat_listing_url, raw_data, created_at')
+        .eq('vehicle_id', vehicleId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Add BaT listing as a source if it exists and has description data
+      if (batListing) {
+        const batDescription = (batListing.raw_data as any)?.description || 
+                              (batListing.raw_data as any)?.post_excerpt ||
+                              batListing.bat_listing_title;
+        
+        if (batDescription && batDescription.trim().length > 0) {
+          mapped.unshift({
+            text: batDescription.toString(),
+            extracted_at: batListing.created_at ? String(batListing.created_at) : null,
+            source_url: batListing.bat_listing_url || null
+          });
+        }
+      }
+
       setRawListingDescriptions(mapped);
     } catch (err) {
       // Non-fatal if table missing in some environments
@@ -252,27 +276,30 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* Curated summary (editable) */}
-            <div>
-              <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
-                CURATED SUMMARY
-              </div>
-              {isEmpty ? (
-                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                  No curated summary yet. Use Generate or Edit to create one.
+            {/* Curated summary (editable) - Only show if it's substantial and not just listing boilerplate */}
+            {(() => {
+              const cleaned = sanitizeCuratedSummary(description);
+              const isSubstantial = cleaned && cleaned.length > 100 && !cleaned.toLowerCase().includes('chrome-finished') && !cleaned.toLowerCase().includes('braking is provide');
+              // Hide if it's too short or looks like bad AI generation
+              if (!isSubstantial && !isEmpty) return null;
+              
+              return (
+                <div>
+                  <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
+                    CURATED SUMMARY
+                  </div>
+                  {isEmpty ? (
+                    <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                      No curated summary yet. Use Generate or Edit to create one.
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                      {cleaned || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No summary available</span>}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                  {(() => {
-                    const cleaned = sanitizeCuratedSummary(description);
-                    if (!cleaned) {
-                      return <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No summary available</span>;
-                    }
-                    return cleaned;
-                  })()}
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Source description entries (provenance-backed) */}
             <div>
