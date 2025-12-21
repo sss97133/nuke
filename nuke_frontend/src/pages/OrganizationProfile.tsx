@@ -1453,13 +1453,16 @@ export default function OrganizationProfile() {
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
       {/* HEADER: Organization Name - Top Focus */}
       <div style={{
-        background: 'var(--surface)',
-        borderBottom: '2px solid var(--border)',
-        padding: '20px 16px',
         position: 'sticky',
-        top: 48,
-        zIndex: 10,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.12)'
+        top: 'var(--header-height, 40px)',
+        zIndex: 900,
+        background: 'var(--surface-glass)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        border: '1px solid var(--border)',
+        padding: '8px 12px',
+        marginBottom: '12px',
+        boxShadow: 'rgba(0, 0, 0, 0.12) 0px 2px 4px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           {/* Organization name - PRIMARY FOCUS */}

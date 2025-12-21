@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { extractBatDomMap } from "../_shared/batDomMap.ts";
+import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,8 +56,8 @@ async function isAuthorized(req: Request): Promise<{ ok: boolean; mode: "service
     const { data: userData, error: userErr } = await authClient.auth.getUser();
     if (userErr || !userData?.user) return { ok: false, mode: "none", error: "Unauthorized" };
 
-    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    const { data: isAdmin, error: adminErr } = await admin.rpc("is_admin_or_moderator");
+    // IMPORTANT: is_admin_or_moderator() depends on auth.uid(), so it must run under the user's JWT context.
+    const { data: isAdmin, error: adminErr } = await authClient.rpc("is_admin_or_moderator");
     if (adminErr) return { ok: false, mode: "none", error: adminErr.message };
     if (isAdmin === true) return { ok: true, mode: "admin_user" };
     return { ok: false, mode: "none", error: "Forbidden" };
@@ -80,6 +80,74 @@ function cleanCanonical(urls: any[]): string[] {
   }
   // De-dupe preserving order
   return [...new Set(out)];
+}
+
+function safeDecodeHtmlAttr(s: string): string {
+  return String(s || "")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#038;/g, "&")
+    .replace(/&amp;/g, "&");
+}
+
+function extractCanonicalGalleryUrlsFromHtml(html: string): string[] {
+  const h = String(html || "");
+
+  const normalize = (u: string) =>
+    u
+      .split("#")[0]
+      .split("?")[0]
+      .replace(/&#038;/g, "&")
+      .replace(/&amp;/g, "&")
+      .replace(/-scaled\./g, ".")
+      .trim();
+
+  const isOk = (u: string) => {
+    const s = u.toLowerCase();
+    return u.startsWith("http") && s.includes("bringatrailer.com/wp-content/uploads/") && !s.endsWith(".svg") && !s.endsWith(".pdf");
+  };
+
+  const isNoise = (u: string): boolean => {
+    const f = u.toLowerCase();
+    return (
+      f.includes("qotw") ||
+      f.includes("winner-template") ||
+      f.includes("weekly-weird") ||
+      f.includes("mile-marker") ||
+      f.includes("podcast") ||
+      f.includes("merch") ||
+      f.includes("thumbnail-template") ||
+      f.includes("site-post-") ||
+      f.includes("screenshot-") ||
+      f.includes("countries/") ||
+      f.includes("themes/") ||
+      f.includes("assets/img/") ||
+      /\/web-\d{3,}-/i.test(f)
+    );
+  };
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(h, "text/html");
+    const galleryDiv = doc?.getElementById("bat_listing_page_photo_gallery");
+    if (!galleryDiv) return [];
+    const attr = galleryDiv.getAttribute("data-gallery-items");
+    if (!attr) return [];
+    const jsonText = safeDecodeHtmlAttr(attr);
+    const items = JSON.parse(jsonText);
+    if (!Array.isArray(items)) return [];
+    const urls: string[] = [];
+    for (const it of items) {
+      const u = it?.large?.url || it?.small?.url;
+      if (typeof u !== "string" || !u.trim()) continue;
+      const nu = normalize(u);
+      if (!isOk(nu)) continue;
+      if (isNoise(nu)) continue;
+      urls.push(nu);
+    }
+    return [...new Set(urls)];
+  } catch {
+    return [];
+  }
 }
 
 async function fetchHtml(url: string): Promise<{ html: string; method: string; status: number }> {
@@ -222,10 +290,9 @@ Deno.serve(async (req) => {
           results.candidates++;
           if (!dryRun) {
             const fetched = await fetchHtml(url);
-            const extracted = extractBatDomMap(fetched.html, url);
-            const fresh = cleanCanonical(extracted?.extracted?.image_urls || []);
+            const fresh = extractCanonicalGalleryUrlsFromHtml(fetched.html);
             if (fresh.length >= 20) {
-              const nextOm = { ...(om as any), image_urls: fresh, image_count: fresh.length, bat_hygiene: { ...(om as any)?.bat_hygiene, refreshed_at: new Date().toISOString(), refresh_method: extracted?.gallery_method || null } };
+              const nextOm = { ...(om as any), image_urls: fresh, image_count: fresh.length, bat_hygiene: { ...(om as any)?.bat_hygiene, refreshed_at: new Date().toISOString(), refresh_method: fetched.method } };
               await admin.from("vehicles").update({ origin_metadata: nextOm, updated_at: new Date().toISOString() }).eq("id", vehicle.id);
               canonical = fresh;
               vehicleResult.canonical_images = canonical.length;
