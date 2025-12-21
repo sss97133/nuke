@@ -13,6 +13,8 @@ interface HypeVehicle {
   current_value?: number;
   purchase_price?: number;
   sale_price?: number;
+  sale_status?: string;
+  sale_date?: string;
   asking_price?: number;
   display_price?: number; // Computed smart price
   roi_pct?: number;
@@ -804,19 +806,36 @@ const CursorHomepage: React.FC = () => {
   const filteredStats = useMemo(() => {
     const totalVehicles = filteredVehicles.length;
     const totalValue = filteredVehicles.reduce((sum, v) => {
-      // Sum all price fields for each vehicle, then add to total
-      const prices = [
-        v.current_value,
-        v.purchase_price,
-        v.sale_price,
-        v.asking_price,
-        v.display_price // computed field, may be available
-      ];
-      const vehicleTotal = prices.reduce((vehicleSum: number, price) => {
-        const numPrice = typeof price === 'number' && Number.isFinite(price) ? price : 0;
-        return vehicleSum + numPrice;
-      }, 0);
-      return sum + (vehicleTotal || 0);
+      // Use the best/actual price for each vehicle
+      // Priority: sale_price (if sold) > asking_price > current_value > purchase_price > display_price
+      let vehiclePrice = 0;
+      
+      // If sold, use sale_price
+      if (v.sale_price && (v.sale_status === 'sold' || v.sale_price > 0)) {
+        vehiclePrice = typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) ? v.sale_price : 0;
+      }
+      // Otherwise use asking_price
+      else if (v.asking_price) {
+        vehiclePrice = typeof v.asking_price === 'number' && Number.isFinite(v.asking_price) ? v.asking_price : 0;
+        if (typeof v.asking_price === 'string') {
+          const parsed = parseFloat(v.asking_price);
+          vehiclePrice = Number.isFinite(parsed) ? parsed : 0;
+        }
+      }
+      // Fall back to current_value
+      else if (v.current_value) {
+        vehiclePrice = typeof v.current_value === 'number' && Number.isFinite(v.current_value) ? v.current_value : 0;
+      }
+      // Then purchase_price
+      else if (v.purchase_price) {
+        vehiclePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) ? v.purchase_price : 0;
+      }
+      // Last resort: display_price (computed)
+      else if (v.display_price) {
+        vehiclePrice = typeof v.display_price === 'number' && Number.isFinite(v.display_price) ? v.display_price : 0;
+      }
+      
+      return sum + vehiclePrice;
     }, 0);
     // Sales volume (24hrs): align semantics with dbStats (sold today), but scoped to the filtered set.
     const today = new Date();
@@ -850,25 +869,39 @@ const CursorHomepage: React.FC = () => {
         .from('vehicles')
         .select('*', { count: 'exact', head: true });
       
-      // Get total value - fetch all vehicles with ALL price fields to calculate sum of all prices
+      // Get total value - fetch all vehicles and use best/actual price per vehicle
+      // Priority: sale_price (if sold) > asking_price > current_value > purchase_price
       const { data: allVehicles } = await supabase
         .from('vehicles')
-        .select('current_value, purchase_price, sale_price, asking_price, msrp');
+        .select('sale_price, sale_status, asking_price, current_value, purchase_price');
       
       const totalValue = (allVehicles || []).reduce((sum, v) => {
-        // Sum all price fields for each vehicle, then add to total
-        const prices = [
-          v.current_value,
-          v.purchase_price,
-          v.sale_price,
-          v.asking_price,
-          v.msrp
-        ];
-        const vehicleTotal = prices.reduce((vehicleSum: number, price) => {
-          const numPrice = typeof price === 'number' && Number.isFinite(price) ? price : 0;
-          return vehicleSum + numPrice;
-        }, 0);
-        return sum + (vehicleTotal || 0);
+        // Use the best/actual price for each vehicle
+        let vehiclePrice = 0;
+        
+        // If sold, use sale_price
+        if (v.sale_price && (v.sale_status === 'sold' || v.sale_price > 0)) {
+          vehiclePrice = typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) ? v.sale_price : 0;
+        }
+        // Otherwise use asking_price
+        else if (v.asking_price) {
+          vehiclePrice = typeof v.asking_price === 'number' && Number.isFinite(v.asking_price) ? v.asking_price : 0;
+          // Handle string asking_price (from DB)
+          if (typeof v.asking_price === 'string') {
+            const parsed = parseFloat(v.asking_price);
+            vehiclePrice = Number.isFinite(parsed) ? parsed : 0;
+          }
+        }
+        // Fall back to current_value
+        else if (v.current_value) {
+          vehiclePrice = typeof v.current_value === 'number' && Number.isFinite(v.current_value) ? v.current_value : 0;
+        }
+        // Last resort: purchase_price
+        else if (v.purchase_price) {
+          vehiclePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) ? v.purchase_price : 0;
+        }
+        
+        return sum + vehiclePrice;
       }, 0);
       
       // Get sales volume in last 24 hours (vehicles sold today)
