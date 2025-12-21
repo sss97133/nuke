@@ -303,7 +303,25 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
   const extracted: any[] = [];
   const issues: string[] = [];
 
-  for (const listingUrl of listingUrls) {
+  // Prefer unseen URLs to avoid repeatedly re-importing the same top listing.
+  let urlsToScrape = listingUrls;
+  try {
+    const supabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+    const sample = listingUrls.slice(0, 50);
+    if (sample.length > 0) {
+      const { data: existing } = await supabase
+        .from("vehicles")
+        .select("platform_url")
+        .in("platform_url", sample);
+      const existingSet = new Set((existing || []).map((r: any) => String(r?.platform_url || "")));
+      const unseen = sample.filter((u) => !existingSet.has(u));
+      urlsToScrape = (unseen.length > 0 ? unseen : sample).slice(0, Math.max(1, maxVehicles));
+    }
+  } catch {
+    // ignore (fallback to raw listingUrls)
+  }
+
+  for (const listingUrl of urlsToScrape) {
     try {
       const firecrawlData = await fetchJsonWithTimeout(
         FIRECRAWL_SCRAPE_URL,
@@ -340,8 +358,10 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
     listing_index_url: indexUrl,
     listings_discovered: listingUrls.length,
     vehicles_extracted: extracted.length,
-    vehicles_created: created.ids.length,
-    created_vehicle_ids: created.ids,
+    vehicles_created: created.created_ids.length,
+    vehicles_updated: created.updated_ids.length,
+    created_vehicle_ids: created.created_ids,
+    updated_vehicle_ids: created.updated_ids,
     issues: [...issues, ...created.errors],
     extraction_method: "index_link_discovery + firecrawl_per_listing_extract",
     timestamp: new Date().toISOString(),
@@ -446,14 +466,15 @@ Return JSON array:
 async function storeVehiclesInDatabase(
   vehicles: any[],
   source: string,
-): Promise<{ ids: string[]; errors: string[] }> {
+): Promise<{ created_ids: string[]; updated_ids: string[]; errors: string[] }> {
   const cleaned = vehicles.filter((v) => v && (v.make || v.model || v.year || v.title));
   console.log(`Storing ${cleaned.length} vehicles from ${source} in database...`);
 
-  if (cleaned.length === 0) return { ids: [], errors: [] };
+  if (cleaned.length === 0) return { created_ids: [], updated_ids: [], errors: [] };
 
   const supabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
   const createdIds: string[] = [];
+  const updatedIds: string[] = [];
   const errors: string[] = [];
 
   for (const vehicle of cleaned) {
@@ -498,14 +519,49 @@ async function storeVehiclesInDatabase(
           profile_origin: "agent_import",
         };
 
-      // If we have a VIN, upsert on vin to avoid unique violations and allow refreshes.
-      const write = vin
-        ? supabase.from("vehicles").upsert(payload, { onConflict: "vin" })
-        : supabase.from("vehicles").insert(payload);
+      // If we have a VIN, do a manual "upsert" (PostgREST cannot ON CONFLICT on partial unique indexes).
+      let data: any = null;
+      let error: any = null;
 
-      const { data, error } = await write
-        .select("id")
-        .single();
+      if (vin) {
+        const { data: existing, error: existingErr } = await supabase
+          .from("vehicles")
+          .select("id")
+          .eq("vin", vin)
+          .maybeSingle();
+
+        if (existingErr) {
+          error = existingErr;
+        } else if (existing?.id) {
+          const { data: updated, error: updateErr } = await supabase
+            .from("vehicles")
+            .update(payload)
+            .eq("id", existing.id)
+            .select("id")
+            .single();
+          data = updated;
+          error = updateErr;
+          if (!updateErr && updated?.id) updatedIds.push(String(updated.id));
+        } else {
+          const { data: inserted, error: insertErr } = await supabase
+            .from("vehicles")
+            .insert(payload)
+            .select("id")
+            .single();
+          data = inserted;
+          error = insertErr;
+          if (!insertErr && inserted?.id) createdIds.push(String(inserted.id));
+        }
+      } else {
+        const { data: inserted, error: insertErr } = await supabase
+          .from("vehicles")
+          .insert(payload)
+          .select("id")
+          .single();
+        data = inserted;
+        error = insertErr;
+        if (!insertErr && inserted?.id) createdIds.push(String(inserted.id));
+      }
 
       if (error) {
         const msg = `vehicles insert failed (${listingUrl || "no-url"}): ${error.message}`;
@@ -515,7 +571,6 @@ async function storeVehiclesInDatabase(
       }
 
       if (data?.id) {
-        createdIds.push(data.id);
         if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
           const img = await insertVehicleImages(supabase, data.id, vehicle.images, source);
           errors.push(...img.errors);
@@ -528,7 +583,7 @@ async function storeVehiclesInDatabase(
     }
   }
 
-  return { ids: createdIds, errors };
+  return { created_ids: createdIds, updated_ids: updatedIds, errors };
 }
 
 async function insertVehicleImages(
@@ -543,27 +598,53 @@ async function insertVehicleImages(
     .map((u) => String(u || "").trim())
     .filter((u) => u.startsWith("http"));
 
-  let position = 0;
-  for (const imageUrl of urls.slice(0, 10)) { // Limit to 10 images
+  // Avoid duplicates and append positions after existing images
+  let existingUrls = new Set<string>();
+  let nextPosition = 0;
+  try {
+    const { data: existing, error } = await supabase
+      .from("vehicle_images")
+      .select("image_url, position")
+      .eq("vehicle_id", vehicleId)
+      .limit(5000);
+    if (error) {
+      errors.push(`vehicle_images read existing failed (${vehicleId}): ${error.message}`);
+    } else if (Array.isArray(existing)) {
+      let maxPos = -1;
+      for (const row of existing) {
+        const u = typeof row?.image_url === "string" ? row.image_url : "";
+        if (u) existingUrls.add(u);
+        if (Number.isFinite(row?.position)) maxPos = Math.max(maxPos, row.position);
+      }
+      nextPosition = maxPos + 1;
+    }
+  } catch (e: any) {
+    errors.push(`vehicle_images read existing exception (${vehicleId}): ${e?.message || String(e)}`);
+  }
+
+  for (const imageUrl of urls.slice(0, 25)) { // Limit per run
+    if (existingUrls.has(imageUrl)) continue;
     try {
       const { error } = await supabase
         .from("vehicle_images")
         .insert({
           vehicle_id: vehicleId,
           image_url: imageUrl,
-          source: `${source.toLowerCase()}_agent`,
+          // Must satisfy vehicle_images_attribution_check
+          source: "external_import",
           source_url: imageUrl,
           is_external: true,
           ai_processing_status: "pending",
-          position,
+          position: nextPosition,
         });
-      position += 1;
+      nextPosition += 1;
       if (error) {
         const msg = `vehicle_images insert failed (${vehicleId}): ${error.message}`;
         console.warn(msg);
         errors.push(msg);
       } else {
         inserted += 1;
+        existingUrls.add(imageUrl);
       }
     } catch (e: any) {
       const msg = `vehicle_images insert exception (${vehicleId}): ${e?.message || String(e)}`;

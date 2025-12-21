@@ -725,6 +725,35 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return diffMin >= 0 && diffMin <= 15;
   }, [auctionPulse?.updated_at]);
 
+  const batIdentityHref = useMemo(() => {
+    const makeHref = (rawHandle: string | null): { handle: string; href: string; proofUrl: string } | null => {
+      const h = String(rawHandle || '').trim();
+      if (!h) return null;
+      const handle = h
+        .replace(/^@/, '')
+        .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
+        .replace(/\/+$/, '')
+        .trim();
+      if (!handle) return null;
+      const proofUrl = `https://bringatrailer.com/member/${handle}/`;
+      const href = `/claim-identity?platform=bat&handle=${encodeURIComponent(handle)}&profileUrl=${encodeURIComponent(proofUrl)}`;
+      return { handle, href, proofUrl };
+    };
+
+    const sellerRaw = String((vehicle as any)?.origin_metadata?.bat_seller || (vehicle as any)?.origin_metadata?.seller || '').trim() || null;
+    const winnerRaw =
+      (typeof (auctionPulse as any)?.winner_name === 'string' ? String((auctionPulse as any)?.winner_name) : '') ||
+      (typeof (auctionPulse as any)?.winning_bidder_name === 'string' ? String((auctionPulse as any)?.winning_bidder_name) : '') ||
+      (typeof (auctionPulse as any)?.winner_display_name === 'string' ? String((auctionPulse as any)?.winner_display_name) : '') ||
+      String((vehicle as any)?.origin_metadata?.bat_buyer || (vehicle as any)?.origin_metadata?.buyer || '').trim() ||
+      null;
+
+    return {
+      seller: makeHref(sellerRaw),
+      winner: makeHref(winnerRaw),
+    };
+  }, [vehicle, auctionPulse]);
+
   const auctionPulseMs = useMemo(() => {
     if (!auctionPulse?.listing_url) return null;
     if (!isAuctionLive) return null;
@@ -824,8 +853,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         .replace(/^@/, '')
         .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
         .replace(/\/+$/, '');
-      const href = slug ? `https://bringatrailer.com/member/${slug}/` : null;
-      return { label: metaSeller, logo_url: null, relationship: 'seller', href, kind: 'bat_user' };
+      const proofUrl = slug ? `https://bringatrailer.com/member/${slug}/` : null;
+      const href = slug && proofUrl
+        ? `/claim-identity?platform=bat&handle=${encodeURIComponent(slug)}&profileUrl=${encodeURIComponent(proofUrl)}`
+        : null;
+      return { label: metaSeller, logo_url: null, relationship: 'seller', href, proofUrl, handle: slug, kind: 'bat_user' };
     }
 
     return null;
@@ -840,7 +872,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
       .replace(/\/+$/, '');
     if (!slug) return null;
-    return { label: metaSeller, href: `https://bringatrailer.com/member/${slug}/` };
+    const proofUrl = `https://bringatrailer.com/member/${slug}/`;
+    const href = `/claim-identity?platform=bat&handle=${encodeURIComponent(slug)}&profileUrl=${encodeURIComponent(proofUrl)}`;
+    return { label: metaSeller, href, proofUrl, handle: slug };
   }, [vehicle]);
 
   const formatRelationship = (relationship?: string | null) => {
@@ -949,7 +983,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       .sort((a, b) => priority(a.id) - priority(b.id));
   }, [vehicle, valuation]);
 
-  const saleDate = (vehicle as any)?.sale_date || (vehicle as any)?.bat_sale_date || auctionPulse?.sold_at || null;
+  const saleDate = (vehicle as any)?.sale_date || (vehicle as any)?.bat_sale_date || ((auctionPulse as any)?.sold_at ?? null);
   const primaryPrice = getDisplayValue();
   const primaryAmount = typeof primaryPrice.amount === 'number' ? primaryPrice.amount : null;
   const primaryLabel = primaryPrice.label || 'Price pending';
@@ -1447,10 +1481,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             if (isBatConsigner && (isBatPulse || isBatOrigin)) return null;
             
             return (sellerBadge as any)?.href ? (
-              <a
-                href={String((sellerBadge as any).href)}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                to={String((sellerBadge as any).href)}
                 onClick={(e) => e.stopPropagation()}
                 className="badge badge-secondary"
                 title={sellerBadge.relationship === 'consigner' ? 'Consigner' : 'Seller'}
@@ -1459,7 +1491,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {sellerBadge.label}
                 </span>
-              </a>
+              </Link>
             ) : (
               <span
                 className="badge badge-secondary"
@@ -1491,6 +1523,36 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   />
                 ) : null;
               })()}
+              {/* Seller bubble (internal): if we have a BaT seller handle, show a second circle next to platform */}
+              {batIdentityHref?.seller?.handle ? (
+                <Link
+                  to={batIdentityHref.seller.href}
+                  onClick={(e) => e.stopPropagation()}
+                  title="Seller (internal profile)"
+                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+                >
+                  <span
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: 999,
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface)',
+                      color: 'var(--text)',
+                      fontSize: '9px',
+                      fontWeight: 800,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      lineHeight: 1,
+                      paddingTop: 1,
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {String(batIdentityHref.seller.handle || '').slice(0, 1).toUpperCase()}
+                  </span>
+                </Link>
+              ) : null}
               {auctionPulse.updated_at ? (
                 <span
                   className="badge badge-secondary"
@@ -1534,7 +1596,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </span>
                 </span>
               ) : null}
-              {auctionTelemetryFresh && typeof auctionPulse.bid_count === 'number' ? (
+              {isAuctionLive && auctionTelemetryFresh && typeof auctionPulse.bid_count === 'number' ? (
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Bid count">
                   {auctionPulse.bid_count} bids
                 </span>
@@ -1549,7 +1611,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   {auctionPulse.view_count.toLocaleString()} views
                 </span>
               ) : null}
-              {auctionTelemetryFresh && typeof auctionPulse.comment_count === 'number' ? (
+              {isAuctionLive && auctionTelemetryFresh && typeof auctionPulse.comment_count === 'number' ? (
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Comments">
                   {auctionPulse.comment_count.toLocaleString()} comments
                 </span>
@@ -1926,38 +1988,53 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
                 if (isDiscoveredVehicle) {
                   return (
-                    <a
-                      href={claimHref}
-                      style={{
-                        border: '2px solid var(--border)',
-                        background: 'var(--white)',
-                        color: 'var(--text)',
-                        fontWeight: 700,
-                        padding: '4px 8px',
-                        cursor: 'pointer',
-                        fontSize: '8pt',
-                        borderRadius: '3px',
-                        transition: 'all 0.12s ease',
-                        textDecoration: 'none',
-                        display: 'inline-flex',
-                        alignItems: 'center'
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
-                        (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
-                        (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
-                      }}
-                      title={
-                        hasClaim
-                          ? (claimNeedsId ? 'Claim started. Upload your driver’s license to complete.' : 'Claim submitted.')
-                          : 'Upload title document to claim ownership'
-                      }
-                    >
-                      {hasClaim ? (claimNeedsId ? 'Complete claim' : 'Claim submitted') : 'Claim this vehicle'}
-                    </a>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      {batIdentityHref?.winner?.handle && !isAuctionLive ? (
+                        <Link
+                          to={batIdentityHref.winner.href}
+                          onClick={(e) => e.stopPropagation()}
+                          className="badge badge-secondary"
+                          title="Winner (internal profile)"
+                          style={{ fontSize: '10px', fontWeight: 700, textDecoration: 'none', color: 'inherit' }}
+                        >
+                          Winner: {batIdentityHref.winner.handle}
+                        </Link>
+                      ) : null}
+                      <a
+                        href={claimHref}
+                        style={{
+                          border: '2px solid var(--border)',
+                          background: 'var(--white)',
+                          color: 'var(--text)',
+                          fontWeight: 700,
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          fontSize: '8pt',
+                          borderRadius: '3px',
+                          transition: 'all 0.12s ease',
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLAnchorElement).style.background = 'var(--grey-100)';
+                          (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
+                          (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
+                        }}
+                        title={
+                          hasClaim
+                            ? (claimNeedsId ? 'Claim started. Upload your driver’s license to complete.' : 'Claim submitted.')
+                            : (batIdentityHref?.winner?.handle
+                              ? `Winner is ${batIdentityHref.winner.handle}. If that's you, claim your BaT identity and upload a title document.`
+                              : 'Upload title document to claim ownership')
+                        }
+                      >
+                        {hasClaim ? (claimNeedsId ? 'Complete claim' : 'Claim submitted') : 'Claim this vehicle'}
+                      </a>
+                    </span>
                   );
                 }
                 

@@ -48,6 +48,10 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
           onClick={() => isMobile && setShowGallery(true)}
           style={{
             width: '100%',
+            // NOTE: `ResilientImage` in `fill` mode uses a wrapper with `height: 100%`.
+            // Percentage heights require a definite parent height (minHeight alone is not enough),
+            // otherwise the wrapper collapses to 0px and the image becomes invisible.
+            height: '400px',
             minHeight: '400px',
             borderRadius: '0px',
             position: 'relative',
@@ -64,7 +68,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
             alt="Vehicle hero image"
             fill={true}
             objectFit="contain"
-            style={{ objectPosition: 'center' }}
+            imgStyle={{ objectPosition: 'center' }}
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
           />

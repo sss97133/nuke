@@ -271,9 +271,10 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               // They have a linked N-Zero profile
               setBuyerProfileLink({ url: `/profile/${buyerIdentity.claimed_by_user_id}`, isExternal: false });
             } else {
-              // Link to BaT profile
+              // Keep navigation internal: route to claim-identity (BaT profile remains available as proof elsewhere)
               const batProfileUrl = buyerIdentity?.profile_url || `https://bringatrailer.com/member/${auctionMetrics.buyer_name}/`;
-              setBuyerProfileLink({ url: batProfileUrl, isExternal: true });
+              const internal = `/claim-identity?platform=bat&handle=${encodeURIComponent(auctionMetrics.buyer_name)}&profileUrl=${encodeURIComponent(batProfileUrl)}`;
+              setBuyerProfileLink({ url: internal, isExternal: false });
             }
           } else {
             setBuyerProfileLink(null);
@@ -610,27 +611,63 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             {provenance?.seller_username && (
               <div style={{ marginTop: '8px', fontSize: '8pt', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Seller:</span>
-                <a
-                  href={provenance.seller_profile_url || `https://bringatrailer.com/member/${provenance.seller_username}/`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ 
-                    color: 'var(--primary)', 
-                    textDecoration: 'underline',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontWeight: 600
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FaviconIcon 
-                    url={provenance.seller_profile_url || `https://bringatrailer.com/member/${provenance.seller_username}/`} 
-                    size={12} 
-                    preserveAspectRatio={true} 
-                  />
-                  {provenance.seller_username}
-                </a>
+                {(() => {
+                  const proofUrl = provenance.seller_profile_url || `https://bringatrailer.com/member/${provenance.seller_username}/`;
+                  const internal = `/claim-identity?platform=bat&handle=${encodeURIComponent(provenance.seller_username)}&profileUrl=${encodeURIComponent(proofUrl)}`;
+                  return (
+                    <>
+                      <a
+                        href={internal}
+                        style={{
+                          color: 'var(--primary)',
+                          textDecoration: 'underline',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontWeight: 600
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          navigate(internal);
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: 999,
+                            border: '1px solid var(--border)',
+                            background: 'var(--surface)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '9px',
+                            fontWeight: 800,
+                            color: 'var(--text)',
+                            lineHeight: 1,
+                            paddingTop: 1,
+                            boxSizing: 'border-box'
+                          }}
+                          aria-hidden="true"
+                        >
+                          {String(provenance.seller_username || '').slice(0, 1).toUpperCase()}
+                        </span>
+                        {provenance.seller_username}
+                      </a>
+                      <a
+                        href={proofUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: 'var(--text-muted)', textDecoration: 'underline', fontWeight: 600 }}
+                        onClick={(e) => e.stopPropagation()}
+                        title="View source proof"
+                      >
+                        Proof
+                      </a>
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>
