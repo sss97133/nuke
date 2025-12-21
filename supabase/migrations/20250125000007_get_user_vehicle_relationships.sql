@@ -31,11 +31,12 @@ BEGIN
       WHERE (v.user_id = p_user_id OR v.uploaded_by = p_user_id)
     ),
     
-    -- Discovered vehicles with relationships
+    -- Discovered vehicles with relationships (user-specific + public scraper vehicles)
     'discovered_vehicles', (
       SELECT COALESCE(json_agg(
         json_build_object(
           'relationship_type', COALESCE(dv.relationship_type, 'interested'),
+          'discovery_source', v.discovery_source,
           'vehicle', row_to_json(v.*),
           'images', (
             SELECT COALESCE(json_agg(
@@ -50,10 +51,27 @@ BEGIN
           )
         )
       ), '[]'::json)
-      FROM discovered_vehicles dv
-      JOIN vehicles v ON v.id = dv.vehicle_id
-      WHERE dv.user_id = p_user_id
-        AND dv.is_active = true
+      FROM (
+        -- User-specific discovered vehicles
+        SELECT DISTINCT v.id, COALESCE(dv.relationship_type, 'interested') as relationship_type
+        FROM discovered_vehicles dv
+        JOIN vehicles v ON v.id = dv.vehicle_id
+        WHERE dv.user_id = p_user_id
+          AND dv.is_active = true
+        
+        UNION
+        
+        -- Public scraper vehicles (Mecum, Barrett-Jackson, etc.) - visible to all users
+        SELECT DISTINCT v.id, 'interested' as relationship_type
+        FROM vehicles v
+        WHERE v.profile_origin = 'url_scraper'
+          AND v.discovery_source LIKE '%agent_extraction%'
+          AND v.is_public = true
+          AND v.id NOT IN (
+            SELECT vehicle_id FROM discovered_vehicles WHERE user_id = p_user_id
+          )
+      ) combined
+      JOIN vehicles v ON v.id = combined.id
     ),
     
     -- Verified ownerships
