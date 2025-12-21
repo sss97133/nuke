@@ -380,35 +380,111 @@ export default function RealVehicleData({ segmentSlug, limit = 20 }: RealVehicle
         </div>
       </div>
 
-      {/* Segment Performance Summary */}
+      {/* ETF Contract Terms & Legal Structure */}
       <div className="card" style={{ marginTop: '24px' }}>
         <div className="card-header">
-          <h3 className="heading-3">Investment Opportunities</h3>
+          <h3 className="heading-3">ETF Contract Terms & Legal Structure</h3>
+        </div>
+        <div className="card-body">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '10pt' }}>Legal Structure</div>
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px', marginBottom: '12px' }}>
+                • <strong>Entity Type:</strong> Market Segment Fund (Limited Partnership)<br/>
+                • <strong>Securities Class:</strong> Investment Fund Shares<br/>
+                • <strong>Custody Model:</strong> Platform holds underlying vehicle titles<br/>
+                • <strong>Governance:</strong> Proportional voting rights<br/>
+                • <strong>Liquidity:</strong> Daily redemption at current NAV<br/>
+                • <strong>Regulatory:</strong> SEC-compliant investment vehicle
+              </div>
+              
+              <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '10pt' }}>Fee Structure</div>
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                • <strong>Management Fee:</strong> 0.10% annually on AUM<br/>
+                • <strong>Performance Fee:</strong> 10% of returns above 8% annual<br/>
+                • <strong>Transaction Fee:</strong> 0.05% per buy/sell trade<br/>
+                • <strong>Custody Fee:</strong> Included in management fee<br/>
+                • <strong>Administrative:</strong> $25 annual account minimum
+              </div>
+            </div>
+            
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '10pt' }}>Investment Terms</div>
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px', marginBottom: '12px' }}>
+                • <strong>Minimum Investment:</strong> $100<br/>
+                • <strong>Maximum Position:</strong> No limit<br/>
+                • <strong>Settlement:</strong> T+1 business day<br/>
+                • <strong>Distributions:</strong> Quarterly (if any)<br/>
+                • <strong>Tax Treatment:</strong> Capital gains/losses<br/>
+                • <strong>Reporting:</strong> Monthly statements
+              </div>
+
+              <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '10pt' }}>Risk Factors</div>
+              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+                • <strong>Market Risk:</strong> Vehicle values may decline<br/>
+                • <strong>Liquidity Risk:</strong> Underlying vehicles illiquid<br/>
+                • <strong>Concentration Risk:</strong> Sector-specific exposure<br/>
+                • <strong>Operational Risk:</strong> Platform dependency
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ marginTop: '16px', padding: '12px', background: 'var(--surface)', borderRadius: '4px' }}>
+            <div style={{ fontWeight: 700, marginBottom: '6px', fontSize: '10pt' }}>Underlying Assets ({segmentData.vehicle_count} Vehicles)</div>
+            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: '14px' }}>
+              <strong>Selection Criteria:</strong> {segmentData.year_min ? `${segmentData.year_min}-${segmentData.year_max} ` : ''}
+              {segmentData.makes?.join(', ') || 'All makes'} vehicles matching "{segmentData.model_keywords?.join(', ') || 'any model'}" keywords.
+              All vehicles must be publicly verifiable with documented ownership and current market valuations.
+            </div>
+            <div style={{ marginTop: '8px', fontSize: '9pt' }}>
+              <strong>Geographic Distribution:</strong> {segmentData.top_locations.slice(0, 3).map(l => `${l.location} (${l.count})`).join(', ')}
+              {segmentData.top_locations.length > 3 && ` + ${segmentData.top_locations.length - 3} more locations`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Individual Investment Opportunities */}
+      <div className="card" style={{ marginTop: '24px' }}>
+        <div className="card-header">
+          <h3 className="heading-3">Individual Investment Contracts Available</h3>
         </div>
         <div className="card-body">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
             <div>
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>Funding Rounds</div>
               <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                {segmentData.vehicles.filter(v => v.contract_status === 'funding_round').length} active rounds
+                {segmentData.vehicles.filter(v => v.contract_status === 'funding_round').length} active restoration projects
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Profit-sharing stakes available
               </div>
             </div>
             <div>
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>Share Trading</div>
               <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                {segmentData.vehicles.filter(v => v.contract_status === 'shares_trading').length} vehicles trading
+                {segmentData.vehicles.filter(v => v.contract_status === 'shares_trading').length} vehicles with live trading
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Fractional ownership, real-time pricing
               </div>
             </div>
             <div>
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>For Sale</div>
               <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                {segmentData.vehicles.filter(v => v.contract_status === 'for_sale').length} vehicles listed
+                {segmentData.vehicles.filter(v => v.contract_status === 'for_sale').length} whole vehicle purchases
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Complete ownership transfer
               </div>
             </div>
             <div>
               <div style={{ fontWeight: 700, marginBottom: '4px' }}>Bond Offerings</div>
               <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                {segmentData.vehicles.filter(v => v.contract_status === 'bonded').length} bonds available
+                {segmentData.vehicles.filter(v => v.contract_status === 'bonded').length} fixed-income investments
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                6-8% annual yield, secured by vehicle
               </div>
             </div>
           </div>
