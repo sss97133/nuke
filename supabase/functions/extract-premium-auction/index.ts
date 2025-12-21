@@ -21,7 +21,7 @@ const corsHeaders = {
 
 const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v1/scrape";
 const FIRECRAWL_MAP_URL = "https://api.firecrawl.dev/v1/map";
-const FIRECRAWL_LISTING_TIMEOUT_MS = 35000;
+const FIRECRAWL_LISTING_TIMEOUT_MS = 20000; // Reduced from 35s to 20s for speed
 
 function requiredEnv(name: string): string {
   const v = Deno.env.get(name);
@@ -152,29 +152,124 @@ function extractBarrettJacksonListingUrlsFromText(text: string, limit: number): 
 function extractMecumImagesFromHtml(html: string): string[] {
   const h = String(html || "");
   const urls = new Set<string>();
-  const re = /https?:\/\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
-  for (const m of h.match(re) || []) {
-    const u = String(m || "").trim();
-    const lower = u.toLowerCase();
-    // Mecum images are commonly hosted on mecum.com or related CDNs; keep this reasonably permissive.
-    if (!lower.includes("mecum")) continue;
-    urls.add(u);
-    if (urls.size >= 25) break;
+  
+  // Pattern 1: Extract from pswp__img class (PhotoSwipe gallery images - full resolution)
+  // Format: <img class="pswp__img" src="https://images.mecum.com/.../v1761760377/auctions/FL26/1154889/728345.jpg?"
+  const pswpImgRe = /<img[^>]*class=["'][^"']*pswp__img[^"']*["'][^>]*src=["'](https?:\/\/images\.mecum\.com\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
+  let match;
+  while ((match = pswpImgRe.exec(h)) !== null && urls.size < 50) {
+    const u = String(match[1] || "").trim();
+    // Extract version path: /v{version}/auctions/{auction}/{lot}/{imageId}.jpg
+    const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
+    if (versionMatch) {
+      const [, version, auction, lot, imageId] = versionMatch;
+      const fullUrl = `https://images.mecum.com/image/upload/v${version}/auctions/${auction}/${lot}/${imageId}.jpg`;
+      urls.add(fullUrl);
+    }
   }
+  
+  // Pattern 2: Extract from srcset attributes (gallery thumbnails)
+  const srcsetRe = /srcset=["']([^"']+)["']/gi;
+  while ((match = srcsetRe.exec(h)) !== null && urls.size < 50) {
+    const srcsetValue = match[1];
+    // Extract first URL from srcset (they're all the same image, different sizes)
+    const firstUrlMatch = srcsetValue.match(/https?:\/\/images\.mecum\.com\/image\/upload\/[^"'\\s,>]+?\/auctions\/[^"'\\s,>]+?\/\d+\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s,>]*)?/i);
+    if (firstUrlMatch) {
+      const u = String(firstUrlMatch[0] || "").trim();
+      const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
+      if (versionMatch) {
+        const [, version, auction, lot, imageId] = versionMatch;
+        const fullUrl = `https://images.mecum.com/image/upload/v${version}/auctions/${auction}/${lot}/${imageId}.jpg`;
+        urls.add(fullUrl);
+      }
+    }
+  }
+  
+  // Pattern 3: Extract from src attributes (any img tag)
+  const srcRe = /src=["'](https?:\/\/images\.mecum\.com\/image\/upload\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
+  while ((match = srcRe.exec(h)) !== null && urls.size < 50) {
+    const u = String(match[1] || "").trim();
+    const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
+    if (versionMatch) {
+      const [, version, auction, lot, imageId] = versionMatch;
+      const fullUrl = `https://images.mecum.com/image/upload/v${version}/auctions/${auction}/${lot}/${imageId}.jpg`;
+      urls.add(fullUrl);
+    }
+  }
+  
+  // Pattern 4: Aggressive fallback - match ANY images.mecum.com URL with /auctions/ pattern
+  const mecumImageRe = /https?:\/\/images\.mecum\.com\/image\/upload\/[^"'\\s,>]+?\/auctions\/[^"'\\s,>]+?\/\d+\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s,>]*)?/gi;
+  const allMatches = h.match(mecumImageRe) || [];
+  for (const urlMatch of allMatches) {
+    if (urls.size >= 50) break;
+    const u = String(urlMatch || "").trim();
+    const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
+    if (versionMatch) {
+      const [, version, auction, lot, imageId] = versionMatch;
+      const fullUrl = `https://images.mecum.com/image/upload/v${version}/auctions/${auction}/${lot}/${imageId}.jpg`;
+      urls.add(fullUrl);
+    }
+  }
+  
   return Array.from(urls);
 }
 
 function extractBarrettJacksonImagesFromHtml(html: string): string[] {
   const h = String(html || "");
   const urls = new Set<string>();
-  const re = /https?:\/\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
-  for (const m of h.match(re) || []) {
+  
+  // Pattern 1: Next.js image optimization URLs (_next/image?url=...)
+  const nextImageRe = /_next\/image\?url=([^&"'\\s>]+)/gi;
+  let match;
+  while ((match = nextImageRe.exec(h)) !== null && urls.size < 25) {
+    try {
+      const decoded = decodeURIComponent(match[1]);
+      if (decoded.includes('.jpg') || decoded.includes('.jpeg') || decoded.includes('.png') || decoded.includes('.webp')) {
+        const fullUrl = decoded.startsWith('http') ? decoded : `https://www.barrett-jackson.com${decoded}`;
+        const lower = fullUrl.toLowerCase();
+        if (!lower.includes("no-car-image") && !lower.includes("placeholder") && !lower.includes("logo")) {
+          urls.add(fullUrl);
+        }
+      }
+    } catch {
+      // ignore decode errors
+    }
+  }
+  
+  // Pattern 2: Direct image URLs
+  const directImageRe = /https?:\/\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
+  for (const m of h.match(directImageRe) || []) {
+    if (urls.size >= 25) break;
     const u = String(m || "").trim();
     const lower = u.toLowerCase();
-    if (!lower.includes("barrett") && !lower.includes("barrett-jackson")) continue;
-    urls.add(u);
-    if (urls.size >= 25) break;
+    // STRICT filter: reject icons, placeholders, UI assets FIRST
+    if (lower.includes("no-car-image") || lower.includes("placeholder") || 
+        lower.includes("logo") || lower.includes("icon") || 
+        lower.includes("policy_icon") || lower.includes("favicon") ||
+        lower.includes("policy") || lower.endsWith("icon.png") ||
+        lower.includes("/icons/") || lower.includes("/assets/")) {
+      continue; // Skip this URL entirely
+    }
+    // Only accept Barrett-Jackson CDN images that look like vehicle photos
+    if ((lower.includes("barrett-jackson.com") || lower.includes("barrettjackson.com")) &&
+        (lower.includes("/compressed/") || lower.includes("/images/") || 
+         lower.includes("/photos/") || lower.includes("/media/") ||
+         lower.includes("_next/image"))) {
+      urls.add(u);
+    }
   }
+  
+  // Pattern 3: Data attributes (data-src, data-image, etc.)
+  const dataSrcRe = /data-(?:src|image|url)=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
+  while ((match = dataSrcRe.exec(h)) !== null && urls.size < 25) {
+    const u = String(match[1] || "").trim();
+    const lower = u.toLowerCase();
+    if (!lower.includes("no-car-image") && !lower.includes("placeholder")) {
+      const fullUrl = u.startsWith('http') ? u : `https://www.barrett-jackson.com${u}`;
+      urls.add(fullUrl);
+    }
+  }
+  
   return Array.from(urls);
 }
 
@@ -431,7 +526,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
             url: listingUrl,
             formats: ["extract", "html"],
             onlyMainContent: false,
-            waitFor: 4500,
+            waitFor: 2000, // Reduced for speed
             extract: { schema: listingSchema },
           }),
         },
@@ -1079,7 +1174,9 @@ async function extractMecum(url: string, maxVehicles: number) {
     // ignore
   }
 
-  for (const listingUrl of urlsToScrape.slice(0, Math.max(1, maxVehicles))) {
+  // PARALLEL scraping for speed - process multiple listings concurrently
+  const urlsToProcess = urlsToScrape.slice(0, Math.max(1, maxVehicles));
+  const scrapePromises = urlsToProcess.map(async (listingUrl: string) => {
     try {
       const firecrawlData = await fetchJsonWithTimeout(
         FIRECRAWL_SCRAPE_URL,
@@ -1093,7 +1190,7 @@ async function extractMecum(url: string, maxVehicles: number) {
             url: listingUrl,
             formats: ["extract", "html"],
             onlyMainContent: false,
-            waitFor: 4000,
+            waitFor: 10000, // 10s wait for PhotoSwipe gallery to render (pswp__img images)
             extract: { schema: listingSchema },
           }),
         },
@@ -1103,19 +1200,45 @@ async function extractMecum(url: string, maxVehicles: number) {
 
       const vehicle = firecrawlData?.data?.extract || {};
       const html = String(firecrawlData?.data?.html || "");
-      const images = Array.isArray(vehicle?.images) && vehicle.images.length > 0
+      
+      // Get images from schema extraction first
+      let images = Array.isArray(vehicle?.images) && vehicle.images.length > 0
         ? vehicle.images
-        : (html ? extractMecumImagesFromHtml(html) : []);
+        : [];
+      
+      // Always also parse HTML as backup (Mecum uses lazy-loaded galleries)
+      if (html) {
+        const htmlImages = extractMecumImagesFromHtml(html);
+        // Merge and dedupe
+        const allImages = [...images, ...htmlImages];
+        images = Array.from(new Set(allImages));
+      }
+      
+      // Filter out UI assets
+      images = images.filter((img: string) => {
+        const lower = img.toLowerCase();
+        return !lower.includes('logo') && 
+               !lower.includes('icon') && 
+               !lower.includes('placeholder') &&
+               !lower.includes('no-image') &&
+               !lower.includes('/assets/') &&
+               !lower.includes('/icons/');
+      });
 
-      extracted.push({
+      return {
         ...vehicle,
         listing_url: listingUrl,
         images,
-      });
+      };
     } catch (e: any) {
       issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);
+      return null;
     }
-  }
+  });
+
+  // Wait for all parallel scrapes to complete
+  const results = await Promise.all(scrapePromises);
+  extracted.push(...results.filter((r) => r !== null));
 
   // Step 3: Store extracted vehicles in DB + link to source org profile
   const created = await storeVehiclesInDatabase(extracted, "Mecum Auctions", sourceWebsite);
@@ -1254,7 +1377,11 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
       description: { type: "string", description: "Description" },
       sale_price: { type: "number", description: "Sold price / hammer price if available" },
       sale_date: { type: "string", description: "Sale date" },
-      images: { type: "array", items: { type: "string" }, description: "Image URLs" },
+      images: { 
+        type: "array", 
+        items: { type: "string" }, 
+        description: "ALL vehicle image URLs from the page - gallery images, main photos, detail shots. Include full URLs including Next.js optimized image URLs. Exclude placeholder images, logos, and icons." 
+      },
     },
   };
 
@@ -1279,7 +1406,9 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
     // ignore
   }
 
-  for (const listingUrl of urlsToScrape.slice(0, Math.max(1, maxVehicles))) {
+  // PARALLEL scraping for speed - process multiple listings concurrently
+  const urlsToProcess = urlsToScrape.slice(0, Math.max(1, maxVehicles));
+  const scrapePromises = urlsToProcess.map(async (listingUrl: string) => {
     try {
       const firecrawlData = await fetchJsonWithTimeout(
         FIRECRAWL_SCRAPE_URL,
@@ -1293,7 +1422,7 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
             url: listingUrl,
             formats: ["extract", "html"],
             onlyMainContent: false,
-            waitFor: 4000,
+            waitFor: 10000, // 10s wait for PhotoSwipe gallery to render (pswp__img images)
             extract: { schema: listingSchema },
           }),
         },
@@ -1303,19 +1432,47 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
 
       const vehicle = firecrawlData?.data?.extract || {};
       const html = String(firecrawlData?.data?.html || "");
-      const images = Array.isArray(vehicle?.images) && vehicle.images.length > 0
-        ? vehicle.images
-        : (html ? extractBarrettJacksonImagesFromHtml(html) : []);
+      
+      // Get images from schema extraction first, then fallback to HTML parsing
+      let images = Array.isArray(vehicle?.images) && vehicle.images.length > 0
+        ? vehicle.images.filter((img: string) => 
+            !img.toLowerCase().includes('no-car-image') && 
+            !img.toLowerCase().includes('placeholder')
+          )
+        : [];
+      
+      // If schema extraction didn't find images, parse HTML aggressively
+      if (images.length === 0 && html) {
+        images = extractBarrettJacksonImagesFromHtml(html);
+      }
+      
+      // STRICT filter: reject icons, placeholders, UI assets
+      images = images.filter((img: string) => {
+        const lower = img.toLowerCase();
+        return !lower.includes('no-car-image') && 
+               !lower.includes('placeholder') &&
+               !lower.includes('logo') &&
+               !lower.includes('icon') &&
+               !lower.includes('policy') &&
+               !lower.endsWith('icon.png') &&
+               !lower.includes('/icons/') &&
+               !lower.includes('/assets/');
+      });
 
-      extracted.push({
+      return {
         ...vehicle,
         listing_url: listingUrl,
         images,
-      });
+      };
     } catch (e: any) {
       issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);
+      return null;
     }
-  }
+  });
+
+  // Wait for all parallel scrapes to complete
+  const results = await Promise.all(scrapePromises);
+  extracted.push(...results.filter((r) => r !== null));
 
   const created = await storeVehiclesInDatabase(extracted, "Barrett-Jackson", sourceWebsite);
 
