@@ -1543,13 +1543,31 @@ async function extractBaTListing(bat_auction_url: string, import_images: boolean
       // Non-blocking
     }
 
+    // Track image import stats for the API response.
+    // IMPORTANT: BaT images MUST come ONLY from the canonical gallery JSON inside
+    // `#bat_listing_page_photo_gallery` -> `data-gallery-items`.
+    const imageImport = {
+      original_found: 0,
+      found: 0,
+      uploaded: 0,
+      skipped: 0,
+      failed: 0,
+      batches: 0,
+      batch_size: imageBatchSize,
+      method: 'dom_map:data-gallery-items' as string,
+    };
+
     // Persist BaT gallery images into vehicle_images (fixes: "images show up via UI fallback but DB has 0 images").
     // IMPORTANT: Only use DOM map extracted images (data-gallery-items attribute).
     // Do NOT fall back to regex extraction - it captures images from related auctions and pollutes the gallery.
     try {
       const images = Array.isArray(domExtracted?.image_urls) ? domExtracted.image_urls : [];
       if (vehicleId && images.length > 0) {
-        await supabase.functions.invoke('backfill-images', {
+        imageImport.original_found = images.length;
+        imageImport.found = images.length;
+        imageImport.batches = 1;
+
+        const { data: backfillData, error: backfillError } = await supabase.functions.invoke('backfill-images', {
           body: {
             vehicle_id: vehicleId,
             image_urls: images,
@@ -1561,6 +1579,13 @@ async function extractBaTListing(bat_auction_url: string, import_images: boolean
             max_runtime_ms: 25000,
           }
         });
+        if (backfillError) {
+          imageImport.failed = images.length;
+        } else {
+          imageImport.uploaded += Number((backfillData as any)?.uploaded || 0);
+          imageImport.skipped += Number((backfillData as any)?.skipped || 0);
+          imageImport.failed += Number((backfillData as any)?.failed || 0);
+        }
 
         // Store for provenance + future repair/backfills.
         try {
@@ -1808,64 +1833,8 @@ async function extractBaTListing(bat_auction_url: string, import_images: boolean
       console.error('❌ Comprehensive extraction exception:', err.message || String(err));
       // Don't fail the import, but log the error
     }
-
-    // Import ALL BaT listing images by scraping URLs then calling backfill-images in batches.
-    const imageImport = {
-      original_found: 0,
-      found: 0,
-      uploaded: 0,
-      skipped: 0,
-      failed: 0,
-      batches: 0,
-      batch_size: imageBatchSize
-    };
-    try {
-      // If DOM-map already found a real gallery, don't spend runtime re-scraping.
-      const alreadyHaveGallery = Array.isArray(domExtracted?.image_urls) && domExtracted.image_urls.length >= 20;
-      if (alreadyHaveGallery) {
-        console.log('Skipping simple-scraper: DOM-map gallery is sufficient');
-      } else {
-      const { data: simpleData, error: simpleError } = await supabase.functions.invoke('simple-scraper', {
-        body: { url: batUrl }
-      });
-      const images: string[] = (simpleData?.success && Array.isArray(simpleData?.data?.images)) ? simpleData.data.images : [];
-      const MAX_TOTAL_IMAGES = 120;
-      const capped = images.slice(0, MAX_TOTAL_IMAGES);
-      imageImport.original_found = images.length;
-      imageImport.found = capped.length;
-
-      if (simpleError) {
-        console.log('simple-scraper failed (non-fatal):', simpleError.message);
-      } else if (capped.length > 0) {
-        for (let start = 0; start < capped.length; start += imageBatchSize) {
-          const slice = capped.slice(start, start + imageBatchSize);
-          imageImport.batches++;
-          const { data: backfillData, error: backfillError } = await supabase.functions.invoke('backfill-images', {
-            body: {
-              vehicle_id: vehicleId,
-              image_urls: slice,
-              source: 'bat_import',
-              run_analysis: false,
-              listed_date: saleDate,
-              max_images: slice.length
-            }
-          });
-          if (backfillError) {
-            console.log(`backfill-images batch failed (non-fatal):`, backfillError.message);
-            imageImport.failed += slice.length;
-            continue;
-          }
-          imageImport.uploaded += Number(backfillData?.uploaded || 0);
-          imageImport.skipped += Number(backfillData?.skipped || 0);
-          imageImport.failed += Number(backfillData?.failed || 0);
-        }
-      } else {
-        console.log('No images found by simple-scraper');
-      }
-      }
-    } catch (e: any) {
-      console.log('Image import failed (non-fatal):', e?.message || String(e));
-    }
+    // NOTE: We intentionally do NOT fall back to other BaT page scraping for images here.
+    // If `data-gallery-items` parsing fails, we want a hard failure/visibility rather than silent contamination.
 
     return new Response(
       JSON.stringify({

@@ -2521,7 +2521,8 @@ serve(async (req) => {
             body: {
               vehicle_id: vehicleId,
               image_urls: images,
-              source: 'bat_comprehensive_extraction',
+              // Backfill-images only allows a small set of canonical sources; use bat_import for BaT galleries.
+              source: 'bat_import',
               run_analysis: false,
               max_images: 0, // Upload all images
               continue: true,

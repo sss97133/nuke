@@ -46,11 +46,19 @@ serve(async (req) => {
     // This is the most reliable way to get *all* listing images without pulling "recommended auctions" noise.
     const extractBatGalleryImages = (html: string): string[] => {
       try {
-        const m = html.match(/data-gallery-items="([^"]+)"/i)
-        if (!m?.[1]) return []
+        // CRITICAL: Only accept the gallery JSON from the actual listing gallery container.
+        // Do NOT fall back to scanning other parts of the page, as that can contaminate vehicle galleries.
+        let idx = html.indexOf('id="bat_listing_page_photo_gallery"')
+        if (idx < 0) idx = html.indexOf("id='bat_listing_page_photo_gallery'")
+        if (idx < 0) return []
+        const window = html.slice(idx, idx + 300000)
+
+        const m = window.match(/data-gallery-items=(?:"([^"]+)"|'([^']+)')/i)
+        const encoded = (m?.[1] || m?.[2] || '').trim()
+        if (!encoded) return []
 
         // Decode minimal HTML entities used inside the attribute.
-        const jsonText = m[1]
+        const jsonText = encoded
           .replace(/&quot;/g, '"')
           .replace(/&#038;/g, '&')
           .replace(/&amp;/g, '&')
@@ -126,43 +134,6 @@ serve(async (req) => {
         const gallery = extractBatGalleryImages(html)
         if (gallery.length > 0) {
           images = gallery
-        } else {
-        // Capture absolute, protocol-relative, and relative gallery URLs.
-        // IMPORTANT: Only scan within the listing photo gallery section to avoid pulling images
-        // from related/recommended auctions elsewhere on the page.
-        const galleryIndex = html.indexOf('bat_listing_page_photo_gallery')
-        const scanHtml = galleryIndex >= 0 ? html.slice(galleryIndex, galleryIndex + 200000) : ''
-
-        const abs = scanHtml.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
-        const protoRel = scanHtml.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
-        const rel = scanHtml.match(/\/wp-content\/uploads\/[^"'\s>]+\.(jpg|jpeg|png)(?:\?[^"'\s>]*)?/gi) || []
-
-        const batImageMatches = [...abs, ...protoRel, ...rel]
-        if (batImageMatches.length > 0) {
-          images = batImageMatches
-            .map((img) => {
-              let u = img
-              if (u.startsWith('//')) u = 'https:' + u
-              if (u.startsWith('/')) u = 'https://bringatrailer.com' + u
-
-              // Clean HTML entities and resize parameters
-              return u
-                .replace(/&#038;/g, '&')
-                .replace(/&amp;/g, '&')
-                .replace(/[?&]w=\d+/g, '')
-                .replace(/[?&]resize=[^&]*/g, '')
-                .replace(/[?&]fit=[^&]*/g, '')
-                .replace(/[?&]$/, '')
-                .replace(/-scaled\./g, '.')
-            })
-            .filter((u: string) => {
-              const lower = u.toLowerCase()
-              return lower.includes('/wp-content/uploads/') &&
-                     !lower.includes('/wp-content/themes/') &&
-                     !lower.includes('/assets/') &&
-                     !lower.includes('.svg')
-            })
-        }
         }
       }
       
