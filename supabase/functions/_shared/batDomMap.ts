@@ -128,8 +128,11 @@ function extractGalleryImagesFromHtml(html: string): { urls: string[]; method: s
     const galleryDiv = doc?.getElementById('bat_listing_page_photo_gallery');
     
     if (galleryDiv) {
-      // Extract data-gallery-items attribute from the specific gallery div
-      const galleryItemsAttr = galleryDiv.getAttribute('data-gallery-items');
+      // Extract data-gallery-items attribute from within the specific gallery container.
+      // On BaT, `data-gallery-items` is typically on a nested div inside #bat_listing_page_photo_gallery.
+      const galleryItemsAttr =
+        galleryDiv.getAttribute('data-gallery-items') ||
+        (galleryDiv.querySelector?.('[data-gallery-items]')?.getAttribute?.('data-gallery-items') ?? null);
       if (galleryItemsAttr) {
         const jsonText = safeDecodeHtmlAttr(galleryItemsAttr);
         const items = JSON.parse(jsonText);
@@ -159,31 +162,35 @@ function extractGalleryImagesFromHtml(html: string): { urls: string[]; method: s
       console.warn('[batDomMap] #bat_listing_page_photo_gallery div not found in HTML');
     }
     
-    // Fallback: regex match (less ideal, but handle edge cases where DOMParser fails)
-    // Still look for data-gallery-items, but log a warning
-    const m = h.match(/data-gallery-items=(?:"([^"]+)"|'([^']+)')/i);
-    if (m) {
-      console.warn('[batDomMap] Using regex fallback (DOMParser method failed)');
-      const encoded = String((m?.[1] || m?.[2] || '') as string);
-      if (encoded) {
-        const jsonText = safeDecodeHtmlAttr(encoded);
-        const items = JSON.parse(jsonText);
-        if (Array.isArray(items)) {
-          const urls: string[] = [];
-          for (const it of items) {
-            const u = it?.large?.url || it?.small?.url;
-            if (typeof u !== 'string' || !u.trim()) continue;
-            const nu = normalize(u);
-            if (!isOk(nu)) continue;
-            if (isNoise(nu)) {
-              console.log(`[batDomMap] Filtered noise image from gallery: ${nu}`);
-              continue;
+    // Fallback: substring+regex (less ideal, but still constrained to the gallery section).
+    // If we can't find the gallery container, we return empty rather than risking contamination.
+    const idx = h.indexOf('bat_listing_page_photo_gallery');
+    if (idx >= 0) {
+      const window = h.slice(idx, idx + 400000);
+      const m = window.match(/data-gallery-items=(?:"([^"]+)"|'([^']+)')/i);
+      if (m) {
+        console.warn('[batDomMap] Using regex fallback (DOMParser method failed)');
+        const encoded = String((m?.[1] || m?.[2] || '') as string);
+        if (encoded) {
+          const jsonText = safeDecodeHtmlAttr(encoded);
+          const items = JSON.parse(jsonText);
+          if (Array.isArray(items)) {
+            const urls: string[] = [];
+            for (const it of items) {
+              const u = it?.large?.url || it?.small?.url;
+              if (typeof u !== 'string' || !u.trim()) continue;
+              const nu = normalize(u);
+              if (!isOk(nu)) continue;
+              if (isNoise(nu)) {
+                console.log(`[batDomMap] Filtered noise image from gallery: ${nu}`);
+                continue;
+              }
+              urls.push(nu);
             }
-            urls.push(nu);
-          }
-          const unique = [...new Set(urls)];
-          if (unique.length) {
-            return { urls: unique, method: 'attr:data-gallery-items:regex-fallback' };
+            const unique = [...new Set(urls)];
+            if (unique.length) {
+              return { urls: unique, method: 'attr:data-gallery-items:regex-fallback:scoped' };
+            }
           }
         }
       }

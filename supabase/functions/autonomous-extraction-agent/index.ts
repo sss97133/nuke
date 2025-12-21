@@ -21,16 +21,22 @@ interface AgentTask {
 }
 
 const PREMIUM_AUCTION_SITES = [
-  { url: 'https://carsandbids.com', name: 'Cars & Bids', priority: 'high', expected_daily: 7 },
+  { url: 'https://carsandbids.com/auctions', name: 'Cars & Bids', priority: 'high', expected_daily: 7 },
   { url: 'https://www.mecum.com', name: 'Mecum Auctions', priority: 'critical', expected_daily: 41 },
   { url: 'https://www.barrett-jackson.com', name: 'Barrett-Jackson', priority: 'high', expected_daily: 20 },
   { url: 'https://www.russoandsteele.com', name: 'Russo and Steele', priority: 'medium', expected_daily: 4 }
 ];
 
 Deno.serve(async (req) => {
+  const authHeader = req.headers.get('authorization');
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    {
+      global: {
+        headers: authHeader ? { Authorization: authHeader } : {},
+      },
+    },
   );
 
   try {
@@ -38,10 +44,10 @@ Deno.serve(async (req) => {
     
     switch (action) {
       case 'run_autonomous_cycle':
-        return await runAutonomousCycle(supabase);
+        return await runAutonomousCycle(supabase, authHeader);
       
       case 'daily_extraction_run':
-        return await dailyExtractionRun(supabase, params);
+        return await dailyExtractionRun(supabase, params, authHeader);
       
       case 'health_check_and_repair':
         return await healthCheckAndRepair(supabase);
@@ -53,7 +59,7 @@ Deno.serve(async (req) => {
         return await maintainExtractionPatterns(supabase);
       
       default:
-        return await runAutonomousCycle(supabase);
+        return await runAutonomousCycle(supabase, authHeader);
     }
   } catch (error) {
     console.error('Autonomous extraction agent error:', error);
@@ -65,30 +71,30 @@ Deno.serve(async (req) => {
   }
 });
 
-async function runAutonomousCycle(supabase: any) {
-  console.log('🤖 AUTONOMOUS EXTRACTION AGENT - Starting Cycle');
-  console.log('===============================================');
+async function runAutonomousCycle(supabase: any, authHeader: string | null) {
+  console.log('AUTONOMOUS EXTRACTION AGENT - Starting Cycle');
+  console.log('==========================================');
   
   const cycleResults = [];
   
   // Step 1: Health check all sites
-  console.log('🔍 Step 1: Health checking all premium sites...');
+  console.log('Step 1: Health checking all premium sites...');
   const healthCheck = await checkAllSitesHealth(supabase);
   cycleResults.push({ step: 'health_check', result: healthCheck });
   
   // Step 2: Extract from healthy sites
-  console.log('📊 Step 2: Extracting from healthy sites...');
-  const extraction = await extractFromHealthySites(supabase, healthCheck.healthy_sites);
+  console.log('Step 2: Extracting from healthy sites...');
+  const extraction = await extractFromHealthySites(supabase, healthCheck.healthy_sites, authHeader);
   cycleResults.push({ step: 'extraction', result: extraction });
   
   // Step 3: Update extraction patterns for failing sites
-  console.log('🔧 Step 3: Updating patterns for degraded sites...');
+  console.log('Step 3: Updating patterns for degraded sites...');
   const patternUpdates = await updateDegradedSitePatterns(supabase, healthCheck.degraded_sites);
   cycleResults.push({ step: 'pattern_updates', result: patternUpdates });
   
   // Step 4: Discover new sites if below targets
   if (extraction.daily_rate < 33000) {
-    console.log('🔍 Step 4: Discovering new sites (below target)...');
+    console.log('Step 4: Discovering new sites (below target)...');
     const discovery = await discoverAdditionalSites(supabase);
     cycleResults.push({ step: 'site_discovery', result: discovery });
   }
@@ -115,10 +121,10 @@ async function runAutonomousCycle(supabase: any) {
   }));
 }
 
-async function dailyExtractionRun(supabase: any, params: any) {
+async function dailyExtractionRun(supabase: any, params: any, authHeader: string | null) {
   const { target_vehicles = 33333 } = params;
   
-  console.log(`🎯 DAILY EXTRACTION RUN: Target ${target_vehicles} vehicles`);
+  console.log(`DAILY EXTRACTION RUN: Target ${target_vehicles} vehicles`);
   
   const results = [];
   let totalExtracted = 0;
@@ -126,9 +132,9 @@ async function dailyExtractionRun(supabase: any, params: any) {
   // Extract from each premium site in priority order
   for (const site of PREMIUM_AUCTION_SITES) {
     try {
-      console.log(`\n🔄 Extracting from ${site.name}...`);
+      console.log(`\nExtracting from ${site.name}...`);
       
-      const siteResult = await extractFromSite(site.url, site.expected_daily * 5); // 5x daily target
+      const siteResult = await extractFromSite(site.url, site.expected_daily * 5, authHeader); // 5x daily target
       
       results.push({
         site: site.name,
@@ -140,13 +146,13 @@ async function dailyExtractionRun(supabase: any, params: any) {
       
       totalExtracted += siteResult.vehicles_extracted;
       
-      console.log(`  ✅ ${site.name}: ${siteResult.vehicles_extracted} vehicles extracted`);
+      console.log(`  ${site.name}: ${siteResult.vehicles_extracted} vehicles extracted`);
       
       // Small delay between sites
       await new Promise(resolve => setTimeout(resolve, 5000));
       
     } catch (error) {
-      console.error(`❌ ${site.name} extraction failed:`, error);
+      console.error(`${site.name} extraction failed:`, error);
       results.push({
         site: site.name,
         url: site.url,
@@ -176,7 +182,7 @@ async function dailyExtractionRun(supabase: any, params: any) {
 }
 
 async function checkAllSitesHealth(supabase: any) {
-  console.log('🔍 Checking health of all premium auction sites...');
+  console.log('Checking health of all premium auction sites...');
   
   const healthResults = [];
   
@@ -206,21 +212,21 @@ async function checkAllSitesHealth(supabase: any) {
   };
 }
 
-async function extractFromHealthySites(supabase: any, healthySites: any[]) {
-  console.log(`📊 Extracting from ${healthySites.length} healthy sites...`);
+async function extractFromHealthySites(supabase: any, healthySites: any[], authHeader: string | null) {
+  console.log(`Extracting from ${healthySites.length} healthy sites...`);
   
   let totalVehicles = 0;
   const extractionResults = [];
   
   for (const site of healthySites) {
     try {
-      const extraction = await extractFromSite(site.url, 100); // Extract 100 vehicles per site
+      const extraction = await extractFromSite(site.url, 100, authHeader); // Extract 100 vehicles per site
       extractionResults.push(extraction);
       totalVehicles += extraction.vehicles_extracted;
       
-      console.log(`  ✅ ${site.site}: ${extraction.vehicles_extracted} vehicles`);
+      console.log(`  ${site.site}: ${extraction.vehicles_extracted} vehicles`);
     } catch (error) {
-      console.error(`❌ Extraction failed for ${site.site}:`, error);
+      console.error(`Extraction failed for ${site.site}:`, error);
     }
   }
   
@@ -232,22 +238,31 @@ async function extractFromHealthySites(supabase: any, healthySites: any[]) {
   };
 }
 
-async function extractFromSite(siteUrl: string, maxVehicles: number) {
-  // Use correct Supabase function call format
+async function extractFromSite(siteUrl: string, maxVehicles: number, authHeader: string | null) {
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    serviceKey,
+    {
+      global: {
+        headers: authHeader ? { Authorization: authHeader } : (serviceKey ? { Authorization: `Bearer ${serviceKey}` } : {}),
+      },
+    },
   );
-  
-  console.log(`Extracting from ${siteUrl} with ${maxVehicles} max vehicles...`);
-  
-  // Use new Firecrawl + LLM extractor that auto-maps DOM and fills DB
-  console.log(`Extracting from ${siteUrl} using Firecrawl + LLM auto DOM mapping...`);
-  
+
+  console.log(`Extracting from ${siteUrl} with max_vehicles=${maxVehicles}...`);
+
+  const siteType =
+    siteUrl.includes('carsandbids.com') ? 'carsandbids' :
+    siteUrl.includes('mecum.com') ? 'mecum' :
+    siteUrl.includes('barrett-jackson.com') ? 'barrettjackson' :
+    siteUrl.includes('russoandsteele.com') ? 'russoandsteele' :
+    'unknown';
+
   const { data, error } = await supabase.functions.invoke('extract-premium-auction', {
     body: {
       url: siteUrl,
-      site_type: 'carsandbids', // Default to Cars & Bids for now
+      site_type: siteType,
       max_vehicles: maxVehicles
     }
   });
@@ -255,22 +270,12 @@ async function extractFromSite(siteUrl: string, maxVehicles: number) {
   if (error) {
     throw new Error(`Function call error: ${error.message}`);
   }
-  
-  const response = {
-    ok: true,
-    json: async () => data
-  };
-  
-  if (!response.ok) {
-    throw new Error(`Extraction failed: ${response.status}`);
-  }
-  
-  const result = await response.json();
-  
+
+  const result = data || {};
   return {
-    vehicles_extracted: result.vehicles_created || 0,
-    success_rate: result.success_rate || 0,
-    issues: result.issues || []
+    vehicles_extracted: Number(result.vehicles_created ?? 0),
+    success_rate: result.listings_discovered ? Number(result.vehicles_created ?? 0) / Number(result.listings_discovered) : 0,
+    issues: result.issues || [],
   };
 }
 
@@ -302,7 +307,7 @@ async function checkSiteHealth(siteUrl: string) {
 }
 
 async function updateDegradedSitePatterns(supabase: any, degradedSites: any[]) {
-  console.log(`🔧 Updating extraction patterns for ${degradedSites.length} degraded sites...`);
+  console.log(`Updating extraction patterns for ${degradedSites.length} degraded sites...`);
   
   const updateResults = [];
   
@@ -333,7 +338,7 @@ async function updateDegradedSitePatterns(supabase: any, degradedSites: any[]) {
 }
 
 async function discoverAdditionalSites(supabase: any) {
-  console.log('🔍 Discovering additional automotive sites...');
+  console.log('Discovering additional automotive sites...');
   
   // Auto-discover new sites when below extraction targets
   const discovery = await autoDiscoverSites(['premium car auctions', 'classic car dealers'], 20);
@@ -363,7 +368,7 @@ async function scheduleNextCycle(supabase: any) {
   // Schedule next autonomous cycle in 1 hour
   const nextRun = new Date(Date.now() + 3600000); // 1 hour from now
   
-  console.log(`⏰ Next autonomous cycle scheduled for: ${nextRun.toISOString()}`);
+  console.log(`Next autonomous cycle scheduled for: ${nextRun.toISOString()}`);
   
   // In production, this would use Supabase cron or external scheduler
   // For now, return the schedule info
