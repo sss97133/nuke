@@ -79,6 +79,7 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
           sale_price: price,
           sale_date: saleDate,
           sale_status: 'sold',
+          auction_outcome: 'sold', // Mark as sold so price display logic picks it up
           updated_at: new Date().toISOString()
         })
         .eq('id', vehicleId);
@@ -87,7 +88,12 @@ const UpdateSalePriceModal: React.FC<UpdateSalePriceModalProps> = ({
         throw new Error(updateError.message);
       }
 
-      onSuccess?.();
+      // Force a page reload to refresh all data
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        window.location.reload();
+      }
       onClose();
     } catch (err: any) {
       setError(err.message || 'Failed to update sale price');
