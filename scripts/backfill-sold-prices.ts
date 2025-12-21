@@ -123,12 +123,16 @@ async function scrapeBaTPrice(batUrl: string): Promise<{ price: number | null; s
     const priceMatch = title.match(/\$([\d,]+)/);
     const dateMatch = title.match(/(\w+ \d+, \d{4})/);
 
-    // Try to find price in page content
+    // Try to find price in page content - more comprehensive patterns
     let pagePrice = null;
     const pricePatterns = [
       /sold for \$([\d,]+)/i,
       /final bid: \$([\d,]+)/i,
-      /\$([\d,]+)\s*(?:was|is|final)/i,
+      /high bid.*?\$([\d,]+)/i,
+      /reserve not met.*?\$([\d,]+)/i,
+      /reserve met.*?\$([\d,]+)/i,
+      /\$([\d,]+)\s*(?:was|is|final|sold)/i,
+      /USD\s*\$([\d,]+)/i,
     ];
 
     for (const pattern of pricePatterns) {
@@ -136,6 +140,45 @@ async function scrapeBaTPrice(batUrl: string): Promise<{ price: number | null; s
       if (match) {
         pagePrice = match[1].replace(/,/g, '');
         break;
+      }
+    }
+
+    // Also check for JSON data in the page (BAT_VMS or similar)
+    const batVmsMatch = html.match(/var BAT_VMS = ({[^;]+});/);
+    if (batVmsMatch) {
+      try {
+        const batData = JSON.parse(batVmsMatch[1]);
+        // Look for highest bid in comments
+        if (batData.comments && Array.isArray(batData.comments)) {
+          let maxBid = 0;
+          for (const comment of batData.comments) {
+            if (comment.type === 'bat-bid' && comment.bidAmount && comment.bidAmount > maxBid) {
+              maxBid = comment.bidAmount;
+            }
+            // Also check for "Reserve not met" comments with prices
+            if (comment.content && comment.content.match(/reserve not met.*?\$([\d,]+)/i)) {
+              const reserveMatch = comment.content.match(/\$([\d,]+)/);
+              if (reserveMatch) {
+                const reservePrice = parseInt(reserveMatch[1].replace(/,/g, ''));
+                if (reservePrice > maxBid) maxBid = reservePrice;
+              }
+            }
+          }
+          if (maxBid > 0 && (!pagePrice || maxBid > parseInt(pagePrice))) {
+            pagePrice = maxBid.toString();
+          }
+        }
+      } catch (e) {
+        // JSON parse failed, ignore
+      }
+    }
+
+    // Check for seller comments mentioning sale price (e.g., "sold for $68K")
+    const sellerCommentMatch = html.match(/sold for \$?([\d,]+)K/i);
+    if (sellerCommentMatch) {
+      const kPrice = parseInt(sellerCommentMatch[1].replace(/,/g, '')) * 1000;
+      if (!pagePrice || kPrice > parseInt(pagePrice)) {
+        pagePrice = kPrice.toString();
       }
     }
 
