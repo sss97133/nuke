@@ -19,6 +19,8 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // This function uses service role key from Edge Function secrets
+    // It doesn't need JWT verification because it's called by cron jobs
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
