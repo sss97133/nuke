@@ -29,6 +29,40 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
     date?: string;
   } | null>(null);
 
+  const getSourceDomain = (u?: string | null): string | null => {
+    try {
+      if (!u) return null;
+      const url = new URL(u);
+      return url.hostname.replace(/^www\./, '');
+    } catch {
+      return null;
+    }
+  };
+
+  const formatEntryDate = (iso?: string | null): string => {
+    try {
+      if (!iso) return 'Date unknown';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return 'Date unknown';
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return 'Date unknown';
+    }
+  };
+
+  const sanitizeCuratedSummary = (raw: string): string => {
+    let cleaned = raw || '';
+    // Remove BaT listing boilerplate patterns
+    cleaned = cleaned.replace(/\s*for sale on BaT Auctions?\s*/gi, '');
+    cleaned = cleaned.replace(/\s*sold for \$[\d,]+ on [A-Z][a-z]+ \d{1,2}, \d{4}\s*/gi, '');
+    cleaned = cleaned.replace(/\s*\(Lot #[\d,]+\)\s*/gi, '');
+    cleaned = cleaned.replace(/\s*\|\s*Bring a Trailer\s*/gi, '');
+    cleaned = cleaned.replace(/\s*on bringatrailer\.com\s*/gi, '');
+    // Clean up whitespace
+    cleaned = cleaned.trim().replace(/\s+/g, ' ');
+    return cleaned;
+  };
+
   useEffect(() => {
     loadDescriptionMetadata();
   }, [vehicleId]);
@@ -216,173 +250,101 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               </button>
             </div>
           </div>
-        ) : isEmpty ? (
-          <div style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
-              No description yet.
-            </div>
-            {isEditable && (
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-              <button
-                className="button button-primary"
-                  style={{ fontSize: '8pt', padding: '4px 12px' }}
-                  onClick={handleGenerate}
-                  disabled={generating}
-                >
-                  {generating ? 'Generating...' : 'Generate'}
-                </button>
-                <button
-                  className="button button-secondary"
-                style={{ fontSize: '8pt', padding: '4px 12px' }}
-                onClick={handleEdit}
-              >
-                Add Description
-              </button>
-              </div>
-            )}
-          </div>
         ) : (
-          <div>
-            {/* Normalized description display */}
-            <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap', marginBottom: rawListingDescriptions.length > 0 ? '8px' : '0' }}>
-              {(() => {
-                // Sanitize description to remove BaT listing contamination
-                let cleaned = description;
-                if (cleaned) {
-                  // Remove BaT listing boilerplate patterns
-                  cleaned = cleaned.replace(/\s*for sale on BaT Auctions?\s*/gi, '');
-                  cleaned = cleaned.replace(/\s*sold for \$[\d,]+ on [A-Z][a-z]+ \d{1,2}, \d{4}\s*/gi, '');
-                  cleaned = cleaned.replace(/\s*\(Lot #[\d,]+\)\s*/gi, '');
-                  cleaned = cleaned.replace(/\s*\|\s*Bring a Trailer\s*/gi, '');
-                  cleaned = cleaned.replace(/\s*on bringatrailer\.com\s*/gi, '');
-                  // Remove leading/trailing whitespace and clean up multiple spaces
-                  cleaned = cleaned.trim().replace(/\s+/g, ' ');
-                  // If description is now empty or just whitespace, don't show it
-                  if (!cleaned || cleaned.length === 0) {
-                    return <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No description available</span>;
-                  }
-                }
-                return cleaned;
-              })()}
-            </div>
-            
-            {/* Raw listing descriptions - button with hover */}
-            {rawListingDescriptions.length > 0 && (
-              <div style={{ marginTop: '8px' }}>
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '8pt',
-                    border: '1px solid var(--border)',
-                    background: 'var(--white)',
-                    color: 'var(--text)',
-                    cursor: 'pointer',
-                    borderRadius: '3px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    position: 'relative'
-                  }}
-                  onMouseEnter={(e) => {
-                    const popup = document.getElementById('raw-description-popup');
-                    if (popup) {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      popup.style.display = 'block';
-                      popup.style.top = `${rect.bottom + 8}px`;
-                      popup.style.left = `${rect.left}px`;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    const popup = document.getElementById('raw-description-popup');
-                    if (popup) {
-                      const popupRect = popup.getBoundingClientRect();
-                      const buttonRect = e.currentTarget.getBoundingClientRect();
-                      // Only hide if mouse isn't over popup
-                      if (!(e.clientX >= popupRect.left && e.clientX <= popupRect.right &&
-                            e.clientY >= popupRect.top && e.clientY <= popupRect.bottom)) {
-                        popup.style.display = 'none';
-                      }
-                    }
-                  }}
-                >
-                  <span>Raw Listing Descriptions ({rawListingDescriptions.length})</span>
-                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>ⓘ</span>
-                </button>
-                <div
-                  id="raw-description-popup"
-                  style={{
-                    display: 'none',
-                    position: 'fixed',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '6px',
-                    padding: '12px',
-                    maxWidth: '500px',
-                    maxHeight: '400px',
-                    overflowY: 'auto',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
-                    zIndex: 1000,
-                    fontSize: '8pt',
-                    lineHeight: 1.5
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.display = 'block';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                >
-                  <div style={{ fontWeight: 700, marginBottom: '8px', fontSize: '9pt' }}>
-                    Original Listing Descriptions
-                  </div>
-                  {rawListingDescriptions.map((row, idx) => (
-                    <div key={idx} style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: idx < rawListingDescriptions.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                        {row.extracted_at ? `Extracted ${new Date(row.extracted_at).toLocaleDateString()}` : 'Extracted date unknown'}
-                        {row.source_url ? ' • ' : ''}
-                        {row.source_url ? (
-                          <a href={row.source_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>
-                            Source
-                          </a>
-                        ) : null}
-                      </div>
-                      <div style={{ whiteSpace: 'pre-wrap', fontSize: '8pt' }}>
-                        {row.text}
-                      </div>
-                    </div>
-                  ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Curated summary (editable) */}
+            <div>
+              <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
+                CURATED SUMMARY
+              </div>
+              {isEmpty ? (
+                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                  No curated summary yet. Use Generate or Edit to create one.
                 </div>
-              </div>
-            )}
+              ) : (
+                <div style={{ fontSize: '9pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                  {(() => {
+                    const cleaned = sanitizeCuratedSummary(description);
+                    if (!cleaned) {
+                      return <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No summary available</span>;
+                    }
+                    return cleaned;
+                  })()}
+                </div>
+              )}
+            </div>
 
-            {rawListingDescriptions.length > 0 && (
-              <div style={{ marginTop: '12px' }}>
-                <details>
-                  <summary style={{ cursor: 'pointer', fontSize: '8pt', fontWeight: 700 }}>
-                    Raw listing descriptions ({rawListingDescriptions.length})
-                  </summary>
-                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {rawListingDescriptions.map((row, idx) => (
-                      <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: '6px', padding: '8px', background: 'var(--bg-secondary)' }}>
-                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                          {row.extracted_at ? `Extracted ${new Date(row.extracted_at).toLocaleDateString()}` : 'Extracted date unknown'}
-                          {row.source_url ? ' • ' : ''}
-                          {row.source_url ? (
-                            <a href={row.source_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>
-                              Source
-                            </a>
-                          ) : null}
-                        </div>
-                        <div style={{ fontSize: '8pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                          {row.text}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </details>
+            {/* Source description entries (provenance-backed) */}
+            <div>
+              <div style={{ fontSize: '7pt', fontWeight: 700, marginBottom: '6px', color: 'var(--text-muted)' }}>
+                DESCRIPTION ENTRIES
               </div>
-            )}
+              {rawListingDescriptions.length === 0 ? (
+                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                  No source descriptions yet.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {rawListingDescriptions.map((row, idx) => {
+                    const domain = getSourceDomain(row.source_url);
+                    const dateLabel = formatEntryDate(row.extracted_at);
+                    const linkLabel = domain ? `${domain} listing` : 'Source listing';
+                    return (
+                      <details
+                        key={`${idx}-${row.extracted_at || 'unknown'}`}
+                        style={{
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          padding: '8px 10px',
+                          background: 'var(--bg-secondary)',
+                        }}
+                      >
+                        <summary
+                          style={{
+                            cursor: 'pointer',
+                            listStyle: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            fontSize: '8pt',
+                            fontWeight: 700,
+                          }}
+                        >
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                            {row.source_url ? <FaviconIcon url={row.source_url} matchTextSize={true} textSize={8} /> : null}
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              Imported listing description
+                              {domain ? ` • ${domain}` : ''}
+                            </span>
+                          </span>
+                          <span style={{ fontSize: '7pt', fontWeight: 500, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                            {dateLabel}
+                          </span>
+                        </summary>
+                        <div style={{ marginTop: '8px' }}>
+                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                            {row.source_url ? (
+                              <a
+                                href={row.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ textDecoration: 'underline' }}
+                              >
+                                {linkLabel}
+                              </a>
+                            ) : null}
+                          </div>
+                          <div style={{ fontSize: '8.5pt', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                            {row.text}
+                          </div>
+                        </div>
+                      </details>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {(isAIGenerated || sourceInfo) && (
               <div style={{
