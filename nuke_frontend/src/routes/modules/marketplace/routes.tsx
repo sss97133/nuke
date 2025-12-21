@@ -11,11 +11,13 @@ import MarketFundDetail from '../../../pages/MarketFundDetail';
 import MarketSegments from '../../../pages/MarketSegments';
 import MarketSegmentDetail from '../../../pages/MarketSegmentDetail';
 import MarketMovement from '../../../pages/MarketMovement';
+import MarketDashboard from '../../../pages/MarketDashboard';
 
 const MarketplaceModuleRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<BrowseInvestments />} />
+      <Route path="/" element={<MarketDashboard />} />
+      <Route path="/dashboard" element={<MarketDashboard />} />
       <Route path="/browse" element={<BrowseInvestments />} />
       <Route path="/exchange" element={<MarketExchange />} />
       <Route path="/exchange/:symbol" element={<MarketFundDetail />} />

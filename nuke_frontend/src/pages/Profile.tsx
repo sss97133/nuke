@@ -51,6 +51,11 @@ import { AdminNotificationService } from '../services/adminNotificationService';
 import { PersonalPhotoLibraryService } from '../services/personalPhotoLibraryService';
 import { PersonalPhotoLibrary } from './PersonalPhotoLibrary';
 import ShopFinancials from './ShopFinancials';
+import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
+import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
+import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
+import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
+import { getUserProfileData } from '../services/profileStatsService';
 
 const Profile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -66,11 +71,15 @@ const Profile: React.FC = () => {
     'professional' |
     'organizations' |
     'auctions' |
+    'listings' |
+    'bids' |
+    'stories' |
     'photos' |
     'financials' |
     'duplicates' |
     'settings'
   >('overview');
+  const [comprehensiveData, setComprehensiveData] = useState<any>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   // Heatmap year is a hook and must be declared unconditionally (not after early returns)
   const [heatmapYear, setHeatmapYear] = useState<number>(new Date().getFullYear());
@@ -164,6 +173,14 @@ const Profile: React.FC = () => {
         } catch (err) {
           console.warn('Failed to load photo library stats:', err);
         }
+      }
+
+      // Load comprehensive profile data (BaT-style stats)
+      try {
+        const comprehensive = await getUserProfileData(targetUserId);
+        setComprehensiveData(comprehensive);
+      } catch (err) {
+        console.warn('Failed to load comprehensive profile data:', err);
       }
 
     } catch (err: any) {
@@ -548,8 +565,11 @@ const Profile: React.FC = () => {
             { key: 'professional', label: 'Professional' },
             { key: 'organizations', label: 'My Organizations' },
             { key: 'auctions', label: 'My Auctions' },
+            { key: 'listings', label: 'Listings', public: true },
+            { key: 'bids', label: 'Bids', public: true },
+            { key: 'stories', label: 'Success Stories', public: true },
             { key: 'settings', label: 'Settings' }
-          ].filter(tab => tab.key === 'settings' ? isOwnProfile : (tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations' || tab.key === 'auctions')).map((tab) => (
+          ].filter(tab => tab.key === 'settings' ? isOwnProfile : (tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations' || tab.key === 'auctions' || tab.key === 'listings' || tab.key === 'bids' || tab.key === 'stories')).map((tab) => (
             <button
               key={tab.key}
               className="text-small"
@@ -582,6 +602,18 @@ const Profile: React.FC = () => {
         <div className="profile-content">
             {activeTab === 'overview' && (
               <div className="section">
+                {/* Comprehensive Profile Stats (BaT-style) */}
+                {comprehensiveData?.stats && (
+                  <div style={{ marginBottom: 'var(--space-4)' }}>
+                    <ComprehensiveProfileStats
+                      stats={comprehensiveData.stats}
+                      profileType="user"
+                      profileId={profile.id}
+                      location={profile.location}
+                    />
+                  </div>
+                )}
+
                 {/* Contribution Timeline - Forefront */}
                 <div style={{ marginBottom: 'var(--space-4)' }}>
                   <ContributionTimeline
@@ -637,6 +669,33 @@ const Profile: React.FC = () => {
             {activeTab === 'auctions' && (
               <div>
                 {isOwnProfile ? <MyAuctions /> : <PublicAuctionTrackRecord profileUserId={profile.id} />}
+              </div>
+            )}
+
+            {activeTab === 'listings' && comprehensiveData && (
+              <div>
+                <ProfileListingsTab
+                  listings={comprehensiveData.listings || []}
+                  profileType="user"
+                />
+              </div>
+            )}
+
+            {activeTab === 'bids' && comprehensiveData && (
+              <div>
+                <ProfileBidsTab
+                  bids={comprehensiveData.bids || []}
+                  profileType="user"
+                />
+              </div>
+            )}
+
+            {activeTab === 'stories' && comprehensiveData && (
+              <div>
+                <ProfileSuccessStoriesTab
+                  stories={comprehensiveData.success_stories || []}
+                  profileType="user"
+                />
               </div>
             )}
 

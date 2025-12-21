@@ -27,6 +27,11 @@ import { OrganizationServiceTab } from '../components/organization/OrganizationS
 import { OrganizationAuctionsTab } from '../components/organization/OrganizationAuctionsTab';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import VehicleThumbnail from '../components/VehicleThumbnail';
+import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
+import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
+import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
+import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
+import { getOrganizationProfileData } from '../services/profileStatsService';
 import '../design-system.css';
 
 interface Organization {
@@ -272,6 +277,7 @@ export default function OrganizationProfile() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
   const ownershipUploadId = `org-ownership-${organizationId}`;
+  const [comprehensiveData, setComprehensiveData] = useState<any>(null);
 
   // One-time CSS for "aliveness" bursts
   useEffect(() => {
@@ -732,6 +738,14 @@ export default function OrganizationProfile() {
       }
       
       setOrganization(org);
+      
+      // Load comprehensive profile data (BaT-style stats)
+      try {
+        const comprehensive = await getOrganizationProfileData(organizationId);
+        setComprehensiveData(comprehensive);
+      } catch (err) {
+        console.warn('[OrgProfile] Failed to load comprehensive profile data:', err);
+      }
       
       // Load organization intelligence (respects explicit settings)
       (async () => {
@@ -3038,6 +3052,107 @@ export default function OrganizationProfile() {
         {/* AUCTIONS TAB */}
         {activeTab === 'auctions' && organizationId && (
           <OrganizationAuctionsTab organizationId={organizationId} />
+        )}
+
+        {activeTab === 'listings' && comprehensiveData && (
+          <ProfileListingsTab
+            listings={comprehensiveData.listings || []}
+            profileType="organization"
+          />
+        )}
+
+        {activeTab === 'bids' && comprehensiveData && (
+          <ProfileBidsTab
+            bids={comprehensiveData.bids || []}
+            profileType="organization"
+          />
+        )}
+
+        {activeTab === 'stories' && comprehensiveData && (
+          <ProfileSuccessStoriesTab
+            stories={comprehensiveData.success_stories || []}
+            profileType="organization"
+          />
+        )}
+
+        {activeTab === 'services' && comprehensiveData && (
+          <div style={{ padding: 'var(--space-4)' }}>
+            <div style={{
+              padding: 'var(--space-3)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: '4px',
+              marginBottom: 'var(--space-3)',
+            }}>
+              <h3 style={{ fontSize: '10pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
+                Services Offered
+              </h3>
+              {comprehensiveData.website_mapping && (
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+                  Services mapped from: <a href={comprehensiveData.website_mapping.website_url} target="_blank" rel="noopener noreferrer">{comprehensiveData.website_mapping.website_url}</a>
+                </div>
+              )}
+            </div>
+            {comprehensiveData.services && comprehensiveData.services.length > 0 ? (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                gap: 'var(--space-3)',
+              }}>
+                {comprehensiveData.services.map((service: any) => (
+                  <div
+                    key={service.id}
+                    style={{
+                      padding: 'var(--space-3)',
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: 'var(--space-2)' }}>
+                      {service.service_name}
+                    </div>
+                    {service.service_category && (
+                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
+                        {service.service_category.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                      </div>
+                    )}
+                    {service.description && (
+                      <div style={{ fontSize: '8pt', color: 'var(--text)', marginBottom: 'var(--space-2)', lineHeight: '1.5' }}>
+                        {service.description}
+                      </div>
+                    )}
+                    {service.pricing_model && service.pricing_model !== 'unknown' && (
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--border)' }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Pricing:</div>
+                        {service.pricing_model === 'fixed_price' && service.base_price && `$${service.base_price.toLocaleString()}`}
+                        {service.pricing_model === 'hourly_rate' && service.hourly_rate && `$${service.hourly_rate.toLocaleString()}/hour`}
+                        {service.pricing_model === 'percentage' && service.percentage_rate && `${service.percentage_rate}%`}
+                        {service.pricing_model === 'tiered' && 'Tiered Pricing'}
+                        {service.pricing_model === 'custom_quote' && 'Custom Quote Available'}
+                      </div>
+                    )}
+                    {service.source_url && (
+                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
+                        <a href={service.source_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+                          Source
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                padding: 'var(--space-6)',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                fontSize: '8pt',
+              }}>
+                No services defined yet. Services can be automatically discovered from your website or manually added.
+              </div>
+            )}
+          </div>
         )}
 
         {/* Inventory Tab */}
