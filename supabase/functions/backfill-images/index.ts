@@ -67,6 +67,11 @@ function isKnownNoiseUrl(url: string): boolean {
   if (s.includes('themes/')) return true;
   if (s.includes('assets/img/')) return true;
 
+  // Block geo-location service flag images (THE AMERICAN FLAG ISSUE!)
+  if (s.includes('hello.zonos.com/images/flags/')) return true;
+  if (s.includes('/flags/') && s.includes('.png')) return true;
+  if (s.includes('flags/us.png') || s.includes('flags/US.png')) return true;
+
   return false;
 }
 
@@ -487,6 +492,24 @@ serve(async (req: Request) => {
         const { data: { publicUrl } } = supabase.storage
           .from('vehicle-images')
           .getPublicUrl(storagePath);
+
+        // Validate that the uploaded image is actually accessible to prevent blank squares
+        if (!uploadError) {
+          try {
+            const testResponse = await fetch(publicUrl, { method: 'HEAD' });
+            if (!testResponse.ok) {
+              console.error(`❌ Uploaded file not accessible: ${publicUrl} (${testResponse.status})`);
+              results.errors.push(`upload_not_accessible: ${rawUrl} :: ${testResponse.status}`);
+              results.failed++;
+              continue;
+            }
+          } catch (accessError) {
+            console.error(`❌ Error testing uploaded file accessibility: ${accessError}`);
+            results.errors.push(`upload_test_failed: ${rawUrl} :: ${accessError}`);
+            results.failed++;
+            continue;
+          }
+        }
 
         // Create database record (even if storage object already existed).
         // If a previous run uploaded to storage but DB insert failed, this is the recovery path.
