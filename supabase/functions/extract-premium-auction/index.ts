@@ -167,9 +167,12 @@ function extractMecumImagesFromHtml(html: string): string[] {
     let jsonMatch;
     while ((jsonMatch = jsonImageRe.exec(scriptContent)) !== null) {
       const u = String(jsonMatch[1] || "").trim();
-      const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
+      // Extract version path: /v{version}/auctions/{auction}/{lot}/{imageId}
+      // Handle URLs with or without file extensions, with or without query params
+      const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/\?]+)\/([^\/\?]+)\/(\d+)(?:\.(?:jpg|jpeg|png|webp))?/i);
       if (versionMatch) {
         const [, version, auction, lot, imageId] = versionMatch;
+        // Construct clean full-resolution URL (no transformations)
         const fullUrl = `https://images.mecum.com/image/upload/v${version}/auctions/${auction}/${lot}/${imageId}.jpg`;
         urls.add(fullUrl);
       }
@@ -196,9 +199,12 @@ function extractMecumImagesFromHtml(html: string): string[] {
     const firstUrlMatch = srcsetValue.match(/https?:\/\/images\.mecum\.com\/image\/upload\/[^"'\\s,>]+?\/auctions\/[^"'\\s,>]+?\/\d+\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s,>]*)?/i);
     if (firstUrlMatch) {
       const u = String(firstUrlMatch[0] || "").trim();
-      const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
+      // Extract version path: /v{version}/auctions/{auction}/{lot}/{imageId}
+      // Handle URLs with or without file extensions, with or without query params
+      const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/\?]+)\/([^\/\?]+)\/(\d+)(?:\.(?:jpg|jpeg|png|webp))?/i);
       if (versionMatch) {
         const [, version, auction, lot, imageId] = versionMatch;
+        // Construct clean full-resolution URL (no transformations)
         const fullUrl = `https://images.mecum.com/image/upload/v${version}/auctions/${auction}/${lot}/${imageId}.jpg`;
         urls.add(fullUrl);
       }
@@ -1207,7 +1213,8 @@ async function extractMecum(url: string, maxVehicles: number) {
       let markdown = "";
       let images: string[] = [];
       
-      // Step 1: Firecrawl with markdown format (often captures URLs even if HTML doesn't render)
+      // Step 1: Firecrawl with actions to trigger gallery opening
+      // Click gallery buttons to load images that are lazy-loaded
       try {
         const firecrawlMarkdown = await fetchJsonWithTimeout(
           FIRECRAWL_SCRAPE_URL,
@@ -1221,11 +1228,44 @@ async function extractMecum(url: string, maxVehicles: number) {
               url: listingUrl,
               formats: ["markdown", "html"],
               onlyMainContent: false,
-              waitFor: 10000,
+              waitFor: 8000,
+              actions: [
+                {
+                  type: "wait",
+                  milliseconds: 3000, // Wait for initial page load
+                },
+                {
+                  type: "scroll",
+                  direction: "down",
+                  pixels: 500, // Scroll down to trigger lazy loading
+                },
+                {
+                  type: "wait",
+                  milliseconds: 2000, // Wait for images to load
+                },
+                {
+                  type: "scroll",
+                  direction: "down",
+                  pixels: 1000, // Scroll more to load gallery
+                },
+                {
+                  type: "wait",
+                  milliseconds: 2000, // Wait for more images
+                },
+                {
+                  type: "scroll",
+                  direction: "up",
+                  pixels: 300, // Scroll back up
+                },
+                {
+                  type: "wait",
+                  milliseconds: 1000, // Final wait
+                },
+              ],
             }),
           },
           FIRECRAWL_LISTING_TIMEOUT_MS,
-          "Firecrawl markdown+html",
+          "Firecrawl with gallery trigger",
         );
         
         markdown = String(firecrawlMarkdown?.data?.markdown || firecrawlMarkdown?.markdown || "");
@@ -1333,8 +1373,15 @@ async function extractMecum(url: string, maxVehicles: number) {
         }
       }
       
-      // Dedupe
-      images = Array.from(new Set(images));
+      // Dedupe and normalize all URLs to full-resolution (remove transformation params)
+      images = Array.from(new Set(images)).map((url) => {
+        // Extract base URL pattern: /v{version}/auctions/{auction}/{lot}/{imageId}
+        const baseMatch = url.match(/(https?:\/\/images\.mecum\.com\/image\/upload\/v\d+\/auctions\/[^\/\?]+\/[^\/\?]+\/\d+)(?:\.(?:jpg|jpeg|png|webp))?(?:\?.*)?/i);
+        if (baseMatch) {
+          return `${baseMatch[1]}.jpg`;
+        }
+        return url;
+      });
       
       // Filter out UI assets
       images = images.filter((img: string) => {
