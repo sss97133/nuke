@@ -15,6 +15,7 @@ import { FaviconIcon } from '../../components/common/FaviconIcon';
 import { AuctionPlatformBadge } from '../../components/auction/AuctionBadges';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 import vinDecoderService from '../../services/vinDecoder';
+import UpdateSalePriceModal from '../../components/vehicle/UpdateSalePriceModal';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -89,6 +90,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [showProvenancePopup, setShowProvenancePopup] = useState(false);
   const [priceSources, setPriceSources] = useState<Record<string, boolean>>({});
   const [showVinValidation, setShowVinValidation] = useState(false);
+  const [showUpdateSalePriceModal, setShowUpdateSalePriceModal] = useState(false);
 
   const { summary: vinProofSummary } = useVINProofs(vehicle?.id);
   // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
@@ -1041,18 +1043,19 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       }
       if (isLive) return 'BID';
       
-      // Sold: show final price or SOLD badge
+      // Sold: show final price (NO "Bid:" prefix) or SOLD badge
       if (isSold) {
         const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
           ? (auctionPulse as any).final_price
           : (typeof (vehicle as any)?.sale_price === 'number' && (vehicle as any).sale_price > 0 ? (vehicle as any).sale_price : null);
         if (finalPrice) {
+          // Don't show "Bid:" prefix for sold vehicles - just show the price
           return formatCurrency(finalPrice);
         }
         return 'SOLD';
       }
       
-      // Ended/RNM: show final price, high bid, or sale price if available
+      // Ended/RNM: show final price, high bid, or sale price if available (NO "Bid:" prefix)
       if (isEnded) {
         const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
           ? (auctionPulse as any).final_price
@@ -1061,8 +1064,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         const winBid = typeof (vehicle as any)?.winning_bid === 'number' && (vehicle as any).winning_bid > 0 ? (vehicle as any).winning_bid : null;
         const hBid = typeof (vehicle as any)?.high_bid === 'number' && (vehicle as any).high_bid > 0 ? (vehicle as any).high_bid : null;
         
-        if (finalPrice) return formatCurrency(finalPrice);
+        // Prioritize sale price over bid amounts for ended auctions
         if (salePrice) return formatCurrency(salePrice);
+        if (finalPrice) return formatCurrency(finalPrice);
         if (winBid) return formatCurrency(winBid);
         if (hBid) return formatCurrency(hBid);
         
@@ -1529,23 +1533,32 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             );
           })()}
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
-          {auctionPulse?.listing_url && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              {/* Only show platform badge if consigner badge and origin badge aren't already showing BaT */}
-              {(() => {
-                const isBatConsigner = sellerBadge && (sellerBadge.label?.toLowerCase().includes('bring a trailer') || sellerBadge.label?.toLowerCase().includes('bat'));
-                const isBatOrigin = (vehicle as any)?.profile_origin === 'bat_import' || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com');
-                // Hide platform badge if BaT is already shown elsewhere
-                return !isBatConsigner && !isBatOrigin ? (
-                  <AuctionPlatformBadge
-                    platform={auctionPulse.platform}
-                    urlForFavicon={auctionPulse.listing_url}
-                    label={auctionPulse.platform === 'bat' ? 'BaT' : undefined}
-                  />
-                ) : null;
-              })()}
-              {/* Seller bubble (internal): if we have a BaT seller handle, show a second circle next to platform */}
-              {batIdentityHref?.seller?.handle ? (
+          {/* Only show auction badges if auction is still live/active, not if it's ended/sold */}
+          {auctionPulse?.listing_url && (() => {
+            const status = String(auctionPulse.listing_status || '').toLowerCase();
+            const isLive = status === 'active' || status === 'live';
+            const isSold = status === 'sold';
+            const isEnded = status === 'ended' || status === 'reserve_not_met';
+            // Don't show auction badges if auction has ended or sold
+            if (isSold || isEnded) return null;
+            
+            return (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                {/* Only show platform badge if consigner badge and origin badge aren't already showing BaT */}
+                {(() => {
+                  const isBatConsigner = sellerBadge && (sellerBadge.label?.toLowerCase().includes('bring a trailer') || sellerBadge.label?.toLowerCase().includes('bat'));
+                  const isBatOrigin = (vehicle as any)?.profile_origin === 'bat_import' || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com');
+                  // Hide platform badge if BaT is already shown elsewhere
+                  return !isBatConsigner && !isBatOrigin ? (
+                    <AuctionPlatformBadge
+                      platform={auctionPulse.platform}
+                      urlForFavicon={auctionPulse.listing_url}
+                      label={auctionPulse.platform === 'bat' ? 'BaT' : undefined}
+                    />
+                  ) : null;
+                })()}
+                {/* Seller bubble (internal): if we have a BaT seller handle, show a second circle next to platform */}
+                {batIdentityHref?.seller?.handle ? (
                 <Link
                   to={batIdentityHref.seller.href}
                   onClick={(e) => e.stopPropagation()}
@@ -1641,9 +1654,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Time since last bid">
                   last bid {formatAge(auctionPulse.last_bid_at) || '—'} ago
                 </span>
-              ) : null}
-            </span>
-          )}
+                ) : null}
+              </span>
+            );
+          })()}
           {/* Hide external import/source badge once the profile is claimed/verified to avoid contaminating context */}
           {!isVerifiedOwner && vehicle && (vehicle as any).profile_origin && (() => {
             // Don't show origin badge if we're showing organization name (avoid duplication)
@@ -2510,6 +2524,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
               {isOwnerLike && (
                 <div style={{ marginTop: 12, borderTop: '1px solid #e5e7eb', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPriceMenuOpen(false);
+                      setShowUpdateSalePriceModal(true);
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '8pt',
+                      fontWeight: 'bold',
+                      background: 'var(--accent)',
+                      color: 'var(--white)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      textAlign: 'center'
+                    }}
+                  >
+                    Update Sale Price
+                  </button>
                   <div style={{ fontWeight: 600 }}>Display price</div>
                   <select
                     value={displayMode}
@@ -2671,6 +2706,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             // Optionally refresh the vehicle data or update local state
             setShowProvenancePopup(false);
             window.location.reload(); // Simple refresh for now
+          }}
+        />
+      )}
+
+      {/* Update Sale Price Modal */}
+      {vehicle && (
+        <UpdateSalePriceModal
+          vehicleId={vehicle.id}
+          vehicleName={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
+          currentSalePrice={vehicle.sale_price ?? null}
+          currentSaleDate={vehicle.sale_date || null}
+          auctionBid={vehicle.current_bid || (auctionPulse as any)?.current_bid || null}
+          isOpen={showUpdateSalePriceModal}
+          onClose={() => setShowUpdateSalePriceModal(false)}
+          onSuccess={() => {
+            // Refresh vehicle data
+            window.location.reload();
           }}
         />
       )}

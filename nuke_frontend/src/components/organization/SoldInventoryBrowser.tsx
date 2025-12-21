@@ -130,6 +130,14 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
         .in('vehicle_id', vehicleIds);
       const externalMap = new Map((externalListings || []).map((l: any) => [l.vehicle_id, l]));
 
+      // Fetch BaT listings data to supplement missing vehicle fields
+      const { data: batListings } = await supabase
+        .from('bat_listings')
+        .select('vehicle_id, sale_price, final_bid, sale_date, bat_listing_url, bat_listing_title, raw_data')
+        .in('vehicle_id', vehicleIds)
+        .eq('listing_status', 'sold');
+      const batMap = new Map((batListings || []).map((bl: any) => [bl.vehicle_id, bl]));
+
       // Fetch images in one shot and build:
       // - primary image per vehicle (primary first, newest first)
       // - image count per vehicle
@@ -160,6 +168,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
 
           const proof = proofMap.get(v.id);
           const externalListing = externalMap.get(v.id);
+          const batListing = batMap.get(v.id);
 
           const saleStatus = String(v.sale_status || '').toLowerCase();
           const listingStatus = String(orgVehicle.listing_status || externalListing?.listing_status || '').toLowerCase();
@@ -167,14 +176,17 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           const ovSalePriceNum = orgVehicle.sale_price ? Number(orgVehicle.sale_price) : 0;
           const vSalePriceNum = v.sale_price ? Number(v.sale_price) : 0;
           const extFinalPriceNum = externalListing?.final_price ? Number(externalListing.final_price) : 0;
+          const batPriceNum = batListing?.sale_price || batListing?.final_bid ? Number(batListing.sale_price || batListing.final_bid) : 0;
 
           const isSold =
             listingStatus === 'sold' ||
             saleStatus === 'sold' ||
             Boolean(orgVehicle.sale_date) ||
             Boolean(v.sale_date) ||
+            Boolean(batListing?.sale_date) ||
             ovSalePriceNum > 0 ||
             vSalePriceNum > 0 ||
+            batPriceNum > 0 ||
             Boolean(externalListing?.sold_at) ||
             extFinalPriceNum > 0;
 
@@ -190,30 +202,43 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
             if (!isSold) return null;
           }
 
-          const saleDate = orgVehicle.sale_date || v.sale_date || externalListing?.sold_at || null;
+          const saleDate = orgVehicle.sale_date || v.sale_date || batListing?.sale_date || externalListing?.sold_at || null;
           const salePrice =
             (orgVehicle.sale_price ? Number(orgVehicle.sale_price) : null) ||
             (v.sale_price ? Number(v.sale_price) : null) ||
+            (batListing?.sale_price ? Number(batListing.sale_price) : null) ||
+            (batListing?.final_bid ? Number(batListing.final_bid) : null) ||
             null;
+
+          // Extract data from BaT raw_data if vehicle fields are missing
+          const rawData = batListing?.raw_data || {};
+          const batYear = rawData?.year ? parseInt(rawData.year) : null;
+          const batMake = rawData?.make || null;
+          const batModel = rawData?.model || null;
+          const batTrim = rawData?.trim || null;
+          const batEngine = rawData?.engine || rawData?.engine_size || null;
+          const batDrivetrain = rawData?.drivetrain || null;
+          const batMileage = rawData?.mileage ? parseInt(rawData.mileage) : null;
+          const batDisplacement = rawData?.displacement || null;
 
           return {
             id: orgVehicle.id,
             vehicle_id: v.id,
-            year: v.year,
-            make: v.make,
-            model: v.model,
-            trim: v.trim,
-            engine_size: v.engine_size,
-            displacement: v.displacement,
-            transmission: v.transmission,
-            drivetrain: v.drivetrain,
-            mileage: v.mileage,
+            year: v.year || batYear,
+            make: v.make || batMake,
+            model: v.model || batModel,
+            trim: v.trim || batTrim,
+            engine_size: v.engine_size || batEngine,
+            displacement: v.displacement || batDisplacement,
+            transmission: v.transmission || rawData?.transmission || null,
+            drivetrain: v.drivetrain || batDrivetrain,
+            mileage: v.mileage || batMileage,
             sale_price: salePrice,
             sale_date: saleDate,
-            platform: proof?.proof_platform || externalListing?.platform,
-            listing_url: proof?.proof_url || externalListing?.listing_url,
-            final_price: externalListing?.final_price,
-            sold_at: externalListing?.sold_at,
+            platform: proof?.proof_platform || externalListing?.platform || (batListing ? 'bat' : null),
+            listing_url: proof?.proof_url || externalListing?.listing_url || batListing?.bat_listing_url,
+            final_price: externalListing?.final_price || (batListing?.sale_price || batListing?.final_bid ? Number(batListing.sale_price || batListing.final_bid) : null),
+            sold_at: externalListing?.sold_at || batListing?.sale_date,
             primary_image: primaryImageByVehicle.get(v.id) || null,
             image_count: imageCountByVehicle.get(v.id) || 0,
             // Proof data
