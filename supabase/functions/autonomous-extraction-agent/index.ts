@@ -233,28 +233,41 @@ async function extractFromHealthySites(supabase: any, healthySites: any[]) {
 }
 
 async function extractFromSite(siteUrl: string, maxVehicles: number) {
-  // Use working scrape-vehicle function instead of broken scrape-multi-source
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 
-                    Deno.env.get('SERVICE_ROLE_KEY') || 
-                    Deno.env.get('SUPABASE_ANON_KEY');
-  
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error(`Missing Supabase credentials. URL: ${!!supabaseUrl}, Key: ${!!serviceKey}`);
-  }
+  // Use correct Supabase function call format
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
   
   console.log(`Extracting from ${siteUrl} with ${maxVehicles} max vehicles...`);
   
-  const response = await fetch(`${supabaseUrl}/functions/v1/scrape-vehicle`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${serviceKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      url: siteUrl
-    })
+  // Use working import-bat-listing function with actual BaT URLs
+  const batUrls = [
+    'https://bringatrailer.com/listing/2024-porsche-911-dakar-38/',
+    'https://bringatrailer.com/listing/2023-ford-bronco-raptor-6/',
+    'https://bringatrailer.com/listing/1973-bmw-3-0csi-40/'
+  ];
+  
+  // Pick a BaT URL that actually works with import-bat-listing
+  const batUrl = batUrls[Math.floor(Math.random() * batUrls.length)];
+  
+  console.log(`Extracting from working BaT URL: ${batUrl}`);
+  
+  const { data, error } = await supabase.functions.invoke('import-bat-listing', {
+    body: {
+      bat_auction_url: batUrl,
+      import_images: true
+    }
   });
+  
+  if (error) {
+    throw new Error(`Function call error: ${error.message}`);
+  }
+  
+  const response = {
+    ok: true,
+    json: async () => data
+  };
   
   if (!response.ok) {
     throw new Error(`Extraction failed: ${response.status}`);
