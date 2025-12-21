@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { batRateLimiter } from '../../utils/rateLimiter';
 
 interface Props {
   organizationId: string;
@@ -45,27 +46,29 @@ const BaTBulkImporter: React.FC<Props> = ({
   };
 
   const importSingleListing = async (batUrl: string): Promise<ImportResult> => {
-    try {
-      const { data, error } = await supabase.functions.invoke('import-bat-listing', {
-        body: {
-          batUrl,
-          organizationId
-        }
-      });
+    return batRateLimiter.execute(async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('import-bat-listing', {
+          body: {
+            batUrl,
+            organizationId
+          }
+        });
 
-      if (error) {
+        if (error) {
+          return { url: batUrl, success: false, error: error.message };
+        }
+
+        return {
+          url: batUrl,
+          success: true,
+          vehicleId: data.vehicleId,
+          listing: data.listing
+        };
+      } catch (error: any) {
         return { url: batUrl, success: false, error: error.message };
       }
-
-      return {
-        url: batUrl,
-        success: true,
-        vehicleId: data.vehicleId,
-        listing: data.listing
-      };
-    } catch (error: any) {
-      return { url: batUrl, success: false, error: error.message };
-    }
+    }, 1); // High priority for user-initiated imports
   };
 
   const handleBulkImport = async () => {

@@ -42,7 +42,8 @@ const OrganizationInventoryTab: React.FC<Props> = ({ organizationId, isOwner }) 
   const loadInventory = async () => {
     setLoading(true);
     try {
-      // Load inventory vehicles - include in_stock, consignment, and seller (dealers often use 'seller' instead of 'in_stock')
+      // Load inventory vehicles - valid relationship_types for dealer inventory:
+      // 'seller', 'consigner', 'current_consignment', 'owner' (for dealer-owned inventory)
       const { data, error } = await supabase
         .from('organization_vehicles')
         .select(`
@@ -64,7 +65,7 @@ const OrganizationInventoryTab: React.FC<Props> = ({ organizationId, isOwner }) 
           )
         `)
         .eq('organization_id', organizationId)
-        .in('relationship_type', ['in_stock', 'consignment', 'seller', 'consigner'])
+        .in('relationship_type', ['consigner', 'sold_by', 'owner'])
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
