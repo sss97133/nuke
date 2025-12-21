@@ -39,6 +39,17 @@ function coalesceUrl(v: any): string | null {
   return url ? String(url) : null;
 }
 
+function looksLikeBatUiAssetUrl(raw: any): boolean {
+  const s = String(raw || "").toLowerCase();
+  if (!s) return false;
+  return (
+    s.includes("bringatrailer.com/wp-content/themes/") ||
+    s.includes("/countries/") ||
+    s.endsWith(".svg") ||
+    s.includes("assets/img/")
+  );
+}
+
 async function isAuthorized(req: Request): Promise<{ ok: boolean; mode: "service_role" | "admin_user" | "none"; error?: string }> {
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
   if (!authHeader) return { ok: false, mode: "none", error: "Missing Authorization header" };
@@ -231,17 +242,49 @@ Deno.serve(async (req) => {
       if (error) throw new Error(error.message);
       if (data) vehicles = [data];
     } else {
-      // Batch mode: Find ALL BaT vehicles that have BaT images
-      // First, get BaT vehicles (we'll filter to candidates during processing loop)
+      // Batch mode:
+      // 1) Prioritize vehicles with obviously-bad primaries (flags/themes/svg) so the feed cleans up quickly.
+      // 2) Fill remaining candidates with general BaT vehicles by updated_at asc.
       const cutoffIso = minAgeHours > 0 ? new Date(Date.now() - minAgeHours * 60 * 60 * 1000).toISOString() : null;
-      const { data, error } = await admin
+
+      const badPrimaryOr =
+        "primary_image_url.ilike.%/countries/%," +
+        "primary_image_url.ilike.%/wp-content/themes/%," +
+        "primary_image_url.ilike.%.svg%," +
+        "image_url.ilike.%/countries/%," +
+        "image_url.ilike.%/wp-content/themes/%," +
+        "image_url.ilike.%.svg%";
+
+      const { data: badPrimaryRows, error: badErr } = await admin
         .from("vehicles")
-        .select("id, year, make, model, profile_origin, discovery_url, listing_url, bat_auction_url, origin_metadata, discovery_source")
+        .select("id, year, make, model, profile_origin, discovery_url, listing_url, bat_auction_url, origin_metadata, discovery_source, updated_at, primary_image_url, image_url")
+        .or("profile_origin.eq.bat_import,discovery_source.eq.bat_import,listing_url.ilike.%bringatrailer.com/listing/%,discovery_url.ilike.%bringatrailer.com/listing/%,bat_auction_url.ilike.%bringatrailer.com/listing/%")
+        .or(badPrimaryOr)
+        .order("updated_at", { ascending: true })
+        .limit(Math.min(250, limit));
+
+      const { data: baseRows, error: baseErr } = await admin
+        .from("vehicles")
+        .select("id, year, make, model, profile_origin, discovery_url, listing_url, bat_auction_url, origin_metadata, discovery_source, updated_at, primary_image_url, image_url")
         .or("profile_origin.eq.bat_import,discovery_source.eq.bat_import,listing_url.ilike.%bringatrailer.com/listing/%,discovery_url.ilike.%bringatrailer.com/listing/%,bat_auction_url.ilike.%bringatrailer.com/listing/%")
         .order("updated_at", { ascending: true })
         .limit(limit);
-      if (error) throw new Error(error.message);
-      vehicles = data || [];
+
+      if (badErr) throw new Error(badErr.message);
+      if (baseErr) throw new Error(baseErr.message);
+
+      const combined = [...(badPrimaryRows || []), ...(baseRows || [])];
+      // De-dupe by id while preserving priority order.
+      const seen = new Set<string>();
+      vehicles = [];
+      for (const v of combined) {
+        const id = String(v?.id || "");
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        vehicles.push(v);
+        if (vehicles.length >= limit) break;
+      }
+
       if (cutoffIso) {
         vehicles = vehicles.filter((v) => !v?.updated_at || String(v.updated_at) <= cutoffIso);
       }
@@ -260,6 +303,7 @@ Deno.serve(async (req) => {
       vehicles: [] as any[],
     };
 
+    let repairedCount = 0;
     for (const vehicle of vehicles) {
       const vehicleResult: any = {
         vehicle_id: vehicle.id,
@@ -314,7 +358,10 @@ Deno.serve(async (req) => {
           if (rpcErr) throw new Error(rpcErr.message);
           vehicleResult.rpc = rpcData;
           vehicleResult.repaired = rpcData?.skipped !== true;
-          if (vehicleResult.repaired) results.repaired++;
+          if (vehicleResult.repaired) {
+            results.repaired++;
+            repairedCount++;
+          }
         } else {
           vehicleResult.skipped_reason = "canonical_missing";
           results.skipped++;
@@ -324,13 +371,11 @@ Deno.serve(async (req) => {
         results.failed++;
       }
 
-      results.vehicles.push(vehicleResult);
+      // Keep response payload small; full details only for a small sample.
+      if (results.vehicles.length < 25) results.vehicles.push(vehicleResult);
 
-      // Soft limit repairs per run (keeps runtime predictable)
-      if (!body.vehicle_id) {
-        const done = results.repaired + results.failed + results.skipped;
-        if (done >= batchSize) break;
-      }
+      // Hard limit: stop only after we've actually repaired N vehicles (skips don't count).
+      if (!body.vehicle_id && repairedCount >= batchSize) break;
 
       // small delay to avoid hammering
       await new Promise((r) => setTimeout(r, 75));
