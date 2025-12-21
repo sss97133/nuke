@@ -242,6 +242,24 @@ const VehicleProfile: React.FC = () => {
   const buildAuctionPulseFromExternalListings = useCallback((rows: any[], vehicleIdForRows: string) => {
     const arr = Array.isArray(rows) ? rows.filter((r) => r && r.listing_url && r.platform) : [];
     if (arr.length === 0) return null;
+    
+    // Filter out stale "active" listings if vehicle is sold (check vehicle data if available)
+    // This prevents showing old bid amounts when vehicle has been sold
+    const vehicleData = (window as any).__vehicleProfileRpcData?.vehicle;
+    const vehicleIsSold = vehicleData?.sale_price > 0 || 
+                         vehicleData?.sale_status === 'sold' ||
+                         vehicleData?.auction_outcome === 'sold';
+    
+    if (vehicleIsSold) {
+      // Remove "active" listings when vehicle is sold - they're stale
+      const filtered = arr.filter(r => {
+        const status = String(r.listing_status || '').toLowerCase();
+        return status !== 'active' && status !== 'live';
+      });
+      if (filtered.length > 0) {
+        arr = filtered;
+      }
+    }
 
     const now = Date.now();
     const toLower = (v: any) => String(v || '').toLowerCase();
@@ -1480,6 +1498,17 @@ const VehicleProfile: React.FC = () => {
             // ignore
           }
         }
+        // Filter out stale active listings if vehicle is sold
+        const vehicleIsSold = (vehicleData as any)?.sale_price > 0 || 
+                             (vehicleData as any)?.sale_status === 'sold' ||
+                             (vehicleData as any)?.auction_outcome === 'sold';
+        if (vehicleIsSold) {
+          arr = arr.filter((r: any) => {
+            const status = String(r.listing_status || '').toLowerCase();
+            return status !== 'active' && status !== 'live';
+          });
+        }
+        
         const best = buildAuctionPulseFromExternalListings(arr, vehicleData.id);
 
         // Fallback: if we can't access external_listings due to RLS, still treat BaT-discovered vehicles as "auction mode"
