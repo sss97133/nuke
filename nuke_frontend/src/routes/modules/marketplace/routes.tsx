@@ -10,6 +10,7 @@ import MarketExchange from '../../../pages/MarketExchange';
 import MarketFundDetail from '../../../pages/MarketFundDetail';
 import MarketSegments from '../../../pages/MarketSegments';
 import MarketSegmentDetail from '../../../pages/MarketSegmentDetail';
+import DebugMarketSegment from '../../../pages/DebugMarketSegment';
 import MarketMovement from '../../../pages/MarketMovement';
 import MarketDashboard from '../../../pages/MarketDashboard';
 
@@ -22,7 +23,7 @@ const MarketplaceModuleRoutes = () => {
       <Route path="/exchange" element={<MarketExchange />} />
       <Route path="/exchange/:symbol" element={<MarketFundDetail />} />
       <Route path="/segments" element={<MarketSegments />} />
-      <Route path="/segments/:slug" element={<MarketSegmentDetail />} />
+      <Route path="/segments/:slug" element={<DebugMarketSegment />} />
       <Route path="/movement" element={<MarketMovement />} />
       <Route path="/investor/dashboard" element={<InvestorDashboardPage />} />
       <Route path="/portfolio" element={<Portfolio />} />

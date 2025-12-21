@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import RealVehicleData from '../components/market/RealVehicleData';
+import SimpleETFDetails from '../components/market/SimpleETFDetails';
 
 type SegmentSubcategory = {
   id: string;
@@ -170,12 +170,17 @@ export default function MarketSegmentDetail() {
   }
 
   if (!segment) {
+    // Show simplified contract details even if segment query failed
+    if (slug) {
+      return <SimpleETFDetails segmentSlug={slug} />;
+    }
+    
     return (
       <div style={{ padding: '24px', color: 'var(--text-muted)', fontSize: '9pt' }}>
         Segment not found.
         <div style={{ marginTop: '10px' }}>
-          <button className="button button-secondary" onClick={() => navigate('/market/segments')}>
-            Back to Segments
+          <button className="button button-secondary" onClick={() => navigate('/market')}>
+            Back to Market
           </button>
         </div>
       </div>
