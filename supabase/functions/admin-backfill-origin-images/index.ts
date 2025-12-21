@@ -273,7 +273,24 @@ Deno.serve(async (req) => {
         // Fallback: create DB rows that point to the external URL directly.
         method = "external_link";
         const nowIso = new Date().toISOString();
-        const rows = urls.map((u: string, idx: number) => ({
+        const safeUrls = (urls || [])
+          .map((u: string) => String(u || "").trim())
+          .filter((u: string) => u.startsWith("http"))
+          // Defensive BaT hygiene: don't allow promo/editorial assets into vehicle galleries.
+          .filter((u: string) => {
+            const s = u.toLowerCase();
+            if (!s.includes("bringatrailer.com/wp-content/uploads/")) return true;
+            if (s.includes("qotw") || s.includes("winner-template")) return false;
+            if (s.includes("weekly-weird") || s.includes("mile-marker")) return false;
+            if (s.includes("podcast") || s.includes("merch")) return false;
+            if (s.includes("thumbnail-template") || s.includes("site-post-")) return false;
+            if (s.includes("screenshot-")) return false;
+            if (s.includes("countries/") || s.includes("themes/") || s.includes("assets/img/")) return false;
+            if (/\/web-\d{3,}-/i.test(s)) return false;
+            return true;
+          });
+
+        const rows = safeUrls.map((u: string, idx: number) => ({
           vehicle_id: v.id,
           image_url: u,
           thumbnail_url: u,
@@ -283,6 +300,14 @@ Deno.serve(async (req) => {
           is_primary: idx === 0,
           is_document: false,
           is_external: true,
+          approval_status: "auto_approved",
+          is_approved: true,
+          redaction_level: "none",
+          is_duplicate: false,
+          duplicate_of: null,
+          stale: false,
+          position: idx,
+          display_order: idx,
           source: String(v?.profile_origin || "origin_metadata"),
           source_url: String(v?.discovery_url || "") || null,
           caption: String(v?.profile_origin || "Imported"),

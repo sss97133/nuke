@@ -253,9 +253,28 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
     );
   };
 
-  // 1) Most reliable: embedded JSON gallery attribute.
+  const isNoise = (u: string): boolean => {
+    const f = u.toLowerCase();
+    return (
+      f.includes('qotw') ||
+      f.includes('winner-template') ||
+      f.includes('weekly-weird') ||
+      f.includes('mile-marker') ||
+      f.includes('podcast') ||
+      f.includes('merch') ||
+      f.includes('thumbnail-template') ||
+      f.includes('site-post-') ||
+      f.includes('screenshot-') ||
+      f.includes('countries/') ||
+      f.includes('themes/') ||
+      f.includes('assets/img/') ||
+      /\/web-\d{3,}-/i.test(f)
+    );
+  };
+
+  // 1) Most reliable: the listing gallery div's embedded JSON.
   try {
-    const m = h.match(/data-gallery-items="([^"]+)"/i);
+    const m = h.match(/id="bat_listing_page_photo_gallery"[^>]*data-gallery-items="([^"]+)"/i);
     if (m?.[1]) {
       const jsonText = m[1]
         .replace(/&quot;/g, '"')
@@ -268,7 +287,9 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
           const u = it?.large?.url || it?.small?.url;
           if (typeof u !== 'string' || !u.trim()) continue;
           const nu = normalize(u);
-          if (isOk(nu)) urls.push(nu);
+          if (!isOk(nu)) continue;
+          if (isNoise(nu)) continue;
+          urls.push(nu);
         }
         if (urls.length) return [...new Set(urls)];
       }
@@ -277,7 +298,7 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
     // continue to fallbacks
   }
 
-  // 2) Regex fallback
+  // 2) Regex fallback (best-effort). Keep it noise-filtered and bounded.
   const abs = h.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
   const protoRel = h.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
   const rel = h.match(/\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
@@ -290,9 +311,11 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
     if (u.startsWith('/')) u = 'https://bringatrailer.com' + u;
     const nu = normalize(u);
     if (!isOk(nu)) continue;
+    if (isNoise(nu)) continue;
     if (seen.has(nu)) continue;
     seen.add(nu);
     out.push(nu);
+    if (out.length >= 400) break;
   }
   return out;
 }

@@ -50,6 +50,7 @@ const AdminMissionControl: React.FC = () => {
   const [batCleanupRunning, setBatCleanupRunning] = useState(false);
   const [batCleanupBatchSize, setBatCleanupBatchSize] = useState(25);
   const [batCleanupLastResult, setBatCleanupLastResult] = useState<any | null>(null);
+  const [batCleanupVehicleId, setBatCleanupVehicleId] = useState('');
   const [batDomHealthRunning, setBatDomHealthRunning] = useState(false);
   const [batDomHealthBatchSize, setBatDomHealthBatchSize] = useState(50);
   const [batDomHealthLastResult, setBatDomHealthLastResult] = useState<any | null>(null);
@@ -489,6 +490,7 @@ const AdminMissionControl: React.FC = () => {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
+          vehicle_id: batCleanupVehicleId.trim() || undefined,
           dry_run: false,
           limit: 1000, // Scan up to 1000 vehicles
           batch_size: batCleanupBatchSize,
@@ -838,7 +840,7 @@ const AdminMissionControl: React.FC = () => {
             disabled={batCleanupRunning}
             onClick={runBatImageCleanup}
           >
-            {batCleanupRunning ? 'Running...' : 'Clean All BaT Images'}
+            {batCleanupRunning ? 'Running...' : (batCleanupVehicleId.trim() ? 'Fix This Vehicle' : 'Clean All BaT Images')}
           </button>
         </div>
         <div className="card-body">
@@ -846,6 +848,16 @@ const AdminMissionControl: React.FC = () => {
             Repairs BaT galleries using the ONLY canonical source: `vehicles.origin_metadata.image_urls` (BaT `data-gallery-items`).\n            Sets `vehicle_images.position` to match BaT order, marks non-canonical BaT-domain images as `is_duplicate`, and resets the primary image to the first canonical photo.\n            Run repeatedly until the BaT feed no longer shows BaT UI assets as primary images.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Vehicle ID (optional)
+              <input
+                type="text"
+                value={batCleanupVehicleId}
+                placeholder="uuid"
+                onChange={(e) => setBatCleanupVehicleId(e.target.value)}
+                style={{ marginLeft: 8, width: 320, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
             <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
               Batch size
               <input
@@ -1183,7 +1195,7 @@ const AdminMissionControl: React.FC = () => {
                     <td style={{ padding: 8, borderBottom: '1px solid var(--border)', textAlign: 'right' }}>{Number(r.vehicles || 0).toLocaleString()}</td>
                     <td style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
                       {r.sample_url ? (
-                        <ImageHoverPreview imageUrl={r.sample_url} vehicleId={r.sample_vehicle_id}>
+                        <ImageHoverPreview imageUrl={r.sample_url} vehicleId={r.sample_vehicle_id || undefined}>
                           <img src={r.sample_url} style={{ width: 72, height: 54, objectFit: 'cover', border: '1px solid var(--border)', cursor: 'pointer' }} />
                         </ImageHoverPreview>
                       ) : (
@@ -1196,7 +1208,7 @@ const AdminMissionControl: React.FC = () => {
                     <td style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {r.sample_url ? (
-                          <ImageHoverPreview imageUrl={r.sample_url} vehicleId={r.sample_vehicle_id}>
+                          <ImageHoverPreview imageUrl={r.sample_url} vehicleId={r.sample_vehicle_id || undefined}>
                             <a className="button button-secondary" style={{ fontSize: '8pt' }} href={r.sample_url} target="_blank" rel="noreferrer">
                               Open image
                             </a>

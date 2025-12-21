@@ -35,6 +35,7 @@ const tools: AdminNavItem[] = [
   { label: 'KSL Scraper', to: '/admin/ksl-scraper' },
   { label: 'Meme Library', to: '/admin/meme-library' },
   { label: 'Catalog Browser', to: '/admin/catalog' },
+  { label: 'Make Logos Catalog', to: '/admin/make-logos-catalog', description: 'Vehicle makes + logo links (Wikidata/Commons)' },
   { label: 'Database Audit', to: '/admin/database-audit' },
   { label: 'Data Diagnostic', to: '/admin/data-diagnostic' },
   { label: 'Test Contributions', to: '/admin/test-contributions' },
