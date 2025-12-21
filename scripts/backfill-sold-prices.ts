@@ -11,6 +11,11 @@
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../.env.local') });
@@ -48,7 +53,7 @@ async function findVehiclesMissingSoldPrice(): Promise<VehicleMissingPrice[]> {
     .from('vehicles')
     .select('id, year, make, model, sale_status, sale_price, sale_date, bat_sold_price, bat_sale_date, bat_auction_url, asking_price, current_value')
     .eq('sale_status', 'sold')
-    .is('sale_price', null);
+    .or('sale_price.is.null,sale_price.eq.0');
 
   if (error1) {
     console.error('Error fetching sold vehicles:', error1);
@@ -59,7 +64,7 @@ async function findVehiclesMissingSoldPrice(): Promise<VehicleMissingPrice[]> {
     .from('vehicles')
     .select('id, year, make, model, sale_status, sale_price, sale_date, bat_sold_price, bat_sale_date, bat_auction_url, asking_price, current_value')
     .not('sale_date', 'is', null)
-    .is('sale_price', null);
+    .or('sale_price.is.null,sale_price.eq.0');
 
   if (error2) {
     console.error('Error fetching vehicles with sale_date:', error2);
@@ -70,7 +75,7 @@ async function findVehiclesMissingSoldPrice(): Promise<VehicleMissingPrice[]> {
     .from('vehicles')
     .select('id, year, make, model, sale_status, sale_price, sale_date, bat_sold_price, bat_sale_date, bat_auction_url, asking_price, current_value')
     .not('bat_sold_price', 'is', null)
-    .is('sale_price', null);
+    .or('sale_price.is.null,sale_price.eq.0');
 
   if (error3) {
     console.error('Error fetching vehicles with bat_sold_price:', error3);
@@ -91,29 +96,102 @@ async function findVehiclesMissingSoldPrice(): Promise<VehicleMissingPrice[]> {
   return unique;
 }
 
+/**
+ * Scrape BaT listing for sold price
+ */
+async function scrapeBaTPrice(batUrl: string): Promise<{ price: number | null; saleDate: string | null }> {
+  try {
+    console.log(`  📡 Scraping BaT: ${batUrl}`);
+    
+    const response = await fetch(batUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+
+    // Extract price from title tag
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1] : '';
+
+    // Extract price from title: "sold for $11,000"
+    const priceMatch = title.match(/\$([\d,]+)/);
+    const dateMatch = title.match(/(\w+ \d+, \d{4})/);
+
+    // Try to find price in page content
+    let pagePrice = null;
+    const pricePatterns = [
+      /sold for \$([\d,]+)/i,
+      /final bid: \$([\d,]+)/i,
+      /\$([\d,]+)\s*(?:was|is|final)/i,
+    ];
+
+    for (const pattern of pricePatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        pagePrice = match[1].replace(/,/g, '');
+        break;
+      }
+    }
+
+    const priceFromTitle = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : null;
+    const price = priceFromTitle || (pagePrice ? parseInt(pagePrice) : null);
+    
+    // Parse date from title
+    let saleDate: string | null = null;
+    if (dateMatch) {
+      try {
+        const date = new Date(dateMatch[1]);
+        saleDate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      } catch (e) {
+        // Date parsing failed, ignore
+      }
+    }
+
+    return { price, saleDate };
+  } catch (error: any) {
+    console.error(`  ❌ Scrape error: ${error.message}`);
+    return { price: null, saleDate: null };
+  }
+}
+
 async function backfillSoldPrice(
   vehicle: VehicleMissingPrice,
-  useBatPrice: boolean = true
-): Promise<{ success: boolean; error?: string }> {
+  scrapeBat: boolean = true
+): Promise<{ success: boolean; error?: string; source?: string }> {
   try {
     let salePrice: number | null = null;
     let saleDate: string | null = null;
     let source = 'backfill_script';
 
-    // Priority 1: Use bat_sold_price if available
-    if (useBatPrice && vehicle.bat_sold_price) {
+    // Priority 1: Use bat_sold_price if already in database
+    if (vehicle.bat_sold_price) {
       salePrice = vehicle.bat_sold_price;
       saleDate = vehicle.bat_sale_date || vehicle.sale_date || null;
       source = 'bat_import';
     }
-    // Priority 2: Use asking_price if vehicle was for sale
-    else if (vehicle.asking_price && vehicle.asking_price > 0) {
+    // Priority 2: Scrape BaT URL if available
+    else if (scrapeBat && vehicle.bat_auction_url) {
+      const scraped = await scrapeBaTPrice(vehicle.bat_auction_url);
+      if (scraped.price) {
+        salePrice = scraped.price;
+        saleDate = scraped.saleDate || vehicle.sale_date || null;
+        source = 'bat_scraped';
+      }
+    }
+    // Priority 3: Use asking_price if vehicle was for sale
+    if (!salePrice && vehicle.asking_price && vehicle.asking_price > 0) {
       salePrice = vehicle.asking_price;
       saleDate = vehicle.sale_date || null;
       source = 'estimated_from_asking';
     }
-    // Priority 3: Use current_value as fallback
-    else if (vehicle.current_value && vehicle.current_value > 0) {
+    // Priority 4: Use current_value as fallback
+    if (!salePrice && vehicle.current_value && vehicle.current_value > 0) {
       salePrice = vehicle.current_value;
       saleDate = vehicle.sale_date || null;
       source = 'estimated_from_value';
@@ -156,7 +234,7 @@ async function backfillSoldPrice(
         is_estimate: source !== 'bat_import'
       });
 
-    return { success: true };
+    return { success: true, source: source };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
@@ -174,12 +252,14 @@ async function main() {
 
   console.log(`Found ${vehicles.length} vehicles missing sold price data:\n`);
 
-  // Group by whether they have bat_sold_price
+  // Group by data availability
   const withBatPrice = vehicles.filter(v => v.bat_sold_price);
-  const withoutBatPrice = vehicles.filter(v => !v.bat_sold_price);
+  const withBatUrl = vehicles.filter(v => v.bat_auction_url && !v.bat_sold_price);
+  const withoutBatData = vehicles.filter(v => !v.bat_sold_price && !v.bat_auction_url);
 
-  console.log(`  - ${withBatPrice.length} have bat_sold_price (can auto-backfill)`);
-  console.log(`  - ${withoutBatPrice.length} need manual review\n`);
+  console.log(`  - ${withBatPrice.length} have bat_sold_price (can auto-backfill immediately)`);
+  console.log(`  - ${withBatUrl.length} have bat_auction_url (can scrape for price)`);
+  console.log(`  - ${withoutBatData.length} need manual entry (no BaT data)\n`);
 
   // Show first 10 vehicles
   console.log('First 10 vehicles:');
@@ -199,25 +279,63 @@ async function main() {
     console.log('   Run with --auto flag to automatically backfill these vehicles.\n');
   }
 
-  // If --auto flag, backfill vehicles with bat_sold_price
+  // If --auto flag, backfill vehicles
   if (process.argv.includes('--auto')) {
-    console.log('🔄 Auto-backfilling vehicles with bat_sold_price...\n');
+    console.log('🔄 Auto-backfilling vehicles...\n');
 
     let successCount = 0;
     let errorCount = 0;
 
+    // First, backfill vehicles with bat_sold_price (fast, no scraping needed)
     for (const vehicle of withBatPrice) {
-      const result = await backfillSoldPrice(vehicle, true);
+      const result = await backfillSoldPrice(vehicle, false); // Don't scrape, use existing data
       if (result.success) {
         successCount++;
-        console.log(`✅ ${vehicle.year || '?'} ${vehicle.make} ${vehicle.model}: $${vehicle.bat_sold_price}`);
+        console.log(`✅ ${vehicle.year || '?'} ${vehicle.make} ${vehicle.model}: $${vehicle.bat_sold_price} (from bat_sold_price)`);
       } else {
         errorCount++;
         console.error(`❌ ${vehicle.year || '?'} ${vehicle.make} ${vehicle.model}: ${result.error}`);
       }
     }
 
-    console.log(`\n📊 Results: ${successCount} succeeded, ${errorCount} failed`);
+    // Then, try scraping BaT URLs for vehicles without bat_sold_price
+    const withBatUrl = vehicles.filter(v => v.bat_auction_url && !v.bat_sold_price);
+    console.log(`\n📡 Scraping ${withBatUrl.length} BaT URLs for sold prices...\n`);
+
+    // Process all vehicles, not just 20
+    const batchSize = 20;
+    const totalBatches = Math.ceil(withBatUrl.length / batchSize);
+    
+    for (let batch = 0; batch < totalBatches; batch++) {
+      const batchVehicles = withBatUrl.slice(batch * batchSize, (batch + 1) * batchSize);
+      console.log(`\n📦 Processing batch ${batch + 1}/${totalBatches} (${batchVehicles.length} vehicles)...\n`);
+      
+      for (const vehicle of batchVehicles) {
+        const result = await backfillSoldPrice(vehicle, true); // Scrape BaT
+        if (result.success) {
+          successCount++;
+          const sourceLabel = result.source === 'bat_scraped' ? 'scraped' : result.source || 'found';
+          console.log(`✅ ${vehicle.year || '?'} ${vehicle.make} ${vehicle.model}: ${sourceLabel}`);
+        } else {
+          errorCount++;
+          console.error(`❌ ${vehicle.year || '?'} ${vehicle.make} ${vehicle.model}: ${result.error}`);
+        }
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      console.log(`\n📊 Batch ${batch + 1} Results: ${successCount} succeeded, ${errorCount} failed`);
+      
+      // Small delay between batches
+      if (batch < totalBatches - 1) {
+        console.log('⏳ Waiting 5 seconds before next batch...\n');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+  
+    console.log(`\n✅ Final Results: ${successCount} succeeded, ${errorCount} failed`);
+    console.log(`💡 Processed ${withBatUrl.length} vehicles total`);
   }
 }
 
