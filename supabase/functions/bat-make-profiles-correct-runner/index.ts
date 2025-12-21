@@ -45,8 +45,8 @@ async function isAuthorized(req: Request): Promise<{ ok: boolean; mode: "service
     const { data: userData, error: userErr } = await authClient.auth.getUser();
     if (userErr || !userData?.user) return { ok: false, mode: "none", error: "Unauthorized" };
 
-    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-    const { data: isAdmin, error: adminErr } = await admin.rpc("is_admin_or_moderator");
+    // IMPORTANT: is_admin_or_moderator() depends on auth.uid(), so it must run under the user's JWT context.
+    const { data: isAdmin, error: adminErr } = await authClient.rpc("is_admin_or_moderator");
     if (adminErr) return { ok: false, mode: "none", error: adminErr.message };
     if (isAdmin === true) return { ok: true, mode: "admin_user" };
     return { ok: false, mode: "none", error: "Forbidden" };

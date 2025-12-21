@@ -357,7 +357,26 @@ const CursorHomepage: React.FC = () => {
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [infoDense, setInfoDense] = useState<boolean>(false);
-  const [cardMinWidth, setCardMinWidth] = useState<number>(180); // Smaller default cards
+  const [cardsPerRow, setCardsPerRow] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_homepage_cardsPerRow');
+      const n = Number(saved);
+      if (Number.isFinite(n) && n >= 1 && n <= 16) return Math.round(n);
+      return 6;
+    } catch {
+      return 6;
+    }
+  });
+  const [thumbFitMode, setThumbFitMode] = useState<'square' | 'original'>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_homepage_thumbFitMode');
+      return saved === 'original' ? 'original' : 'square';
+    } catch {
+      return 'square';
+    }
+  });
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [gridWidth, setGridWidth] = useState<number>(0);
   // ARCHIVED: Thermal pricing - disabled until we're more capable of handling it
   // const [thermalPricing, setThermalPricing] = useState<boolean>(() => {
   //   try {
@@ -495,6 +514,55 @@ const CursorHomepage: React.FC = () => {
       console.warn('Failed to save sortDirection:', err);
     }
   }, [sortDirection]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_homepage_cardsPerRow', String(cardsPerRow));
+    } catch {
+      // ignore
+    }
+  }, [cardsPerRow]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_homepage_thumbFitMode', thumbFitMode);
+    } catch {
+      // ignore
+    }
+  }, [thumbFitMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const el = gridRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setGridWidth((prev) => {
+        const next = Math.max(0, Math.floor(rect.width));
+        return prev === next ? prev : next;
+      });
+    };
+
+    update();
+    window.addEventListener('resize', update);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => update()) : null;
+    if (ro) ro.observe(el);
+
+    return () => {
+      window.removeEventListener('resize', update);
+      if (ro) ro.disconnect();
+    };
+  }, [viewMode, filteredVehicles.length]);
+
+  const gridCardSizePx = useMemo(() => {
+    const cols = Math.max(1, Math.min(16, Math.floor(cardsPerRow || 1)));
+    const gap = 8;
+    const w = Number(gridWidth) || 0;
+    if (!w) return undefined;
+    const px = (w - gap * (cols - 1)) / cols;
+    return Math.max(60, Math.floor(px));
+  }, [gridWidth, cardsPerRow]);
 
   useEffect(() => {
     try {
@@ -1517,6 +1585,69 @@ const CursorHomepage: React.FC = () => {
     }
   };
 
+  // Source pogs are “include chips”: if it's in your set, you see those vehicles.
+  // We keep legacy `hide*` flags for now, but treat them as derived from “included chips”.
+  const setSourceIncluded = useCallback((kind: SourceKind, included: boolean) => {
+    setFilters((prev) => {
+      // This legacy flag conflicts with per-source toggles (it hides CL + dealer sites + KSL).
+      // For the new “pogs” interaction model, we treat sources as independent, so we clear it
+      // whenever the user explicitly picks/changes a source.
+      const base = { ...prev, hideDealerListings: false };
+
+      switch (kind) {
+        case 'craigslist':
+          return { ...base, hideCraigslist: !included };
+        case 'dealer_site':
+          return { ...base, hideDealerSites: !included };
+        case 'ksl':
+          return { ...base, hideKsl: !included };
+        case 'bat':
+          return { ...base, hideBat: !included };
+        case 'classic':
+          return { ...base, hideClassic: !included };
+        default:
+          return base;
+      }
+    });
+  }, []);
+
+  const includedSources = useMemo(() => {
+    return {
+      craigslist: !filters.hideDealerListings && !filters.hideCraigslist,
+      dealer_site: !filters.hideDealerListings && !filters.hideDealerSites,
+      ksl: !filters.hideDealerListings && !filters.hideKsl,
+      bat: !filters.hideBat,
+      classic: !filters.hideClassic
+    };
+  }, [
+    filters.hideDealerListings,
+    filters.hideCraigslist,
+    filters.hideDealerSites,
+    filters.hideKsl,
+    filters.hideBat,
+    filters.hideClassic
+  ]);
+
+  const faviconUrl = useCallback((domain: string) => {
+    return `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}`;
+  }, []);
+
+  const sourcePogs = useMemo(() => {
+    const all = [
+      { key: 'craigslist' as const, domain: 'craigslist.org', title: 'Craigslist', included: includedSources.craigslist },
+      { key: 'ksl' as const, domain: 'ksl.com', title: 'KSL', included: includedSources.ksl },
+      { key: 'dealer_site' as const, domain: 'autotrader.com', title: 'Dealer Sites', included: includedSources.dealer_site },
+      { key: 'bat' as const, domain: 'bringatrailer.com', title: 'Bring a Trailer', included: includedSources.bat },
+      { key: 'classic' as const, domain: 'classic.com', title: 'Classic.com', included: includedSources.classic }
+    ];
+
+    return {
+      all,
+      selected: all.filter((x) => x.included),
+      hiddenCount: all.filter((x) => !x.included).length
+    };
+  }, [includedSources]);
+
   const openFiltersFromMiniBar = useCallback(() => {
     suppressAutoMinimizeUntilRef.current = Date.now() + 1200;
     lastScrollYRef.current = window.scrollY;
@@ -1649,70 +1780,32 @@ const CursorHomepage: React.FC = () => {
               <div style={{ width: '1px', height: '14px', background: 'var(--border)', flex: '0 0 auto' }} aria-hidden="true" />
 
               {(() => {
-                const faviconUrl = (domain: string) => `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}`;
-                const pogs = [
-                  {
-                    key: 'cl',
-                    domain: 'craigslist.org',
-                    title: 'Craigslist',
-                    included: !filters.hideCraigslist,
-                    onClick: () => setFilters({ ...filters, hideCraigslist: !filters.hideCraigslist })
-                  },
-                  {
-                    key: 'ksl',
-                    domain: 'ksl.com',
-                    title: 'KSL',
-                    included: !filters.hideKsl,
-                    onClick: () => setFilters({ ...filters, hideKsl: !filters.hideKsl })
-                  },
-                  {
-                    key: 'sites',
-                    domain: 'autotrader.com',
-                    title: 'Dealer Sites',
-                    included: !filters.hideDealerSites,
-                    onClick: () => setFilters({ ...filters, hideDealerSites: !filters.hideDealerSites })
-                  },
-                  {
-                    key: 'bat',
-                    domain: 'bringatrailer.com',
-                    title: 'Bring a Trailer',
-                    included: !filters.hideBat,
-                    onClick: () => setFilters({ ...filters, hideBat: !filters.hideBat })
-                  },
-                  {
-                    key: 'classic',
-                    domain: 'classic.com',
-                    title: 'Classic.com',
-                    included: !filters.hideClassic,
-                    onClick: () => setFilters({ ...filters, hideClassic: !filters.hideClassic })
-                  }
-                ];
-
                 return (
                   <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flex: '0 0 auto' }}>
-                    {pogs.map((p) => (
+                    {sourcePogs.selected.map((p) => (
                       <button
                         key={p.key}
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          p.onClick();
+                          // Clicking a selected pog removes it (excludes that source).
+                          setSourceIncluded(p.key, false);
                         }}
-                        aria-label={p.included ? `${p.title} (included)` : `${p.title} (hidden)`}
-                        title={p.included ? `${p.title}: Included (click to hide)` : `${p.title}: Hidden (click to include)`}
+                        aria-label={`${p.title} (selected)`}
+                        title={`${p.title}: Selected (click to remove)`}
                         style={{
                           width: '18px',
                           height: '18px',
                           padding: 0,
                           borderRadius: '999px',
-                          border: `1px solid ${p.included ? 'var(--accent)' : 'var(--border)'}`,
+                          border: '1px solid var(--accent)',
                           background: 'var(--white)',
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: p.included ? '0 0 0 2px var(--accent-dim)' : 'none',
-                          opacity: p.included ? 1 : 0.45,
+                          boxShadow: '0 0 0 2px var(--accent-dim)',
+                          opacity: 1,
                           flex: '0 0 auto'
                         }}
                       >
@@ -1727,11 +1820,34 @@ const CursorHomepage: React.FC = () => {
                             width: '14px',
                             height: '14px',
                             borderRadius: '3px',
-                            filter: p.included ? 'none' : 'grayscale(100%)',
+                            filter: 'none',
                           }}
                         />
                       </button>
                     ))}
+
+                    {sourcePogs.hiddenCount > 0 && (
+                      <div
+                        style={{
+                          flex: '0 0 auto',
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '999px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--grey-200)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '7pt',
+                          color: 'var(--text-muted)',
+                          fontFamily: '"MS Sans Serif", sans-serif',
+                          userSelect: 'none'
+                        }}
+                        title="Open filters to add more sources"
+                      >
+                        +{sourcePogs.hiddenCount}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -1740,19 +1856,64 @@ const CursorHomepage: React.FC = () => {
             <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
               <div
                 onClick={(e) => e.stopPropagation()}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                title={`Card density (${Math.round(cardMinWidth)}px min)`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                title={`${cardsPerRow} per row`}
               >
+                <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: '"MS Sans Serif", sans-serif' }}>
+                  {cardsPerRow}/row
+                </div>
                 <input
                   type="range"
-                  min="140"
-                  max="320"
-                  step="10"
-                  value={cardMinWidth}
-                  onChange={(e) => setCardMinWidth(parseInt(e.target.value, 10))}
+                  min="1"
+                  max="16"
+                  step="1"
+                  value={cardsPerRow}
+                  onChange={(e) => setCardsPerRow(parseInt(e.target.value, 10))}
                   className="nuke-range nuke-range-accent"
                   style={{ width: '110px' }}
                 />
+                <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setThumbFitMode('square');
+                    }}
+                    style={{
+                      padding: '1px 6px',
+                      fontSize: '7pt',
+                      border: '1px solid var(--border)',
+                      background: thumbFitMode === 'square' ? 'var(--grey-600)' : 'var(--grey-200)',
+                      color: thumbFitMode === 'square' ? 'var(--white)' : 'var(--text)',
+                      cursor: 'pointer',
+                      borderRadius: '999px',
+                      fontFamily: '"MS Sans Serif", sans-serif',
+                    }}
+                    title="Square thumbnails"
+                  >
+                    1:1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setThumbFitMode('original');
+                    }}
+                    style={{
+                      padding: '1px 6px',
+                      fontSize: '7pt',
+                      border: '1px solid var(--border)',
+                      background: thumbFitMode === 'original' ? 'var(--grey-600)' : 'var(--grey-200)',
+                      color: thumbFitMode === 'original' ? 'var(--white)' : 'var(--text)',
+                      cursor: 'pointer',
+                      borderRadius: '999px',
+                      fontFamily: '"MS Sans Serif", sans-serif',
+                    }}
+                    title="Original aspect (letterbox)"
+                  >
+                    ORIG
+                  </button>
+                </div>
               </div>
               {activeFilterCount > 0 && (
                 <button
@@ -1871,6 +2032,72 @@ const CursorHomepage: React.FC = () => {
                 }}
               >
                 Hide Filters
+              </button>
+            </div>
+
+            {/* Source pog library (add/remove) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 700 }}>
+                Sources
+              </div>
+              <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {sourcePogs.all.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setSourceIncluded(p.key, !p.included)}
+                    aria-label={p.included ? `${p.title} (selected)` : `${p.title} (not selected)`}
+                    title={p.included ? `${p.title}: Selected (click to remove)` : `${p.title}: Not selected (click to add)`}
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      padding: 0,
+                      borderRadius: '999px',
+                      border: `1px solid ${p.included ? 'var(--accent)' : 'var(--border)'}`,
+                      background: 'var(--white)',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: p.included ? '0 0 0 2px var(--accent-dim)' : 'none',
+                      opacity: p.included ? 1 : 0.5
+                    }}
+                  >
+                    <img
+                      src={faviconUrl(p.domain)}
+                      alt=""
+                      width={16}
+                      height={16}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '3px',
+                        filter: p.included ? 'none' : 'grayscale(100%)'
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters((prev) => ({
+                    ...prev,
+                    hideDealerListings: false,
+                    hideCraigslist: false,
+                    hideDealerSites: false,
+                    hideKsl: false,
+                    hideBat: false,
+                    hideClassic: false
+                  }));
+                }}
+                className="button"
+                style={{ fontSize: '8pt', padding: '4px 8px', height: '24px', minHeight: '24px' }}
+                title="Include all sources"
+              >
+                All
               </button>
             </div>
             
@@ -2750,9 +2977,9 @@ const CursorHomepage: React.FC = () => {
 
         {/* Grid View - Small cards side-by-side, lazy loaded */}
         {viewMode === 'grid' && (
-          <div style={{
+          <div ref={gridRef} style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinWidth}px, 1fr))`,
+            gridTemplateColumns: `repeat(${Math.max(1, Math.min(16, cardsPerRow))}, minmax(0, 1fr))`,
             gap: '8px'
         }}>
             {filteredVehicles.map((vehicle) => (
@@ -2760,10 +2987,11 @@ const CursorHomepage: React.FC = () => {
                 key={vehicle.id}
                 vehicle={vehicle}
                 viewMode="grid"
-                cardSizePx={cardMinWidth}
+                cardSizePx={gridCardSizePx}
                 infoDense={false}
                 viewerUserId={session?.user?.id}
                 thermalPricing={thermalPricing}
+                thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}
                 sourceStampUrl={
                   (vehicle as any)?.discovery_url ||
                   ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)

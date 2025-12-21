@@ -73,6 +73,8 @@ interface VehicleCardDenseProps {
   cardSizePx?: number;
   /** Enable thermal pricing color coding (purple=bad price, red=good deal) */
   thermalPricing?: boolean;
+  /** Thumbnail fit mode for the card image (square crop vs original letterbox). */
+  thumbnailFit?: 'cover' | 'contain';
 }
 
 const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
@@ -86,7 +88,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   sourceStampUrl,
   viewerUserId,
   cardSizePx,
-  thermalPricing = false
+  thermalPricing = false,
+  thumbnailFit = 'cover'
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [touchStart, setTouchStart] = React.useState(0);
@@ -595,7 +598,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             ]}
             alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
             fill={true}
-            objectFit="cover"
+            objectFit={thumbnailFit}
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
           />
@@ -697,7 +700,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             ]}
             alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
             fill={true}
-            objectFit="cover"
+            objectFit={thumbnailFit}
             placeholderSrc="/n-zero.png"
             placeholderOpacity={0.25}
           />

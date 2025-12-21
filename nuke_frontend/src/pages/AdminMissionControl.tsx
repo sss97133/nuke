@@ -48,6 +48,7 @@ const AdminMissionControl: React.FC = () => {
   const [batRepairBatchSize, setBatRepairBatchSize] = useState(10);
   const [batRepairLastResult, setBatRepairLastResult] = useState<any | null>(null);
   const [batCleanupRunning, setBatCleanupRunning] = useState(false);
+  const [batCleanupBatchSize, setBatCleanupBatchSize] = useState(25);
   const [batCleanupLastResult, setBatCleanupLastResult] = useState<any | null>(null);
   const [batDomHealthRunning, setBatDomHealthRunning] = useState(false);
   const [batDomHealthBatchSize, setBatDomHealthBatchSize] = useState(50);
@@ -489,7 +490,8 @@ const AdminMissionControl: React.FC = () => {
         },
         body: JSON.stringify({
           dry_run: false,
-          limit: 1000, // Process up to 1000 vehicles
+          limit: 1000, // Scan up to 1000 vehicles
+          batch_size: batCleanupBatchSize,
         }),
       });
 
@@ -505,7 +507,9 @@ const AdminMissionControl: React.FC = () => {
       }
 
       setBatCleanupLastResult(parsed);
-      alert(`BaT cleanup complete. Processed: ${parsed.vehicles_processed || 0}. Cleaned: ${parsed.vehicles_cleaned || 0}. Images removed: ${parsed.images_removed || 0}. Skipped: ${parsed.vehicles_skipped || 0}.`);
+      alert(
+        `BaT hygiene batch complete. Scanned: ${parsed.scanned || 0}. Candidates: ${parsed.candidates || 0}. Repaired: ${parsed.repaired || 0}. Refreshed canonical: ${parsed.refreshed_canonical || 0}. Skipped: ${parsed.skipped || 0}. Failed: ${parsed.failed || 0}.`
+      );
       loadDashboard();
     } catch (e: any) {
       console.error('BaT cleanup error:', e);
@@ -827,7 +831,7 @@ const AdminMissionControl: React.FC = () => {
       {/* BaT IMAGE CONTAMINATION CLEANUP */}
       <div style={{ marginBottom: '24px' }} className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>BaT Image Contamination Cleanup (removes images from related auctions)</span>
+          <span>BaT Image Hygiene (canonical gallery + remove contamination)</span>
           <button
             className="button button-primary"
             style={{ fontSize: '9pt' }}
@@ -839,7 +843,20 @@ const AdminMissionControl: React.FC = () => {
         </div>
         <div className="card-body">
           <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
-            Removes contaminated images from all BaT vehicles. Identifies images that don't belong using date bucket heuristics and canonical image lists from DOM map extraction. Processes ALL BaT vehicles with images (up to 1000 per run).
+            Repairs BaT galleries using the ONLY canonical source: `vehicles.origin_metadata.image_urls` (BaT `data-gallery-items`).\n            Sets `vehicle_images.position` to match BaT order, marks non-canonical BaT-domain images as `is_duplicate`, and resets the primary image to the first canonical photo.\n            Run repeatedly until the BaT feed no longer shows BaT UI assets as primary images.
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Batch size
+              <input
+                type="number"
+                value={batCleanupBatchSize}
+                min={1}
+                max={100}
+                onChange={(e) => setBatCleanupBatchSize(Number(e.target.value || 25))}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
           </div>
           {batCleanupLastResult && (
             <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
