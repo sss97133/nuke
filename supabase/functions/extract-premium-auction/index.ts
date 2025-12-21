@@ -844,7 +844,16 @@ async function storeVehiclesInDatabase(
             .single();
           data = updated;
           error = updateErr;
-          if (!updateErr && updated?.id) updatedIds.push(String(updated.id));
+          if (!updateErr && updated?.id) {
+            updatedIds.push(String(updated.id));
+            // CRITICAL: Also insert images for updated vehicles
+            if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
+              console.log(`Inserting ${vehicle.images.length} images for UPDATED vehicle ${updated.id}`);
+              const img = await insertVehicleImages(supabase, updated.id, vehicle.images, source, listingUrl);
+              console.log(`Inserted ${img.inserted} images for updated vehicle, ${img.errors.length} errors`);
+              errors.push(...img.errors);
+            }
+          }
         } else {
           const { data: inserted, error: insertErr } = await supabase
             .from("vehicles")
@@ -881,8 +890,12 @@ async function storeVehiclesInDatabase(
         // organization_vehicles link is created by DB trigger auto_link_vehicle_to_origin_org()
         // when origin_organization_id is set.
         if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
+          console.log(`Inserting ${vehicle.images.length} images for vehicle ${data.id}`);
           const img = await insertVehicleImages(supabase, data.id, vehicle.images, source, listingUrl);
+          console.log(`Inserted ${img.inserted} images, ${img.errors.length} errors`);
           errors.push(...img.errors);
+        } else {
+          console.log(`No images to insert for vehicle ${data.id} (images: ${vehicle.images ? 'exists but empty/invalid' : 'missing'})`);
         }
       }
     } catch (e: any) {
@@ -1394,10 +1407,15 @@ async function extractMecum(url: string, maxVehicles: number) {
                !lower.includes('/icons/');
       });
 
+      console.log(`Extracted ${images.length} images for ${listingUrl}`);
+      if (images.length > 0) {
+        console.log(`Sample images: ${images.slice(0, 3).join(', ')}`);
+      }
+
       return {
         ...vehicle,
         listing_url: listingUrl,
-        images,
+        images, // CRITICAL: Always include images array, even if empty
       };
     } catch (e: any) {
       issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);

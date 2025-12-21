@@ -29,6 +29,7 @@ import TestContributions from '../../../pages/TestContributions';
 import AdminPendingVehicles from '../../../pages/AdminPendingVehicles';
 import HoverCardDemo from '../../../pages/admin/HoverCardDemo';
 import VehicleMakeLogosCatalog from '../../../pages/admin/VehicleMakeLogosCatalog';
+import MarketDataTools from '../../../pages/MarketDataTools';
 
 const AdminModuleRoutes = () => {
   return (
@@ -65,6 +66,7 @@ const AdminModuleRoutes = () => {
         <Route path="meme-library" element={<MemeLibraryAdmin />} />
         <Route path="catalog" element={<CatalogBrowser />} />
         <Route path="make-logos-catalog" element={<VehicleMakeLogosCatalog />} />
+        <Route path="market-data-tools" element={<MarketDataTools />} />
         <Route path="database-audit" element={<DatabaseAudit />} />
         <Route path="data-diagnostic" element={<DataDiagnostic />} />
         <Route path="test-contributions" element={<TestContributions />} />
