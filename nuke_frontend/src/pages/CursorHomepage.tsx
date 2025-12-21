@@ -747,10 +747,10 @@ const CursorHomepage: React.FC = () => {
       // Get total value - fetch all vehicles with values to calculate
       const { data: allVehicles } = await supabase
         .from('vehicles')
-        .select('current_value, display_price');
+        .select('current_value');
       
       const totalValue = (allVehicles || []).reduce((sum, v) => {
-        const value = v.current_value || v.display_price || 0;
+        const value = v.current_value || 0;
         return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
       }, 0);
       

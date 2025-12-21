@@ -52,17 +52,29 @@ const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality: n
   try {
     const url = String(publicObjectUrl || '').trim();
     if (!url) return null;
+
+    // Validate the URL has the correct Supabase storage format
     const marker = '/storage/v1/object/public/';
     const idx = url.indexOf(marker);
     if (idx < 0) return null;
+
     const base = url.slice(0, idx);
     const path = url.slice(idx + marker.length);
     if (!path) return null;
-    // Preserve only the storage path (strip query params) to avoid double-encoding.
+
+    // Preserve only the storage path (strip query params) to avoid double-encoding
     const cleanPath = path.split('?')[0];
+
+    // Validate the path contains vehicle-images to ensure it's a real vehicle image
+    if (!cleanPath.includes('vehicle-images/')) {
+      console.warn('Invalid vehicle image path:', cleanPath);
+      return null;
+    }
+
     const renderUrl = `${base}/storage/v1/render/image/public/${cleanPath}?width=${encodeURIComponent(String(width))}&quality=${encodeURIComponent(String(quality))}`;
     return renderUrl;
-  } catch {
+  } catch (error) {
+    console.error('Error generating render URL:', error);
     return null;
   }
 };
