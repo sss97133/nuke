@@ -1648,6 +1648,23 @@ const CursorHomepage: React.FC = () => {
     };
   }, [includedSources]);
 
+  const domainHue = useCallback((domain: string) => {
+    // Deterministic pseudo-“dominant color” per domain without needing canvas/CORS.
+    // Hash -> hue. Stable across sessions.
+    const s = String(domain || '').toLowerCase();
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    }
+    return h % 360;
+  }, []);
+
+  const domainGradient = useCallback((domain: string) => {
+    const h1 = domainHue(domain);
+    const h2 = (h1 + 42) % 360;
+    return `linear-gradient(135deg, hsla(${h1}, 92%, 60%, 0.38), hsla(${h2}, 92%, 56%, 0.16))`;
+  }, [domainHue]);
+
   const openFiltersFromMiniBar = useCallback(() => {
     suppressAutoMinimizeUntilRef.current = Date.now() + 1200;
     lastScrollYRef.current = window.scrollY;
@@ -1798,15 +1815,16 @@ const CursorHomepage: React.FC = () => {
                           height: '18px',
                           padding: 0,
                           borderRadius: '999px',
-                          border: '1px solid var(--accent)',
-                          background: 'var(--white)',
+                          border: '1px solid rgba(255,255,255,0.14)',
+                          background: `${domainGradient(p.domain)}, var(--surface-glass)`,
                           cursor: 'pointer',
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: '0 0 0 2px var(--accent-dim)',
+                          boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 0 0 2px var(--accent-dim)',
                           opacity: 1,
-                          flex: '0 0 auto'
+                      flex: '0 0 auto',
+                      backdropFilter: 'blur(10px) saturate(1.35)'
                         }}
                       >
                         <img

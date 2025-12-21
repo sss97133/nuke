@@ -1093,7 +1093,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             ]}
             alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
             fill={true}
-            objectFit="cover"
+            objectFit={thumbnailFit}
             // Grid cards use the "padding-bottom: 100%" square pattern (height is auto).
             // `ResilientImage` fill mode previously used a wrapper with `height: 100%`,
             // which collapses when the parent height isn't definite. Force absolute fill.
