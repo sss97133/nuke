@@ -804,8 +804,19 @@ const CursorHomepage: React.FC = () => {
   const filteredStats = useMemo(() => {
     const totalVehicles = filteredVehicles.length;
     const totalValue = filteredVehicles.reduce((sum, v) => {
-      const value = v.current_value || v.display_price || 0;
-      return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+      // Sum all price fields for each vehicle, then add to total
+      const prices = [
+        v.current_value,
+        v.purchase_price,
+        v.sale_price,
+        v.asking_price,
+        v.display_price // computed field, may be available
+      ];
+      const vehicleTotal = prices.reduce((vehicleSum: number, price) => {
+        const numPrice = typeof price === 'number' && Number.isFinite(price) ? price : 0;
+        return vehicleSum + numPrice;
+      }, 0);
+      return sum + (vehicleTotal || 0);
     }, 0);
     // Sales volume (24hrs): align semantics with dbStats (sold today), but scoped to the filtered set.
     const today = new Date();
@@ -839,14 +850,25 @@ const CursorHomepage: React.FC = () => {
         .from('vehicles')
         .select('*', { count: 'exact', head: true });
       
-      // Get total value - fetch all vehicles with values to calculate
+      // Get total value - fetch all vehicles with ALL price fields to calculate sum of all prices
       const { data: allVehicles } = await supabase
         .from('vehicles')
-        .select('current_value');
+        .select('current_value, purchase_price, sale_price, asking_price, msrp');
       
       const totalValue = (allVehicles || []).reduce((sum, v) => {
-        const value = v.current_value || 0;
-        return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+        // Sum all price fields for each vehicle, then add to total
+        const prices = [
+          v.current_value,
+          v.purchase_price,
+          v.sale_price,
+          v.asking_price,
+          v.msrp
+        ];
+        const vehicleTotal = prices.reduce((vehicleSum: number, price) => {
+          const numPrice = typeof price === 'number' && Number.isFinite(price) ? price : 0;
+          return vehicleSum + numPrice;
+        }, 0);
+        return sum + (vehicleTotal || 0);
       }, 0);
       
       // Get sales volume in last 24 hours (vehicles sold today)

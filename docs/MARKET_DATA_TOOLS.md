@@ -1,5 +1,7 @@
 # Market Data Tools
 
+**Note**: This documentation has been consolidated. See `MARKET_DATA_TOOLS_CONSOLIDATED.md` for the current implementation that integrates with existing functionality.
+
 Tools to populate profiles with data and extract market information from external sources.
 
 ## Overview

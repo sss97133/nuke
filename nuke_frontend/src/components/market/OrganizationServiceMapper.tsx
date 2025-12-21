@@ -17,6 +17,25 @@ interface Service {
   source_url?: string;
 }
 
+// Helper to map service names to categories
+const mapServiceNameToCategory = (serviceName: string): string => {
+  const name = serviceName.toLowerCase();
+  if (name.includes('consignment')) return 'consignment_management';
+  if (name.includes('detail') || name.includes('detailing')) return 'professional_detailing';
+  if (name.includes('paint')) return 'paint_correction';
+  if (name.includes('ceramic')) return 'ceramic_coating';
+  if (name.includes('restoration')) return 'light_restoration';
+  if (name.includes('repair') || name.includes('service') || name.includes('mechanical')) return 'mechanical_repair';
+  if (name.includes('body')) return 'bodywork';
+  if (name.includes('fabricat')) return 'fabrication';
+  if (name.includes('storage')) return 'indoor_storage';
+  if (name.includes('transport') || name.includes('shipping')) return 'transport_coordination';
+  if (name.includes('photo')) return 'photography';
+  if (name.includes('listing') || name.includes('auction')) return 'listing_management';
+  if (name.includes('inspection')) return 'inspection_services';
+  return 'other';
+};
+
 export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = ({ organizationId }) => {
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [mapping, setMapping] = useState(false);
@@ -34,15 +53,32 @@ export const OrganizationServiceMapper: React.FC<{ organizationId: string }> = (
     setError(null);
 
     try {
-      // Call Edge Function to extract services from website
-      const { data, error: extractError } = await supabase.functions.invoke('extract-org-services', {
-        body: { website_url: websiteUrl, organization_id: organizationId },
+      // Use existing extract-using-catalog function for service extraction
+      // This function can extract services from organization websites
+      const { data, error: extractError } = await supabase.functions.invoke('extract-using-catalog', {
+        body: { 
+          url: websiteUrl,
+          domain: 'classic_com', // or auto-detect
+          fallback_to_ai: true,
+        },
       });
 
       if (extractError) throw extractError;
       if (data?.error) throw new Error(data.error);
 
-      setServices(data.services || []);
+      // Extract services from the extracted data
+      const extractedData = data?.data || {};
+      const servicesList = extractedData.services_offered || [];
+      
+      // Convert to our service format
+      const mappedServices: Service[] = servicesList.map((serviceName: string) => ({
+        service_name: serviceName,
+        service_category: mapServiceNameToCategory(serviceName),
+        description: `Service extracted from ${websiteUrl}`,
+        source_url: websiteUrl,
+      }));
+
+      setServices(mappedServices);
     } catch (err: any) {
       setError(err.message || 'Failed to extract services');
     } finally {

@@ -13,6 +13,7 @@ import MarketSegmentDetail from '../../../pages/MarketSegmentDetail';
 import DebugMarketSegment from '../../../pages/DebugMarketSegment';
 import MarketMovement from '../../../pages/MarketMovement';
 import MarketDashboard from '../../../pages/MarketDashboard';
+import ContractStation from '../../../pages/ContractStation';
 
 const MarketplaceModuleRoutes = () => {
   return (
@@ -29,6 +30,8 @@ const MarketplaceModuleRoutes = () => {
       <Route path="/portfolio" element={<Portfolio />} />
       <Route path="/portfolio/success" element={<CreditsSuccess />} />
       <Route path="/builder" element={<BuilderDashboard />} />
+      <Route path="/contracts" element={<ContractStation />} />
+      <Route path="/contracts/:contractId" element={<ContractStation />} />
     </Routes>
   );
 };

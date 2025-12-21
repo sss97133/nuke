@@ -43,10 +43,35 @@ export const BaTProfileExtractor: React.FC = () => {
       }
       const username = urlMatch[1];
 
-      // Call Edge Function to extract profile data
-      const { data, error: extractError } = await supabase.functions.invoke('extract-bat-profile', {
-        body: { profile_url: batProfileUrl, username },
-      });
+      // Use existing comprehensive-bat-extraction function (it handles member profiles too)
+      // For member profiles, we'll extract from the profile page HTML directly
+      // First, try to get existing data from external_identities
+      const { data: existingIdentity } = await supabase
+        .from('external_identities')
+        .select('*')
+        .eq('platform', 'bat')
+        .eq('handle', username)
+        .single();
+
+      if (existingIdentity && existingIdentity.metadata) {
+        // Use existing data
+        setExtractedData({
+          username,
+          profile_url: existingIdentity.profile_url || batProfileUrl,
+          listings: existingIdentity.metadata.listings || 0,
+          bids: existingIdentity.metadata.bids || 0,
+          comments: existingIdentity.metadata.comments || 0,
+          success_stories: existingIdentity.metadata.success_stories || 0,
+          auction_wins: existingIdentity.metadata.auction_wins || 0,
+          member_since: existingIdentity.metadata.member_since || '',
+          location: existingIdentity.metadata.location || '',
+          website: existingIdentity.metadata.website,
+        });
+        return;
+      }
+
+      // If no existing data, we'd need to scrape - for now, show message
+      throw new Error('Profile data not found. Use comprehensive-bat-extraction function or scrape manually.');
 
       if (extractError) throw extractError;
       if (data?.error) throw new Error(data.error);

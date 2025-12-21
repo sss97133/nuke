@@ -6,8 +6,8 @@
 import React, { useState } from 'react';
 import { BaTProfileExtractor } from '../components/market/BaTProfileExtractor';
 import { OrganizationServiceMapper } from '../components/market/OrganizationServiceMapper';
-import { ExternalIdentityClaimer } from '../components/market/ExternalIdentityClaimer';
 import { supabase } from '../lib/supabase';
+import { Link } from 'react-router-dom';
 
 const OrganizationServiceMapperWithSelector = () => {
   const [orgId, setOrgId] = useState('');
@@ -119,7 +119,34 @@ export default function MarketDataTools() {
         )}
 
         {activeTool === 'claim' && (
-          <ExternalIdentityClaimer />
+          <div style={{
+            padding: 'var(--space-4)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '4px',
+          }}>
+            <h3 style={{ fontSize: '10pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-3)' }}>
+              Claim External Identity
+            </h3>
+            <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-3)' }}>
+              Use the existing claim workflow to link your BaT username or other external identities to your profile.
+            </p>
+            <Link
+              to="/claim-identity"
+              style={{
+                display: 'inline-block',
+                padding: 'var(--space-2) var(--space-4)',
+                fontSize: '8pt',
+                fontWeight: 'bold',
+                background: 'var(--accent)',
+                color: 'var(--white)',
+                textDecoration: 'none',
+                borderRadius: '4px',
+              }}
+            >
+              Go to Claim Identity Page →
+            </Link>
+          </div>
         )}
 
         {activeTool === 'backfill' && (
