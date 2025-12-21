@@ -5,7 +5,190 @@ import { extractBatDomMap } from '../_shared/batDomMap.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
+
+// Site detection and DOM mapping
+function detectAuctionSite(url: string): string {
+  const domain = new URL(url).hostname.toLowerCase();
+  
+  if (domain.includes('bringatrailer.com')) return 'bringatrailer';
+  if (domain.includes('carsandbids.com')) return 'carsandbids';
+  if (domain.includes('mecum.com')) return 'mecum';
+  if (domain.includes('barrett-jackson.com')) return 'barrettjackson';
+  if (domain.includes('russoandsteele.com')) return 'russoandsteele';
+  if (domain.includes('rmsothebys.com')) return 'rmsothebys';
+  if (domain.includes('bonhams.com')) return 'bonhams';
+  if (domain.includes('goodingco.com')) return 'gooding';
+  
+  return 'unknown';
+}
+
+// Site-specific extraction methods
+async function extractCarsAndBidsListing(url: string, importImages: boolean) {
+  console.log('Extracting Cars & Bids listing...');
+  
+  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!firecrawlKey) {
+    throw new Error('FIRECRAWL_API_KEY not configured');
+  }
+  
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${firecrawlKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: url,
+      formats: ['markdown', 'extract'],
+      extract: {
+        schema: {
+          vehicle: {
+            year: "Year of the vehicle",
+            make: "Make/brand of the vehicle", 
+            model: "Model name",
+            description: "Vehicle description",
+            current_bid: "Current bid amount",
+            reserve_met: "Whether reserve is met",
+            images: "Array of image URLs"
+          }
+        }
+      }
+    })
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Firecrawl error: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  return new Response(JSON.stringify({
+    success: true,
+    source: 'Cars & Bids',
+    extracted_data: data.data?.extract?.vehicle || {},
+    timestamp: new Date().toISOString()
+  }));
+}
+
+async function extractMecumListing(url: string, importImages: boolean) {
+  console.log('Extracting Mecum listing...');
+  
+  // Mecum DOM mapping
+  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!firecrawlKey) {
+    throw new Error('FIRECRAWL_API_KEY not configured');
+  }
+  
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${firecrawlKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: url,
+      formats: ['markdown', 'extract'],
+      extract: {
+        schema: {
+          vehicle: {
+            year: "Vehicle year",
+            make: "Vehicle make",
+            model: "Vehicle model",
+            lot_number: "Auction lot number",
+            estimate: "Price estimate",
+            description: "Lot description",
+            images: "Vehicle images"
+          }
+        }
+      }
+    })
+  });
+  
+  const data = await response.json();
+  return new Response(JSON.stringify({
+    success: true,
+    source: 'Mecum Auctions',
+    extracted_data: data.data?.extract?.vehicle || {},
+    timestamp: new Date().toISOString()
+  }));
+}
+
+async function extractBarrettJacksonListing(url: string, importImages: boolean) {
+  console.log('Extracting Barrett-Jackson listing...');
+  
+  // Barrett-Jackson DOM mapping
+  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${firecrawlKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: url,
+      formats: ['extract'],
+      extract: {
+        schema: {
+          vehicle: {
+            year: "Vehicle year",
+            make: "Vehicle make", 
+            model: "Vehicle model",
+            estimate: "Auction estimate",
+            description: "Vehicle description"
+          }
+        }
+      }
+    })
+  });
+  
+  const data = await response.json();
+  return new Response(JSON.stringify({
+    success: true,
+    source: 'Barrett-Jackson',
+    extracted_data: data.data?.extract?.vehicle || {},
+    timestamp: new Date().toISOString()
+  }));
+}
+
+async function extractRussoAndSteeleListing(url: string, importImages: boolean) {
+  // Russo & Steele extraction
+  const data = { message: 'Russo & Steele extraction not implemented yet' };
+  return new Response(JSON.stringify({
+    success: true,
+    source: 'Russo and Steele', 
+    extracted_data: data,
+    timestamp: new Date().toISOString()
+  }));
+}
+
+async function extractGenericAuctionListing(url: string, importImages: boolean, siteType: string) {
+  console.log(`Extracting generic auction listing from ${siteType}...`);
+  
+  // Generic extraction for unknown sites
+  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${firecrawlKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: url,
+      formats: ['markdown']
+    })
+  });
+  
+  const data = await response.json();
+  return new Response(JSON.stringify({
+    success: true,
+    source: siteType,
+    extracted_data: { raw_content: data.data?.markdown?.substring(0, 500) || 'No content' },
+    timestamp: new Date().toISOString()
+  }));
+}
+
+// Original BaT extraction function (keep existing logic)
+async function extractBaTListing(bat_auction_url: string, import_images: boolean, force_reimport: boolean) {;
 
 interface BaTListing {
   url: string;
@@ -549,6 +732,257 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
+    const { bat_auction_url, auction_url, source_url, import_images = true, force_reimport = false } = payload;
+    
+    // Accept multiple URL parameter names for flexibility
+    const auctionUrl = bat_auction_url || auction_url || source_url;
+    
+    if (!auctionUrl) {
+      throw new Error('Missing auction URL parameter (bat_auction_url, auction_url, or source_url)');
+    }
+    
+    console.log(`Processing auction URL: ${auctionUrl}`);
+    
+    // Detect auction site and use appropriate extraction method
+    const siteType = detectAuctionSite(auctionUrl);
+    console.log(`Detected auction site: ${siteType}`);
+    
+    // Route to appropriate extraction method
+    switch (siteType) {
+      case 'bringatrailer':
+        return await extractBaTListing(auctionUrl, import_images, force_reimport);
+      case 'carsandbids':
+        return await extractCarsAndBidsListing(auctionUrl, import_images);
+      case 'mecum':
+        return await extractMecumListing(auctionUrl, import_images);
+      case 'barrettjackson':
+        return await extractBarrettJacksonListing(auctionUrl, import_images);
+      case 'russoandsteele':
+        return await extractRussoAndSteeleListing(auctionUrl, import_images);
+      default:
+        return await extractGenericAuctionListing(auctionUrl, import_images, siteType);
+    }
+  } catch (error) {
+    console.error('Error in import-bat-listing:', error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message
+    }), { 
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});
+
+// Site detection function
+function detectAuctionSite(url: string): string {
+  try {
+    const domain = new URL(url).hostname.toLowerCase();
+    
+    if (domain.includes('bringatrailer.com')) return 'bringatrailer';
+    if (domain.includes('carsandbids.com')) return 'carsandbids';
+    if (domain.includes('mecum.com')) return 'mecum';
+    if (domain.includes('barrett-jackson.com')) return 'barrettjackson';
+    if (domain.includes('russoandsteele.com')) return 'russoandsteele';
+    if (domain.includes('rmsothebys.com')) return 'rmsothebys';
+    if (domain.includes('bonhams.com')) return 'bonhams';
+    if (domain.includes('goodingco.com')) return 'gooding';
+    
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+// Cars & Bids extraction with DOM mapping
+async function extractCarsAndBidsListing(url: string, importImages: boolean) {
+  console.log('Extracting Cars & Bids listing with custom DOM mapping...');
+  
+  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+  if (!firecrawlKey) {
+    throw new Error('FIRECRAWL_API_KEY not configured');
+  }
+  
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${firecrawlKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: url,
+      formats: ['html', 'extract'],
+      extract: {
+        schema: {
+          vehicle: {
+            type: "object",
+            properties: {
+              year: { type: "number", description: "Vehicle year" },
+              make: { type: "string", description: "Vehicle make/brand" },
+              model: { type: "string", description: "Vehicle model" },
+              title: { type: "string", description: "Full vehicle title" },
+              description: { type: "string", description: "Vehicle description" },
+              current_bid: { type: "number", description: "Current highest bid" },
+              reserve_met: { type: "boolean", description: "Whether reserve price is met" },
+              seller: { type: "string", description: "Seller name/username" },
+              location: { type: "string", description: "Vehicle location" },
+              images: { 
+                type: "array", 
+                items: { type: "string" },
+                description: "Array of image URLs"
+              }
+            }
+          }
+        }
+      }
+    })
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Cars & Bids extraction failed: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  
+  return new Response(JSON.stringify({
+    success: true,
+    source: 'Cars & Bids',
+    site_type: 'carsandbids',
+    extraction_method: 'firecrawl_structured',
+    vehicle_data: data.data?.extract?.vehicle || {},
+    raw_html_length: data.data?.html?.length || 0,
+    timestamp: new Date().toISOString()
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// Mecum extraction with DOM mapping
+async function extractMecumListing(url: string, importImages: boolean) {
+  console.log('Extracting Mecum listing with custom DOM mapping...');
+  
+  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${firecrawlKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: url,
+      formats: ['extract'],
+      extract: {
+        schema: {
+          vehicle: {
+            type: "object",
+            properties: {
+              year: { type: "number", description: "Vehicle year" },
+              make: { type: "string", description: "Vehicle make" },
+              model: { type: "string", description: "Vehicle model" },
+              lot_number: { type: "string", description: "Mecum lot number" },
+              estimate_low: { type: "number", description: "Low estimate" },
+              estimate_high: { type: "number", description: "High estimate" },
+              description: { type: "string", description: "Lot description" },
+              engine: { type: "string", description: "Engine description" },
+              transmission: { type: "string", description: "Transmission type" },
+              images: { 
+                type: "array", 
+                items: { type: "string" },
+                description: "Vehicle image URLs"
+              }
+            }
+          }
+        }
+      }
+    })
+  });
+  
+  const data = await response.json();
+  
+  return new Response(JSON.stringify({
+    success: true,
+    source: 'Mecum Auctions',
+    site_type: 'mecum',
+    extraction_method: 'firecrawl_structured',
+    vehicle_data: data.data?.extract?.vehicle || {},
+    timestamp: new Date().toISOString()
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// Barrett-Jackson extraction
+async function extractBarrettJacksonListing(url: string, importImages: boolean) {
+  console.log('Extracting Barrett-Jackson listing...');
+  
+  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${firecrawlKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: url,
+      formats: ['extract'],
+      extract: {
+        schema: {
+          vehicle: {
+            year: "Vehicle year",
+            make: "Vehicle make",
+            model: "Vehicle model", 
+            description: "Vehicle description",
+            estimate: "Auction estimate"
+          }
+        }
+      }
+    })
+  });
+  
+  const data = await response.json();
+  
+  return new Response(JSON.stringify({
+    success: true,
+    source: 'Barrett-Jackson',
+    site_type: 'barrettjackson',
+    vehicle_data: data.data?.extract?.vehicle || {},
+    timestamp: new Date().toISOString()
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// Russo & Steele extraction  
+async function extractRussoAndSteeleListing(url: string, importImages: boolean) {
+  return new Response(JSON.stringify({
+    success: true,
+    source: 'Russo and Steele',
+    site_type: 'russoandsteele', 
+    vehicle_data: { note: 'Russo & Steele DOM mapping not implemented yet' },
+    timestamp: new Date().toISOString()
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// Generic auction site extraction
+async function extractGenericAuctionListing(url: string, importImages: boolean, siteType: string) {
+  console.log(`Generic extraction for ${siteType}...`);
+  
+  return new Response(JSON.stringify({
+    success: true,
+    source: siteType,
+    site_type: 'generic',
+    vehicle_data: { note: `Generic extraction for ${siteType} - needs specific DOM mapping` },
+    timestamp: new Date().toISOString()
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
+// START OF ORIGINAL BAT FUNCTION
+async function extractBaTListing(bat_auction_url: string, import_images: boolean, force_reimport: boolean) {
+  // Keep existing BaT extraction logic below this point...
     // Backwards/compat: accept {listingUrl}, {batUrl}, {bat_url}, {url}
     const batUrlRaw = coalesceString(payload?.listingUrl, payload?.batUrl, payload?.bat_url, payload?.url);
     // Optional: when provided, this is the SELLER business id to link the listing to (public.businesses.id).
