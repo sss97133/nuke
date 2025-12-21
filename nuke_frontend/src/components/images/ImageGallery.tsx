@@ -205,7 +205,7 @@ const ImageGallery = ({
   // New sorting/grouping states
   const [groupByCategory, setGroupByCategory] = useState(false);
   const [chronologicalMode, setChronologicalMode] = useState<'off' | 'asc' | 'desc'>('off'); // off, ascending, descending
-  const [imagesPerRow, setImagesPerRow] = useState(3); // 1-10
+  const [imagesPerRow, setImagesPerRow] = useState(3); // 1-16
   const [preserveAspectRatio, setPreserveAspectRatio] = useState(false); // Original image ratio
   const [auctionStartDate, setAuctionStartDate] = useState<string | null>(null); // For date calculations
   const [autoLoad, setAutoLoad] = useState(false);
@@ -1808,10 +1808,11 @@ const ImageGallery = ({
               <input
                 type="range"
                 min="1"
-                max="10"
+                max="16"
                 value={imagesPerRow}
                 onChange={(e) => setImagesPerRow(parseInt(e.target.value, 10))}
-                style={{ flex: 1, height: '4px' }}
+                className="nuke-range nuke-range-accent"
+                style={{ flex: 1 }}
                 title={`${imagesPerRow} images per row`}
               />
             </div>

@@ -380,6 +380,8 @@ const CursorHomepage: React.FC = () => {
   const [debugInfo, setDebugInfo] = useState<any>(null);
   const [orgWebsitesById, setOrgWebsitesById] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+  const filterPanelRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollYRef = useRef<number>(0);
 
   const infiniteObserverRef = useRef<IntersectionObserver | null>(null);
 
@@ -416,20 +418,24 @@ const CursorHomepage: React.FC = () => {
     
     // Scroll listener for sticky filter bar and scroll-to-top button
     let rafId: number | null = null;
+    lastScrollYRef.current = window.scrollY;
     const handleScroll = () => {
       if (rafId !== null) return;
       rafId = window.requestAnimationFrame(() => {
         rafId = null;
         const currentScrollY = window.scrollY;
+        const deltaY = currentScrollY - lastScrollYRef.current;
+        lastScrollYRef.current = currentScrollY;
 
         // Show scroll-to-top button after scrolling down 500px (only update on change)
         const shouldShowScrollTop = currentScrollY > 500;
         setShowScrollTop((prev) => (prev === shouldShowScrollTop ? prev : shouldShowScrollTop));
 
-        // Auto-minimize filter bar after scrolling down 200px (if filters are shown and active)
-        // Only auto-minimize when there are active filters, don't auto-expand (let user control expansion)
-        if (showFilters && hasActiveFilters && currentScrollY > 200 && !filterBarMinimized) {
+        // Auto-minimize the filter panel as soon as the user starts scrolling.
+        // Do NOT auto-expand (let the user control expansion).
+        if (deltaY > 0 && showFilters && currentScrollY > 12 && !filterBarMinimized) {
           setFilterBarMinimized(true);
+          setShowFilters(false);
         }
       });
     };
@@ -441,7 +447,7 @@ const CursorHomepage: React.FC = () => {
         window.cancelAnimationFrame(rafId);
       }
     };
-  }, [showFilters, hasActiveFilters, filterBarMinimized]);
+  }, [showFilters, filterBarMinimized]);
 
   // Save filters to localStorage whenever they change
   useEffect(() => {
@@ -716,11 +722,15 @@ const CursorHomepage: React.FC = () => {
       const value = v.current_value || v.display_price || 0;
       return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
     }, 0);
+    // Sales volume (24hrs): align semantics with dbStats (sold today), but scoped to the filtered set.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD
     const salesVolume = filteredVehicles
-      .filter(v => v.is_for_sale)
-      .reduce((sum, v) => {
-        const price = v.display_price || v.asking_price || v.sale_price || 0;
-        return sum + (typeof price === 'number' && Number.isFinite(price) ? price : 0);
+      .filter((v: any) => Boolean(v?.sale_price) && Boolean(v?.sale_date) && String(v.sale_date) >= todayISO)
+      .reduce((sum, v: any) => {
+        const price = Number(v.sale_price || 0) || 0;
+        return sum + (Number.isFinite(price) ? price : 0);
       }, 0);
     
     return { totalVehicles, totalValue, salesVolume };
@@ -1499,87 +1509,209 @@ const CursorHomepage: React.FC = () => {
         margin: '0 auto',
         padding: '0 16px'
       }}>
-        {/* Sticky Filter Bar - Shows when filters are active and minimized */}
-        {hasActiveFilters && filterBarMinimized && (
+        {/* Sticky Minimized Filter Bar - docks under the sticky header/search bar */}
+        {filterBarMinimized && (
           <div style={{
             position: 'sticky',
-            top: 0,
-            background: 'var(--surface)',
+            top: 'var(--header-height, 40px)',
+            background: 'var(--surface-glass)',
             backdropFilter: 'blur(8px)',
             border: '1px solid var(--border)',
             padding: '8px 12px',
             marginBottom: '12px',
-            zIndex: 100,
+            zIndex: 900,
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
             display: 'flex',
             flexWrap: 'wrap',
             gap: '6px',
             alignItems: 'center'
           }}>
-            <div style={{ fontSize: '8pt', fontWeight: 700, color: 'var(--text)', marginRight: '4px' }}>
-              {filteredVehicles.length} vehicles
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '10px', marginRight: '6px' }}>
+              <div style={{ fontSize: '8pt', fontWeight: 900, color: 'var(--text)' }}>
+                {displayStats.totalVehicles.toLocaleString()} vehicles
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                {formatCurrency(displayStats.totalValue)} value
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                {formatCurrency(displayStats.salesVolume)} volume (24hrs)
+              </div>
             </div>
-            {getActiveFilterBadges.map((badge, idx) => (
+
+            {/* Selected filter chips */}
+            {activeFilterCount === 0 ? (
               <div
-                key={idx}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  padding: '2px 6px',
+                  padding: '2px 8px',
                   background: 'var(--grey-200)',
                   border: '1px solid var(--border)',
-                  borderRadius: '2px',
+                  borderRadius: '999px',
                   fontSize: '7pt',
+                  color: 'var(--text-muted)',
                   fontFamily: '"MS Sans Serif", sans-serif'
                 }}
               >
-                <span>{badge.label}</span>
-                {badge.onRemove && (
-                  <button
-                    onClick={badge.onRemove}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: '0',
-                      margin: 0,
-                      cursor: 'pointer',
-                      fontSize: '8pt',
-                      lineHeight: 1,
-                      color: 'var(--text-muted)',
-                      fontWeight: 'bold'
-                    }}
-                    title="Remove filter"
-                  >
-                    ×
-                  </button>
-                )}
+                No filters
               </div>
-            ))}
-            <button
-              onClick={() => {
-                setFilterBarMinimized(false);
-                setShowFilters(true);
-              }}
-              style={{
-                marginLeft: 'auto',
-                padding: '2px 6px',
-                fontSize: '7pt',
-                border: '1px solid var(--border)',
-                background: 'var(--grey-200)',
-                color: 'var(--text)',
-                cursor: 'pointer',
-                borderRadius: '2px',
-                fontFamily: '"MS Sans Serif", sans-serif'
-              }}
-            >
-              Show Filters
-            </button>
+            ) : (
+              getActiveFilterBadges.map((badge, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '2px 8px',
+                    background: 'var(--grey-200)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '999px',
+                    fontSize: '7pt',
+                    fontFamily: '"MS Sans Serif", sans-serif'
+                  }}
+                >
+                  <span>{badge.label}</span>
+                  {badge.onRemove && (
+                    <button
+                      onClick={badge.onRemove}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '0',
+                        margin: 0,
+                        cursor: 'pointer',
+                        fontSize: '8pt',
+                        lineHeight: 1,
+                        color: 'var(--text-muted)',
+                        fontWeight: 'bold'
+                      }}
+                      title="Remove filter"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+
+            {/* Market/source toggles */}
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: '6px' }}>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontWeight: 900, letterSpacing: '0.3px' }}>
+                Markets
+              </div>
+              {[
+                {
+                  key: 'dealers',
+                  label: 'DEALERS',
+                  included: !filters.hideDealerListings,
+                  onClick: () => setFilters({ ...filters, hideDealerListings: !filters.hideDealerListings })
+                },
+                {
+                  key: 'cl',
+                  label: 'CL',
+                  included: !filters.hideCraigslist,
+                  onClick: () => setFilters({ ...filters, hideCraigslist: !filters.hideCraigslist })
+                },
+                {
+                  key: 'sites',
+                  label: 'SITES',
+                  included: !filters.hideDealerSites,
+                  onClick: () => setFilters({ ...filters, hideDealerSites: !filters.hideDealerSites })
+                },
+                {
+                  key: 'ksl',
+                  label: 'KSL',
+                  included: !filters.hideKsl,
+                  onClick: () => setFilters({ ...filters, hideKsl: !filters.hideKsl })
+                },
+                {
+                  key: 'bat',
+                  label: 'BAT',
+                  included: !filters.hideBat,
+                  onClick: () => setFilters({ ...filters, hideBat: !filters.hideBat })
+                },
+                {
+                  key: 'classic',
+                  label: 'CLASSIC',
+                  included: !filters.hideClassic,
+                  onClick: () => setFilters({ ...filters, hideClassic: !filters.hideClassic })
+                }
+              ].map((b) => (
+                <button
+                  key={b.key}
+                  type="button"
+                  onClick={b.onClick}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '7pt',
+                    fontWeight: 900,
+                    letterSpacing: '0.3px',
+                    textTransform: 'uppercase',
+                    border: '1px solid var(--border)',
+                    borderRadius: '999px',
+                    background: b.included ? 'var(--white)' : 'var(--grey-200)',
+                    color: b.included ? 'var(--text)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    fontFamily: '"MS Sans Serif", sans-serif'
+                  }}
+                  title={b.included ? 'Included (click to hide)' : 'Hidden (click to include)'}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => {
+                    setFilters(DEFAULT_FILTERS);
+                    setSearchText('');
+                  }}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '7pt',
+                    border: '1px solid var(--border)',
+                    background: 'var(--grey-200)',
+                    color: 'var(--text)',
+                    cursor: 'pointer',
+                    borderRadius: '2px',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    fontWeight: 700
+                  }}
+                >
+                  Reset
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setFilterBarMinimized(false);
+                  setShowFilters(true);
+                  window.requestAnimationFrame(() => {
+                    filterPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  });
+                }}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '7pt',
+                  border: '1px solid var(--border)',
+                  background: 'var(--grey-600)',
+                  color: 'var(--white)',
+                  cursor: 'pointer',
+                  borderRadius: '2px',
+                  fontFamily: '"MS Sans Serif", sans-serif',
+                  fontWeight: 800
+                }}
+              >
+                Filters
+              </button>
+            </div>
           </div>
         )}
 
         {/* Show Filters Button - only when filters are hidden and no active filters */}
-        {!showFilters && !hasActiveFilters && (
+        {!showFilters && !filterBarMinimized && !hasActiveFilters && (
           <div style={{
             marginBottom: '16px',
             display: 'flex',
@@ -1610,12 +1742,13 @@ const CursorHomepage: React.FC = () => {
 
         {/* Filter Panel - Collapsible with integrated header */}
         {showFilters && (
-          <div style={{
+          <div ref={filterPanelRef} style={{
             background: 'var(--white)',
             border: '1px solid var(--border)',
             padding: '12px',
             marginBottom: '16px',
-            fontSize: '8pt'
+            fontSize: '8pt',
+            scrollMarginTop: 'var(--header-height, 40px)'
           }}>
             {/* Header with vehicle stats and controls */}
             <div style={{
@@ -1628,25 +1761,24 @@ const CursorHomepage: React.FC = () => {
               borderBottom: '1px solid var(--border)'
             }}>
               <div
-                onClick={() => navigate('/market/movement')}
                 style={{
                   fontSize: '9pt',
                   fontWeight: 700,
                   color: 'var(--text)',
-                  cursor: 'pointer',
+                  cursor: 'default',
                   display: 'flex',
                   flexDirection: 'row',
                   gap: '12px',
                   alignItems: 'center'
                 }}
-                title="Click to view market movement page"
+                title="Market stats"
               >
-                <span>{dbStats.totalVehicles.toLocaleString()} vehicles</span>
+                <span>{displayStats.totalVehicles.toLocaleString()} vehicles</span>
                 <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                  {formatCurrency(dbStats.totalValue)} total value
+                  {formatCurrency(displayStats.totalValue)} total value
                 </span>
                 <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                  {formatCurrency(dbStats.salesVolume)} sales volume (24hrs)
+                  {formatCurrency(displayStats.salesVolume)} sales volume (24hrs)
                 </span>
               </div>
               
@@ -1654,9 +1786,7 @@ const CursorHomepage: React.FC = () => {
               <button
                 onClick={() => {
                   setShowFilters(false);
-                  if (hasActiveFilters) {
-                    setFilterBarMinimized(true);
-                  }
+                  setFilterBarMinimized(true);
                 }}
                 style={{
                   padding: '4px 8px',

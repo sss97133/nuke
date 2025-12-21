@@ -84,6 +84,42 @@ async function fetchTextWithTimeout(url: string, timeoutMs: number, label: strin
   }
 }
 
+function titleCaseToken(s: string): string {
+  const t = String(s || "").trim();
+  if (!t) return t;
+  if (t.length <= 2) return t.toUpperCase();
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
+function parseCarsAndBidsIdentityFromUrl(listingUrl: string): { year: number | null; make: string | null; model: string | null; title: string | null } {
+  try {
+    const u = new URL(listingUrl);
+    // /auctions/<id>/<year>-<make>-<model...>
+    const m = u.pathname.match(/\/auctions\/[^/]+\/(\d{4})-([a-z0-9-]+)\/?$/i);
+    if (!m?.[1] || !m?.[2]) return { year: null, make: null, model: null, title: null };
+    const year = Number(m[1]);
+    if (!Number.isFinite(year)) return { year: null, make: null, model: null, title: null };
+    const parts = String(m[2]).split("-").filter(Boolean);
+    const make = parts[0] ? titleCaseToken(parts[0]) : null;
+    const model = parts.length > 1 ? parts.slice(1).map(titleCaseToken).join(" ").trim() : null;
+    const title = [year, make, model].filter(Boolean).join(" ");
+    return { year, make, model, title: title || null };
+  } catch {
+    return { year: null, make: null, model: null, title: null };
+  }
+}
+
+function extractCarsAndBidsImagesFromHtml(html: string): string[] {
+  const h = String(html || "");
+  const urls = new Set<string>();
+  const re = /https?:\/\/media\.carsandbids\.com\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
+  for (const m of h.match(re) || []) {
+    urls.add(m.trim());
+    if (urls.size >= 25) break;
+  }
+  return Array.from(urls);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -170,6 +206,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
 
   const indexUrl = isDirectListing ? "https://carsandbids.com/auctions" : (normalizedUrl.includes("carsandbids.com/auctions") ? normalizedUrl : "https://carsandbids.com/auctions");
   const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  const sourceWebsite = "https://carsandbids.com";
 
   // Step 1: Firecrawl-based "DOM map" to bypass bot protection on the index page
   let listingUrls: string[] = [];
@@ -192,7 +229,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         body: JSON.stringify({
           url: indexUrl,
           includeSubdomains: false,
-          limit: Math.max(50, maxVehicles * 10),
+          limit: 500,
         }),
       },
       20000,
@@ -218,7 +255,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
           if (lower.includes("sitemap")) return false;
           return true;
         })
-        .slice(0, Math.max(1, maxVehicles));
+        .slice(0, 300);
     }
   } catch (e: any) {
     console.warn("Firecrawl index discovery failed, will try direct fetch fallback:", e?.message || String(e));
@@ -250,7 +287,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         "";
 
       if (markdown) {
-        listingUrls = extractCarsAndBidsListingUrlsFromText(markdown, maxVehicles);
+        listingUrls = extractCarsAndBidsListingUrlsFromText(markdown, 300);
         if (debug) {
           mapRaw = mapRaw || {};
           mapRaw._debug_index_markdown_len = markdown.length;
@@ -265,7 +302,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
   if (listingUrls.length === 0) {
     try {
       const indexHtml = await fetchTextWithTimeout(indexUrl, 12000, "Cars & Bids index fetch");
-      listingUrls = extractCarsAndBidsListingUrls(indexHtml, maxVehicles);
+      listingUrls = extractCarsAndBidsListingUrls(indexHtml, 300);
     } catch {
       // ignore
     }
@@ -315,6 +352,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         .in("platform_url", sample);
       const existingSet = new Set((existing || []).map((r: any) => String(r?.platform_url || "")));
       const unseen = sample.filter((u) => !existingSet.has(u));
+      // pick the first N unseen (or fallback to the sample)
       urlsToScrape = (unseen.length > 0 ? unseen : sample).slice(0, Math.max(1, maxVehicles));
     }
   } catch {
@@ -333,7 +371,9 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
           },
           body: JSON.stringify({
             url: listingUrl,
-            formats: ["extract"],
+            formats: ["extract", "html"],
+            onlyMainContent: false,
+            waitFor: 4500,
             extract: { schema: listingSchema },
           }),
         },
@@ -342,14 +382,32 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
       );
 
       const vehicle = firecrawlData?.data?.extract || {};
-      extracted.push({ ...vehicle, listing_url: listingUrl });
+      const html = String(firecrawlData?.data?.html || "");
+
+      // If extraction is empty, fall back to parsing the listing URL so we still insert vehicles.
+      const empty = !vehicle || (typeof vehicle === "object" && Object.keys(vehicle).length === 0);
+      const fallback = parseCarsAndBidsIdentityFromUrl(listingUrl);
+
+      const merged = {
+        ...(empty ? {} : vehicle),
+        listing_url: listingUrl,
+        year: (vehicle?.year ?? fallback.year) ?? null,
+        make: (vehicle?.make ?? fallback.make) ?? null,
+        model: (vehicle?.model ?? fallback.model) ?? null,
+        title: (vehicle?.title ?? fallback.title) ?? null,
+        images: Array.isArray(vehicle?.images) && vehicle.images.length > 0
+          ? vehicle.images
+          : (html ? extractCarsAndBidsImagesFromHtml(html) : []),
+      };
+
+      extracted.push(merged);
     } catch (e: any) {
       issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);
     }
   }
 
-  // Step 3: Store extracted vehicles in DB
-  const created = await storeVehiclesInDatabase(extracted, "Cars & Bids");
+  // Step 3: Store extracted vehicles in DB + link to source org profile
+  const created = await storeVehiclesInDatabase(extracted, "Cars & Bids", sourceWebsite);
 
   const baseResult: any = {
     success: true,
@@ -360,6 +418,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
     vehicles_extracted: extracted.length,
     vehicles_created: created.created_ids.length,
     vehicles_updated: created.updated_ids.length,
+    vehicles_saved: created.created_ids.length + created.updated_ids.length,
     created_vehicle_ids: created.created_ids,
     updated_vehicle_ids: created.updated_ids,
     issues: [...issues, ...created.errors],
@@ -466,16 +525,18 @@ Return JSON array:
 async function storeVehiclesInDatabase(
   vehicles: any[],
   source: string,
-): Promise<{ created_ids: string[]; updated_ids: string[]; errors: string[] }> {
+  sourceWebsite: string | null,
+): Promise<{ created_ids: string[]; updated_ids: string[]; errors: string[]; source_org_id: string | null }> {
   const cleaned = vehicles.filter((v) => v && (v.make || v.model || v.year || v.title));
   console.log(`Storing ${cleaned.length} vehicles from ${source} in database...`);
 
-  if (cleaned.length === 0) return { created_ids: [], updated_ids: [], errors: [] };
+  if (cleaned.length === 0) return { created_ids: [], updated_ids: [], errors: [], source_org_id: null };
 
   const supabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
   const createdIds: string[] = [];
   const updatedIds: string[] = [];
   const errors: string[] = [];
+  const sourceOrgId = await ensureSourceBusiness(supabase, source, sourceWebsite);
 
   for (const vehicle of cleaned) {
     try {
@@ -516,7 +577,10 @@ async function storeVehiclesInDatabase(
             extracted_at: new Date().toISOString(),
             extractor: "extract-premium-auction",
           },
-          profile_origin: "agent_import",
+          // This is effectively a URL-based scraper import; using url_scraper makes downstream org-link triggers
+          // attach the vehicle as a 'consigner' (allowed by organization_vehicles_relationship_type_check).
+          profile_origin: "url_scraper",
+          origin_organization_id: sourceOrgId,
         };
 
       // If we have a VIN, do a manual "upsert" (PostgREST cannot ON CONFLICT on partial unique indexes).
@@ -571,6 +635,8 @@ async function storeVehiclesInDatabase(
       }
 
       if (data?.id) {
+        // organization_vehicles link is created by DB trigger auto_link_vehicle_to_origin_org()
+        // when origin_organization_id is set.
         if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
           const img = await insertVehicleImages(supabase, data.id, vehicle.images, source);
           errors.push(...img.errors);
@@ -583,7 +649,45 @@ async function storeVehiclesInDatabase(
     }
   }
 
-  return { created_ids: createdIds, updated_ids: updatedIds, errors };
+  return { created_ids: createdIds, updated_ids: updatedIds, errors, source_org_id: sourceOrgId };
+}
+
+async function ensureSourceBusiness(
+  supabase: any,
+  sourceName: string,
+  website: string | null,
+): Promise<string | null> {
+  const w = website ? String(website).trim() : "";
+  if (!w) return null;
+  try {
+    const { data: existing } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("website", w)
+      .limit(1)
+      .maybeSingle();
+    if (existing?.id) return existing.id;
+
+    const { data: inserted, error } = await supabase
+      .from("businesses")
+      .insert({
+        business_name: sourceName,
+        website: w,
+        type: "auction_house",
+        is_public: true,
+        discovered_via: "extract-premium-auction",
+        source_url: w,
+        metadata: { source_kind: "auction_house" },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any)
+      .select("id")
+      .single();
+    if (error) return null;
+    return inserted?.id || null;
+  } catch {
+    return null;
+  }
 }
 
 async function insertVehicleImages(

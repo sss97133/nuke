@@ -928,7 +928,7 @@ const VehicleProfile: React.FC = () => {
         let lastCommentAt: string | null = auctionPulse.last_comment_at || null;
 
         try {
-          const [cCount, lastBid, lastComment] = await Promise.all([
+          const [cCount, lastBid, lastComment, lastSeller] = await Promise.all([
             commentCount === null
               ? supabase
                   .from('auction_comments')
@@ -937,7 +937,7 @@ const VehicleProfile: React.FC = () => {
               : Promise.resolve({ count: commentCount } as any),
             supabase
               .from('auction_comments')
-              .select('posted_at')
+              .select('posted_at, author_username')
               .eq('vehicle_id', vehicle.id)
               .not('bid_amount', 'is', null)
               .order('posted_at', { ascending: false })
@@ -950,11 +950,28 @@ const VehicleProfile: React.FC = () => {
               .order('posted_at', { ascending: false })
               .limit(1)
               .maybeSingle(),
+            supabase
+              .from('auction_comments')
+              .select('author_username')
+              .eq('vehicle_id', vehicle.id)
+              .eq('is_seller', true)
+              .order('posted_at', { ascending: false })
+              .limit(1)
+              .maybeSingle(),
           ]);
 
           if (commentCount === null) commentCount = typeof (cCount as any)?.count === 'number' ? (cCount as any).count : null;
           lastBidAt = (lastBid as any)?.data?.posted_at || lastBidAt;
           lastCommentAt = (lastComment as any)?.data?.posted_at || lastCommentAt;
+          const winnerName = String((lastBid as any)?.data?.author_username || '').trim() || null;
+          const sellerUsername = String((lastSeller as any)?.data?.author_username || '').trim() || null;
+          if (!cancelled) {
+            setAuctionPulse((prev: any) => ({
+              ...(prev || {}),
+              winner_name: winnerName ?? (prev?.winner_name ?? null),
+              seller_username: sellerUsername ?? (prev?.seller_username ?? null),
+            }));
+          }
         } catch {
           // ignore telemetry failures
         }
@@ -973,6 +990,9 @@ const VehicleProfile: React.FC = () => {
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
             updated_at: (merged as any)?.updated_at ?? auctionPulse.updated_at ?? null,
+            // Preserve any derived winner/seller identity from auction_comments
+            winner_name: (auctionPulse as any)?.winner_name ?? null,
+            seller_username: (auctionPulse as any)?.seller_username ?? null,
           });
         }
       } catch {
@@ -1503,7 +1523,8 @@ const VehicleProfile: React.FC = () => {
               bidCountResult,
               commentCountResult,
               lastBid,
-              lastComment
+              lastComment,
+              lastSeller
             ] = await Promise.all([
               // Count only bids (where bid_amount is not null)
               bidCount === null
@@ -1521,7 +1542,7 @@ const VehicleProfile: React.FC = () => {
                 .or('bid_amount.is.null,comment_type.neq.bid'),
               supabase
                 .from('auction_comments')
-                .select('posted_at')
+                .select('posted_at, author_username')
                 .eq('vehicle_id', vehicleData.id)
                 .not('bid_amount', 'is', null)
                 .order('posted_at', { ascending: false })
@@ -1535,12 +1556,24 @@ const VehicleProfile: React.FC = () => {
                 .order('posted_at', { ascending: false })
                 .limit(1)
                 .maybeSingle(),
+              supabase
+                .from('auction_comments')
+                .select('author_username')
+                .eq('vehicle_id', vehicleData.id)
+                .eq('is_seller', true)
+                .order('posted_at', { ascending: false })
+                .limit(1)
+                .maybeSingle(),
             ]);
 
             if (bidCount === null) bidCount = typeof (bidCountResult as any)?.count === 'number' ? (bidCountResult as any).count : null;
             commentCount = typeof (commentCountResult as any)?.count === 'number' ? (commentCountResult as any).count : null;
             lastBidAt = (lastBid as any)?.data?.posted_at || null;
             lastCommentAt = (lastComment as any)?.data?.posted_at || null;
+            const winnerName = String((lastBid as any)?.data?.author_username || '').trim() || null;
+            const sellerUsername = String((lastSeller as any)?.data?.author_username || '').trim() || null;
+            (effective as any).winner_name = winnerName;
+            (effective as any).seller_username = sellerUsername;
           } catch {
             // ignore telemetry failures
           }
@@ -1561,6 +1594,8 @@ const VehicleProfile: React.FC = () => {
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
             updated_at: (effective as any).updated_at || null,
+            winner_name: (effective as any).winner_name ?? null,
+            seller_username: (effective as any).seller_username ?? null,
           });
 
           // Best-effort: if this is a BaT listing and we don't yet have end_date/final_price,
