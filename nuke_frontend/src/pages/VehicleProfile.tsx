@@ -2700,9 +2700,6 @@ const VehicleProfile: React.FC = () => {
                   {/* 2b. Structured listing data (Options / Service records / etc.) */}
                   <VehicleStructuredListingDataCard vehicle={vehicle} />
                   
-                  {/* 2c. External Listings */}
-                  <ExternalListingCard vehicleId={vehicle.id} />
-                  
                   {/* 3. Comments */}
               <VehicleCommentsCard
                 vehicleId={vehicle.id}
