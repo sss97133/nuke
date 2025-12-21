@@ -390,6 +390,19 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                     >
                       Market
                     </Link>
+                    <Link
+                      to="/market/contracts"
+                      className={`nav-link ${isActivePage('/market/contracts') ? 'active' : ''}`}
+                      style={{
+                        display: 'block',
+                        padding: '8px 12px',
+                        textDecoration: 'none',
+                        borderBottom: '1px solid var(--border)'
+                      }}
+                      onClick={() => setNZeroMenuOpen(false)}
+                    >
+                      Contract Station
+                    </Link>
                     <a
                       href="https://n-zero.dev/"
                       target="_blank"
