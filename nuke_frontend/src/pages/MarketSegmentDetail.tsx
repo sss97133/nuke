@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import RealVehicleData from '../components/market/RealVehicleData';
 
 type SegmentSubcategory = {
   id: string;

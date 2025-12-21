@@ -226,7 +226,6 @@ export default function VehicleTrading({ vehicleId, vehicleTitle, offeringId }: 
     return (
       <div className="card">
         <div className="card-body" style={{ textAlign: 'center', padding: '48px' }}>
-          <div style={{ fontSize: '24pt', marginBottom: '16px' }}>📈</div>
           <div style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '8px' }}>Trading Not Available</div>
           <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
             This vehicle is not currently available for share trading.
@@ -281,10 +280,10 @@ export default function VehicleTrading({ vehicleId, vehicleTitle, offeringId }: 
       {/* Tabs */}
       <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', borderBottom: '2px solid var(--border)' }}>
         {[
-          { key: 'ticker', label: 'Trade', icon: '📈' },
-          { key: 'orderbook', label: 'Order Book', icon: '📊' },
-          { key: 'orders', label: `My Orders (${userOrders.length})`, icon: '📋' },
-          { key: 'trades', label: 'Recent Trades', icon: '🕒' }
+          { key: 'ticker', label: 'Trade', icon: 'TRADE' },
+          { key: 'orderbook', label: 'Order Book', icon: 'BOOK' },
+          { key: 'orders', label: `My Orders (${userOrders.length})`, icon: 'ORDERS' },
+          { key: 'trades', label: 'Recent Trades', icon: 'TRADES' }
         ].map((tab) => (
           <button
             key={tab.key}
@@ -301,7 +300,7 @@ export default function VehicleTrading({ vehicleId, vehicleTitle, offeringId }: 
               fontSize: '9pt'
             }}
           >
-            {tab.icon} {tab.label}
+            {tab.label}
           </button>
         ))}
       </div>
