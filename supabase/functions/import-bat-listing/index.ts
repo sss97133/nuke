@@ -272,6 +272,19 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
     );
   };
 
+  // Strip sidebar (ads/CTAs) before any fallback scanning.
+  // Sidebar often contains images (email signup, promos, etc.) that are NOT part of the listing gallery.
+  const stripSidebar = (rawHtml: string): string => {
+    try {
+      const doc = new DOMParser().parseFromString(String(rawHtml || ''), 'text/html');
+      if (!doc) return String(rawHtml || '');
+      doc.querySelectorAll('.sidebar, #sidebar, [class*=\"sidebar\"]').forEach((n) => n.remove());
+      return doc.documentElement?.outerHTML || String(rawHtml || '');
+    } catch {
+      return String(rawHtml || '');
+    }
+  };
+
   // 1) Most reliable: the listing gallery div's embedded JSON.
   try {
     const m = h.match(/id="bat_listing_page_photo_gallery"[^>]*data-gallery-items="([^"]+)"/i);
@@ -299,9 +312,10 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
   }
 
   // 2) Regex fallback (best-effort). Keep it noise-filtered and bounded.
-  const abs = h.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
-  const protoRel = h.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
-  const rel = h.match(/\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
+  const cleaned = stripSidebar(h);
+  const abs = cleaned.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
+  const protoRel = cleaned.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
+  const rel = cleaned.match(/\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
 
   const out: string[] = [];
   const seen = new Set<string>();

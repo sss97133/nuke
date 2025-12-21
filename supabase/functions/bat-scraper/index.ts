@@ -11,6 +11,79 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function stripBatSidebarHtml(html: string): string {
+  try {
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    if (!doc) return String(html || '');
+    doc.querySelectorAll('.sidebar, #sidebar, [class*=\"sidebar\"]').forEach((n) => n.remove());
+    return doc.documentElement?.outerHTML || String(html || '');
+  } catch {
+    return String(html || '');
+  }
+}
+
+function extractBatGalleryImagesFromHtml(html: string): string[] {
+  const h = String(html || '');
+  const normalize = (u: string) => u.split('#')[0].split('?')[0].replace(/-scaled\./g, '.').trim();
+  const isOk = (u: string) => {
+    const s = u.toLowerCase();
+    return (
+      u.startsWith('http') &&
+      s.includes('bringatrailer.com/wp-content/uploads/') &&
+      !s.endsWith('.svg') &&
+      !s.endsWith('.pdf')
+    );
+  };
+
+  // 1) Canonical source: listing gallery JSON
+  try {
+    let idx = h.indexOf('id=\"bat_listing_page_photo_gallery\"');
+    if (idx < 0) idx = h.indexOf(\"id='bat_listing_page_photo_gallery'\");
+    if (idx >= 0) {
+      const window = h.slice(idx, idx + 300000);
+      const m = window.match(/data-gallery-items=(?:\"([^\"]+)\"|'([^']+)')/i);
+      const encoded = (m?.[1] || m?.[2] || '').trim();
+      if (encoded) {
+        const jsonText = encoded.replace(/&quot;/g, '\"').replace(/&#038;/g, '&').replace(/&amp;/g, '&');
+        const items = JSON.parse(jsonText);
+        if (Array.isArray(items)) {
+          const urls: string[] = [];
+          for (const it of items) {
+            const u = it?.large?.url || it?.small?.url;
+            if (typeof u !== 'string' || !u.trim()) continue;
+            const nu = normalize(u);
+            if (!isOk(nu)) continue;
+            urls.push(nu);
+          }
+          if (urls.length) return [...new Set(urls)];
+        }
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  // 2) Fallback: scan uploads, but strip sidebar first to avoid ad/CTA images.
+  const cleaned = stripBatSidebarHtml(h);
+  const abs = cleaned.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^\"'\\s>]+\\.(jpg|jpeg|png|webp)(?:\\?[^\"'\\s>]*)?/gi) || [];
+  const protoRel = cleaned.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^\"'\\s>]+\\.(jpg|jpeg|png|webp)(?:\\?[^\"'\\s>]*)?/gi) || [];
+  const rel = cleaned.match(/\/wp-content\/uploads\/[^\"'\\s>]+\\.(jpg|jpeg|png|webp)(?:\\?[^\"'\\s>]*)?/gi) || [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [...abs, ...protoRel, ...rel]) {
+    let u = raw;
+    if (u.startsWith('//')) u = 'https:' + u;
+    if (u.startsWith('/')) u = 'https://bringatrailer.com' + u;
+    const nu = normalize(u);
+    if (!isOk(nu)) continue;
+    if (seen.has(nu)) continue;
+    seen.add(nu);
+    out.push(nu);
+    if (out.length >= 400) break;
+  }
+  return out;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -127,27 +200,10 @@ serve(async (req) => {
       result.seller = sellerMatch[1].trim();
     }
 
-    // Extract images - BaT uses various formats
-    const imageMatches = html.matchAll(/<img[^>]*src="([^"]*bringatrailer\.com[^"]*)"[^>]*>/gi);
-    const imageUrls = new Set<string>();
-    
-    for (const match of imageMatches) {
-      let imgUrl = match[1];
-      
-      // Filter out icons/logos/small images
-      if (imgUrl.includes('logo') || imgUrl.includes('icon') || imgUrl.includes('avatar')) continue;
-      if (imgUrl.includes('150x150') || imgUrl.includes('50x50')) continue;
-      
-      // Get full resolution
-      imgUrl = imgUrl.replace(/-\d+x\d+\./, '.');
-      
-      // Only include unique URLs
-      if (imgUrl.includes('bringatrailer.com') && !imageUrls.has(imgUrl)) {
-        imageUrls.add(imgUrl);
-      }
-    }
-
-    result.images = Array.from(imageUrls);
+    // Extract images:
+    // CRITICAL: Do NOT scan arbitrary <img> tags (sidebar ads + CTAs contaminate galleries).
+    // Prefer the canonical gallery JSON; fallback explicitly strips `.sidebar`.
+    result.images = extractBatGalleryImagesFromHtml(html);
 
     console.log('Parsed result:', result);
 

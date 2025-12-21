@@ -944,7 +944,19 @@ serve(async (req) => {
       data.images = imgs
     }
 
+    const isBatListing = url.includes('bringatrailer.com/listing/')
+
+    // BaT: never scan arbitrary <img> tags (sidebar ads/CTAs contaminate galleries).
+    // Prefer the canonical gallery JSON embedded in #bat_listing_page_photo_gallery[data-gallery-items].
+    if (isBatListing && html) {
+      const bat = extractBatGalleryImagesFromHtml(html)
+      if (bat.length > 0) {
+        data.images = normalizeImageUrls(bat)
+      }
+    }
+
     // If Firecrawl didn’t yield images (or it wasn’t used), use HTML extraction.
+    // NOTE: For BaT listings, this is intentionally bypassed in favor of canonical gallery extraction above.
     if ((!data.images || data.images.length === 0) && html) {
       data.images = normalizeImageUrls(extractImageURLs(html))
     }
@@ -1335,6 +1347,90 @@ function extractImageURLs(html: string): string[] {
     const bSize = extractImageSize(b)
     return (bSize || 0) - (aSize || 0)
   })
+}
+
+function stripBatSidebarHtml(html: string): string {
+  try {
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html')
+    if (!doc) return String(html || '')
+    doc.querySelectorAll('.sidebar, #sidebar, [class*=\"sidebar\"]').forEach((n) => n.remove())
+    return doc.documentElement?.outerHTML || String(html || '')
+  } catch {
+    return String(html || '')
+  }
+}
+
+function extractBatGalleryImagesFromHtml(html: string): string[] {
+  const h = String(html || '')
+  const normalize = (u: string) =>
+    u
+      .split('#')[0]
+      .split('?')[0]
+      .replace(/&#038;/g, '&')
+      .replace(/&amp;/g, '&')
+      .replace(/-scaled\./g, '.')
+      .trim()
+
+  const isOk = (u: string) => {
+    const s = u.toLowerCase()
+    return (
+      u.startsWith('http') &&
+      s.includes('bringatrailer.com/wp-content/uploads/') &&
+      !s.endsWith('.svg') &&
+      !s.endsWith('.pdf')
+    )
+  }
+
+  // 1) Canonical source: listing gallery JSON
+  try {
+    let idx = h.indexOf('id=\"bat_listing_page_photo_gallery\"')
+    if (idx < 0) idx = h.indexOf(\"id='bat_listing_page_photo_gallery'\")
+    if (idx >= 0) {
+      const window = h.slice(idx, idx + 300000)
+      const m = window.match(/data-gallery-items=(?:\"([^\"]+)\"|'([^']+)')/i)
+      const encoded = (m?.[1] || m?.[2] || '').trim()
+      if (encoded) {
+        const jsonText = encoded
+          .replace(/&quot;/g, '\"')
+          .replace(/&#038;/g, '&')
+          .replace(/&amp;/g, '&')
+        const items = JSON.parse(jsonText)
+        if (Array.isArray(items)) {
+          const urls: string[] = []
+          for (const it of items) {
+            const u = it?.large?.url || it?.small?.url
+            if (typeof u !== 'string' || !u.trim()) continue
+            const nu = normalize(u)
+            if (!isOk(nu)) continue
+            urls.push(nu)
+          }
+          if (urls.length) return [...new Set(urls)]
+        }
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  // 2) Fallback: scan uploads, but strip sidebar first to avoid ad/CTA images.
+  const cleaned = stripBatSidebarHtml(h)
+  const abs = cleaned.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^\"'\\s>]+\\.(jpg|jpeg|png|webp)(?:\\?[^\"'\\s>]*)?/gi) || []
+  const protoRel = cleaned.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^\"'\\s>]+\\.(jpg|jpeg|png|webp)(?:\\?[^\"'\\s>]*)?/gi) || []
+  const rel = cleaned.match(/\/wp-content\/uploads\/[^\"'\\s>]+\\.(jpg|jpeg|png|webp)(?:\\?[^\"'\\s>]*)?/gi) || []
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const raw of [...abs, ...protoRel, ...rel]) {
+    let u = raw
+    if (u.startsWith('//')) u = 'https:' + u
+    if (u.startsWith('/')) u = 'https://bringatrailer.com' + u
+    const nu = normalize(u)
+    if (!isOk(nu)) continue
+    if (seen.has(nu)) continue
+    seen.add(nu)
+    out.push(nu)
+    if (out.length >= 400) break
+  }
+  return out
 }
 
 // Helper to extract image size from URL for sorting
