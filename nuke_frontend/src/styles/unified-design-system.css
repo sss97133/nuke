@@ -518,6 +518,70 @@ select:focus {
   border-color: var(--border-focus);
 }
 
+/* Range / slider (opt-in via class so we don't unintentionally restyle other controls) */
+.nuke-range {
+  width: 100%;
+  height: 16px; /* gives room for the thumb; track is styled separately */
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Use accent colorway so it updates when data-accent changes */
+.nuke-range-accent {
+  accent-color: var(--accent);
+}
+
+.nuke-range-accent:focus {
+  outline: none;
+}
+
+/* WebKit */
+.nuke-range-accent::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.nuke-range-accent::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  margin-top: -5px; /* centers thumb on 4px track */
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.nuke-range-accent:active::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--accent-dim), 0 0 0 4px rgba(0, 0, 0, 0.06);
+}
+
+/* Firefox */
+.nuke-range-accent::-moz-range-track {
+  height: 4px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.nuke-range-accent::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+.nuke-range-accent::-moz-focus-outer {
+  border: 0;
+}
+
 /* ================================================
    LAYOUT SYSTEM
    ================================================ */

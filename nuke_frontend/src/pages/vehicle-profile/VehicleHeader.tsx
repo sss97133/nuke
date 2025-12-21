@@ -740,11 +740,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return { handle, href, proofUrl };
     };
 
-    const sellerRaw = String((vehicle as any)?.origin_metadata?.bat_seller || (vehicle as any)?.origin_metadata?.seller || '').trim() || null;
+    const sellerRaw = String(
+      // Prefer auction telemetry metadata (authoritative for BaT participant usernames)
+      (auctionPulse as any)?.seller_username ||
+        (auctionPulse as any)?.metadata?.seller_username ||
+        (auctionPulse as any)?.metadata?.seller ||
+        // Fallbacks
+        (vehicle as any)?.origin_metadata?.bat_seller ||
+        (vehicle as any)?.origin_metadata?.seller ||
+        ''
+    ).trim() || null;
     const winnerRaw =
+      // Prefer auction telemetry metadata (authoritative for buyer username)
+      String((auctionPulse as any)?.winner_name || '').trim() ||
+      String((auctionPulse as any)?.metadata?.buyer_username || (auctionPulse as any)?.metadata?.buyer || '').trim() ||
+      // Some pipelines may place winner fields at top-level
       (typeof (auctionPulse as any)?.winner_name === 'string' ? String((auctionPulse as any)?.winner_name) : '') ||
       (typeof (auctionPulse as any)?.winning_bidder_name === 'string' ? String((auctionPulse as any)?.winning_bidder_name) : '') ||
       (typeof (auctionPulse as any)?.winner_display_name === 'string' ? String((auctionPulse as any)?.winner_display_name) : '') ||
+      // Legacy fallbacks
       String((vehicle as any)?.origin_metadata?.bat_buyer || (vehicle as any)?.origin_metadata?.buyer || '').trim() ||
       null;
 
@@ -846,7 +860,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       };
     }
 
-    const metaSeller = String((vehicle as any)?.origin_metadata?.bat_seller || (vehicle as any)?.origin_metadata?.seller || '').trim();
+    const metaSeller = String(
+      (auctionPulse as any)?.seller_username ||
+        (auctionPulse as any)?.metadata?.seller_username ||
+        (auctionPulse as any)?.metadata?.seller ||
+        (vehicle as any)?.origin_metadata?.bat_seller ||
+        (vehicle as any)?.origin_metadata?.seller ||
+        ''
+    ).trim();
     if (metaSeller) {
       const slug = metaSeller
         .trim()
@@ -861,7 +882,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
 
     return null;
-  }, [organizationLinks, vehicle]);
+  }, [organizationLinks, vehicle, auctionPulse]);
 
   const batMemberLink = useMemo(() => {
     const metaSeller = String((vehicle as any)?.origin_metadata?.bat_seller || (vehicle as any)?.origin_metadata?.seller || '').trim();

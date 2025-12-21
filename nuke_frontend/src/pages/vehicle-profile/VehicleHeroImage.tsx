@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import type { VehicleHeroImageProps } from './types';
 import MobileImageGallery from '../../components/image/MobileImageGallery';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import ResilientImage from '../../components/images/ResilientImage';
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode }) => {
   const [showGallery, setShowGallery] = useState(false);
@@ -38,6 +37,11 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
   // Always include original URL as fallback - ResilientImage will try render URL first, then fall back to original
   const sources = renderFallback ? [renderFallback, src] : [src];
   const finalSources = sources.filter(Boolean) as string[];
+  // Prefer the optimized render URL, but also include the original URL as a fallback.
+  // For CSS backgrounds, we can provide a layered list: if the first fails, the next can still show.
+  const hiResUrl = finalSources[0] || src;
+  const backgroundImageCss =
+    finalSources.length >= 2 ? `url(${finalSources[0]}), url(${finalSources[1]})` : `url(${hiResUrl})`;
 
   return (
     <>
@@ -48,31 +52,19 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
           onClick={() => isMobile && setShowGallery(true)}
           style={{
             width: '100%',
-            // NOTE: `ResilientImage` in `fill` mode uses a wrapper with `height: 100%`.
-            // Percentage heights require a definite parent height (minHeight alone is not enough),
-            // otherwise the wrapper collapses to 0px and the image becomes invisible.
             height: '400px',
-            minHeight: '400px',
             borderRadius: '0px',
             position: 'relative',
             cursor: isMobile ? 'pointer' : 'default',
             overflow: 'hidden',
             backgroundColor: 'var(--bg)', // Fallback background
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+            backgroundImage: backgroundImageCss,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
           }}
         >
-          <ResilientImage
-            sources={finalSources}
-            alt="Vehicle hero image"
-            fill={true}
-            objectFit="contain"
-            imgStyle={{ objectPosition: 'center' }}
-            placeholderSrc="/n-zero.png"
-            placeholderOpacity={0.25}
-          />
-          {overlayNode}
+          {overlayNode ? <div style={{ position: 'relative', zIndex: 1 }}>{overlayNode}</div> : null}
         </div>
       </div>
     </section>
