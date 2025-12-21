@@ -241,22 +241,14 @@ async function extractFromSite(siteUrl: string, maxVehicles: number) {
   
   console.log(`Extracting from ${siteUrl} with ${maxVehicles} max vehicles...`);
   
-  // Use working import-bat-listing function with actual BaT URLs
-  const batUrls = [
-    'https://bringatrailer.com/listing/2024-porsche-911-dakar-38/',
-    'https://bringatrailer.com/listing/2023-ford-bronco-raptor-6/',
-    'https://bringatrailer.com/listing/1973-bmw-3-0csi-40/'
-  ];
+  // Use new Firecrawl + LLM extractor that auto-maps DOM and fills DB
+  console.log(`Extracting from ${siteUrl} using Firecrawl + LLM auto DOM mapping...`);
   
-  // Pick a BaT URL that actually works with import-bat-listing
-  const batUrl = batUrls[Math.floor(Math.random() * batUrls.length)];
-  
-  console.log(`Extracting from working BaT URL: ${batUrl}`);
-  
-  const { data, error } = await supabase.functions.invoke('import-bat-listing', {
+  const { data, error } = await supabase.functions.invoke('extract-premium-auction', {
     body: {
-      bat_auction_url: batUrl,
-      import_images: true
+      url: siteUrl,
+      site_type: 'carsandbids', // Default to Cars & Bids for now
+      max_vehicles: maxVehicles
     }
   });
   

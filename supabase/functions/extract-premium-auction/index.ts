@@ -90,13 +90,16 @@ function detectAuctionSite(url: string): string {
 }
 
 async function extractCarsAndBids(url: string, maxVehicles: number) {
-  console.log('Cars & Bids DOM mapping...');
+  console.log('Cars & Bids: Firecrawl DOM mapping + LLM extraction...');
   
   const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  
   if (!firecrawlKey) {
-    throw new Error('FIRECRAWL_API_KEY not configured in Supabase secrets');
+    throw new Error('FIRECRAWL_API_KEY not configured');
   }
   
+  // Step 1: Let Firecrawl handle DOM mapping automatically
   const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
     method: 'POST',
     headers: {
@@ -105,31 +108,46 @@ async function extractCarsAndBids(url: string, maxVehicles: number) {
     },
     body: JSON.stringify({
       url: url,
-      formats: ['html', 'extract'],
+      formats: ['markdown', 'html', 'extract'],
       extract: {
         schema: {
           type: "object",
           properties: {
-            auctions: {
+            vehicles: {
               type: "array",
               items: {
-                type: "object", 
+                type: "object",
                 properties: {
-                  title: { type: "string", description: "Vehicle title" },
-                  year: { type: "number", description: "Year" },
-                  make: { type: "string", description: "Make" },
-                  model: { type: "string", description: "Model" },
-                  current_bid: { type: "number", description: "Current bid amount" },
-                  reserve_met: { type: "boolean", description: "Reserve met status" },
-                  time_left: { type: "string", description: "Time remaining" },
-                  seller: { type: "string", description: "Seller name" },
+                  // Complete DB schema mapping
+                  year: { type: "number", description: "Vehicle year" },
+                  make: { type: "string", description: "Vehicle make/brand" },
+                  model: { type: "string", description: "Vehicle model" },
+                  trim: { type: "string", description: "Trim level" },
+                  vin: { type: "string", description: "VIN number if visible" },
+                  mileage: { type: "number", description: "Odometer reading" },
+                  color: { type: "string", description: "Exterior color" },
+                  interior_color: { type: "string", description: "Interior color" },
+                  transmission: { type: "string", description: "Transmission type" },
+                  engine_size: { type: "string", description: "Engine displacement" },
+                  drivetrain: { type: "string", description: "AWD/RWD/FWD/4WD" },
+                  fuel_type: { type: "string", description: "Fuel type" },
+                  body_style: { type: "string", description: "Body style" },
+                  asking_price: { type: "number", description: "Asking price or current bid" },
                   location: { type: "string", description: "Vehicle location" },
-                  listing_url: { type: "string", description: "Direct listing URL" },
+                  description: { type: "string", description: "Full vehicle description" },
+                  seller_name: { type: "string", description: "Seller name" },
+                  listing_url: { type: "string", description: "Direct link to this listing" },
                   images: { 
                     type: "array",
                     items: { type: "string" },
-                    description: "Image URLs"
-                  }
+                    description: "All vehicle image URLs"
+                  },
+                  // Auction specific
+                  current_bid: { type: "number", description: "Current highest bid" },
+                  reserve_met: { type: "boolean", description: "Reserve price met" },
+                  bid_count: { type: "number", description: "Number of bids" },
+                  time_left: { type: "string", description: "Time remaining" },
+                  auction_end_date: { type: "string", description: "When auction ends" }
                 }
               }
             }
@@ -140,11 +158,26 @@ async function extractCarsAndBids(url: string, maxVehicles: number) {
   });
   
   if (!response.ok) {
-    throw new Error(`Cars & Bids Firecrawl failed: ${response.status} ${await response.text()}`);
+    throw new Error(`Firecrawl failed: ${response.status}`);
   }
   
-  const data = await response.json();
-  const vehicles = data.data?.extract?.auctions || [];
+  const firecrawlData = await response.json();
+  let vehicles = firecrawlData.data?.extract?.vehicles || [];
+  
+  // Step 2: If Firecrawl didn't get everything, use LLM to find more
+  if (vehicles.length === 0 && openaiKey) {
+    console.log('Firecrawl found no vehicles, using LLM extraction...');
+    
+    const markdown = firecrawlData.data?.markdown || '';
+    if (markdown.length > 0) {
+      vehicles = await extractVehiclesWithLLM(markdown, openaiKey, maxVehicles);
+    }
+  }
+  
+  // Step 3: Store vehicles in database
+  if (vehicles.length > 0) {
+    await storeVehiclesInDatabase(vehicles, 'Cars & Bids');
+  }
   
   return {
     success: true,
@@ -152,10 +185,157 @@ async function extractCarsAndBids(url: string, maxVehicles: number) {
     site_type: 'carsandbids',
     vehicles_found: vehicles.length,
     vehicles: vehicles.slice(0, maxVehicles),
-    extraction_method: 'firecrawl_structured_schema',
-    needs_database_insert: true,
+    extraction_method: 'firecrawl_auto_dom_mapping + llm_fallback',
+    database_inserts: vehicles.length,
     timestamp: new Date().toISOString()
   };
+}
+
+// LLM extraction to find everything Firecrawl missed
+async function extractVehiclesWithLLM(markdown: string, openaiKey: string, maxVehicles: number) {
+  console.log('Using LLM to extract vehicle data...');
+  
+  const prompt = `Extract ALL vehicle listings from this auction site content. Find EVERYTHING needed to fill the database.
+
+For each vehicle, extract ALL these fields if available:
+- year, make, model, trim, vin
+- mileage, color, interior_color  
+- transmission, engine_size, drivetrain, fuel_type, body_style
+- asking_price, current_bid, reserve_met, bid_count
+- location, seller_name, description
+- listing_url, images (array of URLs)
+- auction_end_date, time_left
+
+CONTENT:
+${markdown.substring(0, 15000)}
+
+Return JSON array:
+[
+  {
+    "year": 2023,
+    "make": "BMW",
+    "model": "M4",
+    "asking_price": 85000,
+    "location": "Los Angeles, CA",
+    "description": "...",
+    "images": ["url1", "url2"],
+    "listing_url": "...",
+    "current_bid": 82000,
+    "time_left": "2 days"
+  }
+]`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openaiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 4000,
+      temperature: 0.1
+    })
+  });
+  
+  if (!response.ok) {
+    console.warn('LLM extraction failed:', response.status);
+    return [];
+  }
+  
+  const data = await response.json();
+  const content = data.choices[0].message.content;
+  
+  try {
+    // Extract JSON from response
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const vehicles = JSON.parse(jsonMatch[0]);
+      return Array.isArray(vehicles) ? vehicles.slice(0, maxVehicles) : [];
+    }
+  } catch (error) {
+    console.warn('Failed to parse LLM response:', error);
+  }
+  
+  return [];
+}
+
+// Store extracted vehicles in your database
+async function storeVehiclesInDatabase(vehicles: any[], source: string) {
+  console.log(`Storing ${vehicles.length} vehicles from ${source} in database...`);
+  
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+  
+  for (const vehicle of vehicles) {
+    try {
+      // Insert into vehicles table with all extracted fields
+      const { data, error } = await supabase
+        .from('vehicles')
+        .insert({
+          make: vehicle.make || 'Unknown',
+          model: vehicle.model || 'Unknown',
+          year: vehicle.year,
+          vin: vehicle.vin,
+          mileage: vehicle.mileage,
+          color: vehicle.color,
+          interior_color: vehicle.interior_color,
+          transmission: vehicle.transmission,
+          engine_size: vehicle.engine_size,
+          drivetrain: vehicle.drivetrain,
+          fuel_type: vehicle.fuel_type,
+          body_style: vehicle.body_style,
+          asking_price: vehicle.asking_price,
+          description: vehicle.description,
+          discovery_source: `${source.toLowerCase()}_agent_extraction`,
+          discovery_url: vehicle.listing_url,
+          platform_source: source.toLowerCase(),
+          platform_url: vehicle.listing_url,
+          is_public: true,
+          uploaded_by: null, // System import
+          profile_origin: 'agent_import'
+        })
+        .select('id')
+        .single();
+      
+      if (error) {
+        console.error('Database insert error:', error);
+        continue;
+      }
+      
+      console.log(`✅ Vehicle created: ${vehicle.year} ${vehicle.make} ${vehicle.model} (${data.id})`);
+      
+      // Insert images if available
+      if (vehicle.images && Array.isArray(vehicle.images) && data.id) {
+        await insertVehicleImages(supabase, data.id, vehicle.images, source);
+      }
+      
+    } catch (error) {
+      console.error('Failed to store vehicle:', error);
+    }
+  }
+}
+
+async function insertVehicleImages(supabase: any, vehicleId: string, imageUrls: string[], source: string) {
+  for (const imageUrl of imageUrls.slice(0, 10)) { // Limit to 10 images
+    try {
+      await supabase
+        .from('vehicle_images')
+        .insert({
+          vehicle_id: vehicleId,
+          image_url: imageUrl,
+          source: `${source.toLowerCase()}_agent`,
+          source_url: imageUrl,
+          is_external: true,
+          ai_processing_status: 'pending'
+        });
+    } catch (error) {
+      console.warn('Failed to insert image:', imageUrl, error);
+    }
+  }
 }
 
 async function extractMecum(url: string, maxVehicles: number) {
