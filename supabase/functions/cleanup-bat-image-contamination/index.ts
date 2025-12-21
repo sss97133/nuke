@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractBatDomMap } from "../_shared/batDomMap.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,48 +9,117 @@ const corsHeaders = {
 };
 
 /**
- * Cleanup function to remove contaminated images from BaT vehicles.
- * 
- * Problem: Older imports used regex fallback that captured images from related auctions.
- * This function identifies and removes images that don't belong to the vehicle's actual gallery.
- * 
- * Strategy:
- * 1. Get the vehicle's canonical image URLs from origin_metadata.image_urls (from DOM map extractor)
- * 2. Find all vehicle_images for the vehicle that are BaT URLs
- * 3. Keep only images that match the canonical list OR are within the same date bucket as the majority
- * 4. Delete contaminated images (those from different date buckets that aren't in canonical list)
+ * BaT Gallery Hygiene Runner (batch-safe).
+ *
+ * Canonical source of truth: vehicles.origin_metadata.image_urls (BaT #bat_listing_page_photo_gallery[data-gallery-items]).
+ *
+ * This function:
+ * - If canonical URLs are missing/small, fetches the BaT listing HTML and refreshes origin_metadata.image_urls (NO backfill).
+ * - Calls public.repair_bat_vehicle_gallery_images(vehicle_id) to:
+ *   - set vehicle_images.position to match canonical ordering
+ *   - mark non-canonical BaT-domain images as is_duplicate (never delete)
+ *   - reset primary image to canonical position 0
  */
 
 type ReqBody = {
-  vehicle_id?: string; // If provided, only clean this vehicle (for testing)
+  vehicle_id?: string; // If provided, only process this vehicle
   dry_run?: boolean;
-  batch_size?: number; // Default: process all vehicles
-  limit?: number; // Max vehicles to process (safety limit, default 1000)
+  limit?: number; // Max vehicles to scan (default 1000)
+  batch_size?: number; // Max vehicles to repair in one run (default 25)
+  min_vehicle_age_hours?: number; // optional rate limiter
 };
 
-function bucketKey(url: string): string | null {
-  const m = String(url || '').match(/\/wp-content\/uploads\/(\d{4})\/(\d{2})\//);
-  return m ? `${m[1]}/${m[2]}` : null;
+function isBatListingUrl(raw: string | null | undefined): boolean {
+  const s = String(raw || "").toLowerCase();
+  return s.includes("bringatrailer.com/listing/");
 }
 
-function normalizeImageUrl(url: string): string {
-  return String(url || '')
-    .split('#')[0]
-    .split('?')[0]
-    .replace(/&#038;/g, '&')
-    .replace(/&amp;/g, '&')
-    .replace(/-scaled\./g, '.')
-    .trim();
+function coalesceUrl(v: any): string | null {
+  const url = (v?.bat_auction_url || v?.listing_url || v?.discovery_url || null) as string | null;
+  return url ? String(url) : null;
 }
 
-async function isAuthorized(req: Request): Promise<{ ok: boolean; error?: string }> {
+async function isAuthorized(req: Request): Promise<{ ok: boolean; mode: "service_role" | "admin_user" | "none"; error?: string }> {
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  if (!authHeader) return { ok: false, error: "Missing Authorization header" };
+  if (!authHeader) return { ok: false, mode: "none", error: "Missing Authorization header" };
 
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
-  if (serviceKey && authHeader.trim() === `Bearer ${serviceKey}`) return { ok: true };
+  if (serviceKey && authHeader.trim() === `Bearer ${serviceKey}`) return { ok: true, mode: "service_role" };
 
-  return { ok: false, error: "Unauthorized" };
+  // Allow logged-in admins to trigger from the UI.
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("ANON_KEY") ?? "";
+  if (!supabaseUrl || !anonKey) return { ok: false, mode: "none", error: "Server not configured" };
+
+  try {
+    const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: userData, error: userErr } = await authClient.auth.getUser();
+    if (userErr || !userData?.user) return { ok: false, mode: "none", error: "Unauthorized" };
+
+    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    const { data: isAdmin, error: adminErr } = await admin.rpc("is_admin_or_moderator");
+    if (adminErr) return { ok: false, mode: "none", error: adminErr.message };
+    if (isAdmin === true) return { ok: true, mode: "admin_user" };
+    return { ok: false, mode: "none", error: "Forbidden" };
+  } catch (e: any) {
+    return { ok: false, mode: "none", error: e?.message || String(e) };
+  }
+}
+
+function cleanCanonical(urls: any[]): string[] {
+  const arr = Array.isArray(urls) ? urls : [];
+  const out: string[] = [];
+  for (const u of arr) {
+    if (typeof u !== "string") continue;
+    const s = u.trim();
+    if (!s) continue;
+    const low = s.toLowerCase();
+    if (!low.includes("bringatrailer.com/wp-content/uploads/")) continue;
+    if (low.includes("/countries/") || low.includes("/themes/") || low.endsWith(".svg")) continue;
+    out.push(s.split("#")[0].split("?")[0].replace(/-scaled\./g, "."));
+  }
+  // De-dupe preserving order
+  return [...new Set(out)];
+}
+
+async function fetchHtml(url: string): Promise<{ html: string; method: string; status: number }> {
+  const firecrawlApiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  if (firecrawlApiKey) {
+    try {
+      const r = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${firecrawlApiKey}`,
+        },
+        body: JSON.stringify({
+          url,
+          formats: ["html"],
+          onlyMainContent: false,
+          waitFor: 3500,
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (r.ok) {
+        const j = await r.json().catch(() => ({}));
+        const html = String(j?.data?.html || "");
+        if (html) return { html, method: "firecrawl", status: 200 };
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const r = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; NukeBot/1.0)",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.5",
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  const html = await r.text();
+  return { html, method: "direct", status: r.status };
 }
 
 Deno.serve(async (req) => {
@@ -58,7 +128,7 @@ Deno.serve(async (req) => {
   const auth = await isAuthorized(req);
   if (!auth.ok) {
     return new Response(JSON.stringify({ success: false, error: auth.error || "Unauthorized" }), {
-      status: 401,
+      status: auth.error === "Forbidden" ? 403 : 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -76,7 +146,8 @@ Deno.serve(async (req) => {
     const body: ReqBody = await req.json().catch(() => ({}));
     const dryRun = body.dry_run === true;
     const limit = Math.max(1, Math.min(5000, Number(body.limit || 1000))); // Safety limit
-    const batchSize = Math.max(1, Math.min(100, Number(body.batch_size || 100))); // Process in batches
+    const batchSize = Math.max(1, Math.min(100, Number(body.batch_size || 25))); // Repairs per run
+    const minAgeHours = Math.max(0, Math.min(24 * 90, Number(body.min_vehicle_age_hours || 0)));
 
     const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
@@ -93,22 +164,31 @@ Deno.serve(async (req) => {
       if (data) vehicles = [data];
     } else {
       // Batch mode: Find ALL BaT vehicles that have BaT images
-      // First, get all BaT vehicles (we'll filter by image existence in the processing loop)
+      // First, get BaT vehicles (we'll filter to candidates during processing loop)
+      const cutoffIso = minAgeHours > 0 ? new Date(Date.now() - minAgeHours * 60 * 60 * 1000).toISOString() : null;
       const { data, error } = await admin
         .from("vehicles")
         .select("id, year, make, model, profile_origin, discovery_url, listing_url, bat_auction_url, origin_metadata, discovery_source")
         .or("profile_origin.eq.bat_import,discovery_source.eq.bat_import,listing_url.ilike.%bringatrailer.com/listing/%,discovery_url.ilike.%bringatrailer.com/listing/%,bat_auction_url.ilike.%bringatrailer.com/listing/%")
+        .order("updated_at", { ascending: true })
         .limit(limit);
       if (error) throw new Error(error.message);
       vehicles = data || [];
+      if (cutoffIso) {
+        vehicles = vehicles.filter((v) => !v?.updated_at || String(v.updated_at) <= cutoffIso);
+      }
     }
 
     const results: any = {
       success: true,
       dry_run: dryRun,
-      vehicles_processed: 0,
-      vehicles_cleaned: 0,
-      images_removed: 0,
+      auth_mode: auth.mode,
+      scanned: vehicles.length,
+      candidates: 0,
+      repaired: 0,
+      refreshed_canonical: 0,
+      skipped: 0,
+      failed: 0,
       vehicles: [] as any[],
     };
 
@@ -117,117 +197,76 @@ Deno.serve(async (req) => {
         vehicle_id: vehicle.id,
         vehicle_name: `${vehicle.year} ${vehicle.make} ${vehicle.model}`,
         canonical_images: 0,
-        total_images: 0,
-        contaminated_images: 0,
-        images_removed: 0,
+        repaired: false,
+        refreshed_canonical: false,
+        rpc: null as any,
         errors: [] as string[],
       };
 
       try {
-        // Get canonical image URLs from origin_metadata (from DOM map extractor)
+        const url = coalesceUrl(vehicle);
+        if (!url || !isBatListingUrl(url)) {
+          vehicleResult.skipped_reason = "no_bat_listing_url";
+          results.skipped++;
+          results.vehicles.push(vehicleResult);
+          continue;
+        }
+
+        // Canonical set from origin_metadata.image_urls
         const om = (vehicle.origin_metadata && typeof vehicle.origin_metadata === "object") ? vehicle.origin_metadata : {};
-        const canonicalUrls = Array.isArray((om as any)?.image_urls) ? (om as any).image_urls : [];
-        const canonicalSet = new Set(canonicalUrls.map(normalizeImageUrl).filter(Boolean));
-        vehicleResult.canonical_images = canonicalSet.size;
+        let canonical = cleanCanonical((om as any)?.image_urls);
+        vehicleResult.canonical_images = canonical.length;
 
-        // Get all BaT images for this vehicle
-        const { data: images, error: imgErr } = await admin
-          .from("vehicle_images")
-          .select("id, image_url, source_url, storage_path, created_at")
-          .eq("vehicle_id", vehicle.id)
-          .or("image_url.ilike.%bringatrailer.com/wp-content/uploads/%,source_url.ilike.%bringatrailer.com/wp-content/uploads/%");
-
-        if (imgErr) {
-          vehicleResult.errors.push(`Error fetching images: ${imgErr.message}`);
-          results.vehicles.push(vehicleResult);
-          continue;
-        }
-
-        vehicleResult.total_images = images?.length || 0;
-
-        if (!images || images.length === 0) {
-          vehicleResult.skipped_reason = "no_bat_images";
-          results.vehicles_skipped++;
-          results.vehicles.push(vehicleResult);
-          continue;
-        }
-
-        // Analyze buckets
-        const bucketCounts = new Map<string, number>();
-        const imagesByBucket = new Map<string, any[]>();
-
-        for (const img of images) {
-          const url = normalizeImageUrl(img.source_url || img.image_url || "");
-          if (!url.includes("bringatrailer.com/wp-content/uploads/")) continue;
-
-          const bucket = bucketKey(url);
-          if (!bucket) continue;
-
-          bucketCounts.set(bucket, (bucketCounts.get(bucket) || 0) + 1);
-          if (!imagesByBucket.has(bucket)) imagesByBucket.set(bucket, []);
-          imagesByBucket.get(bucket)!.push(img);
-        }
-
-        // Find the dominant bucket (should match the listing date)
-        let dominantBucket: string | null = null;
-        let dominantCount = 0;
-        for (const [bucket, count] of bucketCounts.entries()) {
-          if (count > dominantCount) {
-            dominantBucket = bucket;
-            dominantCount = count;
-          }
-        }
-
-        // Identify contaminated images: BaT URLs that are:
-        // 1. Not in the canonical list, AND
-        // 2. Not in the dominant bucket
-        const toRemove: string[] = [];
-        for (const img of images) {
-          const url = normalizeImageUrl(img.source_url || img.image_url || "");
-          if (!url.includes("bringatrailer.com/wp-content/uploads/")) continue;
-
-          const isCanonical = canonicalSet.has(url);
-          const bucket = bucketKey(url);
-          const isInDominantBucket = bucket === dominantBucket;
-
-          // Keep if canonical OR in dominant bucket
-          if (isCanonical || isInDominantBucket) continue;
-
-          // This image is contaminated
-          toRemove.push(img.id);
-        }
-
-        vehicleResult.contaminated_images = toRemove.length;
-
-        if (toRemove.length > 0) {
+        // If canonical is missing/small, refresh it from HTML using batDomMap (no backfill)
+        if (canonical.length < 20) {
+          results.candidates++;
           if (!dryRun) {
-            const { error: delErr } = await admin
-              .from("vehicle_images")
-              .delete()
-              .in("id", toRemove);
-
-            if (delErr) {
-              vehicleResult.errors.push(`Error deleting images: ${delErr.message}`);
-            } else {
-              vehicleResult.images_removed = toRemove.length;
-              results.images_removed += toRemove.length;
-              results.vehicles_cleaned++;
+            const fetched = await fetchHtml(url);
+            const extracted = extractBatDomMap(fetched.html, url);
+            const fresh = cleanCanonical(extracted?.extracted?.image_urls || []);
+            if (fresh.length >= 20) {
+              const nextOm = { ...(om as any), image_urls: fresh, image_count: fresh.length, bat_hygiene: { ...(om as any)?.bat_hygiene, refreshed_at: new Date().toISOString(), refresh_method: extracted?.gallery_method || null } };
+              await admin.from("vehicles").update({ origin_metadata: nextOm, updated_at: new Date().toISOString() }).eq("id", vehicle.id);
+              canonical = fresh;
+              vehicleResult.canonical_images = canonical.length;
+              vehicleResult.refreshed_canonical = true;
+              results.refreshed_canonical++;
             }
           } else {
-            vehicleResult.images_removed = toRemove.length; // Would be removed
-            results.vehicles_cleaned++; // Count in dry-run too
+            vehicleResult.refreshed_canonical = true;
           }
-        } else {
-          vehicleResult.skipped_reason = "no_contamination_found";
-          results.vehicles_skipped++;
         }
 
+        // If we now have canonical, run the strict repair RPC
+        if (vehicleResult.canonical_images >= 20) {
+          results.candidates++;
+          const { data: rpcData, error: rpcErr } = await admin.rpc("repair_bat_vehicle_gallery_images", {
+            p_vehicle_id: vehicle.id,
+            p_dry_run: dryRun,
+          });
+          if (rpcErr) throw new Error(rpcErr.message);
+          vehicleResult.rpc = rpcData;
+          vehicleResult.repaired = rpcData?.skipped !== true;
+          if (vehicleResult.repaired) results.repaired++;
+        } else {
+          vehicleResult.skipped_reason = "canonical_missing";
+          results.skipped++;
+        }
       } catch (e: any) {
         vehicleResult.errors.push(e?.message || String(e));
+        results.failed++;
       }
 
       results.vehicles.push(vehicleResult);
-      results.vehicles_processed++;
+
+      // Soft limit repairs per run (keeps runtime predictable)
+      if (!body.vehicle_id) {
+        const done = results.repaired + results.failed + results.skipped;
+        if (done >= batchSize) break;
+      }
+
+      // small delay to avoid hammering
+      await new Promise((r) => setTimeout(r, 75));
     }
 
     return new Response(JSON.stringify(results, null, 2), {

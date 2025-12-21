@@ -382,6 +382,7 @@ const CursorHomepage: React.FC = () => {
   const navigate = useNavigate();
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
   const lastScrollYRef = useRef<number>(0);
+  const suppressAutoMinimizeUntilRef = useRef<number>(0);
 
   const infiniteObserverRef = useRef<IntersectionObserver | null>(null);
 
@@ -426,14 +427,30 @@ const CursorHomepage: React.FC = () => {
         const currentScrollY = window.scrollY;
         const deltaY = currentScrollY - lastScrollYRef.current;
         lastScrollYRef.current = currentScrollY;
+        const now = Date.now();
 
         // Show scroll-to-top button after scrolling down 500px (only update on change)
         const shouldShowScrollTop = currentScrollY > 500;
         setShowScrollTop((prev) => (prev === shouldShowScrollTop ? prev : shouldShowScrollTop));
 
-        // Auto-minimize the filter panel as soon as the user starts scrolling.
+        // Auto-minimize ONLY after the filter panel has been scrolled past.
+        // This prevents the panel from collapsing while the user is still scrolling through the filters.
         // Do NOT auto-expand (let the user control expansion).
-        if (deltaY > 0 && showFilters && currentScrollY > 12 && !filterBarMinimized) {
+        let filterPanelStillVisible = false;
+        try {
+          const panel = filterPanelRef.current;
+          if (panel) {
+            const rect = panel.getBoundingClientRect();
+            const headerHeightRaw = getComputedStyle(document.documentElement).getPropertyValue('--header-height');
+            const headerHeight = Number.parseFloat(headerHeightRaw) || 40;
+            filterPanelStillVisible = rect.bottom > headerHeight + 8;
+          }
+        } catch {
+          // ignore
+        }
+
+        const suppressAutoMinimize = now < suppressAutoMinimizeUntilRef.current;
+        if (!suppressAutoMinimize && deltaY > 0 && showFilters && currentScrollY > 12 && !filterBarMinimized && !filterPanelStillVisible) {
           setFilterBarMinimized(true);
           setShowFilters(false);
         }
@@ -1500,6 +1517,16 @@ const CursorHomepage: React.FC = () => {
     }
   };
 
+  const openFiltersFromMiniBar = useCallback(() => {
+    suppressAutoMinimizeUntilRef.current = Date.now() + 1200;
+    lastScrollYRef.current = window.scrollY;
+    setFilterBarMinimized(false);
+    setShowFilters(true);
+    window.requestAnimationFrame(() => {
+      filterPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
+
   // Show grid immediately - no loading state blocking
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: '16px' }}>
@@ -1511,22 +1538,27 @@ const CursorHomepage: React.FC = () => {
       }}>
         {/* Sticky Minimized Filter Bar - docks under the sticky header/search bar */}
         {filterBarMinimized && (
-          <div style={{
+          <div
+            onClick={openFiltersFromMiniBar}
+            title="Click to open filters"
+            style={{
             position: 'sticky',
             top: 'var(--header-height, 40px)',
             background: 'var(--surface-glass)',
             backdropFilter: 'blur(8px)',
             border: '1px solid var(--border)',
-            padding: '8px 12px',
-            marginBottom: '12px',
+            padding: '6px 10px',
+            marginBottom: '10px',
             zIndex: 900,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
             display: 'flex',
-            flexWrap: 'wrap',
-            gap: '6px',
-            alignItems: 'center'
+            flexWrap: 'nowrap',
+            gap: '10px',
+            alignItems: 'center',
+            overflow: 'hidden',
+            cursor: 'pointer'
           }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '10px', marginRight: '6px' }}>
+            <div style={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'baseline', gap: '10px', flex: '0 0 auto' }}>
               <div style={{ fontSize: '8pt', fontWeight: 900, color: 'var(--text)' }}>
                 {displayStats.totalVehicles.toLocaleString()} vehicles
               </div>
@@ -1538,134 +1570,194 @@ const CursorHomepage: React.FC = () => {
               </div>
             </div>
 
-            {/* Selected filter chips */}
-            {activeFilterCount === 0 ? (
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '2px 8px',
-                  background: 'var(--grey-200)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '999px',
-                  fontSize: '7pt',
-                  color: 'var(--text-muted)',
-                  fontFamily: '"MS Sans Serif", sans-serif'
-                }}
-              >
-                No filters
-              </div>
-            ) : (
-              getActiveFilterBadges.map((badge, idx) => (
+            {/* Scrollable strip: selected filters + market pogs */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                flex: '1 1 auto',
+                minWidth: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                overflowX: 'auto',
+                overflowY: 'hidden',
+                paddingBottom: '2px'
+              }}
+            >
+              {/* Selected filter chips */}
+              {activeFilterCount === 0 ? (
                 <div
-                  key={idx}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '2px 8px',
+                    padding: '1px 8px',
                     background: 'var(--grey-200)',
                     border: '1px solid var(--border)',
                     borderRadius: '999px',
                     fontSize: '7pt',
-                    fontFamily: '"MS Sans Serif", sans-serif'
+                    color: 'var(--text-muted)',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    flex: '0 0 auto'
                   }}
                 >
-                  <span>{badge.label}</span>
-                  {badge.onRemove && (
-                    <button
-                      onClick={badge.onRemove}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        padding: '0',
-                        margin: 0,
-                        cursor: 'pointer',
-                        fontSize: '8pt',
-                        lineHeight: 1,
-                        color: 'var(--text-muted)',
-                        fontWeight: 'bold'
-                      }}
-                      title="Remove filter"
-                    >
-                      ×
-                    </button>
-                  )}
+                  No filters
                 </div>
-              ))
-            )}
+              ) : (
+                getActiveFilterBadges.map((badge, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '1px 8px',
+                      background: 'var(--grey-200)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '999px',
+                      fontSize: '7pt',
+                      fontFamily: '"MS Sans Serif", sans-serif',
+                      flex: '0 0 auto'
+                    }}
+                  >
+                    <span>{badge.label}</span>
+                    {badge.onRemove && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          badge.onRemove?.();
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '0',
+                          margin: 0,
+                          cursor: 'pointer',
+                          fontSize: '8pt',
+                          lineHeight: 1,
+                          color: 'var(--text-muted)',
+                          fontWeight: 'bold'
+                        }}
+                        title="Remove filter"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
 
-            {/* Market/source toggles */}
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: '6px' }}>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontWeight: 900, letterSpacing: '0.3px' }}>
-                Markets
-              </div>
-              {[
-                {
-                  key: 'dealers',
-                  label: 'DEALERS',
-                  included: !filters.hideDealerListings,
-                  onClick: () => setFilters({ ...filters, hideDealerListings: !filters.hideDealerListings })
-                },
-                {
-                  key: 'cl',
-                  label: 'CL',
-                  included: !filters.hideCraigslist,
-                  onClick: () => setFilters({ ...filters, hideCraigslist: !filters.hideCraigslist })
-                },
-                {
-                  key: 'sites',
-                  label: 'SITES',
-                  included: !filters.hideDealerSites,
-                  onClick: () => setFilters({ ...filters, hideDealerSites: !filters.hideDealerSites })
-                },
-                {
-                  key: 'ksl',
-                  label: 'KSL',
-                  included: !filters.hideKsl,
-                  onClick: () => setFilters({ ...filters, hideKsl: !filters.hideKsl })
-                },
-                {
-                  key: 'bat',
-                  label: 'BAT',
-                  included: !filters.hideBat,
-                  onClick: () => setFilters({ ...filters, hideBat: !filters.hideBat })
-                },
-                {
-                  key: 'classic',
-                  label: 'CLASSIC',
-                  included: !filters.hideClassic,
-                  onClick: () => setFilters({ ...filters, hideClassic: !filters.hideClassic })
-                }
-              ].map((b) => (
-                <button
-                  key={b.key}
-                  type="button"
-                  onClick={b.onClick}
-                  style={{
-                    padding: '2px 8px',
-                    fontSize: '7pt',
-                    fontWeight: 900,
-                    letterSpacing: '0.3px',
-                    textTransform: 'uppercase',
-                    border: '1px solid var(--border)',
-                    borderRadius: '999px',
-                    background: b.included ? 'var(--white)' : 'var(--grey-200)',
-                    color: b.included ? 'var(--text)' : 'var(--text-muted)',
-                    cursor: 'pointer',
-                    fontFamily: '"MS Sans Serif", sans-serif'
-                  }}
-                  title={b.included ? 'Included (click to hide)' : 'Hidden (click to include)'}
-                >
-                  {b.label}
-                </button>
-              ))}
+              <div style={{ width: '1px', height: '14px', background: 'var(--border)', flex: '0 0 auto' }} aria-hidden="true" />
+
+              {(() => {
+                const faviconUrl = (domain: string) => `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}`;
+                const pogs = [
+                  {
+                    key: 'cl',
+                    domain: 'craigslist.org',
+                    title: 'Craigslist',
+                    included: !filters.hideCraigslist,
+                    onClick: () => setFilters({ ...filters, hideCraigslist: !filters.hideCraigslist })
+                  },
+                  {
+                    key: 'ksl',
+                    domain: 'ksl.com',
+                    title: 'KSL',
+                    included: !filters.hideKsl,
+                    onClick: () => setFilters({ ...filters, hideKsl: !filters.hideKsl })
+                  },
+                  {
+                    key: 'sites',
+                    domain: 'autotrader.com',
+                    title: 'Dealer Sites',
+                    included: !filters.hideDealerSites,
+                    onClick: () => setFilters({ ...filters, hideDealerSites: !filters.hideDealerSites })
+                  },
+                  {
+                    key: 'bat',
+                    domain: 'bringatrailer.com',
+                    title: 'Bring a Trailer',
+                    included: !filters.hideBat,
+                    onClick: () => setFilters({ ...filters, hideBat: !filters.hideBat })
+                  },
+                  {
+                    key: 'classic',
+                    domain: 'classic.com',
+                    title: 'Classic.com',
+                    included: !filters.hideClassic,
+                    onClick: () => setFilters({ ...filters, hideClassic: !filters.hideClassic })
+                  }
+                ];
+
+                return (
+                  <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flex: '0 0 auto' }}>
+                    {pogs.map((p) => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          p.onClick();
+                        }}
+                        aria-label={p.included ? `${p.title} (included)` : `${p.title} (hidden)`}
+                        title={p.included ? `${p.title}: Included (click to hide)` : `${p.title}: Hidden (click to include)`}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          padding: 0,
+                          borderRadius: '999px',
+                          border: `1px solid ${p.included ? 'var(--accent)' : 'var(--border)'}`,
+                          background: 'var(--white)',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: p.included ? '0 0 0 2px var(--accent-dim)' : 'none',
+                          opacity: p.included ? 1 : 0.45,
+                          flex: '0 0 auto'
+                        }}
+                      >
+                        <img
+                          src={faviconUrl(p.domain)}
+                          alt=""
+                          width={14}
+                          height={14}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          style={{
+                            width: '14px',
+                            height: '14px',
+                            borderRadius: '3px',
+                            filter: p.included ? 'none' : 'grayscale(100%)',
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                title={`Card density (${Math.round(cardMinWidth)}px min)`}
+              >
+                <input
+                  type="range"
+                  min="140"
+                  max="320"
+                  step="10"
+                  value={cardMinWidth}
+                  onChange={(e) => setCardMinWidth(parseInt(e.target.value, 10))}
+                  className="nuke-range nuke-range-accent"
+                  style={{ width: '110px' }}
+                />
+              </div>
               {activeFilterCount > 0 && (
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setFilters(DEFAULT_FILTERS);
                     setSearchText('');
                   }}
@@ -1684,28 +1776,6 @@ const CursorHomepage: React.FC = () => {
                   Reset
                 </button>
               )}
-              <button
-                onClick={() => {
-                  setFilterBarMinimized(false);
-                  setShowFilters(true);
-                  window.requestAnimationFrame(() => {
-                    filterPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  });
-                }}
-                style={{
-                  padding: '2px 8px',
-                  fontSize: '7pt',
-                  border: '1px solid var(--border)',
-                  background: 'var(--grey-600)',
-                  color: 'var(--white)',
-                  cursor: 'pointer',
-                  borderRadius: '2px',
-                  fontFamily: '"MS Sans Serif", sans-serif',
-                  fontWeight: 800
-                }}
-              >
-                Filters
-              </button>
             </div>
           </div>
         )}

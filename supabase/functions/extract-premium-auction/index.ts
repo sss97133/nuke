@@ -538,12 +538,69 @@ async function storeVehiclesInDatabase(
   const errors: string[] = [];
   const sourceOrgId = await ensureSourceBusiness(supabase, source, sourceWebsite);
 
+  const nowIso = () => new Date().toISOString();
+
+  const normalizeDescriptionSummary = (raw: any): string | null => {
+    const s = typeof raw === "string" ? raw.trim() : "";
+    if (!s) return null;
+    // Keep the curated summary short (UI editor currently enforces 500 chars).
+    const cleaned = s.replace(/\s+/g, " ").trim();
+    if (cleaned.length <= 480) return cleaned;
+    return `${cleaned.slice(0, 480).trim()}…`;
+  };
+
+  const saveRawListingDescription = async (vehicleId: string, listingUrl: string | null, raw: any) => {
+    const text = typeof raw === "string" ? raw.trim() : "";
+    if (!text) return;
+    try {
+      // Avoid writing duplicate snapshots when re-running extraction.
+      const { data: latest, error: latestErr } = await supabase
+        .from("extraction_metadata")
+        .select("field_value")
+        .eq("vehicle_id", vehicleId)
+        .eq("field_name", "raw_listing_description")
+        .order("extracted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!latestErr && latest?.field_value && String(latest.field_value).trim() === text) return;
+    } catch {
+      // Non-fatal; we'll still attempt insert below.
+    }
+
+    try {
+      const { error } = await supabase
+        .from("extraction_metadata")
+        .insert({
+          vehicle_id: vehicleId,
+          field_name: "raw_listing_description",
+          field_value: text,
+          extraction_method: "extract-premium-auction",
+          scraper_version: "v1",
+          source_url: listingUrl,
+          confidence_score: 0.75,
+          validation_status: "unvalidated",
+          extracted_at: nowIso(),
+          created_at: nowIso(),
+          raw_extraction_data: {
+            source,
+            listing_url: listingUrl,
+          },
+        } as any);
+      if (error) {
+        console.warn(`extraction_metadata insert failed (${vehicleId}): ${error.message}`);
+      }
+    } catch (e: any) {
+      console.warn(`extraction_metadata insert exception (${vehicleId}): ${e?.message || String(e)}`);
+    }
+  };
+
   for (const vehicle of cleaned) {
     try {
       const listingUrl = vehicle.listing_url || vehicle.platform_url || vehicle.url || null;
       const title = vehicle.title || vehicle.listing_title || null;
       const vinRaw = typeof vehicle.vin === "string" ? vehicle.vin.trim() : "";
       const vin = vinRaw && vinRaw.toLowerCase() !== "n/a" ? vinRaw : null;
+      const rawListingDescription = vehicle.description || null;
 
       const payload = {
           make: vehicle.make || "Unknown",
@@ -559,7 +616,10 @@ async function storeVehiclesInDatabase(
           fuel_type: vehicle.fuel_type || null,
           body_style: vehicle.body_style || null,
           asking_price: Number.isFinite(vehicle.asking_price) ? vehicle.asking_price : (Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null),
-          description: vehicle.description || null,
+          // IMPORTANT: keep `vehicles.description` as a curated summary (not a raw listing dump).
+          // The raw listing description is stored (with provenance and history) in `extraction_metadata`.
+          description: normalizeDescriptionSummary(rawListingDescription),
+          description_source: rawListingDescription ? "source_imported" : null,
           listing_url: listingUrl,
           listing_source: source.toLowerCase(),
           listing_title: title,
@@ -574,7 +634,7 @@ async function storeVehiclesInDatabase(
           import_method: "scraper",
           import_metadata: {
             source,
-            extracted_at: new Date().toISOString(),
+            extracted_at: nowIso(),
             extractor: "extract-premium-auction",
           },
           // This is effectively a URL-based scraper import; using url_scraper makes downstream org-link triggers
@@ -635,10 +695,14 @@ async function storeVehiclesInDatabase(
       }
 
       if (data?.id) {
+        // Persist raw listing description as a provenance-backed "description entry"
+        // (shown in UI as a dated, source-linked post).
+        await saveRawListingDescription(String(data.id), listingUrl, rawListingDescription);
+
         // organization_vehicles link is created by DB trigger auto_link_vehicle_to_origin_org()
         // when origin_organization_id is set.
         if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
-          const img = await insertVehicleImages(supabase, data.id, vehicle.images, source);
+          const img = await insertVehicleImages(supabase, data.id, vehicle.images, source, listingUrl);
           errors.push(...img.errors);
         }
       }
@@ -695,6 +759,7 @@ async function insertVehicleImages(
   vehicleId: string,
   imageUrls: any[],
   source: string,
+  listingUrl: string | null,
 ): Promise<{ inserted: number; errors: string[] }> {
   const errors: string[] = [];
   let inserted = 0;
@@ -705,10 +770,11 @@ async function insertVehicleImages(
   // Avoid duplicates and append positions after existing images
   let existingUrls = new Set<string>();
   let nextPosition = 0;
+  let hasPrimary = false;
   try {
     const { data: existing, error } = await supabase
       .from("vehicle_images")
-      .select("image_url, position")
+      .select("image_url, position, is_primary")
       .eq("vehicle_id", vehicleId)
       .limit(5000);
     if (error) {
@@ -719,6 +785,7 @@ async function insertVehicleImages(
         const u = typeof row?.image_url === "string" ? row.image_url : "";
         if (u) existingUrls.add(u);
         if (Number.isFinite(row?.position)) maxPos = Math.max(maxPos, row.position);
+        if (row?.is_primary) hasPrimary = true;
       }
       nextPosition = maxPos + 1;
     }
@@ -729,6 +796,7 @@ async function insertVehicleImages(
   for (const imageUrl of urls.slice(0, 25)) { // Limit per run
     if (existingUrls.has(imageUrl)) continue;
     try {
+      const makePrimary = !hasPrimary && nextPosition === 0;
       const { error } = await supabase
         .from("vehicle_images")
         .insert({
@@ -740,6 +808,16 @@ async function insertVehicleImages(
           is_external: true,
           ai_processing_status: "pending",
           position: nextPosition,
+          display_order: nextPosition,
+          is_primary: makePrimary,
+          is_approved: true,
+          approval_status: "auto_approved",
+          redaction_level: "none",
+          exif_data: {
+            source_url: listingUrl,
+            discovery_url: listingUrl,
+            imported_from: source,
+          },
         });
       nextPosition += 1;
       if (error) {
@@ -749,6 +827,7 @@ async function insertVehicleImages(
       } else {
         inserted += 1;
         existingUrls.add(imageUrl);
+        if (makePrimary) hasPrimary = true;
       }
     } catch (e: any) {
       const msg = `vehicle_images insert exception (${vehicleId}): ${e?.message || String(e)}`;

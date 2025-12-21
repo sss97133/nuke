@@ -248,9 +248,11 @@ def download_logo(
     width: Optional[int],
     user_agent: str,
     sleep_s: float,
-) -> Tuple[Optional[str], Optional[str], Optional[int]]:
+    retries: int,
+    timeout_s: int,
+) -> Tuple[Optional[str], Optional[str], Optional[int], Optional[str]]:
     """
-    Returns (local_path, sha256, bytes) or (None, None, None) if download fails.
+    Returns (local_path, sha256, bytes, error) where error is None on success.
     Uses Special:FilePath with optional width for rasterization.
     """
     ensure_dir(out_dir)
@@ -266,46 +268,72 @@ def download_logo(
         local_name = f"logo{ext or ''}"
         local_path = os.path.join(logo_dir, local_name)
         if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
-            return local_path, sha256_file(local_path), os.path.getsize(local_path)
+            return local_path, sha256_file(local_path), os.path.getsize(local_path), None
     else:
         # Thumbnails may be served as PNG/JPEG/WebP regardless of the original file type.
         for candidate in ["logo.png", "logo.jpg", "logo.jpeg", "logo.webp"]:
             candidate_path = os.path.join(logo_dir, candidate)
             if os.path.exists(candidate_path) and os.path.getsize(candidate_path) > 0:
-                return candidate_path, sha256_file(candidate_path), os.path.getsize(candidate_path)
+                return candidate_path, sha256_file(candidate_path), os.path.getsize(candidate_path), None
 
-    try:
-        with requests.get(url, headers=headers, stream=True, timeout=90, allow_redirects=True) as resp:
-            resp.raise_for_status()
-            content_type = (resp.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
-            if width is None:
-                ext = os.path.splitext(commons_filename)[1].lower()
-                local_name = f"logo{ext or ''}"
-            else:
-                ext_by_type = {
-                    "image/png": ".png",
-                    "image/jpeg": ".jpg",
-                    "image/webp": ".webp",
-                    "image/svg+xml": ".svg",
-                }
-                local_name = "logo" + ext_by_type.get(content_type, ".png")
-            local_path = os.path.join(logo_dir, local_name)
+    retryable_statuses = {429, 500, 502, 503, 504}
+    last_error: Optional[str] = None
 
-            with open(local_path, "wb") as f:
-                for chunk in resp.iter_content(chunk_size=1024 * 128):
-                    if chunk:
-                        f.write(chunk)
-        if sleep_s > 0:
-            time.sleep(sleep_s)
-        return local_path, sha256_file(local_path), os.path.getsize(local_path)
-    except Exception:
-        # Don't crash the whole run; caller will record missing local file.
+    for attempt in range(max(0, int(retries)) + 1):
         try:
-            if os.path.exists(local_path):
-                os.remove(local_path)
-        except Exception:
-            pass
-        return None, None, None
+            with requests.get(url, headers=headers, stream=True, timeout=timeout_s, allow_redirects=True) as resp:
+                if resp.status_code in retryable_statuses:
+                    retry_after = resp.headers.get("Retry-After")
+                    if retry_after:
+                        try:
+                            wait_s = float(retry_after)
+                        except ValueError:
+                            wait_s = 2.0
+                    else:
+                        wait_s = min(2.0 * (2 ** attempt), 60.0)
+                    last_error = f"HTTP {resp.status_code} (retryable), waiting {wait_s:.1f}s"
+                    time.sleep(wait_s)
+                    continue
+
+                resp.raise_for_status()
+                content_type = (resp.headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+                if width is None:
+                    ext = os.path.splitext(commons_filename)[1].lower()
+                    local_name = f"logo{ext or ''}"
+                else:
+                    ext_by_type = {
+                        "image/png": ".png",
+                        "image/jpeg": ".jpg",
+                        "image/webp": ".webp",
+                        "image/svg+xml": ".svg",
+                    }
+                    local_name = "logo" + ext_by_type.get(content_type, ".png")
+                local_path = os.path.join(logo_dir, local_name)
+
+                with open(local_path, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=1024 * 128):
+                        if chunk:
+                            f.write(chunk)
+
+            if sleep_s > 0:
+                time.sleep(sleep_s)
+            return local_path, sha256_file(local_path), os.path.getsize(local_path), None
+
+        except Exception as e:
+            last_error = f"{type(e).__name__}: {e}"
+            # Backoff for network-y failures.
+            if attempt < int(retries):
+                time.sleep(min(2.0 * (2 ** attempt), 60.0))
+                continue
+            break
+
+    # Don't crash the whole run; caller will record missing local file.
+    try:
+        if "local_path" in locals() and local_path and os.path.exists(local_path):
+            os.remove(local_path)
+    except Exception:
+        pass
+    return None, None, None, last_error or "download_failed"
 
 
 def write_json(path: str, data: Any) -> None:
@@ -362,6 +390,8 @@ def main() -> int:
     p.add_argument("--max-downloads", type=int, default=500, help="Cap number of logo downloads")
     p.add_argument("--width", type=int, default=None, help="Optional pixel width for logo download (rasterized via Commons)")
     p.add_argument("--sleep", type=float, default=0.2, help="Sleep seconds between downloads (politeness)")
+    p.add_argument("--retries", type=int, default=4, help="Retries per logo download for transient errors")
+    p.add_argument("--timeout", type=int, default=90, help="Per-request timeout in seconds")
     p.add_argument("--user-agent", default="NukeLogoIndexer/1.0 (internal design indexing)", help="HTTP User-Agent")
     args = p.parse_args()
 
@@ -461,6 +491,7 @@ def main() -> int:
 
     # Optional downloads
     downloaded = 0
+    download_failures: List[Dict[str, Any]] = []
     if args.download:
         for r in records:
             if downloaded >= int(args.max_downloads):
@@ -468,19 +499,31 @@ def main() -> int:
             if not r.commons_logo_filename:
                 continue
             make_slug = slugify(r.label)
-            local_path, digest, size_b = download_logo(
+            local_path, digest, size_b, err = download_logo(
                 commons_filename=r.commons_logo_filename,
                 out_dir=out_dir,
                 make_slug=make_slug,
                 width=args.width,
                 user_agent=args.user_agent,
                 sleep_s=float(args.sleep),
+                retries=int(args.retries),
+                timeout_s=int(args.timeout),
             )
             if local_path:
                 r.local_logo_path = os.path.relpath(local_path, out_dir)
                 r.local_logo_sha256 = digest
                 r.local_logo_bytes = size_b
                 downloaded += 1
+            else:
+                download_failures.append(
+                    {
+                        "label": r.label,
+                        "wikidata_id": r.wikidata_id,
+                        "commons_logo_filename": r.commons_logo_filename,
+                        "commons_logo_download_url": r.commons_logo_download_url,
+                        "error": err,
+                    }
+                )
 
     json_path = os.path.join(out_dir, "index.json")
     csv_path = os.path.join(out_dir, "index.csv")
@@ -499,16 +542,28 @@ def main() -> int:
             "download": bool(args.download),
             "max_downloads": int(args.max_downloads),
             "width": args.width,
+            "retries": int(args.retries),
+            "timeout": int(args.timeout),
         },
         "stats": {
             "total_items": len(records),
             "items_with_commons_logo": sum(1 for r in records if r.commons_logo_filename),
             "logos_downloaded": downloaded,
+            "logo_download_failures": len(download_failures),
         },
         "items": records_to_jsonable(records),
     }
 
     write_json(json_path, json_payload)
+
+    if args.download and download_failures:
+        failures_path = os.path.join(out_dir, "download_failures.csv")
+        write_csv(
+            failures_path,
+            download_failures,
+            fieldnames=["label", "wikidata_id", "commons_logo_filename", "commons_logo_download_url", "error"],
+        )
+        print(f"Wrote {failures_path}")
 
     csv_rows: List[Dict[str, Any]] = []
     for r in records:
