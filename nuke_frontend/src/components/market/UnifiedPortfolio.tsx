@@ -16,13 +16,13 @@ const formatPct = (value: number) => {
   return `${sign}${value.toFixed(2)}%`;
 };
 
-const getTypeIcon = (type: string) => {
+const getTypeLabel = (type: string) => {
   switch (type) {
-    case 'etf': return '📊';
-    case 'vehicle_shares': return '🚗';
-    case 'vehicle_stake': return '💰';
-    case 'vehicle_bond': return '🏦';
-    default: return '💼';
+    case 'etf': return 'ETF';
+    case 'vehicle_shares': return 'SHARES';
+    case 'vehicle_stake': return 'STAKE';
+    case 'vehicle_bond': return 'BOND';
+    default: return 'INVEST';
   }
 };
 
@@ -212,7 +212,6 @@ export default function UnifiedPortfolio() {
         {filteredHoldings.length === 0 ? (
           <div className="card">
             <div className="card-body" style={{ textAlign: 'center', padding: '48px' }}>
-              <div style={{ fontSize: '24pt', marginBottom: '16px' }}>📊</div>
               <div style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '8px' }}>No investments yet</div>
               <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
                 Start building your portfolio by investing in ETFs or individual vehicles
@@ -230,7 +229,16 @@ export default function UnifiedPortfolio() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '12pt' }}>{getTypeIcon(holding.type)}</span>
+                        <span style={{ 
+                          fontSize: '7pt', 
+                          padding: '4px 6px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '2px',
+                          fontWeight: 700
+                        }}>
+                          {getTypeLabel(holding.type)}
+                        </span>
                         <div>
                           <div style={{ fontWeight: 800, fontSize: '11pt' }}>{holding.symbol}</div>
                           <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>{getTypeName(holding.type)}</div>

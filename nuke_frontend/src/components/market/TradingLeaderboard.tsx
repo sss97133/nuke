@@ -37,24 +37,23 @@ const formatPct = (value: number) => {
   return `${sign}${value.toFixed(2)}%`;
 };
 
-const getRankEmoji = (rank: number) => {
-  if (rank === 1) return '🥇';
-  if (rank === 2) return '🥈';
-  if (rank === 3) return '🥉';
-  if (rank <= 10) return '🔥';
-  return '📊';
+const getRankDisplay = (rank: number) => {
+  if (rank === 1) return '#1';
+  if (rank === 2) return '#2';
+  if (rank === 3) return '#3';
+  return `#${rank}`;
 };
 
-const getBadgeEmoji = (badge: string) => {
+const getBadgeIcon = (badge: string) => {
   switch (badge) {
-    case 'hot_streak': return '🔥';
-    case 'diamond_hands': return '💎';
-    case 'day_trader': return '⚡';
-    case 'whale': return '🐋';
-    case 'consistent': return '📈';
-    case 'rookie': return '🐣';
-    case 'veteran': return '🎖️';
-    default: return '🏆';
+    case 'hot_streak': return 'HOT';
+    case 'diamond_hands': return 'DIAMOND';
+    case 'day_trader': return 'TRADER';
+    case 'whale': return 'WHALE';
+    case 'consistent': return 'STEADY';
+    case 'rookie': return 'ROOKIE';
+    case 'veteran': return 'VET';
+    default: return 'CHAMP';
   }
 };
 
@@ -339,8 +338,7 @@ export default function TradingLeaderboard() {
                 >
                   {/* Rank */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
-                    <span>{getRankEmoji(entry.rank)}</span>
-                    <span>{entry.rank}</span>
+                    <span>{getRankDisplay(entry.rank)}</span>
                   </div>
 
                   {/* Trader */}
@@ -393,19 +391,26 @@ export default function TradingLeaderboard() {
                   </div>
 
                   {/* Badges */}
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    {entry.badges.slice(0, 3).map((badge, index) => (
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    {entry.badges.slice(0, 2).map((badge, index) => (
                       <span
                         key={index}
-                        style={{ fontSize: '12pt' }}
+                        style={{ 
+                          fontSize: '7pt', 
+                          padding: '2px 4px',
+                          background: 'var(--surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '2px',
+                          fontWeight: 700
+                        }}
                         title={getBadgeName(badge)}
                       >
-                        {getBadgeEmoji(badge)}
+                        {getBadgeIcon(badge)}
                       </span>
                     ))}
-                    {entry.badges.length > 3 && (
+                    {entry.badges.length > 2 && (
                       <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                        +{entry.badges.length - 3}
+                        +{entry.badges.length - 2}
                       </span>
                     )}
                   </div>
@@ -432,7 +437,16 @@ export default function TradingLeaderboard() {
               { badge: 'veteran', description: '1000+ total trades' }
             ].map((item, index) => (
               <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '14pt' }}>{getBadgeEmoji(item.badge)}</span>
+                <span style={{ 
+                  fontSize: '7pt', 
+                  padding: '4px 6px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '2px',
+                  fontWeight: 700
+                }}>
+                  {getBadgeIcon(item.badge)}
+                </span>
                 <div>
                   <div style={{ fontWeight: 700 }}>{getBadgeName(item.badge)}</div>
                   <div style={{ color: 'var(--text-muted)' }}>{item.description}</div>

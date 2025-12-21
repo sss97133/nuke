@@ -507,7 +507,7 @@ export default function MarketDashboard() {
                       <div style={{ fontWeight: 900 }}>{formatPct(s.change_30d_pct)}</div>
                     </div>
                     <div style={{ marginTop: '10px', padding: '8px', background: 'var(--primary)', color: 'var(--white)', borderRadius: '4px', textAlign: 'center', fontSize: '9pt', fontWeight: 800 }}>
-                      Invest Now
+                      INVEST
                     </div>
                   </button>
                 ))}
@@ -557,7 +557,7 @@ export default function MarketDashboard() {
                       )}
                     </div>
                     <div style={{ marginTop: '10px', padding: '8px', background: 'var(--primary)', color: 'var(--white)', borderRadius: '4px', textAlign: 'center', fontSize: '9pt', fontWeight: 800 }}>
-                      View Vehicle
+                      VIEW VEHICLE
                     </div>
                   </button>
                 ))}
