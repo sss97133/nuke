@@ -233,16 +233,25 @@ async function extractFromHealthySites(supabase: any, healthySites: any[]) {
 }
 
 async function extractFromSite(siteUrl: string, maxVehicles: number) {
-  // Use existing scrape-multi-source function
-  const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-multi-source`, {
+  // Use existing scrape-multi-source function with Supabase secrets
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY');
+  
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error('Missing Supabase credentials in Edge Function secrets');
+  }
+  
+  const response = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      'Authorization': `Bearer ${serviceKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      url: siteUrl,
-      max_results: maxVehicles
+      source_url: siteUrl,
+      source_type: 'auction_house',
+      max_listings: maxVehicles,
+      extract_dealer_info: true
     })
   });
   
