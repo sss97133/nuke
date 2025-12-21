@@ -1030,6 +1030,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const isRNM = (vehicle as any)?.auction_outcome === 'reserve_not_met';
   const highBid = (vehicle as any)?.high_bid || (vehicle as any)?.winning_bid;
   const priceDisplay = (() => {
+    // HIGHEST PRIORITY: If vehicle has a sale_price, always show it (overrides auction pulse)
+    const vehicleSalePrice = typeof (vehicle as any)?.sale_price === 'number' && (vehicle as any).sale_price > 0 ? (vehicle as any).sale_price : null;
+    const vehicleSaleDate = (vehicle as any)?.sale_date || saleDate;
+    const vehicleIsSold = vehicleSaleDate !== null || 
+                         String((vehicle as any)?.sale_status || '').toLowerCase() === 'sold' ||
+                         String((vehicle as any)?.auction_outcome || '').toLowerCase() === 'sold';
+    
+    // If vehicle is sold and has sale_price, show it (no "Bid:" prefix)
+    if (vehicleIsSold && vehicleSalePrice) {
+      return formatCurrency(vehicleSalePrice);
+    }
+    
     // If we have external auction telemetry, reflect it directly in the header.
     if (auctionPulse?.listing_url) {
       const status = String(auctionPulse.listing_status || '').toLowerCase();
@@ -1037,17 +1049,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       const isSold = status === 'sold';
       const isEnded = status === 'ended' || status === 'reserve_not_met';
       
-      // Live auction: show current bid
-      if (isLive && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
+      // Live auction: show current bid (only if vehicle isn't sold)
+      if (isLive && !vehicleIsSold && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
         return `Bid: ${formatCurrency(auctionPulse.current_bid)}`;
       }
-      if (isLive) return 'BID';
+      if (isLive && !vehicleIsSold) return 'BID';
       
       // Sold: show final price (NO "Bid:" prefix) or SOLD badge
       if (isSold) {
         const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
           ? (auctionPulse as any).final_price
-          : (typeof (vehicle as any)?.sale_price === 'number' && (vehicle as any).sale_price > 0 ? (vehicle as any).sale_price : null);
+          : vehicleSalePrice;
         if (finalPrice) {
           // Don't show "Bid:" prefix for sold vehicles - just show the price
           return formatCurrency(finalPrice);
@@ -1060,12 +1072,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
           ? (auctionPulse as any).final_price
           : null;
-        const salePrice = typeof (vehicle as any)?.sale_price === 'number' && (vehicle as any).sale_price > 0 ? (vehicle as any).sale_price : null;
         const winBid = typeof (vehicle as any)?.winning_bid === 'number' && (vehicle as any).winning_bid > 0 ? (vehicle as any).winning_bid : null;
         const hBid = typeof (vehicle as any)?.high_bid === 'number' && (vehicle as any).high_bid > 0 ? (vehicle as any).high_bid : null;
         
         // Prioritize sale price over bid amounts for ended auctions
-        if (salePrice) return formatCurrency(salePrice);
+        if (vehicleSalePrice) return formatCurrency(vehicleSalePrice);
         if (finalPrice) return formatCurrency(finalPrice);
         if (winBid) return formatCurrency(winBid);
         if (hBid) return formatCurrency(hBid);
@@ -1085,7 +1096,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
 
     // Check if vehicle is sold (sale_date exists or sale_status is 'sold')
-    const isSold = saleDate !== null || 
+    const isSold = vehicleSaleDate !== null || 
                    String((vehicle as any)?.sale_status || '').toLowerCase() === 'sold' ||
                    String((vehicle as any)?.auction_outcome || '').toLowerCase() === 'sold';
 
