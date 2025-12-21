@@ -4,7 +4,6 @@
  */
 
 import React, { useState } from 'react';
-import React, { useState } from 'react';
 import { BaTProfileExtractor } from '../components/market/BaTProfileExtractor';
 import { OrganizationServiceMapper } from '../components/market/OrganizationServiceMapper';
 import { ExternalIdentityClaimer } from '../components/market/ExternalIdentityClaimer';
