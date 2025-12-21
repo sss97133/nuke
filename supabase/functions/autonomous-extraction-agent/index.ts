@@ -75,7 +75,7 @@ async function runAutonomousCycle(supabase: any, authHeader: string | null) {
   console.log('AUTONOMOUS EXTRACTION AGENT - Starting Cycle');
   console.log('==========================================');
   
-  const cycleResults = [];
+  const cycleResults: any[] = [];
   
   // Step 1: Health check all sites
   console.log('Step 1: Health checking all premium sites...');
@@ -126,7 +126,7 @@ async function dailyExtractionRun(supabase: any, params: any, authHeader: string
   
   console.log(`DAILY EXTRACTION RUN: Target ${target_vehicles} vehicles`);
   
-  const results = [];
+  const results: any[] = [];
   let totalExtracted = 0;
   
   // Extract from each premium site in priority order
@@ -134,7 +134,10 @@ async function dailyExtractionRun(supabase: any, params: any, authHeader: string
     try {
       console.log(`\nExtracting from ${site.name}...`);
       
-      const siteResult = await extractFromSite(site.url, site.expected_daily * 5, authHeader); // 5x daily target
+      const remaining = Math.max(0, Number(target_vehicles) - totalExtracted);
+      const maxForThisSite = Math.max(1, Math.min(site.expected_daily * 5, remaining || 1));
+
+      const siteResult = await extractFromSite(site.url, maxForThisSite, authHeader);
       
       results.push({
         site: site.name,
@@ -148,8 +151,13 @@ async function dailyExtractionRun(supabase: any, params: any, authHeader: string
       
       console.log(`  ${site.name}: ${siteResult.vehicles_extracted} vehicles extracted`);
       
+      if (totalExtracted >= target_vehicles) {
+        console.log("Target reached, stopping early.");
+        break;
+      }
+
       // Small delay between sites
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
     } catch (error) {
       console.error(`${site.name} extraction failed:`, error);
@@ -184,7 +192,7 @@ async function dailyExtractionRun(supabase: any, params: any, authHeader: string
 async function checkAllSitesHealth(supabase: any) {
   console.log('Checking health of all premium auction sites...');
   
-  const healthResults = [];
+  const healthResults: any[] = [];
   
   for (const site of PREMIUM_AUCTION_SITES) {
     const health = await checkSiteHealth(site.url);
@@ -216,7 +224,7 @@ async function extractFromHealthySites(supabase: any, healthySites: any[], authH
   console.log(`Extracting from ${healthySites.length} healthy sites...`);
   
   let totalVehicles = 0;
-  const extractionResults = [];
+  const extractionResults: any[] = [];
   
   for (const site of healthySites) {
     try {
@@ -309,7 +317,7 @@ async function checkSiteHealth(siteUrl: string) {
 async function updateDegradedSitePatterns(supabase: any, degradedSites: any[]) {
   console.log(`Updating extraction patterns for ${degradedSites.length} degraded sites...`);
   
-  const updateResults = [];
+  const updateResults: any[] = [];
   
   for (const site of degradedSites) {
     try {
@@ -344,7 +352,7 @@ async function discoverAdditionalSites(supabase: any) {
   const discovery = await autoDiscoverSites(['premium car auctions', 'classic car dealers'], 20);
   
   // Auto-map discovered sites
-  const mappedSites = [];
+  const mappedSites: any[] = [];
   for (const site of discovery.slice(0, 5)) {
     try {
       const mapping = await quickMapSite(site.url);
@@ -362,6 +370,42 @@ async function discoverAdditionalSites(supabase: any) {
     sites_mapped: mappedSites.length,
     new_extraction_capacity: mappedSites.reduce((sum, s) => sum + s.estimated_daily_vehicles, 0)
   };
+}
+
+// Action stubs kept for compatibility with older callers.
+async function healthCheckAndRepair(supabase: any) {
+  const health = await checkAllSitesHealth(supabase);
+  const degraded = health.degraded_sites || [];
+  const repaired = await updateDegradedSitePatterns(supabase, degraded);
+  return new Response(JSON.stringify({
+    success: true,
+    action: "health_check_and_repair",
+    health,
+    repaired,
+    timestamp: new Date().toISOString(),
+  }), { headers: { "Content-Type": "application/json" } });
+}
+
+async function discoverNewSites(supabase: any) {
+  const discovery = await discoverAdditionalSites(supabase);
+  return new Response(JSON.stringify({
+    success: true,
+    action: "discover_new_sites",
+    discovery,
+    timestamp: new Date().toISOString(),
+  }), { headers: { "Content-Type": "application/json" } });
+}
+
+async function maintainExtractionPatterns(supabase: any) {
+  const health = await checkAllSitesHealth(supabase);
+  const degraded = health.degraded_sites || [];
+  const updated = await updateDegradedSitePatterns(supabase, degraded);
+  return new Response(JSON.stringify({
+    success: true,
+    action: "maintain_extraction_patterns",
+    updated,
+    timestamp: new Date().toISOString(),
+  }), { headers: { "Content-Type": "application/json" } });
 }
 
 async function scheduleNextCycle(supabase: any) {
