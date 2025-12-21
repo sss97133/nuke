@@ -24,21 +24,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { batchSize = 10 } = await req.json().catch(() => ({ batchSize: 10 }));
+    const { batchSize = 10, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 10, maxAttempts: 3 }));
 
-    console.log(`🔄 Processing BaT extraction queue (batch size: ${batchSize})...`);
+    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 10, 200));
+    const safeMaxAttempts = Math.max(1, Math.min(Number(maxAttempts) || 3, 20));
+    const workerId = `process-bat-extraction-queue:${crypto.randomUUID?.() || String(Date.now())}`;
 
-    // Get next batch of pending extractions
-    const { data: queueItems, error: queueError } = await supabase
-      .from('bat_extraction_queue')
-      .select('*')
-      .eq('status', 'pending')
-      .order('priority', { ascending: false }) // Higher priority first
-      .order('created_at', { ascending: true }) // Then oldest first
-      .limit(batchSize);
+    console.log(`Processing BaT extraction queue (batch size: ${safeBatchSize}, max attempts: ${safeMaxAttempts})`);
+
+    // Claim work atomically (prevents double-processing under concurrent cron / manual runs).
+    const { data: queueItems, error: queueError } = await supabase.rpc('claim_bat_extraction_queue_batch', {
+      p_batch_size: safeBatchSize,
+      p_max_attempts: safeMaxAttempts,
+      p_worker_id: workerId,
+      p_lock_ttl_seconds: 15 * 60,
+    });
 
     if (queueError) {
-      throw new Error(`Failed to fetch queue: ${queueError.message}`);
+      throw new Error(`Failed to claim queue: ${queueError.message}`);
     }
 
     if (!queueItems || queueItems.length === 0) {
@@ -51,7 +54,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`📋 Found ${queueItems.length} extractions to process`);
+    console.log(`Claimed ${queueItems.length} extractions to process`);
 
     const results = {
       processed: 0,
@@ -64,18 +67,8 @@ serve(async (req) => {
     for (const item of queueItems) {
       results.processed++;
 
-      // Mark as processing
-      await supabase
-        .from('bat_extraction_queue')
-        .update({
-          status: 'processing',
-          attempts: item.attempts + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', item.id);
-
       try {
-        console.log(`🔄 Processing vehicle ${item.vehicle_id} (${item.bat_url})`);
+        console.log(`Processing vehicle ${item.vehicle_id} (${item.bat_url})`);
 
         // Call comprehensive extraction
         const { data: extractionResult, error: extractionError } = await supabase.functions.invoke(
@@ -102,34 +95,50 @@ serve(async (req) => {
           .update({
             status: 'complete',
             completed_at: new Date().toISOString(),
+            error_message: null,
+            locked_at: null,
+            locked_by: null,
+            next_attempt_at: null,
             updated_at: new Date().toISOString()
           })
           .eq('id', item.id);
 
         results.completed++;
-        console.log(`✅ Completed extraction for vehicle ${item.vehicle_id}`);
+        console.log(`Completed extraction for vehicle ${item.vehicle_id}`);
 
       } catch (error: any) {
         const errorMsg = error.message || String(error);
-        console.error(`❌ Failed to process ${item.vehicle_id}: ${errorMsg}`);
+        console.error(`Failed to process ${item.vehicle_id}: ${errorMsg}`);
 
-        // Mark as failed if max attempts reached, otherwise leave as pending for retry
-        if (item.attempts >= 3) {
+        const attemptsNow = Number(item.attempts || 0);
+
+        // Mark as failed if max attempts reached, otherwise leave as pending with backoff
+        if (attemptsNow >= safeMaxAttempts) {
           await supabase
             .from('bat_extraction_queue')
             .update({
               status: 'failed',
               error_message: errorMsg,
+              locked_at: null,
+              locked_by: null,
+              next_attempt_at: null,
               updated_at: new Date().toISOString()
             })
             .eq('id', item.id);
         } else {
-          // Reset to pending for retry
+          // Reset to pending for retry with exponential backoff (cap at 6 hours)
+          const baseSeconds = 5 * 60;
+          const delaySeconds = Math.min(6 * 60 * 60, baseSeconds * Math.pow(2, Math.max(0, attemptsNow - 1)));
+          const nextAttemptAt = new Date(Date.now() + delaySeconds * 1000).toISOString();
+
           await supabase
             .from('bat_extraction_queue')
             .update({
               status: 'pending',
               error_message: errorMsg,
+              locked_at: null,
+              locked_by: null,
+              next_attempt_at: nextAttemptAt,
               updated_at: new Date().toISOString()
             })
             .eq('id', item.id);
@@ -143,7 +152,7 @@ serve(async (req) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    console.log(`✅ Queue processing complete: ${results.completed} completed, ${results.failed} failed`);
+    console.log(`Queue processing complete: ${results.completed} completed, ${results.failed} failed`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -153,7 +162,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('❌ Queue processing error:', error);
+    console.error('Queue processing error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error.message || String(error)

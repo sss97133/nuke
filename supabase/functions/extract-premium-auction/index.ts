@@ -120,6 +120,64 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   return Array.from(urls);
 }
 
+function extractMecumListingUrlsFromText(text: string, limit: number): string[] {
+  const urls = new Set<string>();
+  // Mecum URLs: /lots/{lot-id}/{slug} or /lots/detail/{...}
+  const abs = /https?:\/\/(?:www\.)?mecum\.com\/lots\/(?:detail\/[a-zA-Z0-9-]+|\d+\/[^\/\s"'<>]+)/g;
+  for (const m of text.match(abs) || []) {
+    urls.add(m.split("?")[0]);
+    if (urls.size >= Math.max(1, limit)) break;
+  }
+  return Array.from(urls);
+}
+
+function extractBarrettJacksonListingUrlsFromText(text: string, limit: number): string[] {
+  const urls = new Set<string>();
+  const absDetails = /https?:\/\/(?:www\.)?barrett-jackson\.com\/Events\/Event\/Details\/[^\s"'<>]+/g;
+  const absArchive = /https?:\/\/(?:www\.)?barrett-jackson\.com\/Archive\/Event\/Item\/[^\s"'<>]+/g;
+
+  for (const m of text.match(absDetails) || []) {
+    urls.add(m.split("?")[0]);
+    if (urls.size >= Math.max(1, limit)) break;
+  }
+  if (urls.size < Math.max(1, limit)) {
+    for (const m of text.match(absArchive) || []) {
+      urls.add(m.split("?")[0]);
+      if (urls.size >= Math.max(1, limit)) break;
+    }
+  }
+  return Array.from(urls);
+}
+
+function extractMecumImagesFromHtml(html: string): string[] {
+  const h = String(html || "");
+  const urls = new Set<string>();
+  const re = /https?:\/\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
+  for (const m of h.match(re) || []) {
+    const u = String(m || "").trim();
+    const lower = u.toLowerCase();
+    // Mecum images are commonly hosted on mecum.com or related CDNs; keep this reasonably permissive.
+    if (!lower.includes("mecum")) continue;
+    urls.add(u);
+    if (urls.size >= 25) break;
+  }
+  return Array.from(urls);
+}
+
+function extractBarrettJacksonImagesFromHtml(html: string): string[] {
+  const h = String(html || "");
+  const urls = new Set<string>();
+  const re = /https?:\/\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
+  for (const m of h.match(re) || []) {
+    const u = String(m || "").trim();
+    const lower = u.toLowerCase();
+    if (!lower.includes("barrett") && !lower.includes("barrett-jackson")) continue;
+    urls.add(u);
+    if (urls.size >= 25) break;
+  }
+  return Array.from(urls);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -873,69 +931,414 @@ function extractCarsAndBidsListingUrlsFromText(text: string, limit: number): str
 }
 
 async function extractMecum(url: string, maxVehicles: number) {
-  console.log('Mecum DOM mapping...');
-  
-  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
-  
-  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${firecrawlKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      url: url,
-      formats: ['extract'],
-      extract: {
-        schema: {
-          lots: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                lot_number: { type: "string", description: "Lot number" },
-                year: { type: "number", description: "Vehicle year" },
-                make: { type: "string", description: "Vehicle make" },
-                model: { type: "string", description: "Vehicle model" },
-                estimate_low: { type: "number", description: "Low estimate" },
-                estimate_high: { type: "number", description: "High estimate" },
-                description: { type: "string", description: "Vehicle description" },
-                location: { type: "string", description: "Vehicle location" }
-              }
-            }
-          }
-        }
+  console.log("Mecum: discovering lot URLs then extracting per-lot");
+
+  const normalizedUrl = String(url || "").trim();
+  const isDirectListing = normalizedUrl.includes("mecum.com/lots/detail/");
+  const indexUrl = isDirectListing
+    ? normalizedUrl.split("?")[0]
+    : (normalizedUrl.includes("mecum.com/lots/") ? normalizedUrl : "https://www.mecum.com/lots/");
+
+  const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  const sourceWebsite = "https://www.mecum.com";
+
+  let listingUrls: string[] = [];
+  let mapRaw: any = null;
+
+  if (isDirectListing) {
+    listingUrls = [indexUrl];
+  }
+
+  // Step 1: Discover listing URLs via Firecrawl map (best for JS-heavy indexes)
+  if (listingUrls.length === 0) {
+    try {
+      const mapped = await fetchJsonWithTimeout(
+        FIRECRAWL_MAP_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${firecrawlKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url: indexUrl,
+            includeSubdomains: false,
+            limit: 800,
+          }),
+        },
+        20000,
+        "Firecrawl map",
+      );
+      mapRaw = mapped;
+
+      const urls: string[] =
+        mapped?.data?.urls ||
+        mapped?.urls ||
+        mapped?.data ||
+        mapped?.links ||
+        [];
+
+      if (Array.isArray(urls) && urls.length > 0) {
+        listingUrls = urls
+          .map((u: any) => String(u || "").trim())
+          .filter((u: string) => u.startsWith("http"))
+          .map((u: string) => u.split("?")[0])
+          .filter((u: string) => {
+            // Mecum URLs: /lots/{lot-id}/{slug} or /lots/detail/{...}
+            const lower = u.toLowerCase();
+            if (!lower.includes("mecum.com/lots/")) return false;
+            if (lower.includes("/lots/detail/")) return true;
+            // Match pattern: /lots/ followed by digits (lot ID)
+            return /\/lots\/\d+\//.test(u);
+          })
+          .slice(0, 500);
       }
-    })
-  });
-  
-  const data = await response.json();
-  const lots = data.data?.extract?.lots || [];
-  
+    } catch (e: any) {
+      console.warn("Mecum map discovery failed:", e?.message || String(e));
+    }
+  }
+
+  // Fallback: scrape markdown and regex out listing URLs
+  if (listingUrls.length === 0) {
+    try {
+      const fc = await fetchJsonWithTimeout(
+        FIRECRAWL_SCRAPE_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${firecrawlKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url: indexUrl,
+            formats: ["markdown"],
+            onlyMainContent: false,
+            waitFor: 2500,
+          }),
+        },
+        20000,
+        "Firecrawl index scrape",
+      );
+      const markdown: string = fc?.data?.markdown || fc?.markdown || "";
+      if (markdown) listingUrls = extractMecumListingUrlsFromText(markdown, 500);
+    } catch (e: any) {
+      console.warn("Mecum markdown discovery failed:", e?.message || String(e));
+    }
+  }
+
+  // Fallback: direct fetch (cheap if it works)
+  if (listingUrls.length === 0) {
+    try {
+      const html = await fetchTextWithTimeout(indexUrl, 12000, "Mecum index fetch");
+      listingUrls = extractMecumListingUrlsFromText(html, 500);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Step 2: Per-lot extraction
+  const listingSchema = {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Listing title" },
+      lot_number: { type: "string", description: "Lot number" },
+      year: { type: "number", description: "Vehicle year" },
+      make: { type: "string", description: "Vehicle make" },
+      model: { type: "string", description: "Vehicle model" },
+      trim: { type: "string", description: "Trim level" },
+      vin: { type: "string", description: "VIN if available" },
+      mileage: { type: "number", description: "Mileage / odometer" },
+      location: { type: "string", description: "Location" },
+      description: { type: "string", description: "Description" },
+      estimate_low: { type: "number", description: "Low estimate" },
+      estimate_high: { type: "number", description: "High estimate" },
+      sale_price: { type: "number", description: "Sold price / hammer price if available" },
+      sale_date: { type: "string", description: "Sale date" },
+      images: { type: "array", items: { type: "string" }, description: "Image URLs" },
+    },
+  };
+
+  const extracted: any[] = [];
+  const issues: string[] = [];
+
+  // Prefer unseen URLs to avoid repeatedly re-importing the same top listings.
+  let urlsToScrape = listingUrls;
+  try {
+    const supabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+    const sample = listingUrls.slice(0, 50);
+    if (sample.length > 0) {
+      const { data: existing } = await supabase
+        .from("vehicles")
+        .select("platform_url")
+        .in("platform_url", sample);
+      const existingSet = new Set((existing || []).map((r: any) => String(r?.platform_url || "")));
+      const unseen = sample.filter((u) => !existingSet.has(u));
+      urlsToScrape = (unseen.length > 0 ? unseen : sample).slice(0, Math.max(1, maxVehicles));
+    }
+  } catch {
+    // ignore
+  }
+
+  for (const listingUrl of urlsToScrape.slice(0, Math.max(1, maxVehicles))) {
+    try {
+      const firecrawlData = await fetchJsonWithTimeout(
+        FIRECRAWL_SCRAPE_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${firecrawlKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url: listingUrl,
+            formats: ["extract", "html"],
+            onlyMainContent: false,
+            waitFor: 4000,
+            extract: { schema: listingSchema },
+          }),
+        },
+        FIRECRAWL_LISTING_TIMEOUT_MS,
+        "Firecrawl listing scrape",
+      );
+
+      const vehicle = firecrawlData?.data?.extract || {};
+      const html = String(firecrawlData?.data?.html || "");
+      const images = Array.isArray(vehicle?.images) && vehicle.images.length > 0
+        ? vehicle.images
+        : (html ? extractMecumImagesFromHtml(html) : []);
+
+      extracted.push({
+        ...vehicle,
+        listing_url: listingUrl,
+        images,
+      });
+    } catch (e: any) {
+      issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);
+    }
+  }
+
+  // Step 3: Store extracted vehicles in DB + link to source org profile
+  const created = await storeVehiclesInDatabase(extracted, "Mecum Auctions", sourceWebsite);
+
   return {
     success: true,
-    source: 'Mecum Auctions',
-    site_type: 'mecum',
-    vehicles_found: lots.length,
-    vehicles: lots.slice(0, maxVehicles),
-    extraction_method: 'firecrawl_mecum_schema',
-    timestamp: new Date().toISOString()
+    source: "Mecum Auctions",
+    site_type: "mecum",
+    listing_index_url: indexUrl,
+    listings_discovered: listingUrls.length,
+    vehicles_extracted: extracted.length,
+    vehicles_created: created.created_ids.length,
+    vehicles_updated: created.updated_ids.length,
+    vehicles_saved: created.created_ids.length + created.updated_ids.length,
+    created_vehicle_ids: created.created_ids,
+    updated_vehicle_ids: created.updated_ids,
+    issues: [...issues, ...created.errors],
+    extraction_method: "index_link_discovery + firecrawl_per_listing_extract",
+    timestamp: new Date().toISOString(),
+    debug: {
+      map_response_keys: mapRaw && typeof mapRaw === "object" ? Object.keys(mapRaw) : null,
+      map_url_sample: (mapRaw?.data?.urls || mapRaw?.urls || mapRaw?.data || mapRaw?.links || []).slice?.(0, 5) || null,
+      discovered_listing_urls: listingUrls.slice(0, 5),
+    },
   };
 }
 
 async function extractBarrettJackson(url: string, maxVehicles: number) {
-  console.log('Barrett-Jackson DOM mapping...');
-  
-  // Barrett-Jackson specific extraction
+  console.log("Barrett-Jackson: discovering listing URLs then extracting per-lot");
+
+  const normalizedUrl = String(url || "").trim();
+  const isDirectListing =
+    normalizedUrl.includes("barrett-jackson.com/Events/Event/Details/") ||
+    normalizedUrl.includes("barrett-jackson.com/Archive/Event/Item/");
+
+  const indexUrl = isDirectListing
+    ? normalizedUrl.split("?")[0]
+    : (normalizedUrl.includes("barrett-jackson.com/Events") ? normalizedUrl : "https://www.barrett-jackson.com/Events/");
+
+  const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  const sourceWebsite = "https://www.barrett-jackson.com";
+
+  let listingUrls: string[] = [];
+  let mapRaw: any = null;
+
+  if (isDirectListing) {
+    listingUrls = [indexUrl];
+  }
+
+  // Step 1: Discover listing URLs via Firecrawl map
+  if (listingUrls.length === 0) {
+    try {
+      const mapped = await fetchJsonWithTimeout(
+        FIRECRAWL_MAP_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${firecrawlKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url: indexUrl,
+            includeSubdomains: false,
+            limit: 1200,
+          }),
+        },
+        20000,
+        "Firecrawl map",
+      );
+      mapRaw = mapped;
+
+      const urls: string[] =
+        mapped?.data?.urls ||
+        mapped?.urls ||
+        mapped?.data ||
+        mapped?.links ||
+        [];
+
+      if (Array.isArray(urls) && urls.length > 0) {
+        listingUrls = urls
+          .map((u: any) => String(u || "").trim())
+          .filter((u: string) => u.startsWith("http"))
+          .map((u: string) => u.split("?")[0])
+          .filter((u: string) =>
+            u.includes("barrett-jackson.com/Events/Event/Details/") ||
+            u.includes("barrett-jackson.com/Archive/Event/Item/")
+          )
+          .slice(0, 500);
+      }
+    } catch (e: any) {
+      console.warn("Barrett-Jackson map discovery failed:", e?.message || String(e));
+    }
+  }
+
+  // Fallback: scrape markdown and regex out listing URLs
+  if (listingUrls.length === 0) {
+    try {
+      const fc = await fetchJsonWithTimeout(
+        FIRECRAWL_SCRAPE_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${firecrawlKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url: indexUrl,
+            formats: ["markdown"],
+            onlyMainContent: false,
+            waitFor: 2500,
+          }),
+        },
+        20000,
+        "Firecrawl index scrape",
+      );
+      const markdown: string = fc?.data?.markdown || fc?.markdown || "";
+      if (markdown) listingUrls = extractBarrettJacksonListingUrlsFromText(markdown, 500);
+    } catch (e: any) {
+      console.warn("Barrett-Jackson markdown discovery failed:", e?.message || String(e));
+    }
+  }
+
+  // Step 2: Per-listing extraction
+  const listingSchema = {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Listing title" },
+      lot_number: { type: "string", description: "Lot number" },
+      year: { type: "number", description: "Vehicle year" },
+      make: { type: "string", description: "Vehicle make" },
+      model: { type: "string", description: "Vehicle model" },
+      trim: { type: "string", description: "Trim level" },
+      vin: { type: "string", description: "VIN if available" },
+      mileage: { type: "number", description: "Mileage / odometer" },
+      location: { type: "string", description: "Location" },
+      description: { type: "string", description: "Description" },
+      sale_price: { type: "number", description: "Sold price / hammer price if available" },
+      sale_date: { type: "string", description: "Sale date" },
+      images: { type: "array", items: { type: "string" }, description: "Image URLs" },
+    },
+  };
+
+  const extracted: any[] = [];
+  const issues: string[] = [];
+
+  // Prefer unseen URLs to avoid repeatedly re-importing the same top listings.
+  let urlsToScrape = listingUrls;
+  try {
+    const supabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+    const sample = listingUrls.slice(0, 50);
+    if (sample.length > 0) {
+      const { data: existing } = await supabase
+        .from("vehicles")
+        .select("platform_url")
+        .in("platform_url", sample);
+      const existingSet = new Set((existing || []).map((r: any) => String(r?.platform_url || "")));
+      const unseen = sample.filter((u) => !existingSet.has(u));
+      urlsToScrape = (unseen.length > 0 ? unseen : sample).slice(0, Math.max(1, maxVehicles));
+    }
+  } catch {
+    // ignore
+  }
+
+  for (const listingUrl of urlsToScrape.slice(0, Math.max(1, maxVehicles))) {
+    try {
+      const firecrawlData = await fetchJsonWithTimeout(
+        FIRECRAWL_SCRAPE_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${firecrawlKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url: listingUrl,
+            formats: ["extract", "html"],
+            onlyMainContent: false,
+            waitFor: 4000,
+            extract: { schema: listingSchema },
+          }),
+        },
+        FIRECRAWL_LISTING_TIMEOUT_MS,
+        "Firecrawl listing scrape",
+      );
+
+      const vehicle = firecrawlData?.data?.extract || {};
+      const html = String(firecrawlData?.data?.html || "");
+      const images = Array.isArray(vehicle?.images) && vehicle.images.length > 0
+        ? vehicle.images
+        : (html ? extractBarrettJacksonImagesFromHtml(html) : []);
+
+      extracted.push({
+        ...vehicle,
+        listing_url: listingUrl,
+        images,
+      });
+    } catch (e: any) {
+      issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);
+    }
+  }
+
+  const created = await storeVehiclesInDatabase(extracted, "Barrett-Jackson", sourceWebsite);
+
   return {
     success: true,
-    source: 'Barrett-Jackson',
-    site_type: 'barrettjackson',
-    vehicles_found: 0,
-    vehicles: [],
-    extraction_method: 'needs_dom_mapping',
-    note: 'Barrett-Jackson DOM mapping needs to be implemented',
-    timestamp: new Date().toISOString()
+    source: "Barrett-Jackson",
+    site_type: "barrettjackson",
+    listing_index_url: indexUrl,
+    listings_discovered: listingUrls.length,
+    vehicles_extracted: extracted.length,
+    vehicles_created: created.created_ids.length,
+    vehicles_updated: created.updated_ids.length,
+    vehicles_saved: created.created_ids.length + created.updated_ids.length,
+    created_vehicle_ids: created.created_ids,
+    updated_vehicle_ids: created.updated_ids,
+    issues: [...issues, ...created.errors],
+    extraction_method: "index_link_discovery + firecrawl_per_listing_extract",
+    timestamp: new Date().toISOString(),
+    debug: {
+      map_response_keys: mapRaw && typeof mapRaw === "object" ? Object.keys(mapRaw) : null,
+      map_url_sample: (mapRaw?.data?.urls || mapRaw?.urls || mapRaw?.data || mapRaw?.links || []).slice?.(0, 5) || null,
+      discovered_listing_urls: listingUrls.slice(0, 5),
+    },
   };
 }
 

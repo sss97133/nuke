@@ -526,9 +526,14 @@ serve(async (req: Request) => {
             filename,
             source: effectiveSource,
             source_url: rawUrl,
+            // Imported images should be visible by default (fixes: BaT galleries stuck in pending).
+            approval_status: 'auto_approved',
+            is_approved: true,
+            redaction_level: 'none',
             // Preserve gallery order deterministically (fixes: profiles showing BaT galleries reversed/random).
             // We use the source list index so repeated runs keep a stable ordering.
             position: i,
+            display_order: i,
             // Only set primary if there isn't one already (prevents later chunks from overwriting primary).
             is_primary: !hasPrimaryAlready && results.uploaded === 0,
             taken_at: imageDate,
