@@ -156,6 +156,7 @@ export default function CreateOrganization() {
                     <option value="parts_supplier">Parts Supplier</option>
                     <option value="fabrication">Fabrication</option>
                     <option value="racing_team">Racing Team</option>
+                    <option value="auction_house">Auction House</option>
                     <option value="other">Other</option>
                   </select>
                 </div>

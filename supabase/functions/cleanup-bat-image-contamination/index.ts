@@ -348,22 +348,23 @@ Deno.serve(async (req) => {
           }
         }
 
-        // If we now have canonical, run the strict repair RPC
-        if (vehicleResult.canonical_images >= 20) {
-          results.candidates++;
-          const { data: rpcData, error: rpcErr } = await admin.rpc("repair_bat_vehicle_gallery_images", {
-            p_vehicle_id: vehicle.id,
-            p_dry_run: dryRun,
-          });
-          if (rpcErr) throw new Error(rpcErr.message);
-          vehicleResult.rpc = rpcData;
-          vehicleResult.repaired = rpcData?.skipped !== true;
-          if (vehicleResult.repaired) {
-            results.repaired++;
-            repairedCount++;
-          }
+        // Run repair RPC:
+        // - If canonical is present, it will do strict ordering + dedupe.
+        // - If canonical is missing/small, the RPC (v3+) will at least hide obvious BaT UI assets
+        //   and reset the primary off of flags/themes/svg.
+        results.candidates++;
+        const { data: rpcData, error: rpcErr } = await admin.rpc("repair_bat_vehicle_gallery_images", {
+          p_vehicle_id: vehicle.id,
+          p_dry_run: dryRun,
+        });
+        if (rpcErr) throw new Error(rpcErr.message);
+        vehicleResult.rpc = rpcData;
+        vehicleResult.repaired = rpcData?.skipped !== true;
+        if (vehicleResult.repaired) {
+          results.repaired++;
+          repairedCount++;
         } else {
-          vehicleResult.skipped_reason = "canonical_missing";
+          vehicleResult.skipped_reason = rpcData?.reason || "rpc_skipped";
           results.skipped++;
         }
       } catch (e: any) {
