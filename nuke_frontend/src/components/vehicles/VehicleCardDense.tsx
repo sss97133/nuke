@@ -484,6 +484,39 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return undefined; // Neutral/no color
   }, [thermalPricing, vehicle]);
 
+  // Check if auction ended more than 1 day ago (for fade logic) - MOVED BEFORE badgeStyle
+  const auctionEndedDaysAgo = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const endDate = v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date;
+    if (!endDate) return null;
+    
+    const end = new Date(endDate);
+    const now = new Date();
+    const daysAgo = (now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24);
+    return daysAgo > 0 ? daysAgo : null;
+  }, [vehicle]);
+
+  // Determine if we should show asset value instead of auction status - MOVED BEFORE badgeStyle
+  const shouldShowAssetValue = React.useMemo(() => {
+    if (!isAuctionSource) return false;
+    const v: any = vehicle as any;
+    const outcome = String(v.auction_outcome || '').toLowerCase();
+    const saleStatus = String(v.sale_status || '').toLowerCase();
+    const isResult = ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) || ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(saleStatus);
+    
+    // Show asset value if auction ended more than 1 day ago (especially if unsold)
+    if (isResult && auctionEndedDaysAgo !== null && auctionEndedDaysAgo >= 1) {
+      // Always fade unsold auctions, but also fade sold after 1 day
+      if (outcome === 'reserve_not_met' || outcome === 'no_sale' || outcome === 'ended') {
+        return true; // Always show asset value for unsold
+      }
+      // For sold, fade after 1 day but still show sold price if available
+      return true;
+    }
+    
+    return false;
+  }, [isAuctionSource, vehicle, auctionEndedDaysAgo]);
+
   const badgeStyle = React.useMemo((): React.CSSProperties => {
     const base: React.CSSProperties = {
       position: 'absolute',
@@ -546,39 +579,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       animation: anim || undefined,
     };
   }, [isAuctionSource, auctionProgress01, badgePulseSeconds, badgeExplode, thermalPriceColor, shouldShowAssetValue, vehicle, auctionEndedDaysAgo]);
-
-  // Check if auction ended more than 1 day ago (for fade logic)
-  const auctionEndedDaysAgo = React.useMemo(() => {
-    const v: any = vehicle as any;
-    const endDate = v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date;
-    if (!endDate) return null;
-    
-    const end = new Date(endDate);
-    const now = new Date();
-    const daysAgo = (now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24);
-    return daysAgo > 0 ? daysAgo : null;
-  }, [vehicle]);
-
-  // Determine if we should show asset value instead of auction status
-  const shouldShowAssetValue = React.useMemo(() => {
-    if (!isAuctionSource) return false;
-    const v: any = vehicle as any;
-    const outcome = String(v.auction_outcome || '').toLowerCase();
-    const saleStatus = String(v.sale_status || '').toLowerCase();
-    const isResult = ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) || ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(saleStatus);
-    
-    // Show asset value if auction ended more than 1 day ago (especially if unsold)
-    if (isResult && auctionEndedDaysAgo !== null && auctionEndedDaysAgo >= 1) {
-      // Always fade unsold auctions, but also fade sold after 1 day
-      if (outcome === 'reserve_not_met' || outcome === 'no_sale' || outcome === 'ended') {
-        return true; // Always show asset value for unsold
-      }
-      // For sold, fade after 1 day but still show sold price if available
-      return true;
-    }
-    
-    return false;
-  }, [isAuctionSource, vehicle, auctionEndedDaysAgo]);
 
   // Get market value (current_value or estimated value)
   const marketValue = React.useMemo(() => {
