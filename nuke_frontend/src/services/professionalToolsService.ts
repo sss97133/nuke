@@ -7,37 +7,11 @@
 import { supabase } from '../lib/supabase';
 import { SnapOnParser } from './snapOnParser';
 import { ClaudeReceiptParser, type ClaudeReceiptParseResult } from './claudeReceiptParser';
+import type { ParsedTool, ToolImportResult } from './types/toolTypes';
+// Re-export types for backward compatibility
+export type { ParsedTool, ToolImportResult } from './types/toolTypes';
 // For now, we'll handle PDF parsing server-side or use text extraction
 // PDF.js has issues with worker loading in Vite
-
-export interface ParsedTool {
-  // Core tool data
-  name: string;
-  part_number?: string;
-  serial_number?: string;
-  brand_name?: string;
-  
-  // Financial data
-  purchase_price?: number;
-  purchase_date?: string;
-  transaction_number?: string;
-  
-  // Additional metadata
-  description?: string;
-  category?: string;
-  condition?: string;
-  quantity?: number;
-  
-  // Flexible additional fields (can grow over time)
-  metadata?: Record<string, any>;
-}
-
-export interface ToolImportResult {
-  success: boolean;
-  toolsImported: number;
-  tools: ParsedTool[];
-  errors: string[];
-}
 
 export class ProfessionalToolsService {
   /**

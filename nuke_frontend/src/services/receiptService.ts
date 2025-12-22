@@ -3,7 +3,7 @@
  */
 
 import { supabase } from '../lib/supabase';
-import type { UniversalReceiptResult } from './universalReceiptParser';
+import type { UniversalReceiptResult } from './types/receiptTypes';
 
 export interface SaveReceiptResult {
   success: boolean;
