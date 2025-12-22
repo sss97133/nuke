@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase, getSupabaseFunctionsUrl } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { ImageHoverPreview, AnalysisModelPopup } from '../components/admin';
+import { useAdminAccess } from '../hooks/useAdminAccess';
 
 interface SystemStats {
   totalVehicles: number;
@@ -25,6 +26,7 @@ interface ImageRadarRow {
 
 const AdminMissionControl: React.FC = () => {
   const navigate = useNavigate();
+  const { loading: adminLoading, isAdmin } = useAdminAccess();
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [inventoryCompleteness, setInventoryCompleteness] = useState<any | null>(null);
   const [angleCoverage, setAngleCoverage] = useState<any | null>(null);
@@ -567,6 +569,31 @@ const AdminMissionControl: React.FC = () => {
       setAngleBackfillRunning(false);
     }
   };
+
+  // Admin access check
+  if (adminLoading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+        Checking admin access...
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '8pt' }}>
+        <div style={{ marginBottom: '16px', fontWeight: 700 }}>Access Denied</div>
+        <div style={{ marginBottom: '16px' }}>Admin privileges are required to access this page.</div>
+        <button
+          className="button button-secondary"
+          onClick={() => navigate('/org/dashboard')}
+          style={{ fontSize: '8pt', padding: '8px 16px' }}
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -810,11 +810,11 @@ const CursorHomepage: React.FC = () => {
       // Priority: sale_price (if sold) > asking_price > current_value > purchase_price > display_price
       let vehiclePrice = 0;
       
-      // If sold, use sale_price
-      if (v.sale_price && (v.sale_status === 'sold' || v.sale_price > 0)) {
-        vehiclePrice = typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) ? v.sale_price : 0;
+      // Priority: sale_price first (if exists, use it - sold vehicles should have sale_price)
+      if (v.sale_price && typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0) {
+        vehiclePrice = v.sale_price;
       }
-      // Otherwise use asking_price
+      // Otherwise use asking_price (only if no sale_price)
       else if (v.asking_price) {
         vehiclePrice = typeof v.asking_price === 'number' && Number.isFinite(v.asking_price) ? v.asking_price : 0;
         if (typeof v.asking_price === 'string') {
