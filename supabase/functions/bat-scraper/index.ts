@@ -49,8 +49,11 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
         if (Array.isArray(items)) {
           const urls: string[] = [];
           for (const it of items) {
-            const u = it?.large?.url || it?.small?.url;
+            // Prioritize highest resolution: full/original > large > small
+            let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url;
             if (typeof u !== 'string' || !u.trim()) continue;
+            // Aggressively upgrade to highest resolution
+            u = upgradeBatImageUrl(u);
             const nu = normalize(u);
             if (!isOk(nu)) continue;
             urls.push(nu);

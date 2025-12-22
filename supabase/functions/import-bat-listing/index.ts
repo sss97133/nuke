@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { extractGalleryImagesFromHtml } from '../_shared/batDomMap.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -231,107 +232,10 @@ function extractSellerUsernameFromHtml(html: string): string | null {
   return null;
 }
 
+// Use shared gallery extraction from batDomMap (single source of truth)
 function extractBatGalleryImagesFromHtml(html: string): string[] {
-  const h = String(html || '');
-
-  const normalize = (u: string) =>
-    u
-      .split('#')[0]
-      .split('?')[0]
-      .replace(/&#038;/g, '&')
-      .replace(/&amp;/g, '&')
-      .replace(/-scaled\./g, '.')
-      .trim();
-
-  const isOk = (u: string) => {
-    const s = u.toLowerCase();
-    return (
-      u.startsWith('http') &&
-      s.includes('bringatrailer.com/wp-content/uploads/') &&
-      !s.endsWith('.svg') &&
-      !s.endsWith('.pdf')
-    );
-  };
-
-  const isNoise = (u: string): boolean => {
-    const f = u.toLowerCase();
-    return (
-      f.includes('qotw') ||
-      f.includes('winner-template') ||
-      f.includes('weekly-weird') ||
-      f.includes('mile-marker') ||
-      f.includes('podcast') ||
-      f.includes('merch') ||
-      f.includes('thumbnail-template') ||
-      f.includes('site-post-') ||
-      f.includes('screenshot-') ||
-      f.includes('countries/') ||
-      f.includes('themes/') ||
-      f.includes('assets/img/') ||
-      /\/web-\d{3,}-/i.test(f)
-    );
-  };
-
-  // Strip sidebar (ads/CTAs) before any fallback scanning.
-  // Sidebar often contains images (email signup, promos, etc.) that are NOT part of the listing gallery.
-  const stripSidebar = (rawHtml: string): string => {
-    try {
-      const doc = new DOMParser().parseFromString(String(rawHtml || ''), 'text/html');
-      if (!doc) return String(rawHtml || '');
-      doc.querySelectorAll('.sidebar, #sidebar, [class*=\"sidebar\"]').forEach((n) => n.remove());
-      return doc.documentElement?.outerHTML || String(rawHtml || '');
-    } catch {
-      return String(rawHtml || '');
-    }
-  };
-
-  // 1) Most reliable: the listing gallery div's embedded JSON.
-  try {
-    const m = h.match(/id="bat_listing_page_photo_gallery"[^>]*data-gallery-items="([^"]+)"/i);
-    if (m?.[1]) {
-      const jsonText = m[1]
-        .replace(/&quot;/g, '"')
-        .replace(/&#038;/g, '&')
-        .replace(/&amp;/g, '&');
-      const items = JSON.parse(jsonText);
-      if (Array.isArray(items)) {
-        const urls: string[] = [];
-        for (const it of items) {
-          const u = it?.large?.url || it?.small?.url;
-          if (typeof u !== 'string' || !u.trim()) continue;
-          const nu = normalize(u);
-          if (!isOk(nu)) continue;
-          if (isNoise(nu)) continue;
-          urls.push(nu);
-        }
-        if (urls.length) return [...new Set(urls)];
-      }
-    }
-  } catch {
-    // continue to fallbacks
-  }
-
-  // 2) Regex fallback (best-effort). Keep it noise-filtered and bounded.
-  const cleaned = stripSidebar(h);
-  const abs = cleaned.match(/https:\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
-  const protoRel = cleaned.match(/\/\/bringatrailer\.com\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
-  const rel = cleaned.match(/\/wp-content\/uploads\/[^"'\\s>]+\.(jpg|jpeg|png)(?:\?[^"'\\s>]*)?/gi) || [];
-
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const raw of [...abs, ...protoRel, ...rel]) {
-    let u = raw;
-    if (u.startsWith('//')) u = 'https:' + u;
-    if (u.startsWith('/')) u = 'https://bringatrailer.com' + u;
-    const nu = normalize(u);
-    if (!isOk(nu)) continue;
-    if (isNoise(nu)) continue;
-    if (seen.has(nu)) continue;
-    seen.add(nu);
-    out.push(nu);
-    if (out.length >= 400) break;
-  }
-  return out;
+  const result = extractGalleryImagesFromHtml(html);
+  return result.urls;
 }
 
 function extractBuyerUsernameFromHtml(html: string): string | null {

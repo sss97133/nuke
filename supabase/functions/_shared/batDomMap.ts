@@ -74,17 +74,53 @@ function safeDecodeHtmlAttr(s: string): string {
     .replace(/&amp;/g, '&');
 }
 
-function extractGalleryImagesFromHtml(html: string): { urls: string[]; method: string } {
+/**
+ * Aggressively upgrade BaT image URLs to highest resolution available.
+ * Removes resize params, scaled suffixes, and constructs original URLs.
+ */
+export function upgradeBatImageUrl(url: string): string {
+  if (!url || typeof url !== 'string' || !url.includes('bringatrailer.com')) {
+    return url;
+  }
+
+  let upgraded = url
+    // Decode HTML entities first
+    .replace(/&#038;/g, '&')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    // Remove ALL resize/width query parameters that force lower resolution
+    .replace(/[?&]w=\d+/g, '')
+    .replace(/[?&]h=\d+/g, '')
+    .replace(/[?&]resize=[^&]*/g, '')
+    .replace(/[?&]fit=[^&]*/g, '')
+    .replace(/[?&]quality=[^&]*/g, '')
+    .replace(/[?&]strip=[^&]*/g, '')
+    // Clean up trailing ? or &
+    .replace(/[?&]+$/, '')
+    // Remove -scaled suffix to get original (BaT WordPress adds this for responsive images)
+    .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+    // Remove any size suffixes like -150x150, -300x300, -768x512, etc.
+    .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+    .trim();
+
+  return upgraded;
+}
+
+export function extractGalleryImagesFromHtml(html: string): { urls: string[]; method: string } {
   const h = String(html || '');
 
-  const normalize = (u: string) =>
-    u
+  const normalize = (u: string) => {
+    // First upgrade to highest resolution, then normalize
+    const upgraded = upgradeBatImageUrl(u);
+    return upgraded
       .split('#')[0]
       .split('?')[0]
       .replace(/&#038;/g, '&')
       .replace(/&amp;/g, '&')
       .replace(/-scaled\./g, '.')
       .trim();
+  };
 
   const isOk = (u: string) => {
     const s = u.toLowerCase();
@@ -139,8 +175,11 @@ function extractGalleryImagesFromHtml(html: string): { urls: string[]; method: s
         if (Array.isArray(items)) {
           const urls: string[] = [];
           for (const it of items) {
-            const u = it?.large?.url || it?.small?.url;
+            // Prioritize highest resolution: full/original > large > small
+            let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url;
             if (typeof u !== 'string' || !u.trim()) continue;
+            // Aggressively upgrade to highest resolution
+            u = upgradeBatImageUrl(u);
             const nu = normalize(u);
             if (!isOk(nu)) continue;
             // CRITICAL: Filter noise even from data-gallery-items (defense in depth)
@@ -177,8 +216,11 @@ function extractGalleryImagesFromHtml(html: string): { urls: string[]; method: s
           if (Array.isArray(items)) {
             const urls: string[] = [];
             for (const it of items) {
-              const u = it?.large?.url || it?.small?.url;
+              // Prioritize highest resolution: full/original > large > small
+              let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url;
               if (typeof u !== 'string' || !u.trim()) continue;
+              // Aggressively upgrade to highest resolution
+              u = upgradeBatImageUrl(u);
               const nu = normalize(u);
               if (!isOk(nu)) continue;
               if (isNoise(nu)) {

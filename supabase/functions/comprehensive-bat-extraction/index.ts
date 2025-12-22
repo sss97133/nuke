@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts';
 import { extractBatListingWithFirecrawl, extractBasicBatDataFromHtml } from '../_shared/batFirecrawlMapper.ts';
+import { extractGalleryImagesFromHtml } from '../_shared/batDomMap.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -2532,36 +2533,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Extract and backfill images from BaT gallery using batDomMap
+    // Extract and backfill images from BaT gallery using proper gallery extraction
     if (vehicleId && html) {
       try {
         console.log('📸 Extracting images from BaT gallery...');
-        // Use Firecrawl extracted images if available, otherwise extract from HTML
-        const images = (() => {
-          // First try: if we have Firecrawl data with images, use those
-          if (extractedData && 'image_urls' in extractedData && Array.isArray((extractedData as any).image_urls)) {
-            return (extractedData as any).image_urls;
-          }
-          // Fallback: extract images from HTML using regex
-          if (html) {
-            const imageMatches = html.matchAll(/<img[^>]+src=["']([^"']+\.(jpg|jpeg|png|webp))["'][^>]*>/gi);
-            const imageUrls: string[] = [];
-            for (const match of imageMatches) {
-              const url = match[1];
-              if (url && url.includes('bringatrailer.com/wp-content/uploads/') && 
-                  !url.includes('logo') && !url.includes('icon') && !url.includes('qotw')) {
-                const cleanUrl = url.split('#')[0].split('?')[0].replace(/&#038;/g, '&').replace(/&amp;/g, '&');
-                if (cleanUrl.startsWith('http')) {
-                  imageUrls.push(cleanUrl);
-                } else {
-                  imageUrls.push(`https://bringatrailer.com${cleanUrl}`);
-                }
-              }
-            }
-            return [...new Set(imageUrls)].slice(0, 50); // Dedupe and limit to 50
-          }
-          return [];
-        })();
+        // Use proper gallery extraction that prioritizes high-res images from data-gallery-items JSON
+        const galleryResult = extractGalleryImagesFromHtml(html);
+        const images = galleryResult.urls;
         
         if (images.length > 0) {
           console.log(`✅ Found ${images.length} gallery images, backfilling...`);

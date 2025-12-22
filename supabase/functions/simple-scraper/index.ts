@@ -45,6 +45,28 @@ serve(async (req) => {
     // BaT listing pages embed the real gallery as JSON inside `data-gallery-items="[...]"`
     // This is the most reliable way to get *all* listing images without pulling "recommended auctions" noise.
     const extractBatGalleryImages = (html: string): string[] => {
+      // Aggressively upgrade BaT image URLs to highest resolution
+      const upgradeBatImageUrl = (url: string): string => {
+        if (!url || typeof url !== 'string' || !url.includes('bringatrailer.com')) {
+          return url;
+        }
+        return url
+          .replace(/&#038;/g, '&')
+          .replace(/&#039;/g, "'")
+          .replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"')
+          .replace(/[?&]w=\d+/g, '')
+          .replace(/[?&]h=\d+/g, '')
+          .replace(/[?&]resize=[^&]*/g, '')
+          .replace(/[?&]fit=[^&]*/g, '')
+          .replace(/[?&]quality=[^&]*/g, '')
+          .replace(/[?&]strip=[^&]*/g, '')
+          .replace(/[?&]+$/, '')
+          .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+          .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+          .trim();
+      };
+
       try {
         // CRITICAL: Only accept the gallery JSON from the actual listing gallery container.
         // Do NOT fall back to scanning other parts of the page, as that can contaminate vehicle galleries.
@@ -68,8 +90,11 @@ serve(async (req) => {
 
         const urls: string[] = []
         for (const it of items) {
-          const u = it?.large?.url || it?.small?.url
+          // Prioritize highest resolution: full/original > large > small
+          let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url
           if (typeof u !== 'string' || !u.trim()) continue
+          // Aggressively upgrade to highest resolution
+          u = upgradeBatImageUrl(u)
           // Normalize: drop query params (fit/resize), keep canonical path.
           urls.push(u.split('#')[0].split('?')[0])
         }
