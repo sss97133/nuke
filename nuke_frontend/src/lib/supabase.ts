@@ -1,15 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
+// Import env vars - these are computed in an IIFE so they're safe
 import { SUPABASE_ANON_KEY as ENV_SUPABASE_ANON_KEY, SUPABASE_URL as ENV_SUPABASE_URL } from './env';
 
 // Define basic types for the database
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
-// Initialize all variables in a single block to avoid TDZ issues
-// This ensures the bundler doesn't reorder initialization
-const initSupabase = (() => {
+// Use a function to ensure proper initialization order - can't be reordered by bundler
+function initializeSupabase() {
   // Get environment variables (supports both VITE_* and legacy SUPABASE_* names)
-  const url = ENV_SUPABASE_URL?.trim() || '';
-  const key = ENV_SUPABASE_ANON_KEY?.trim() || '';
+  // Access the imported values directly - they're already initialized from env.ts IIFE
+  const url = (ENV_SUPABASE_URL || '').trim();
+  const key = (ENV_SUPABASE_ANON_KEY || '').trim();
   
   // Optional environment debug logging
   const ENABLE_DEBUG = (import.meta as any).env?.VITE_ENABLE_DEBUG === 'true';
@@ -45,12 +46,15 @@ const initSupabase = (() => {
   );
 
   return { url, key, client };
-})();
+}
 
-// Export constants
-export const SUPABASE_URL: string = initSupabase.url;
-export const SUPABASE_ANON_KEY: string = initSupabase.key;
-export const supabase = initSupabase.client;
+// Initialize immediately but through function call to ensure order
+const _supabaseInit = initializeSupabase();
+
+// Export constants - these are safe because _supabaseInit is fully initialized
+export const SUPABASE_URL: string = _supabaseInit.url;
+export const SUPABASE_ANON_KEY: string = _supabaseInit.key;
+export const supabase = _supabaseInit.client;
 
 // Utility to get Supabase Functions URL
 export const getSupabaseFunctionsUrl = () => {

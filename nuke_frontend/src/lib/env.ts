@@ -15,16 +15,20 @@ function readEnv(key: string): string | null {
   return s ? s : null;
 }
 
-export const SUPABASE_URL =
-  readEnv('VITE_SUPABASE_URL') ||
-  readEnv('SUPABASE_URL') ||
-  // Last-resort default for production reliability (anon keys are public by design).
-  'https://qkgaybvrernstplzjaam.supabase.co';
+// Initialize all env vars in a single IIFE to prevent TDZ issues
+const envVars = (() => {
+  const url = readEnv('VITE_SUPABASE_URL') ||
+    readEnv('SUPABASE_URL') ||
+    'https://qkgaybvrernstplzjaam.supabase.co';
+  
+  const key = readEnv('VITE_SUPABASE_ANON_KEY') ||
+    readEnv('SUPABASE_ANON_KEY') ||
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk';
+  
+  return { url, key };
+})();
 
-export const SUPABASE_ANON_KEY =
-  readEnv('VITE_SUPABASE_ANON_KEY') ||
-  readEnv('SUPABASE_ANON_KEY') ||
-  // Last-resort default for production reliability (anon keys are public by design).
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk';
+export const SUPABASE_URL: string = envVars.url;
+export const SUPABASE_ANON_KEY: string = envVars.key;
 
 
