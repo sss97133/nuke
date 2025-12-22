@@ -1362,14 +1362,36 @@ function stripBatSidebarHtml(html: string): string {
 
 function extractBatGalleryImagesFromHtml(html: string): string[] {
   const h = String(html || '')
-  const normalize = (u: string) =>
-    u
+  const upgradeBatImageUrl = (url: string): string => {
+    if (!url || typeof url !== 'string' || !url.includes('bringatrailer.com')) {
+      return url;
+    }
+    return url
+      .replace(/&#038;/g, '&')
+      .replace(/&#039;/g, "'")
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/[?&]w=\d+/g, '')
+      .replace(/[?&]h=\d+/g, '')
+      .replace(/[?&]resize=[^&]*/g, '')
+      .replace(/[?&]fit=[^&]*/g, '')
+      .replace(/[?&]quality=[^&]*/g, '')
+      .replace(/[?&]strip=[^&]*/g, '')
+      .replace(/[?&]+$/, '')
+      .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .trim();
+  };
+  const normalize = (u: string) => {
+    const upgraded = upgradeBatImageUrl(u);
+    return upgraded
       .split('#')[0]
       .split('?')[0]
       .replace(/&#038;/g, '&')
       .replace(/&amp;/g, '&')
       .replace(/-scaled\./g, '.')
-      .trim()
+      .trim();
+  }
 
   const isOk = (u: string) => {
     const s = u.toLowerCase()
@@ -1398,8 +1420,11 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
         if (Array.isArray(items)) {
           const urls: string[] = []
           for (const it of items) {
-            const u = it?.large?.url || it?.small?.url
+            // Prioritize highest resolution: full/original > large > small
+            let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url
             if (typeof u !== 'string' || !u.trim()) continue
+            // Aggressively upgrade to highest resolution
+            u = upgradeBatImageUrl(u)
             const nu = normalize(u)
             if (!isOk(nu)) continue
             urls.push(nu)
