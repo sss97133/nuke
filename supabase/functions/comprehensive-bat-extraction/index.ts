@@ -1527,7 +1527,13 @@ Deno.serve(async (req) => {
             ...basicData,
           } as ComprehensiveBaTData;
         } else {
-          throw new Error('Firecrawl returned no data and no HTML');
+          console.warn('⚠️ Firecrawl returned no data and no HTML, using basic parser as last resort');
+          // Last resort: use basic HTML parser
+          const basicData = extractBasicBatDataFromHtml(html || '', batUrl);
+          extractedData = {
+            url: batUrl,
+            ...basicData,
+          } as ComprehensiveBaTData;
         }
       } catch (e) {
         console.warn('Firecrawl extraction failed, trying direct fetch:', e);
