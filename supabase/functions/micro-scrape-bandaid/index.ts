@@ -247,16 +247,47 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get quality scores
+    // Calculate quality scores directly from database entries
     const vehicleIdsList = vehicles.map((v: any) => v.id);
+    
+    // Get quality scores (or calculate on-the-fly from DB state)
     const { data: qualityScores } = await supabase
       .from('vehicle_quality_scores')
       .select('vehicle_id, overall_score')
       .in('vehicle_id', vehicleIdsList);
 
-    const qualityMap = new Map(
-      (qualityScores || []).map((qs: any) => [qs.vehicle_id, qs.overall_score || 0])
-    );
+    const qualityMap = new Map<string, number>();
+    
+    // For vehicles without quality scores, calculate from actual DB state
+    for (const vehicle of vehicles) {
+      const existing = (qualityScores || []).find((qs: any) => qs.vehicle_id === vehicle.id);
+      if (existing) {
+        qualityMap.set(vehicle.id, existing.overall_score || 0);
+      } else {
+        // Calculate quality score from actual DB entries
+        let score = 0;
+        
+        // VIN (20 points)
+        if (vehicle.vin && vehicle.vin.length >= 10 && !vehicle.vin.startsWith('VIVA-')) {
+          score += 20;
+        }
+        
+        // Price (20 points)
+        if (vehicle.sale_price > 0) {
+          score += 20;
+        }
+        
+        // Images will be counted below
+        // Timeline events will be counted below
+        
+        // Mileage (5 points)
+        if (vehicle.mileage) {
+          score += 5;
+        }
+        
+        qualityMap.set(vehicle.id, score);
+      }
+    }
 
     // Get image counts
     const { data: images } = await supabase
@@ -318,18 +349,37 @@ Deno.serve(async (req) => {
       // Recalculate quality score after actions
       if (actionResults.succeeded > 0) {
         try {
-          await supabase.rpc('calculate_vehicle_quality_score', {
-            p_vehicle_id: vehicle.id,
-          });
-
-          // Check if now complete
-          const { data: updatedScore } = await supabase
-            .from('vehicle_quality_scores')
-            .select('overall_score')
-            .eq('vehicle_id', vehicle.id)
+          // Recalculate quality score from updated DB state (direct DB query)
+          const { data: updatedVehicle } = await supabase
+            .from('vehicles')
+            .select('vin, sale_price, mileage')
+            .eq('id', vehicle.id)
             .single();
+          
+          const { count: updatedImageCount } = await supabase
+            .from('vehicle_images')
+            .select('id', { count: 'exact', head: true })
+            .eq('vehicle_id', vehicle.id);
 
-          if (updatedScore?.overall_score >= QUALITY_THRESHOLD.min_score) {
+          // Calculate score from actual DB entries
+          let newScore = 0;
+          if (updatedVehicle?.vin && updatedVehicle.vin.length >= 10 && !updatedVehicle.vin.startsWith('VIVA-')) {
+            newScore += 20;
+          }
+          if (updatedVehicle?.sale_price > 0) {
+            newScore += 20;
+          }
+          const imgCount = updatedImageCount || 0;
+          if (imgCount > 0) {
+            newScore += 15;
+            if (imgCount >= 5) newScore += 10;
+            if (imgCount >= 20) newScore += 5;
+          }
+          if (updatedVehicle?.mileage) {
+            newScore += 5;
+          }
+
+          if (newScore >= QUALITY_THRESHOLD.min_score) {
             // Mark as complete in origin_metadata
             await supabase
               .from('vehicles')
@@ -343,7 +393,7 @@ Deno.serve(async (req) => {
               .eq('id', vehicle.id);
 
             results.marked_complete++;
-            console.log(`✅ Vehicle ${vehicle.id.substring(0, 8)} marked as complete (score: ${updatedScore.overall_score})`);
+            console.log(`✅ Vehicle ${vehicle.id.substring(0, 8)} marked as complete (score: ${newScore})`);
           }
         } catch (error: any) {
           console.error(`Error recalculating quality:`, error.message);
