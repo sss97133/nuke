@@ -27,11 +27,18 @@ export default defineConfig({
         //   pdf: ['pdfjs-dist'],
         //   exif: ['exifr', 'piexifjs', 'exif-js', 'exifreader'],
         // }
-      }
+      },
+      // Preserve module order to avoid TDZ issues
+      preserveEntrySignatures: 'strict',
     },
     // Ensure production builds don't use eval
     target: 'esnext',
     minify: 'esbuild',
+    // Use commonjs format for better compatibility
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
   },
   server: {
     port: 5174,

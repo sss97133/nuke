@@ -8,8 +8,9 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 const supabaseUrl = ENV_SUPABASE_URL?.trim();
 const supabaseAnonKey = ENV_SUPABASE_ANON_KEY?.trim();
 
-export const SUPABASE_URL = supabaseUrl;
-export const SUPABASE_ANON_KEY = supabaseAnonKey;
+// Export constants after initialization to avoid TDZ
+export const SUPABASE_URL: string = supabaseUrl || '';
+export const SUPABASE_ANON_KEY: string = supabaseAnonKey || '';
 
 // Utility to get Supabase Functions URL
 export const getSupabaseFunctionsUrl = () => {
@@ -57,18 +58,26 @@ console.error = (...args) => {
 };
 
 // Create and export the Supabase client
-export const supabase = createClient(
-  supabaseUrl,
-  supabaseAnonKey,
-  {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true
-    }
-    // Using default realtime settings to avoid compatibility issues
+// Use function to ensure initialization happens after all const declarations
+function createSupabaseClient() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase configuration not available');
   }
-);
+  return createClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+      // Using default realtime settings to avoid compatibility issues
+    }
+  );
+}
+
+export const supabase = createSupabaseClient();
 
 // Helper function to get the current user ID
 export const getCurrentUserId = async (): Promise<string | null> => {
