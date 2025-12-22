@@ -61,7 +61,8 @@ export class AdminNotificationService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
-      // Primary: explicit admin allowlist table.
+      // Primary: explicit admin allowlist table (admin_users).
+      // This is the authoritative source for admin privileges.
       // Use maybeSingle so missing rows are not treated as hard errors.
       const { data, error } = await supabase
         .from('admin_users')
@@ -72,12 +73,17 @@ export class AdminNotificationService {
 
       if (!error && !!data?.id) return true;
 
-      // Fallback: profile-based privilege check (covers environments where admin_users isn't populated).
+      // DEPRECATED FALLBACK: profile-based privilege check.
+      // This fallback exists for backwards compatibility with environments where
+      // admin_users table may not be fully populated. It checks profiles.user_type
+      // or profiles.role for 'admin'/'moderator' values.
+      // TODO: Remove this fallback once all environments use admin_users table exclusively.
+      // See: docs/audits/ADMIN_SYSTEM_AUDIT.md for standardization plan.
       try {
         const { data: allowed, error: rpcErr } = await supabase.rpc('is_admin_or_moderator');
         if (!rpcErr && allowed === true) return true;
       } catch {
-        // ignore
+        // ignore - fallback is optional
       }
 
       return false;

@@ -4,7 +4,12 @@ import '../../design-system.css';
 
 type AuctionStatus = 'active' | 'sold' | 'ended' | 'expired' | 'cancelled' | 'pending' | 'ending_soon' | 'reserve_not_met';
 
-export const AuctionStatusBadge: React.FC<{ status: AuctionStatus; title?: string }> = ({ status, title }) => {
+export const AuctionStatusBadge: React.FC<{ 
+  status: AuctionStatus; 
+  title?: string;
+  endedAt?: string | Date | null;
+  fadeAfterDays?: number;
+}> = ({ status, title, endedAt, fadeAfterDays = 1 }) => {
   // Mirror the visual language used in VehicleHeader (sold/rnm/live)
   const cfg: Record<AuctionStatus, { text: string; color: string; bg: string }> = {
     sold: { text: 'SOLD', color: '#22c55e', bg: '#dcfce7' },
@@ -19,6 +24,29 @@ export const AuctionStatusBadge: React.FC<{ status: AuctionStatus; title?: strin
 
   const s = cfg[status] || cfg.ended;
 
+  // Calculate fade opacity - fade out badges for ended auctions (especially unsold) after 1 day
+  let opacity = 1;
+  let display = 'inline-block';
+  
+  if (endedAt && (status === 'ended' || status === 'reserve_not_met' || status === 'expired')) {
+    const endDate = endedAt instanceof Date ? endedAt : new Date(endedAt);
+    const daysSinceEnd = (Date.now() - endDate.getTime()) / (1000 * 60 * 60 * 24);
+    
+    if (daysSinceEnd >= fadeAfterDays) {
+      // Fade out completely after fadeAfterDays
+      opacity = 0;
+      display = 'none';
+    } else if (daysSinceEnd > 0) {
+      // Gradually fade over the fadeAfterDays period
+      opacity = Math.max(0, 1 - (daysSinceEnd / fadeAfterDays));
+    }
+  }
+
+  // Don't show at all if faded out
+  if (opacity === 0) {
+    return null;
+  }
+
   return (
     <span
       className="badge"
@@ -31,6 +59,9 @@ export const AuctionStatusBadge: React.FC<{ status: AuctionStatus; title?: strin
         fontSize: '10px',
         padding: '3px 8px',
         borderRadius: '4px',
+        opacity,
+        display,
+        transition: 'opacity 0.3s ease',
       }}
     >
       {s.text}

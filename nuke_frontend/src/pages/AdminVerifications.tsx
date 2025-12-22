@@ -29,13 +29,15 @@ const AdminVerifications: React.FC = () => {
         setLoading(false);
         return;
       }
-      // Verify moderator/admin
-      const { data: me } = await supabase
-        .from('profiles')
-        .select('user_type')
-        .eq('id', user.id)
+      // Verify admin via admin_users table (standardized admin check)
+      const { data: adminData } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
         .single();
-      if (!me || !['moderator','admin'].includes(me.user_type)) {
+      
+      if (!adminData) {
         // Not authorized: redirect to profile and stop
         setAuthorized(false);
         navigate('/profile');

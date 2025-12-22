@@ -36,7 +36,7 @@ const ResilientImage: React.FC<ResilientImageProps> = ({
   style,
   className,
   imgStyle,
-  objectFit = 'cover',
+  objectFit = 'contain',
   placeholderSrc = DEFAULT_PLACEHOLDER,
   placeholderOpacity = 0.3,
 }) => {

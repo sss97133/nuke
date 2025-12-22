@@ -2878,7 +2878,7 @@ const CursorHomepage: React.FC = () => {
                             style={{
                               width: 'min(100px, 15vw)',
                               height: 'min(60px, 9vw)',
-                              objectFit: 'cover',
+                              objectFit: 'contain',
                               border: '1px solid var(--border)',
                               display: 'block'
                             }}
