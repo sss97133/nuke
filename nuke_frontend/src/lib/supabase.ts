@@ -4,40 +4,59 @@ import { SUPABASE_ANON_KEY as ENV_SUPABASE_ANON_KEY, SUPABASE_URL as ENV_SUPABAS
 // Define basic types for the database
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
-// Get environment variables (supports both VITE_* and legacy SUPABASE_* names)
-const supabaseUrl = ENV_SUPABASE_URL?.trim();
-const supabaseAnonKey = ENV_SUPABASE_ANON_KEY?.trim();
+// Initialize all variables in a single block to avoid TDZ issues
+// This ensures the bundler doesn't reorder initialization
+const initSupabase = (() => {
+  // Get environment variables (supports both VITE_* and legacy SUPABASE_* names)
+  const url = ENV_SUPABASE_URL?.trim() || '';
+  const key = ENV_SUPABASE_ANON_KEY?.trim() || '';
+  
+  // Optional environment debug logging
+  const ENABLE_DEBUG = (import.meta as any).env?.VITE_ENABLE_DEBUG === 'true';
+  if (ENABLE_DEBUG) {
+    console.log('Auth system initialized with Supabase configuration');
+    console.log('VITE_SUPABASE_URL:', url);
+    console.log('VITE_SUPABASE_ANON_KEY present:', !!key);
+    if (!url) console.warn('Missing VITE_SUPABASE_URL - check your .env file');
+    if (!key) console.warn('Missing VITE_SUPABASE_ANON_KEY - check your .env file');
+  }
 
-// Export constants after initialization to avoid TDZ
-export const SUPABASE_URL: string = supabaseUrl || '';
-export const SUPABASE_ANON_KEY: string = supabaseAnonKey || '';
+  // Validate required environment variables (fail fast if missing)
+  if (!url || !key) {
+    const missingVars: string[] = [];
+    if (!url) missingVars.push('VITE_SUPABASE_URL (or SUPABASE_URL)');
+    if (!key) missingVars.push('VITE_SUPABASE_ANON_KEY (or SUPABASE_ANON_KEY)');
+    const message = `Missing required Supabase configuration: ${missingVars.join(', ')}`;
+    console.error(message);
+    throw new Error(`${message}. Configure these environment variables before running the app.`);
+  }
+
+  // Create Supabase client
+  const client = createClient(
+    url,
+    key,
+    {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true
+      }
+    }
+  );
+
+  return { url, key, client };
+})();
+
+// Export constants
+export const SUPABASE_URL: string = initSupabase.url;
+export const SUPABASE_ANON_KEY: string = initSupabase.key;
+export const supabase = initSupabase.client;
 
 // Utility to get Supabase Functions URL
 export const getSupabaseFunctionsUrl = () => {
-  if (!supabaseUrl) throw new Error('VITE_SUPABASE_URL is not defined');
-  return `${supabaseUrl}/functions/v1`;
+  if (!initSupabase.url) throw new Error('VITE_SUPABASE_URL is not defined');
+  return `${initSupabase.url}/functions/v1`;
 };
-
-// Optional environment debug logging
-const ENABLE_DEBUG = (import.meta as any).env?.VITE_ENABLE_DEBUG === 'true';
-if (ENABLE_DEBUG) {
-  // Keep logs opt-in to avoid distracting normal testing
-  console.log('Auth system initialized with Supabase configuration');
-  console.log('VITE_SUPABASE_URL:', supabaseUrl);
-  console.log('VITE_SUPABASE_ANON_KEY present:', !!supabaseAnonKey);
-  if (!supabaseUrl) console.warn('Missing VITE_SUPABASE_URL - check your .env file');
-  if (!supabaseAnonKey) console.warn('Missing VITE_SUPABASE_ANON_KEY - check your .env file');
-}
-
-// Validate required environment variables (fail fast if missing)
-if (!supabaseUrl || !supabaseAnonKey) {
-  const missingVars: string[] = [];
-  if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL (or SUPABASE_URL)');
-  if (!supabaseAnonKey) missingVars.push('VITE_SUPABASE_ANON_KEY (or SUPABASE_ANON_KEY)');
-  const message = `Missing required Supabase configuration: ${missingVars.join(', ')}`;
-  console.error(message);
-  throw new Error(`${message}. Configure these environment variables before running the app.`);
-}
 
 // Suppress non-critical errors (404s for optional tables, WebSocket connection failures)
 const originalError = console.error;
@@ -56,28 +75,6 @@ console.error = (...args) => {
   }
   originalError.apply(console, args);
 };
-
-// Create and export the Supabase client
-// Use function to ensure initialization happens after all const declarations
-function createSupabaseClient() {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase configuration not available');
-  }
-  return createClient(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true
-      }
-      // Using default realtime settings to avoid compatibility issues
-    }
-  );
-}
-
-export const supabase = createSupabaseClient();
 
 // Helper function to get the current user ID
 export const getCurrentUserId = async (): Promise<string | null> => {

@@ -33,7 +33,7 @@ export default defineConfig({
     },
     // Ensure production builds don't use eval
     target: 'esnext',
-    minify: 'esbuild',
+    minify: false, // Temporarily disabled to debug TDZ error
     // Use commonjs format for better compatibility
     commonjsOptions: {
       include: [/node_modules/],
