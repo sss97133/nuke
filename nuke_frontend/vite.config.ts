@@ -34,6 +34,7 @@ export default defineConfig({
     // Ensure production builds don't use eval
     target: 'esnext',
     minify: false, // Temporarily disabled to debug TDZ error
+    terserOptions: undefined, // Explicitly disable terser
     // Use commonjs format for better compatibility
     commonjsOptions: {
       include: [/node_modules/],
