@@ -70,13 +70,55 @@ export const BaTProfileExtractor: React.FC = () => {
         return;
       }
 
-      // If no existing data, we'd need to scrape - for now, show message
-      throw new Error('Profile data not found. Use comprehensive-bat-extraction function or scrape manually.');
+      // Call edge function to extract profile and vehicles
+      const { data: extractData, error: extractError } = await supabase.functions.invoke(
+        'extract-bat-profile-vehicles',
+        {
+          body: { profile_url: batProfileUrl, extract_vehicles: true }
+        }
+      );
 
       if (extractError) throw extractError;
-      if (data?.error) throw new Error(data.error);
+      if (extractData?.error) throw new Error(extractData.error);
 
-      setExtractedData(data);
+      // Get updated identity data
+      const { data: updatedIdentity } = await supabase
+        .from('external_identities')
+        .select('*')
+        .eq('id', extractData.external_identity_id)
+        .single();
+
+      if (updatedIdentity?.metadata) {
+        setExtractedData({
+          username,
+          profile_url: updatedIdentity.profile_url || batProfileUrl,
+          listings: extractData.listings_found || 0,
+          bids: updatedIdentity.metadata.bids || 0,
+          comments: updatedIdentity.metadata.comments || 0,
+          success_stories: updatedIdentity.metadata.success_stories || 0,
+          auction_wins: updatedIdentity.metadata.auction_wins || 0,
+          member_since: updatedIdentity.metadata.member_since || '',
+          location: updatedIdentity.metadata.location || '',
+          website: updatedIdentity.metadata.website,
+        });
+      } else {
+        setExtractedData({
+          username,
+          profile_url: batProfileUrl,
+          listings: extractData.listings_found || 0,
+          bids: 0,
+          comments: 0,
+          success_stories: 0,
+          auction_wins: 0,
+          member_since: '',
+          location: '',
+        });
+      }
+
+      // Show results
+      if (extractData.vehicles_created > 0 || extractData.vehicles_updated > 0) {
+        alert(`Successfully imported ${extractData.vehicles_created} vehicles and updated ${extractData.vehicles_updated} vehicles!`);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to extract profile data');
     } finally {
@@ -219,37 +261,22 @@ export const BaTProfileExtractor: React.FC = () => {
           marginBottom: 'var(--space-3)',
         }}>
           <h4 style={{ fontSize: '9pt', fontWeight: 'bold', margin: 0, marginBottom: 'var(--space-2)' }}>
-            Extracted Data
+            Profile Data
           </h4>
           <div style={{ fontSize: '8pt', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
             <div><strong>Username:</strong> {extractedData.username}</div>
-            <div><strong>Listings:</strong> {extractedData.listings.toLocaleString()}</div>
+            <div><strong>Listings Found:</strong> {extractedData.listings.toLocaleString()}</div>
             <div><strong>Bids:</strong> {extractedData.bids.toLocaleString()}</div>
             <div><strong>Comments:</strong> {extractedData.comments.toLocaleString()}</div>
             <div><strong>Auction Wins:</strong> {extractedData.auction_wins.toLocaleString()}</div>
             <div><strong>Success Stories:</strong> {extractedData.success_stories.toLocaleString()}</div>
-            <div><strong>Member Since:</strong> {extractedData.member_since}</div>
+            {extractedData.member_since && <div><strong>Member Since:</strong> {extractedData.member_since}</div>}
             {extractedData.location && <div><strong>Location:</strong> {extractedData.location}</div>}
             {extractedData.website && <div><strong>Website:</strong> <a href={extractedData.website} target="_blank" rel="noopener noreferrer">{extractedData.website}</a></div>}
           </div>
-
-          <button
-            onClick={saveToDatabase}
-            disabled={saving}
-            style={{
-              marginTop: 'var(--space-3)',
-              padding: 'var(--space-2) var(--space-4)',
-              fontSize: '8pt',
-              fontWeight: 'bold',
-              background: saving ? 'var(--text-muted)' : 'var(--success)',
-              color: 'var(--white)',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: saving ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {saving ? 'Saving...' : 'Save to Database'}
-          </button>
+          <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 'var(--space-2)', marginBottom: 0 }}>
+            ✓ Profile data and vehicles have been automatically extracted and imported.
+          </p>
         </div>
       )}
     </div>
