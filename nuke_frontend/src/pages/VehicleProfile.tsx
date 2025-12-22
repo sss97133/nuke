@@ -240,7 +240,7 @@ const VehicleProfile: React.FC = () => {
   // We intentionally merge duplicate rows that share the same `listing_url` (multiple import pipelines)
   // so the UI doesn't flip to SOLD just because a stale duplicate row updated last.
   const buildAuctionPulseFromExternalListings = useCallback((rows: any[], vehicleIdForRows: string) => {
-    const arr = Array.isArray(rows) ? rows.filter((r) => r && r.listing_url && r.platform) : [];
+    let arr = Array.isArray(rows) ? rows.filter((r) => r && r.listing_url && r.platform) : [];
     if (arr.length === 0) return null;
     
     // Filter out stale "active" listings if vehicle is sold (check vehicle data if available)

@@ -145,14 +145,6 @@ export interface VehicleHeroImageProps {
   overlayNode?: React.ReactNode;
 }
 
-// Removed duplicate - see VehicleBasicInfoProps below that extends VehicleBaseProps
-
-export interface VehicleBaseProps {
-  vehicle: Vehicle | null;
-  session?: any;
-  permissions?: any;
-}
-
 export interface VehiclePricingSectionProps {
   vehicle: Vehicle | null;
   saleSettings?: any;
