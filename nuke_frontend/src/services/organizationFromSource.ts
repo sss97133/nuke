@@ -81,6 +81,16 @@ class OrganizationFromSourceService {
   getOrganizationMap(source: string): SourceOrganizationMap | null {
     const sourceLower = source.toLowerCase();
     
+    // PCarMarket
+    if (sourceLower.includes('pcarmarket') || sourceLower === 'pcarmarket') {
+      return {
+        organization_id: null, // Will be created/found dynamically
+        organization_name: 'PCarMarket',
+        website: 'https://www.pcarmarket.com',
+        business_type: 'auction_house'
+      };
+    }
+    
     // Direct match
     if (SOURCE_TO_ORG_MAP[sourceLower]) {
       return SOURCE_TO_ORG_MAP[sourceLower];

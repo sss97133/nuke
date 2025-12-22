@@ -30,7 +30,8 @@
     "node-fetch": "^3.3.2",
     "openai": "^6.10.0",
     "pdf-parse": "^2.4.5",
-    "pdfjs-dist": "^5.4.449"
+    "pdfjs-dist": "^5.4.449",
+    "playwright": "^1.57.0"
   },
   "devDependencies": {
     "tsx": "^4.7.0"

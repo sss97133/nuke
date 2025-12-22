@@ -34,9 +34,34 @@ serve(async (req) => {
 
     console.log(`[backfill-instagram-content] Starting backfill for ${instagram_handle} (org: ${organization_id})`);
 
-    const accessToken = Deno.env.get('INSTAGRAM_ACCESS_TOKEN');
+    // Get access token from external_identity or env var
+    let accessToken: string | null = null;
+    
+    // Try to get from external_identity
+    const { data: identity } = await supabase
+      .from('external_identities')
+      .select('metadata')
+      .eq('platform', 'instagram')
+      .eq('handle', instagram_handle.toLowerCase())
+      .maybeSingle();
+    
+    if (identity?.metadata?.access_token) {
+      accessToken = identity.metadata.access_token;
+      // Check if expired
+      const expiresAt = identity.metadata.token_expires_at;
+      if (expiresAt && new Date(expiresAt) < new Date()) {
+        console.warn('[backfill-instagram-content] Access token expired, using env var fallback');
+        accessToken = null;
+      }
+    }
+    
+    // Fallback to environment variable (check both old and new names for compatibility)
     if (!accessToken) {
-      throw new Error('Instagram access token not configured');
+      accessToken = Deno.env.get('META_APP_USER_TOKEN') || Deno.env.get('INSTAGRAM_ACCESS_TOKEN');
+    }
+    
+    if (!accessToken) {
+      throw new Error('Instagram access token not configured. Set META_APP_USER_TOKEN or connect via OAuth.');
     }
 
     let igAccountId = instagram_account_id;
