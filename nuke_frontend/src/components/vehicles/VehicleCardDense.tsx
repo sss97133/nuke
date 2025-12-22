@@ -89,7 +89,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   viewerUserId,
   cardSizePx,
   thermalPricing = false,
-  thumbnailFit = 'cover'
+  thumbnailFit = 'contain'
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [touchStart, setTouchStart] = React.useState(0);
@@ -500,9 +500,35 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       maxWidth: '85%',
       border: thermalPriceColor ? `1px solid ${thermalPriceColor}80` : '1px solid rgba(255,255,255,0.18)',
       transformOrigin: 'center',
+      transition: 'opacity 0.3s ease',
     };
 
     if (!isAuctionSource) return base;
+
+    // Fade out badge if auction ended more than 1 day ago (especially unsold)
+    if (shouldShowAssetValue) {
+      const v: any = vehicle as any;
+      const outcome = String(v.auction_outcome || '').toLowerCase();
+      const isUnsold = outcome === 'reserve_not_met' || outcome === 'no_sale' || outcome === 'ended';
+      
+      // Fade completely for unsold after 1 day
+      if (isUnsold && auctionEndedDaysAgo !== null && auctionEndedDaysAgo >= 1) {
+        return {
+          ...base,
+          opacity: 0,
+          display: 'none',
+        };
+      }
+      
+      // For sold, fade but still show (less prominent)
+      if (auctionEndedDaysAgo !== null && auctionEndedDaysAgo >= 1) {
+        const fadeAmount = Math.max(0, 1 - (auctionEndedDaysAgo - 1) * 0.5); // Fade over 2 more days
+        return {
+          ...base,
+          opacity: fadeAmount,
+        };
+      }
+    }
 
     // Heat: subtle border shift (cold -> hot) as listing ages.
     const border =
@@ -519,10 +545,71 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       border: thermalPriceColor ? `1px solid ${thermalPriceColor}80` : border,
       animation: anim || undefined,
     };
-  }, [isAuctionSource, auctionProgress01, badgePulseSeconds, badgeExplode, thermalPriceColor]);
+  }, [isAuctionSource, auctionProgress01, badgePulseSeconds, badgeExplode, thermalPriceColor, shouldShowAssetValue, vehicle, auctionEndedDaysAgo]);
+
+  // Check if auction ended more than 1 day ago (for fade logic)
+  const auctionEndedDaysAgo = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const endDate = v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date;
+    if (!endDate) return null;
+    
+    const end = new Date(endDate);
+    const now = new Date();
+    const daysAgo = (now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24);
+    return daysAgo > 0 ? daysAgo : null;
+  }, [vehicle]);
+
+  // Determine if we should show asset value instead of auction status
+  const shouldShowAssetValue = React.useMemo(() => {
+    if (!isAuctionSource) return false;
+    const v: any = vehicle as any;
+    const outcome = String(v.auction_outcome || '').toLowerCase();
+    const saleStatus = String(v.sale_status || '').toLowerCase();
+    const isResult = ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) || ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(saleStatus);
+    
+    // Show asset value if auction ended more than 1 day ago (especially if unsold)
+    if (isResult && auctionEndedDaysAgo !== null && auctionEndedDaysAgo >= 1) {
+      // Always fade unsold auctions, but also fade sold after 1 day
+      if (outcome === 'reserve_not_met' || outcome === 'no_sale' || outcome === 'ended') {
+        return true; // Always show asset value for unsold
+      }
+      // For sold, fade after 1 day but still show sold price if available
+      return true;
+    }
+    
+    return false;
+  }, [isAuctionSource, vehicle, auctionEndedDaysAgo]);
+
+  // Get market value (current_value or estimated value)
+  const marketValue = React.useMemo(() => {
+    const v: any = vehicle as any;
+    // Priority: current_value > asking_price > purchase_price
+    return v.current_value || v.asking_price || v.purchase_price || null;
+  }, [vehicle]);
+
+  // Get owner cost (total investment)
+  const ownerCost = React.useMemo(() => {
+    const v: any = vehicle as any;
+    // Priority: cost_basis > purchase_price > sum of receipts
+    return v.cost_basis || v.purchase_price || null;
+  }, [vehicle]);
 
   const badgeMainText = React.useMemo(() => {
     if (!isAuctionSource) return displayPrice;
+    
+    // If auction ended > 1 day ago, show asset value instead of auction status
+    if (shouldShowAssetValue) {
+      // Show market value if available, otherwise owner cost
+      if (marketValue) {
+        return `$${(marketValue / 100).toLocaleString()}`;
+      }
+      if (ownerCost) {
+        return `$${(ownerCost / 100).toLocaleString()}`;
+      }
+      // Fallback to display price
+      return displayPrice || '—';
+    }
+    
     const v: any = vehicle as any;
     const outcome = String(v.auction_outcome || '').toLowerCase();
     const saleStatus = String(v.sale_status || '').toLowerCase();
@@ -541,7 +628,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
     // Live auction: show the amount if we have it, otherwise a compact placeholder.
     return auctionHighBidText || (displayPrice && displayPrice !== '—' ? displayPrice : null) || 'BID';
-  }, [isAuctionSource, displayPrice, vehicle, auctionHighBidText]);
+  }, [isAuctionSource, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost]);
 
   // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {

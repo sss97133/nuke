@@ -1544,17 +1544,55 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             );
           })()}
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
-          {/* Only show auction badges if auction is still live/active, not if it's ended/sold */}
+          {/* Fade out auction badges after auction ends (especially unsold) - show asset value instead */}
           {auctionPulse?.listing_url && (() => {
             const status = String(auctionPulse.listing_status || '').toLowerCase();
             const isLive = status === 'active' || status === 'live';
             const isSold = status === 'sold';
             const isEnded = status === 'ended' || status === 'reserve_not_met';
-            // Don't show auction badges if auction has ended or sold
-            if (isSold || isEnded) return null;
+            
+            // Check if auction ended more than 1 day ago
+            const endDate = auctionPulse.end_date || (vehicle as any)?.auction_end_date;
+            let daysSinceEnd = null;
+            let shouldFade = false;
+            
+            if (endDate && (isSold || isEnded)) {
+              const end = new Date(endDate);
+              const now = new Date();
+              daysSinceEnd = (now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24);
+              
+              // Fade unsold auctions completely after 1 day
+              if (isEnded && daysSinceEnd >= 1) {
+                return null; // Don't show at all
+              }
+              
+              // Fade sold auctions gradually after 1 day
+              if (isSold && daysSinceEnd >= 1) {
+                shouldFade = true;
+              }
+            }
+            
+            // Don't show auction badges if auction has ended or sold (unless very recent)
+            if ((isSold || isEnded) && !shouldFade && daysSinceEnd === null) return null;
+            
+            // Calculate fade opacity
+            const fadeOpacity = shouldFade && daysSinceEnd !== null 
+              ? Math.max(0, 1 - (daysSinceEnd - 1) * 0.5) // Fade over 2 more days
+              : 1;
+            
+            if (fadeOpacity <= 0) return null;
             
             return (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              <span 
+                style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: 6, 
+                  flexShrink: 0,
+                  opacity: fadeOpacity,
+                  transition: 'opacity 0.3s ease'
+                }}
+              >
                 {/* Only show platform badge if consigner badge and origin badge aren't already showing BaT */}
                 {(() => {
                   const isBatConsigner = sellerBadge && (sellerBadge.label?.toLowerCase().includes('bring a trailer') || sellerBadge.label?.toLowerCase().includes('bat'));

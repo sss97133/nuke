@@ -204,7 +204,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
               style={{
                 width: '120px',
                 height: '80px',
-                objectFit: 'cover',
+                objectFit: 'contain',
                 borderRadius: '4px',
               }}
             />
