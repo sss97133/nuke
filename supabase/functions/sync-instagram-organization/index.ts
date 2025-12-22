@@ -83,11 +83,36 @@ serve(async (req) => {
       }
     }
 
-    // 2. Get Instagram access token (from organization metadata or external_identities)
-    // For now, we'll need to store this in external_identities.metadata or organization metadata
-    const accessToken = Deno.env.get('INSTAGRAM_ACCESS_TOKEN'); // TODO: Get from org/external_identity
+    // 2. Get Instagram access token
+    // Priority: 1) external_identities.metadata, 2) INSTAGRAM_ACCESS_TOKEN env var
+    let accessToken: string | null = null;
+    
+    // Try to get from external_identity metadata first
+    if (externalIdentityId) {
+      const { data: identity } = await supabase
+        .from('external_identities')
+        .select('metadata')
+        .eq('id', externalIdentityId)
+        .single();
+      
+      if (identity?.metadata?.access_token) {
+        accessToken = identity.metadata.access_token;
+        // Check if token is expired
+        const expiresAt = identity.metadata.token_expires_at;
+        if (expiresAt && new Date(expiresAt) < new Date()) {
+          console.warn('[sync-instagram-organization] Access token expired, using env var fallback');
+          accessToken = null;
+        }
+      }
+    }
+    
+    // Fallback to environment variable (check both old and new names for compatibility)
     if (!accessToken) {
-      throw new Error('Instagram access token not configured. Set INSTAGRAM_ACCESS_TOKEN or store in organization metadata.');
+      accessToken = Deno.env.get('META_APP_USER_TOKEN') || Deno.env.get('INSTAGRAM_ACCESS_TOKEN');
+    }
+    
+    if (!accessToken) {
+      throw new Error('Instagram access token not configured. Set META_APP_USER_TOKEN environment variable or connect via OAuth.');
     }
 
     // 3. Get Instagram Business Account ID
@@ -105,11 +130,169 @@ serve(async (req) => {
       }
     }
 
+    // If still no account ID, try to get it from Facebook Pages
+    // The token might be a user token - we need to get page tokens first
+    if (!igAccountId && accessToken) {
+      try {
+        console.log('[sync-instagram-organization] Attempting to get Instagram account ID from Facebook Pages...');
+        
+        // First, verify this is a Facebook token (not Instagram token)
+        const fbMeResponse = await fetch(
+          `https://graph.facebook.com/v18.0/me?access_token=${accessToken}`
+        );
+        
+        if (fbMeResponse.ok) {
+          // Get Facebook Pages (requires pages_show_list permission)
+          const pagesResponse = await fetch(
+            `https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}`
+          );
+          
+          if (pagesResponse.ok) {
+            const pagesData = await pagesResponse.json();
+            const pages = pagesData.data || [];
+            
+            console.log(`[sync-instagram-organization] Found ${pages.length} Facebook Page(s)`);
+            
+            // Try each page to find Instagram Business Account
+            for (const page of pages) {
+              const pageToken = page.access_token;
+              console.log(`[sync-instagram-organization] Checking page: ${page.name} (${page.id})`);
+              
+              const igAccountResponse = await fetch(
+                `https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${pageToken}`
+              );
+              
+              if (igAccountResponse.ok) {
+                const igAccountData = await igAccountResponse.json();
+                if (igAccountData.instagram_business_account) {
+                  igAccountId = igAccountData.instagram_business_account.id;
+                  console.log(`[sync-instagram-organization] Found Instagram account ID: ${igAccountId}`);
+                  
+                  // Store it in external_identity for future use
+                  if (externalIdentityId) {
+                    const { data: identity } = await supabase
+                      .from('external_identities')
+                      .select('metadata')
+                      .eq('id', externalIdentityId)
+                      .single();
+                    
+                    await supabase
+                      .from('external_identities')
+                      .update({
+                        metadata: {
+                          ...(identity?.metadata || {}),
+                          instagram_account_id: igAccountId,
+                          facebook_page_id: page.id,
+                          page_access_token: pageToken // Store page token for future use
+                        }
+                      })
+                      .eq('id', externalIdentityId);
+                  }
+                  break;
+                }
+              } else {
+                const errorData = await igAccountResponse.json().catch(() => ({}));
+                console.warn(`[sync-instagram-organization] Page ${page.id} error: ${JSON.stringify(errorData)}`);
+              }
+            }
+          } else {
+            const errorData = await pagesResponse.json().catch(() => ({}));
+            console.warn(`[sync-instagram-organization] Could not get pages: ${JSON.stringify(errorData)}`);
+            console.warn('[sync-instagram-organization] Token may need pages_show_list permission');
+          }
+        }
+      } catch (error: any) {
+        console.warn(`[sync-instagram-organization] Could not auto-detect account ID: ${error.message}`);
+      }
+    }
+
+    // If still no account ID, try /me endpoint (works with user tokens that have instagram_basic permission)
     if (!igAccountId) {
-      throw new Error('Instagram account ID required. Provide instagram_account_id or ensure it\'s in external_identities metadata.');
+      try {
+        console.log('[sync-instagram-organization] Trying /me endpoint to get account ID...');
+        const meResponse = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
+        
+        if (meResponse.ok) {
+          const meData = await meResponse.json();
+          if (meData.id && !meData.error) {
+            igAccountId = meData.id;
+            console.log(`[sync-instagram-organization] Got account ID from /me endpoint: ${igAccountId}`);
+            
+            // Store it for future use
+            if (externalIdentityId) {
+              const { data: identity } = await supabase
+                .from('external_identities')
+                .select('metadata')
+                .eq('id', externalIdentityId)
+                .single();
+              
+              await supabase
+                .from('external_identities')
+                .update({
+                  metadata: {
+                    ...(identity?.metadata || {}),
+                    instagram_account_id: igAccountId
+                  }
+                })
+                .eq('id', externalIdentityId);
+            }
+          } else if (meData.error) {
+            console.warn(`[sync-instagram-organization] /me endpoint error: ${meData.error.message}`);
+          }
+        } else {
+          const errorText = await meResponse.text();
+          console.warn(`[sync-instagram-organization] /me endpoint failed: ${errorText}`);
+        }
+      } catch (error: any) {
+        console.warn(`[sync-instagram-organization] Could not get account ID from /me: ${error.message}`);
+      }
     }
 
     // 4. Fetch posts from Instagram Graph API
+    if (!igAccountId) {
+      // Try to get account ID from /me endpoint
+      try {
+        const meResponse = await fetch(`https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`);
+        if (meResponse.ok) {
+          const meData = await meResponse.json();
+          if (meData.id) {
+            igAccountId = meData.id;
+            console.log(`[sync-instagram-organization] Got account ID from /me endpoint: ${igAccountId}`);
+            
+            // Store it for future use
+            if (externalIdentityId) {
+              await supabase
+                .from('external_identities')
+                .update({
+                  metadata: {
+                    ...identity?.metadata,
+                    instagram_account_id: igAccountId
+                  }
+                })
+                .eq('id', externalIdentityId);
+            }
+          }
+        }
+      } catch (error: any) {
+        console.warn(`[sync-instagram-organization] Could not get account ID from /me: ${error.message}`);
+      }
+    }
+
+    if (!igAccountId) {
+      // Provide helpful error message
+      const errorMsg = `Instagram account ID required. 
+
+Options:
+1. Provide instagram_account_id parameter in the request
+2. Get it from Meta Business Suite: https://business.facebook.com/
+3. Ensure your access token has pages_show_list and pages_read_engagement permissions
+4. Ensure your Instagram account is connected to a Facebook Page
+
+The function attempted to auto-detect but could not find the account ID.`;
+      
+      throw new Error(errorMsg);
+    }
+
     const fields = 'id,media_type,media_url,permalink,caption,timestamp,thumbnail_url,children{id,media_url}';
     const url = `https://graph.instagram.com/${igAccountId}/media?fields=${fields}&limit=${limit}&access_token=${accessToken}${since ? `&since=${since}` : ''}`;
 

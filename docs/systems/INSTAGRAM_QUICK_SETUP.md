@@ -29,12 +29,17 @@ Go to Supabase Dashboard → Edge Functions → Secrets:
 ```bash
 FACEBOOK_APP_ID=9b0118aa9df248469f59c4ce9f1efe91
 FACEBOOK_APP_SECRET=<your_app_secret_from_meta_dashboard>
+
+# Instagram Access Token (for direct API access)
+INSTAGRAM_ACCESS_TOKEN=EAAG2H7d3KpkBQdMZC20WUWHuJqvDZA5Arh2BWUQ73YWQpgv6k9EwM07UFeSARVDJHwPOOkm5odMfnKtHMpJ6DRAODEI76u3ywDOO7fviTDCloXcDAFSKfmnm0KrWZCwZBETbFanTqJYoPzvNLuWG4LS3CZBccmkf0lcoySfApZBv3L7nwkXhRxblQvFXesi7EwvFMaoZAKsivmSYfGcP6S7bw7XAaChG3M066I3
 ```
 
 **To get your App Secret:**
 1. Go to Meta App Dashboard
 2. Settings → Basic
 3. Copy "App Secret" (click "Show" if hidden)
+
+**Note**: The access token above is a long-lived token. It will expire in ~60 days. For production, use the OAuth flow to automatically refresh tokens.
 
 ## Step 4: Deploy Edge Functions
 

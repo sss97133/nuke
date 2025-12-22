@@ -1,7 +1,7 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts';
-import { extractBatDomMap } from '../_shared/batDomMap.ts';
+import { extractBatListingWithFirecrawl, extractBasicBatDataFromHtml } from '../_shared/batFirecrawlMapper.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1445,7 +1445,7 @@ async function extractComprehensiveBaTData(html: string, batUrl: string): Promis
   return validatedData;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -1462,51 +1462,77 @@ serve(async (req) => {
 
     console.log(`Fetching comprehensive BaT data: ${batUrl}`);
     
-    // Use Firecrawl first (BaT is JS-driven, needs rendering)
+    // Use Firecrawl structured extraction (new approach - much cleaner!)
+    let extractedData: ComprehensiveBaTData | null = null;
     let html = '';
+    let markdown = '';
+    
     const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
     if (firecrawlApiKey) {
       try {
-        const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${firecrawlApiKey}`,
-          },
-          body: JSON.stringify({
+        const firecrawlResult = await extractBatListingWithFirecrawl(batUrl, firecrawlApiKey);
+        
+        if (firecrawlResult.data) {
+          // Use Firecrawl's structured extraction - much better!
+          console.log('✅ Got structured data via Firecrawl extraction');
+          extractedData = {
             url: batUrl,
-            formats: ['html', 'markdown'],
-            onlyMainContent: false,
-            waitFor: 6500, // Give JS time to render
-          }),
-          signal: (() => {
-            const controller = new AbortController();
-            setTimeout(() => controller.abort(), 30000);
-            return controller.signal;
-          })(),
-        });
-        if (firecrawlResponse.ok) {
-          const firecrawlData = await firecrawlResponse.json();
-          if (firecrawlData?.success) {
-            html = String(firecrawlData?.data?.html || '');
-            console.log('✅ Got HTML via Firecrawl');
-          }
+            vin: firecrawlResult.data.vin,
+            year: firecrawlResult.data.year,
+            make: firecrawlResult.data.make,
+            model: firecrawlResult.data.model,
+            trim: firecrawlResult.data.trim,
+            mileage: firecrawlResult.data.mileage,
+            auction_start_date: firecrawlResult.data.auction_start_date,
+            auction_end_date: firecrawlResult.data.auction_end_date,
+            sale_date: firecrawlResult.data.sale_date,
+            sale_price: firecrawlResult.data.sale_price,
+            reserve_price: firecrawlResult.data.reserve_price,
+            bid_count: firecrawlResult.data.bid_count,
+            view_count: firecrawlResult.data.view_count,
+            watcher_count: firecrawlResult.data.watcher_count,
+            comment_count: firecrawlResult.data.comment_count,
+            reserve_not_met: firecrawlResult.data.reserve_not_met,
+            high_bid: firecrawlResult.data.high_bid,
+            engine: firecrawlResult.data.engine,
+            transmission: firecrawlResult.data.transmission,
+            drivetrain: firecrawlResult.data.drivetrain,
+            color: firecrawlResult.data.color,
+            interior_color: firecrawlResult.data.interior_color,
+            body_style: firecrawlResult.data.body_style,
+            displacement: firecrawlResult.data.displacement,
+            location: firecrawlResult.data.location,
+            seller: firecrawlResult.data.seller || firecrawlResult.data.seller_username,
+            buyer: firecrawlResult.data.buyer || firecrawlResult.data.buyer_username,
+            lot_number: firecrawlResult.data.lot_number,
+            description: firecrawlResult.data.description,
+            title: firecrawlResult.data.title,
+            features: firecrawlResult.data.features,
+            bid_history: firecrawlResult.data.bid_history,
+          };
+          html = firecrawlResult.html || '';
+          markdown = firecrawlResult.markdown || '';
+        } else if (firecrawlResult.html) {
+          // Firecrawl gave us HTML but no structured data - fall back to parsing
+          console.log('⚠️ Firecrawl returned HTML but no structured data, parsing HTML...');
+          html = firecrawlResult.html;
+          extractedData = await extractComprehensiveBaTData(html, batUrl);
         }
       } catch (e) {
-        console.warn('Firecrawl failed, trying direct fetch:', e);
+        console.warn('Firecrawl extraction failed, trying direct fetch:', e);
       }
     }
     
-    // Fallback to direct fetch
-    if (!html) {
+    // Fallback to direct fetch + HTML parsing
+    if (!extractedData) {
       const response = await fetch(batUrl);
       if (!response.ok) {
         throw new Error(`Failed to fetch BaT URL: ${response.status}`);
       }
       html = await response.text();
-      console.log('✅ Got HTML via direct fetch');
+      console.log('✅ Got HTML via direct fetch, parsing...');
+      extractedData = await extractComprehensiveBaTData(html, batUrl);
     }
-    const extractedData = await extractComprehensiveBaTData(html, batUrl);
 
     console.log('Extracted data:', JSON.stringify(extractedData, null, 2));
 
@@ -2510,8 +2536,32 @@ serve(async (req) => {
     if (vehicleId && html) {
       try {
         console.log('📸 Extracting images from BaT gallery...');
-        const { extracted: domExtracted } = extractBatDomMap(html, batUrl);
-        const images = Array.isArray(domExtracted?.image_urls) ? domExtracted.image_urls : [];
+        // Use Firecrawl extracted images if available, otherwise extract from HTML
+        const images = (() => {
+          // First try: if we have Firecrawl data with images, use those
+          if (extractedData && 'image_urls' in extractedData && Array.isArray((extractedData as any).image_urls)) {
+            return (extractedData as any).image_urls;
+          }
+          // Fallback: extract images from HTML using regex
+          if (html) {
+            const imageMatches = html.matchAll(/<img[^>]+src=["']([^"']+\.(jpg|jpeg|png|webp))["'][^>]*>/gi);
+            const imageUrls: string[] = [];
+            for (const match of imageMatches) {
+              const url = match[1];
+              if (url && url.includes('bringatrailer.com/wp-content/uploads/') && 
+                  !url.includes('logo') && !url.includes('icon') && !url.includes('qotw')) {
+                const cleanUrl = url.split('#')[0].split('?')[0].replace(/&#038;/g, '&').replace(/&amp;/g, '&');
+                if (cleanUrl.startsWith('http')) {
+                  imageUrls.push(cleanUrl);
+                } else {
+                  imageUrls.push(`https://bringatrailer.com${cleanUrl}`);
+                }
+              }
+            }
+            return [...new Set(imageUrls)].slice(0, 50); // Dedupe and limit to 50
+          }
+          return [];
+        })();
         
         if (images.length > 0) {
           console.log(`✅ Found ${images.length} gallery images, backfilling...`);
