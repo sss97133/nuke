@@ -67,10 +67,14 @@ interface ComprehensiveBaTData {
   features?: string[];
 }
 
-/**
- * Extract VIN using AI inspection as fallback
- */
-async function extractVINWithAI(html: string, batUrl: string): Promise<string | undefined> {
+// REMOVED: Large HTML parsing functions - using Firecrawl instead
+// Keeping only essential database saving logic below
+
+// REMOVED: All HTML parsing functions - using Firecrawl structured extraction instead
+// The functions below are kept for reference but should not be called
+
+/*
+async function extractVINWithAI_DEPRECATED(html: string, batUrl: string): Promise<string | undefined> {
   try {
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiKey) {
@@ -1514,25 +1518,35 @@ Deno.serve(async (req) => {
           html = firecrawlResult.html || '';
           markdown = firecrawlResult.markdown || '';
         } else if (firecrawlResult.html) {
-          // Firecrawl gave us HTML but no structured data - fall back to parsing
-          console.log('⚠️ Firecrawl returned HTML but no structured data, parsing HTML...');
+          // Firecrawl gave us HTML but no structured data - use basic parser
+          console.log('⚠️ Firecrawl returned HTML but no structured data, using basic HTML parser...');
           html = firecrawlResult.html;
-          extractedData = await extractComprehensiveBaTData(html, batUrl);
+          const basicData = extractBasicBatDataFromHtml(html, batUrl);
+          extractedData = {
+            url: batUrl,
+            ...basicData,
+          } as ComprehensiveBaTData;
+        } else {
+          throw new Error('Firecrawl returned no data and no HTML');
         }
       } catch (e) {
         console.warn('Firecrawl extraction failed, trying direct fetch:', e);
       }
     }
     
-    // Fallback to direct fetch + HTML parsing
+    // Fallback to direct fetch + basic HTML parsing
     if (!extractedData) {
       const response = await fetch(batUrl);
       if (!response.ok) {
         throw new Error(`Failed to fetch BaT URL: ${response.status}`);
       }
       html = await response.text();
-      console.log('✅ Got HTML via direct fetch, parsing...');
-      extractedData = await extractComprehensiveBaTData(html, batUrl);
+      console.log('✅ Got HTML via direct fetch, using basic parser...');
+      const basicData = extractBasicBatDataFromHtml(html, batUrl);
+      extractedData = {
+        url: batUrl,
+        ...basicData,
+      } as ComprehensiveBaTData;
     }
 
     console.log('Extracted data:', JSON.stringify(extractedData, null, 2));
