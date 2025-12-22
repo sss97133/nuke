@@ -246,4 +246,12 @@ export class VercelAIGateway {
   }
 }
 
-export const aiGateway = new VercelAIGateway();
+// Lazy initialization to avoid TDZ issues
+let _aiGatewayInstance: VercelAIGateway | null = null;
+
+export const aiGateway = (() => {
+  if (!_aiGatewayInstance) {
+    _aiGatewayInstance = new VercelAIGateway();
+  }
+  return _aiGatewayInstance;
+})();
