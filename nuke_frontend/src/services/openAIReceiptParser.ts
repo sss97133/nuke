@@ -1,4 +1,4 @@
-import type { ParsedTool } from './professionalToolsService';
+import type { ParsedTool } from './types/toolTypes';
 import { aiGateway } from '../lib/aiGateway';
 
 export class OpenAIReceiptParser {

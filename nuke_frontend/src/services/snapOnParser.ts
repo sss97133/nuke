@@ -1,4 +1,4 @@
-import type { ParsedTool } from './professionalToolsService';
+import type { ParsedTool } from './types/toolTypes';
 
 export class SnapOnParser {
   static parse(text: string): ParsedTool[] {

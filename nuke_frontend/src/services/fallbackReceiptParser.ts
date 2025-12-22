@@ -3,7 +3,7 @@
  * Works without Claude API - uses pattern matching for basic parsing
  */
 
-import type { UniversalReceiptResult } from './universalReceiptParser';
+import type { UniversalReceiptResult } from './types/receiptTypes';
 
 export class FallbackReceiptParser {
   /**
