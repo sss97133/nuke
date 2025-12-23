@@ -227,33 +227,88 @@ Deno.serve(async (req: Request) => {
 
     if (extract_vehicles && listingUrlsArray.length > 0) {
       // Import vehicles in batches to avoid overwhelming the system
-      const batchSize = 5;
-      for (let i = 0; i < listingUrlsArray.length; i += batchSize) {
-        const batch = listingUrlsArray.slice(i, i + batchSize);
-        
-        await Promise.all(batch.map(async (listingUrl) => {
-          try {
-            console.log(`Processing listing: ${listingUrl}`);
+      // Process listings sequentially to avoid timeouts (Firecrawl takes 10+ seconds per listing)
+      for (const listingUrl of listingUrlsArray) {
+        try {
+          console.log(`Processing listing: ${listingUrl}`);
             
-            // Call comprehensive-bat-extraction to import the listing
-            const extractResponse = await fetch(`${supabaseUrl}/functions/v1/comprehensive-bat-extraction`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseKey}`,
-              },
-              body: JSON.stringify({ url: listingUrl }),
-            });
-
-            if (!extractResponse.ok) {
-              const errorText = await extractResponse.text();
-              throw new Error(`Extraction failed: ${extractResponse.status} - ${errorText}`);
+            // Extract listing data directly using Firecrawl (bypassing broken comprehensive-bat-extraction)
+            const firecrawlResult = await extractBatListingWithFirecrawl(listingUrl, FIRECRAWL_API_KEY || '');
+            
+            if (!firecrawlResult.data) {
+              throw new Error(`Firecrawl extraction failed: ${firecrawlResult.error || 'No data returned'}`);
             }
 
-            const extractData = await extractResponse.json();
+            const data = firecrawlResult.data;
+            
+            // Find or create vehicle
+            let vehicleId: string | null = null;
+            
+            // Try to find by VIN first
+            if (data.vin) {
+              const { data: existingByVin } = await supabase
+                .from('vehicles')
+                .select('id')
+                .eq('vin', data.vin.toUpperCase())
+                .maybeSingle();
+              if (existingByVin) vehicleId = existingByVin.id;
+            }
+            
+            // Try to find by listing URL
+            if (!vehicleId) {
+              const { data: existingByUrl } = await supabase
+                .from('vehicles')
+                .select('id')
+                .eq('bat_auction_url', listingUrl)
+                .maybeSingle();
+              if (existingByUrl) vehicleId = existingByUrl.id;
+            }
+            
+            // Create or update vehicle
+            const vehicleData: any = {
+              year: data.year || null,
+              make: data.make?.toLowerCase() || null,
+              model: data.model?.toLowerCase() || null,
+              trim: data.trim?.toLowerCase() || null,
+              vin: data.vin?.toUpperCase() || null,
+              mileage: data.mileage || null,
+              sale_price: data.sale_price || null,
+              sale_date: data.sale_date || null,
+              auction_end_date: data.auction_end_date || null,
+              auction_outcome: data.sale_price ? 'sold' : (data.reserve_not_met ? 'reserve_not_met' : null),
+              description: data.description || null,
+              bat_auction_url: listingUrl,
+              listing_url: listingUrl,
+              discovery_url: listingUrl,
+              profile_origin: 'bat_import',
+              discovery_source: 'bat_profile_extraction',
+              origin_metadata: {
+                source: 'bat_profile_extraction',
+                bat_url: listingUrl,
+                bat_seller_username: data.seller_username || data.seller || null,
+                bat_buyer_username: data.buyer_username || data.buyer || null,
+                lot_number: data.lot_number || null,
+                imported_at: new Date().toISOString(),
+              },
+            };
+            
+            if (vehicleId) {
+              await supabase
+                .from('vehicles')
+                .update(vehicleData)
+                .eq('id', vehicleId);
+            } else {
+              const { data: newVehicle, error: vehicleError } = await supabase
+                .from('vehicles')
+                .insert(vehicleData)
+                .select('id')
+                .single();
+              
+              if (vehicleError) throw vehicleError;
+              vehicleId = newVehicle.id;
+            }
 
-            if (extractData.success && extractData.vehicle_id) {
-              const vehicleId = extractData.vehicle_id;
+            if (vehicleId) {
               results.vehicle_ids.push(vehicleId);
 
               // Check if this vehicle was newly created or updated
@@ -307,17 +362,14 @@ Deno.serve(async (req: Request) => {
               results.vehicles_skipped++;
               console.log(`Skipped listing (no vehicle created): ${listingUrl}`);
             }
+            
+            // Small delay between listings to avoid rate limits
+            await new Promise(resolve => setTimeout(resolve, 500));
           } catch (err: any) {
             const errorMsg = `Failed to import ${listingUrl}: ${err.message}`;
             results.errors.push(errorMsg);
             console.error(errorMsg);
           }
-        }));
-
-        // Small delay between batches
-        if (i + batchSize < listingUrlsArray.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
       }
     }
 

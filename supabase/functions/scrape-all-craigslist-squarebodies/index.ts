@@ -432,13 +432,24 @@ serve(async (req) => {
 
     console.log(`\n📊 Total unique listings found: ${allListingUrls.size}`)
     
-    // Limit processing to avoid timeout - process max 20 listings per run
-    const maxProcessPerRun = 20
+    // Limit processing to avoid timeout - process max 10 listings per run to prevent 504 errors
+    const maxProcessPerRun = 10
     const listingArray = Array.from(allListingUrls).slice(0, maxProcessPerRun)
     
-    console.log(`🔄 Processing ${listingArray.length} listings (limited to avoid timeout)...\n`)
+    console.log(`🔄 Processing ${listingArray.length} listings (limited to ${maxProcessPerRun} to avoid timeout)...\n`)
+    
+    // Track start time to prevent function timeout (Supabase edge functions have ~60s limit)
+    const startTime = Date.now()
+    const maxExecutionTime = 50000 // 50 seconds - leave 10s buffer
     
     for (const listingUrl of listingArray) {
+      // Check if we're approaching timeout
+      const elapsed = Date.now() - startTime
+      if (elapsed > maxExecutionTime) {
+        console.log(`⏰ Approaching timeout (${elapsed}ms elapsed), stopping processing`)
+        break
+      }
+      
       try {
         console.log(`  🔍 Processing: ${listingUrl}`)
         
@@ -446,11 +457,18 @@ serve(async (req) => {
         let scrapeData: any
         try {
           console.log(`  📡 Fetching: ${listingUrl}`)
+          // Add timeout to individual fetch requests
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout per listing
+          
           const response = await fetch(listingUrl, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+            },
+            signal: controller.signal
           })
+          
+          clearTimeout(timeoutId)
           
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -471,6 +489,13 @@ serve(async (req) => {
           
           console.log(`  📦 Scraped: ${scrapeData.data.year} ${scrapeData.data.make} ${scrapeData.data.model || 'unknown'}`)
         } catch (scrapeError: any) {
+          // Handle timeout errors gracefully
+          if (scrapeError?.name === 'AbortError' || scrapeError?.message?.includes('timeout')) {
+            console.warn(`  ⏰ Timeout scraping ${listingUrl}, skipping`)
+            stats.errors++
+            continue
+          }
+          
           const scrapeErrorObj = {
             message: `Failed to scrape ${listingUrl}: ${scrapeError?.message || String(scrapeError)}`,
             listingUrl: listingUrl,

@@ -821,7 +821,13 @@ serve(async (req) => {
     // Initialize Supabase client for schema lookup
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+    let supabase = null;
+    try {
+      supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+    } catch (e: any) {
+      console.warn('Failed to initialize Supabase client:', e?.message);
+      supabase = null;
+    }
 
     // Robust path: Firecrawl structured extraction first (works better on JS-heavy dealer sites).
     const firecrawlExtract = await tryFirecrawl(url)
@@ -847,37 +853,63 @@ serve(async (req) => {
       }
 
       html = await response.text()
-      doc = new DOMParser().parseFromString(html, 'text/html')
+      try {
+        doc = new DOMParser().parseFromString(html, 'text/html')
+        if (!doc) {
+          console.warn('Failed to parse HTML document');
+        }
+      } catch (parseError: any) {
+        console.warn('HTML parsing error:', parseError?.message);
+        doc = null;
+      }
     }
 
     // Check for registered extraction patterns for this domain
-    const domain = new URL(url).hostname.replace(/^www\./, '');
+    let domain = '';
     let registeredSchema = null;
     try {
-      const schemaResponse = await supabase
-        .from('dealer_site_schemas')
-        .select('schema_data, site_name')
-        .eq('domain', domain)
-        .single();
-      if (schemaResponse.data) {
-        registeredSchema = schemaResponse.data;
-        console.log(`📋 Found registered schema for ${domain}: ${registeredSchema.site_name}`);
+      domain = new URL(url).hostname.replace(/^www\./, '');
+      if (supabase) {
+        const schemaResponse = await supabase
+          .from('dealer_site_schemas')
+          .select('schema_data, site_name')
+          .eq('domain', domain)
+          .single();
+        if (schemaResponse.data && !schemaResponse.error) {
+          registeredSchema = schemaResponse.data;
+          console.log(`📋 Found registered schema for ${domain}: ${registeredSchema.site_name}`);
+        }
       }
-    } catch (e) {
+    } catch (e: any) {
       // Non-critical - continue with generic extraction
-      console.log(`No registered schema for ${domain}, using generic extraction`);
+      console.log(`No registered schema for ${domain || 'unknown domain'}, using generic extraction`);
     }
 
     // Extract sidebar data if doc is available (Classic.com, Hagerty, etc.)
-    const sidebarData = doc ? extractSidebarData(doc) : null
+    let sidebarData = null;
+    let tableData = null;
+    let descriptionText = '';
+    let descriptionData = null;
     
-    // Extract table data if doc is available (Cantech Automotive, etc.)
-    const tableData = doc ? extractTableData(doc) : null
+    try {
+      sidebarData = doc ? extractSidebarData(doc) : null;
+    } catch (e: any) {
+      console.warn('Error extracting sidebar data:', e?.message);
+    }
     
-    // Extract description text for rich parsing
-    const descriptionEl = doc?.querySelector('.description, [class*="description"], .listing-description, .vehicle-description');
-    const descriptionText = descriptionEl?.textContent?.trim() || '';
-    const descriptionData = descriptionText ? extractDescriptionData(descriptionText) : null
+    try {
+      tableData = doc ? extractTableData(doc) : null;
+    } catch (e: any) {
+      console.warn('Error extracting table data:', e?.message);
+    }
+    
+    try {
+      const descriptionEl = doc?.querySelector('.description, [class*="description"], .listing-description, .vehicle-description');
+      descriptionText = descriptionEl?.textContent?.trim() || '';
+      descriptionData = descriptionText ? extractDescriptionData(descriptionText) : null;
+    } catch (e: any) {
+      console.warn('Error extracting description:', e?.message);
+    }
 
     // Basic data extraction (normalized output shape)
     const data: any = {
@@ -949,22 +981,37 @@ serve(async (req) => {
     // BaT: never scan arbitrary <img> tags (sidebar ads/CTAs contaminate galleries).
     // Prefer the canonical gallery JSON embedded in #bat_listing_page_photo_gallery[data-gallery-items].
     if (isBatListing && html) {
-      const bat = extractBatGalleryImagesFromHtml(html)
-      if (bat.length > 0) {
-        data.images = normalizeImageUrls(bat)
+      try {
+        const bat = extractBatGalleryImagesFromHtml(html)
+        if (bat && bat.length > 0) {
+          data.images = normalizeImageUrls(bat)
+        }
+      } catch (e: any) {
+        console.warn('Error extracting BaT gallery images:', e?.message);
       }
     }
 
-    // If Firecrawl didn’t yield images (or it wasn’t used), use HTML extraction.
+    // If Firecrawl didn't yield images (or it wasn't used), use HTML extraction.
     // NOTE: For BaT listings, this is intentionally bypassed in favor of canonical gallery extraction above.
     if ((!data.images || data.images.length === 0) && html) {
-      data.images = normalizeImageUrls(extractImageURLs(html))
+      try {
+        const extractedImages = extractImageURLs(html)
+        if (extractedImages && extractedImages.length > 0) {
+          data.images = normalizeImageUrls(extractedImages)
+        }
+      } catch (e: any) {
+        console.warn('Error extracting images from HTML:', e?.message);
+      }
     }
 
     // Site-specific: L'Art de l'Automobile (/fiche/*) has structured spec blocks + explicit hi-res image URLs.
     if (url.includes('lartdelautomobile.com/fiche/') && html) {
-      const parsed = parseLartFiche(html, url)
-      data.source = parsed.source
+      try {
+        const parsed = parseLartFiche(html, url)
+        if (!parsed) {
+          throw new Error('parseLartFiche returned null/undefined');
+        }
+        data.source = parsed.source || data.source
       data.title = parsed.title || data.title
       data.year = parsed.year ?? data.year
       data.make = parsed.make || data.make
@@ -995,12 +1042,19 @@ serve(async (req) => {
         data.thumbnail_url = thumbs[0] || hires[0] || data.thumbnail_url
       }
       data.image_thumbnails = thumbs
+      } catch (e: any) {
+        console.warn('Error parsing L\'Art de l\'Automobile listing:', e?.message);
+      }
     }
 
     // Site-specific: Beverly Hills Car Club uses explicit galleria_images URLs and a structured details panel.
     // Firecrawl often under-returns hi-res images here, so prefer HTML parsing when available.
     if (url.includes('beverlyhillscarclub.com') && html) {
-      const parsed = parseBeverlyHillsCarClubListing(html, url)
+      try {
+        const parsed = parseBeverlyHillsCarClubListing(html, url)
+        if (!parsed) {
+          throw new Error('parseBeverlyHillsCarClubListing returned null/undefined');
+        }
       data.source = parsed.source
       data.title = parsed.title || data.title
       data.year = parsed.year ?? data.year
@@ -1020,28 +1074,37 @@ serve(async (req) => {
       // Dealer identity (critical for org extraction in process-import-queue when ingesting single listings).
       data.dealer_name = 'Beverly Hills Car Club'
       data.dealer_website = 'https://www.beverlyhillscarclub.com'
+      } catch (e: any) {
+        console.warn('Error parsing Beverly Hills Car Club listing:', e?.message);
+      }
     }
 
     // Extract VIN from HTML - works for multiple sites
-    const vinPatterns = [
-      // Pattern 1: Dealer listings with <span class="valu">VIN</span> (Jordan Motorsports pattern)
-      /<span[^>]*class="[^"]*valu[^"]*"[^>]*>([A-HJ-NPR-Z0-9]{17})<\/span>/i,
-      // Pattern 2: Worldwide Vintage Autos format: <div class="spec-line vin">VIN 1Z8749S420546</div>
-      /<div[^>]*class="[^"]*spec-line[^"]*vin[^"]*"[^>]*>VIN\s+([A-HJ-NPR-Z0-9]{17})/i,
-      // Pattern 3: General VIN pattern with class containing "vin"
-      /<[^>]*class="[^"]*vin[^"]*"[^>]*>[\s\S]*?VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
-      // Pattern 4: Simple VIN: pattern
-      /VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i,
-      // Pattern 5: Any 17-char alphanumeric near "VIN" text
-      /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
-    ]
+    if (html && !data.vin) {
+      try {
+        const vinPatterns = [
+          // Pattern 1: Dealer listings with <span class="valu">VIN</span> (Jordan Motorsports pattern)
+          /<span[^>]*class="[^"]*valu[^"]*"[^>]*>([A-HJ-NPR-Z0-9]{17})<\/span>/i,
+          // Pattern 2: Worldwide Vintage Autos format: <div class="spec-line vin">VIN 1Z8749S420546</div>
+          /<div[^>]*class="[^"]*spec-line[^"]*vin[^"]*"[^>]*>VIN\s+([A-HJ-NPR-Z0-9]{17})/i,
+          // Pattern 3: General VIN pattern with class containing "vin"
+          /<[^>]*class="[^"]*vin[^"]*"[^>]*>[\s\S]*?VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+          // Pattern 4: Simple VIN: pattern
+          /VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i,
+          // Pattern 5: Any 17-char alphanumeric near "VIN" text
+          /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+        ]
 
-    for (const pattern of vinPatterns) {
-      const match = html ? html.match(pattern) : null
-      if (match && match[1] && match[1].length === 17 && !/[IOQ]/.test(match[1])) {
-        data.vin = match[1].toUpperCase()
-        console.log(`✅ VIN extracted: ${data.vin}`)
-        break
+        for (const pattern of vinPatterns) {
+          const match = html.match(pattern)
+          if (match && match[1] && match[1].length === 17 && !/[IOQ]/.test(match[1])) {
+            data.vin = match[1].toUpperCase()
+            console.log(`✅ VIN extracted: ${data.vin}`)
+            break
+          }
+        }
+      } catch (e: any) {
+        console.warn('Error extracting VIN:', e?.message);
       }
     }
 

@@ -32,6 +32,7 @@ const tools: AdminNavItem[] = [
   { label: 'Price Import', to: '/admin/price-import' },
   { label: 'Shipping Settings', to: '/admin/shipping-settings' },
   { label: 'x402 Settings', to: '/admin/x402-settings' },
+  { label: 'Scraper Dashboard', to: '/admin/scrapers', description: 'Monitor and trigger all scrapers' },
   { label: 'KSL Scraper', to: '/admin/ksl-scraper' },
   { label: 'Meme Library', to: '/admin/meme-library' },
   { label: 'Catalog Browser', to: '/admin/catalog' },

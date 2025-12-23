@@ -31,6 +31,8 @@ interface HypeVehicle {
   mileage?: number;
   vin?: string;
   is_for_sale?: boolean;
+  bid_count?: number;
+  auction_outcome?: string;
   all_images?: Array<{ id: string; url: string; is_primary: boolean }>;
   origin_metadata?: any;
   discovery_url?: string | null;
@@ -404,6 +406,7 @@ const CursorHomepage: React.FC = () => {
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
   const lastScrollYRef = useRef<number>(0);
   const suppressAutoMinimizeUntilRef = useRef<number>(0);
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const infiniteObserverRef = useRef<IntersectionObserver | null>(null);
 
@@ -411,6 +414,7 @@ const CursorHomepage: React.FC = () => {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     yearQuickFilters: false,
     sourceFilters: true, // Source filters collapsed by default
+    sourcePogs: true, // Source pogs library collapsed by default
     priceFilters: false,
     statusFilters: false,
     locationFilters: false,
@@ -802,11 +806,280 @@ const CursorHomepage: React.FC = () => {
     return n;
   }, [filters, debouncedSearchText]);
 
-  // Calculate filtered vehicle statistics
+  // State for filtered stats from database
+  const [filteredStatsFromDb, setFilteredStatsFromDb] = useState({
+    totalVehicles: 0,
+    totalValue: 0,
+    salesVolume: 0,
+    forSaleCount: 0,
+    activeAuctions: 0,
+    totalBids: 0,
+    avgValue: 0
+  });
+  const [filteredStatsLoading, setFilteredStatsLoading] = useState(false);
+
+  // Load filtered stats directly from database when filters are active
+  const loadFilteredStats = useCallback(async () => {
+    if (!hasActiveFilters && !debouncedSearchText) {
+      // No filters - use dbStats instead
+      return;
+    }
+
+    try {
+      setFilteredStatsLoading(true);
+      
+      // Build query with filters applied
+      let query = supabase
+        .from('vehicles')
+        .select('sale_price, sale_status, asking_price, current_value, purchase_price, is_for_sale, bid_count, auction_outcome, sale_date, discovery_url, discovery_source, profile_origin, year, make, model, title, vin, image_count', { count: 'exact' })
+        .eq('is_public', true)
+        .neq('status', 'pending');
+
+      // Year filters
+      if (filters.yearMin) {
+        query = query.gte('year', filters.yearMin);
+      }
+      if (filters.yearMax) {
+        query = query.lte('year', filters.yearMax);
+      }
+
+      // Make filters
+      if (filters.makes.length > 0) {
+        // Use OR for multiple makes - Supabase .or() syntax
+        const makeFilters = filters.makes.map(make => `make.ilike.%${make}%`).join(',');
+        query = query.or(makeFilters);
+      }
+
+      // For sale filter
+      if (filters.forSale) {
+        query = query.eq('is_for_sale', true);
+      }
+
+      // Hide sold filter - vehicles that are NOT sold
+      if (filters.hideSold) {
+        query = query.or('sale_status.neq.sold,sale_status.is.null');
+      }
+
+      // Source filters - we'll filter by discovery_source and discovery_url patterns
+      // Note: classifySource uses discovery_url patterns, so we'll do source filtering client-side
+      // to match the exact same logic
+
+      // Execute query
+      const { data: vehicles, count, error } = await query;
+
+      if (error) {
+        console.error('Error loading filtered stats:', error);
+        return;
+      }
+
+      // Apply client-side filters that are harder to do in SQL
+      let filtered = vehicles || [];
+      
+      // Source filters (client-side to match classifySource logic exactly)
+      if (
+        filters.hideDealerListings ||
+        filters.hideCraigslist ||
+        filters.hideDealerSites ||
+        filters.hideKsl ||
+        filters.hideBat ||
+        filters.hideClassic
+      ) {
+        filtered = filtered.filter((v: any) => {
+          const src = classifySource(v);
+
+          if (filters.hideDealerListings) {
+            if (src === 'craigslist' || src === 'dealer_site' || src === 'ksl') return false;
+          }
+
+          if (filters.hideCraigslist && src === 'craigslist') return false;
+          if (filters.hideDealerSites && src === 'dealer_site') return false;
+          if (filters.hideKsl && src === 'ksl') return false;
+          if (filters.hideBat && src === 'bat') return false;
+          if (filters.hideClassic && src === 'classic') return false;
+
+          return true;
+        });
+      }
+      
+      // Price filters (client-side because we need to check multiple price fields)
+      if (filters.priceMin || filters.priceMax) {
+        filtered = filtered.filter((v: any) => {
+          // Calculate display price (same logic as in applyFiltersAndSort)
+          let vehiclePrice = 0;
+          if (v.sale_price && typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0) {
+            vehiclePrice = v.sale_price;
+          } else if (v.asking_price) {
+            vehiclePrice = typeof v.asking_price === 'number' && Number.isFinite(v.asking_price) ? v.asking_price : 0;
+            if (typeof v.asking_price === 'string') {
+              const parsed = parseFloat(v.asking_price);
+              vehiclePrice = Number.isFinite(parsed) ? parsed : 0;
+            }
+          } else if (v.current_value) {
+            vehiclePrice = typeof v.current_value === 'number' && Number.isFinite(v.current_value) ? v.current_value : 0;
+          } else if (v.purchase_price) {
+            vehiclePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) ? v.purchase_price : 0;
+          }
+          
+          if (filters.priceMin && vehiclePrice < filters.priceMin) return false;
+          if (filters.priceMax && vehiclePrice > filters.priceMax) return false;
+          return true;
+        });
+      }
+
+      // Has images filter
+      if (filters.hasImages) {
+        filtered = filtered.filter((v: any) => (v.image_count || 0) > 0);
+      }
+
+      // Search text filter (client-side)
+      if (debouncedSearchText) {
+        const terms = debouncedSearchText.toLowerCase().trim().split(/\s+/).filter(Boolean);
+        filtered = filtered.filter((v: any) => {
+          const hay = [
+            v.year,
+            v.make,
+            v.model,
+            v.title,
+            v.vin,
+          ].filter(Boolean).join(' ').toLowerCase();
+          return terms.every((t) => hay.includes(t));
+        });
+      }
+
+      // Calculate stats from filtered vehicles
+      let totalValue = 0;
+      let vehiclesWithValue = 0;
+      let forSaleCount = 0;
+      let activeAuctions = 0;
+      let totalBids = 0;
+
+      filtered.forEach((v: any) => {
+        // Count for sale
+        if (v.is_for_sale === true) {
+          forSaleCount++;
+        }
+
+        // Count active auctions
+        const hasBids = (v.bid_count && Number(v.bid_count) > 0) || false;
+        const auctionOutcome = v.auction_outcome;
+        const isActiveAuction = auctionOutcome === 'active' || auctionOutcome === 'live';
+        if (hasBids || isActiveAuction) {
+          activeAuctions++;
+        }
+
+        // Sum total bids
+        if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
+          totalBids += Number(v.bid_count);
+        }
+
+        // Calculate value
+        let vehiclePrice = 0;
+        if (v.sale_price && typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0) {
+          vehiclePrice = v.sale_price;
+        } else if (v.asking_price) {
+          vehiclePrice = typeof v.asking_price === 'number' && Number.isFinite(v.asking_price) ? v.asking_price : 0;
+          if (typeof v.asking_price === 'string') {
+            const parsed = parseFloat(v.asking_price);
+            vehiclePrice = Number.isFinite(parsed) ? parsed : 0;
+          }
+        } else if (v.current_value) {
+          vehiclePrice = typeof v.current_value === 'number' && Number.isFinite(v.current_value) ? v.current_value : 0;
+        } else if (v.purchase_price) {
+          vehiclePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) ? v.purchase_price : 0;
+        }
+
+        if (vehiclePrice > 0) {
+          totalValue += vehiclePrice;
+          vehiclesWithValue++;
+        }
+      });
+
+      const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
+
+      // Sales volume (24hrs)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString().split('T')[0];
+      const salesVolume = filtered
+        .filter((v: any) => Boolean(v?.sale_price) && Boolean(v?.sale_date) && String(v.sale_date) >= todayISO)
+        .reduce((sum, v: any) => {
+          const price = Number(v.sale_price || 0) || 0;
+          return sum + (Number.isFinite(price) ? price : 0);
+        }, 0);
+
+      setFilteredStatsFromDb({
+        totalVehicles: filtered.length,
+        totalValue,
+        salesVolume,
+        forSaleCount,
+        activeAuctions,
+        totalBids,
+        avgValue
+      });
+    } catch (error) {
+      console.error('Error loading filtered stats:', error);
+    } finally {
+      setFilteredStatsLoading(false);
+    }
+  }, [hasActiveFilters, debouncedSearchText, filters]);
+
+  // Load filtered stats when filters change
+  useEffect(() => {
+    if (hasActiveFilters || debouncedSearchText) {
+      // Debounce to avoid too many queries
+      const timer = setTimeout(() => {
+        loadFilteredStats();
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      // Clear filtered stats when no filters
+      setFilteredStatsFromDb({
+        totalVehicles: 0,
+        totalValue: 0,
+        salesVolume: 0,
+        forSaleCount: 0,
+        activeAuctions: 0,
+        totalBids: 0,
+        avgValue: 0
+      });
+    }
+  }, [hasActiveFilters, debouncedSearchText, filters, loadFilteredStats]);
+
+  // Calculate filtered vehicle statistics (fallback for display, but we prefer DB stats)
   const filteredStats = useMemo(() => {
+    // If we have DB stats, use those (more accurate)
+    if (hasActiveFilters || debouncedSearchText) {
+      return filteredStatsFromDb;
+    }
+    
+    // Otherwise compute from filteredVehicles (for backwards compatibility)
     const totalVehicles = filteredVehicles.length;
-    const totalValue = filteredVehicles.reduce((sum, v) => {
-      // Use the best/actual price for each vehicle
+    let totalValue = 0;
+    let vehiclesWithValue = 0;
+    let forSaleCount = 0;
+    let activeAuctions = 0;
+    let totalBids = 0;
+    
+    filteredVehicles.forEach((v) => {
+      // Count for sale
+      if (v.is_for_sale === true) {
+        forSaleCount++;
+      }
+      
+      // Count active auctions
+      const hasBids = (v.bid_count && Number(v.bid_count) > 0) || false;
+      const auctionOutcome = (v as any).auction_outcome;
+      const isActiveAuction = auctionOutcome === 'active' || auctionOutcome === 'live';
+      if (hasBids || isActiveAuction) {
+        activeAuctions++;
+      }
+      
+      // Sum total bids
+      if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
+        totalBids += Number(v.bid_count);
+      }
+      
+      // Calculate value - use the best/actual price per vehicle
       // Priority: sale_price (if sold) > asking_price > current_value > purchase_price > display_price
       let vehiclePrice = 0;
       
@@ -835,8 +1108,14 @@ const CursorHomepage: React.FC = () => {
         vehiclePrice = typeof v.display_price === 'number' && Number.isFinite(v.display_price) ? v.display_price : 0;
       }
       
-      return sum + vehiclePrice;
-    }, 0);
+      if (vehiclePrice > 0) {
+        totalValue += vehiclePrice;
+        vehiclesWithValue++;
+      }
+    });
+    
+    const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
+    
     // Sales volume (24hrs): align semantics with dbStats (sold today), but scoped to the filtered set.
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -848,14 +1127,26 @@ const CursorHomepage: React.FC = () => {
         return sum + (Number.isFinite(price) ? price : 0);
       }, 0);
     
-    return { totalVehicles, totalValue, salesVolume };
-  }, [filteredVehicles]);
+    return { 
+      totalVehicles, 
+      totalValue, 
+      salesVolume,
+      forSaleCount,
+      activeAuctions,
+      totalBids,
+      avgValue
+    };
+  }, [filteredVehicles, hasActiveFilters, debouncedSearchText, filteredStatsFromDb]);
 
   // Add state for database-wide stats (around line 370, after existing stats state)
   const [dbStats, setDbStats] = useState({
     totalVehicles: 0,
     totalValue: 0,
-    salesVolume: 0
+    salesVolume: 0,
+    forSaleCount: 0,
+    activeAuctions: 0,
+    totalBids: 0,
+    avgValue: 0
   });
   const [dbStatsLoading, setDbStatsLoading] = useState(true);
 
@@ -869,14 +1160,36 @@ const CursorHomepage: React.FC = () => {
         .from('vehicles')
         .select('*', { count: 'exact', head: true });
       
-      // Get total value - fetch all vehicles and use best/actual price per vehicle
-      // Priority: sale_price (if sold) > asking_price > current_value > purchase_price
+      // Get comprehensive vehicle data for stats
       const { data: allVehicles } = await supabase
         .from('vehicles')
-        .select('sale_price, sale_status, asking_price, current_value, purchase_price');
+        .select('sale_price, sale_status, asking_price, current_value, purchase_price, is_for_sale, bid_count, auction_outcome');
       
-      const totalValue = (allVehicles || []).reduce((sum, v) => {
-        // Use the best/actual price for each vehicle
+      let totalValue = 0;
+      let vehiclesWithValue = 0;
+      let forSaleCount = 0;
+      let activeAuctions = 0;
+      let totalBids = 0;
+      
+      (allVehicles || []).forEach((v) => {
+        // Count for sale
+        if (v.is_for_sale === true) {
+          forSaleCount++;
+        }
+        
+        // Count active auctions (has bids or auction outcome is active)
+        const hasBids = (v.bid_count && Number(v.bid_count) > 0) || false;
+        const isActiveAuction = v.auction_outcome === 'active' || v.auction_outcome === 'live';
+        if (hasBids || isActiveAuction) {
+          activeAuctions++;
+        }
+        
+        // Sum total bids
+        if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
+          totalBids += Number(v.bid_count);
+        }
+        
+        // Calculate value - use the best/actual price per vehicle
         let vehiclePrice = 0;
         
         // If sold, use sale_price
@@ -901,8 +1214,13 @@ const CursorHomepage: React.FC = () => {
           vehiclePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) ? v.purchase_price : 0;
         }
         
-        return sum + vehiclePrice;
-      }, 0);
+        if (vehiclePrice > 0) {
+          totalValue += vehiclePrice;
+          vehiclesWithValue++;
+        }
+      });
+      
+      const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
       
       // Get sales volume in last 24 hours (vehicles sold today)
       const today = new Date();
@@ -923,7 +1241,11 @@ const CursorHomepage: React.FC = () => {
       setDbStats({
         totalVehicles: totalCount || 0,
         totalValue,
-        salesVolume
+        salesVolume,
+        forSaleCount,
+        activeAuctions,
+        totalBids,
+        avgValue
       });
     } catch (error) {
       console.error('Error loading database stats:', error);
@@ -932,9 +1254,55 @@ const CursorHomepage: React.FC = () => {
     }
   };
 
-  // Update useEffect to load DB stats on mount (around line 510, add to existing useEffect or create new one)
+  // Load DB stats on mount and refresh periodically
   useEffect(() => {
     loadDatabaseStats();
+    
+    // Refresh stats every 30 seconds to keep data current
+    const refreshInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadDatabaseStats();
+      }
+    }, 30000); // 30 seconds
+    
+    // Also refresh when page becomes visible (user returns to tab)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadDatabaseStats();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Subscribe to real-time vehicle changes for instant updates
+    const channel = supabase
+      .channel('homepage-stats-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'vehicles'
+        },
+        () => {
+          // Debounce rapid changes - refresh after 2 seconds of no changes
+          if (refreshTimerRef.current) {
+            clearTimeout(refreshTimerRef.current);
+          }
+          refreshTimerRef.current = setTimeout(() => {
+            loadDatabaseStats();
+          }, 2000);
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      clearInterval(refreshInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      supabase.removeChannel(channel);
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
   }, []);
 
   // Update filteredStats to show DB stats when no filters, filtered stats when filters active
@@ -1766,11 +2134,28 @@ const CursorHomepage: React.FC = () => {
                 {displayStats.totalVehicles.toLocaleString()} vehicles
               </div>
               <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                {formatCurrency(displayStats.totalValue)} value
+                {formatCurrency(displayStats.totalValue)} total value
               </div>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                {formatCurrency(displayStats.salesVolume)} volume (24hrs)
-              </div>
+              {displayStats.forSaleCount > 0 && (
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  {displayStats.forSaleCount.toLocaleString()} for sale
+                </div>
+              )}
+              {displayStats.activeAuctions > 0 && (
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  {displayStats.activeAuctions} active auctions
+                </div>
+              )}
+              {displayStats.salesVolume > 0 && (
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  {formatCurrency(displayStats.salesVolume)} sales (24hrs)
+                </div>
+              )}
+              {displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                  {formatCurrency(displayStats.avgValue)} avg
+                </div>
+              )}
             </div>
 
             {/* Scrollable strip: selected filters + market pogs */}
@@ -1849,10 +2234,10 @@ const CursorHomepage: React.FC = () => {
                 ))
               )}
 
-              <div style={{ width: '1px', height: '14px', background: 'var(--border)', flex: '0 0 auto' }} aria-hidden="true" />
-
-              {(() => {
-                return (
+              {/* Only show source pogs in mini bar if some sources are filtered out */}
+              {sourcePogs.hiddenCount > 0 && (
+                <>
+                  <div style={{ width: '1px', height: '14px', background: 'var(--border)', flex: '0 0 auto' }} aria-hidden="true" />
                   <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flex: '0 0 auto' }}>
                     {sourcePogs.selected.map((p) => (
                       <button
@@ -1878,8 +2263,8 @@ const CursorHomepage: React.FC = () => {
                           justifyContent: 'center',
                           boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 0 0 2px var(--accent-dim)',
                           opacity: 1,
-                      flex: '0 0 auto',
-                      backdropFilter: 'blur(10px) saturate(1.35)'
+                          flex: '0 0 auto',
+                          backdropFilter: 'blur(10px) saturate(1.35)'
                         }}
                       >
                         <img
@@ -1899,31 +2284,29 @@ const CursorHomepage: React.FC = () => {
                       </button>
                     ))}
 
-                    {sourcePogs.hiddenCount > 0 && (
-                      <div
-                        style={{
-                          flex: '0 0 auto',
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '999px',
-                          border: '1px solid var(--border)',
-                          background: 'var(--grey-200)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '7pt',
-                          color: 'var(--text-muted)',
-                          fontFamily: '"MS Sans Serif", sans-serif',
-                          userSelect: 'none'
-                        }}
-                        title="Open filters to add more sources"
-                      >
-                        +{sourcePogs.hiddenCount}
-                      </div>
-                    )}
+                    <div
+                      style={{
+                        flex: '0 0 auto',
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '999px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--grey-200)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '7pt',
+                        color: 'var(--text-muted)',
+                        fontFamily: '"MS Sans Serif", sans-serif',
+                        userSelect: 'none'
+                      }}
+                      title="Open filters to add more sources"
+                    >
+                      +{sourcePogs.hiddenCount}
+                    </div>
                   </div>
-                );
-              })()}
+                </>
+              )}
             </div>
 
             <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
@@ -2081,9 +2464,27 @@ const CursorHomepage: React.FC = () => {
                 <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
                   {formatCurrency(displayStats.totalValue)} total value
                 </span>
-                <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                  {formatCurrency(displayStats.salesVolume)} sales volume (24hrs)
-                </span>
+                {displayStats.forSaleCount > 0 && (
+                  <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
+                    {displayStats.forSaleCount.toLocaleString()} for sale
+                  </span>
+                )}
+                {displayStats.activeAuctions > 0 && (
+                  <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
+                    {displayStats.activeAuctions} active auctions
+                    {displayStats.totalBids > 0 && ` (${displayStats.totalBids.toLocaleString()} bids)`}
+                  </span>
+                )}
+                {displayStats.salesVolume > 0 && (
+                  <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
+                    {formatCurrency(displayStats.salesVolume)} sales (24hrs)
+                  </span>
+                )}
+                {displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
+                  <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
+                    {formatCurrency(displayStats.avgValue)} avg
+                  </span>
+                )}
               </div>
               
               {/* Hide Filters Button */}
@@ -2108,70 +2509,133 @@ const CursorHomepage: React.FC = () => {
               </button>
             </div>
 
-            {/* Source pog library (add/remove) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 700 }}>
-                Sources
-              </div>
-              <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                {sourcePogs.all.map((p) => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => setSourceIncluded(p.key, !p.included)}
-                    aria-label={p.included ? `${p.title} (selected)` : `${p.title} (not selected)`}
-                    title={p.included ? `${p.title}: Selected (click to remove)` : `${p.title}: Not selected (click to add)`}
-                    style={{
-                      width: '22px',
-                      height: '22px',
-                      padding: 0,
-                      borderRadius: '999px',
-                      border: `1px solid ${p.included ? 'var(--accent)' : 'var(--border)'}`,
-                      background: 'var(--white)',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: p.included ? '0 0 0 2px var(--accent-dim)' : 'none',
-                      opacity: p.included ? 1 : 0.5
-                    }}
-                  >
-                    <img
-                      src={faviconUrl(p.domain)}
-                      alt=""
-                      width={16}
-                      height={16}
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '3px',
-                        filter: p.included ? 'none' : 'grayscale(100%)'
-                      }}
-                    />
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setFilters((prev) => ({
-                    ...prev,
-                    hideDealerListings: false,
-                    hideCraigslist: false,
-                    hideDealerSites: false,
-                    hideKsl: false,
-                    hideBat: false,
-                    hideClassic: false
-                  }));
+            {/* Source pog library (add/remove) - Collapsible */}
+            <div style={{ marginBottom: '12px' }}>
+              <div 
+                onClick={() => toggleCollapsedSection('sourcePogs')}
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  marginBottom: '8px',
+                  paddingBottom: '4px',
+                  borderBottom: '1px solid var(--border)'
                 }}
-                className="button"
-                style={{ fontSize: '8pt', padding: '4px 8px', height: '24px', minHeight: '24px' }}
-                title="Include all sources"
               >
-                All
-              </button>
+                <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 700 }}>
+                  Sources {sourcePogs.selected.length > 0 && `(${sourcePogs.selected.length}/${sourcePogs.all.length})`}
+                </span>
+                <span>{collapsedSections.sourcePogs ? '▼' : '▲'}</span>
+              </div>
+              {!collapsedSections.sourcePogs && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {sourcePogs.all.map((p) => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => setSourceIncluded(p.key, !p.included)}
+                        aria-label={p.included ? `${p.title} (selected)` : `${p.title} (not selected)`}
+                        title={p.included ? `${p.title}: Selected (click to remove)` : `${p.title}: Not selected (click to add)`}
+                        style={{
+                          width: '22px',
+                          height: '22px',
+                          padding: 0,
+                          borderRadius: '999px',
+                          border: `1px solid ${p.included ? 'var(--accent)' : 'var(--border)'}`,
+                          background: 'var(--white)',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: p.included ? '0 0 0 2px var(--accent-dim)' : 'none',
+                          opacity: p.included ? 1 : 0.5
+                        }}
+                      >
+                        <img
+                          src={faviconUrl(p.domain)}
+                          alt=""
+                          width={16}
+                          height={16}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '3px',
+                            filter: p.included ? 'none' : 'grayscale(100%)'
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((prev) => ({
+                        ...prev,
+                        hideDealerListings: false,
+                        hideCraigslist: false,
+                        hideDealerSites: false,
+                        hideKsl: false,
+                        hideBat: false,
+                        hideClassic: false
+                      }));
+                    }}
+                    className="button"
+                    style={{ fontSize: '8pt', padding: '4px 8px', height: '24px', minHeight: '24px' }}
+                    title="Include all sources"
+                  >
+                    All
+                  </button>
+                </div>
+              )}
+              {collapsedSections.sourcePogs && sourcePogs.selected.length > 0 && (
+                <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
+                  {sourcePogs.selected.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSourceIncluded(p.key, false);
+                      }}
+                      aria-label={`${p.title} (selected)`}
+                      title={`${p.title}: Selected (click to remove)`}
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        padding: 0,
+                        borderRadius: '999px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--white)',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: 1
+                      }}
+                    >
+                      <img
+                        src={faviconUrl(p.domain)}
+                        alt=""
+                        width={14}
+                        height={14}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '3px',
+                          filter: 'none'
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             
             {/* Year Quick Filters - Collapsible */}

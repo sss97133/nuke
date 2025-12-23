@@ -47,7 +47,7 @@ import VehicleMemePanel from '../components/vehicle/VehicleMemePanel';
 import type { ContentActionEvent } from '../services/streamActionsService';
 // Lazy load heavy components to avoid circular dependencies
 const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/MergeProposalsPanel'));
-const ImageGallery = React.lazy(() => import('../components/images/ImageGallery'));
+const VehicleProfileTabs = React.lazy(() => import('./vehicle-profile/VehicleProfileTabs'));
 import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
 import type { Session } from '@supabase/supabase-js';
 import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
@@ -2648,183 +2648,82 @@ const VehicleProfile: React.FC = () => {
       );
     }
 
-    // Simplified view - tabs disabled until backend processing is ready
-        return (
-          <>
+    return (
+      <>
         {/* Timeline - Full width under hero image */}
-            <section className="section">
+        <section className="section">
           <VehicleTimelineSection
-                vehicle={vehicle}
+            vehicle={vehicle}
             session={session}
-                permissions={permissions}
+            permissions={permissions}
             onAddEventClick={() => setShowAddEvent(true)}
-              />
-            </section>
+          />
+        </section>
 
-            {/* Wiring Query Context Bar & AI Parts Quote Generator */}
-            {(isRowOwner || isVerifiedOwner) && (
-              <section className="section">
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ 
-                    fontSize: '10pt', 
-                    fontWeight: 'bold', 
-                    marginBottom: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
-                    WIRING PLAN
-                  </div>
-                  <WiringQueryContextBar
-                    vehicleId={vehicle.id}
-                    vehicleInfo={{
-                      year: vehicle.year,
-                      make: vehicle.make,
-                      model: vehicle.model
-                    }}
-                    onQuoteGenerated={(quote) => {
-                      // Quote will be displayed in PartsQuoteGenerator
-                      console.log('Quote generated:', quote)
-                    }}
-                  />
-                </div>
-                <PartsQuoteGenerator 
-                  vehicleId={vehicle.id}
-                  vehicleInfo={{
-                    year: vehicle.year,
-                    make: vehicle.make,
-                    model: vehicle.model
-                  }}
-                />
-              </section>
-            )}
-
-        {/* Two column layout: Info on left, Images on right */}
-            <section className="section">
-          <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: '320px 1fr' }}>
-            {/* Left Column: Vehicle Info & Tools - Order: Basic Info → Description → Comments → Ref Docs → Maps */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                  {/* 1. Basic Info */}
-                  <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading basic info...</div>}>
-                    <VehicleBasicInfo
-                      vehicle={vehicle}
-                      session={session}
-                      permissions={permissions}
-                      onDataPointClick={handleDataPointClick}
-                      onEditClick={handleEditClick}
-                    />
-                  </React.Suspense>
-
-                  {/* 1b. Investment / ROI summary */}
-                  <VehicleROISummaryCard vehicleId={vehicle.id} />
-                  
-                  {/* 2. Description */}
-              <VehicleDescriptionCard
+        {/* Wiring Query Context Bar & AI Parts Quote Generator */}
+        {(isRowOwner || isVerifiedOwner) && (
+          <section className="section">
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ 
+                fontSize: '10pt', 
+                fontWeight: 'bold', 
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                WIRING PLAN
+              </div>
+              <WiringQueryContextBar
                 vehicleId={vehicle.id}
-                initialDescription={vehicle.description}
-                isEditable={canEdit}
-                onUpdate={() => loadVehicle()}
+                vehicleInfo={{
+                  year: vehicle.year,
+                  make: vehicle.make,
+                  model: vehicle.model
+                }}
+                onQuoteGenerated={(quote) => {
+                  // Quote will be displayed in PartsQuoteGenerator
+                  console.log('Quote generated:', quote)
+                }}
               />
-
-                  {/* 2b. Structured listing data (Options / Service records / etc.) */}
-                  <VehicleStructuredListingDataCard vehicle={vehicle} />
-                  
-                  {/* 3. Comments */}
-              <VehicleCommentsCard
-                vehicleId={vehicle.id}
-                    session={session}
-                collapsed={true}
-                maxVisible={2}
-                  />
-                  
-                  {/* 4. Reference Documents - Upload */}
-                  {session && (
-                    <ReferenceLibraryUpload
-                      vehicleId={vehicle.id}
-                      year={vehicle.year}
-                      make={vehicle.make}
-                      series={(vehicle as any).series}
-                      model={vehicle.model}
-                      bodyStyle={(vehicle as any).body_style}
-                      onUploadComplete={() => {
-                        loadVehicle();
-                        setReferenceLibraryRefreshKey((v) => v + 1);
-                      }}
-                    />
-                  )}
-                  
-                  {/* 4. Reference Documents - Display */}
-                  <VehicleReferenceLibrary
-                    vehicleId={vehicle.id}
-                    userId={session?.user?.id}
-                    year={vehicle.year}
-                    make={vehicle.make}
-                    series={(vehicle as any).series}
-                    model={vehicle.model}
-                    bodyStyle={(vehicle as any).body_style}
-                    refreshKey={referenceLibraryRefreshKey}
-                  />
-                  
-                  {/* 5. Coverage Map */}
-                  <div className="card">
-                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>Coverage Map</span>
-                      <button className="btn-utility" style={{ fontSize: '10px' }} onClick={() => setShowMap(prev => !prev)}>
-                        {showMap ? 'Hide map' : 'Show map'}
-                      </button>
-                    </div>
-                    {showMap && (
-                      <div className="card-body">
-                        <EventMap vehicleId={vehicle.id} />
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Image Tagging (for owners/contributors only) */}
-                  {(isRowOwner || isVerifiedOwner || (hasContributorAccess && ['owner','moderator','consigner','co_owner','restorer'].includes(contributorRole || ''))) && (leadImageUrl || (vehicle as any)?.primary_image_url || (vehicle as any)?.primaryImageUrl) && (
-                    <div className="card">
-                      <div className="card-header">Image Tagging & AI Validation</div>
-                      <div className="card-body">
-                        <EnhancedImageTagger
-                          imageUrl={leadImageUrl || (vehicle as any)?.primary_image_url || (vehicle as any)?.primaryImageUrl}
-                          vehicleId={vehicle.id}
-                          onTagAdded={() => {
-                            window.dispatchEvent(new CustomEvent('tags_updated', { detail: { vehicleId: vehicle.id } }));
-                          }}
-                          onTagValidated={() => {
-                            window.dispatchEvent(new CustomEvent('tags_updated', { detail: { vehicleId: vehicle.id } }));
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-            {/* Right Column: Gallery */}
-            <div>
-              <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading gallery...</div>}>
-                <ImageGallery
-                  vehicleId={vehicle.id}
-                  showUpload={true}
-                  fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
-                  fallbackLabel={(vehicle as any)?.profile_origin === 'bat_import' ? 'BaT listing' : 'Listing'}
-                  fallbackSourceUrl={
-                    (vehicle as any)?.discovery_url ||
-                    (vehicle as any)?.bat_auction_url ||
-                    (vehicle as any)?.listing_url ||
-                    undefined
-                  }
-                  onImagesUpdated={() => {
-                    loadVehicle();
-                    loadTimelineEvents();
-                  }}
-                />
-              </React.Suspense>
             </div>
-          </div>
-            </section>
-          </>
-        );
+            <PartsQuoteGenerator 
+              vehicleId={vehicle.id}
+              vehicleInfo={{
+                year: vehicle.year,
+                make: vehicle.make,
+                model: vehicle.model
+              }}
+            />
+          </section>
+        )}
+
+        {/* Tabbed Interface - Description, Media, Specs, Comparables, Taxonomy */}
+        <section className="section">
+          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading tabs...</div>}>
+            <VehicleProfileTabs
+              vehicle={vehicle}
+              session={session}
+              permissions={permissions}
+              vehicleImages={vehicleImages}
+              fallbackListingImageUrls={fallbackListingImageUrls}
+              onImagesUpdated={() => {
+                loadVehicle();
+                loadTimelineEvents();
+              }}
+              onDataPointClick={handleDataPointClick}
+              onEditClick={handleEditClick}
+              canEdit={canEdit}
+              referenceLibraryRefreshKey={referenceLibraryRefreshKey}
+              onReferenceLibraryRefresh={() => {
+                loadVehicle();
+                setReferenceLibraryRefreshKey((v) => v + 1);
+              }}
+            />
+          </React.Suspense>
+        </section>
+      </>
+    );
   };
 
   // Render vehicle profile (responsive for mobile and desktop)

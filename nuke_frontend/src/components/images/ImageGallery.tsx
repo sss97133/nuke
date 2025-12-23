@@ -114,6 +114,32 @@ const getImportedSourceDomain = (image: any): string | null => {
   }
 };
 
+// Detect image source from storage_path or other metadata
+const getImageSource = (image: any): { type: string; label: string; color: string } => {
+  const storagePath = String(image?.storage_path || image?.image_url || '').toLowerCase();
+  const source = image?.source;
+  
+  // Check explicit source field first
+  if (source === 'bat_import' || storagePath.includes('bat_import')) {
+    return { type: 'bat', label: 'BaT', color: '#ef4444' };
+  }
+  if (source === 'organization_import' || storagePath.includes('organization_import')) {
+    return { type: 'org', label: 'Org', color: '#3b82f6' };
+  }
+  if (source === 'external_import' || storagePath.includes('external_import')) {
+    return { type: 'external', label: 'External', color: '#8b5cf6' };
+  }
+  if (storagePath.includes('import_queue')) {
+    return { type: 'queue', label: 'Queue', color: '#f59e0b' };
+  }
+  if (image?.is_external || image?.source === 'external_import') {
+    return { type: 'external', label: 'External', color: '#8b5cf6' };
+  }
+  
+  // Default: user upload
+  return { type: 'user', label: 'User', color: '#10b981' };
+};
+
 const parseBatUploadMonth = (url: string): string | null => {
   try {
     const m = url.match(/\/wp-content\/uploads\/(\d{4})\/(\d{2})\//);
@@ -204,6 +230,7 @@ const ImageGallery = ({
   const [imagesPerPage] = useState(25);
   // New sorting/grouping states
   const [groupByCategory, setGroupByCategory] = useState(false);
+  const [groupBySource, setGroupBySource] = useState(false);
   const [chronologicalMode, setChronologicalMode] = useState<'off' | 'asc' | 'desc'>('off'); // off, ascending, descending
   const [imagesPerRow, setImagesPerRow] = useState(3); // 1-16
   const [preserveAspectRatio, setPreserveAspectRatio] = useState(false); // Original image ratio
@@ -651,8 +678,49 @@ const ImageGallery = ({
   const getSortedImages = () => {
     let sorted = sortRows(allImages, sortBy);
     
-    // Apply grouping by category if enabled
-    if (groupByCategory) {
+    // Apply grouping by source if enabled
+    if (groupBySource) {
+      const grouped = new Map<string, any[]>();
+      for (const img of sorted) {
+        const source = getImageSource(img);
+        const key = source.type;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(img);
+      }
+      
+      // Within each group, sort chronologically if enabled
+      const dir = chronologicalMode === 'off' ? 0 : (chronologicalMode === 'asc' ? 1 : -1);
+      if (dir !== 0) {
+        for (const [sourceType, images] of grouped.entries()) {
+          images.sort((a, b) => {
+            const effA = getEffectiveImageDate(a, auctionStartDate);
+            const effB = getEffectiveImageDate(b, auctionStartDate);
+            const dateA = effA.iso ? new Date(effA.iso).getTime() : 0;
+            const dateB = effB.iso ? new Date(effB.iso).getTime() : 0;
+            if (dateA !== dateB) return (dateA - dateB) * dir;
+            return (a.id || '').localeCompare(b.id || '');
+          });
+        }
+      }
+      
+      // Sort groups by source priority, then flatten
+      const sourcePriority: Record<string, number> = {
+        user: 100,      // User uploads first
+        queue: 80,      // Import queue
+        org: 60,        // Organization imports
+        bat: 40,        // BaT imports
+        external: 20    // Other external
+      };
+      sorted = Array.from(grouped.entries())
+        .sort((a, b) => {
+          const priA = sourcePriority[a[0]] || 10;
+          const priB = sourcePriority[b[0]] || 10;
+          return priB - priA;
+        })
+        .flatMap(([_, images]) => images);
+    }
+    // Apply grouping by category if enabled (and not grouping by source)
+    else if (groupByCategory) {
       const grouped = new Map<string, any[]>();
       for (const img of sorted) {
         const category = img.category || 'general';
@@ -1111,13 +1179,13 @@ const ImageGallery = ({
     };
   }, [vehicleId, displayedImages.length, onImagesUpdated]);
 
-  // Re-sort displayed images when sort option changes
+  // Re-sort displayed images when sort option or grouping changes
   useEffect(() => {
     if (showImages && displayedImages.length > 0) {
       const sortedImages = getSortedImages();
       setDisplayedImages(sortedImages.slice(0, displayedImages.length));
     }
-  }, [sortBy]);
+  }, [sortBy, groupBySource, groupByCategory, chronologicalMode]);
 
   // Load tag counts when displayed images change
   useEffect(() => {
@@ -1764,9 +1832,30 @@ const ImageGallery = ({
 
           {/* Toggle Buttons for Sorting */}
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            {/* Group by Source Toggle */}
+            <button
+              onClick={() => {
+                setGroupBySource(!groupBySource);
+                if (!groupBySource) setGroupByCategory(false); // Disable category grouping when enabling source
+              }}
+              className={groupBySource ? 'button button-primary' : 'button'}
+              style={{ 
+                fontSize: '8pt', 
+                padding: '4px 8px', 
+                height: '24px', 
+                minHeight: '24px',
+                whiteSpace: 'nowrap'
+              }}
+              title="Group images by source (User, Import Queue, Organization, BaT, External)"
+            >
+              By Source
+            </button>
             {/* Groups Toggle */}
             <button
-              onClick={() => setGroupByCategory(!groupByCategory)}
+              onClick={() => {
+                setGroupByCategory(!groupByCategory);
+                if (!groupByCategory) setGroupBySource(false); // Disable source grouping when enabling category
+              }}
               className={groupByCategory ? 'button button-primary' : 'button'}
               style={{ 
                 fontSize: '8pt', 
@@ -1777,7 +1866,7 @@ const ImageGallery = ({
               }}
               title="Group images by category"
             >
-              Groups
+              By Category
             </button>
             
             {/* Chronological Toggle (3-state: off -> asc -> desc -> off) */}
@@ -1894,6 +1983,389 @@ const ImageGallery = ({
 
       {/* Image Grid */}
       {viewMode === 'grid' && showImages && (
+        <div>
+          {(() => {
+            // If grouping by source, add section headers
+            if (groupBySource) {
+              const grouped: Array<{ source: ReturnType<typeof getImageSource>; images: any[] }> = [];
+              const currentGroup: { source: ReturnType<typeof getImageSource> | null; images: any[] } = { source: null, images: [] };
+              
+              displayedImages.forEach((image) => {
+                const source = getImageSource(image);
+                if (!currentGroup.source || currentGroup.source.type !== source.type) {
+                  if (currentGroup.source && currentGroup.images.length > 0) {
+                    grouped.push({ source: currentGroup.source, images: [...currentGroup.images] });
+                  }
+                  currentGroup.source = source;
+                  currentGroup.images = [image];
+                } else {
+                  currentGroup.images.push(image);
+                }
+              });
+              
+              if (currentGroup.source && currentGroup.images.length > 0) {
+                grouped.push({ source: currentGroup.source, images: currentGroup.images });
+              }
+              
+              return grouped.map((group, groupIndex) => (
+                <div key={group.source.type}>
+                  {/* Section Header */}
+                  <div style={{
+                    padding: 'var(--space-3) var(--space-2)',
+                    backgroundColor: 'var(--grey-100)',
+                    borderBottom: '2px solid var(--border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)'
+                  }}>
+                    <div style={{
+                      width: '12px',
+                      height: '12px',
+                      backgroundColor: group.source.color,
+                      border: '1px solid var(--border)'
+                    }} />
+                    <span style={{ 
+                      fontSize: '9pt', 
+                      fontWeight: 700, 
+                      color: 'var(--text)',
+                      textTransform: 'uppercase'
+                    }}>
+                      {group.source.label} ({group.images.length})
+                    </span>
+                  </div>
+                  
+                  {/* Images in this group */}
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: 0 }}>
+                    {group.images.map((image, imgIndex) => {
+                      const isSelected = selectMode && selectedImages?.has(image.id);
+                      const globalIndex = displayedImages.indexOf(image);
+                      const source = getImageSource(image);
+                      return (
+                        <div
+                          key={image.id}
+                          style={{ 
+                            cursor: 'pointer', 
+                            position: 'relative', 
+                            overflow: 'hidden', 
+                            backgroundColor: 'var(--grey-100)',
+                            aspectRatio: preserveAspectRatio ? undefined : '1 / 1',
+                            border: 'none',
+                            ...(preserveAspectRatio ? { height: 'auto' } : {})
+                          }}
+                          onClick={(e) => {
+                            if (selectMode) {
+                              handleImageSelect(image.id, e);
+                            } else {
+                              openLightbox(globalIndex);
+                            }
+                          }}
+                        >
+                          {/* Selection Checkbox */}
+                          {selectMode && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 'var(--space-1)',
+                                left: 'var(--space-1)',
+                                width: '24px',
+                                height: '24px',
+                                backgroundColor: isSelected ? 'var(--grey-900)' : 'var(--white)',
+                                border: '2px solid var(--grey-900)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 20,
+                                cursor: 'pointer'
+                              }}
+                              onClick={(e) => handleImageSelect(image.id, e)}
+                            >
+                              {isSelected && (
+                                <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '10pt' }}>X</span>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Image Container */}
+                          <div style={{ 
+                            width: '100%', 
+                            height: preserveAspectRatio ? 'auto' : '100%', 
+                            overflow: 'hidden', 
+                            backgroundColor: 'var(--grey-100)',
+                            position: 'relative'
+                          }}>
+                            <SensitiveImageOverlay
+                              imageId={image.id}
+                              vehicleId={vehicleId}
+                              imageUrl={getOptimalImageUrl(image,'medium')}
+                              isSensitive={image.is_sensitive || false}
+                              sensitiveType={image.sensitive_type}
+                              objectFit={preserveAspectRatio ? 'contain' : 'cover'}
+                            />
+                          </div>
+
+                          {/* Analysis Badge */}
+                          {(() => {
+                            const metadata = image.ai_scan_metadata;
+                            const hasAnalysis = metadata && (
+                              metadata.appraiser?.primary_label ||
+                              metadata.tier_1_analysis ||
+                              metadata.appraiser ||
+                              image.ai_last_scanned ||
+                              image.angle
+                            );
+                            if (!hasAnalysis) return null;
+                            const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
+                            const analysisType = metadata?.tier_1_analysis ? 'TIER1' : metadata?.appraiser ? 'AI' : 'SCANNED';
+                            return (
+                              <div style={{
+                                position: 'absolute',
+                                top: 'var(--space-1)',
+                                right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
+                                backgroundColor: '#10b981',
+                                color: '#fff',
+                                borderRadius: '0px',
+                                border: '1px solid #fff',
+                                padding: '2px 6px',
+                                fontSize: '7pt',
+                                fontWeight: 'bold',
+                                fontFamily: '"MS Sans Serif", sans-serif',
+                                zIndex: 10,
+                                cursor: 'help',
+                                maxWidth: '60px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                              title={angle ? `${analysisType}: ${angle}` : `${analysisType} analyzed`}
+                              >
+                                {angle ? angle.substring(0, 6).toUpperCase() : analysisType}
+                              </div>
+                            );
+                          })()}
+
+                          {/* Source Badge - Only show if not user (already grouped by source) */}
+                          {source.type !== 'user' && (
+                            <div style={{
+                              position: 'absolute',
+                              bottom: 'var(--space-1)',
+                              left: 'var(--space-1)',
+                              backgroundColor: source.color,
+                              color: '#fff',
+                              borderRadius: '0px',
+                              border: '1px solid #fff',
+                              padding: '2px 6px',
+                              fontSize: '7pt',
+                              fontWeight: 'bold',
+                              fontFamily: '"MS Sans Serif", sans-serif',
+                              zIndex: 10,
+                              cursor: 'help'
+                            }}
+                            title={`Source: ${source.label}`}
+                            >
+                              {source.label}
+                            </div>
+                          )}
+
+                          {/* Tag Count Badge */}
+                          {imageTagCounts[image.id] && (
+                            <div style={{
+                              position: 'absolute',
+                              top: 'var(--space-1)',
+                              right: 'var(--space-1)',
+                              backgroundColor: '#000',
+                              color: '#fff',
+                              borderRadius: '0px',
+                              border: '1px solid #fff',
+                              width: '18px',
+                              height: '18px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '8pt',
+                              fontWeight: 'bold',
+                              fontFamily: '"MS Sans Serif", sans-serif',
+                              zIndex: 10
+                            }}>
+                              {imageTagCounts[image.id]}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ));
+            }
+            
+            // Default: flat grid without headers
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: 0 }}>
+                {displayedImages.map((image, index) => {
+                  const isSelected = selectMode && selectedImages?.has(image.id);
+                  return (
+                    <div
+                      key={image.id}
+                      style={{ 
+                        cursor: 'pointer', 
+                        position: 'relative', 
+                        overflow: 'hidden', 
+                        backgroundColor: 'var(--grey-100)',
+                        aspectRatio: preserveAspectRatio ? undefined : '1 / 1',
+                        border: 'none',
+                        ...(preserveAspectRatio ? { height: 'auto' } : {})
+                      }}
+                      onClick={(e) => {
+                        if (selectMode) {
+                          handleImageSelect(image.id, e);
+                        } else {
+                          openLightbox(index);
+                        }
+                      }}
+                    >
+                      {/* Selection Checkbox */}
+                      {selectMode && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 'var(--space-1)',
+                            left: 'var(--space-1)',
+                            width: '24px',
+                            height: '24px',
+                            backgroundColor: isSelected ? 'var(--grey-900)' : 'var(--white)',
+                            border: '2px solid var(--grey-900)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 20,
+                            cursor: 'pointer'
+                          }}
+                          onClick={(e) => handleImageSelect(image.id, e)}
+                        >
+                          {isSelected && (
+                            <span style={{ color: 'var(--white)', fontWeight: 'bold', fontSize: '10pt' }}>X</span>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Image Container */}
+                      <div style={{ 
+                        width: '100%', 
+                        height: preserveAspectRatio ? 'auto' : '100%', 
+                        overflow: 'hidden', 
+                        backgroundColor: 'var(--grey-100)',
+                        position: 'relative'
+                      }}>
+                        <SensitiveImageOverlay
+                          imageId={image.id}
+                          vehicleId={vehicleId}
+                          imageUrl={getOptimalImageUrl(image,'medium')}
+                          isSensitive={image.is_sensitive || false}
+                          sensitiveType={image.sensitive_type}
+                          objectFit={preserveAspectRatio ? 'contain' : 'cover'}
+                        />
+                      </div>
+
+                      {/* Analysis Badge */}
+                      {(() => {
+                        const metadata = image.ai_scan_metadata;
+                        const hasAnalysis = metadata && (
+                          metadata.appraiser?.primary_label ||
+                          metadata.tier_1_analysis ||
+                          metadata.appraiser ||
+                          image.ai_last_scanned ||
+                          image.angle
+                        );
+                        if (!hasAnalysis) return null;
+                        const angle = image.angle || metadata?.appraiser?.angle || metadata?.appraiser?.primary_label;
+                        const analysisType = metadata?.tier_1_analysis ? 'TIER1' : metadata?.appraiser ? 'AI' : 'SCANNED';
+                        return (
+                          <div style={{
+                            position: 'absolute',
+                            top: 'var(--space-1)',
+                            right: imageTagCounts[image.id] ? '28px' : 'var(--space-1)',
+                            backgroundColor: '#10b981',
+                            color: '#fff',
+                            borderRadius: '0px',
+                            border: '1px solid #fff',
+                            padding: '2px 6px',
+                            fontSize: '7pt',
+                            fontWeight: 'bold',
+                            fontFamily: '"MS Sans Serif", sans-serif',
+                            zIndex: 10,
+                            cursor: 'help',
+                            maxWidth: '60px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                          title={angle ? `${analysisType}: ${angle}` : `${analysisType} analyzed`}
+                          >
+                            {angle ? angle.substring(0, 6).toUpperCase() : analysisType}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Source Badge */}
+                      {(() => {
+                        const source = getImageSource(image);
+                        if (source.type === 'user') return null;
+                        return (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: 'var(--space-1)',
+                            left: 'var(--space-1)',
+                            backgroundColor: source.color,
+                            color: '#fff',
+                            borderRadius: '0px',
+                            border: '1px solid #fff',
+                            padding: '2px 6px',
+                            fontSize: '7pt',
+                            fontWeight: 'bold',
+                            fontFamily: '"MS Sans Serif", sans-serif',
+                            zIndex: 10,
+                            cursor: 'help'
+                          }}
+                          title={`Source: ${source.label}`}
+                          >
+                            {source.label}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Tag Count Badge */}
+                      {imageTagCounts[image.id] && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 'var(--space-1)',
+                          right: 'var(--space-1)',
+                          backgroundColor: '#000',
+                          color: '#fff',
+                          borderRadius: '0px',
+                          border: '1px solid #fff',
+                          width: '18px',
+                          height: '18px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '8pt',
+                          fontWeight: 'bold',
+                          fontFamily: '"MS Sans Serif", sans-serif',
+                          zIndex: 10
+                        }}>
+                          {imageTagCounts[image.id]}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+      
+      {/* Legacy grid rendering (disabled, kept for reference) */}
+      {viewMode === 'grid' && showImages && false && (
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: 0 }}>
           {displayedImages.map((image, index) => {
             const isSelected = selectMode && selectedImages?.has(image.id);
@@ -1999,6 +2471,34 @@ const ImageGallery = ({
                   title={angle ? `${analysisType}: ${angle}` : `${analysisType} analyzed`}
                   >
                     {angle ? angle.substring(0, 6).toUpperCase() : analysisType}
+                  </div>
+                );
+              })()}
+
+              {/* Source Badge - Bottom left */}
+              {(() => {
+                const source = getImageSource(image);
+                // Only show badge if not a user upload (to reduce clutter)
+                if (source.type === 'user') return null;
+                return (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 'var(--space-1)',
+                    left: 'var(--space-1)',
+                    backgroundColor: source.color,
+                    color: '#fff',
+                    borderRadius: '0px',
+                    border: '1px solid #fff',
+                    padding: '2px 6px',
+                    fontSize: '7pt',
+                    fontWeight: 'bold',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    zIndex: 10,
+                    cursor: 'help'
+                  }}
+                  title={`Source: ${source.label}`}
+                  >
+                    {source.label}
                   </div>
                 );
               })()}

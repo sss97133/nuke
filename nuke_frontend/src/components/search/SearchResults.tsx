@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { FeedItem } from '../feed/types';
 import ContentCard from '../feed/ContentCard';
+import { highlightSearchTerm } from '../../utils/searchHighlight';
 import '../../design-system.css';
 
 interface SearchResult {
@@ -31,6 +33,8 @@ interface SearchResultsProps {
 }
 
 const SearchResults = ({ results, searchSummary, loading = false }: SearchResultsProps) => {
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q') || '';
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'map'>('cards');
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'location'>('relevance');
   const [filterBy, setFilterBy] = useState<'all' | 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference'>('all');
@@ -324,16 +328,16 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
       {filteredAndSortedResults.length === 0 ? (
         <div style={{
           textAlign: 'center',
-          padding: '32px 16px',
+          padding: '48px 16px',
           background: 'var(--surface)',
           border: '2px solid #000',
           borderRadius: '0px'
         }}>
-          <div style={{ fontSize: '24pt', marginBottom: '12px' }}>🔍</div>
+          <div style={{ fontSize: '32pt', marginBottom: '16px' }}>🔍</div>
           <h3 style={{ 
             fontSize: '10pt', 
             fontWeight: 700,
-            marginBottom: '6px',
+            marginBottom: '8px',
             color: '#000',
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
@@ -341,12 +345,71 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
             No Results Found
           </h3>
           <p style={{ 
-            fontSize: '8pt',
+            fontSize: '9pt',
             color: '#666',
-            margin: 0
+            margin: '0 0 24px 0',
+            maxWidth: '400px',
+            marginLeft: 'auto',
+            marginRight: 'auto'
           }}>
-            Try adjusting your search terms or filters
+            We couldn't find anything matching "{searchQuery}"
           </p>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            maxWidth: '300px',
+            margin: '0 auto',
+            textAlign: 'left'
+          }}>
+            <div style={{ fontSize: '8pt', fontWeight: 700, color: '#000', marginBottom: '4px' }}>Try:</div>
+            <ul style={{ 
+              margin: 0, 
+              paddingLeft: '20px',
+              fontSize: '8pt',
+              color: '#666',
+              listStyle: 'disc'
+            }}>
+              <li>Check your spelling</li>
+              <li>Use more general terms</li>
+              <li>Try different keywords</li>
+              <li>Remove filters</li>
+            </ul>
+            {searchQuery.length > 0 && (
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: '8pt', fontWeight: 700, color: '#000', marginBottom: '8px' }}>Popular Searches:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+                  {['C10', 'BMW 2002', 'Squarebody', 'Restoration'].map(term => (
+                    <button
+                      key={term}
+                      onClick={() => window.location.href = `/search?q=${encodeURIComponent(term)}`}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '8pt',
+                        fontWeight: 600,
+                        border: '2px solid #000',
+                        borderRadius: '0px',
+                        background: 'white',
+                        color: '#000',
+                        cursor: 'pointer',
+                        transition: 'all 0.12s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#000';
+                        e.currentTarget.style.color = '#fff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'white';
+                        e.currentTarget.style.color = '#000';
+                      }}
+                    >
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <>
@@ -464,18 +527,21 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                       </div>
                     </div>
 
-                    <p style={{
-                      margin: '0 0 8px 0',
-                      fontSize: '8pt',
-                      color: '#666',
-                      lineHeight: '1.4',
-                      overflow: 'hidden',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical'
-                    }}>
-                      {result.description}
-                    </p>
+                    <p 
+                      style={{
+                        margin: '0 0 8px 0',
+                        fontSize: '8pt',
+                        color: '#666',
+                        lineHeight: '1.4',
+                        overflow: 'hidden',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical'
+                      }}
+                      dangerouslySetInnerHTML={{
+                        __html: searchQuery ? highlightSearchTerm(result.description || '', searchQuery) : (result.description || '')
+                      }}
+                    />
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                       <div style={{

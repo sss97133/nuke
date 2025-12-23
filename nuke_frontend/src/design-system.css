@@ -178,6 +178,15 @@
   --heat-border: rgba(255, 255, 255, 0.10);
 }
 
+/* Search Highlighting */
+mark {
+  background-color: #fef08a;
+  color: #000;
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
 /* Greyscale / High contrast profiles */
 :root[data-contrast="greyscale"] {
   --primary: var(--text);

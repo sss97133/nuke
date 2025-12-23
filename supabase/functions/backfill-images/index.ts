@@ -240,22 +240,35 @@ serve(async (req: Request) => {
       errors: [] as string[]
     };
 
-    // Dedupe: skip images already linked by source_url for this vehicle
+    // Dedupe: skip images already linked by source_url OR file_hash for this vehicle
+    // Also check storage_path to catch legacy import_queue_* images that may be duplicates
     const { data: existingRows } = await supabase
       .from('vehicle_images')
-      .select('id, source_url, file_hash, is_primary, position')
+      .select('id, source_url, file_hash, storage_path, image_url, is_primary, position')
       .eq('vehicle_id', vehicle_id)
-      .not('source_url', 'is', null)
       .limit(5000);
     const existingBySourceUrl = new Map<string, any>();
     const existingFileHashes = new Set<string>();
+    const existingImageUrls = new Set<string>();
+    const legacyImportQueuePaths = new Set<string>();
+    
     for (const r of (existingRows || []) as any[]) {
       const u = String(r?.source_url || '');
-      if (!u) continue;
-      if (!existingBySourceUrl.has(u)) existingBySourceUrl.set(u, r);
+      if (u && !existingBySourceUrl.has(u)) {
+        existingBySourceUrl.set(u, r);
+      }
 
       const fh = String(r?.file_hash || '').trim();
       if (fh) existingFileHashes.add(fh);
+      
+      const imgUrl = String(r?.image_url || '').trim();
+      if (imgUrl) existingImageUrls.add(imgUrl);
+      
+      // Track legacy import_queue_* paths for cleanup
+      const storagePath = String(r?.storage_path || '');
+      if (storagePath.includes('import_queue_') && !storagePath.includes('/organization_import/') && !storagePath.includes('/external_import/')) {
+        legacyImportQueuePaths.add(r.id);
+      }
     }
     const existingSourceUrls = new Set(Array.from(existingBySourceUrl.keys()));
     const hasPrimaryAlready = (existingRows || []).some((r: any) => r?.is_primary === true);
@@ -306,6 +319,8 @@ serve(async (req: Request) => {
       }
       const rawUrl = uniqueUrls[i];
       processed++;
+      
+      // Check if we already have this image by source_url
       if (existingSourceUrls.has(rawUrl)) {
         // Self-heal ordering: older backfills didn't set position. If we have a row with NULL position,
         // set it using the gallery index so profiles become stable without requiring re-upload.
@@ -321,6 +336,13 @@ serve(async (req: Request) => {
         } catch {
           // ignore
         }
+        results.skipped++;
+        continue;
+      }
+      
+      // Check if image_url already exists (catches duplicates from different sources)
+      const normalizedUrl = normalizeSourceUrl(rawUrl);
+      if (existingImageUrls.has(normalizedUrl)) {
         results.skipped++;
         continue;
       }
@@ -443,7 +465,9 @@ serve(async (req: Request) => {
         }
 
         // If we already imported an identical image for this vehicle, skip creating a duplicate row.
+        // This catches duplicates even if source_url differs (e.g., import_queue_* vs organization_import/)
         if (fileHash && existingFileHashes.has(fileHash)) {
+          console.log(`Skipping duplicate image by file_hash: ${rawUrl.substring(0, 80)}...`);
           results.skipped++;
           continue;
         }
@@ -559,6 +583,41 @@ serve(async (req: Request) => {
 
         results.uploaded++;
         console.log(`Uploaded image ${i + 1}/${image_urls.length}: ${filename}`);
+        
+        // Cleanup: After successful upload, mark legacy import_queue_* images as duplicates
+        // This prevents the gallery from showing both the old import_queue_* and new organization_import/ images
+        if (fileHash && results.uploaded > 0) {
+          try {
+            // Find legacy import_queue images for this vehicle that might be duplicates
+            const { data: legacyImages } = await supabase
+              .from('vehicle_images')
+              .select('id, file_hash, storage_path')
+              .eq('vehicle_id', vehicle_id)
+              .like('storage_path', '%/import_queue_%')
+              .not('storage_path', 'like', '%/organization_import/%')
+              .not('storage_path', 'like', '%/external_import/%')
+              .eq('is_duplicate', false)
+              .limit(50);
+            
+            for (const legacy of (legacyImages || []) as any[]) {
+              const legacyHash = String(legacy?.file_hash || '').trim();
+              const legacyPath = String(legacy?.storage_path || '');
+              
+              // If legacy image has same hash, mark as duplicate
+              if (legacyHash && legacyHash === fileHash) {
+                await supabase
+                  .from('vehicle_images')
+                  .update({ is_duplicate: true })
+                  .eq('id', legacy.id)
+                  .catch(() => null);
+                console.log(`Marked legacy import_queue image as duplicate (same hash): ${legacyPath}`);
+              }
+            }
+          } catch (cleanupErr) {
+            // Non-blocking cleanup
+            console.log(`Cleanup warning: ${(cleanupErr as any)?.message || String(cleanupErr)}`);
+          }
+        }
 
         // UPDATE: Ensure vehicle has primary_image_url set (robust fallback)
         // After first successful image upload, ensure vehicle.primary_image_url is set

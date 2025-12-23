@@ -65,6 +65,21 @@ interface ComprehensiveBaTData {
   
   // Features and equipment
   features?: string[];
+  
+  // Comprehensive specs (from extractTechnicalSpecs)
+  horsepower?: number;
+  torque?: number;
+  mpg_city?: number;
+  mpg_highway?: number;
+  mpg_combined?: number;
+  top_speed?: number;
+  acceleration_0_60?: number;
+  curb_weight_lbs?: number;
+  length_inches?: number;
+  width_inches?: number;
+  height_inches?: number;
+  wheelbase_inches?: number;
+  fuel_capacity_gallons?: number;
 }
 
 // REMOVED: Large HTML parsing functions - using Firecrawl instead
@@ -446,6 +461,19 @@ function extractTechnicalSpecs(html: string): {
   body_style?: string;
   displacement?: string;
   mileage?: number;
+  horsepower?: number;
+  torque?: number;
+  mpg_city?: number;
+  mpg_highway?: number;
+  mpg_combined?: number;
+  top_speed?: number;
+  acceleration_0_60?: number;
+  curb_weight_lbs?: number;
+  length_inches?: number;
+  width_inches?: number;
+  height_inches?: number;
+  wheelbase_inches?: number;
+  fuel_capacity_gallons?: number;
 } {
   const specs: any = {};
   
@@ -601,6 +629,164 @@ function extractTechnicalSpecs(html: string): {
       // Limit length to avoid extracting too much
       if (interior.length > 0 && interior.length < 50) {
         specs.interior_color = interior;
+        break;
+      }
+    }
+  }
+  
+  // Extract horsepower - look for patterns like "100 hp", "100 horsepower", "100 bhp"
+  const hpPatterns = [
+    /(\d+)\s*(?:hp|horsepower|bhp)/i,
+    /Horsepower[:\s]*(\d+)/i,
+    /Power[:\s]*(\d+)\s*(?:hp|horsepower)/i,
+  ];
+  for (const pattern of hpPatterns) {
+    const match = essentialsText.match(pattern) || descriptionText.match(pattern) || html.match(pattern);
+    if (match) {
+      const hp = parseInt(match[1]);
+      if (hp > 0 && hp < 10000) {
+        specs.horsepower = hp;
+        break;
+      }
+    }
+  }
+  
+  // Extract torque - look for patterns like "106 lb-ft", "106 ft-lbs", "143 Nm"
+  const torquePatterns = [
+    /(\d+)\s*(?:lb-ft|ft-lbs|ft\.lbs)/i,
+    /Torque[:\s]*(\d+)\s*(?:lb-ft|ft-lbs)/i,
+    /(\d+)\s*Nm/i,
+  ];
+  for (const pattern of torquePatterns) {
+    const match = essentialsText.match(pattern) || descriptionText.match(pattern) || html.match(pattern);
+    if (match) {
+      const torque = parseInt(match[1]);
+      if (torque > 0 && torque < 2000) {
+        specs.torque = torque;
+        break;
+      }
+    }
+  }
+  
+  // Extract fuel economy - look for patterns like "24 mpg", "18/24 mpg", "18 city / 24 highway"
+  const mpgPatterns = [
+    /(\d+)\s*\/\s*(\d+)\s*mpg/i, // "18/24 mpg"
+    /(\d+)\s*city\s*\/\s*(\d+)\s*highway/i, // "18 city / 24 highway"
+    /(\d+)\s*mpg\s*city[,\s]+(\d+)\s*mpg\s*highway/i,
+    /(\d+)\s*mpg/i, // Single mpg value (combined)
+  ];
+  for (const pattern of mpgPatterns) {
+    const match = essentialsText.match(pattern) || descriptionText.match(pattern) || html.match(pattern);
+    if (match) {
+      if (match[2]) {
+        // Two values (city/highway)
+        specs.mpg_city = parseInt(match[1]);
+        specs.mpg_highway = parseInt(match[2]);
+        specs.mpg_combined = Math.round((parseInt(match[1]) + parseInt(match[2])) / 2);
+      } else {
+        // Single value (combined)
+        const mpg = parseInt(match[1]);
+        if (mpg > 0 && mpg < 200) {
+          specs.mpg_combined = mpg;
+        }
+      }
+      break;
+    }
+  }
+  
+  // Extract top speed - look for patterns like "110 mph", "132 mph top speed"
+  const topSpeedPatterns = [
+    /(\d+)\s*mph\s*(?:top\s*speed|maximum)/i,
+    /Top\s*speed[:\s]*(\d+)\s*mph/i,
+    /(\d+)\s*mph\s*top/i,
+  ];
+  for (const pattern of topSpeedPatterns) {
+    const match = essentialsText.match(pattern) || descriptionText.match(pattern) || html.match(pattern);
+    if (match) {
+      const speed = parseInt(match[1]);
+      if (speed > 0 && speed < 300) {
+        specs.top_speed = speed;
+        break;
+      }
+    }
+  }
+  
+  // Extract 0-60 acceleration - look for patterns like "10 seconds", "0-60 in 6.8 seconds"
+  const accelPatterns = [
+    /0-60[:\s]*(?:in\s*)?(\d+\.?\d*)\s*seconds?/i,
+    /(\d+\.?\d*)\s*seconds?\s*(?:0-60|to\s*60)/i,
+    /Acceleration[:\s]*(\d+\.?\d*)\s*seconds?/i,
+  ];
+  for (const pattern of accelPatterns) {
+    const match = essentialsText.match(pattern) || descriptionText.match(pattern) || html.match(pattern);
+    if (match) {
+      const accel = parseFloat(match[1]);
+      if (accel > 0 && accel < 30) {
+        specs.acceleration_0_60 = accel;
+        break;
+      }
+    }
+  }
+  
+  // Extract weight - look for patterns like "2,300 lbs", "2300 pounds", "curb weight 2300"
+  const weightPatterns = [
+    /(?:curb\s*weight|weight)[:\s]*(\d{1,4}(?:,\d{3})*)\s*(?:lbs|pounds?)/i,
+    /(\d{1,4}(?:,\d{3})*)\s*(?:lbs|pounds?)\s*(?:curb|weight)/i,
+  ];
+  for (const pattern of weightPatterns) {
+    const match = essentialsText.match(pattern) || descriptionText.match(pattern) || html.match(pattern);
+    if (match) {
+      const weight = parseInt(match[1].replace(/,/g, ''));
+      if (weight > 500 && weight < 20000) {
+        specs.curb_weight_lbs = weight;
+        break;
+      }
+    }
+  }
+  
+  // Extract dimensions - look for patterns like "166.5 inches", "166.5\" length"
+  const dimensionPatterns = [
+    /Length[:\s]*(\d+\.?\d*)\s*(?:inches?|"|in\.?)/i,
+    /Width[:\s]*(\d+\.?\d*)\s*(?:inches?|"|in\.?)/i,
+    /Height[:\s]*(\d+\.?\d*)\s*(?:inches?|"|in\.?)/i,
+    /Wheelbase[:\s]*(\d+\.?\d*)\s*(?:inches?|"|in\.?)/i,
+  ];
+  
+  const lengthMatch = html.match(/Length[:\s]*(\d+\.?\d*)\s*(?:inches?|"|in\.?)/i);
+  if (lengthMatch) {
+    const length = parseFloat(lengthMatch[1]);
+    if (length > 0 && length < 1000) specs.length_inches = length;
+  }
+  
+  const widthMatch = html.match(/Width[:\s]*(\d+\.?\d*)\s*(?:inches?|"|in\.?)/i);
+  if (widthMatch) {
+    const width = parseFloat(widthMatch[1]);
+    if (width > 0 && width < 200) specs.width_inches = width;
+  }
+  
+  const heightMatch = html.match(/Height[:\s]*(\d+\.?\d*)\s*(?:inches?|"|in\.?)/i);
+  if (heightMatch) {
+    const height = parseFloat(heightMatch[1]);
+    if (height > 0 && height < 150) specs.height_inches = height;
+  }
+  
+  const wheelbaseMatch = html.match(/Wheelbase[:\s]*(\d+\.?\d*)\s*(?:inches?|"|in\.?)/i);
+  if (wheelbaseMatch) {
+    const wheelbase = parseFloat(wheelbaseMatch[1]);
+    if (wheelbase > 0 && wheelbase < 300) specs.wheelbase_inches = wheelbase;
+  }
+  
+  // Extract fuel capacity - look for patterns like "15 gallons", "15 gal tank"
+  const fuelCapPatterns = [
+    /(?:fuel\s*capacity|tank\s*size)[:\s]*(\d+\.?\d*)\s*(?:gallons?|gal\.?)/i,
+    /(\d+\.?\d*)\s*(?:gallons?|gal\.?)\s*(?:fuel|tank)/i,
+  ];
+  for (const pattern of fuelCapPatterns) {
+    const match = essentialsText.match(pattern) || descriptionText.match(pattern) || html.match(pattern);
+    if (match) {
+      const capacity = parseFloat(match[1]);
+      if (capacity > 0 && capacity < 200) {
+        specs.fuel_capacity_gallons = capacity;
         break;
       }
     }
@@ -1813,6 +1999,34 @@ Deno.serve(async (req) => {
       if (extractedData.view_count !== undefined) vehicleUpdates.bat_views = extractedData.view_count;
       // Store comment_count in bat_comments field
       if (extractedData.comment_count !== undefined) vehicleUpdates.bat_comments = extractedData.comment_count;
+      
+      // Trigger organization extraction for seller (async, fire and forget)
+      // This follows seller links to external sites and creates organization profiles
+      if (extractedData.seller && vehicleId) {
+        supabase.functions.invoke('extract-organization-from-seller', {
+          body: {
+            seller_name: extractedData.seller,
+            platform: 'bat',
+            vehicle_id: vehicleId,
+            // BaT sellers don't have direct profile URLs, but we can still extract from their username
+          }
+        }).catch(err => {
+          console.warn('Failed to trigger organization extraction for seller (non-fatal):', err);
+        });
+      }
+      
+      // Comprehensive specs from extraction (already extracted in extractTechnicalSpecs)
+      if ((extractedData as any).horsepower) vehicleUpdates.horsepower = (extractedData as any).horsepower;
+      if ((extractedData as any).torque) vehicleUpdates.torque = (extractedData as any).torque;
+      if ((extractedData as any).mpg_city) vehicleUpdates.mpg_city = (extractedData as any).mpg_city;
+      if ((extractedData as any).mpg_highway) vehicleUpdates.mpg_highway = (extractedData as any).mpg_highway;
+      if ((extractedData as any).mpg_combined) vehicleUpdates.mpg_combined = (extractedData as any).mpg_combined;
+      if ((extractedData as any).curb_weight_lbs) vehicleUpdates.weight_lbs = (extractedData as any).curb_weight_lbs;
+      if ((extractedData as any).length_inches) vehicleUpdates.length_inches = (extractedData as any).length_inches;
+      if ((extractedData as any).width_inches) vehicleUpdates.width_inches = (extractedData as any).width_inches;
+      if ((extractedData as any).height_inches) vehicleUpdates.height_inches = (extractedData as any).height_inches;
+      if ((extractedData as any).wheelbase_inches) vehicleUpdates.wheelbase_inches = (extractedData as any).wheelbase_inches;
+      if ((extractedData as any).fuel_capacity_gallons) vehicleUpdates.fuel_capacity_gallons = (extractedData as any).fuel_capacity_gallons;
       
       // Store features in origin_metadata
       if (extractedData.features && Array.isArray(extractedData.features) && extractedData.features.length > 0) {
