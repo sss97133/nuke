@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { extractBatListingWithFirecrawl } from '../_shared/batFirecrawlMapper.ts';
+import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
