@@ -16,7 +16,7 @@ serve(async (req) => {
 
   try {
     const { 
-      batch_size = 15, // Process 15 listings per run (to avoid timeout)
+      batch_size = 50, // Increased for Large compute (160 direct, 800 pooler connections)
       user_id = null // Optional: user_id for vehicle creation
     } = await req.json()
 

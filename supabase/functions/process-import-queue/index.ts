@@ -480,7 +480,7 @@ serve(async (req) => {
 
     const body: ProcessRequest = await req.json().catch(() => ({}));
     const {
-      batch_size = 20,
+      batch_size = 40, // Increased for Large compute (faster DB operations)
       priority_only = false,
       source_id,
       fast_mode = false,
