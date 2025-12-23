@@ -74,27 +74,71 @@ serve(async (req) => {
         })
 
         if (!searchResp.ok) {
-          const errorText = await searchResp.text()
-          console.log(`   ⚠️  Firecrawl search failed: ${searchResp.status}`, errorText)
+          const errorText = await searchResp.text().catch(() => '')
+          console.log(`   ⚠️  Firecrawl search failed: ${searchResp.status}`, errorText.substring(0, 200))
+          
+          // If 403, LMC is blocking - skip this part
+          if (searchResp.status === 403) {
+            console.log(`   🚫 LMC blocking detected (403), skipping part ${part.part_number}`)
+          }
+          
           results.failed++
           continue
         }
 
-        const searchData = await searchResp.json()
-        console.log(`   📊 Search response:`, JSON.stringify(searchData).substring(0, 200))
+        const searchData = await searchResp.json().catch(() => null)
+        if (!searchData || !searchData.success) {
+          console.log(`   ⚠️  Invalid Firecrawl response`)
+          results.failed++
+          continue
+        }
+        
+        console.log(`   📊 Search response received`)
         const searchHtml = searchData.data?.html || ''
+        const searchMarkdown = searchData.data?.markdown || ''
 
-        // Find product URL
+        // Try multiple patterns to find product URL
+        let productUrl: string | null = null
+        
+        // Pattern 1: href="/products/..."
         const productLinkMatch = searchHtml.match(/href="([^"]*\/products\/[^"]*)"/)
-        if (!productLinkMatch) {
-          console.log(`   ⚠️  No product found`)
+        if (productLinkMatch) {
+          productUrl = productLinkMatch[1]
+        }
+        
+        // Pattern 2: href="/product/..." (alternative path)
+        if (!productUrl) {
+          const altMatch = searchHtml.match(/href="([^"]*\/product\/[^"]*)"/)
+          if (altMatch) {
+            productUrl = altMatch[1]
+          }
+        }
+        
+        // Pattern 3: Direct product link in markdown
+        if (!productUrl && searchMarkdown) {
+          const mdMatch = searchMarkdown.match(/\[([^\]]+)\]\(([^)]*\/products?\/[^)]+)\)/)
+          if (mdMatch && mdMatch[2]) {
+            productUrl = mdMatch[2]
+          }
+        }
+        
+        // Pattern 4: Search for part number in URL
+        if (!productUrl) {
+          const partNumMatch = searchHtml.match(new RegExp(`href="([^"]*${part.part_number}[^"]*)"`, 'i'))
+          if (partNumMatch) {
+            productUrl = partNumMatch[1]
+          }
+        }
+        
+        if (!productUrl) {
+          console.log(`   ⚠️  No product URL found for ${part.part_number}`)
           results.failed++
           continue
         }
 
-        let productUrl = productLinkMatch[1]
+        // Ensure absolute URL
         if (!productUrl.startsWith('http')) {
-          productUrl = `https://www.lmctruck.com${productUrl}`
+          productUrl = `https://www.lmctruck.com${productUrl.startsWith('/') ? '' : '/'}${productUrl}`
         }
 
         console.log(`   📄 Product: ${productUrl}`)
@@ -113,12 +157,25 @@ serve(async (req) => {
         })
 
         if (!productResp.ok) {
-          console.log(`   ⚠️  Product page failed: ${productResp.status}`)
+          const errorText = await productResp.text().catch(() => '')
+          console.log(`   ⚠️  Product page failed: ${productResp.status}`, errorText.substring(0, 200))
+          
+          // If 403, LMC is blocking - skip this part
+          if (productResp.status === 403) {
+            console.log(`   🚫 LMC blocking detected (403) for product page`)
+          }
+          
           results.failed++
           continue
         }
 
-        const productData = await productResp.json()
+        const productData = await productResp.json().catch(() => null)
+        if (!productData || !productData.success) {
+          console.log(`   ⚠️  Invalid product page response`)
+          results.failed++
+          continue
+        }
+        
         const productHtml = productData.data?.html || ''
         const productMarkdown = productData.data?.markdown || ''
 
@@ -171,8 +228,8 @@ serve(async (req) => {
           })
         }
 
-      } catch (error) {
-        console.error(`   ❌ Error: ${error.message}`)
+      } catch (error: any) {
+        console.error(`   ❌ Error: ${error?.message || String(error)}`)
         results.failed++
       }
 

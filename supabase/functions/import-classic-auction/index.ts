@@ -319,6 +319,36 @@ serve(async (req) => {
       }
     }
 
+    // Extract seller links and trigger organization extraction
+    // Pattern: <a href="/s/2002ad-8pJl1On/lots/...">2002AD</a> or similar
+    const sellerLinkPattern = /<a[^>]+href=["']([^"']*\/s\/[^"']+)["'][^>]*>([^<]+)<\/a>/gi;
+    const sellerMatches = Array.from(html.matchAll(sellerLinkPattern));
+    
+    for (const match of sellerMatches) {
+      const sellerUrl = match[1].startsWith('http') ? match[1] : `https://www.classic.com${match[1]}`;
+      const sellerName = match[2].trim();
+      
+      // Only process if it looks like a seller profile (not a vehicle listing)
+      if (sellerUrl.includes('/s/') && sellerName.length > 0 && sellerName.length < 100) {
+        console.log(`🔍 Found seller link: ${sellerName} -> ${sellerUrl}`);
+        
+        // Trigger organization extraction (async, fire and forget)
+        supabase.functions.invoke('extract-organization-from-seller', {
+          body: {
+            seller_name: sellerName,
+            seller_url: sellerUrl,
+            platform: 'classic_com',
+            vehicle_id: vehicleId,
+          }
+        }).catch(err => {
+          console.warn('Failed to trigger organization extraction for seller (non-fatal):', err);
+        });
+        
+        // Only process first seller link to avoid duplicates
+        break;
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

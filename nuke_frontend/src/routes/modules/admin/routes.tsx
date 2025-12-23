@@ -14,6 +14,7 @@ import PriceCsvImport from '../../../pages/admin/PriceCsvImport';
 import ShippingSettings from '../../../pages/admin/ShippingSettings';
 import X402Settings from '../../../pages/admin/X402Settings';
 import KSLScraper from '../../../pages/admin/KSLScraper';
+import ScraperDashboard from '../../../pages/admin/ScraperDashboard';
 import MemeLibraryAdmin from '../../../pages/admin/MemeLibraryAdmin';
 import ScriptControlCenter from '../../../pages/ScriptControlCenter';
 import ImageProcessingDashboard from '../../../pages/ImageProcessingDashboard';
@@ -63,6 +64,7 @@ const AdminModuleRoutes = () => {
         <Route path="shipping-settings" element={<ShippingSettings />} />
         <Route path="x402-settings" element={<X402Settings />} />
         <Route path="ksl-scraper" element={<KSLScraper />} />
+        <Route path="scrapers" element={<ScraperDashboard />} />
         <Route path="meme-library" element={<MemeLibraryAdmin />} />
         <Route path="catalog" element={<CatalogBrowser />} />
         <Route path="make-logos-catalog" element={<VehicleMakeLogosCatalog />} />

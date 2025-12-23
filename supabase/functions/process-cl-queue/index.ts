@@ -357,8 +357,9 @@ serve(async (req) => {
           }
         }
 
-        const finalMake = make || data.make || ''
-        const finalModel = model || data.model || 'Unknown'
+        // Only use extracted data - don't fill with defaults
+        const finalMake = make || data.make || null
+        const finalModel = model || data.model || null
 
         // Filter for squarebodies (1973-1991 Chevy/GMC)
         const isSquarebody = 
@@ -412,12 +413,14 @@ serve(async (req) => {
           continue
         }
 
-        if (!finalMake || finalMake.trim() === '') {
+        // Validate required fields - but don't fail if optional fields are missing
+        // Only fail if critical fields are missing (year is required, make/model can be null)
+        if (!yearNum || isNaN(yearNum)) {
           await supabase
             .from('craigslist_listing_queue')
             .update({
               status: 'failed',
-              error_message: `Missing make`,
+              error_message: `Missing or invalid year`,
               updated_at: new Date().toISOString()
             })
             .eq('id', queueItem.id)
@@ -444,8 +447,8 @@ serve(async (req) => {
           }
         }
 
-        // Try to find by year/make/model
-        if (!vehicleId) {
+        // Try to find by year/make/model (only if we have make and model)
+        if (!vehicleId && finalMake && finalModel) {
           const { data: existing } = await supabase
             .from('vehicles')
             .select('id')
@@ -467,8 +470,8 @@ serve(async (req) => {
             .from('vehicles')
             .insert({
               year: yearNum,
-              make: finalMake.charAt(0).toUpperCase() + finalMake.slice(1),
-              model: finalModel,
+              make: finalMake ? (finalMake.charAt(0).toUpperCase() + finalMake.slice(1)) : null,
+              model: finalModel || null,
               discovery_source: 'craigslist_scrape',
               discovery_url: queueItem.listing_url,
               listing_source: 'craigslist',
@@ -602,66 +605,74 @@ serve(async (req) => {
             })
 
             // Create timeline event
-if (data.posted_date) {
+// Create timeline event ONLY if we have the listing posted date (not import date)
+              const listingPostedAt = (data as any)?.listing_posted_at || data.posted_date
+              if (listingPostedAt) {
               try {
-                let eventDate = new Date().toISOString().split('T')[0] // Default to today
+                let eventDate: string | null = null
                 
-                // Parse posted_date - it should be an ISO string like "2025-11-27T15:00:37.000Z"
+                // Parse listing posted date - must be valid, don't default to today
                 try {
-                  const parsedDate = new Date(data.posted_date)
+                  const parsedDate = new Date(listingPostedAt)
                   if (!isNaN(parsedDate.getTime())) {
                     // Extract just the date part (YYYY-MM-DD)
                     eventDate = parsedDate.toISOString().split('T')[0]
                   } else {
                     // Fallback: try regex extraction
-                    const dateMatch = data.posted_date.match(/(\d{4})-(\d{2})-(\d{2})/)
+                    const dateMatch = String(listingPostedAt).match(/(\d{4})-(\d{2})-(\d{2})/)
                     if (dateMatch) {
                       eventDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
                     }
                   }
                 } catch (parseErr) {
                   // Fallback: try regex extraction
-                  const dateMatch = data.posted_date.match(/(\d{4})-(\d{2})-(\d{2})/)
+                  const dateMatch = String(listingPostedAt).match(/(\d{4})-(\d{2})-(\d{2})/)
                   if (dateMatch) {
                     eventDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
                   }
                 }
+                
+                // Only create timeline event if we successfully parsed the listing date
+                if (!eventDate) {
+                  console.warn(`  ⚠️ Could not parse listing date for timeline event: ${listingPostedAt}`)
+                } else {
 
-                // Idempotency: avoid duplicate "Listed on Craigslist" events for the same listing URL.
-                const { data: existingEvent } = await supabase
-                  .from('timeline_events')
-                  .select('id')
-                  .eq('vehicle_id', vehicleId)
-                  .eq('event_type', 'discovery')
-                  .eq('source', 'craigslist')
-                  .eq('metadata->>listing_url', queueItem.listing_url)
-                  .limit(1)
-                  .maybeSingle()
+                  // Idempotency: avoid duplicate "Listed on Craigslist" events for the same listing URL.
+                  const { data: existingEvent } = await supabase
+                    .from('timeline_events')
+                    .select('id')
+                    .eq('vehicle_id', vehicleId)
+                    .eq('event_type', 'discovery')
+                    .eq('source', 'craigslist')
+                    .eq('metadata->>listing_url', queueItem.listing_url)
+                    .limit(1)
+                    .maybeSingle()
 
-                if (!existingEvent?.id) {
-await supabase
-                  .from('timeline_events')
-                  .insert({
-                    vehicle_id: vehicleId,
-                    user_id: importUserId,
-                    event_type: 'discovery',
-                    source: 'craigslist',
-                    title: `Listed on Craigslist`,
-                    event_date: eventDate,
-                    description: `Vehicle listed for sale on Craigslist${data.asking_price ? ` for $${data.asking_price.toLocaleString()}` : ''}`,
-                    metadata: {
-                      listing_url: queueItem.listing_url,
-                      asking_price: data.asking_price || data.price,
-                      location: data.location,
-                        posted_date: data.posted_date,
-                        listing_posted_at: (data as any)?.listing_posted_at || null,
-                        listing_updated_at: (data as any)?.listing_updated_at || null,
-                    }
-                  })
+                  if (!existingEvent?.id) {
+                    await supabase
+                      .from('timeline_events')
+                      .insert({
+                        vehicle_id: vehicleId,
+                        user_id: importUserId,
+                        event_type: 'discovery',
+                        source: 'craigslist',
+                        title: `Listed on Craigslist`,
+                        event_date: eventDate, // This is the listing posted date, not import date
+                        description: `Vehicle listed for sale on Craigslist${data.asking_price ? ` for $${data.asking_price.toLocaleString()}` : ''}`,
+                        metadata: {
+                          listing_url: queueItem.listing_url,
+                          asking_price: data.asking_price || null,
+                          location: data.location || null,
+                          posted_date: data.posted_date || null,
+                          listing_posted_at: (data as any)?.listing_posted_at || null,
+                          listing_updated_at: (data as any)?.listing_updated_at || null,
+                        }
+                      })
+                  }
                 }
-} catch (timelineErr) {
+              } catch (timelineErr) {
                 console.warn(`  ⚠️ Timeline event creation error:`, timelineErr)
-}
+              }
             } else {
 }
 
@@ -911,20 +922,14 @@ const data: any = {
   const titleElement = doc.querySelector('h1, .postingtitletext #titletextonly')
   if (titleElement) {
     data.title = titleElement.textContent.trim()
-const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
-    if (yearMatch) data.year = yearMatch[0]
     
-    // Improved make/model extraction - handle models with dashes like "F-150"
-    // Strategy: Extract year and make first, then everything else until price is the model
-    // Example: "2010 Ford F-150 Super Crew Harley-Davidson Edition - $14,995"
-    
-    // Step 1: Extract year
+    // Step 1: Extract year from title
     const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
     if (yearMatch) {
       data.year = yearMatch[0]
     }
     
-    // Step 2: Extract make (common makes)
+    // Step 2: Extract make (common makes) - only set if found
     const makePatterns = [
       /\b(19|20)\d{2}\s+(Ford|Chevrolet|Chevy|GMC|Toyota|Honda|Nissan|Dodge|Jeep|BMW|Mercedes|Audi|Volkswagen|VW|Lexus|Acura|Infiniti|Mazda|Subaru|Mitsubishi|Hyundai|Kia|Volvo|Porsche|Jaguar|Land Rover|Range Rover|Tesla|Genesis|Alfa Romeo|Fiat|Mini|Cadillac|Buick|Pontiac|Oldsmobile|Lincoln|Chrysler)\b/i
     ]
@@ -943,6 +948,7 @@ const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
     }
     
     // Step 3: Extract model - everything between make and price/location
+    // Only set model if we found a make (don't guess)
     if (makeFound && data.make) {
       // Remove year and make from title
       const afterMake = data.title.replace(new RegExp(`\\b(19|20)\\d{2}\\s+${data.make}\\s+`, 'i'), '')
@@ -964,15 +970,29 @@ const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
       // Remove emojis and special characters that might be in the title
       modelText = modelText.replace(/[🚨🏁🏍️✨🧰⚙️🕒🛞🔥💺🧵🌞📡📷🧼🧷🏷️🏢🤝📍📞🌐💳🪙🧾]/g, '').trim()
       
-      if (modelText && modelText.length > 0) {
+      // Only set model if we have meaningful text (at least 2 chars)
+      if (modelText && modelText.length >= 2) {
         data.model = modelText
       }
+      // If modelText is empty or too short, leave data.model undefined (don't fill)
     }
 const priceMatch = data.title.match(/\$\s*([\d,]+)/)
     if (priceMatch) data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
     
     const locationMatch = data.title.match(/\(([^)]+)\)\s*$/i)
     if (locationMatch) data.location = locationMatch[1].trim()
+  }
+
+  // Extract price from .price element (primary method - more reliable than title)
+  if (!data.asking_price) {
+    const priceElement = doc.querySelector('.price')
+    if (priceElement) {
+      const priceText = priceElement.textContent?.trim() || ''
+      const priceMatch = priceText.match(/\$?\s*([\d,]+)/)
+      if (priceMatch) {
+        data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
+      }
+    }
   }
 
   // Prefer Craigslist's map address/location when present (more precise than title parentheses).
@@ -1127,9 +1147,36 @@ const attrGroups = doc.querySelectorAll('.attrgroup')
     })
   })
   
+  // Extract description from #postingbody (primary method)
   const descElement = doc.querySelector('#postingbody')
   if (descElement) {
-    data.description = descElement.textContent.replace(/QR Code Link to This Post\s*/i, '').trim().substring(0, 5000)
+    // Get full text content, clean up common CL artifacts
+    let descText = descElement.textContent || descElement.innerText || ''
+    // Remove QR code link text
+    descText = descText.replace(/QR Code Link to This Post\s*/gi, '')
+    // Remove excessive whitespace
+    descText = descText.replace(/\s+/g, ' ').trim()
+    // Store full description (up to 10k chars for comprehensive details)
+    if (descText) {
+      data.description = descText.substring(0, 10000)
+    }
+  }
+  
+  // Fallback: try section.userbody if #postingbody not found
+  if (!data.description) {
+    const userbodyElement = doc.querySelector('section.userbody')
+    if (userbodyElement) {
+      // Extract text but skip the attributes section
+      const postingBody = userbodyElement.querySelector('#postingbody')
+      if (postingBody) {
+        let descText = postingBody.textContent || postingBody.innerText || ''
+        descText = descText.replace(/QR Code Link to This Post\s*/gi, '')
+        descText = descText.replace(/\s+/g, ' ').trim()
+        if (descText) {
+          data.description = descText.substring(0, 10000)
+        }
+      }
+    }
   }
 
   // Canonical keys for UI: listing_posted_at mirrors posted_date for Craigslist.

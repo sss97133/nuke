@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { advancedSearchService } from '../../services/advancedSearchService';
 import { fullTextSearchService } from '../../services/fullTextSearchService';
 import { UnifiedImageImportService } from '../../services/unifiedImageImportService';
 import { FaviconIcon } from '../common/FaviconIcon';
 import { extractAndCacheFavicon, detectSourceType } from '../../services/sourceFaviconService';
+import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
 import '../../design-system.css';
 
 interface SearchResult {
@@ -49,15 +51,26 @@ interface IntelligentSearchProps {
 }
 
 const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }: IntelligentSearchProps) => {
+  const navigate = useNavigate();
   const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
   const [query, setQuery] = useState(initialQuery);
   const [isSearching, setIsSearching] = useState(false);
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('nuke_search_history');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [autocompleteResults, setAutocompleteResults] = useState<Array<{id: string; title: string; type: string}>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [hasInitialSearched, setHasInitialSearched] = useState(false);
   const lastSearchedRef = useRef<string>('');
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Common search patterns and their translations
   const searchPatterns = [
@@ -85,7 +98,90 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     'Custom fabrication shops nearby'
   ];
 
+  // Load search history on mount
   useEffect(() => {
+    try {
+      const stored = localStorage.getItem('nuke_search_history');
+      if (stored) {
+        setSearchHistory(JSON.parse(stored));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Save search history
+  const saveToHistory = (searchTerm: string) => {
+    if (!searchTerm.trim()) return;
+    const trimmed = searchTerm.trim();
+    setSearchHistory(prev => {
+      const updated = [trimmed, ...prev.filter(h => h !== trimmed)].slice(0, 10);
+      try {
+        localStorage.setItem('nuke_search_history', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+  };
+
+  // Real-time autocomplete
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    if (query.length > 2 && !isSearching) {
+      debounceTimerRef.current = setTimeout(async () => {
+        try {
+          // Quick autocomplete search
+          const [vehicles, orgs] = await Promise.all([
+            supabase
+              .from('vehicles')
+              .select('id, year, make, model')
+              .eq('is_public', true)
+              .or(`make.ilike.%${escapeILike(query)}%,model.ilike.%${escapeILike(query)}%,year::text.ilike.%${escapeILike(query)}%`)
+              .limit(3),
+            supabase
+              .from('businesses')
+              .select('id, business_name')
+              .eq('is_public', true)
+              .ilike('business_name', `%${escapeILike(query)}%`)
+              .limit(3)
+          ]);
+
+          const results: Array<{id: string; title: string; type: string}> = [];
+          
+          if (vehicles.data) {
+            vehicles.data.forEach((v: any) => {
+              results.push({
+                id: v.id,
+                title: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim(),
+                type: 'vehicle'
+              });
+            });
+          }
+          
+          if (orgs.data) {
+            orgs.data.forEach((o: any) => {
+              results.push({
+                id: o.id,
+                title: o.business_name,
+                type: 'organization'
+              });
+            });
+          }
+
+          setAutocompleteResults(results);
+        } catch (error) {
+          console.error('Autocomplete error:', error);
+        }
+      }, 300);
+    } else {
+      setAutocompleteResults([]);
+    }
+
+    // Update suggestions from common list
     if (query.length > 2) {
       const filtered = commonSuggestions.filter(s =>
         s.toLowerCase().includes(query.toLowerCase()) && s.toLowerCase() !== query.toLowerCase()
@@ -94,7 +190,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     } else {
       setSuggestions([]);
     }
-  }, [query]);
+  }, [query, isSearching]);
 
   const parseSearchQuery = (searchQuery: string) => {
     const queryAnalysis = {
@@ -924,7 +1020,30 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       }
 
       // Use full-text search
-      const orgs = await fullTextSearchService.searchBusinesses(searchTerm, { limit: 15 });
+      let orgs = await fullTextSearchService.searchBusinesses(searchTerm, { limit: 15 });
+
+      // Fallback to simple ILIKE search if full-text search returns no results
+      if (orgs.length === 0) {
+        const { data: simpleSearchOrgs, error: simpleError } = await supabase
+          .from('businesses')
+          .select('id, business_name, legal_name, description, city, state, created_at')
+          .eq('is_public', true)
+          .or(`business_name.ilike.%${searchTermSafe}%,legal_name.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`)
+          .limit(15);
+
+        if (!simpleError && simpleSearchOrgs) {
+          orgs = simpleSearchOrgs.map((org: any) => ({
+            id: org.id,
+            business_name: org.business_name,
+            legal_name: org.legal_name,
+            description: org.description,
+            city: org.city,
+            state: org.state,
+            created_at: org.created_at,
+            relevance: 0.8 // Default relevance for simple search
+          }));
+        }
+      }
 
       // Also search through related vehicles
       const yearMatch = searchTerm.match(/^\d{4}$/);
@@ -943,7 +1062,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       const { data: relatedVehicles } = await relatedVehiclesQuery.limit(5);
 
       // Fetch full org details for location data
-      const orgIds = orgs.map(o => o.id);
+      const orgIds = orgs.map((o: any) => o.id);
       const { data: orgDetails } = orgIds.length > 0 ? await supabase
         .from('businesses')
         .select('id, latitude, longitude, address, business_type, specializations, services_offered')
@@ -954,7 +1073,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         return acc;
       }, {});
 
-      return orgs.map(org => {
+      return orgs.map((org: any) => {
         const details = orgDetailsMap[org.id] || {};
         return {
           id: org.id,
@@ -1391,18 +1510,64 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     console.log('🔘 GO button clicked, query:', searchTerm);
     if (searchTerm) {
       console.log('✅ Executing search...');
+      saveToHistory(searchTerm);
       executeSearch(searchTerm);
       setShowSuggestions(false);
+      
+      // Track search analytics
+      try {
+        supabase.from('search_analytics').insert({
+          query: searchTerm,
+          timestamp: new Date().toISOString()
+        }).catch(() => {
+          // Ignore analytics errors
+        });
+      } catch {
+        // Ignore
+      }
     } else {
       console.log('⚠️ Empty query, not searching');
     }
   };
 
-  // Add explicit keyboard handler for Enter key
+  // Keyboard shortcut: Cmd/Ctrl+K to focus search
+  useKeyboardShortcut({
+    key: 'k',
+    meta: true,
+    callback: () => {
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+        setShowSuggestions(true);
+      }
+    }
+  });
+
+  // Add explicit keyboard handler for Enter key and navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit();
+      if (selectedSuggestionIndex >= 0 && autocompleteResults.length > 0) {
+        const selected = autocompleteResults[selectedSuggestionIndex];
+        if (selected.type === 'vehicle') {
+          navigate(`/vehicle/${selected.id}`);
+        } else if (selected.type === 'organization') {
+          navigate(`/org/${selected.id}`);
+        }
+        setShowSuggestions(false);
+      } else {
+        handleSubmit();
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => 
+        prev < autocompleteResults.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
     }
   };
 
@@ -1447,9 +1612,12 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             ref={searchInputRef}
             type="text"
             className="input"
-            placeholder="Search..."
+            placeholder="Search vehicles, organizations, parts... (⌘K)"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedSuggestionIndex(-1);
+            }}
             onKeyDown={handleKeyDown}
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
@@ -1490,25 +1658,70 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         </div>
       </form>
 
-      {/* Search Suggestions */}
-      {showSuggestions && (suggestions.length > 0 || searchHistory.length > 0) && (
+      {/* Search Suggestions & Autocomplete */}
+      {showSuggestions && (autocompleteResults.length > 0 || suggestions.length > 0 || searchHistory.length > 0) && (
         <div style={{
           position: 'absolute',
           top: '100%',
           left: 0,
           right: 0,
           background: 'var(--surface)',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
+          border: '2px solid #000',
+          borderRadius: '0px',
           marginTop: '4px',
           boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
           zIndex: 1000,
-          maxHeight: '300px',
+          maxHeight: '400px',
           overflowY: 'auto'
         }}>
-          {suggestions.length > 0 && (
+          {/* Autocomplete Results */}
+          {autocompleteResults.length > 0 && (
             <div style={{ padding: '8px 0' }}>
-              <div style={{ padding: '4px 16px', fontSize: '12px', fontWeight: 'bold', color: '#6b7280' }}>
+              <div style={{ padding: '4px 16px', fontSize: '8pt', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
+                Quick Results
+              </div>
+              {autocompleteResults.map((result, index) => (
+                <div
+                  key={result.id}
+                  onClick={() => {
+                    if (result.type === 'vehicle') {
+                      navigate(`/vehicle/${result.id}`);
+                    } else if (result.type === 'organization') {
+                      navigate(`/org/${result.id}`);
+                    }
+                    setShowSuggestions(false);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    cursor: 'pointer',
+                    fontSize: '9pt',
+                    borderBottom: '1px solid #e5e7eb',
+                    background: selectedSuggestionIndex === index ? '#f0f0f0' : 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={() => setSelectedSuggestionIndex(index)}
+                  onMouseLeave={() => setSelectedSuggestionIndex(-1)}
+                >
+                  <span style={{
+                    fontSize: '8pt',
+                    fontWeight: 700,
+                    color: '#000',
+                    minWidth: '20px'
+                  }}>
+                    {result.type === 'vehicle' ? 'V' : 'O'}
+                  </span>
+                  <span style={{ flex: 1 }}>{result.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Suggestions */}
+          {suggestions.length > 0 && (
+            <div style={{ padding: '8px 0', borderTop: autocompleteResults.length > 0 ? '1px solid #e5e7eb' : 'none' }}>
+              <div style={{ padding: '4px 16px', fontSize: '8pt', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
                 Suggestions
               </div>
               {suggestions.map((suggestion, index) => (
@@ -1518,10 +1731,10 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                   style={{
                     padding: '8px 16px',
                     cursor: 'pointer',
-                    fontSize: '14px',
-                    borderBottom: '1px solid #f3f4f6'
+                    fontSize: '9pt',
+                    borderBottom: '1px solid #e5e7eb'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                 >
                   {suggestion}
@@ -1530,22 +1743,23 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             </div>
           )}
 
+          {/* Recent Searches */}
           {searchHistory.length > 0 && (
-            <div style={{ padding: '8px 0', borderTop: '1px solid #f3f4f6' }}>
-              <div style={{ padding: '4px 16px', fontSize: '12px', fontWeight: 'bold', color: '#6b7280' }}>
+            <div style={{ padding: '8px 0', borderTop: (autocompleteResults.length > 0 || suggestions.length > 0) ? '1px solid #e5e7eb' : 'none' }}>
+              <div style={{ padding: '4px 16px', fontSize: '8pt', fontWeight: 700, color: '#000', textTransform: 'uppercase' }}>
                 Recent Searches
               </div>
-              {searchHistory.slice(0, 3).map((historyQuery, index) => (
+              {searchHistory.slice(0, 5).map((historyQuery, index) => (
                 <div
                   key={index}
                   onClick={() => handleSuggestionClick(historyQuery)}
                   style={{
                     padding: '8px 16px',
                     cursor: 'pointer',
-                    fontSize: '14px',
-                    color: '#6b7280'
+                    fontSize: '9pt',
+                    color: '#666'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
                 >
                   {historyQuery}

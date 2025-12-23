@@ -48,30 +48,68 @@ export default function KSLScraper() {
       // Option 2: For now, we'll show instructions to run the script
       // In production, you'd set up a Vercel serverless function or similar
       
-      const { data, error } = await supabase.functions.invoke('scrape-ksl-listings', {
-        body: {
-          searchUrl: searchUrl.trim(),
-          maxListings,
-          importToDb
-        }
-      });
+      let data, error;
+      try {
+        const result = await supabase.functions.invoke('scrape-ksl-listings', {
+          body: {
+            searchUrl: searchUrl.trim(),
+            maxListings,
+            importToDb
+          }
+        });
+        data = result.data;
+        error = result.error;
+      } catch (invokeError: any) {
+        // Network or connection errors
+        console.error('Function invoke error:', invokeError);
+        const errorMsg = invokeError?.message || invokeError?.toString() || 'Network error';
+        throw new Error(`Failed to connect to scrape-ksl-listings function: ${errorMsg}`);
+      }
 
       if (error) {
-        throw new Error(error.message || 'Scrape failed');
+        console.error('KSL scrape error:', error);
+        const errorMsg = error?.message || error?.toString() || JSON.stringify(error) || 'Unknown error';
+        throw new Error(`Scrape failed: ${errorMsg}`);
+      }
+
+      if (!data || !data.success) {
+        const errorMsg = data?.error || 'Unknown error occurred';
+        throw new Error(`Scrape failed: ${errorMsg}`);
       }
 
       setProgress('Processing results...');
       
-      // For now, show a message that the script needs to be run
-      // In production, this would return actual results
-      alert('KSL scraping initiated. Since Edge Functions cannot run Playwright, please run:\n\nnode scripts/scrape-ksl-parallel.js "' + searchUrl + '" ' + maxListings + ' ' + (importToDb ? 'true' : 'false'));
-      
-      setProgress('Complete');
+      // Display results
+      if (data.listings && data.listings.length > 0) {
+        setResults(data.listings.map((listing: any) => ({
+          url: listing.url,
+          success: true,
+          data: listing
+        })));
+        
+        setSummary({
+          imported: data.imported || 0,
+          skipped: 0,
+          errors: 0
+        });
+        
+        setProgress(`Complete: Found ${data.count || 0} listings, imported ${data.imported || 0}`);
+      } else {
+        setProgress('Complete: No listings found');
+        alert('No listings found. This might be due to:\n1. KSL bot protection\n2. Invalid search URL\n3. Missing FIRECRAWL_API_KEY\n\nCheck edge function logs for details.');
+      }
       
     } catch (error: any) {
       console.error('Scrape error:', error);
-      setProgress('Error: ' + error.message);
-      alert('Error: ' + error.message);
+      const errorMessage = error?.message || String(error) || 'Unknown error';
+      setProgress(`Error: ${errorMessage}`);
+      
+      // Show user-friendly error
+      if (errorMessage.includes('FIRECRAWL_API_KEY')) {
+        alert('Error: FIRECRAWL_API_KEY not configured. KSL requires Firecrawl to bypass bot protection.\n\nPlease set FIRECRAWL_API_KEY in Supabase Edge Function secrets.');
+      } else {
+        alert(`Error: ${errorMessage}`);
+      }
     } finally {
       setScraping(false);
     }

@@ -1355,6 +1355,7 @@ const AdminMissionControl: React.FC = () => {
             { label: 'LIVE ANALYSIS', sublabel: 'Real-time progress', path: '/admin/live-analysis', primary: true },
             { label: 'BATCH ANALYSIS', sublabel: 'AI vehicle analysis', path: '/admin/batch-analysis', primary: true },
             { label: 'EXTRACTION MONITOR', sublabel: 'Image extraction progress', path: '/admin/extraction-monitor', primary: true },
+            { label: 'SCRAPER DASHBOARD', sublabel: 'Monitor all scrapers', path: '/admin/scrapers', primary: true },
             { label: 'KSL SCRAPER', sublabel: 'Import trucks from KSL', path: '/admin/ksl-scraper', primary: true },
             { label: 'BUSINESS INTELLIGENCE', sublabel: 'Feedback inbox', path: '/admin/business-intelligence', primary: true },
             { label: 'VERIFICATIONS', sublabel: 'Review pending', path: '/admin/verifications' },
