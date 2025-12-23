@@ -92,8 +92,11 @@ serve(async (req) => {
   try {
     const { 
       max_regions = null, // null = all regions
-      max_searches_per_region = 10, // Limit searches per region to avoid timeout
-      regions = null // Optional: specific regions to search
+      max_searches_per_region = 10, // Increased for paid plan (400s timeout)
+      regions = null, // Optional: specific regions to search
+      chain_depth = 0, // Function chaining: number of remaining self-invocations (0 = no chaining)
+      regions_processed = [], // Track which regions have been processed (for chaining)
+      skip_regions = [] // Regions to skip (already processed)
     } = await req.json()
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || `https://qkgaybvrernstplzjaam.supabase.co`
@@ -141,7 +144,7 @@ serve(async (req) => {
 
             // Fetch search results with timeout
             const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 5000)
+            const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout (increased for paid plan)
 
             try {
               const response = await fetch(searchUrl, {
@@ -220,7 +223,7 @@ serve(async (req) => {
             }
 
             // Rate limiting
-            await new Promise(resolve => setTimeout(resolve, 1000))
+            await new Promise(resolve => setTimeout(resolve, 800)) // Slightly increased delay
 
           } catch (error) {
             console.error(`    ❌ Error searching ${searchTerm} in ${region}:`, error)
@@ -229,7 +232,7 @@ serve(async (req) => {
         }
 
         // Rate limiting between regions
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 800)) // Slightly increased delay
 
       } catch (error) {
         console.error(`❌ Error processing region ${region}:`, error)
@@ -279,6 +282,44 @@ serve(async (req) => {
       .from('craigslist_listing_queue')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'pending')
+
+    // Function chaining: self-invoke to continue processing if more regions remain
+    // Determine which regions were processed and which remain
+    const allRegions = regions || CRAIGSLIST_REGIONS
+    const processedRegions = [...(regions_processed || []), ...regionsToSearch]
+    const skippedRegions = skip_regions || []
+    const remainingRegions = allRegions.filter(r => 
+      !processedRegions.includes(r) && !skippedRegions.includes(r)
+    )
+    const hasMoreRegions = remainingRegions.length > 0 && (max_regions === null || processedRegions.length < max_regions)
+    
+    if (hasMoreRegions && chain_depth > 0) {
+      const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || ''
+      const invokeHeaders = authHeader 
+        ? { Authorization: authHeader, 'Content-Type': 'application/json' }
+        : { Authorization: `Bearer ${serviceRoleKey}`, 'Content-Type': 'application/json' }
+      
+      const fnBase = `${supabaseUrl.replace(/\/$/, '')}/functions/v1`
+      const nextBody = {
+        max_regions,
+        max_searches_per_region,
+        regions: remainingRegions.slice(0, max_regions || remainingRegions.length),
+        chain_depth: chain_depth - 1,
+        regions_processed: processedRegions,
+        skip_regions: skippedRegions
+      }
+      
+      // Fire-and-forget self-invocation (don't block response)
+      fetch(`${fnBase}/discover-cl-squarebodies`, {
+        method: 'POST',
+        headers: invokeHeaders,
+        body: JSON.stringify(nextBody)
+      }).catch((err) => {
+        console.warn('Self-invocation failed (non-blocking):', err.message)
+      })
+      
+      console.log(`🔄 Self-invoking to continue discovery (chain_depth: ${chain_depth - 1}, remaining: ${remainingRegions.length} regions)`)
+    }
 
     return new Response(
       JSON.stringify({
