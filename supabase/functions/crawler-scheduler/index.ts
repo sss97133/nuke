@@ -27,7 +27,8 @@ serve(async (req) => {
     const { 
       action = 'process_queue',
       batch_size = 10,
-      priority_threshold = 5
+      priority_threshold = 5,
+      concurrency = 2
     } = await req.json()
     
     console.log(`🎯 Crawler scheduler: ${action}`)
@@ -36,7 +37,7 @@ serve(async (req) => {
     
     switch (action) {
       case 'process_queue':
-        result = await processScheduledCrawls(batch_size, priority_threshold)
+        result = await processScheduledCrawls(batch_size, priority_threshold, concurrency)
         break
         
       case 'health_check':
@@ -79,8 +80,10 @@ serve(async (req) => {
 /**
  * Process scheduled crawls with intelligent prioritization
  */
-async function processScheduledCrawls(batchSize: number, priorityThreshold: number) {
-  console.log(`🚀 Processing crawler queue (batch: ${batchSize}, priority: ${priorityThreshold}+)`)
+async function processScheduledCrawls(batchSize: number, priorityThreshold: number, concurrency: number) {
+  const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 10, 200))
+  const safeConcurrency = Math.max(1, Math.min(Number(concurrency) || 2, 10))
+  console.log(`🚀 Processing crawler queue (batch: ${safeBatchSize}, priority: ${priorityThreshold}+, concurrency: ${safeConcurrency})`)
   
   // Get pending crawls ordered by priority and age
   const { data: pendingCrawls, error } = await supabase
@@ -91,7 +94,7 @@ async function processScheduledCrawls(batchSize: number, priorityThreshold: numb
     .gte('priority', priorityThreshold)
     .order('priority', { ascending: false })
     .order('next_run', { ascending: true })
-    .limit(batchSize)
+    .limit(safeBatchSize)
   
   if (error || !pendingCrawls || pendingCrawls.length === 0) {
     return {
@@ -103,9 +106,8 @@ async function processScheduledCrawls(batchSize: number, priorityThreshold: numb
   console.log(`📋 Found ${pendingCrawls.length} pending crawls`)
   
   const results = []
-  
-  // Process each crawl
-  for (const crawl of pendingCrawls) {
+
+  const processOne = async (crawl: any) => {
     try {
       console.log(`🕷️ Processing crawl for vehicle ${crawl.vehicle_id}`)
       
@@ -178,10 +180,18 @@ async function processScheduledCrawls(batchSize: number, priorityThreshold: numb
         next_retry: nextRetry
       })
     }
-    
-    // Rate limiting between crawls
-    await new Promise(resolve => setTimeout(resolve, 2000))
   }
+
+  const workerCount = Math.min(safeConcurrency, pendingCrawls.length)
+  let nextIndex = 0
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const idx = nextIndex++
+      if (idx >= pendingCrawls.length) break
+      await processOne(pendingCrawls[idx])
+    }
+  })
+  await Promise.all(workers)
   
   return {
     processed_count: results.length,

@@ -407,6 +407,10 @@ interface ProcessRequest {
   batch_size?: number;
   priority_only?: boolean;
   source_id?: string;
+  // Controls parallelism within a single Edge Function invocation.
+  // Higher = more scrape subcalls in flight (Firecrawl / direct fetch / child functions).
+  // Keep this modest to avoid upstream rate limits.
+  concurrency?: number;
   // Keep edge runtimes safe when ingesting heavy dealer listings.
   // - fast_mode: reduce immediate image downloads
   // - max_images_immediate: explicit override (0 = skip immediate image uploads)
@@ -414,6 +418,12 @@ interface ProcessRequest {
   fast_mode?: boolean;
   max_images_immediate?: number;
   skip_image_upload?: boolean;
+}
+
+function clampNumber(n: unknown, min: number, max: number, fallback: number): number {
+  const v = typeof n === 'number' && Number.isFinite(n) ? n : Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.max(min, Math.min(max, v));
 }
 
 /**
@@ -483,17 +493,19 @@ serve(async (req) => {
       batch_size = 40, // Increased for Large compute (faster DB operations)
       priority_only = false,
       source_id,
-      fast_mode = false,
+      // Default to fast mode to avoid 504s/timeouts; images can be backfilled later.
+      fast_mode = true,
       max_images_immediate,
       skip_image_upload = false,
     } = body;
+    const concurrency = Math.floor(clampNumber((body as any)?.concurrency, 1, 12, 4));
     debugLog({
       sessionId,
       runId,
       hypothesisId: 'H5',
       location: 'supabase/functions/process-import-queue/index.ts:parsed_body',
       message: 'Parsed request body',
-      data: { batch_size, priority_only, source_id, fast_mode, max_images_immediate, skip_image_upload },
+      data: { batch_size, priority_only, source_id, fast_mode, max_images_immediate, skip_image_upload, concurrency },
     });
 
     // Claim work atomically (prevents double-processing and enables horizontal scaling).
@@ -540,7 +552,7 @@ serve(async (req) => {
       vehicles_created: [] as string[]
     };
 
-    for (const item of queueItems) {
+    const processQueueItem = async (item: any) => {
       try {
         debugLog({
           sessionId,
@@ -3238,7 +3250,20 @@ serve(async (req) => {
       }
 
       results.processed++;
-    }
+    };
+
+    // Process in parallel (bounded) so scaling compute/RAM results in more throughput.
+    const workerCount = Math.min(concurrency, queueItems.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const idx = nextIndex++;
+        if (idx >= queueItems.length) break;
+        const item = queueItems[idx];
+        await processQueueItem(item);
+      }
+    });
+    await Promise.all(workers);
 
     return new Response(JSON.stringify({
       success: true,

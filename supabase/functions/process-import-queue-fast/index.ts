@@ -11,6 +11,8 @@ const corsHeaders = {
 type ProcessRequest = {
   batch_size?: number;
   source_id?: string;
+  // Parallelism within this invocation (bounded).
+  concurrency?: number;
   // If true, only create vehicles + external vehicle_images (do not download/upload to storage)
   // This keeps edge runtimes fast and avoids 504s.
   external_images_only?: boolean;
@@ -213,6 +215,7 @@ serve(async (req: Request) => {
     const sourceId = safeString(body.source_id);
     const externalOnly = body.external_images_only !== false; // default true
     const maxExternalImages = clampInt(body.max_external_images, 1, 60, 24);
+    const concurrency = clampInt(body.concurrency, 1, 10, 5);
     const importUserId =
       safeString(body.import_user_id) ||
       (await getDefaultImportUserId(supabase));
@@ -249,11 +252,12 @@ serve(async (req: Request) => {
       sample: [] as any[],
       external_images_only: externalOnly,
       max_external_images: maxExternalImages,
+      concurrency,
     };
 
-    for (const item of items as any[]) {
+    const processOne = async (item: any) => {
       const listingUrl = safeString(item.listing_url);
-      if (!listingUrl) continue;
+      if (!listingUrl) return;
 
       // mark processing
       await supabase
@@ -475,7 +479,18 @@ serve(async (req: Request) => {
           .update({ status: "failed", error_message: err?.message || String(err), processed_at: new Date().toISOString() } as any)
           .eq("id", item.id);
       }
-    }
+    };
+
+    const workerCount = Math.min(concurrency, (items as any[]).length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const idx = nextIndex++;
+        if (idx >= (items as any[]).length) break;
+        await processOne((items as any[])[idx]);
+      }
+    });
+    await Promise.all(workers);
 
     return new Response(JSON.stringify(out), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
