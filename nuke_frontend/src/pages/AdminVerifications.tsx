@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { secureDocumentService, type SecureDocument, type PIIAuditLog } from '../services/secureDocumentService';
 import { ImageHoverPreview, IDHoverCard } from '../components/admin';
+import { FaviconIcon } from '../components/common/FaviconIcon';
 
 const AdminVerifications: React.FC = () => {
   const [pending, setPending] = useState<SecureDocument[]>([]);
@@ -53,34 +54,97 @@ const AdminVerifications: React.FC = () => {
           .eq('verification_status', 'pending')
           .order('created_at', { ascending: false });
         if (err) throw err;
-        setPending(docs || []);
+        
+        // Hydrate user profile data for documents
+        const docUserIds = Array.from(new Set((docs || []).map((d: SecureDocument) => d.user_id).filter(Boolean)));
+        let docUserMap: Record<string, any> = {};
+        if (docUserIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, avatar_url, full_name, username')
+            .in('id', docUserIds);
+          (profiles || []).forEach((p: any) => {
+            docUserMap[p.id] = {
+              avatar_url: p.avatar_url,
+              full_name: p.full_name,
+              username: p.username
+            };
+          });
+        }
+        
+        // Attach user profile data to documents
+        const docsWithProfiles = (docs || []).map((d: SecureDocument) => ({
+          ...d,
+          user_avatar_url: docUserMap[d.user_id]?.avatar_url,
+          user_name: docUserMap[d.user_id]?.full_name || docUserMap[d.user_id]?.username || 'Unknown'
+        }));
+        
+        setPending(docsWithProfiles);
 
         // Pending organization verification requests
         const { data: reqs, error: reqErr } = await supabase
-          .from('verification_requests')
-          .select('id, user_id, verification_type, status, created_at, submission_data')
-          .eq('verification_type', 'shop_verification')
+          .from('shop_verification_requests')
+          .select('id, shop_id, requested_by, status, created_at, legal_name, business_entity_type, extracted_data')
           .eq('status', 'pending')
           .order('created_at', { ascending: false });
         if (reqErr) throw reqErr;
 
         const list = reqs || [];
-        // Hydrate shop names in one query
-        const shopIds = Array.from(new Set(list.map((r: any) => r.submission_data?.shop_id).filter(Boolean)));
-        let shopMap: Record<string, string> = {};
+        // Hydrate shop data and user profiles in parallel queries
+        const shopIds = Array.from(new Set(list.map((r: any) => r.shop_id).filter(Boolean)));
+        const userIds = Array.from(new Set(list.map((r: any) => r.requested_by).filter(Boolean)));
+        
+        let shopMap: Record<string, any> = {};
+        let userMap: Record<string, any> = {};
+        
         if (shopIds.length > 0) {
           const { data: shops } = await supabase
             .from('shops')
-            .select('id, name')
+            .select('id, name, logo_url, website_url, website')
             .in('id', shopIds);
-          (shops || []).forEach((s: any) => { shopMap[s.id] = s.name; });
+          (shops || []).forEach((s: any) => { 
+            shopMap[s.id] = {
+              name: s.name,
+              logo_url: s.logo_url,
+              website_url: s.website_url || s.website
+            };
+          });
         }
-        const hydrated = list.map((r: any) => ({
-          ...r,
-          shop_id: r.submission_data?.shop_id,
-          reason: r.submission_data?.reason,
-          shop_name: r.submission_data?.shop_id ? (shopMap[r.submission_data.shop_id] || r.submission_data.shop_id) : 'Unknown'
-        }));
+        
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, avatar_url, full_name, username')
+            .in('id', userIds);
+          (profiles || []).forEach((p: any) => {
+            userMap[p.id] = {
+              avatar_url: p.avatar_url,
+              full_name: p.full_name,
+              username: p.username
+            };
+          });
+        }
+        
+        const hydrated = list.map((r: any) => {
+          const shop = r.shop_id ? shopMap[r.shop_id] : null;
+          const user = r.requested_by ? userMap[r.requested_by] : null;
+          return {
+            ...r,
+            user_id: r.requested_by, // Map requested_by to user_id for compatibility
+            verification_type: 'shop_verification', // Add for compatibility
+            submission_data: {
+              shop_id: r.shop_id,
+              legal_name: r.legal_name,
+              business_entity_type: r.business_entity_type,
+              ...r.extracted_data
+            },
+            shop_name: shop?.name || r.shop_id || 'Unknown',
+            shop_logo_url: shop?.logo_url,
+            shop_website_url: shop?.website_url,
+            requester_avatar_url: user?.avatar_url,
+            requester_name: user?.full_name || user?.username || 'Unknown'
+          };
+        });
         setOrgRequests(hydrated);
       }
     } catch (e: any) {
@@ -239,7 +303,7 @@ const AdminVerifications: React.FC = () => {
       const { error: rpcErr } = await supabase.rpc('verify_shop', { p_shop_id: req.shop_id });
       if (rpcErr) throw rpcErr;
       const { error: updErr } = await supabase
-        .from('verification_requests')
+        .from('shop_verification_requests')
         .update({ status: 'approved' })
         .eq('id', req.id);
       if (updErr) throw updErr;
@@ -254,7 +318,7 @@ const AdminVerifications: React.FC = () => {
     try {
       setMessage(null);
       const { error: updErr } = await supabase
-        .from('verification_requests')
+        .from('shop_verification_requests')
         .update({ status: 'rejected' })
         .eq('id', req.id);
       if (updErr) throw updErr;
@@ -342,17 +406,115 @@ const AdminVerifications: React.FC = () => {
                         {orgRequests.map((r) => (
                           <div key={r.id} className="card">
                             <div className="card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                              <div>
-                                <div className="text">
-                                  <strong>{r.shop_name}</strong>
-                                  <span className="text-small text-muted" style={{ marginLeft: 8 }}>({r.shop_id})</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                                {/* Shop Logo/Favicon */}
+                                <div style={{ flexShrink: 0 }}>
+                                  {r.shop_logo_url ? (
+                                    <img
+                                      src={r.shop_logo_url}
+                                      alt={r.shop_name}
+                                      style={{
+                                        width: 48,
+                                        height: 48,
+                                        objectFit: 'contain',
+                                        borderRadius: 4,
+                                        border: '1px solid var(--border)',
+                                        background: 'var(--surface)',
+                                        padding: 4
+                                      }}
+                                      onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                  ) : r.shop_website_url ? (
+                                    <FaviconIcon
+                                      url={r.shop_website_url}
+                                      size={48}
+                                      style={{
+                                        borderRadius: 4,
+                                        border: '1px solid var(--border)',
+                                        padding: 8,
+                                        background: 'var(--surface)'
+                                      }}
+                                    />
+                                  ) : (
+                                    <div
+                                      style={{
+                                        width: 48,
+                                        height: 48,
+                                        borderRadius: 4,
+                                        border: '1px solid var(--border)',
+                                        background: 'var(--surface-hover)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '18pt',
+                                        fontWeight: 'bold',
+                                        color: 'var(--text-muted)'
+                                      }}
+                                    >
+                                      {(r.shop_name || 'S').charAt(0).toUpperCase()}
+                                    </div>
+                                  )}
                                 </div>
-                                {r.reason && (
-                                  <div className="text text-small text-muted" style={{ marginTop: 4 }}>Reason: {r.reason}</div>
-                                )}
-                                <div className="text text-small text-muted" style={{ marginTop: 4 }}>Requested: {new Date(r.created_at).toLocaleString()}</div>
+                                
+                                {/* Shop Info */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div className="text" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                    <strong>{r.shop_name}</strong>
+                                    {r.shop_website_url && (
+                                      <FaviconIcon
+                                        url={r.shop_website_url}
+                                        size={16}
+                                        matchTextSize={true}
+                                        textSize={8}
+                                      />
+                                    )}
+                                    <span className="text-small text-muted">({r.shop_id?.substring(0, 8)}...)</span>
+                                  </div>
+                                  {/* Requester Profile */}
+                                  <div className="text text-small" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span className="text-muted">Requested by:</span>
+                                    {r.requester_avatar_url ? (
+                                      <img
+                                        src={r.requester_avatar_url}
+                                        alt={r.requester_name}
+                                        style={{
+                                          width: 20,
+                                          height: 20,
+                                          borderRadius: '50%',
+                                          objectFit: 'cover',
+                                          border: '1px solid var(--border)',
+                                          verticalAlign: 'middle'
+                                        }}
+                                      />
+                                    ) : (
+                                      <div
+                                        style={{
+                                          width: 20,
+                                          height: 20,
+                                          borderRadius: '50%',
+                                          background: 'var(--surface-hover)',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: '8pt',
+                                          fontWeight: 'bold',
+                                          border: '1px solid var(--border)'
+                                        }}
+                                      >
+                                        {(r.requester_name || 'U').charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <span>{r.requester_name}</span>
+                                  </div>
+                                  {r.reason && (
+                                    <div className="text text-small text-muted" style={{ marginTop: 4 }}>Reason: {r.reason}</div>
+                                  )}
+                                  <div className="text text-small text-muted" style={{ marginTop: 4 }}>Requested: {new Date(r.created_at).toLocaleString()}</div>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
                                 <button className="button button-small" onClick={() => approveOrgRequest(r)}>Approve</button>
                                 <button className="button button-small button-secondary" onClick={() => rejectOrgRequest(r)}>Reject</button>
                               </div>
@@ -433,9 +595,43 @@ const AdminVerifications: React.FC = () => {
                               <div className="vehicle-detail"><span>Document</span><span className="text-small">{d.document_type}</span></div>
                               <div className="vehicle-detail">
                                 <span>User</span>
-                                <span className="text-small">
+                                <span className="text-small" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  {(d as any).user_avatar_url ? (
+                                    <img
+                                      src={(d as any).user_avatar_url}
+                                      alt={(d as any).user_name}
+                                      style={{
+                                        width: 24,
+                                        height: 24,
+                                        borderRadius: '50%',
+                                        objectFit: 'cover',
+                                        border: '1px solid var(--border)',
+                                        flexShrink: 0
+                                      }}
+                                    />
+                                  ) : (
+                                    <div
+                                      style={{
+                                        width: 24,
+                                        height: 24,
+                                        borderRadius: '50%',
+                                        background: 'var(--surface-hover)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '8pt',
+                                        fontWeight: 'bold',
+                                        border: '1px solid var(--border)',
+                                        flexShrink: 0
+                                      }}
+                                    >
+                                      {((d as any).user_name || d.user_id || 'U').charAt(0).toUpperCase()}
+                                    </div>
+                                  )}
                                   <IDHoverCard id={d.user_id} type="user">
-                                    {d.user_id.substring(0, 8)}...
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                      <span>{(d as any).user_name || d.user_id.substring(0, 8) + '...'}</span>
+                                    </span>
                                   </IDHoverCard>
                                 </span>
                               </div>

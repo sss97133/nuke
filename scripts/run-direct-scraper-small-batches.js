@@ -78,8 +78,8 @@ async function main() {
   for (let i = 0; i < 15; i++) { // More runs with increased resources
     console.log(`Run ${i + 1}/15...`);
     const result = await callFunction('scrape-all-craigslist-squarebodies', {
-      max_regions: 15, // Increased for more compute/RAM
-      max_listings_per_search: 50, // Increased for more compute/RAM
+      max_regions: 12, // Balanced for upgraded compute/RAM (reduced from 20 to avoid timeouts)
+      max_listings_per_search: 50, // Balanced for upgraded compute/RAM (reduced from 70 to avoid timeouts)
       chain_depth: 2 // Self-invoke to process more
     });
     
