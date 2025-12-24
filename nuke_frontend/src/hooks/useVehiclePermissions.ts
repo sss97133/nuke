@@ -42,16 +42,20 @@ export const useVehiclePermissions = (
         // contributor_owner means explicitly set as 'owner' role in vehicle_contributors.
         const isOwner = status.isLegalOwner || status.status === 'contributor_owner';
         
-        // Debug logging
-        console.log('[useVehiclePermissions] Status:', {
-          vehicleId,
-          status: status.status,
-          hasContributorAccess: status.hasContributorAccess,
-          isUploader: status.isUploader,
-          contributorRole: status.contributorRole,
-          permissionLevel: status.permissionLevel,
-          isOwner
-        });
+        // Debug logging - ensure all values are serializable
+        try {
+          console.log('[useVehiclePermissions] Status:', {
+            vehicleId: String(vehicleId || ''),
+            status: String(status?.status || ''),
+            hasContributorAccess: Boolean(status?.hasContributorAccess),
+            isUploader: Boolean(status?.isUploader),
+            contributorRole: String(status?.contributorRole || ''),
+            permissionLevel: String(status?.permissionLevel || ''),
+            isOwner: Boolean(isOwner)
+          });
+        } catch (err) {
+          // Silently fail if logging causes issues
+        }
         
         setPermissions({
           isOwner,

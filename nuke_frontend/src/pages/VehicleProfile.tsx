@@ -521,12 +521,12 @@ const VehicleProfile: React.FC = () => {
   })();
   const isDbUploader = Boolean(session?.user?.id && vehicle?.uploaded_by === session.user.id);
 
-  // Consolidated permissions object
+  // Consolidated permissions object - ensure all values are primitives for React safety
   const permissions: VehiclePermissions = {
-    isVerifiedOwner,
-    hasContributorAccess,
-    contributorRole,
-    isDbUploader
+    isVerifiedOwner: Boolean(isVerifiedOwner),
+    hasContributorAccess: Boolean(hasContributorAccess),
+    contributorRole: contributorRole ? String(contributorRole) : null,
+    isDbUploader: Boolean(isDbUploader)
   };
 
   const loadSaleSettings = async (vehId: string) => {

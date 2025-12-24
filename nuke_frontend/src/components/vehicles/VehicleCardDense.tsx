@@ -93,6 +93,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [touchStart, setTouchStart] = React.useState(0);
+  const [auctionNow, setAuctionNow] = React.useState(() => Date.now());
 
   // Local CSS for badge animations. We scope keyframes to avoid collisions
   // (the design system defines multiple `@keyframes pulse` variations).
@@ -121,6 +122,44 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     `;
     document.head.appendChild(style);
   }, []);
+
+  // Auction timer - updates every second for live auctions
+  const auctionEndDate = React.useMemo(() => {
+    const v: any = vehicle as any;
+    return v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date || null;
+  }, [vehicle]);
+
+  React.useEffect(() => {
+    if (!auctionEndDate) return;
+    const tick = () => setAuctionNow(Date.now());
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') tick();
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [auctionEndDate]);
+
+  const formatAuctionTimer = React.useMemo(() => {
+    if (!auctionEndDate) return null;
+    const end = new Date(auctionEndDate).getTime();
+    if (!Number.isFinite(end)) return null;
+    const diff = end - auctionNow;
+    const maxReasonable = 14 * 24 * 60 * 60 * 1000;
+    if (diff > maxReasonable) return null;
+    if (diff <= 0) return 'Ended';
+    
+    const totalSeconds = Math.floor(diff / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    
+    // Show days when > 24 hours, HH:MM:SS when <= 24 hours
+    if (totalSeconds > 86400) {
+      return `${days}d`;
+    }
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  }, [auctionEndDate, auctionNow]);
 
   // PERF: Never do per-card network calls on the feed.
   // Use the already-available vehicle fields (or precomputed display_price) to render pricing synchronously.
@@ -1231,16 +1270,21 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         {/* Price/Bid badge (no favicon here) */}
         {showPriceOverlay && badgeMainText !== '—' && (
           <div style={badgeStyle}>
-            {isAuctionSource && auctionBidderDisplay ? (
-              <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '160px' }}>
-                <div style={{ display: 'flex', width: '200%', animation: 'nuke-badge-ticker 6s ease-in-out infinite' }}>
-                  <div style={{ width: '50%', paddingRight: '10px', fontSize: gridTypography.badge, fontWeight: 800 }}>
-                    {badgeMainText}
-                  </div>
-                  <div style={{ width: '50%', paddingRight: '10px', fontSize: gridTypography.badge, fontWeight: 700, opacity: 0.95 }}>
-                    {auctionBidderDisplay}
-                  </div>
+            {isAuctionSource ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
+                  BID
                 </div>
+                {auctionHighBidText && (
+                  <div style={{ fontSize: gridTypography.badge, fontWeight: 800, lineHeight: 1 }}>
+                    {auctionHighBidText}
+                  </div>
+                )}
+                {formatAuctionTimer && (
+                  <div style={{ fontSize: '5.5pt', fontWeight: 700, fontFamily: 'monospace', opacity: 0.9, lineHeight: 1 }}>
+                    {formatAuctionTimer}
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ fontSize: gridTypography.badge, fontWeight: 800 }}>
