@@ -852,10 +852,54 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             </div>
           )}
 
+          {/* Timer badge (separate, on left side top) */}
+          {isAuctionSource && formatAuctionTimer && (
+            <div style={{
+              position: 'absolute',
+              top: vehicle.is_streaming ? '34px' : '8px', // Below LIVE badge if it exists
+              left: '8px',
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(6px)',
+              color: 'white',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              fontSize: '7pt',
+              fontWeight: 700,
+              fontFamily: 'monospace',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              border: '1px solid rgba(255,255,255,0.18)',
+              zIndex: 5,
+            }}>
+              {formatAuctionTimer}
+            </div>
+          )}
+
           {/* Price/Bid badge (no favicon here) */}
           {showPriceOverlay && badgeMainText !== '—' && (
             <div style={{ ...badgeStyle, top: '8px', right: '8px' }}>
-              {isAuctionSource && auctionBidderDisplay ? (
+              {isAuctionSource ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                  <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
+                    BID
+                  </div>
+                  {auctionHighBidText && (
+                    <div style={{ fontSize: '9pt', fontWeight: 800, lineHeight: 1 }}>
+                      {auctionHighBidText}
+                    </div>
+                  )}
+                  {(() => {
+                    const v: any = vehicle as any;
+                    const bidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 ? v.bid_count : null;
+                    return bidCount ? (
+                      <div style={{ fontSize: '6pt', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
+                        {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              ) : auctionBidderDisplay ? (
                 <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '220px' }}>
                   <div
                     style={{
@@ -1267,6 +1311,30 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           </div>
         )}
 
+        {/* Timer badge (separate, on left side top) */}
+        {isAuctionSource && formatAuctionTimer && (
+          <div style={{
+            position: 'absolute',
+            top: vehicle.is_streaming ? '28px' : '6px', // Below LIVE badge if it exists
+            left: '6px',
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(6px)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            fontSize: '6.5pt',
+            fontWeight: 700,
+            fontFamily: 'monospace',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            border: '1px solid rgba(255,255,255,0.18)',
+            zIndex: 5,
+          }}>
+            {formatAuctionTimer}
+          </div>
+        )}
+
         {/* Price/Bid badge (no favicon here) */}
         {showPriceOverlay && badgeMainText !== '—' && (
           <div style={badgeStyle}>
@@ -1280,11 +1348,15 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     {auctionHighBidText}
                   </div>
                 )}
-                {formatAuctionTimer && (
-                  <div style={{ fontSize: '5.5pt', fontWeight: 700, fontFamily: 'monospace', opacity: 0.9, lineHeight: 1 }}>
-                    {formatAuctionTimer}
-                  </div>
-                )}
+                {(() => {
+                  const v: any = vehicle as any;
+                  const bidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 ? v.bid_count : null;
+                  return bidCount ? (
+                    <div style={{ fontSize: '5.5pt', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
+                      {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             ) : (
               <div style={{ fontSize: gridTypography.badge, fontWeight: 800 }}>

@@ -145,6 +145,33 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
+    // Get or create scrape source
+    const { data: source } = await supabase
+      .from('scrape_sources')
+      .select('id')
+      .eq('domain', 'classic.com')
+      .maybeSingle();
+
+    let sourceId = source?.id;
+
+    if (!sourceId) {
+      const { data: newSource } = await supabase
+        .from('scrape_sources')
+        .insert({
+          domain: 'classic.com',
+          source_name: 'Classic.com',
+          source_type: 'auction_house',
+          base_url: 'https://www.classic.com',
+          is_active: true,
+        })
+        .select('id')
+        .single();
+
+      if (newSource) {
+        sourceId = newSource.id;
+      }
+    }
+
     const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
     let html = '';
     let title = '';
@@ -230,10 +257,10 @@ serve(async (req) => {
           description: '',
           listing_url: url,
           discovery_url: url,
-          profile_origin: 'classic_com_import',
-          discovery_source: 'classic_com_auction',
+          profile_origin: 'CLASSIC_COM_IMPORT',
+          discovery_source: 'CLASSIC_COM_AUCTION',
           origin_metadata: {
-            source: 'classic_com_import',
+              source: 'CLASSIC_COM_IMPORT',
             classic_url: url,
             extracted_at: new Date().toISOString(),
           },
@@ -253,7 +280,7 @@ serve(async (req) => {
           listing_url: url,
           discovery_url: url,
           origin_metadata: {
-            source: 'classic_com_import',
+              source: 'CLASSIC_COM_IMPORT',
             classic_url: url,
             extracted_at: new Date().toISOString(),
           },
@@ -349,12 +376,25 @@ serve(async (req) => {
       }
     }
 
+    // Update source health tracking
+    if (sourceId) {
+      await supabase
+        .from('scrape_sources')
+        .update({
+          last_scraped_at: new Date().toISOString(),
+          last_successful_scrape: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sourceId);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         vehicle_id: vehicleId,
         external_listing_id: ext?.id,
         platform: 'classic_com',
+        source_id: sourceId,
         listing_status: listingStatus,
         end_date: endDateIso,
         current_bid: currentBid,

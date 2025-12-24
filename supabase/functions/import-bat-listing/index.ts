@@ -448,6 +448,33 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Get or create scrape source
+    const { data: source } = await supabase
+      .from('scrape_sources')
+      .select('id')
+      .eq('domain', 'bringatrailer.com')
+      .maybeSingle();
+
+    let sourceId = source?.id;
+
+    if (!sourceId) {
+      const { data: newSource } = await supabase
+        .from('scrape_sources')
+        .insert({
+          domain: 'bringatrailer.com',
+          source_name: 'Bring a Trailer',
+          source_type: 'auction_house',
+          base_url: 'https://bringatrailer.com',
+          is_active: true,
+        })
+        .select('id')
+        .single();
+
+      if (newSource) {
+        sourceId = newSource.id;
+      }
+    }
+
     const serviceRoleKey =
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
       Deno.env.get('SERVICE_ROLE_KEY') ||
@@ -637,8 +664,8 @@ serve(async (req) => {
           imported_by: null,
           listing_url: batUrl,
           discovery_url: batUrl,
-          profile_origin: 'bat_import',
-          discovery_source: 'bat_import',
+          profile_origin: 'BAT_IMPORT',
+          discovery_source: 'BAT_IMPORT',
           bat_seller: seller || null,
           origin_metadata: {
             source: 'bat_import',
@@ -823,7 +850,7 @@ serve(async (req) => {
             comment_count: metrics.commentCount || null,
             last_updated_at: new Date().toISOString(),
             raw_data: {
-              source: 'bat_import',
+              source: 'BAT_IMPORT',
               bat_url: batUrl,
               seller_type: sellerType || null,
               seller_business_id: sellerOrganizationId,
@@ -910,7 +937,7 @@ serve(async (req) => {
             description: `${year} ${make} ${model} sold on BaT auction #${lotNumber}. Seller: ${seller}${buyer ? `, Buyer: ${buyer}` : ''}`,
             cost_amount: salePrice,
             metadata: {
-              source: 'bat_import',
+              source: 'BAT_IMPORT',
               bat_url: batUrl,
               lot_number: lotNumber,
               seller,
@@ -979,7 +1006,7 @@ serve(async (req) => {
             body: {
               vehicle_id: vehicleId,
               image_urls: slice,
-              source: 'bat_import',
+              source: 'BAT_IMPORT',
               run_analysis: false,
               listed_date: saleDate,
               max_images: slice.length
@@ -1001,12 +1028,25 @@ serve(async (req) => {
       console.log('Image import failed (non-fatal):', e?.message || String(e));
     }
 
+    // Update source health tracking
+    if (sourceId) {
+      await supabase
+        .from('scrape_sources')
+        .update({
+          last_scraped_at: new Date().toISOString(),
+          last_successful_scrape: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sourceId);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         vehicleId,
         vehicle: listing,
         action: createdVehicle ? 'created' : 'updated',
+        source_id: sourceId,
         seller_identity: {
           bat_username: sellerUser.username,
           bat_user_id: sellerUser.id,

@@ -1192,10 +1192,10 @@ async function addListingToQueue(
       listing_make: listing.make,
       listing_model: listing.model,
       thumbnail_url: listing.images[0] || null,
-      raw_data: {
-        ...listing,
-        source: 'sbxcars',
-        auction_status: listing.auction_status,
+        raw_data: {
+          ...listing,
+          source: 'SBXCARS',
+          auction_status: listing.auction_status,
         lot_number: listing.lot_number,
         amg_nomenclature: listing.amg_nomenclature,
         transmission: listing.transmission,
