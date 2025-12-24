@@ -1,0 +1,458 @@
+/**
+ * Merge Proposals Dashboard Styles
+ * Follows Nuke Design System standards
+ */
+
+.merge-dashboard {
+  padding: var(--space-6);
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: var(--font-family);
+}
+
+.merge-header {
+  margin-bottom: var(--space-6);
+}
+
+.merge-title {
+  font-size: var(--fs-11);
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.merge-subtitle {
+  font-size: var(--fs-9);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.merge-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  text-align: center;
+  transition: var(--transition);
+}
+
+.stat-card:hover {
+  border-color: var(--border-focus);
+}
+
+.stat-value {
+  font-size: var(--fs-11);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--space-1);
+  font-family: var(--font-mono);
+}
+
+.stat-label {
+  font-size: var(--fs-8);
+  color: var(--text-secondary);
+}
+
+.merge-proposals-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.merge-proposal-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  transition: var(--transition);
+}
+
+.merge-proposal-card:hover {
+  border-color: var(--border-focus);
+}
+
+.proposal-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.proposal-badges {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.merge-badge {
+  padding: 2px var(--space-2);
+  border-radius: 2px;
+  font-size: var(--fs-8);
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+}
+
+.confidence-badge {
+  padding: 2px var(--space-2);
+  border-radius: 2px;
+  font-size: var(--fs-8);
+  font-weight: 700;
+  color: white;
+}
+
+.proposal-meta {
+  font-size: var(--fs-8);
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.vehicle-comparison {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.vehicle-card {
+  padding: var(--space-3);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.vehicle-primary {
+  border-color: var(--success);
+  background: var(--success-dim);
+}
+
+.vehicle-duplicate {
+  border-color: var(--error);
+  background: var(--error-dim);
+}
+
+.vehicle-label {
+  font-size: var(--fs-8);
+  font-weight: 700;
+  color: var(--success);
+  margin-bottom: var(--space-2);
+  text-transform: uppercase;
+}
+
+.vehicle-label-duplicate {
+  color: var(--error);
+}
+
+.vehicle-title {
+  font-size: var(--fs-10);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--space-2);
+}
+
+.vehicle-detail {
+  font-size: var(--fs-8);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.vin-auto {
+  color: var(--error);
+}
+
+.vehicle-stats {
+  font-size: var(--fs-8);
+  font-weight: 600;
+  color: var(--success);
+  margin-bottom: var(--space-2);
+}
+
+.vehicle-stats-duplicate {
+  color: var(--error);
+}
+
+.merge-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-summary {
+  padding: var(--space-2);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--fs-8);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.expand-details-button {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--fs-9);
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: var(--transition);
+  margin-bottom: var(--space-3);
+  font-family: var(--font-family);
+}
+
+.expand-details-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-focus);
+}
+
+.expand-details-button:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.field-merge-details {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-3);
+}
+
+.field-merge-header {
+  margin-bottom: var(--space-4);
+}
+
+.field-merge-header h3 {
+  font-size: var(--fs-10);
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.field-merge-note {
+  font-size: var(--fs-8);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.field-merge-table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field-merge-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1.2fr 1.2fr 1.5fr 0.8fr 1fr;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+
+.field-merge-header-row {
+  background: var(--surface);
+  font-weight: 700;
+  font-size: var(--fs-8);
+  color: var(--text);
+  border-bottom: 2px solid var(--border);
+  padding: var(--space-2);
+}
+
+.field-col {
+  font-size: var(--fs-9);
+  color: var(--text);
+}
+
+.field-name {
+  font-weight: 600;
+}
+
+.value-col {
+  font-size: var(--fs-9);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.value-null {
+  color: var(--text-disabled);
+  font-style: italic;
+}
+
+.value-winning {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.old-value-note {
+  font-size: var(--fs-8);
+  color: var(--text-disabled);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.merge-col {
+  font-size: var(--fs-9);
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
+.confidence-col {
+  font-size: var(--fs-9);
+  font-family: var(--font-mono);
+}
+
+.confidence-indicator {
+  font-weight: 600;
+}
+
+.source-col {
+  font-size: var(--fs-8);
+}
+
+.source-badge {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border-radius: 2px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.source-primary {
+  background: var(--success-dim);
+  color: var(--success);
+}
+
+.source-duplicate {
+  background: var(--error-dim);
+  color: var(--error);
+}
+
+.source-both {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.source-null {
+  background: var(--bg);
+  color: var(--text-disabled);
+}
+
+.action-hint {
+  padding: var(--space-2);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: var(--fs-8);
+  color: var(--text);
+}
+
+.empty-state {
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.empty-title {
+  font-size: var(--fs-10);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--space-2);
+}
+
+.empty-message {
+  font-size: var(--fs-8);
+  color: var(--text-secondary);
+}
+
+.merge-history {
+  margin-top: var(--space-6);
+}
+
+.history-title {
+  font-size: var(--fs-10);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: var(--space-4);
+}
+
+.history-note {
+  font-size: var(--fs-8);
+  color: var(--text-secondary);
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: var(--space-3);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border);
+  border-top: 2px solid var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  font-size: var(--fs-9);
+  color: var(--text-secondary);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .vehicle-comparison {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .merge-arrow {
+    transform: rotate(90deg);
+  }
+
+  .field-merge-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+
+  .field-merge-header-row {
+    display: none;
+  }
+
+  .field-col::before {
+    content: attr(data-label) ": ";
+    font-weight: 700;
+  }
+}
+
+@media (max-width: 768px) {
+  .merge-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .merge-dashboard {
+    padding: var(--space-4);
+  }
+}
+
