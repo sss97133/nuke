@@ -141,8 +141,8 @@ async function main() {
   for (let round = 0; round < 3; round++) {
     console.log(`   Discovery round ${round + 1}/3...`);
     const discoverResult = await callFunction('discover-cl-squarebodies', {
-      max_regions: 20, // Increased for more compute/RAM
-      max_searches_per_region: 8,
+      max_regions: 25, // Optimized for upgraded compute/RAM
+      max_searches_per_region: 10,
       chain_depth: 2 // Self-invoke to process more
     });
     

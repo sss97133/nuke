@@ -112,8 +112,8 @@ serve(async (req) => {
 
   try {
     const { 
-      max_regions = 50, // Increased for Large compute (faster DB operations)
-      max_listings_per_search = 75, // Increased for Large compute
+      max_regions = 60, // Increased for upgraded compute/RAM
+      max_listings_per_search = 90, // Increased for upgraded compute/RAM
       user_id,
       regions = null, // Optional: specific regions to search
       chain_depth = 0, // Function chaining: number of remaining self-invocations (0 = no chaining)
@@ -141,7 +141,7 @@ serve(async (req) => {
     // If source data has username (BaT, pcar, cars & bids), we can create/link users later
     let importUserId = user_id || null
 
-    // TEST: Try a direct insert to verify database connection works (without user_id)
+    // TEST: Try a direct insert to verify database connection works (without user_id - trigger prevents it)
     console.log('🧪 Testing direct database insert...')
     const { data: testInsert, error: testError } = await supabase
       .from('vehicles')
@@ -150,8 +150,8 @@ serve(async (req) => {
         model: 'K10',
         year: 1985,
         discovery_source: 'craigslist_scrape_test',
-        is_public: true,
-        user_id: importUserId || null
+        is_public: true
+        // user_id is NOT set - database trigger prevents it, ownership must be verified
       })
       .select('id')
       .single()
@@ -383,7 +383,7 @@ serve(async (req) => {
     console.log(`\n📊 Total unique listings found: ${allListingUrls.size}`)
     
     // Process more listings per run with Large compute (faster DB queries)
-    const maxProcessPerRun = 40 // Increased for Large compute (160 direct, 800 pooler connections)
+    const maxProcessPerRun = 50 // Increased for upgraded compute/RAM
     const listingArray = Array.from(allListingUrls).slice(0, maxProcessPerRun)
     
     console.log(`🔄 Processing ${listingArray.length} listings (limited to ${maxProcessPerRun} to avoid timeout)...\n`)
@@ -666,9 +666,9 @@ serve(async (req) => {
                     status: 'active' // Set to 'active' so vehicles show up in homepage feed
                   }
                   
-                  // user_id is optional - only set if provided
+                  // user_id is NOT set - database trigger prevents it (ownership must be verified)
+                  // Only set uploaded_by to track who imported it (for attribution)
                   if (importUserId) {
-                    vehicleInsert.user_id = importUserId
                     vehicleInsert.uploaded_by = importUserId
                   }
                   if (scrapeData.data.trim) vehicleInsert.trim = scrapeData.data.trim
