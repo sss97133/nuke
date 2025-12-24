@@ -357,21 +357,25 @@ export class OwnershipService {
       // If user has vehicle_user_permissions with owner role, use that as contributor role
       const contributorRole = contributor?.role || (userPermission?.role === 'owner' ? 'owner' : null) || orgContributorRole;
       
-      // Debug logging
-      console.log('[OwnershipService] Permission check result:', {
-        vehicleId,
-        userId: session.user.id,
-        isUploader,
-        hasVerification: !!verification,
-        hasUserPermission: !!userPermission,
-        userPermissionRole: userPermission?.role,
-        isLegalOwner,
-        hasContributor: !!contributor,
-        hasOrgAccess,
-        orgContributorRole,
-        hasContributorAccess,
-        finalContributorRole: contributorRole
-      });
+      // Debug logging - ensure all values are serializable
+      try {
+        console.log('[OwnershipService] Permission check result:', {
+          vehicleId: String(vehicleId || ''),
+          userId: String(session?.user?.id || ''),
+          isUploader: Boolean(isUploader),
+          hasVerification: Boolean(verification),
+          hasUserPermission: Boolean(userPermission),
+          userPermissionRole: String(userPermission?.role || ''),
+          isLegalOwner: Boolean(isLegalOwner),
+          hasContributor: Boolean(contributor),
+          hasOrgAccess: Boolean(hasOrgAccess),
+          orgContributorRole: String(orgContributorRole || ''),
+          hasContributorAccess: Boolean(hasContributorAccess),
+          finalContributorRole: String(contributorRole || '')
+        });
+      } catch (err) {
+        // Silently fail if logging causes issues
+      }
 
       // Call helper functions directly to avoid TDZ issues
       const status = determineOwnershipLevel(isUploader, isLegalOwner, contributorRole);
