@@ -27,6 +27,35 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Get or create scrape source
+    const { data: source, error: sourceError } = await supabase
+      .from('scrape_sources')
+      .select('id')
+      .eq('domain', 'craigslist.org')
+      .maybeSingle();
+
+    let sourceId = source?.id;
+
+    if (!sourceId) {
+      const { data: newSource, error: createError } = await supabase
+        .from('scrape_sources')
+        .insert({
+          domain: 'craigslist.org',
+          source_name: 'Craigslist',
+          source_type: 'classifieds',
+          base_url: 'https://craigslist.org',
+          is_active: true,
+        })
+        .select('id')
+        .single();
+
+      if (createError) {
+        console.error('Error creating source:', createError);
+      } else {
+        sourceId = newSource?.id;
+      }
+    }
+
     console.log('🔍 Scraping Craigslist search results:', search_url)
 
     // Fetch the search results page
@@ -69,70 +98,76 @@ serve(async (req) => {
     const urlsToProcess = listingUrls.slice(0, max_listings)
     
     const results = {
-      processed: 0,
-      created: 0,
-      updated: 0,
-      errors: 0,
-      listings: [] as any[]
+      queued: 0,
+      skipped: 0,
+      errors: 0
     }
 
-    // Process each listing through scrape-vehicle
+    // Add all listings to import_queue (standardized approach)
     for (const listingUrl of urlsToProcess) {
       try {
-        console.log(`Processing: ${listingUrl}`)
-        
-        // Call scrape-vehicle function
-        const scrapeResponse = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-vehicle`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-            },
-            body: JSON.stringify({ url: listingUrl })
-          }
-        )
+        // Check if already in queue
+        const { data: existing } = await supabase
+          .from('import_queue')
+          .select('id')
+          .eq('listing_url', listingUrl)
+          .maybeSingle();
 
-        if (scrapeResponse.ok) {
-          const scrapeData = await scrapeResponse.json()
-          
-          if (scrapeData.success && scrapeData.data) {
-            // Use dataRouter to find/create vehicle
-            const routerResponse = await supabase.functions.invoke('data-router', {
-              body: {
-                vehicleData: scrapeData.data,
-                userId: user_id || null
-              }
-            })
-
-            if (routerResponse.data?.isNew) {
-              results.created++
-            } else if (routerResponse.data?.vehicleId) {
-              results.updated++
-            }
-
-            results.listings.push({
-              url: listingUrl,
-              vehicleData: scrapeData.data,
-              vehicleId: routerResponse.data?.vehicleId
-            })
-          }
-        } else {
-          console.error(`Failed to scrape ${listingUrl}:`, await scrapeResponse.text())
-          results.errors++
+        if (existing) {
+          results.skipped++;
+          continue;
         }
 
-        results.processed++
+        // Check if vehicle already exists
+        const { data: existingVehicle } = await supabase
+          .from('vehicles')
+          .select('id')
+          .eq('discovery_url', listingUrl)
+          .maybeSingle();
 
-        // Rate limiting - wait 1 second between requests
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        if (existingVehicle) {
+          results.skipped++;
+          continue;
+        }
+
+        // Add to import_queue
+        const { error: queueError } = await supabase
+          .from('import_queue')
+          .insert({
+            source_id: sourceId,
+            listing_url: listingUrl,
+            raw_data: {
+              source: 'CRAIGSLIST',
+              search_url: search_url
+            },
+            status: 'pending',
+            priority: 0
+          });
+
+        if (queueError) {
+          console.error(`Failed to queue listing ${listingUrl}:`, queueError.message);
+          results.errors++;
+        } else {
+          results.queued++;
+        }
 
       } catch (error) {
-        console.error(`Error processing ${listingUrl}:`, error)
-        results.errors++
-        results.processed++
+        console.error(`Error queuing listing ${listingUrl}:`, error);
+        results.errors++;
       }
+    }
+
+    // Update source health tracking
+    if (sourceId) {
+      await supabase
+        .from('scrape_sources')
+        .update({
+          last_scraped_at: new Date().toISOString(),
+          last_successful_scrape: new Date().toISOString(),
+          total_listings_found: urlsToProcess.length,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sourceId);
     }
 
     return new Response(
@@ -140,11 +175,10 @@ serve(async (req) => {
         success: true,
         search_url,
         total_listings_found: listingUrls.length,
-        processed: results.processed,
-        created: results.created,
-        updated: results.updated,
+        queued: results.queued,
+        skipped: results.skipped,
         errors: results.errors,
-        listings: results.listings
+        source_id: sourceId
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )

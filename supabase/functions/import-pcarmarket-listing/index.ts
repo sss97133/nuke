@@ -189,6 +189,33 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Get or create scrape source
+    const { data: source } = await supabase
+      .from('scrape_sources')
+      .select('id')
+      .eq('domain', 'pcarmarket.com')
+      .maybeSingle();
+
+    let sourceId = source?.id;
+
+    if (!sourceId) {
+      const { data: newSource } = await supabase
+        .from('scrape_sources')
+        .insert({
+          domain: 'pcarmarket.com',
+          source_name: 'PCarMarket',
+          source_type: 'auction_house',
+          base_url: 'https://www.pcarmarket.com',
+          is_active: true,
+        })
+        .select('id')
+        .single();
+
+      if (newSource) {
+        sourceId = newSource.id;
+      }
+    }
+
     console.log(`Importing PCarMarket listing: ${listing_url}`);
 
     // Step 1: Scrape listing
@@ -270,13 +297,13 @@ Deno.serve(async (req: Request) => {
       auction_end_date: listing.auctionEndDate || null,
       auction_outcome: listing.auctionOutcome || null,
       description: listing.description || listing.title || null,
-      profile_origin: 'pcarmarket_import',
-      discovery_source: 'pcarmarket',
+      profile_origin: 'PCARMARKET_IMPORT',
+      discovery_source: 'PCARMARKET',
       discovery_url: listing.url,
       listing_url: listing.url,
-      origin_metadata: {
-        source: 'pcarmarket_import',
-        pcarmarket_url: listing.url,
+        origin_metadata: {
+          source: 'PCARMARKET_IMPORT',
+          pcarmarket_url: listing.url,
         pcarmarket_listing_title: listing.title,
         pcarmarket_seller_username: listing.sellerUsername || null,
         pcarmarket_buyer_username: listing.buyerUsername || null,
@@ -375,11 +402,24 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Update source health tracking
+    if (sourceId) {
+      await supabase
+        .from('scrape_sources')
+        .update({
+          last_scraped_at: new Date().toISOString(),
+          last_successful_scrape: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', sourceId);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         vehicle_id: vehicleId,
         organization_id: orgId,
+        source_id: sourceId,
         listing: {
           title: listing.title,
           url: listing.url
