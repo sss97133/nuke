@@ -1281,6 +1281,101 @@ serve(async (req) => {
       })
     }
 
+    // SBX Cars detection and parsing
+    if (url.includes('sbxcars.com')) {
+      data.source = 'SBX Cars'
+
+      // Extract title
+      const titleElement = doc?.querySelector('h1') || doc?.querySelector('[class*="title"]')
+      if (titleElement) {
+        data.title = titleElement.textContent?.trim() || data.title
+      }
+
+      // Extract price/bid information
+      const priceElement = doc?.querySelector('[class*="price"]') || doc?.querySelector('[class*="bid"]')
+      if (priceElement) {
+        const priceText = priceElement.textContent?.trim()
+        const priceMatch = priceText?.match(/\$?([\d,]+)/)
+        if (priceMatch) {
+          data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
+        }
+      }
+
+      // Extract auction end date
+      const dateElement = doc?.querySelector('[class*="end"]') || doc?.querySelector('[class*="date"]')
+      if (dateElement) {
+        const dateText = dateElement.textContent?.trim()
+        const dateMatch = dateText?.match(/(\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})/)
+        if (dateMatch) {
+          data.auction_end_date = dateMatch[1]
+        }
+      }
+
+      // Extract lot number
+      const lotElement = doc?.querySelector('[class*="lot"]')
+      if (lotElement) {
+        const lotText = lotElement.textContent?.trim()
+        const lotMatch = lotText.match(/lot[:\s#]+([A-Z0-9-]+)/i)
+        if (lotMatch) {
+          data.lot_number = lotMatch[1]
+        }
+      }
+
+      // Extract description
+      const descriptionElement = doc?.querySelector('[class*="description"]')
+      if (descriptionElement) {
+        data.description = descriptionElement.textContent?.trim() || data.description
+      }
+
+      // Extract location
+      const locationElement = doc?.querySelector('[class*="location"]')
+      if (locationElement) {
+        data.location = locationElement.textContent?.trim()
+      }
+
+      // Extract year, make, model from title if not already set
+      if (data.title && (!data.year || !data.make || !data.model)) {
+        const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
+        if (yearMatch) {
+          data.year = parseInt(yearMatch[0])
+        }
+
+        const parts = data.title.split(/\s+/)
+        if (parts.length >= 3) {
+          const yearIndex = parts.findIndex((p) => /^(19|20)\d{2}$/.test(p))
+          if (yearIndex >= 0 && yearIndex < parts.length - 1) {
+            if (!data.make) data.make = parts[yearIndex + 1] || null
+            if (!data.model) data.model = parts.slice(yearIndex + 2).join(' ') || null
+          }
+        }
+      }
+
+      // Determine auction status
+      const urlLower = url.toLowerCase()
+      if (urlLower.includes('upcoming')) {
+        data.auction_status = 'upcoming'
+      } else if (urlLower.includes('live') || urlLower.includes('active')) {
+        data.auction_status = 'live'
+      } else if (urlLower.includes('ended') || urlLower.includes('sold')) {
+        data.auction_status = 'ended'
+      }
+
+      console.log('🔍 SBX Cars extraction results:', {
+        title: data.title,
+        year: data.year,
+        make: data.make,
+        model: data.model,
+        price: data.asking_price,
+        lot_number: data.lot_number,
+        auction_status: data.auction_status,
+        imageCount: data.images?.length || 0
+      })
+    }
+
+    // Final normalization pass (regardless of source)
+    data.make = cleanMakeName(data.make) || data.make
+    data.model = cleanModelName(data.model) || data.model
+
     console.log(`✅ Final data structure being returned:`, data)
 
     return new Response(
