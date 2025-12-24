@@ -9,6 +9,7 @@ interface MergeProposal {
   status: string;
   ai_summary?: string;
   created_at: string;
+  match_reasoning?: any;
   
   primary_vehicle: {
     id: string;
@@ -18,6 +19,7 @@ interface MergeProposal {
     vin?: string;
     image_count: number;
     event_count: number;
+    [key: string]: any; // For additional fields
   };
   
   duplicate_vehicle: {
@@ -28,7 +30,18 @@ interface MergeProposal {
     vin?: string;
     image_count: number;
     event_count: number;
+    [key: string]: any; // For additional fields
   };
+}
+
+interface FieldMerge {
+  field: string;
+  primaryValue: any;
+  duplicateValue: any;
+  winningValue: any;
+  confidence: number;
+  source: 'primary' | 'duplicate' | 'both' | 'null';
+  oldValue?: any;
 }
 
 export default function MergeProposalsDashboard() {
@@ -56,19 +69,19 @@ export default function MergeProposalsDashboard() {
       if (error) {
         console.error('Failed to load proposals:', error);
         
-        // Fallback: manual query
+        // Fallback: manual query with full vehicle data
         const { data: proposalsData } = await supabase
           .from('vehicle_merge_proposals')
           .select('*')
           .order('confidence_score', { ascending: false });
 
         if (proposalsData) {
-          // Enrich manually
+          // Enrich manually with full vehicle data
           const enriched = await Promise.all(
             proposalsData.map(async (p) => {
               const [primary, duplicate] = await Promise.all([
-                supabase.from('vehicles').select('id, year, make, model, vin').eq('id', p.primary_vehicle_id).single(),
-                supabase.from('vehicles').select('id, year, make, model, vin').eq('id', p.duplicate_vehicle_id).single()
+                supabase.from('vehicles').select('*').eq('id', p.primary_vehicle_id).single(),
+                supabase.from('vehicles').select('*').eq('id', p.duplicate_vehicle_id).single()
               ]);
 
               const [primaryImages, primaryEvents, dupImages, dupEvents] = await Promise.all([
@@ -97,7 +110,13 @@ export default function MergeProposalsDashboard() {
           setProposals(enriched as MergeProposal[]);
         }
       } else {
-        setProposals(data || []);
+        // Transform the function response to match our interface
+        const transformed = (data || []).map((item: any) => ({
+          ...item,
+          primary_vehicle: typeof item.primary_vehicle === 'object' ? item.primary_vehicle : JSON.parse(item.primary_vehicle || '{}'),
+          duplicate_vehicle: typeof item.duplicate_vehicle === 'object' ? item.duplicate_vehicle : JSON.parse(item.duplicate_vehicle || '{}')
+        }));
+        setProposals(transformed);
       }
 
       // Calculate stats
@@ -119,6 +138,153 @@ export default function MergeProposalsDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Compute field-by-field merge analysis with confidence scores
+  const computeFieldMerges = (proposal: MergeProposal): FieldMerge[] => {
+    const fields = [
+      'year', 'make', 'model', 'trim', 'vin', 'color', 'mileage',
+      'transmission', 'drivetrain', 'engine_size', 'body_style',
+      'current_value', 'sale_price', 'purchase_price', 'description'
+    ];
+
+    const primary = proposal.primary_vehicle;
+    const duplicate = proposal.duplicate_vehicle;
+    const overallConfidence = proposal.confidence_score;
+
+    return fields.map(field => {
+      const primaryVal = primary[field];
+      const duplicateVal = duplicate[field];
+      
+      // Treat low confidence (<20) as null for practical purposes
+      const effectiveConfidence = overallConfidence < 20 ? 0 : overallConfidence;
+      
+      // Determine winning value and confidence
+      let winningValue: any = null;
+      let source: 'primary' | 'duplicate' | 'both' | 'null' = 'null';
+      let confidence = 0;
+      let oldValue: any = null;
+
+      // Both null
+      if ((!primaryVal || primaryVal === '') && (!duplicateVal || duplicateVal === '')) {
+        source = 'null';
+        confidence = 0;
+      }
+      // Primary has value, duplicate doesn't
+      else if (primaryVal && primaryVal !== '' && (!duplicateVal || duplicateVal === '')) {
+        winningValue = primaryVal;
+        source = 'primary';
+        confidence = effectiveConfidence >= 50 ? effectiveConfidence : Math.max(effectiveConfidence, 50);
+        oldValue = primaryVal;
+      }
+      // Duplicate has value, primary doesn't
+      else if ((!primaryVal || primaryVal === '') && duplicateVal && duplicateVal !== '') {
+        winningValue = duplicateVal;
+        source = 'duplicate';
+        confidence = effectiveConfidence >= 50 ? effectiveConfidence : Math.max(effectiveConfidence, 50);
+        oldValue = primaryVal; // Old value from primary (null)
+      }
+      // Both have values
+      else {
+        // Special handling for VIN - prefer real VIN over auto-generated
+        if (field === 'vin') {
+          const primaryIsReal = primaryVal && !primaryVal.startsWith('VIVA-');
+          const duplicateIsReal = duplicateVal && !duplicateVal.startsWith('VIVA-');
+          
+          if (primaryIsReal && !duplicateIsReal) {
+            winningValue = primaryVal;
+            source = 'primary';
+            confidence = 90;
+            oldValue = duplicateVal;
+          } else if (!primaryIsReal && duplicateIsReal) {
+            winningValue = duplicateVal;
+            source = 'duplicate';
+            confidence = 90;
+            oldValue = primaryVal;
+          } else if (primaryIsReal && duplicateIsReal && primaryVal === duplicateVal) {
+            winningValue = primaryVal;
+            source = 'both';
+            confidence = 95;
+            oldValue = primaryVal;
+          } else {
+            // Both are auto or both are real but different
+            winningValue = primaryVal;
+            source = 'primary';
+            confidence = effectiveConfidence;
+            oldValue = duplicateVal;
+          }
+        }
+        // For numeric fields, prefer higher value if confidence is high
+        else if (field === 'mileage' || field === 'current_value' || field === 'sale_price' || field === 'purchase_price') {
+          const numPrimary = Number(primaryVal) || 0;
+          const numDuplicate = Number(duplicateVal) || 0;
+          
+          if (numPrimary === numDuplicate) {
+            winningValue = primaryVal;
+            source = 'both';
+            confidence = Math.min(effectiveConfidence + 10, 95);
+            oldValue = primaryVal;
+          } else if (effectiveConfidence >= 80) {
+            // High confidence: prefer higher value
+            winningValue = numPrimary >= numDuplicate ? primaryVal : duplicateVal;
+            source = numPrimary >= numDuplicate ? 'primary' : 'duplicate';
+            confidence = effectiveConfidence;
+            oldValue = numPrimary >= numDuplicate ? duplicateVal : primaryVal;
+          } else {
+            // Low confidence: prefer primary
+            winningValue = primaryVal;
+            source = 'primary';
+            confidence = Math.max(effectiveConfidence - 10, 20);
+            oldValue = duplicateVal;
+          }
+        }
+        // For text fields, prefer primary unless duplicate is significantly better
+        else {
+          if (primaryVal === duplicateVal) {
+            winningValue = primaryVal;
+            source = 'both';
+            confidence = Math.min(effectiveConfidence + 10, 95);
+            oldValue = primaryVal;
+          } else {
+            // Prefer primary by default, but lower confidence if they differ
+            winningValue = primaryVal;
+            source = 'primary';
+            confidence = Math.max(effectiveConfidence - 15, 30);
+            oldValue = duplicateVal;
+          }
+        }
+      }
+
+      // Treat confidence < 20 as null for practical purposes
+      if (confidence < 20) {
+        winningValue = null;
+        source = 'null';
+      }
+
+      return {
+        field,
+        primaryValue: primaryVal || null,
+        duplicateValue: duplicateVal || null,
+        winningValue,
+        confidence,
+        source,
+        oldValue: source === 'primary' ? duplicateVal : source === 'duplicate' ? primaryVal : null
+      };
+    }).filter(fm => fm.primaryValue !== null || fm.duplicateValue !== null || fm.winningValue !== null);
+  };
+
+  const formatFieldValue = (value: any): string => {
+    if (value === null || value === undefined || value === '') return 'null';
+    if (typeof value === 'number') return value.toLocaleString();
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    return String(value);
+  };
+
+  const getConfidenceColor = (confidence: number): string => {
+    if (confidence < 20) return '#6b7280'; // Gray for null/low
+    if (confidence < 50) return '#ef4444'; // Red for low
+    if (confidence < 80) return '#f59e0b'; // Orange for medium
+    return '#10b981'; // Green for high
   };
 
   const getMatchTypeBadge = (matchType: string) => {
