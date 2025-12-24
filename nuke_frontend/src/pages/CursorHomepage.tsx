@@ -223,6 +223,7 @@ interface FilterState {
   hideKsl: boolean;
   hideBat: boolean;
   hideClassic: boolean;
+  hiddenSources?: string[]; // For dynamic sources not in legacy filters
   zipCode: string;
   radiusMiles: number;
   showPending: boolean;
@@ -243,6 +244,7 @@ const DEFAULT_FILTERS: FilterState = {
   hideKsl: false,
   hideBat: false,
   hideClassic: false,
+  hiddenSources: [],
   zipCode: '',
   radiusMiles: 50, // Default to 50 miles as requested
   showPending: false
@@ -693,10 +695,12 @@ const CursorHomepage: React.FC = () => {
       filters.hideDealerSites ||
       filters.hideKsl ||
       filters.hideBat ||
-      filters.hideClassic
+      filters.hideClassic ||
+      (filters.hiddenSources && filters.hiddenSources.length > 0)
     ) {
       result = result.filter((v: any) => {
         const src = classifySource(v);
+        const hiddenSourcesSet = new Set(filters.hiddenSources || []);
 
         if (filters.hideDealerListings) {
           if (src === 'craigslist' || src === 'dealer_site' || src === 'ksl') return false;
@@ -707,6 +711,9 @@ const CursorHomepage: React.FC = () => {
         if (filters.hideKsl && src === 'ksl') return false;
         if (filters.hideBat && src === 'bat') return false;
         if (filters.hideClassic && src === 'classic') return false;
+        
+        // Check dynamic sources
+        if (hiddenSourcesSet.has(src)) return false;
 
         return true;
       });
@@ -882,10 +889,12 @@ const CursorHomepage: React.FC = () => {
         filters.hideDealerSites ||
         filters.hideKsl ||
         filters.hideBat ||
-        filters.hideClassic
+        filters.hideClassic ||
+        (filters.hiddenSources && filters.hiddenSources.length > 0)
       ) {
         filtered = filtered.filter((v: any) => {
           const src = classifySource(v);
+          const hiddenSourcesSet = new Set(filters.hiddenSources || []);
 
           if (filters.hideDealerListings) {
             if (src === 'craigslist' || src === 'dealer_site' || src === 'ksl') return false;
@@ -896,6 +905,9 @@ const CursorHomepage: React.FC = () => {
           if (filters.hideKsl && src === 'ksl') return false;
           if (filters.hideBat && src === 'bat') return false;
           if (filters.hideClassic && src === 'classic') return false;
+          
+          // Check dynamic sources
+          if (hiddenSourcesSet.has(src)) return false;
 
           return true;
         });
@@ -2008,15 +2020,17 @@ const CursorHomepage: React.FC = () => {
     }
   };
 
-  // Source pogs are “include chips”: if it's in your set, you see those vehicles.
-  // We keep legacy `hide*` flags for now, but treat them as derived from “included chips”.
-  const setSourceIncluded = useCallback((kind: SourceKind, included: boolean) => {
+  // Source pogs are "include chips": if it's in your set, you see those vehicles.
+  // We keep legacy `hide*` flags for now, but treat them as derived from "included chips".
+  // For new dynamic sources, we use a hiddenSources set in filters.
+  const setSourceIncluded = useCallback((kind: string, included: boolean) => {
     setFilters((prev) => {
       // This legacy flag conflicts with per-source toggles (it hides CL + dealer sites + KSL).
-      // For the new “pogs” interaction model, we treat sources as independent, so we clear it
+      // For the new "pogs" interaction model, we treat sources as independent, so we clear it
       // whenever the user explicitly picks/changes a source.
       const base = { ...prev, hideDealerListings: false };
 
+      // Handle legacy sources
       switch (kind) {
         case 'craigslist':
           return { ...base, hideCraigslist: !included };
@@ -2029,26 +2043,106 @@ const CursorHomepage: React.FC = () => {
         case 'classic':
           return { ...base, hideClassic: !included };
         default:
-          return base;
+          // For new dynamic sources, use hiddenSources set
+          const hiddenSources = new Set(prev.hiddenSources || []);
+          if (!included) {
+            hiddenSources.add(kind);
+          } else {
+            hiddenSources.delete(kind);
+          }
+          return { ...base, hiddenSources: Array.from(hiddenSources) };
       }
     });
   }, []);
 
+  // Load active sources from database
+  const [activeSources, setActiveSources] = useState<Array<{
+    id: string;
+    domain: string;
+    source_name: string;
+    url: string;
+  }>>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadActiveSources() {
+      try {
+        const { data, error } = await supabase
+          .from('scrape_sources')
+          .select('id, domain, source_name, url')
+          .eq('is_active', true)
+          .order('source_name', { ascending: true });
+
+        if (error) {
+          console.error('Error loading sources:', error);
+          // Fallback to hardcoded sources if DB fails
+          setActiveSources([
+            { id: '1', domain: 'craigslist.org', source_name: 'Craigslist', url: 'https://craigslist.org' },
+            { id: '2', domain: 'ksl.com', source_name: 'KSL', url: 'https://ksl.com' },
+            { id: '3', domain: 'autotrader.com', source_name: 'Dealer Sites', url: 'https://autotrader.com' },
+            { id: '4', domain: 'bringatrailer.com', source_name: 'Bring a Trailer', url: 'https://bringatrailer.com' },
+            { id: '5', domain: 'classic.com', source_name: 'Classic.com', url: 'https://classic.com' }
+          ]);
+        } else {
+          setActiveSources(data || []);
+        }
+      } catch (err) {
+        console.error('Error loading sources:', err);
+      } finally {
+        setSourcesLoading(false);
+      }
+    }
+
+    loadActiveSources();
+  }, []);
+
+  // Map domain to filter key for backward compatibility
+  const domainToFilterKey = useCallback((domain: string): string => {
+    const domainLower = domain.toLowerCase();
+    if (domainLower.includes('craigslist')) return 'craigslist';
+    if (domainLower.includes('ksl')) return 'ksl';
+    if (domainLower.includes('autotrader') || domainLower.includes('dealer')) return 'dealer_site';
+    if (domainLower.includes('bringatrailer') || domainLower.includes('bat')) return 'bat';
+    if (domainLower.includes('classic')) return 'classic';
+    // For new sources, use domain as key
+    return domainLower.replace(/[^a-z0-9]/g, '_');
+  }, []);
+
   const includedSources = useMemo(() => {
-    return {
-      craigslist: !filters.hideDealerListings && !filters.hideCraigslist,
-      dealer_site: !filters.hideDealerListings && !filters.hideDealerSites,
-      ksl: !filters.hideDealerListings && !filters.hideKsl,
-      bat: !filters.hideBat,
-      classic: !filters.hideClassic
-    };
+    const base: Record<string, boolean> = {};
+    const hiddenSourcesSet = new Set(filters.hiddenSources || []);
+    
+    // Initialize all active sources as included by default
+    activeSources.forEach(source => {
+      const key = domainToFilterKey(source.domain);
+      // Check if there's a specific filter for this source
+      if (key === 'craigslist') {
+        base[key] = !filters.hideDealerListings && !filters.hideCraigslist;
+      } else if (key === 'ksl') {
+        base[key] = !filters.hideDealerListings && !filters.hideKsl;
+      } else if (key === 'dealer_site') {
+        base[key] = !filters.hideDealerListings && !filters.hideDealerSites;
+      } else if (key === 'bat') {
+        base[key] = !filters.hideBat;
+      } else if (key === 'classic') {
+        base[key] = !filters.hideClassic;
+      } else {
+        // New sources: check if they're in hiddenSources set
+        base[key] = !hiddenSourcesSet.has(key);
+      }
+    });
+
+    return base;
   }, [
+    activeSources,
     filters.hideDealerListings,
     filters.hideCraigslist,
     filters.hideDealerSites,
     filters.hideKsl,
     filters.hideBat,
-    filters.hideClassic
+    filters.hideClassic,
+    filters.hiddenSources,
+    domainToFilterKey
   ]);
 
   const faviconUrl = useCallback((domain: string) => {
@@ -2056,20 +2150,24 @@ const CursorHomepage: React.FC = () => {
   }, []);
 
   const sourcePogs = useMemo(() => {
-    const all = [
-      { key: 'craigslist' as const, domain: 'craigslist.org', title: 'Craigslist', included: includedSources.craigslist },
-      { key: 'ksl' as const, domain: 'ksl.com', title: 'KSL', included: includedSources.ksl },
-      { key: 'dealer_site' as const, domain: 'autotrader.com', title: 'Dealer Sites', included: includedSources.dealer_site },
-      { key: 'bat' as const, domain: 'bringatrailer.com', title: 'Bring a Trailer', included: includedSources.bat },
-      { key: 'classic' as const, domain: 'classic.com', title: 'Classic.com', included: includedSources.classic }
-    ];
+    const all = activeSources.map(source => {
+      const key = domainToFilterKey(source.domain);
+      return {
+        key: key as any,
+        domain: source.domain,
+        title: source.source_name || source.domain,
+        included: includedSources[key] !== false, // Default to true if not explicitly set
+        id: source.id,
+        url: source.url
+      };
+    });
 
     return {
       all,
       selected: all.filter((x) => x.included),
       hiddenCount: all.filter((x) => !x.included).length
     };
-  }, [includedSources]);
+  }, [activeSources, includedSources, domainToFilterKey]);
 
   const domainHue = useCallback((domain: string) => {
     // Deterministic pseudo-“dominant color” per domain without needing canvas/CORS.
@@ -2581,7 +2679,8 @@ const CursorHomepage: React.FC = () => {
                         hideDealerSites: false,
                         hideKsl: false,
                         hideBat: false,
-                        hideClassic: false
+                        hideClassic: false,
+                        hiddenSources: []
                       }));
                     }}
                     className="button"
