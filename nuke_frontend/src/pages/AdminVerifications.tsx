@@ -572,7 +572,6 @@ const AdminVerifications: React.FC = () => {
                                 <ImageHoverPreview
                                   imageUrl={thumb}
                                   imageId={d.id}
-                                  vehicleId={d.vehicle_id}
                                 >
                                   <img
                                     src={thumb}
