@@ -192,3 +192,5 @@ export const VehicleProfileTabs: React.FC<VehicleProfileTabsProps> = ({
   );
 };
 
+export default VehicleProfileTabs;
+
