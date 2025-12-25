@@ -197,15 +197,11 @@ async function discoverSBXCarsListings(
   const listings: SBXCarsListing[] = []
   const seenUrls = new Set<string>()
 
-  // SBX Cars likely has browse pages like:
-  // - https://sbxcars.com/auctions (live auctions)
-  // - https://sbxcars.com/upcoming (upcoming auctions)
-  // - https://sbxcars.com/ended (ended auctions)
+  // Manual discovery with pagination and multiple browse pages
   const browseUrls = [
     'https://sbxcars.com/auctions',
     'https://sbxcars.com/upcoming',
     'https://sbxcars.com/ended',
-    'https://sbxcars.com',
   ]
 
   for (const browseUrl of browseUrls) {
@@ -213,22 +209,57 @@ async function discoverSBXCarsListings(
 
     try {
       console.log(`🔍 Discovering listings from: ${browseUrl}`)
-      const listingUrls = await extractListingUrlsFromBrowsePage(browseUrl, firecrawlKey, useFirecrawl)
+      
+      // Try multiple pagination patterns
+      const paginationPatterns = [
+        (p: number) => p === 1 ? browseUrl : `${browseUrl}?page=${p}`,
+        (p: number) => p === 1 ? browseUrl : `${browseUrl}/page/${p}`,
+        (p: number) => p === 1 ? browseUrl : `${browseUrl}?p=${p}`,
+      ]
 
-      for (const url of listingUrls) {
+      // First pass: collect all listing URLs from first 10 pages
+      const allListingUrls: string[] = []
+      let page = 1
+      const maxPages = 10 // Limit to 10 pages per section to avoid timeouts
+      let foundNewUrls = true
+
+      while (foundNewUrls && page <= maxPages && allListingUrls.length < maxListings * 2) {
+        foundNewUrls = false
+        
+        // Try first pagination pattern
+        const pageUrl = page === 1 ? browseUrl : `${browseUrl}?page=${page}`
+        const listingUrls = await extractListingUrlsFromBrowsePage(pageUrl, firecrawlKey, useFirecrawl)
+        
+        if (listingUrls.length > 0) {
+          foundNewUrls = true
+          for (const url of listingUrls) {
+            if (!allListingUrls.includes(url) && url.includes('/listing/')) {
+              allListingUrls.push(url)
+            }
+          }
+        }
+        
+        page++
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+
+      console.log(`  📋 Found ${allListingUrls.length} listing URLs from ${browseUrl}`)
+
+      // Second pass: scrape listings (limit to maxListings)
+      for (const url of allListingUrls) {
         if (seenUrls.has(url) || listings.length >= maxListings) continue
         seenUrls.add(url)
 
-        // Scrape individual listing
         const listing = await scrapeSBXCarsListing(url, firecrawlKey, useFirecrawl, supabase)
         if (listing) {
           listings.push(listing)
           console.log(`  ✅ Scraped: ${listing.title || url}`)
         }
 
-        // Rate limiting
         await new Promise((resolve) => setTimeout(resolve, 1000))
       }
+      
+      console.log(`  📊 Found ${listings.length} listings from ${browseUrl}`)
     } catch (error: any) {
       console.error(`Error discovering from ${browseUrl}:`, error.message)
     }
