@@ -1467,6 +1467,7 @@ const CursorHomepage: React.FC = () => {
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
           auction_outcome, high_bid, winning_bid, bid_count,
+          auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin
         `)
@@ -1508,22 +1509,46 @@ const CursorHomepage: React.FC = () => {
 
       // Batch-load live auction bids (fixes: BaT cards showing EST/— instead of current bid).
       // Best-effort only: if RLS blocks external_listings for anon, we keep the old behavior.
-      const auctionByVehicleId = new Map<string, any>();
+      // Group by vehicle_id to support multiple listings per vehicle (VehicleCardDense uses external_listings[0]).
+      const externalListingsByVehicleId = new Map<string, any[]>();
+      const auctionByVehicleId = new Map<string, any>(); // Keep for backward compatibility (display price logic)
       try {
         const ids = Array.from(new Set((vehicles || []).map((v: any) => String(v?.id || '')).filter(Boolean)));
         if (ids.length > 0) {
           const { data: listings, error: listErr } = await supabase
             .from('external_listings')
-            .select('vehicle_id, platform, listing_status, current_bid, final_price, updated_at')
+            .select('vehicle_id, platform, listing_status, current_bid, final_price, end_date, updated_at')
             .in('vehicle_id', ids)
             .order('updated_at', { ascending: false })
             .limit(2000);
           if (!listErr && Array.isArray(listings)) {
+            // Group all listings by vehicle_id (prioritize active listings first)
             for (const row of listings as any[]) {
               const vid = String(row?.vehicle_id || '');
               if (!vid) continue;
-              if (auctionByVehicleId.has(vid)) continue;
-              auctionByVehicleId.set(vid, row);
+              
+              // Add to grouped array (for VehicleCardDense)
+              if (!externalListingsByVehicleId.has(vid)) {
+                externalListingsByVehicleId.set(vid, []);
+              }
+              externalListingsByVehicleId.get(vid)!.push(row);
+              
+              // Keep first listing for backward compatibility (display price logic)
+              if (!auctionByVehicleId.has(vid)) {
+                auctionByVehicleId.set(vid, row);
+              }
+            }
+            
+            // Sort each vehicle's listings array: active/live first, then by updated_at
+            for (const [vid, listingsArray] of externalListingsByVehicleId.entries()) {
+              listingsArray.sort((a, b) => {
+                const aStatus = String(a.listing_status || '').toLowerCase();
+                const bStatus = String(b.listing_status || '').toLowerCase();
+                const aActive = aStatus === 'active' || aStatus === 'live';
+                const bActive = bStatus === 'active' || bStatus === 'live';
+                if (aActive !== bActive) return aActive ? -1 : 1;
+                return (new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+              });
             }
           }
         }
@@ -1655,6 +1680,9 @@ const CursorHomepage: React.FC = () => {
           hypeReason = 'NEW';
         }
 
+        // Attach external_listings array for VehicleCardDense auction badge detection
+        const externalListings = externalListingsByVehicleId.get(vehicleId) || [];
+        
         return {
           ...v,
           make: displayMake || v.make,
@@ -1675,6 +1703,8 @@ const CursorHomepage: React.FC = () => {
             large: mediumUrl || optimalImageUrl || undefined,
           },
           all_images: allImages || (optimalImageUrl ? [{ id: `fallback-${v.id}-0`, url: optimalImageUrl, is_primary: true }] : []),
+          // Attach external_listings for auction badge detection (VehicleCardDense expects external_listings[0])
+          external_listings: externalListings.length > 0 ? externalListings : undefined,
           tier: 'C',
           tier_label: 'Tier C'
         };
