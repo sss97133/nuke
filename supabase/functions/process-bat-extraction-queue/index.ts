@@ -24,13 +24,14 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { batchSize = 10, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 10, maxAttempts: 3 }));
+    const { batchSize = 10, maxAttempts = 3, concurrency = 2 } = await req.json().catch(() => ({ batchSize: 10, maxAttempts: 3, concurrency: 2 }));
 
     const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 10, 200));
     const safeMaxAttempts = Math.max(1, Math.min(Number(maxAttempts) || 3, 20));
+    const safeConcurrency = Math.max(1, Math.min(Number(concurrency) || 2, 10));
     const workerId = `process-bat-extraction-queue:${crypto.randomUUID?.() || String(Date.now())}`;
 
-    console.log(`Processing BaT extraction queue (batch size: ${safeBatchSize}, max attempts: ${safeMaxAttempts})`);
+    console.log(`Processing BaT extraction queue (batch size: ${safeBatchSize}, max attempts: ${safeMaxAttempts}, concurrency: ${safeConcurrency})`);
 
     // Claim work atomically (prevents double-processing under concurrent cron / manual runs).
     const { data: queueItems, error: queueError } = await supabase.rpc('claim_bat_extraction_queue_batch', {
@@ -63,10 +64,8 @@ serve(async (req) => {
       errors: [] as string[]
     };
 
-    // Process each item
-    for (const item of queueItems) {
+    const processOne = async (item: any) => {
       results.processed++;
-
       try {
         console.log(`Processing vehicle ${item.vehicle_id} (${item.bat_url})`);
 
@@ -147,10 +146,18 @@ serve(async (req) => {
         results.failed++;
         results.errors.push(`${item.vehicle_id}: ${errorMsg}`);
       }
+    };
 
-      // Small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+    const workerCount = Math.min(safeConcurrency, queueItems.length);
+    let nextIndex = 0;
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const idx = nextIndex++;
+        if (idx >= queueItems.length) break;
+        await processOne(queueItems[idx]);
+      }
+    });
+    await Promise.all(workers);
 
     console.log(`Queue processing complete: ${results.completed} completed, ${results.failed} failed`);
 

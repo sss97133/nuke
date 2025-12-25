@@ -84,6 +84,36 @@ Deno.serve(async (req) => {
     const systemStatus = healthySources === totalSources ? 'healthy' :
                         healthySources > totalSources / 2 ? 'degraded' : 'failing'
 
+    // Queue backlog snapshots (best-effort, schema-safe)
+    const queues: any = {}
+    const countRows = async (table: string, where: Record<string, any>) => {
+      try {
+        let q = supabase.from(table).select('id', { count: 'exact', head: true })
+        for (const [k, v] of Object.entries(where)) q = (q as any).eq(k, v)
+        const { count, error } = await q
+        if (error) return null
+        return typeof count === 'number' ? count : null
+      } catch {
+        return null
+      }
+    }
+
+    const importQueue = {
+      pending: await countRows('import_queue', { status: 'pending' }),
+      processing: await countRows('import_queue', { status: 'processing' }),
+      complete: await countRows('import_queue', { status: 'complete' }),
+      failed: await countRows('import_queue', { status: 'failed' }),
+    }
+    if (Object.values(importQueue).some((v) => typeof v === 'number')) queues.import_queue = importQueue
+
+    const batExtractionQueue = {
+      pending: await countRows('bat_extraction_queue', { status: 'pending' }),
+      processing: await countRows('bat_extraction_queue', { status: 'processing' }),
+      complete: await countRows('bat_extraction_queue', { status: 'complete' }),
+      failed: await countRows('bat_extraction_queue', { status: 'failed' }),
+    }
+    if (Object.values(batExtractionQueue).some((v) => typeof v === 'number')) queues.bat_extraction_queue = batExtractionQueue
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -95,6 +125,7 @@ Deno.serve(async (req) => {
           degraded_sources: degradedSources.length,
           total_attempts_24h: totalAttempts
         },
+        queues,
         sources: healthSummary,
         detailed_stats: detailedStats,
         degraded_sources: degradedSources
