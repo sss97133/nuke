@@ -1510,6 +1510,7 @@ const CursorHomepage: React.FC = () => {
       // Batch-load live auction bids (fixes: BaT cards showing EST/— instead of current bid).
       // Best-effort only: if RLS blocks external_listings for anon, we keep the old behavior.
       // Group by vehicle_id to support multiple listings per vehicle (VehicleCardDense uses external_listings[0]).
+      // IMPORTANT: Filter for active/live listings to ensure badges show correctly on homepage.
       const externalListingsByVehicleId = new Map<string, any[]>();
       const auctionByVehicleId = new Map<string, any>(); // Keep for backward compatibility (display price logic)
       try {
@@ -1519,10 +1520,11 @@ const CursorHomepage: React.FC = () => {
             .from('external_listings')
             .select('vehicle_id, platform, listing_status, current_bid, final_price, end_date, updated_at')
             .in('vehicle_id', ids)
+            .in('listing_status', ['active', 'live']) // Only fetch active listings for badge display
             .order('updated_at', { ascending: false })
             .limit(2000);
           if (!listErr && Array.isArray(listings)) {
-            // Group all listings by vehicle_id (prioritize active listings first)
+            // Group all listings by vehicle_id (all are already active/live since we filtered)
             for (const row of listings as any[]) {
               const vid = String(row?.vehicle_id || '');
               if (!vid) continue;
@@ -1539,14 +1541,10 @@ const CursorHomepage: React.FC = () => {
               }
             }
             
-            // Sort each vehicle's listings array: active/live first, then by updated_at
+            // Sort each vehicle's listings array by updated_at (most recent first)
+            // All listings are already active/live, so no need to check status
             for (const [vid, listingsArray] of externalListingsByVehicleId.entries()) {
               listingsArray.sort((a, b) => {
-                const aStatus = String(a.listing_status || '').toLowerCase();
-                const bStatus = String(b.listing_status || '').toLowerCase();
-                const aActive = aStatus === 'active' || aStatus === 'live';
-                const bActive = bStatus === 'active' || bStatus === 'live';
-                if (aActive !== bActive) return aActive ? -1 : 1;
                 return (new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
               });
             }
