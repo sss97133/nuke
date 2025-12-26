@@ -2189,7 +2189,12 @@ const VehicleProfile: React.FC = () => {
 
     const filterProfileImages = (urls: string[], v: any): string[] => {
       const normalized = (Array.isArray(urls) ? urls : []).map(normalizeUrl).filter(Boolean);
-      return filterIconNoise(filterClassicNoise(filterBatNoise(normalized, v), v));
+      // Exclude import_queue images from profile display
+      const withoutImportQueue = normalized.filter((u: string) => {
+        const urlLower = String(u || '').toLowerCase();
+        return !urlLower.includes('import_queue');
+      });
+      return filterIconNoise(filterClassicNoise(filterBatNoise(withoutImportQueue, v), v));
     };
 
     const getOriginImages = (v: any): { images: string[]; declaredCount: number | null } => {
@@ -2303,9 +2308,13 @@ const VehicleProfile: React.FC = () => {
 
         const primaryRow = imageRecords.find((r: any) => r?.is_primary === true) || null;
         const primaryCandidate = primaryRow ? (resolveDbImageUrl(primaryRow) || null) : null;
-        const primaryOk = primaryCandidate && filterProfileImages([primaryCandidate], vehicle).length > 0;
+        // Exclude import_queue images from primary selection
+        const primaryIsImportQueue = primaryRow && isImportedStoragePath(primaryRow?.storage_path);
+        const primaryOk = primaryCandidate && !primaryIsImportQueue && filterProfileImages([primaryCandidate], vehicle).length > 0;
 
+        // Build fallback pool, excluding import_queue images
         const fallbackPool = imageRecords
+          .filter((r: any) => !isImportedStoragePath(r?.storage_path)) // Exclude import_queue images
           .map((r: any) => resolveDbImageUrl(r))
           .filter(Boolean) as string[];
         const filteredPool = filterProfileImages([...fallbackPool, ...originImages], vehicle);
@@ -2320,6 +2329,8 @@ const VehicleProfile: React.FC = () => {
         const shouldHealPrimary = (!hasPrimary && imageRecords[0]) || (hasPrimary && !primaryOk);
         if (shouldHealPrimary && session?.user?.id) {
           const isValidForPrimary = (r: any) => {
+            // Exclude import_queue images from primary selection
+            if (isImportedStoragePath(r?.storage_path)) return false;
             const url = resolveDbImageUrl(r) || r?.image_url;
             return url && filterProfileImages([url], vehicle).length > 0;
           };
@@ -2422,8 +2433,11 @@ const VehicleProfile: React.FC = () => {
         setVehicleImages(images);
 
         // If we filtered out a noisy lead image, ensure we still have a hero.
+        // Also check that lead doesn't contain import_queue in the URL path
         if (images.length > 0) {
-          const leadStillOk = lead && filterProfileImages([String(lead)], vehicle).length > 0;
+          const leadStr = String(lead || '').toLowerCase();
+          const leadIsImportQueue = leadStr.includes('import_queue');
+          const leadStillOk = lead && !leadIsImportQueue && filterProfileImages([String(lead)], vehicle).length > 0;
           if (!leadStillOk) setLeadImageUrl(images[0]);
         }
 

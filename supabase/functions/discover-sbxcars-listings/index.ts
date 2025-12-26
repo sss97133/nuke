@@ -40,6 +40,33 @@ serve(async (req) => {
 
     console.log(`🔍 Discovering SBX Cars listings from sections: ${sections.join(', ')}`)
 
+    // Ensure scrape source exists
+    let { data: source } = await supabase
+      .from('scrape_sources')
+      .select('id')
+      .ilike('url', '%sbxcars.com%')
+      .maybeSingle()
+
+      if (!source?.id) {
+        const { data: newSource, error: createError } = await supabase
+          .from('scrape_sources')
+          .insert({
+            url: 'https://sbxcars.com',
+            name: 'SBX Cars',
+            source_type: 'auction_house',
+            is_active: true,
+          })
+          .select('id')
+          .single()
+
+        if (createError) {
+          console.error('Error creating source:', createError)
+        } else {
+          source = newSource
+          console.log('✅ Created scrape source for sbxcars.com')
+        }
+      }
+
     const allListingUrls = new Set<string>()
     const stats = {
       pages_checked: 0,
@@ -262,12 +289,15 @@ serve(async (req) => {
 
     // Add new URLs to import_queue
     if (newUrls.length > 0) {
-      const { data: source } = await supabase
-        .from('scrape_sources')
-        .select('id')
-        .eq('domain', 'sbxcars.com')
-        .maybeSingle()
-
+      // Re-fetch source to ensure we have the ID
+      if (!source?.id) {
+        const { data: refetchedSource } = await supabase
+          .from('scrape_sources')
+          .select('id')
+          .ilike('url', '%sbxcars.com%')
+          .maybeSingle()
+        if (refetchedSource) source = refetchedSource
+      }
       const sourceId = source?.id
 
       const queueItems = newUrls.map(url => ({

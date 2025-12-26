@@ -85,7 +85,7 @@ serve(async (req) => {
     const { data: source, error: sourceError } = await supabase
       .from('scrape_sources')
       .select('id')
-      .eq('domain', 'sbxcars.com')
+      .ilike('url', '%sbxcars.com%')
       .maybeSingle()
 
     let sourceId = source?.id
@@ -94,10 +94,9 @@ serve(async (req) => {
       const { data: newSource, error: createError } = await supabase
         .from('scrape_sources')
         .insert({
-          domain: 'sbxcars.com',
-          source_name: 'SBX Cars',
+          url: 'https://sbxcars.com',
+          name: 'SBX Cars',
           source_type: 'auction_house',
-          base_url: 'https://sbxcars.com',
           is_active: true,
         })
         .select('id')
