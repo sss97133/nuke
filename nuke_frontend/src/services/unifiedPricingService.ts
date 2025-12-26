@@ -154,11 +154,22 @@ export class UnifiedPricingService {
     }
 
     // Apply truth hierarchy (highest wins)
+    // Helper to normalize price values (handles string/number from DB)
+    const toNumber = (value: any): number | null => {
+      if (value == null) return null;
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
+        const parsed = parseFloat(value);
+        return !isNaN(parsed) && parsed > 0 ? parsed : null;
+      }
+      return null;
+    };
     
     // 1. HIGHEST TRUTH: Actual sale price
-    if (vehicle.sale_price && vehicle.sale_price > 0) {
+    const salePrice = toNumber(vehicle.sale_price);
+    if (salePrice) {
       return {
-        displayValue: vehicle.sale_price,
+        displayValue: salePrice,
         displayLabel: 'Sold for',
         source: 'sale_price',
         confidence: 'verified',
@@ -187,9 +198,10 @@ export class UnifiedPricingService {
     }
 
     // 3. SECOND TRUTH: Owner's asking price (intent to sell)
-    if (vehicle.asking_price && vehicle.asking_price > 0) {
+    const askingPrice = toNumber(vehicle.asking_price);
+    if (askingPrice) {
       return {
-        displayValue: vehicle.asking_price,
+        displayValue: askingPrice,
         displayLabel: 'Asking',
         source: 'asking_price',
         confidence: 'high',
@@ -198,9 +210,10 @@ export class UnifiedPricingService {
     }
 
     // 4. THIRD TRUTH: Current estimated value
-    if (vehicle.current_value && vehicle.current_value > 0) {
+    const currentValue = toNumber(vehicle.current_value);
+    if (currentValue) {
       return {
-        displayValue: vehicle.current_value,
+        displayValue: currentValue,
         displayLabel: 'Estimated at',
         source: 'current_value',
         confidence: 'medium',
@@ -209,9 +222,10 @@ export class UnifiedPricingService {
     }
 
     // 5. FOURTH TRUTH: Historical purchase price
-    if (vehicle.purchase_price && vehicle.purchase_price > 0) {
+    const purchasePrice = toNumber(vehicle.purchase_price);
+    if (purchasePrice) {
       return {
-        displayValue: vehicle.purchase_price,
+        displayValue: purchasePrice,
         displayLabel: 'Purchased for',
         source: 'purchase_price',
         confidence: 'low',
@@ -220,9 +234,10 @@ export class UnifiedPricingService {
     }
 
     // 6. LOWEST TRUTH: MSRP (baseline reference)
-    if (vehicle.msrp && vehicle.msrp > 0) {
+    const msrp = toNumber(vehicle.msrp);
+    if (msrp) {
       return {
-        displayValue: vehicle.msrp,
+        displayValue: msrp,
         displayLabel: 'MSRP',
         source: 'msrp',
         confidence: 'low',
@@ -296,58 +311,81 @@ export class UnifiedPricingService {
 
     const priceMap = new Map<string, UnifiedPrice>();
 
+    // Helper to normalize price values (handles string/number from DB)
+    const toNumber = (value: any): number | null => {
+      if (value == null) return null;
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
+        const parsed = parseFloat(value);
+        return !isNaN(parsed) && parsed > 0 ? parsed : null;
+      }
+      return null;
+    };
+
     for (const vehicle of vehicles) {
       try {
         // Apply same truth hierarchy
-        let price: UnifiedPrice;
+        let price: UnifiedPrice | null = null;
 
-        if (vehicle.sale_price && vehicle.sale_price > 0) {
+        const salePrice = toNumber(vehicle.sale_price);
+        if (salePrice) {
           price = {
-            displayValue: vehicle.sale_price,
+            displayValue: salePrice,
             displayLabel: 'Sold for',
             source: 'sale_price',
             confidence: 'verified',
             lastUpdated: vehicle.updated_at || new Date().toISOString(),
             metadata: { bat_auction_url: vehicle.bat_auction_url || undefined }
           };
-        } else if (vehicle.asking_price && vehicle.asking_price > 0) {
-          price = {
-            displayValue: vehicle.asking_price,
-            displayLabel: 'Asking',
-            source: 'asking_price',
-            confidence: 'high',
-            lastUpdated: vehicle.updated_at || new Date().toISOString()
-          };
-        } else if (vehicle.current_value && vehicle.current_value > 0) {
-          price = {
-            displayValue: vehicle.current_value,
-            displayLabel: 'Estimated at',
-            source: 'current_value',
-            confidence: 'medium',
-            lastUpdated: vehicle.updated_at || new Date().toISOString()
-          };
-        } else if (vehicle.purchase_price && vehicle.purchase_price > 0) {
-          price = {
-            displayValue: vehicle.purchase_price,
-            displayLabel: 'Purchased for',
-            source: 'purchase_price',
-            confidence: 'low',
-            lastUpdated: vehicle.updated_at || new Date().toISOString()
-          };
-        } else if (vehicle.msrp && vehicle.msrp > 0) {
-          price = {
-            displayValue: vehicle.msrp,
-            displayLabel: 'MSRP',
-            source: 'msrp',
-            confidence: 'low',
-            lastUpdated: vehicle.updated_at || new Date().toISOString()
-          };
         } else {
-          // Skip vehicles with no price data
-          continue;
+          const askingPrice = toNumber(vehicle.asking_price);
+          if (askingPrice) {
+            price = {
+              displayValue: askingPrice,
+              displayLabel: 'Asking',
+              source: 'asking_price',
+              confidence: 'high',
+              lastUpdated: vehicle.updated_at || new Date().toISOString()
+            };
+          } else {
+            const currentValue = toNumber(vehicle.current_value);
+            if (currentValue) {
+              price = {
+                displayValue: currentValue,
+                displayLabel: 'Estimated at',
+                source: 'current_value',
+                confidence: 'medium',
+                lastUpdated: vehicle.updated_at || new Date().toISOString()
+              };
+            } else {
+              const purchasePrice = toNumber(vehicle.purchase_price);
+              if (purchasePrice) {
+                price = {
+                  displayValue: purchasePrice,
+                  displayLabel: 'Purchased for',
+                  source: 'purchase_price',
+                  confidence: 'low',
+                  lastUpdated: vehicle.updated_at || new Date().toISOString()
+                };
+              } else {
+                const msrp = toNumber(vehicle.msrp);
+                if (msrp) {
+                  price = {
+                    displayValue: msrp,
+                    displayLabel: 'MSRP',
+                    source: 'msrp',
+                    confidence: 'low',
+                    lastUpdated: vehicle.updated_at || new Date().toISOString()
+                  };
+                }
+              }
+            }
+          }
         }
 
-        priceMap.set(vehicle.id, price);
+        if (price) {
+          priceMap.set(vehicle.id, price);
+        }
       } catch (err) {
         console.error(`[UnifiedPricing] Error processing vehicle ${vehicle.id}:`, err);
       }

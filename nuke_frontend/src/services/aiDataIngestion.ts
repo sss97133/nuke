@@ -246,10 +246,18 @@ class AIDataIngestionService {
   }
 
   /**
-   * Extract data from URL (listing pages)
+   * Extract data from URL (listing pages or organization websites)
    */
   private async extractFromURL(url: string, userId?: string): Promise<ExtractionResult> {
     try {
+      // First, check if this is an organization website (not a vehicle listing)
+      const isOrgWebsite = this.isOrganizationWebsite(url);
+      
+      if (isOrgWebsite) {
+        return await this.handleOrganizationWebsite(url);
+      }
+
+      // Otherwise, treat as vehicle listing
       const parsed = await listingURLParser.parseListingURL(url);
       
       return {
@@ -279,6 +287,168 @@ class AIDataIngestionService {
         inputType: 'url',
         confidence: 0,
         errors: [error.message || 'URL parsing failed']
+      };
+    }
+  }
+
+  /**
+   * Check if URL is an organization website (not a vehicle listing)
+   */
+  private isOrganizationWebsite(url: string): boolean {
+    const urlLower = url.toLowerCase();
+    
+    // Vehicle listing patterns (these are NOT org websites)
+    const listingPatterns = [
+      /\/vehicle\/[^\/]+/i,
+      /\/inventory\/[^\/]+/i,
+      /\/listing\/[^\/]+/i,
+      /\/lot\/[^\/]+/i,
+      /\/car\/[^\/]+/i,
+      /\/auction\/[^\/]+/i,
+      /\/bid\/[^\/]+/i,
+      /vin=/i,
+      /id=/i,
+    ];
+
+    for (const pattern of listingPatterns) {
+      if (pattern.test(url)) {
+        return false; // This is a vehicle listing
+      }
+    }
+
+    // Organization website patterns
+    const orgPatterns = [
+      /^https?:\/\/[^\/]+\/?$/i, // Root domain
+      /\/about/i,
+      /\/contact/i,
+      /\/inventory$/i, // Inventory index (not a specific vehicle)
+      /\/vehicles$/i,
+      /\/sold$/i,
+      /\/current$/i,
+      /\/auctions?$/i, // Auctions index
+      /\/events?$/i,
+    ];
+
+    for (const pattern of orgPatterns) {
+      if (pattern.test(url)) {
+        return true; // This is likely an org website
+      }
+    }
+
+    // Default: if it's a root domain or has no vehicle-specific path, treat as org
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/').filter(p => p);
+    return pathParts.length <= 1; // Root or single-level path
+  }
+
+  /**
+   * Handle organization website URL
+   */
+  private async handleOrganizationWebsite(url: string): Promise<ExtractionResult> {
+    try {
+      // Normalize URL to base domain
+      const urlObj = new URL(url);
+      const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+      const normalizedUrl = url.replace(/\/$/, ''); // Remove trailing slash
+
+      // Check if organization already exists
+      const { data: existingOrgs, error: lookupError } = await supabase
+        .from('businesses')
+        .select('id, business_name, website, description')
+        .or(`website.eq.${normalizedUrl},website.eq.${baseUrl},website.eq.${normalizedUrl}/,website.eq.${baseUrl}/`)
+        .limit(5);
+
+      if (lookupError) {
+        console.error('Organization lookup error:', lookupError);
+      }
+
+      // If organization exists, return info about it
+      if (existingOrgs && existingOrgs.length > 0) {
+        const org = existingOrgs[0];
+        return {
+          inputType: 'url',
+          confidence: 1.0,
+          source: 'organization_lookup',
+          rawData: {
+            organization: {
+              id: org.id,
+              name: org.business_name,
+              website: org.website,
+              description: org.description,
+            },
+            exists: true,
+            message: `Organization "${org.business_name}" already exists in the system.`,
+          },
+        };
+      }
+
+      // Organization doesn't exist - trigger creation/enrichment
+      // Use thorough-site-mapper or create directly
+      // First, try to create a basic organization, then enrich it
+      const domain = urlObj.hostname.replace(/^www\./, '');
+      const orgName = domain.split('.')[0].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      
+      // Create basic organization first
+      const { data: newOrg, error: createError } = await supabase
+        .from('businesses')
+        .insert({
+          business_name: orgName,
+          business_type: 'dealership', // Default, can be updated
+          website: normalizedUrl,
+          metadata: {
+            discovered_from: 'url_ingestion',
+            discovered_at: new Date().toISOString(),
+          },
+        })
+        .select('id, business_name')
+        .single();
+
+      if (createError) {
+        return {
+          inputType: 'url',
+          confidence: 0,
+          errors: [createError.message || 'Failed to create organization'],
+        };
+      }
+
+      // Now enrich it with website data
+      const { data: enrichData, error: enrichError } = await supabase.functions.invoke('update-org-from-website', {
+        body: {
+          organizationId: newOrg.id,
+          websiteUrl: normalizedUrl,
+        },
+      });
+
+      if (createError) {
+        return {
+          inputType: 'url',
+          confidence: 0,
+          errors: [createError.message || 'Failed to create organization'],
+        };
+      }
+
+      // Return the created organization info
+      return {
+        inputType: 'url',
+        confidence: 0.9,
+        source: 'organization_creation',
+        rawData: {
+          organization: {
+            id: newOrg.id,
+            name: newOrg.business_name,
+            website: normalizedUrl,
+            description: enrichData?.description || undefined,
+          },
+          exists: false,
+          message: `Organization "${newOrg.business_name}" has been created${enrichData?.success ? ' and enriched' : ''}.`,
+          enrichData,
+        },
+      };
+    } catch (error: any) {
+      return {
+        inputType: 'url',
+        confidence: 0,
+        errors: [error.message || 'Organization website handling failed'],
       };
     }
   }

@@ -454,6 +454,28 @@ export default function AIDataIngestionSearch() {
         extractionResult = await aiDataIngestion.extractData(input, userId);
       }
 
+      // Handle organization website URLs
+      if (extractionResult.inputType === 'url' && extractionResult.rawData?.organization) {
+        const org = extractionResult.rawData.organization;
+        const exists = extractionResult.rawData.exists;
+        
+        // Show preview with organization info
+        setExtractionPreview({
+          result: extractionResult,
+        });
+        setShowPreview(true);
+        setError(null);
+        setIsProcessing(false);
+        
+        // If organization exists, show message
+        if (exists) {
+          showToast(`Organization "${org.name}" already exists`, 'info');
+        } else {
+          showToast(`Organization "${org.name || 'Unknown'}" has been created`, 'success');
+        }
+        return;
+      }
+
       // Handle organization/garage search queries
       if (extractionResult.inputType === 'org_search') {
         // Navigate to unified search page with search query
@@ -1146,6 +1168,46 @@ export default function AIDataIngestionSearch() {
                         • {evidence.matchType}: {evidence.details}
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Organization Preview */}
+          {extractionPreview.result.rawData?.organization && (
+            <div style={{ marginBottom: '12px', fontSize: '8pt' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                {extractionPreview.result.rawData.exists ? '✅ Organization Found' : '🆕 Organization Created'}
+              </div>
+              <div style={{ paddingLeft: '8px' }}>
+                <div style={{ fontWeight: 'bold' }}>
+                  {extractionPreview.result.rawData.organization.name}
+                </div>
+                {extractionPreview.result.rawData.organization.website && (
+                  <div style={{ fontSize: '7pt', color: '#666', marginTop: '2px' }}>
+                    {extractionPreview.result.rawData.organization.website}
+                  </div>
+                )}
+                {extractionPreview.result.rawData.organization.description && (
+                  <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px', fontStyle: 'italic' }}>
+                    {extractionPreview.result.rawData.organization.description}
+                  </div>
+                )}
+                {extractionPreview.result.rawData.organization.id && (
+                  <div style={{ marginTop: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigate(`/organization/${extractionPreview.result.rawData.organization.id}`);
+                        setShowPreview(false);
+                        setInput('');
+                      }}
+                      className="button button-primary"
+                      style={{ fontSize: '8pt', padding: '4px 8px' }}
+                    >
+                      View Organization
+                    </button>
                   </div>
                 )}
               </div>
