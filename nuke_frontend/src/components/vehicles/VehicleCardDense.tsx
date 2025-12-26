@@ -412,67 +412,46 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     (vehicle.discovery_url ? String(vehicle.discovery_url) : '') ||
     '';
 
-  const isAuctionSource = React.useMemo(() => {
+  // STATE-BASED: Is this vehicle in an ACTIVE AUCTION right now?
+  // This is the first question - what's the current state, not the source
+  const isActiveAuction = React.useMemo(() => {
     const v: any = vehicle as any;
     const now = Date.now();
     
-    // Check for active auction based on DATABASE FIELDS, not source URLs
-    // Any vehicle can go to auction - source is irrelevant, only current auction status matters
-    
-    // 1. Check if auction_end_date exists and is in the future (active auction)
-    const endDate = v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date;
-    if (endDate) {
-      const end = new Date(endDate).getTime();
-      if (Number.isFinite(end) && end > now) {
-        return true; // Active auction with end date in future
-      }
-    }
-    
-    // 2. Check external_listings for active listings (if available on vehicle object)
+    // Check 1: Active external listing (BaT, Cars & Bids, etc.) - most reliable
     const externalListing = v?.external_listings?.[0];
     if (externalListing) {
       const status = String(externalListing.listing_status || '').toLowerCase();
       if (status === 'active' || status === 'live') {
-        // Also check if end_date is in future (if available)
+        // Must have future end date (or be actively running)
         const extEndDate = externalListing.end_date;
         if (extEndDate) {
           const extEnd = new Date(extEndDate).getTime();
           if (Number.isFinite(extEnd) && extEnd > now) {
-            return true; // Active external listing with future end date
+            // Active listing with future end date - this is live!
+            return true;
           }
         } else {
-          // If no end_date but status is active/live, consider it active
+          // No end date but status is active/live - assume it's running
+          // (some live auctions don't have specific end times)
           return true;
         }
       }
     }
     
-    // 3. Check if vehicle has bid data indicating active auction
-    // (bid_count > 0 OR high_bid/current_bid exists) AND auction hasn't ended
-    const hasBidData = (
-      (typeof v.bid_count === 'number' && v.bid_count > 0) ||
-      (typeof v.high_bid === 'number' && v.high_bid > 0) ||
-      (typeof v.current_bid === 'number' && v.current_bid > 0) ||
-      (typeof v.winning_bid === 'number' && v.winning_bid > 0)
-    );
-    
-    if (hasBidData) {
-      // Only consider it active if auction hasn't explicitly ended
-      const outcome = String(v.auction_outcome || '').toLowerCase();
-      const saleStatus = String(v.sale_status || '').toLowerCase();
-      const isEnded = ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) || 
-                      ['sold', 'ended'].includes(saleStatus);
-      
-      // If we have bid data and it hasn't ended, check if end date is in future (if available)
-      if (!isEnded) {
-        if (endDate) {
-          const end = new Date(endDate).getTime();
-          if (Number.isFinite(end) && end > now) {
-            return true; // Has bid data, hasn't ended, and end date is in future
-          }
-        } else {
-          // Has bid data, hasn't ended, but no end date - still consider it potentially active
-          // (could be a live auction without specific end time)
+    // Check 2: Vehicle-level auction_end_date in future
+    const endDate = v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date;
+    if (endDate) {
+      const end = new Date(endDate).getTime();
+      if (Number.isFinite(end) && end > now) {
+        // Has future end date, but must also check it's not ended/sold
+        const outcome = String(v.auction_outcome || '').toLowerCase();
+        const saleStatus = String(v.sale_status || '').toLowerCase();
+        const isEnded = ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) || 
+                        ['sold', 'ended'].includes(saleStatus);
+        
+        if (!isEnded) {
+          // Future end date + not ended = active auction
           return true;
         }
       }
@@ -480,6 +459,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     
     return false;
   }, [vehicle]);
+  
+  // Keep isAuctionSource for backward compatibility (used in badge animations, etc.)
+  // But it should generally match isActiveAuction for live auctions
+  const isAuctionSource = isActiveAuction;
 
   const auctionProgress01 = React.useMemo(() => {
     if (!isAuctionSource) return 0;
@@ -501,50 +484,52 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return max - (max - min) * auctionProgress01;
   }, [isAuctionSource, auctionProgress01]);
 
+  // Get current bid for active auctions - prioritize external_listings (live data)
   const auctionHighBidText = React.useMemo(() => {
     const v: any = vehicle as any;
     
-    // Check external_listings first (live auction data)
-    const listingLiveBid = typeof v?.external_listings?.[0]?.current_bid === 'number' 
-      ? v.external_listings[0].current_bid 
-      : null;
-    const listingStatus = String(v?.external_listings?.[0]?.listing_status || '').toLowerCase();
-    const isLive = listingStatus === 'active' || listingStatus === 'live';
-    const liveBid = (isLive && listingLiveBid && listingLiveBid > 0) ? listingLiveBid : null;
-    
-    // Check metadata live metrics
-    const metaLiveBidRaw =
-      (v?.origin_metadata?.live_metrics?.current_bid ?? v?.origin_metadata?.live_metrics?.currentBid ?? null);
-    const metaLiveBid = typeof metaLiveBidRaw === 'number'
-      ? metaLiveBidRaw
-      : Number(String(metaLiveBidRaw || '').replace(/[^\d.]/g, ''));
-    
-    const currentBid = typeof v.current_bid === 'number' ? v.current_bid : Number(String(v.current_bid || '').replace(/[^\d.]/g, ''));
-    
-    // Prefer canonical auction fields if present (newer schema)
-    // Priority: live bid > sale price > winning bid > high bid > current bid > metadata bid
-    const highBid =
-      liveBid ??
-      (typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0 ? v.sale_price : null) ??
-      (typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0 ? v.winning_bid : null) ??
-      (typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0 ? v.high_bid : null) ??
-      (Number.isFinite(currentBid) && currentBid > 0 ? currentBid : null) ??
-      (Number.isFinite(metaLiveBid) && metaLiveBid > 0 ? metaLiveBid : null);
-    if (typeof highBid === 'number' && Number.isFinite(highBid) && highBid > 0) {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(highBid);
+    // For active auctions, prioritize external_listings[0].current_bid (live BaT data)
+    if (isActiveAuction) {
+      const externalListing = v?.external_listings?.[0];
+      if (externalListing) {
+        const listingLiveBid = typeof externalListing.current_bid === 'number' 
+          ? externalListing.current_bid 
+          : null;
+        if (listingLiveBid && listingLiveBid > 0) {
+          return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(listingLiveBid);
+        }
+      }
+      
+      // Fallback: vehicle.current_bid for active auctions
+      const currentBid = typeof v.current_bid === 'number' && Number.isFinite(v.current_bid) && v.current_bid > 0
+        ? v.current_bid
+        : null;
+      if (currentBid) {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(currentBid);
+      }
     }
+    
+    // For ended auctions or non-auction cases, show final results
+    // Priority: sale price > winning bid > high bid
+    const salePrice = typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0 ? v.sale_price : null;
+    const winningBid = typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0 ? v.winning_bid : null;
+    const highBid = typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0 ? v.high_bid : null;
+    
+    const finalBid = salePrice ?? winningBid ?? highBid;
+    if (finalBid) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(finalBid);
+    }
+    
+    // Fallback: check cents fields
     const cents =
       (typeof v.current_high_bid_cents === 'number' ? v.current_high_bid_cents : null) ??
       (typeof v.latest_bid_cents === 'number' ? v.latest_bid_cents : null);
     if (typeof cents === 'number' && Number.isFinite(cents) && cents > 0) {
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(cents / 100);
     }
-    const bid = typeof v.latest_bid === 'number' ? v.latest_bid : null;
-    if (typeof bid === 'number' && Number.isFinite(bid) && bid > 0) {
-      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(bid);
-    }
+    
     return null;
-  }, [vehicle]);
+  }, [vehicle, isActiveAuction]);
 
   const auctionBidderDisplay = React.useMemo(() => {
     const v: any = vehicle as any;
@@ -708,41 +693,44 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return v.cost_basis || v.purchase_price || null;
   }, [vehicle]);
 
+  // STATE-BASED: What's the most relevant price to show RIGHT NOW?
   const badgeMainText = React.useMemo(() => {
-    if (!isAuctionSource) return displayPrice;
+    const v: any = vehicle as any;
     
-    // If auction ended > 1 day ago, show asset value instead of auction status
-    if (shouldShowAssetValue) {
-      // Show market value if available, otherwise owner cost
-      if (marketValue) {
-        return `$${(marketValue / 100).toLocaleString()}`;
-      }
-      if (ownerCost) {
-        return `$${(ownerCost / 100).toLocaleString()}`;
-      }
-      // Fallback to display price
-      return displayPrice || '—';
+    // PRIORITY 1: ACTIVE TRANSACTION STATE (what's happening NOW)
+    if (isActiveAuction) {
+      // Live auction - show bid amount (badge will add "BID" label separately)
+      return auctionHighBidText || 'BID';
     }
     
-    const v: any = vehicle as any;
+    // PRIORITY 2: RECENTLY COMPLETED TRANSACTION (what just happened)
     const outcome = String(v.auction_outcome || '').toLowerCase();
     const saleStatus = String(v.sale_status || '').toLowerCase();
-    const isResult = ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) || ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(saleStatus);
-
-    if (isResult) {
-      if (outcome === 'sold' || saleStatus === 'sold' || (Number(v.sale_price || 0) > 0)) {
-        return `SOLD ${auctionHighBidText || ''}`.trim();
-      }
-      if (outcome === 'reserve_not_met') {
-        // Reserve not met still has a meaningful final high bid; don't show a misleading "BID" label.
-        return `${auctionHighBidText ? `RESULT ${auctionHighBidText}` : 'RESERVE NOT MET'}`.trim();
-      }
-      return `${auctionHighBidText ? `ENDED ${auctionHighBidText}` : 'ENDED'}`.trim();
+    const isRecentlySold = outcome === 'sold' || saleStatus === 'sold' || (typeof v.sale_price === 'number' && v.sale_price > 0);
+    
+    if (isRecentlySold) {
+      return `SOLD ${auctionHighBidText || ''}`.trim();
     }
-
-    // Live auction: show the amount if we have it, otherwise a compact placeholder.
-    return auctionHighBidText || (displayPrice && displayPrice !== '—' ? displayPrice : null) || 'BID';
-  }, [isAuctionSource, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost]);
+    
+    if (outcome === 'reserve_not_met' || outcome === 'ended' || outcome === 'no_sale') {
+      return auctionHighBidText ? `RESULT ${auctionHighBidText}`.trim() : 'ENDED';
+    }
+    
+    // PRIORITY 3: CURRENT ASSET VALUE (what it's worth NOW)
+    // If auction ended > 1 day ago, show asset value instead of auction status
+    if (shouldShowAssetValue) {
+      if (marketValue) {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(marketValue);
+      }
+      if (ownerCost) {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(ownerCost);
+      }
+    }
+    
+    // PRIORITY 4: REGULAR PRICE (for sale, estimated value, etc.)
+    // For non-auction vehicles, use displayPrice which handles: sale_price > asking_price > etc.
+    return displayPrice;
+  }, [isActiveAuction, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost]);
 
   // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {
@@ -927,8 +915,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             </div>
           )}
 
-          {/* Timer badge (separate, on left side top) */}
-          {isAuctionSource && formatAuctionTimer && (
+          {/* Timer badge (separate, on left side top) - only for ACTIVE auctions */}
+          {isActiveAuction && formatAuctionTimer && (
             <div style={{
               position: 'absolute',
               top: vehicle.is_streaming ? '34px' : '8px', // Below LIVE badge if it exists
@@ -954,7 +942,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           {/* Price/Bid badge (no favicon here) */}
           {showPriceOverlay && badgeMainText !== '—' && (
             <div style={{ ...badgeStyle, top: '8px', right: '8px' }}>
-              {isAuctionSource ? (
+              {isActiveAuction ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
                   <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
                     BID
@@ -966,7 +954,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   )}
                   {(() => {
                     const v: any = vehicle as any;
-                    const bidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 ? v.bid_count : null;
+                    // Prioritize bid_count from external_listings (live data), fallback to vehicle
+                    const externalBidCount = typeof v?.external_listings?.[0]?.bid_count === 'number' 
+                      ? v.external_listings[0].bid_count 
+                      : null;
+                    const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 
+                      ? v.bid_count 
+                      : null;
+                    const bidCount = externalBidCount ?? vehicleBidCount;
                     return bidCount ? (
                       <div style={{ fontSize: '6pt', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
                         {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
@@ -1386,8 +1381,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           </div>
         )}
 
-        {/* Timer badge (separate, on left side top) */}
-        {isAuctionSource && formatAuctionTimer && (
+        {/* Timer badge (separate, on left side top) - only for ACTIVE auctions */}
+        {isActiveAuction && formatAuctionTimer && (
           <div style={{
             position: 'absolute',
             top: vehicle.is_streaming ? '28px' : '6px', // Below LIVE badge if it exists
@@ -1413,7 +1408,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         {/* Price/Bid badge (no favicon here) */}
         {showPriceOverlay && badgeMainText !== '—' && (
           <div style={badgeStyle}>
-            {isAuctionSource ? (
+            {isActiveAuction ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
                 <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
                   BID
@@ -1425,7 +1420,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 )}
                 {(() => {
                   const v: any = vehicle as any;
-                  const bidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 ? v.bid_count : null;
+                  // Prioritize bid_count from external_listings (live data), fallback to vehicle
+                  const externalBidCount = typeof v?.external_listings?.[0]?.bid_count === 'number' 
+                    ? v.external_listings[0].bid_count 
+                    : null;
+                  const vehicleBidCount = typeof v.bid_count === 'number' && Number.isFinite(v.bid_count) && v.bid_count > 0 
+                    ? v.bid_count 
+                    : null;
+                  const bidCount = externalBidCount ?? vehicleBidCount;
                   return bidCount ? (
                     <div style={{ fontSize: '5.5pt', fontWeight: 600, opacity: 0.85, lineHeight: 1 }}>
                       {bidCount} {bidCount === 1 ? 'bid' : 'bids'}
