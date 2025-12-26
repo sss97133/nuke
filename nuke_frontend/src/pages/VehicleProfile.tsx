@@ -47,7 +47,7 @@ import VehicleMemePanel from '../components/vehicle/VehicleMemePanel';
 import type { ContentActionEvent } from '../services/streamActionsService';
 // Lazy load heavy components to avoid circular dependencies
 const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/MergeProposalsPanel'));
-const VehicleProfileTabs = React.lazy(() => import('./vehicle-profile/VehicleProfileTabs'));
+// VehicleProfileTabs removed - using curated layout instead
 import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
 import type { Session } from '@supabase/supabase-js';
 import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
@@ -55,6 +55,7 @@ import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibra
 import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel';
 import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 import { AdminNotificationService } from '../services/adminNotificationService';
+import ImageGallery from '../components/images/ImageGallery';
 
 const WORKSPACE_TABS = [
   { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
@@ -624,8 +625,8 @@ const VehicleProfile: React.FC = () => {
       const { data: imgs } = await supabase
         .from('vehicle_images')
         .select('image_url, is_primary')
-        .eq('vehicle_id', vehicle.id)
-        .limit(300);
+        .eq('vehicle_id', vehicle.id);
+        // NO LIMIT - show ALL images from all sources
       const images = (imgs || []) as any[];
       // Services removed during cleanup - simplified composition
       const pkg = {
@@ -2329,8 +2330,8 @@ const VehicleProfile: React.FC = () => {
           );
 
         const filtered = filterProfileImages(cleaned, v);
-        const limited = filtered.slice(0, declaredCount ?? 120);
-        return { images: limited, declaredCount };
+        // NO LIMIT - show ALL images from source
+        return { images: filtered, declaredCount };
       } catch {
         return { images: [], declaredCount: null };
       }
@@ -2565,73 +2566,96 @@ const VehicleProfile: React.FC = () => {
           }
         }
 
-        // Fallback: If all DB images were filtered out (e.g., all were import_queue), try BaT URLs from external_listings first
+        // Fallback: If all DB images were filtered out (e.g., all were import_queue), try URLs from external_listings for ALL platforms
         if (images.length === 0) {
           try {
             const { data: externalListing } = await supabase
               .from('external_listings')
-              .select('metadata, listing_url')
+              .select('metadata, listing_url, platform')
               .eq('vehicle_id', vehicle.id)
-              .eq('platform', 'bat')
               .order('updated_at', { ascending: false })
               .limit(1)
               .maybeSingle();
             
             if (externalListing?.metadata) {
               const metadata = externalListing.metadata as any;
+              const platform = externalListing.platform || 'unknown';
               const metadataImages = metadata.images || metadata.image_urls || [];
               if (Array.isArray(metadataImages) && metadataImages.length > 0) {
-                // Clean BaT URLs: remove resize params and -scaled suffixes (matches extract-premium-auction logic)
-                const cleanBatUrl = (url: string): string => {
-                  if (!url || typeof url !== 'string' || !url.includes('bringatrailer.com')) {
-                    return url;
-                  }
-                  return String(url || '')
+                // Universal URL cleaner: remove resize params for ALL platforms
+                const cleanImageUrl = (url: string): string => {
+                  if (!url || typeof url !== 'string') return url;
+                  let cleaned = String(url || '')
                     .replace(/&#038;/g, '&')
                     .replace(/&#039;/g, "'")
                     .replace(/&amp;/g, '&')
                     .replace(/&quot;/g, '"')
                     .replace(/[?&]w=\d+/g, '')
                     .replace(/[?&]h=\d+/g, '')
+                    .replace(/[?&]width=\d+/g, '')
+                    .replace(/[?&]height=\d+/g, '')
                     .replace(/[?&]resize=[^&]*/g, '')
                     .replace(/[?&]fit=[^&]*/g, '')
                     .replace(/[?&]quality=[^&]*/g, '')
                     .replace(/[?&]strip=[^&]*/g, '')
-                    .replace(/[?&]+$/, '')
-                    .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
-                    .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
-                    .trim();
+                    .replace(/[?&]format=[^&]*/g, '')
+                    .replace(/[?&]+$/, '');
+                  
+                  // Platform-specific cleaning
+                  if (cleaned.includes('bringatrailer.com')) {
+                    cleaned = cleaned
+                      .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+                      .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1');
+                  } else if (cleaned.includes('carsandbids.com')) {
+                    cleaned = cleaned.split('?')[0];
+                  } else if (cleaned.includes('mecum.com')) {
+                    cleaned = cleaned.split('?')[0];
+                  } else if (cleaned.includes('barrett-jackson.com') || cleaned.includes('barrettjackson.com')) {
+                    cleaned = cleaned.split('?')[0].split('#')[0];
+                  }
+                  
+                  return cleaned.trim();
                 };
                 
                 const cleaned = metadataImages
-                  .map(cleanBatUrl)
+                  .map(cleanImageUrl)
                   .filter((url: string) => {
                     const s = url.toLowerCase();
-                    // Filter out flags and banners (but preserve business/auction logos if needed)
+                    // Filter out flags and banners
                     if (s.includes('flag') || s.includes('banner')) return false;
                     // Filter out UI icons (social, navigation) but NOT business logos
                     if (s.includes('icon') && (s.includes('social-') || s.includes('nav-') || s.includes('/assets/'))) return false;
                     // Filter out generic site chrome logos, but preserve business logos
                     if (s.includes('logo') && (s.includes('/assets/') || s.includes('/themes/') || s.includes('/header'))) return false;
-                    // Filter out SVGs that are UI elements (but business logos are handled separately)
+                    // Filter out SVGs that are UI elements
                     if (s.endsWith('.svg') && (s.includes('social-') || s.includes('/assets/') || s.includes('/icons/'))) return false;
-                    // Only include actual vehicle images from BaT uploads
-                    return s.includes('bringatrailer.com/wp-content/uploads/');
+                    // Platform-specific: only include actual vehicle images
+                    if (platform === 'bat') {
+                      return s.includes('bringatrailer.com/wp-content/uploads/');
+                    } else if (platform === 'carsandbids') {
+                      return s.includes('media.carsandbids.com');
+                    } else if (platform === 'mecum') {
+                      return s.includes('images.mecum.com');
+                    } else if (platform === 'barrettjackson') {
+                      return s.includes('barrett-jackson.com') || s.includes('barrettjackson.com');
+                    }
+                    // Default: accept any valid image URL
+                    return s.startsWith('http') && (s.includes('.jpg') || s.includes('.jpeg') || s.includes('.png') || s.includes('.webp'));
                   });
                 
                 if (cleaned.length > 0) {
                   const filtered = filterProfileImages(cleaned, vehicle);
                   if (filtered.length > 0) {
                     images = filtered;
-                    const batLead = filtered.find((u) => isSupabaseHostedImageUrl(u)) || filtered[0] || null;
-                    if (batLead) setLeadImageUrl(batLead);
-                    console.log(`✅ Using ${filtered.length} BaT URLs from external_listings metadata (fallback)`);
+                    const lead = filtered.find((u) => isSupabaseHostedImageUrl(u)) || filtered[0] || null;
+                    if (lead) setLeadImageUrl(lead);
+                    console.log(`✅ Using ${filtered.length} ${platform.toUpperCase()} URLs from external_listings metadata (fallback)`);
                   }
                 }
               }
             }
           } catch (err) {
-            console.warn('Error loading BaT URLs from external_listings (fallback):', err);
+            console.warn('Error loading URLs from external_listings (fallback):', err);
           }
         }
         
@@ -3000,7 +3024,7 @@ const VehicleProfile: React.FC = () => {
 
     return (
       <>
-        {/* Timeline - Full width under hero image */}
+        {/* Primary Image and Timeline - Full width top section (one column) */}
         <section className="section">
           <VehicleTimelineSection
             vehicle={vehicle}
@@ -3048,29 +3072,123 @@ const VehicleProfile: React.FC = () => {
           </section>
         )}
 
-        {/* Tabbed Interface - Description, Media, Specs, Comparables, Taxonomy */}
+        {/* Two Column Layout: Left (vehicle info, investment, ref docs, description, comments & bids, privacy) | Right (image gallery) */}
         <section className="section">
-          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading tabs...</div>}>
-            <VehicleProfileTabs
-              vehicle={vehicle}
-              session={session}
-              permissions={permissions}
-              vehicleImages={vehicleImages}
-              fallbackListingImageUrls={fallbackListingImageUrls}
-              onImagesUpdated={() => {
-                loadVehicle();
-                loadTimelineEvents();
-              }}
-              onDataPointClick={handleDataPointClick}
-              onEditClick={handleEditClick}
-              canEdit={canEdit}
-              referenceLibraryRefreshKey={referenceLibraryRefreshKey}
-              onReferenceLibraryRefresh={() => {
-                loadVehicle();
-                setReferenceLibraryRefreshKey((v) => v + 1);
-              }}
-            />
-          </React.Suspense>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+            {/* Left Column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {/* Vehicle Info */}
+              <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading basic info...</div>}>
+                <VehicleBasicInfo
+                  vehicle={vehicle}
+                  session={session}
+                  permissions={permissions}
+                  onDataPointClick={handleDataPointClick}
+                  onEditClick={handleEditClick}
+                />
+              </React.Suspense>
+
+              {/* Investment Summary */}
+              <VehicleROISummaryCard vehicleId={vehicle.id} />
+              
+              {/* Structured listing data (Options / Service records / etc.) */}
+              <VehicleStructuredListingDataCard vehicle={vehicle} />
+              
+              {/* Reference Documents - Upload */}
+              {session && (
+                <ReferenceLibraryUpload
+                  vehicleId={vehicle.id}
+                  year={vehicle.year}
+                  make={vehicle.make}
+                  series={(vehicle as any).series}
+                  model={vehicle.model}
+                  bodyStyle={(vehicle as any).body_style}
+                  onUploadComplete={() => {
+                    loadVehicle();
+                    setReferenceLibraryRefreshKey((v) => v + 1);
+                  }}
+                />
+              )}
+              
+              {/* Reference Documents - Display */}
+              <VehicleReferenceLibrary
+                vehicleId={vehicle.id}
+                userId={session?.user?.id}
+                year={vehicle.year}
+                make={vehicle.make}
+                series={(vehicle as any).series}
+                model={vehicle.model}
+                bodyStyle={(vehicle as any).body_style}
+                refreshKey={referenceLibraryRefreshKey}
+              />
+
+              {/* Description */}
+              <VehicleDescriptionCard
+                vehicleId={vehicle.id}
+                initialDescription={vehicle.description}
+                isEditable={canEdit}
+                onUpdate={() => {}}
+              />
+
+              {/* Comments & Bids */}
+              <VehicleCommentsCard
+                vehicleId={vehicle.id}
+                session={session}
+                collapsed={false}
+                maxVisible={50}
+              />
+
+              {/* Privacy Settings */}
+              {!vehicle.isAnonymous && session && (
+                <div className="card">
+                  <div className="card-header">Privacy Settings</div>
+                  <div className="card-body">
+                    <div className="vehicle-detail">
+                      <span>Visibility</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className={`badge ${isPublic ? 'badge-success' : 'badge-secondary'}`}>
+                          {isPublic ? 'Public' : 'Private'}
+                        </span>
+                        <label style={{ display: 'flex', alignItems: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={isPublic}
+                            onChange={(e) => {
+                              setIsPublic(e.target.checked);
+                              updatePrivacy();
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Image Gallery */}
+            <div>
+              <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading gallery...</div>}>
+                <ImageGallery
+                  vehicleId={vehicle.id}
+                  showUpload={true}
+                  fallbackImageUrls={vehicleImages.length > 0 ? [] : fallbackListingImageUrls}
+                  fallbackLabel={(vehicle as any)?.profile_origin === 'bat_import' ? 'BaT listing' : 'Listing'}
+                  fallbackSourceUrl={
+                    (vehicle as any)?.discovery_url ||
+                    (vehicle as any)?.bat_auction_url ||
+                    (vehicle as any)?.listing_url ||
+                    undefined
+                  }
+                  onImagesUpdated={() => {
+                    loadVehicle();
+                    loadTimelineEvents();
+                    loadVehicleImages();
+                  }}
+                />
+              </React.Suspense>
+            </div>
+          </div>
         </section>
       </>
     );
@@ -3156,45 +3274,10 @@ const VehicleProfile: React.FC = () => {
           />
         )}
 
-        {/* Main Content - Tabs disabled until backend processing is ready */}
+        {/* Main Content - Curated layout (no tabs) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
           {renderWorkspaceContent()}
         </div>
-
-        {/* Vehicle Metadata & Privacy Settings (MVP: hide Sale & Distribution card) */}
-        <section className="section">
-
-          {/* REMOVED: VehicleProfileTrading - desktop trading card removed */}
-          {/* Trading is handled by MobileTradingPanel in mobile view */}
-          {/* Desktop trading will be added in Phase 7 with tab reorganization */}
-
-          {/* Privacy Settings for non-anonymous vehicles */}
-          {!vehicle.isAnonymous && session && (
-            <div className="card mt-4">
-              <div className="card-header">Privacy Settings</div>
-              <div className="card-body">
-                <div className="vehicle-detail">
-                  <span>Visibility</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className={`badge ${isPublic ? 'badge-success' : 'badge-secondary'}`}>
-                      {isPublic ? 'Public' : 'Private'}
-                    </span>
-                    <label style={{ display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={isPublic}
-                        onChange={(e) => {
-                          setIsPublic(e.target.checked);
-                          updatePrivacy();
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
 
         {/* Granular Validation Popup */}
         {validationPopup.open && vehicle && (
