@@ -784,6 +784,13 @@ async function storeVehiclesInDatabase(
       const vin = vinRaw && vinRaw.toLowerCase() !== "n/a" ? vinRaw : null;
       const rawListingDescription = vehicle.description || null;
 
+      // Determine sale price (priority: sale_price > final_bid > current_bid > high_bid)
+      const salePrice = Number.isFinite(vehicle.sale_price) ? vehicle.sale_price :
+                       (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid : null);
+      const askingPrice = Number.isFinite(vehicle.asking_price) ? vehicle.asking_price :
+                          (Number.isFinite(vehicle.current_bid) ? vehicle.current_bid :
+                           (Number.isFinite(vehicle.high_bid) ? vehicle.high_bid : null));
+
       const payload = {
           make: vehicle.make || "Unknown",
           model: vehicle.model || "Unknown",
@@ -798,7 +805,9 @@ async function storeVehiclesInDatabase(
           drivetrain: vehicle.drivetrain || null,
           fuel_type: vehicle.fuel_type || null,
           body_style: vehicle.body_style || null,
-          asking_price: Number.isFinite(vehicle.asking_price) ? vehicle.asking_price : (Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null),
+          displacement: vehicle.displacement || null,
+          asking_price: askingPrice,
+          sale_price: salePrice,
           // IMPORTANT: keep `vehicles.description` as a curated summary (not a raw listing dump).
           // The raw listing description is stored (with provenance and history) in `extraction_metadata`.
           description: normalizeDescriptionSummary(rawListingDescription),
@@ -807,8 +816,16 @@ async function storeVehiclesInDatabase(
           listing_source: source.toLowerCase(),
           listing_title: title,
           auction_end_date: vehicle.auction_end_date || null,
-          current_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
+          sale_date: vehicle.sale_date || null,
+          current_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : 
+                      (Number.isFinite(vehicle.high_bid) ? vehicle.high_bid : null),
           bid_count: Number.isFinite(vehicle.bid_count) ? Math.trunc(vehicle.bid_count) : null,
+          // BaT-specific fields
+          bat_seller: vehicle.seller || vehicle.seller_username || null,
+          bat_location: vehicle.location || null,
+          bat_bids: Number.isFinite(vehicle.bid_count) ? Math.trunc(vehicle.bid_count) : null,
+          bat_views: Number.isFinite(vehicle.view_count) ? Math.trunc(vehicle.view_count) : null,
+          bat_comments: Number.isFinite(vehicle.comment_count) ? Math.trunc(vehicle.comment_count) : null,
           is_public: true,
           discovery_source: `${source.toLowerCase()}_agent_extraction`,
           discovery_url: listingUrl,
@@ -892,15 +909,18 @@ async function storeVehiclesInDatabase(
         // (shown in UI as a dated, source-linked post).
         await saveRawListingDescription(String(data.id), listingUrl, rawListingDescription);
 
-        // Create external_listing for BaT auctions to enable current_bid and timer display
+        // Create comprehensive external_listing for BaT auctions with ALL extracted data
         const isBatListing = listingUrl && String(listingUrl).includes('bringatrailer.com');
-        if (isBatListing && (vehicle.current_bid || vehicle.auction_end_date)) {
+        if (isBatListing) {
           try {
             const lotMatch = String(listingUrl).match(/-(\d+)\/?$/);
-            const lotNumber = lotMatch ? lotMatch[1] : null;
+            const lotNumber = vehicle.lot_number || (lotMatch ? lotMatch[1] : null);
             
-            // Calculate end_date in ISO format
+            // Calculate all dates in ISO format
             let endDateIso: string | null = null;
+            let startDateIso: string | null = null;
+            let soldAtIso: string | null = null;
+            
             if (vehicle.auction_end_date) {
               try {
                 const endDate = new Date(vehicle.auction_end_date);
@@ -909,9 +929,49 @@ async function storeVehiclesInDatabase(
                   endDateIso = endDate.toISOString();
                 }
               } catch {
-                // ignore date parsing errors
+                // ignore
               }
             }
+            
+            if (vehicle.auction_start_date) {
+              try {
+                const startDate = new Date(vehicle.auction_start_date);
+                if (Number.isFinite(startDate.getTime())) {
+                  startDate.setUTCHours(0, 0, 0, 0);
+                  startDateIso = startDate.toISOString();
+                }
+              } catch {
+                // ignore
+              }
+            }
+            
+            if (vehicle.sale_date) {
+              try {
+                const soldDate = new Date(vehicle.sale_date);
+                if (Number.isFinite(soldDate.getTime())) {
+                  soldDate.setUTCHours(23, 59, 59, 999);
+                  soldAtIso = soldDate.toISOString();
+                }
+              } catch {
+                // ignore
+              }
+            }
+            
+            // Determine listing status
+            let listingStatus = 'ended';
+            if (endDateIso && new Date(endDateIso) > new Date()) {
+              listingStatus = 'active';
+            } else if (vehicle.sale_price || vehicle.final_bid) {
+              listingStatus = 'sold';
+            } else if (vehicle.reserve_met === false) {
+              listingStatus = 'reserve_not_met';
+            }
+            
+            // Determine final price (priority: sale_price > final_bid > current_bid > high_bid)
+            const finalPrice = Number.isFinite(vehicle.sale_price) ? vehicle.sale_price :
+                              (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid : null);
+            const currentBid = Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : 
+                              (Number.isFinite(vehicle.high_bid) ? vehicle.high_bid : null);
             
             await supabase
               .from('external_listings')
@@ -920,15 +980,31 @@ async function storeVehiclesInDatabase(
                 organization_id: sourceOrgId,
                 platform: 'bat',
                 listing_url: listingUrl,
-                listing_status: endDateIso && new Date(endDateIso) > new Date() ? 'active' : 'ended',
+                listing_status: listingStatus,
                 listing_id: lotNumber || listingUrl.split('/').filter(Boolean).pop() || null,
+                start_date: startDateIso,
                 end_date: endDateIso,
-                current_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
+                sold_at: soldAtIso,
+                current_bid: currentBid,
+                final_price: finalPrice,
+                reserve_price: Number.isFinite(vehicle.reserve_price) ? vehicle.reserve_price : null,
                 bid_count: Number.isFinite(vehicle.bid_count) ? Math.trunc(vehicle.bid_count) : null,
+                view_count: Number.isFinite(vehicle.view_count) ? Math.trunc(vehicle.view_count) : null,
+                watcher_count: Number.isFinite(vehicle.watcher_count) ? Math.trunc(vehicle.watcher_count) : null,
                 metadata: {
                   source: 'extract-premium-auction',
                   lot_number: lotNumber,
+                  auction_start_date: vehicle.auction_start_date,
                   auction_end_date: vehicle.auction_end_date,
+                  sale_date: vehicle.sale_date,
+                  seller: vehicle.seller || vehicle.seller_username || null,
+                  seller_username: vehicle.seller_username || null,
+                  buyer: vehicle.buyer || vehicle.buyer_username || null,
+                  buyer_username: vehicle.buyer_username || null,
+                  location: vehicle.location || null,
+                  comment_count: Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null,
+                  reserve_met: vehicle.reserve_met,
+                  features: Array.isArray(vehicle.features) ? vehicle.features : null,
                 },
                 updated_at: nowIso(),
               }, {
@@ -1818,31 +1894,62 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     return Array.from(new Set(urls));
   };
 
+  // Comprehensive schema to extract ALL BaT data
   const listingSchema = {
     type: "object",
     properties: {
-      title: { type: "string", description: "Listing title" },
+      // Core vehicle identification
+      title: { type: "string", description: "Full listing title" },
       year: { type: "number", description: "Vehicle year" },
       make: { type: "string", description: "Vehicle make" },
       model: { type: "string", description: "Vehicle model" },
       trim: { type: "string", description: "Trim level" },
-      vin: { type: "string", description: "VIN if available" },
-      mileage: { type: "number", description: "Mileage / odometer" },
+      vin: { type: "string", description: "VIN from BaT Essentials section" },
+      lot_number: { type: "string", description: "Lot number" },
+      
+      // Technical specifications
+      mileage: { type: "number", description: "Mileage / odometer reading" },
       color: { type: "string", description: "Exterior color" },
-      interior_color: { type: "string", description: "Interior color" },
-      transmission: { type: "string", description: "Transmission" },
-      drivetrain: { type: "string", description: "Drivetrain" },
-      engine_size: { type: "string", description: "Engine" },
+      interior_color: { type: "string", description: "Interior color/upholstery" },
+      transmission: { type: "string", description: "Transmission type (e.g., 'Five-Speed Manual')" },
+      drivetrain: { type: "string", description: "Drivetrain (RWD, AWD, 4WD, FWD)" },
+      engine_size: { type: "string", description: "Engine description (e.g., '3.5-Liter V6')" },
+      displacement: { type: "string", description: "Engine displacement (e.g., '3.5L', '2.2L')" },
       fuel_type: { type: "string", description: "Fuel type" },
-      body_style: { type: "string", description: "Body style" },
-      current_bid: { type: "number", description: "Current bid amount" },
-      bid_count: { type: "number", description: "Number of bids" },
+      body_style: { type: "string", description: "Body style (Roadster, Coupe, Sedan, etc.)" },
+      
+      // Auction data
+      current_bid: { type: "number", description: "Current bid amount (for active auctions)" },
+      high_bid: { type: "number", description: "Highest bid (for ended auctions)" },
+      final_bid: { type: "number", description: "Final winning bid amount" },
+      sale_price: { type: "number", description: "Sale price (if sold)" },
+      reserve_price: { type: "number", description: "Reserve price (if disclosed)" },
       reserve_met: { type: "boolean", description: "Reserve met" },
-      auction_end_date: { type: "string", description: "Auction end date/time (ISO format preferred)" },
-      auction_start_date: { type: "string", description: "Auction start date" },
-      location: { type: "string", description: "Location" },
-      description: { type: "string", description: "Description" },
-      images: { type: "array", items: { type: "string" }, description: "ALL high-resolution image URLs from gallery" },
+      bid_count: { type: "number", description: "Total number of bids" },
+      view_count: { type: "number", description: "Number of views" },
+      watcher_count: { type: "number", description: "Number of watchers" },
+      comment_count: { type: "number", description: "Number of comments" },
+      auction_start_date: { type: "string", description: "Auction start date (YYYY-MM-DD or ISO)" },
+      auction_end_date: { type: "string", description: "Auction end date/time (YYYY-MM-DD or ISO format preferred)" },
+      sale_date: { type: "string", description: "Sale date (YYYY-MM-DD)" },
+      
+      // Location and parties
+      location: { type: "string", description: "Vehicle location (city, state or country)" },
+      seller: { type: "string", description: "Seller name or username" },
+      seller_username: { type: "string", description: "BaT seller username" },
+      buyer: { type: "string", description: "Buyer name or username (if sold)" },
+      buyer_username: { type: "string", description: "BaT buyer username (if sold)" },
+      
+      // Content
+      description: { type: "string", description: "Full listing description text from post-excerpt" },
+      features: { type: "array", items: { type: "string" }, description: "List of features/equipment" },
+      
+      // Images - CRITICAL: Extract ALL high-resolution images
+      images: { 
+        type: "array", 
+        items: { type: "string" }, 
+        description: "ALL high-resolution image URLs from gallery. Extract from data-gallery-items JSON, prioritize 'full' or 'original' URLs, remove all resize parameters (?w=, ?h=, ?resize=), remove -scaled.jpg suffixes, remove size suffixes (-150x150, -300x300). Get ALL images, not just thumbnails." 
+      },
     },
   };
 
@@ -1895,14 +2002,36 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
              !lower.includes('/icons/');
     });
 
+    // Merge ALL extracted data comprehensively
     const merged = {
       ...vehicle,
       listing_url: normalizedUrl,
-      images,
-      // Ensure current_bid and auction_end_date are preserved
-      current_bid: typeof vehicle?.current_bid === 'number' ? vehicle.current_bid : null,
+      images, // High-res images from HTML gallery extraction
+      // Preserve all auction data
+      current_bid: typeof vehicle?.current_bid === 'number' ? vehicle.current_bid : 
+                   (typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null),
+      high_bid: typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null,
+      final_bid: typeof vehicle?.final_bid === 'number' ? vehicle.final_bid : null,
+      sale_price: typeof vehicle?.sale_price === 'number' ? vehicle.sale_price : null,
+      reserve_price: typeof vehicle?.reserve_price === 'number' ? vehicle.reserve_price : null,
       auction_end_date: vehicle?.auction_end_date || null,
       auction_start_date: vehicle?.auction_start_date || null,
+      sale_date: vehicle?.sale_date || null,
+      // Preserve all metrics
+      bid_count: typeof vehicle?.bid_count === 'number' ? vehicle.bid_count : null,
+      view_count: typeof vehicle?.view_count === 'number' ? vehicle.view_count : null,
+      watcher_count: typeof vehicle?.watcher_count === 'number' ? vehicle.watcher_count : null,
+      comment_count: typeof vehicle?.comment_count === 'number' ? vehicle.comment_count : null,
+      // Preserve location and parties
+      location: vehicle?.location || null,
+      seller: vehicle?.seller || vehicle?.seller_username || null,
+      seller_username: vehicle?.seller_username || null,
+      buyer: vehicle?.buyer || vehicle?.buyer_username || null,
+      buyer_username: vehicle?.buyer_username || null,
+      lot_number: vehicle?.lot_number || null,
+      // Preserve all specs
+      displacement: vehicle?.displacement || null,
+      features: Array.isArray(vehicle?.features) ? vehicle.features : null,
     };
 
     extracted.push(merged);
