@@ -110,6 +110,9 @@ const DiscoveryFeed = ({ viewMode = 'gallery', denseMode = false, initialLocatio
             purchase_price,
             asking_price,
             sale_price,
+            winning_bid,
+            high_bid,
+            current_bid,
             is_for_sale,
             vehicle_images(
               image_url

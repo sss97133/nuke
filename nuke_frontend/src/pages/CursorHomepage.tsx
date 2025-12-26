@@ -838,7 +838,7 @@ const CursorHomepage: React.FC = () => {
       // Build query with filters applied
       let query = supabase
         .from('vehicles')
-        .select('sale_price, sale_status, asking_price, current_value, purchase_price, is_for_sale, bid_count, auction_outcome, sale_date, discovery_url, discovery_source, profile_origin, year, make, model, title, vin, image_count', { count: 'exact' })
+        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, current_bid, is_for_sale, bid_count, auction_outcome, sale_date, discovery_url, discovery_source, profile_origin, year, make, model, title, vin, image_count', { count: 'exact' })
         .eq('is_public', true)
         .neq('status', 'pending');
 
@@ -1175,7 +1175,7 @@ const CursorHomepage: React.FC = () => {
       // Get comprehensive vehicle data for stats
       const { data: allVehicles } = await supabase
         .from('vehicles')
-        .select('sale_price, sale_status, asking_price, current_value, purchase_price, is_for_sale, bid_count, auction_outcome');
+        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, current_bid, is_for_sale, bid_count, auction_outcome');
       
       let totalValue = 0;
       let vehiclesWithValue = 0;

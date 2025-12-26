@@ -401,10 +401,24 @@ const AllVehicles: React.FC = () => {
 
                               {/* Price */}
                               <span className="price-display">
-                                {vehicle.sale_price || vehicle.current_value
-                                  ? `$${(vehicle.sale_price || vehicle.current_value).toLocaleString()}`
-                                  : vehicle.is_for_sale ? 'Price TBA' : ''
-                                }
+                                {(() => {
+                                  // Use proper price hierarchy: sale_price > asking_price > current_value > purchase_price > msrp
+                                  const price = vehicle.sale_price 
+                                    || (vehicle.is_for_sale && vehicle.asking_price)
+                                    || vehicle.current_value
+                                    || vehicle.purchase_price
+                                    || vehicle.msrp;
+                                  
+                                  if (price) {
+                                    return `$${price.toLocaleString()}`;
+                                  }
+                                  
+                                  if (vehicle.is_for_sale) {
+                                    return 'Price TBA';
+                                  }
+                                  
+                                  return '';
+                                })()}
                               </span>
                             </div>
 
