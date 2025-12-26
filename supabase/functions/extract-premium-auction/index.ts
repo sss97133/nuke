@@ -118,8 +118,12 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   const urls = new Set<string>();
   const re = /https?:\/\/media\.carsandbids\.com\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
   for (const m of h.match(re) || []) {
-    urls.add(m.trim());
-    if (urls.size >= 25) break;
+    // Clean URL: remove resize params, get full resolution
+    let url = m.trim();
+    // Remove query params that resize images
+    url = url.split('?')[0];
+    urls.add(url);
+    // No limit - get ALL images
   }
   return Array.from(urls);
 }
@@ -160,7 +164,7 @@ function extractMecumImagesFromHtml(html: string): string[] {
   // Pattern 0: Extract from JSON in script tags (Mecum may embed gallery data)
   const scriptJsonRe = /<script[^>]*>(.*?)<\/script>/gis;
   let scriptMatch;
-  while ((scriptMatch = scriptJsonRe.exec(h)) !== null && urls.size < 50) {
+  while ((scriptMatch = scriptJsonRe.exec(h)) !== null) {
     const scriptContent = scriptMatch[1];
     // Look for image URLs in JSON structures
     const jsonImageRe = /["'](https?:\/\/images\.mecum\.com\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
@@ -182,7 +186,7 @@ function extractMecumImagesFromHtml(html: string): string[] {
   // Pattern 1: Extract from pswp__img class (PhotoSwipe gallery images - full resolution)
   const pswpImgRe = /<img[^>]*class=["'][^"']*pswp__img[^"']*["'][^>]*src=["'](https?:\/\/images\.mecum\.com\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
   let match;
-  while ((match = pswpImgRe.exec(h)) !== null && urls.size < 50) {
+  while ((match = pswpImgRe.exec(h)) !== null) {
     const u = String(match[1] || "").trim();
     const versionMatch = u.match(/\/(v\d+)\/auctions\/([^\/]+)\/([^\/]+)\/(\d+)\.(?:jpg|jpeg|png|webp)/i);
     if (versionMatch) {
@@ -194,7 +198,7 @@ function extractMecumImagesFromHtml(html: string): string[] {
   
   // Pattern 2: Extract from srcset attributes (gallery thumbnails)
   const srcsetRe = /srcset=["']([^"']+)["']/gi;
-  while ((match = srcsetRe.exec(h)) !== null && urls.size < 50) {
+  while ((match = srcsetRe.exec(h)) !== null) {
     const srcsetValue = match[1];
     const firstUrlMatch = srcsetValue.match(/https?:\/\/images\.mecum\.com\/image\/upload\/[^"'\\s,>]+?\/auctions\/[^"'\\s,>]+?\/\d+\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s,>]*)?/i);
     if (firstUrlMatch) {
@@ -247,7 +251,7 @@ function extractBarrettJacksonImagesFromHtml(html: string): string[] {
   // Pattern 1: Next.js image optimization URLs (_next/image?url=...)
   const nextImageRe = /_next\/image\?url=([^&"'\\s>]+)/gi;
   let match;
-  while ((match = nextImageRe.exec(h)) !== null && urls.size < 25) {
+  while ((match = nextImageRe.exec(h)) !== null) {
     try {
       const decoded = decodeURIComponent(match[1]);
       if (decoded.includes('.jpg') || decoded.includes('.jpeg') || decoded.includes('.png') || decoded.includes('.webp')) {
@@ -265,8 +269,9 @@ function extractBarrettJacksonImagesFromHtml(html: string): string[] {
   // Pattern 2: Direct image URLs
   const directImageRe = /https?:\/\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
   for (const m of h.match(directImageRe) || []) {
-    if (urls.size >= 25) break;
     const u = String(m || "").trim();
+    // Clean URL: remove resize params, get full resolution
+    const cleaned = u.split('?')[0].split('#')[0];
     const lower = u.toLowerCase();
     // STRICT filter: reject icons, placeholders, UI assets FIRST
     if (lower.includes("no-car-image") || lower.includes("placeholder") || 
@@ -281,13 +286,13 @@ function extractBarrettJacksonImagesFromHtml(html: string): string[] {
         (lower.includes("/compressed/") || lower.includes("/images/") || 
          lower.includes("/photos/") || lower.includes("/media/") ||
          lower.includes("_next/image"))) {
-      urls.add(u);
+      urls.add(cleaned);
     }
   }
   
   // Pattern 3: Data attributes (data-src, data-image, etc.)
   const dataSrcRe = /data-(?:src|image|url)=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi;
-  while ((match = dataSrcRe.exec(h)) !== null && urls.size < 25) {
+  while ((match = dataSrcRe.exec(h)) !== null) {
     const u = String(match[1] || "").trim();
     const lower = u.toLowerCase();
     if (!lower.includes("no-car-image") && !lower.includes("placeholder")) {
@@ -570,6 +575,14 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
       const empty = !vehicle || (typeof vehicle === "object" && Object.keys(vehicle).length === 0);
       const fallback = parseCarsAndBidsIdentityFromUrl(listingUrl);
 
+      // Extract and clean images
+      let images: string[] = [];
+      if (Array.isArray(vehicle?.images) && vehicle.images.length > 0) {
+        images = vehicle.images.map((u: string) => cleanImageUrl(u, 'carsandbids'));
+      } else if (html) {
+        images = extractCarsAndBidsImagesFromHtml(html).map((u: string) => cleanImageUrl(u, 'carsandbids'));
+      }
+      
       const merged = {
         ...(empty ? {} : vehicle),
         listing_url: listingUrl,
@@ -577,9 +590,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         make: (vehicle?.make ?? fallback.make) ?? null,
         model: (vehicle?.model ?? fallback.model) ?? null,
         title: (vehicle?.title ?? fallback.title) ?? null,
-        images: Array.isArray(vehicle?.images) && vehicle.images.length > 0
-          ? vehicle.images
-          : (html ? extractCarsAndBidsImagesFromHtml(html) : []),
+        images, // Cleaned high-res images
       };
 
       extracted.push(merged);
@@ -909,12 +920,46 @@ async function storeVehiclesInDatabase(
         // (shown in UI as a dated, source-linked post).
         await saveRawListingDescription(String(data.id), listingUrl, rawListingDescription);
 
-        // Create comprehensive external_listing for BaT auctions with ALL extracted data
-        const isBatListing = listingUrl && String(listingUrl).includes('bringatrailer.com');
-        if (isBatListing) {
+        // Create comprehensive external_listing for ALL auction platforms with ALL extracted data
+        // Determine platform from listing URL or source
+        let platform: string | null = null;
+        if (listingUrl) {
+          const urlLower = String(listingUrl).toLowerCase();
+          if (urlLower.includes('bringatrailer.com')) platform = 'bat';
+          else if (urlLower.includes('carsandbids.com')) platform = 'carsandbids';
+          else if (urlLower.includes('mecum.com')) platform = 'mecum';
+          else if (urlLower.includes('barrett-jackson.com') || urlLower.includes('barrettjackson.com')) platform = 'barrettjackson';
+          else if (urlLower.includes('russoandsteele.com')) platform = 'russoandsteele';
+        }
+        
+        // Fallback to source name if URL detection failed
+        if (!platform) {
+          const sourceLower = String(source).toLowerCase();
+          if (sourceLower.includes('bring a trailer') || sourceLower.includes('bat')) platform = 'bat';
+          else if (sourceLower.includes('cars & bids') || sourceLower.includes('carsandbids')) platform = 'carsandbids';
+          else if (sourceLower.includes('mecum')) platform = 'mecum';
+          else if (sourceLower.includes('barrett')) platform = 'barrettjackson';
+          else if (sourceLower.includes('russo')) platform = 'russoandsteele';
+        }
+        
+        if (platform && listingUrl) {
           try {
-            const lotMatch = String(listingUrl).match(/-(\d+)\/?$/);
-            const lotNumber = vehicle.lot_number || (lotMatch ? lotMatch[1] : null);
+            // Extract listing ID from URL (platform-specific)
+            let listingId: string | null = null;
+            if (platform === 'bat') {
+              const lotMatch = String(listingUrl).match(/-(\d+)\/?$/);
+              listingId = vehicle.lot_number || (lotMatch ? lotMatch[1] : null);
+            } else if (platform === 'carsandbids') {
+              listingId = listingUrl.split('/').filter(Boolean).pop() || null;
+            } else if (platform === 'mecum') {
+              const lotMatch = String(listingUrl).match(/\/lots\/(?:detail\/)?([^\/]+)/);
+              listingId = vehicle.lot_number || (lotMatch ? lotMatch[1] : null);
+            } else if (platform === 'barrettjackson') {
+              const itemMatch = String(listingUrl).match(/\/Item\/([^\/]+)/);
+              listingId = vehicle.lot_number || (itemMatch ? itemMatch[1] : null) || listingUrl.split('/').filter(Boolean).pop() || null;
+            } else {
+              listingId = listingUrl.split('/').filter(Boolean).pop() || null;
+            }
             
             // Calculate all dates in ISO format
             let endDateIso: string | null = null;
@@ -973,15 +1018,18 @@ async function storeVehiclesInDatabase(
             const currentBid = Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : 
                               (Number.isFinite(vehicle.high_bid) ? vehicle.high_bid : null);
             
+            // Store ALL extracted images in metadata for fallback display
+            const extractedImages = Array.isArray(vehicle.images) ? vehicle.images : [];
+            
             await supabase
               .from('external_listings')
               .upsert({
                 vehicle_id: data.id,
                 organization_id: sourceOrgId,
-                platform: 'bat',
+                platform: platform,
                 listing_url: listingUrl,
                 listing_status: listingStatus,
-                listing_id: lotNumber || listingUrl.split('/').filter(Boolean).pop() || null,
+                listing_id: listingId,
                 start_date: startDateIso,
                 end_date: endDateIso,
                 sold_at: soldAtIso,
@@ -993,7 +1041,7 @@ async function storeVehiclesInDatabase(
                 watcher_count: Number.isFinite(vehicle.watcher_count) ? Math.trunc(vehicle.watcher_count) : null,
                 metadata: {
                   source: 'extract-premium-auction',
-                  lot_number: lotNumber,
+                  lot_number: vehicle.lot_number || listingId,
                   auction_start_date: vehicle.auction_start_date,
                   auction_end_date: vehicle.auction_end_date,
                   sale_date: vehicle.sale_date,
@@ -1005,6 +1053,9 @@ async function storeVehiclesInDatabase(
                   comment_count: Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null,
                   reserve_met: vehicle.reserve_met,
                   features: Array.isArray(vehicle.features) ? vehicle.features : null,
+                  // CRITICAL: Store ALL extracted images for fallback display
+                  images: extractedImages,
+                  image_urls: extractedImages, // Alias for compatibility
                 },
                 updated_at: nowIso(),
               }, {
@@ -1074,6 +1125,60 @@ async function ensureSourceBusiness(
   }
 }
 
+// Universal URL cleaner: removes resize params, gets full resolution for all platforms
+function cleanImageUrl(url: string, platform?: string): string {
+  if (!url || typeof url !== 'string') return url;
+  
+  let cleaned = url
+    .replace(/&#038;/g, '&')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"');
+  
+  // Remove resize/transform query params (common across platforms)
+  cleaned = cleaned
+    .replace(/[?&]w=\d+/g, '')
+    .replace(/[?&]h=\d+/g, '')
+    .replace(/[?&]width=\d+/g, '')
+    .replace(/[?&]height=\d+/g, '')
+    .replace(/[?&]resize=[^&]*/g, '')
+    .replace(/[?&]fit=[^&]*/g, '')
+    .replace(/[?&]quality=[^&]*/g, '')
+    .replace(/[?&]strip=[^&]*/g, '')
+    .replace(/[?&]format=[^&]*/g, '')
+    .replace(/[?&]+$/, '');
+  
+  // Platform-specific cleaning
+  if (cleaned.includes('bringatrailer.com')) {
+    // BaT: remove -scaled suffixes and size suffixes
+    cleaned = cleaned
+      .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1');
+  } else if (cleaned.includes('carsandbids.com')) {
+    // Cars & Bids: remove query params (already done above)
+    cleaned = cleaned.split('?')[0];
+  } else if (cleaned.includes('mecum.com')) {
+    // Mecum: already constructs clean URLs, but ensure no query params
+    cleaned = cleaned.split('?')[0];
+  } else if (cleaned.includes('barrett-jackson.com') || cleaned.includes('barrettjackson.com')) {
+    // Barrett-Jackson: remove Next.js optimization params
+    if (cleaned.includes('_next/image')) {
+      // Extract the actual image URL from Next.js optimization
+      const urlMatch = cleaned.match(/url=([^&]+)/);
+      if (urlMatch) {
+        try {
+          cleaned = decodeURIComponent(urlMatch[1]);
+        } catch {
+          // fallback to original
+        }
+      }
+    }
+    cleaned = cleaned.split('?')[0].split('#')[0];
+  }
+  
+  return cleaned.trim();
+}
+
 async function insertVehicleImages(
   supabase: any,
   vehicleId: string,
@@ -1083,9 +1188,11 @@ async function insertVehicleImages(
 ): Promise<{ inserted: number; errors: string[] }> {
   const errors: string[] = [];
   let inserted = 0;
+  
+  // Clean all URLs before processing
   const urls = (Array.isArray(imageUrls) ? imageUrls : [])
-    .map((u) => String(u || "").trim())
-    .filter((u) => u.startsWith("http"));
+    .map((u) => cleanImageUrl(String(u || "").trim(), source))
+    .filter((u) => u && u.startsWith("http"));
 
   // Avoid duplicates and append positions after existing images
   let existingUrls = new Set<string>();
@@ -1113,7 +1220,8 @@ async function insertVehicleImages(
     errors.push(`vehicle_images read existing exception (${vehicleId}): ${e?.message || String(e)}`);
   }
 
-  for (const imageUrl of urls.slice(0, 25)) { // Limit per run
+  // Insert ALL images (no limit) - BaT listings can have 100+ images
+  for (const imageUrl of urls) {
     if (existingUrls.has(imageUrl)) continue;
     try {
       const makePrimary = !hasPrimary && nextPosition === 0;
@@ -1524,7 +1632,8 @@ async function extractMecum(url: string, maxVehicles: number) {
         if (baseMatch) {
           return `${baseMatch[1]}.jpg`;
         }
-        return url;
+        // Apply universal cleaner for any remaining params
+        return cleanImageUrl(url, 'mecum');
       });
       
       // Filter out UI assets
@@ -1764,6 +1873,9 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
         images = extractBarrettJacksonImagesFromHtml(html);
       }
       
+      // Clean all URLs to full resolution
+      images = images.map((img: string) => cleanImageUrl(img, 'barrettjackson'));
+      
       // STRICT filter: reject icons, placeholders, UI assets
       images = images.filter((img: string) => {
         const lower = img.toLowerCase();
@@ -1866,7 +1978,8 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       // Extract from data-gallery-items JSON (most reliable)
       const idx = h.indexOf('id="bat_listing_page_photo_gallery"');
       if (idx >= 0) {
-        const window = h.slice(idx, idx + 300000);
+        // Increase window size to handle large galleries (148+ images)
+        const window = h.slice(idx, idx + 1000000);
         const m = window.match(/data-gallery-items=(?:"([^"]+)"|'([^']+)')/i);
         const encoded = (m?.[1] || m?.[2] || '').trim();
         if (encoded) {

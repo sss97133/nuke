@@ -518,7 +518,7 @@ const ImageGallery = ({
     const nextAll = filterBatNoiseRows(allImages);
     if (nextAll.length === allImages.length) return;
     setAllImages(nextAll);
-    setDisplayedImages(sortRows(nextAll, sortBy).slice(0, Math.min(50, nextAll.length)));
+    setDisplayedImages(sortRows(nextAll, sortBy)); // NO LIMIT - show ALL images
     // Do not toggle usingFallback here; we only filter the current view.
   }, [vehicleMeta]); // intentionally not depending on allImages to avoid loops
 
@@ -536,7 +536,7 @@ const ImageGallery = ({
       seen.add(s);
       out.push(s);
     }
-    return out.slice(0, 120); // hard cap to keep UI performant
+    return out; // NO LIMIT - show ALL images from source
   };
 
   const importFallbackImages = useCallback(async () => {
@@ -608,7 +608,7 @@ const ImageGallery = ({
       const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
       setUsingFallback(false);
       setAllImages(images);
-      setDisplayedImages(sortRows(images, sortBy).slice(0, Math.min(50, images.length)));
+      setDisplayedImages(sortRows(images, sortBy)); // NO LIMIT - show ALL images
       setShowImages(true);
       onImagesUpdated?.();
     } catch (err) {

@@ -65,14 +65,13 @@ export const useVehicleImages = (vehicleId?: string) => {
     try {
       const { data, error: fetchError } = await supabase
         .from('vehicle_images')
-        // Keep payload lean to reduce the chance of statement timeouts / 500s on large image tables
         .select('id, vehicle_id, image_url, file_name, caption, is_primary, category, variants, created_at, taken_at')
         .eq('vehicle_id', vehicleId)
         // Legacy rows may have is_document = NULL; treat that as "not a document"
         .not('is_document', 'is', true)
         .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(250);
+        .order('created_at', { ascending: false });
+        // NO LIMIT - show ALL images from all sources
 
       if (fetchError) {
         const status = (fetchError as any)?.status ?? (fetchError as any)?.statusCode;
