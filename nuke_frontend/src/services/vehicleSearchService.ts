@@ -25,6 +25,12 @@ export interface VehicleSearchResult {
   mileage: number | null;
   current_value: number | null;
   asking_price: number | null;
+  sale_price: number | null;
+  purchase_price?: number | null;
+  msrp?: number | null;
+  winning_bid?: number | null;
+  high_bid?: number | null;
+  current_bid?: number | null;
   is_for_sale: boolean;
   zip_code: string | null;
   city: string | null;
