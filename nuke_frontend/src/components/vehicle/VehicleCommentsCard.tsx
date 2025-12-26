@@ -60,6 +60,14 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       }, () => {
         loadComments();
       })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'bat_comments',
+        filter: `vehicle_id=eq.${vehicleId}`
+      }, () => {
+        loadComments();
+      })
       .subscribe();
 
     return () => {
@@ -71,8 +79,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     try {
       setLoading(true);
       
-      // Load both N-Zero comments AND BaT auction comments
-      const [nzeroCommentsResult, batCommentsResult] = await Promise.all([
+      // Load ALL comment sources: N-Zero, auction_comments, AND bat_comments
+      const [nzeroCommentsResult, auctionCommentsResult, batCommentsResult] = await Promise.all([
         // N-Zero vehicle comments
         supabase
           .from('vehicle_comments')
@@ -81,7 +89,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           .order('created_at', { ascending: false })
           .limit(100),
         
-        // BaT auction comments (from auction_comments table)
+        // Auction comments (from auction_comments table)
         supabase
           .from('auction_comments')
           .select(`
@@ -93,10 +101,30 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             bid_amount,
             is_seller,
             auction_event_id,
+            external_identity_id,
             auction_events!inner(vehicle_id)
           `)
           .eq('vehicle_id', vehicleId)
           .order('posted_at', { ascending: false })
+          .limit(200),
+        
+        // BaT comments (from bat_comments table) - THIS WAS MISSING!
+        supabase
+          .from('bat_comments')
+          .select(`
+            id,
+            bat_username,
+            comment_text,
+            comment_timestamp,
+            bat_listing_id,
+            vehicle_id,
+            external_identity_id,
+            contains_bid,
+            is_seller_comment,
+            likes_count
+          `)
+          .eq('vehicle_id', vehicleId)
+          .order('comment_timestamp', { ascending: false })
           .limit(200)
       ]);
 
@@ -126,23 +154,23 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         }
       }
 
-      // Process BaT auction comments
-      if (batCommentsResult.data && batCommentsResult.data.length > 0) {
-        // Get external_identity_id for BaT usernames to link to profiles
-        const batUsernames = [...new Set(batCommentsResult.data.map(c => c.author_username).filter(Boolean))];
+      // Process auction comments (from auction_comments table)
+      if (auctionCommentsResult.data && auctionCommentsResult.data.length > 0) {
+        // Get external_identity_id for usernames to link to profiles
+        const usernames = [...new Set(auctionCommentsResult.data.map(c => c.author_username).filter(Boolean))];
         const { data: externalIds } = await supabase
           .from('external_identities')
-          .select('id, handle, n_zero_user_id, profile_url')
+          .select('id, handle, claimed_by_user_id, profile_url')
           .eq('platform', 'bat')
-          .in('handle', batUsernames);
+          .in('handle', usernames);
 
         const identityMap = new Map((externalIds || []).map(e => [e.handle, e]));
 
-        for (const c of batCommentsResult.data) {
-          const identity = identityMap.get(c.author_username);
+        for (const c of auctionCommentsResult.data) {
+          const identity = identityMap.get(c.author_username) || (c.external_identity_id ? externalIds?.find(e => e.id === c.external_identity_id) : null);
           allComments.push({
-            id: `bat-${c.id}`,
-            user_id: identity?.n_zero_user_id || null,
+            id: `auction-${c.id}`,
+            user_id: identity?.claimed_by_user_id || null,
             author_username: c.author_username,
             comment_text: c.comment_text,
             created_at: c.posted_at,
@@ -152,7 +180,49 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             bid_amount: c.bid_amount ? Number(c.bid_amount) : undefined,
             is_seller: c.is_seller,
             source: 'bat',
-            external_identity_id: identity?.id,
+            external_identity_id: identity?.id || c.external_identity_id,
+            user_avatar: identity?.profile_url || undefined
+          });
+        }
+      }
+
+      // Process BaT comments (from bat_comments table) - THIS WAS MISSING!
+      if (batCommentsResult.data && batCommentsResult.data.length > 0) {
+        // Get external_identity_id for BaT usernames to link to profiles
+        const batUsernames = [...new Set(batCommentsResult.data.map(c => c.bat_username).filter(Boolean))];
+        const { data: externalIds } = await supabase
+          .from('external_identities')
+          .select('id, handle, claimed_by_user_id, profile_url')
+          .eq('platform', 'bat')
+          .in('handle', batUsernames);
+
+        const identityMap = new Map((externalIds || []).map(e => [e.handle, e]));
+
+        for (const c of batCommentsResult.data) {
+          const identity = identityMap.get(c.bat_username) || (c.external_identity_id ? externalIds?.find(e => e.id === c.external_identity_id) : null);
+          
+          // Extract bid amount from comment text if contains_bid is true
+          let bidAmount: number | undefined = undefined;
+          if (c.contains_bid) {
+            const bidMatch = c.comment_text.match(/\$?([\d,]+)/);
+            if (bidMatch) {
+              bidAmount = Number(bidMatch[1].replace(/,/g, ''));
+            }
+          }
+          
+          allComments.push({
+            id: `bat-comment-${c.id}`,
+            user_id: identity?.claimed_by_user_id || null,
+            author_username: c.bat_username,
+            comment_text: c.comment_text,
+            created_at: c.comment_timestamp,
+            posted_at: c.comment_timestamp,
+            user_name: c.bat_username,
+            comment_type: c.contains_bid ? 'bid' : 'comment',
+            bid_amount: bidAmount,
+            is_seller: c.is_seller_comment,
+            source: 'bat',
+            external_identity_id: identity?.id || c.external_identity_id,
             user_avatar: identity?.profile_url || undefined
           });
         }
@@ -212,30 +282,66 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   };
 
   const handleUsernameClick = async (comment: Comment) => {
-    // If it's a BaT user, check if they have a linked N-Zero profile
-    if (comment.source === 'bat' && comment.author_username) {
-      // First check if they have an external_identity linked to an n_zero_user_id
-      const { data: identity } = await supabase
-        .from('external_identities')
-        .select('n_zero_user_id, profile_url')
-        .eq('platform', 'bat')
-        .eq('handle', comment.author_username)
-        .maybeSingle();
+    // If user_id exists (N-Zero user or claimed BaT user), go to their profile
+    if (comment.user_id) {
+      navigate(`/profile/${comment.user_id}`);
+      return;
+    }
+    
+    // If it's a BaT user, check if they have a claimed external identity
+    if (comment.source === 'bat' && (comment.author_username || comment.external_identity_id)) {
+      let identity = null;
       
-      if (identity?.n_zero_user_id) {
-        // They have a linked N-Zero profile, navigate there
-        navigate(`/profile/${identity.n_zero_user_id}`);
-      } else {
-        // No linked profile yet - open BaT profile in new tab, or show claim identity page
-        if (identity?.profile_url) {
-          window.open(identity.profile_url, '_blank');
+      // Try to get identity by external_identity_id first (faster)
+      if (comment.external_identity_id) {
+        const { data } = await supabase
+          .from('external_identities')
+          .select('claimed_by_user_id, profile_url, handle')
+          .eq('id', comment.external_identity_id)
+          .maybeSingle();
+        identity = data;
+      }
+      
+      // Fallback: get by username
+      if (!identity && comment.author_username) {
+        const { data } = await supabase
+          .from('external_identities')
+          .select('claimed_by_user_id, profile_url, handle')
+          .eq('platform', 'bat')
+          .eq('handle', comment.author_username)
+          .maybeSingle();
+        identity = data;
+      }
+      
+      if (identity?.claimed_by_user_id) {
+        // They have a claimed N-Zero profile, navigate there
+        navigate(`/profile/${identity.claimed_by_user_id}`);
+      } else if (identity?.id) {
+        // No claimed profile but we have external identity - show public profile
+        navigate(`/profile/external/${identity.id}`);
+      } else if (comment.external_identity_id) {
+        // Use the external_identity_id from comment
+        navigate(`/profile/external/${comment.external_identity_id}`);
+      } else if (comment.author_username) {
+        // Try to find external identity to show public profile
+        const { data: extIdentity } = await supabase
+          .from('external_identities')
+          .select('id, handle, profile_url')
+          .eq('platform', 'bat')
+          .eq('handle', comment.author_username)
+          .maybeSingle();
+        
+        if (extIdentity?.id) {
+          // Show public profile by external identity
+          navigate(`/profile/external/${extIdentity.id}`);
+        } else if (extIdentity?.profile_url) {
+          // Fallback: open BaT profile
+          window.open(extIdentity.profile_url, '_blank');
         } else {
-          // Open claim identity page so they can link their BaT account
+          // Last resort: open claim identity page
           navigate(`/claim-identity?platform=bat&handle=${encodeURIComponent(comment.author_username)}`);
         }
       }
-    } else if (comment.user_id) {
-      navigate(`/profile/${comment.user_id}`);
     }
   };
 
