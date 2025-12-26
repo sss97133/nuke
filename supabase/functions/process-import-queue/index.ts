@@ -2358,7 +2358,8 @@ serve(async (req) => {
 
           // Keep import-queue processing within Edge runtime limits:
           // upload a limited number immediately; defer the rest to background backfill.
-          const defaultMaxImmediate = isLartFiche ? 24 : 12;
+          const isBatListing = item.listing_url.includes('bringatrailer.com');
+          const defaultMaxImmediate = isLartFiche ? 24 : (isBatListing ? 50 : 12); // BaT listings often have 50+ images
           let MAX_IMAGES_IMMEDIATE = defaultMaxImmediate;
           if (skip_image_upload) {
             MAX_IMAGES_IMMEDIATE = 0;

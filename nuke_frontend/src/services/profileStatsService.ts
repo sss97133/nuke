@@ -57,9 +57,12 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .eq('claimed_by_user_id', userId);
 
   const identityIds = externalIdentities?.map(ei => ei.id) || [];
+  
+  // If no claimed identities, return empty arrays but still return profile
+  // This allows users to see their profile even if they haven't claimed identities yet
 
   // Get listings (BaT listings where user is seller)
-  const { data: listings } = await supabase
+  const { data: listings } = identityIds.length > 0 ? await supabase
     .from('bat_listings')
     .select(`
       *,
@@ -68,7 +71,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     `)
     .in('seller_external_identity_id', identityIds)
     .order('auction_end_date', { ascending: false })
-    .limit(100);
+    .limit(100) : { data: [] };
 
   // Get bids (auction bids + BaT listings where user is buyer)
   const { data: userBids } = await supabase
@@ -81,7 +84,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .order('created_at', { ascending: false })
     .limit(100);
 
-  const { data: batBids } = await supabase
+  const { data: batBids } = identityIds.length > 0 ? await supabase
     .from('bat_listings')
     .select(`
       *,
@@ -90,10 +93,10 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     `)
     .in('buyer_external_identity_id', identityIds)
     .order('auction_end_date', { ascending: false })
-    .limit(100);
+    .limit(100) : { data: [] };
 
   // Get comments (BaT comments + auction comments)
-  const { data: batComments } = await supabase
+  const { data: batComments } = identityIds.length > 0 ? await supabase
     .from('bat_comments')
     .select(`
       *,
@@ -101,9 +104,9 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     `)
     .in('external_identity_id', identityIds)
     .order('comment_timestamp', { ascending: false })
-    .limit(100);
+    .limit(100) : { data: [] };
 
-  const { data: auctionComments } = await supabase
+  const { data: auctionComments } = identityIds.length > 0 ? await supabase
     .from('auction_comments')
     .select(`
       *,
@@ -111,10 +114,10 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     `)
     .in('external_identity_id', identityIds)
     .order('posted_at', { ascending: false })
-    .limit(100);
+    .limit(100) : { data: [] };
 
   // Get auction wins
-  const { data: auctionWins } = await supabase
+  const { data: auctionWins } = identityIds.length > 0 ? await supabase
     .from('bat_listings')
     .select(`
       *,
@@ -123,7 +126,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .in('buyer_external_identity_id', identityIds)
     .eq('listing_status', 'sold')
     .order('auction_end_date', { ascending: false })
-    .limit(50);
+    .limit(50) : { data: [] };
 
   // Get success stories
   const { data: successStories } = await supabase
@@ -137,7 +140,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .limit(20);
 
   // Get comments of note (highly liked/engaged comments)
-  const { data: commentsOfNote } = await supabase
+  const { data: commentsOfNote } = identityIds.length > 0 ? await supabase
     .from('bat_comments')
     .select(`
       *,
@@ -146,7 +149,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .in('external_identity_id', identityIds)
     .gt('likes_count', 5)
     .order('likes_count', { ascending: false })
-    .limit(20);
+    .limit(20) : { data: [] };
 
   // Calculate stats
   const stats: ProfileStats = {

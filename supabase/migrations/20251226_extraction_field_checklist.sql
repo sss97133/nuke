@@ -326,3 +326,4 @@ ORDER BY field_category, db_table;
 COMMENT ON TABLE extraction_field_checklist IS 'Master checklist of all fields that need to be extracted from automotive listings. Used by LLM to systematically find all required data.';
 COMMENT ON VIEW extraction_checklist_by_category IS 'Grouped checklist by category for easy LLM consumption';
 
+
