@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { VehicleHeaderProps } from './types';
@@ -467,41 +467,26 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     };
   }, [priceMenuOpen]);
 
-  // Helper to normalize price values (handle both strings and numbers)
-  const normalizePrice = useCallback((value: any): number | null => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
-    if (typeof value === 'string') {
-      const num = parseFloat(value);
-      if (Number.isFinite(num) && num > 0) return num;
-    }
-    return null;
-  }, []);
-
   const getAutoDisplay = () => {
     if (!vehicle) return { amount: null as number | null, label: '' };
     
-    // CORRECT PRIORITY ORDER:
+    // CORRECT PRIORITY ORDER (DO NOT USE current_value):
     // 1. sale_price (actual sold price)
     // 2. winning_bid (auction result)
     // 3. high_bid (RNM auctions)
     // 4. Live bid (from external_listings/auctionPulse for active auctions)
     // 5. Current bid (from vehicle, if no external listing)
     // 6. Asking price (only if for sale)
-    // 7. current_value (estimated value - fallback)
-    // 8. purchase_price (historical context - fallback)
-    // 9. msrp (baseline reference - fallback)
     
     const v = vehicle as any;
     
     // 1. Sale price (actual sold price) - highest truth
-    const salePrice = normalizePrice(vehicle.sale_price);
-    if (salePrice !== null) {
+    if (typeof vehicle.sale_price === 'number' && vehicle.sale_price > 0) {
       const outcome = v.auction_outcome;
       if (outcome === 'sold') {
-        return { amount: salePrice, label: 'SOLD FOR' };
+        return { amount: vehicle.sale_price, label: 'SOLD FOR' };
       } else {
-        return { amount: salePrice, label: 'Sold for' };
+        return { amount: vehicle.sale_price, label: 'Sold for' };
       }
     }
     
@@ -538,13 +523,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return { amount: vehicle.current_bid, label: 'Current Bid' };
     }
     
-    // 6. Asking price (only if for sale or available)
-    const askingPrice = normalizePrice(vehicle.asking_price);
-    if (askingPrice !== null) {
-      const saleStatus = String(v.sale_status || '').toLowerCase();
-      if (v.is_for_sale === true || saleStatus === 'for_sale' || saleStatus === 'available') {
-        return { amount: askingPrice, label: 'Asking' };
-      }
+    // 6. Asking price (only if for sale)
+    if (typeof vehicle.asking_price === 'number' && vehicle.asking_price > 0 && (v.is_for_sale === true || String(v.sale_status || '').toLowerCase() === 'for_sale')) {
+      return { amount: vehicle.asking_price, label: 'Asking' };
     }
     
     // Reserve Not Met with no price
@@ -552,25 +533,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return { amount: null, label: 'Reserve Not Met' };
     }
     
-    // 7. Fallback to current_value (estimated value)
-    const currentValue = normalizePrice(vehicle.current_value);
-    if (currentValue !== null) {
-      return { amount: currentValue, label: 'Estimated Value' };
-    }
-    
-    // 8. Fallback to purchase_price (historical context)
-    const purchasePrice = normalizePrice(vehicle.purchase_price);
-    if (purchasePrice !== null) {
-      return { amount: purchasePrice, label: 'Purchase Price' };
-    }
-    
-    // 9. Fallback to msrp (baseline reference)
-    const msrp = normalizePrice(vehicle.msrp);
-    if (msrp !== null) {
-      return { amount: msrp, label: 'Original MSRP' };
-    }
-    
-    // No price available
+    // No price available - DO NOT fall back to current_value, purchase_price, msrp, or estimates
     return { amount: null, label: '' };
   };
 
@@ -604,11 +567,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
     if (mode === 'asking') {
       // Asking price - user intent, but still check for verified source if available
-      const askingPrice = normalizePrice(vehicle.asking_price);
-      if (askingPrice !== null) {
+      if (typeof vehicle.asking_price === 'number') {
         // Asking price can be shown without verified source (user intent to sell)
         // But if there IS a source, prefer it
-        return { amount: askingPrice, label: 'Asking Price' };
+        return { amount: vehicle.asking_price, label: 'Asking Price' };
       }
       return { amount: null, label: '' };
     }
@@ -646,10 +608,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       }
       return { amount: null, label: '' };
     }
-    if (mode === 'msrp') {
-      const msrpValue = normalizePrice(vehicle.msrp);
-      return { amount: msrpValue, label: 'Original MSRP' };
-    }
+    if (mode === 'msrp') return { amount: typeof vehicle.msrp === 'number' ? vehicle.msrp : null, label: 'Original MSRP' };
     return getAutoDisplay();
   };
 
