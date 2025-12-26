@@ -70,8 +70,11 @@ const asInt = (s: string | null | undefined): number | null => {
 function safeDecodeHtmlAttr(s: string): string {
   return String(s || '')
     .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
     .replace(/&#038;/g, '&')
-    .replace(/&amp;/g, '&');
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
 }
 
 /**
@@ -154,6 +157,59 @@ export function extractGalleryImagesFromHtml(html: string): { urls: string[]; me
     );
   };
 
+  // Helper function to extract and parse gallery items from a JSON string
+  const parseGalleryItems = (jsonText: string): string[] => {
+    try {
+      const items = JSON.parse(jsonText);
+      if (!Array.isArray(items)) {
+        console.warn(`[batDomMap] Gallery items is not an array, got: ${typeof items}`);
+        return [];
+      }
+      
+      console.log(`[batDomMap] Parsing ${items.length} gallery items from data-gallery-items`);
+      
+      const urls: string[] = [];
+      let skippedNoUrl = 0;
+      let skippedNotOk = 0;
+      let skippedNoise = 0;
+      
+      for (const it of items) {
+        // Prioritize highest resolution: full/original > large > small
+        let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url;
+        if (typeof u !== 'string' || !u.trim()) {
+          skippedNoUrl++;
+          continue;
+        }
+        // Aggressively upgrade to highest resolution
+        u = upgradeBatImageUrl(u);
+        const nu = normalize(u);
+        if (!isOk(nu)) {
+          skippedNotOk++;
+          continue;
+        }
+        // CRITICAL: Filter noise even from data-gallery-items (defense in depth)
+        // The gallery should be clean, but we filter anyway to catch edge cases
+        if (isNoise(nu)) {
+          skippedNoise++;
+          console.log(`[batDomMap] Filtered noise image from gallery: ${nu}`);
+          continue;
+        }
+        urls.push(nu);
+      }
+      
+      const unique = [...new Set(urls)];
+      console.log(`[batDomMap] Extracted ${unique.length} unique images (skipped: ${skippedNoUrl} no-url, ${skippedNotOk} not-ok, ${skippedNoise} noise)`);
+      return unique;
+    } catch (e) {
+      console.warn('[batDomMap] Error parsing gallery JSON:', e);
+      if (e instanceof Error) {
+        console.warn(`[batDomMap] Error message: ${e.message}`);
+        console.warn(`[batDomMap] JSON text length: ${jsonText.length}, preview: ${jsonText.slice(0, 200)}`);
+      }
+      return [];
+    }
+  };
+
   // 1) Most reliable: embedded JSON gallery attribute from #bat_listing_page_photo_gallery div.
   // CRITICAL: This is the ONLY source of images for the subject vehicle.
   // We MUST only extract from this specific gallery element to avoid contamination from related listings.
@@ -164,6 +220,7 @@ export function extractGalleryImagesFromHtml(html: string): { urls: string[]; me
     const galleryDiv = doc?.getElementById('bat_listing_page_photo_gallery');
     
     if (galleryDiv) {
+      console.log(`[batDomMap] Found #bat_listing_page_photo_gallery div`);
       // Extract data-gallery-items attribute from within the specific gallery container.
       // On BaT, `data-gallery-items` is typically on a nested div inside #bat_listing_page_photo_gallery.
       const galleryItemsAttr =
@@ -171,68 +228,88 @@ export function extractGalleryImagesFromHtml(html: string): { urls: string[]; me
         (galleryDiv.querySelector?.('[data-gallery-items]')?.getAttribute?.('data-gallery-items') ?? null);
       if (galleryItemsAttr) {
         const jsonText = safeDecodeHtmlAttr(galleryItemsAttr);
-        const items = JSON.parse(jsonText);
-        if (Array.isArray(items)) {
-          const urls: string[] = [];
-          for (const it of items) {
-            // Prioritize highest resolution: full/original > large > small
-            let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url;
-            if (typeof u !== 'string' || !u.trim()) continue;
-            // Aggressively upgrade to highest resolution
-            u = upgradeBatImageUrl(u);
-            const nu = normalize(u);
-            if (!isOk(nu)) continue;
-            // CRITICAL: Filter noise even from data-gallery-items (defense in depth)
-            // The gallery should be clean, but we filter anyway to catch edge cases
-            if (isNoise(nu)) {
-              console.log(`[batDomMap] Filtered noise image from gallery: ${nu}`);
-              continue;
-            }
-            urls.push(nu);
-          }
-          const unique = [...new Set(urls)];
-          if (unique.length) {
-            console.log(`[batDomMap] Extracted ${unique.length} images from #bat_listing_page_photo_gallery`);
-            return { urls: unique, method: 'attr:data-gallery-items:bat_listing_page_photo_gallery' };
-          }
+        const urls = parseGalleryItems(jsonText);
+        if (urls.length > 0) {
+          console.log(`[batDomMap] Extracted ${urls.length} images from #bat_listing_page_photo_gallery`);
+          return { urls, method: 'attr:data-gallery-items:bat_listing_page_photo_gallery' };
         }
       }
     } else {
-      console.warn('[batDomMap] #bat_listing_page_photo_gallery div not found in HTML');
+      console.warn(`[batDomMap] #bat_listing_page_photo_gallery div not found in HTML (HTML length: ${h.length})`);
+      // Check if HTML contains the string at all (might be in a different format)
+      if (h.includes('data-gallery-items')) {
+        console.log(`[batDomMap] HTML contains 'data-gallery-items' but gallery div not found - trying alternative extraction`);
+      } else {
+        console.warn(`[batDomMap] HTML does not contain 'data-gallery-items' at all`);
+      }
     }
     
-    // Fallback: substring+regex (less ideal, but still constrained to the gallery section).
-    // If we can't find the gallery container, we return empty rather than risking contamination.
+    // Fallback 1: Search for ANY element with data-gallery-items (in case structure changed)
+    // But only if we're on a BaT listing page (check for bringatrailer.com in URL or HTML)
+    if (h.includes('bringatrailer.com')) {
+      const allGalleryElements = doc?.querySelectorAll?.('[data-gallery-items]') || [];
+      for (let i = 0; i < allGalleryElements.length; i++) {
+        const el = allGalleryElements[i];
+        const attr = el?.getAttribute?.('data-gallery-items');
+        if (attr) {
+          const jsonText = safeDecodeHtmlAttr(attr);
+          const urls = parseGalleryItems(jsonText);
+          if (urls.length > 0) {
+            console.log(`[batDomMap] Extracted ${urls.length} images from data-gallery-items attribute (fallback)`);
+            return { urls, method: 'attr:data-gallery-items:any-element' };
+          }
+        }
+      }
+    }
+    
+    // Fallback 2: substring+regex (less ideal, but still constrained to the gallery section).
+    // Improved regex to handle HTML entities and both single and double quotes
     const idx = h.indexOf('bat_listing_page_photo_gallery');
     if (idx >= 0) {
-      const window = h.slice(idx, idx + 400000);
-      const m = window.match(/data-gallery-items=(?:"([^"]+)"|'([^']+)')/i);
-      if (m) {
-        console.warn('[batDomMap] Using regex fallback (DOMParser method failed)');
-        const encoded = String((m?.[1] || m?.[2] || '') as string);
-        if (encoded) {
+      const window = h.slice(Math.max(0, idx - 5000), idx + 400000); // Include some context before
+      // Try to match data-gallery-items with various quote styles and HTML entities
+      // Use non-greedy matching to avoid capturing too much
+      const patterns = [
+        /data-gallery-items\s*=\s*"([^"]*(?:&quot;[^"]*)*)"/i,
+        /data-gallery-items\s*=\s*'([^']*(?:&#039;[^']*)*)'/i,
+        // More flexible: match until we find a closing quote (handles HTML entities)
+        /data-gallery-items\s*=\s*"((?:[^"&]|&[^;]+;)*)"/i,
+        /data-gallery-items\s*=\s*'((?:[^'&]|&[^;]+;)*)'/i,
+      ];
+      
+      for (const pattern of patterns) {
+        const m = window.match(pattern);
+        if (m?.[1]) {
+          console.warn('[batDomMap] Using regex fallback (DOMParser method failed)');
+          const encoded = String(m[1]);
           const jsonText = safeDecodeHtmlAttr(encoded);
-          const items = JSON.parse(jsonText);
-          if (Array.isArray(items)) {
-            const urls: string[] = [];
-            for (const it of items) {
-              // Prioritize highest resolution: full/original > large > small
-              let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url;
-              if (typeof u !== 'string' || !u.trim()) continue;
-              // Aggressively upgrade to highest resolution
-              u = upgradeBatImageUrl(u);
-              const nu = normalize(u);
-              if (!isOk(nu)) continue;
-              if (isNoise(nu)) {
-                console.log(`[batDomMap] Filtered noise image from gallery: ${nu}`);
-                continue;
-              }
-              urls.push(nu);
-            }
-            const unique = [...new Set(urls)];
-            if (unique.length) {
-              return { urls: unique, method: 'attr:data-gallery-items:regex-fallback:scoped' };
-            }
+          const urls = parseGalleryItems(jsonText);
+          if (urls.length > 0) {
+            return { urls, method: 'attr:data-gallery-items:regex-fallback:scoped' };
+          }
+        }
+      }
+    }
+    
+    // Fallback 3: Search entire HTML for data-gallery-items (last resort, but still safer than old regex)
+    // Only if we haven't found anything yet and we're confident this is a BaT listing page
+    if (h.includes('bringatrailer.com') && h.includes('data-gallery-items')) {
+      // Try to find data-gallery-items anywhere in the HTML
+      // Use a more flexible pattern that handles HTML entities
+      const globalPatterns = [
+        /data-gallery-items\s*=\s*"((?:[^"&]|&[^;]+;)*)"/i,
+        /data-gallery-items\s*=\s*'((?:[^'&]|&[^;]+;)*)'/i,
+      ];
+      
+      for (const pattern of globalPatterns) {
+        const globalMatch = h.match(pattern);
+        if (globalMatch?.[1]) {
+          console.warn('[batDomMap] Using global regex fallback (all other methods failed)');
+          const encoded = String(globalMatch[1]);
+          const jsonText = safeDecodeHtmlAttr(encoded);
+          const urls = parseGalleryItems(jsonText);
+          if (urls.length > 0) {
+            return { urls, method: 'attr:data-gallery-items:regex-fallback:global' };
           }
         }
       }

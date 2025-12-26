@@ -785,6 +785,7 @@ async function storeVehiclesInDatabase(
           make: vehicle.make || "Unknown",
           model: vehicle.model || "Unknown",
           year: Number.isFinite(vehicle.year) ? vehicle.year : null,
+          trim: vehicle.trim || null,
           vin,
           mileage: Number.isFinite(vehicle.mileage) ? Math.trunc(vehicle.mileage) : null,
           color: vehicle.color || null,

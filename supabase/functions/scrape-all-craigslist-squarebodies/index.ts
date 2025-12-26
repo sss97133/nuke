@@ -139,34 +139,7 @@ serve(async (req) => {
 
     // user_id is optional - vehicles can be created without it
     // If source data has username (BaT, pcar, cars & bids), we can create/link users later
-    let importUserId = user_id || null
-
-    // TEST: Try a direct insert to verify database connection works (without user_id - trigger prevents it)
-    console.log('🧪 Testing direct database insert...')
-    const { data: testInsert, error: testError } = await supabase
-      .from('vehicles')
-      .insert({
-        make: 'Chevrolet',
-        model: 'K10',
-        year: 1985,
-        discovery_source: 'craigslist_scrape_test',
-        is_public: true
-        // user_id is NOT set - database trigger prevents it, ownership must be verified
-      })
-      .select('id')
-      .single()
-    
-    if (testError) {
-      console.error('❌ TEST INSERT FAILED:', JSON.stringify(testError, null, 2))
-      return new Response(
-        JSON.stringify({ success: false, error: `Database insert test failed: ${testError.message}`, details: testError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      )
-    } else {
-      console.log('✅ TEST INSERT SUCCESS:', testInsert?.id)
-      // Delete test vehicle
-      await supabase.from('vehicles').delete().eq('id', testInsert.id)
-    }
+    const importUserId = user_id || null
 
     console.log('🚀 Starting comprehensive Craigslist squarebody scrape...')
     console.log(`Regions: ${regions ? regions.length : max_regions}, Search terms: ${SQUAREBODY_SEARCH_TERMS.length}`)
@@ -221,7 +194,7 @@ serve(async (req) => {
 
         for (const searchTerm of prioritizedSearchTerms) {
           try {
-            const searchUrl = `https://${region}.craigslist.org/search/cta?query=${encodeURIComponent(searchTerm)}&sort=date&max_auto_year=1991&min_auto_year=1973`
+            const searchUrl = `https://${region}.craigslist.org/search/cta?query=${encodeURIComponent(searchTerm)}&sort=date&max_auto_year=1991&min_auto_year=1967`
             
             console.log(`  Searching: ${searchTerm}`)
             stats.searches_performed++
@@ -1111,11 +1084,16 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   if (titleElement) {
     data.title = titleElement.textContent.trim()
     
-    // Improved make/model extraction - handle models with dashes like "F-150"
-    // Strategy: Extract year and make first, then everything else until price is the model
-    const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
+    // Improved make/model extraction - handle models with dashes like "F-150" and 2-digit years
+    const yearMatch = data.title.match(/\b((19|20)\d{2}|\d{2})\b/)
     if (yearMatch) {
-      data.year = yearMatch[0]
+      const y = yearMatch[1]
+      if (y.length === 2) {
+        const num = parseInt(y, 10)
+        data.year = num >= 50 ? `19${y}` : `20${y}`
+      } else {
+        data.year = y
+      }
     }
     
     // Extract make (common makes)
@@ -1153,15 +1131,63 @@ function scrapeCraigslistInline(doc: any, url: string): any {
         }
       }
     }
+
+    // Trim detection from title tokens
+    const trimTokens = ['Custom Deluxe', 'Silverado', 'Cheyenne', 'Scottsdale', 'High Sierra', 'XLT', 'Lariat', 'Denali']
+    const lowerTitle = data.title.toLowerCase()
+    for (const t of trimTokens) {
+      if (lowerTitle.includes(t.toLowerCase())) {
+        data.trim = t
+        break
+      }
+    }
     
     const priceMatch = data.title.match(/\$\s*([\d,]+)/)
     if (priceMatch) data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
+    if (!data.asking_price) {
+      const priceElement = doc.querySelector('.price, .postingtitletext .price')
+      if (priceElement) {
+        const p = priceElement.textContent?.match(/([\d,]+)/)
+        if (p) data.asking_price = parseInt(p[1].replace(/,/g, ''))
+      }
+    }
     
     const locationMatch = data.title.match(/\(([^)]+)\)\s*$/i)
     if (locationMatch) data.location = locationMatch[1].trim()
   }
 
   const fullText = doc.body?.textContent || ''
+
+  // Fallback make/model detection for common Chevy/GMC squarebody tokens
+  if (!data.make) {
+    const titleLower = (data.title || '').toLowerCase()
+    const patterns: { re: RegExp; make: string; model: string }[] = [
+      { re: /\bk5\b|\bk5\s+blazer\b|\bblazer\b/, make: 'Chevrolet', model: 'K5 Blazer' },
+      { re: /\bk10\b/, make: 'Chevrolet', model: 'K10' },
+      { re: /\bk20\b/, make: 'Chevrolet', model: 'K20' },
+      { re: /\bk30\b/, make: 'Chevrolet', model: 'K30' },
+      { re: /\bc10\b/, make: 'Chevrolet', model: 'C10' },
+      { re: /\bc20\b/, make: 'Chevrolet', model: 'C20' },
+      { re: /\bc30\b/, make: 'Chevrolet', model: 'C30' },
+      { re: /\bsilverado\b/, make: 'Chevrolet', model: 'Silverado' },
+      { re: /\bhigh\s+sierra\b/, make: 'GMC', model: 'High Sierra' },
+      { re: /\bsierra\b/, make: 'GMC', model: 'Sierra' },
+      { re: /\bgmc\b/, make: 'GMC', model: data.model || 'Truck' },
+    ]
+    for (const p of patterns) {
+      if (p.re.test(titleLower)) {
+        data.make = p.make
+        if (!data.model) data.model = p.model
+        break
+      }
+    }
+  }
+
+  // Fallback year detection from body if missing
+  if (!data.year) {
+    const bodyYear = fullText.match(/\b(19[0-9]{2}|20[0-4][0-9])\b/)
+    if (bodyYear) data.year = bodyYear[1]
+  }
   
   // Extract posted date from HTML
   // Craigslist shows "Posted 2025-11-27 15:00" in the HTML
@@ -1303,6 +1329,18 @@ function scrapeCraigslistInline(doc: any, url: string): any {
   const descElement = doc.querySelector('#postingbody')
   if (descElement) {
     data.description = descElement.textContent.trim().substring(0, 5000)
+  }
+
+  // Extract map/address location if present
+  const mapAddress = doc.querySelector('.mapaddress')
+  if (mapAddress) {
+    const addr = mapAddress.textContent.trim()
+    if (addr) data.location = addr
+  }
+  const smallLoc = doc.querySelector('.postingtitletext small')
+  if (!data.location && smallLoc) {
+    const txt = smallLoc.textContent.replace(/[()]/g, '').trim()
+    if (txt) data.location = txt
   }
 
   // Comprehensive image extraction - multiple methods
