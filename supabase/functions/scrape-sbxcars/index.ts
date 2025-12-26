@@ -96,7 +96,7 @@ serve(async (req) => {
         .insert({
           url: 'https://sbxcars.com',
           name: 'SBX Cars',
-          source_type: 'auction_house',
+          source_type: 'auction',
           is_active: true,
         })
         .select('id')
