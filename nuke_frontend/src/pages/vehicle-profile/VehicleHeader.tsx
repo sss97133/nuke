@@ -523,9 +523,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       return { amount: vehicle.current_bid, label: 'Current Bid' };
     }
     
-    // 6. Asking price (only if for sale)
-    if (typeof vehicle.asking_price === 'number' && vehicle.asking_price > 0 && (v.is_for_sale === true || String(v.sale_status || '').toLowerCase() === 'for_sale')) {
-      return { amount: vehicle.asking_price, label: 'Asking' };
+    // 6. Asking price (show if exists - having an asking price implies it's for sale)
+    const askingPrice = typeof vehicle.asking_price === 'number' 
+      ? vehicle.asking_price 
+      : (typeof vehicle.asking_price === 'string' ? parseFloat(vehicle.asking_price) : null);
+    if (askingPrice && !isNaN(askingPrice) && askingPrice > 0) {
+      return { amount: askingPrice, label: 'Asking' };
     }
     
     // Reserve Not Met with no price
@@ -567,10 +570,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
     if (mode === 'asking') {
       // Asking price - user intent, but still check for verified source if available
-      if (typeof vehicle.asking_price === 'number') {
+      const askingPrice = typeof vehicle.asking_price === 'number' 
+        ? vehicle.asking_price 
+        : (typeof vehicle.asking_price === 'string' ? parseFloat(vehicle.asking_price) : null);
+      if (askingPrice && !isNaN(askingPrice) && askingPrice > 0) {
         // Asking price can be shown without verified source (user intent to sell)
         // But if there IS a source, prefer it
-        return { amount: vehicle.asking_price, label: 'Asking Price' };
+        return { amount: askingPrice, label: 'Asking Price' };
       }
       return { amount: null, label: '' };
     }

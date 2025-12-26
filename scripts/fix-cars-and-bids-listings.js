@@ -9,8 +9,15 @@
  * 4. Updates origin_metadata with correct image URLs
  */
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../nuke_frontend/.env.local') });
-const { createClient } = require('@supabase/supabase-js');
+import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: resolve(__dirname, '../nuke_frontend/.env.local') });
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -55,14 +62,17 @@ async function findProblematicListings() {
       .select('id', { count: 'exact', head: true })
       .eq('vehicle_id', vehicle.id);
     
-    // Get listing URL
-    const listingUrl = vehicle.platform_url || vehicle.discovery_url || 
+    // Get listing URL - clean up video URLs
+    let listingUrl = vehicle.platform_url || vehicle.discovery_url || 
       (vehicle.origin_metadata?.listing_url) || 
       (vehicle.origin_metadata?.bat_listing_url);
     
     if (!listingUrl || !listingUrl.includes('carsandbids.com/auctions/')) {
       continue;
     }
+    
+    // Remove /video suffix - that's not the correct listing URL
+    listingUrl = listingUrl.replace(/\/video\/?$/, '');
     
     // Check for problematic images (thumbnails, video frames, low-res)
     const { data: images } = await supabase
@@ -122,16 +132,17 @@ async function reExtractImages(listingUrl) {
     }
     
     if (!data || !data.success) {
+      console.log(`   ⚠️  Extraction response:`, JSON.stringify(data, null, 2));
       return { success: false, error: data?.error || 'Extraction failed' };
     }
     
-    const vehicle = data.vehicles_extracted?.[0] || data.extracted?.[0];
-    if (!vehicle || !vehicle.images || vehicle.images.length === 0) {
-      return { success: false, error: 'No images extracted' };
-    }
+    // The extraction function stores images in the database, so we need to check external_listings metadata
+    // or wait a moment and then check the vehicle's origin_metadata for images
+    console.log(`   📊 Extraction result: ${data.vehicles_extracted || 0} extracted, ${data.vehicles_created || 0} created, ${data.vehicles_updated || 0} updated`);
     
-    console.log(`✅ Extracted ${vehicle.images.length} full-resolution images`);
-    return { success: true, images: vehicle.images };
+    // Try to get images from external_listings metadata if available
+    // For now, return success if extraction succeeded - images should be in DB
+    return { success: true, images: [], note: 'Images stored in database' };
   } catch (error) {
     console.error(`❌ Exception during extraction:`, error);
     return { success: false, error: error.message };
@@ -146,15 +157,32 @@ async function fixListing(problematic) {
   console.log(`\n🔧 Fixing: ${vehicleName} (${vehicle.id.substring(0, 8)}...)`);
   console.log(`   URL: ${listingUrl}`);
   
-  // Step 1: Re-extract images
+  // Step 1: Re-extract images (this stores them in the database)
   const extraction = await reExtractImages(listingUrl);
-  if (!extraction.success || !extraction.images || extraction.images.length === 0) {
+  if (!extraction.success) {
     console.log(`   ⚠️  Failed to extract images: ${extraction.error}`);
     return { success: false, error: extraction.error };
   }
   
-  const fullResImages = extraction.images;
-  console.log(`   ✅ Got ${fullResImages.length} full-resolution images`);
+  // Wait a moment for images to be stored
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Get images from external_listings metadata
+  const { data: externalListing } = await supabase
+    .from('external_listings')
+    .select('metadata')
+    .eq('vehicle_id', vehicle.id)
+    .eq('platform', 'carsandbids')
+    .maybeSingle();
+  
+  const fullResImages = externalListing?.metadata?.images || externalListing?.metadata?.image_urls || [];
+  
+  if (fullResImages.length === 0) {
+    console.log(`   ⚠️  No images found in external_listings metadata`);
+    return { success: false, error: 'No images extracted' };
+  }
+  
+  console.log(`   ✅ Got ${fullResImages.length} full-resolution images from metadata`);
   
   // Step 2: Delete problematic images (thumbnails, video frames, low-res)
   const { data: existingImages } = await supabase
