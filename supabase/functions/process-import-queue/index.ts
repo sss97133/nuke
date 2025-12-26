@@ -181,7 +181,8 @@ function isValidMake(make: string): boolean {
     'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi', 'suzuki',
     'hyundai', 'kia', 'volvo', 'tesla', 'genesis', 'alfa', 'romeo', 'alfa romeo', 'fiat', 'mini',
     'ferrari', 'lamborghini', 'mclaren', 'aston', 'martin', 'aston martin', 'bentley', 'rolls', 'royce', 'rolls-royce',
-    'datsun', 'mercury', 'saturn', 'oldsmobile', 'plymouth', 'eagle', 'isuzu', 'saab'
+    'datsun', 'mercury', 'saturn', 'oldsmobile', 'plymouth', 'eagle', 'isuzu', 'saab',
+    'harley', 'davidson', 'harley-davidson', 'harley davidson', 'yamaha', 'ducati', 'kawasaki', 'indian', 'triumph'
   ];
   
   // Check if make is in valid list
@@ -192,6 +193,7 @@ function isValidMake(make: string): boolean {
   if (makeLower.includes('aston martin') || makeLower.includes('aston-martin')) return true;
   if (makeLower.includes('rolls royce') || makeLower.includes('rolls-royce')) return true;
   if (makeLower.includes('mercedes benz') || makeLower.includes('mercedes-benz')) return true;
+  if (makeLower.includes('harley davidson') || makeLower.includes('harley-davidson')) return true;
   
   // Invalid makes (descriptors, colors, adjectives)
   const invalidMakes = [
@@ -805,8 +807,13 @@ serve(async (req) => {
           scrapeData.data.source = 'Bring a Trailer';
           
           // CRITICAL: Parse from URL first - most reliable format: /listing/YEAR-MAKE-MODEL-ID/
-          // Pattern: /listing/1992-chevrolet-454-ss-14/
-          const urlMatch = item.listing_url.match(/listing\/(\d{4})-([^-]+(?:-[^-]+)*?)-(\d+)\/?$/);
+          // Pattern: /listing/1992-chevrolet-454-ss-14/ or /listing/2003-harley-davidson-electra-glide-classic/
+          // Try pattern with numeric ID first
+          let urlMatch = item.listing_url.match(/listing\/(\d{4})-([^-]+(?:-[^-]+)*?)-(\d+)\/?$/);
+          // If no match, try pattern without numeric ID (just year-make-model)
+          if (!urlMatch) {
+            urlMatch = item.listing_url.match(/listing\/(\d{4})-([^-]+(?:-[^-]+)*?)\/?$/);
+          }
           if (urlMatch) {
             const year = parseInt(urlMatch[1]);
             const makeModelStr = urlMatch[2]; // e.g., "chevrolet-454-ss"
@@ -1037,26 +1044,42 @@ serve(async (req) => {
             // Last resort: Parse from HTML title
             const titleElement = doc.querySelector('h1.post-title, h1, .post-title, title');
             if (titleElement) {
-              const title = titleElement.textContent?.trim() || '';
+              let title = titleElement.textContent?.trim() || '';
+              
+              // CRITICAL: Remove "| Bring a Trailer" suffix from BaT titles
+              title = title.replace(/\s*\|\s*Bring\s+a\s*Trailer.*$/i, '');
+              title = title.replace(/\s*on\s*BaT\s*Auctions?.*$/i, '');
+              title = title.replace(/\s*-\s*Bring\s+a\s*Trailer.*$/i, '');
+              
               scrapeData.data.title = title;
               
-              // Parse from title: "9k-Mile 1992 Chevrolet 454 SS" or "10k-mile 2009 Porsche 911..." or "This 1961 Lincoln..."
-              // Remove mileage/ownership descriptors and other prefixes first
-              let cleanTitle = title
-                .replace(/^\d+k-?mile\s*/gi, '')
-                .replace(/^\d+-years?-owned\s*/gi, '')
-                .replace(/^\d+,\d+-mile\s*/gi, '')
-                .replace(/^single-family-owned\s*/gi, '')
-                .replace(/^original-owner\s*/gi, '')
-                .replace(/^this\s+/gi, '') // Remove "This" prefix
-                .replace(/^el\s+/gi, '') // Remove "El" prefix (El Camino)
-                .replace(/^red\s+/gi, '') // Remove color prefixes
-                .replace(/^beautiful\s+/gi, '')
-                .replace(/^supercharged\s+/gi, '')
-                .replace(/^all\s+/gi, '')
-                .replace(/^502-powered\s*/gi, '')
-                .replace(/\s+/g, ' ')
-                .trim();
+              // Skip non-vehicle listings (accessories, parts, etc.)
+              const nonVehicleKeywords = ['windshield', 'sign', 'statue', 'arcade', 'kiddie', 'ride', 'illuminated'];
+              const titleLower = title.toLowerCase();
+              if (nonVehicleKeywords.some(keyword => titleLower.includes(keyword))) {
+                console.log(`⚠️ Skipping non-vehicle BaT listing: ${title}`);
+                // Mark as junk to prevent processing
+                scrapeData.data.make = 'Bring';
+                scrapeData.data.model = 'a Trailer';
+                scrapeData.data.year = null;
+              } else {
+                // Parse from title: "9k-Mile 1992 Chevrolet 454 SS" or "10k-mile 2009 Porsche 911..." or "This 1961 Lincoln..."
+                // Remove mileage/ownership descriptors and other prefixes first
+                let cleanTitle = title
+                  .replace(/^\d+k-?mile\s*/gi, '')
+                  .replace(/^\d+-years?-owned\s*/gi, '')
+                  .replace(/^\d+,\d+-mile\s*/gi, '')
+                  .replace(/^single-family-owned\s*/gi, '')
+                  .replace(/^original-owner\s*/gi, '')
+                  .replace(/^this\s+/gi, '') // Remove "This" prefix
+                  .replace(/^el\s+/gi, '') // Remove "El" prefix (El Camino)
+                  .replace(/^red\s+/gi, '') // Remove color prefixes
+                  .replace(/^beautiful\s+/gi, '')
+                  .replace(/^supercharged\s+/gi, '')
+                  .replace(/^all\s+/gi, '')
+                  .replace(/^502-powered\s*/gi, '')
+                  .replace(/\s+/g, ' ')
+                  .trim();
               
               const yearMatch = cleanTitle.match(/\b(19|20)\d{2}\b/);
               if (yearMatch) {
@@ -1067,7 +1090,7 @@ serve(async (req) => {
                 
                 // Extract make/model after year
                 const afterYear = cleanTitle.substring(cleanTitle.indexOf(yearMatch[0]) + 4).trim();
-                const knownMakes = ['chevrolet', 'chevy', 'ford', 'gmc', 'dodge', 'ram', 'toyota', 'honda', 'nissan', 'bmw', 'mercedes', 'benz', 'mercedes-benz', 'audi', 'volkswagen', 'vw', 'porsche', 'jaguar', 'cadillac', 'buick', 'pontiac', 'lincoln', 'chrysler', 'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi', 'hyundai', 'kia', 'volvo', 'tesla', 'genesis', 'alfa', 'romeo', 'alfa romeo', 'fiat', 'mini', 'ferrari', 'lamborghini', 'mclaren', 'aston', 'martin', 'aston martin', 'bentley', 'rolls', 'royce', 'rolls-royce', 'datsun', 'mercury', 'jeep', 'suzuki'];
+                const knownMakes = ['chevrolet', 'chevy', 'ford', 'gmc', 'dodge', 'ram', 'toyota', 'honda', 'nissan', 'bmw', 'mercedes', 'benz', 'mercedes-benz', 'audi', 'volkswagen', 'vw', 'porsche', 'jaguar', 'cadillac', 'buick', 'pontiac', 'lincoln', 'chrysler', 'lexus', 'acura', 'infiniti', 'mazda', 'subaru', 'mitsubishi', 'hyundai', 'kia', 'volvo', 'tesla', 'genesis', 'alfa', 'romeo', 'alfa romeo', 'fiat', 'mini', 'ferrari', 'lamborghini', 'mclaren', 'aston', 'martin', 'aston martin', 'bentley', 'rolls', 'royce', 'rolls-royce', 'datsun', 'mercury', 'jeep', 'suzuki', 'harley', 'davidson', 'harley-davidson', 'yamaha', 'ducati', 'kawasaki', 'indian'];
                 const afterYearLower = afterYear.toLowerCase();
                 
                 for (const makeName of knownMakes) {
