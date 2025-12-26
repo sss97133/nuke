@@ -70,6 +70,7 @@ export const DomainRoutes = () => {
         <Route path="/capture" element={<Capture />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/:userId" element={<Profile />} />
+        <Route path="/profile/external/:externalIdentityId" element={<Profile />} />
         <Route path="/capsule" element={<Capsule />} />
         <Route path="/library" element={<Library />} />
         <Route path="/auctions" element={<AuctionMarketplace />} />

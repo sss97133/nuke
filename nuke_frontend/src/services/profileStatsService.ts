@@ -174,6 +174,117 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
 }
 
 /**
+ * Get public profile data by external identity (for unclaimed BaT users)
+ * Shows their activity even if they haven't claimed their identity yet
+ */
+export async function getPublicProfileByExternalIdentity(externalIdentityId: string): Promise<UserProfileData | null> {
+  // Get the external identity
+  const { data: externalIdentity, error: identityError } = await supabase
+    .from('external_identities')
+    .select('id, platform, handle, profile_url, display_name, claimed_by_user_id')
+    .eq('id', externalIdentityId)
+    .single();
+
+  if (identityError || !externalIdentity) return null;
+
+  // If it's claimed, redirect to regular profile
+  if (externalIdentity.claimed_by_user_id) {
+    return getUserProfileData(externalIdentity.claimed_by_user_id);
+  }
+
+  // Create a synthetic profile for display
+  const syntheticProfile = {
+    id: `external-${externalIdentity.id}`,
+    username: externalIdentity.handle,
+    full_name: externalIdentity.display_name || externalIdentity.handle,
+    avatar_url: null,
+    bio: null,
+    location: null,
+    created_at: externalIdentity.first_seen_at || new Date().toISOString(),
+  };
+
+  const identityIds = [externalIdentity.id];
+
+  // Get listings where this identity is seller
+  const { data: listings } = await supabase
+    .from('bat_listings')
+    .select(`
+      *,
+      vehicle:vehicles(*),
+      seller_identity:external_identities!bat_listings_seller_external_identity_id_fkey(*)
+    `)
+    .eq('seller_external_identity_id', externalIdentity.id)
+    .order('auction_end_date', { ascending: false })
+    .limit(100);
+
+  // Get listings where this identity is buyer
+  const { data: batBids } = await supabase
+    .from('bat_listings')
+    .select(`
+      *,
+      vehicle:vehicles(*),
+      buyer_identity:external_identities!bat_listings_buyer_external_identity_id_fkey(*)
+    `)
+    .eq('buyer_external_identity_id', externalIdentity.id)
+    .order('auction_end_date', { ascending: false })
+    .limit(100);
+
+  // Get comments
+  const { data: batComments } = await supabase
+    .from('bat_comments')
+    .select(`
+      *,
+      listing:bat_listings(*, vehicle:vehicles(*))
+    `)
+    .eq('external_identity_id', externalIdentity.id)
+    .order('comment_timestamp', { ascending: false })
+    .limit(100);
+
+  const { data: auctionComments } = await supabase
+    .from('auction_comments')
+    .select(`
+      *,
+      auction:auction_events(*, vehicle:vehicles(*))
+    `)
+    .eq('external_identity_id', externalIdentity.id)
+    .order('posted_at', { ascending: false })
+    .limit(100);
+
+  // Get auction wins
+  const { data: auctionWins } = await supabase
+    .from('bat_listings')
+    .select(`
+      *,
+      vehicle:vehicles(*)
+    `)
+    .eq('buyer_external_identity_id', externalIdentity.id)
+    .eq('listing_status', 'sold')
+    .order('auction_end_date', { ascending: false })
+    .limit(50);
+
+  // Calculate stats
+  const stats: ProfileStats = {
+    total_listings: listings?.length || 0,
+    total_bids: batBids?.length || 0,
+    total_comments: (batComments?.length || 0) + (auctionComments?.length || 0),
+    total_auction_wins: auctionWins?.length || 0,
+    total_success_stories: 0,
+    member_since: externalIdentity.first_seen_at || externalIdentity.created_at,
+  };
+
+  return {
+    profile: syntheticProfile,
+    stats,
+    listings: listings || [],
+    bids: batBids || [],
+    comments: [...(batComments || []), ...(auctionComments || [])],
+    auction_wins: auctionWins || [],
+    success_stories: [],
+    comments_of_note: [],
+  };
+}
+
+/**
  * Get comprehensive organization profile data (BaT-style)
  */
 export async function getOrganizationProfileData(orgId: string): Promise<OrganizationProfileData> {

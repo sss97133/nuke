@@ -58,7 +58,7 @@ import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessSt
 import { getUserProfileData } from '../services/profileStatsService';
 
 const Profile: React.FC = () => {
-  const { userId } = useParams<{ userId: string }>();
+  const { userId, externalIdentityId } = useParams<{ userId?: string; externalIdentityId?: string }>();
   const navigate = useNavigate();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,6 +119,29 @@ const Profile: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Handle external identity profiles (unclaimed BaT users)
+      if (externalIdentityId) {
+        const { getPublicProfileByExternalIdentity } = await import('../services/profileStatsService');
+        const externalData = await getPublicProfileByExternalIdentity(externalIdentityId);
+        if (externalData) {
+          setComprehensiveData(externalData);
+          // Create synthetic profile data for display
+          setProfileData({
+            profile: externalData.profile,
+            stats: externalData.stats,
+            recentContributions: [],
+            recentActivity: [],
+            dailySummaries: []
+          } as any);
+          setLoading(false);
+          return;
+        } else {
+          setError('External identity not found');
+          setLoading(false);
+          return;
+        }
+      }
 
       const targetUserId = userId || currentUserId;
       if (!targetUserId) {
@@ -192,10 +215,10 @@ const Profile: React.FC = () => {
   };
 
   useEffect(() => {
-    if (currentUserId || userId) {
+    if (currentUserId || userId || externalIdentityId) {
       loadProfileData();
     }
-  }, [currentUserId, userId]);
+  }, [currentUserId, userId, externalIdentityId]);
 
   // Check admin status
   useEffect(() => {
