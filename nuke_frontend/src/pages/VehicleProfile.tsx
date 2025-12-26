@@ -2300,6 +2300,7 @@ const VehicleProfile: React.FC = () => {
         const origin = String((vehicle as any)?.profile_origin || '');
         const discoveryUrl = String((vehicle as any)?.discovery_url || '');
         const isClassicScrape = origin === 'url_scraper' && discoveryUrl.includes('classic.com/veh/');
+        const isBat = origin === 'bat_import' || discoveryUrl.includes('bringatrailer.com/listing/');
 
         const isImportedStoragePath = (p: any) => {
           const s = String(p || '').toLowerCase();
@@ -2317,7 +2318,12 @@ const VehicleProfile: React.FC = () => {
           .filter((r: any) => !isImportedStoragePath(r?.storage_path)) // Exclude import_queue images
           .map((r: any) => resolveDbImageUrl(r))
           .filter(Boolean) as string[];
-        const filteredPool = filterProfileImages([...fallbackPool, ...originImages], vehicle);
+        
+        // For BaT vehicles, prioritize origin_metadata images (certified source) over DB images
+        const poolForFiltering = isBat && originImages.length > 0 
+          ? [...originImages, ...fallbackPool] // Origin images first for BaT
+          : [...fallbackPool, ...originImages]; // Default: DB images first, then origin
+        const filteredPool = filterProfileImages(poolForFiltering, vehicle);
         const firstFiltered = filteredPool.find((u) => isSupabaseHostedImageUrl(u)) || filteredPool[0] || null;
 
         const lead = (primaryOk ? primaryCandidate : firstFiltered) || null;
@@ -2427,6 +2433,42 @@ const VehicleProfile: React.FC = () => {
 
           if (looksContaminated && mergedFiltered.length > 0) {
             images = mergedFiltered;
+          }
+        }
+
+        // For BaT vehicles, origin_metadata is the ONLY certified source for listing images
+        // But user-uploaded images (with user_id, not import_queue) should still be shown
+        if (isBat && originImages.length > 0) {
+          // Get user-uploaded images (those with user_id and not from import_queue)
+          const userUploaded = (imageRecords || [])
+            .filter((r: any) => {
+              // Must have user_id (actual user upload) and not be from import_queue
+              return r?.user_id && !isImportedStoragePath(r?.storage_path);
+            })
+            .map((r: any) => resolveDbImageUrl(r))
+            .filter(Boolean) as string[];
+
+          // Combine: origin_metadata images first (certified BaT source), then user uploads
+          const combined = Array.from(new Set([...originImages, ...userUploaded]));
+          const batFiltered = filterProfileImages(combined, vehicle);
+          
+          if (batFiltered.length > 0) {
+            images = batFiltered;
+            // Prefer origin_metadata image for lead, but fall back to user upload if needed
+            const originLead = batFiltered.find((u) => 
+              originImages.some(orig => normalizeUrl(orig) === normalizeUrl(u))
+            ) || batFiltered.find((u) => isSupabaseHostedImageUrl(u)) || batFiltered[0] || null;
+            if (originLead) setLeadImageUrl(originLead);
+          }
+        }
+
+        // Fallback: If all DB images were filtered out (e.g., all were import_queue), use originImages
+        if (images.length === 0 && originImages.length > 0) {
+          images = filterProfileImages(originImages, vehicle);
+          // Also set lead image from originImages if current lead is invalid or missing
+          if (!lead || String(lead || '').toLowerCase().includes('import_queue')) {
+            const originLead = images.find((u) => isSupabaseHostedImageUrl(u)) || images[0] || null;
+            if (originLead) setLeadImageUrl(originLead);
           }
         }
 
