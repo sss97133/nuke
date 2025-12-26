@@ -276,6 +276,192 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   return Array.from(urls);
 }
 
+function extractCarsAndBidsAuctionData(html: string): {
+  current_bid?: number | null;
+  bid_count?: number | null;
+  reserve_met?: boolean | null;
+  reserve_price?: number | null;
+  auction_end_date?: string | null;
+  final_price?: number | null;
+  view_count?: number | null;
+  watcher_count?: number | null;
+} {
+  const h = String(html || "");
+  const result: any = {};
+  
+  // Helper to parse currency amounts
+  const parseCurrency = (text: string | null | undefined): number | null => {
+    if (!text) return null;
+    const match = text.match(/[\$]?([\d,]+)/);
+    if (match && match[1]) {
+      const amount = parseInt(match[1].replace(/,/g, ''), 10);
+      return Number.isFinite(amount) && amount > 0 ? amount : null;
+    }
+    return null;
+  };
+  
+  // Helper to parse integers
+  const parseInteger = (text: string | null | undefined): number | null => {
+    if (!text) return null;
+    const match = text.match(/(\d+)/);
+    if (match && match[1]) {
+      const num = parseInt(match[1], 10);
+      return Number.isFinite(num) && num >= 0 ? num : null;
+    }
+    return null;
+  };
+  
+  // Extract current bid - multiple patterns
+  const bidPatterns = [
+    /Current\s+Bid[^>]*>.*?USD\s*\$?([\d,]+)/i,
+    /Current\s+Bid[^>]*>.*?\$([\d,]+)/i,
+    /<strong[^>]*class[^>]*bid[^>]*>.*?\$([\d,]+)/i,
+    /"currentBid":\s*(\d+)/i,
+    /data-current-bid[^>]*>.*?\$([\d,]+)/i,
+    /High\s+Bid[^>]*>.*?\$([\d,]+)/i,
+  ];
+  
+  for (const pattern of bidPatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const bid = parseCurrency(match[1]);
+      if (bid) {
+        result.current_bid = bid;
+        break;
+      }
+    }
+  }
+  
+  // Extract bid count
+  const bidCountPatterns = [
+    /(\d+)\s+bids?/i,
+    /Bid\s+Count[^>]*>.*?(\d+)/i,
+    /"bidCount":\s*(\d+)/i,
+    /data-bid-count[^>]*>.*?(\d+)/i,
+  ];
+  
+  for (const pattern of bidCountPatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const count = parseInteger(match[1]);
+      if (count !== null) {
+        result.bid_count = count;
+        break;
+      }
+    }
+  }
+  
+  // Extract reserve met status
+  const reserveMetPatterns = [
+    /Reserve\s+Met/i,
+    /"reserveMet":\s*true/i,
+    /data-reserve-met[^>]*>.*?true/i,
+  ];
+  
+  for (const pattern of reserveMetPatterns) {
+    if (pattern.test(h)) {
+      result.reserve_met = true;
+      break;
+    }
+  }
+  
+  // Extract reserve price
+  const reservePricePatterns = [
+    /Reserve[^>]*>.*?\$([\d,]+)/i,
+    /"reservePrice":\s*(\d+)/i,
+    /data-reserve-price[^>]*>.*?\$([\d,]+)/i,
+  ];
+  
+  for (const pattern of reservePricePatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const price = parseCurrency(match[1]);
+      if (price) {
+        result.reserve_price = price;
+        break;
+      }
+    }
+  }
+  
+  // Extract auction end date/time - CRITICAL for timers
+  const endDatePatterns = [
+    /data-countdown-date\s*=\s*"([^"]+)"/i,
+    /data-end-date\s*=\s*"([^"]+)"/i,
+    /"endDate"\s*:\s*"([^"]+)"/i,
+    /Auction\s+Ends[^>]*>.*?(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2})/i,
+    /Ends[^>]*>.*?(\w+\s+\d{1,2},\s+\d{4}[^<]*\d{1,2}:\d{2}\s*(?:AM|PM))/i,
+  ];
+  
+  for (const pattern of endDatePatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const dateStr = match[1].trim();
+      const parsed = Date.parse(dateStr);
+      if (Number.isFinite(parsed)) {
+        result.auction_end_date = new Date(parsed).toISOString();
+        break;
+      }
+    }
+  }
+  
+  // Extract final/sale price (for ended auctions)
+  const finalPricePatterns = [
+    /Sold\s+for[^>]*>.*?\$([\d,]+)/i,
+    /Final\s+Price[^>]*>.*?\$([\d,]+)/i,
+    /"finalPrice":\s*(\d+)/i,
+    /"salePrice":\s*(\d+)/i,
+  ];
+  
+  for (const pattern of finalPricePatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const price = parseCurrency(match[1]);
+      if (price) {
+        result.final_price = price;
+        break;
+      }
+    }
+  }
+  
+  // Extract view count
+  const viewCountPatterns = [
+    /([\d,]+)\s+views?/i,
+    /View\s+Count[^>]*>.*?([\d,]+)/i,
+    /"viewCount":\s*(\d+)/i,
+  ];
+  
+  for (const pattern of viewCountPatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const count = parseInteger(match[1].replace(/,/g, ''));
+      if (count !== null) {
+        result.view_count = count;
+        break;
+      }
+    }
+  }
+  
+  // Extract watcher count
+  const watcherCountPatterns = [
+    /([\d,]+)\s+watchers?/i,
+    /Watcher\s+Count[^>]*>.*?([\d,]+)/i,
+    /"watcherCount":\s*(\d+)/i,
+  ];
+  
+  for (const pattern of watcherCountPatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const count = parseInteger(match[1].replace(/,/g, ''));
+      if (count !== null) {
+        result.watcher_count = count;
+        break;
+      }
+    }
+  }
+  
+  return result;
+}
+
 function extractMecumListingUrlsFromText(text: string, limit: number): string[] {
   const urls = new Set<string>();
   // Mecum URLs: /lots/{lot-id}/{slug} or /lots/detail/{...}
@@ -747,6 +933,12 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
           });
       }
       
+      // Extract auction data from HTML (bids, prices, timers) - CRITICAL for live auctions
+      let auctionData: any = {};
+      if (html) {
+        auctionData = extractCarsAndBidsAuctionData(html);
+      }
+      
       const merged = {
         ...(empty ? {} : vehicle),
         listing_url: listingUrl,
@@ -755,6 +947,15 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         model: (vehicle?.model ?? fallback.model) ?? null,
         title: (vehicle?.title ?? fallback.title) ?? null,
         images, // Cleaned high-res images
+        // Auction data - prioritize HTML extraction, fallback to Firecrawl
+        current_bid: auctionData.current_bid ?? vehicle?.current_bid ?? null,
+        bid_count: auctionData.bid_count ?? vehicle?.bid_count ?? null,
+        reserve_met: auctionData.reserve_met ?? vehicle?.reserve_met ?? null,
+        reserve_price: auctionData.reserve_price ?? vehicle?.reserve_price ?? null,
+        auction_end_date: auctionData.auction_end_date ?? vehicle?.auction_end_date ?? null,
+        final_price: auctionData.final_price ?? vehicle?.final_price ?? vehicle?.sale_price ?? null,
+        view_count: auctionData.view_count ?? vehicle?.view_count ?? null,
+        watcher_count: auctionData.watcher_count ?? vehicle?.watcher_count ?? null,
       };
 
       extracted.push(merged);

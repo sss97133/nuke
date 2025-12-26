@@ -2110,6 +2110,21 @@ body {
   margin-bottom: var(--space-4);
 }
 
+/* Vehicle Profile Two Column Layout */
+.vehicle-profile-two-column {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .vehicle-profile-two-column {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+  }
+}
+
 /* Commentable elements */
 .commentable {
   position: relative;
