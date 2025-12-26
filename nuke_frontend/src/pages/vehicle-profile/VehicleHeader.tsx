@@ -16,6 +16,7 @@ import { AuctionPlatformBadge } from '../../components/auction/AuctionBadges';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 import vinDecoderService from '../../services/vinDecoder';
 import UpdateSalePriceModal from '../../components/vehicle/UpdateSalePriceModal';
+import { FollowAuctionCard } from '../../components/auction/FollowAuctionCard';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -91,6 +92,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [priceSources, setPriceSources] = useState<Record<string, boolean>>({});
   const [showVinValidation, setShowVinValidation] = useState(false);
   const [showUpdateSalePriceModal, setShowUpdateSalePriceModal] = useState(false);
+  const [showFollowAuctionCard, setShowFollowAuctionCard] = useState(false);
+  const [futureAuctionListing, setFutureAuctionListing] = useState<any | null>(null);
 
   const { summary: vinProofSummary } = useVINProofs(vehicle?.id);
   // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
@@ -134,6 +137,58 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     };
     
     checkPriceSources();
+  }, [vehicle?.id]);
+
+  // Check for future auction dates (for Mecum or other future auctions)
+  useEffect(() => {
+    const checkFutureAuction = async () => {
+      if (!vehicle?.id) {
+        setFutureAuctionListing(null);
+        return;
+      }
+
+      try {
+        const now = new Date().toISOString();
+        const { data, error } = await supabase
+          .from('external_listings')
+          .select('id, platform, listing_url, listing_status, start_date, end_date, metadata')
+          .eq('vehicle_id', vehicle.id)
+          .order('start_date', { ascending: true, nullsLast: true })
+          .limit(10);
+
+        if (error) {
+          console.error('Error checking future auctions:', error);
+          setFutureAuctionListing(null);
+          return;
+        }
+
+        // Find the first listing with a future start_date or end_date
+        const futureListing = (data || []).find((listing: any) => {
+          // Check start_date first (auction start)
+          if (listing.start_date) {
+            const startDate = new Date(listing.start_date).getTime();
+            if (Number.isFinite(startDate) && startDate > Date.now()) {
+              return true;
+            }
+          }
+          // Check end_date (auction end)
+          if (listing.end_date) {
+            const endDate = new Date(listing.end_date).getTime();
+            if (Number.isFinite(endDate) && endDate > Date.now()) {
+              return true;
+            }
+          }
+          return false;
+        });
+
+        setFutureAuctionListing(futureListing || null);
+      } catch (error) {
+        console.error('Error checking future auctions:', error);
+        setFutureAuctionListing(null);
+      }
+    };
+
+    checkFutureAuction();
   }, [vehicle?.id]);
 
   // Only fetch if not provided via props (eliminates duplicate query)
@@ -1029,7 +1084,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   // For RNM (Reserve Not Met), show blurred high bid instead of "Set a price"
   const isRNM = (vehicle as any)?.auction_outcome === 'reserve_not_met';
   const highBid = (vehicle as any)?.high_bid || (vehicle as any)?.winning_bid;
-  const priceDisplay = (() => {
+  const priceDisplay = useMemo(() => {
     // HIGHEST PRIORITY: If vehicle has a sale_price, always show it (overrides auction pulse)
     const vehicleSalePrice = typeof (vehicle as any)?.sale_price === 'number' && (vehicle as any).sale_price > 0 ? (vehicle as any).sale_price : null;
     const vehicleSaleDate = (vehicle as any)?.sale_date || saleDate;
@@ -1100,6 +1155,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                    String((vehicle as any)?.sale_status || '').toLowerCase() === 'sold' ||
                    String((vehicle as any)?.auction_outcome || '').toLowerCase() === 'sold';
 
+    // Check for future auction date - if we have one and would show "Set a price", show the auction date instead
+    if (futureAuctionListing && primaryAmount === null && !isRNM && !isSold) {
+      const auctionDate = futureAuctionListing.start_date || futureAuctionListing.end_date;
+      if (auctionDate) {
+        const dateTime = new Date(auctionDate).getTime();
+        if (Number.isFinite(dateTime) && dateTime > Date.now()) {
+          // Format date nicely (e.g., "Jan 15, 2025")
+          try {
+            const formatted = new Intl.DateTimeFormat('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            }).format(new Date(auctionDate));
+            return formatted;
+          } catch {
+            // Fall through to default
+          }
+        }
+      }
+    }
+
     // Fallback to primary amount or RNM high bid
     return primaryAmount !== null
       ? formatCurrency(primaryAmount)
@@ -1108,7 +1184,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         : isSold
           ? 'SOLD'
           : 'Set a price';
-  })();
+  }, [vehicle, auctionPulse, futureAuctionListing, primaryAmount, isRNM, highBid, saleDate]);
 
   const priceHoverText = (() => {
     // Hover reveals more detail (without adding noise to the visible header).
@@ -2382,14 +2458,29 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           })()}
         </div>
 
-        <div ref={priceMenuRef} style={{ flex: '0 0 auto', textAlign: 'right', position: 'relative' }}>
+        <div ref={priceMenuRef} style={{ flex: '0 0 auto', textAlign: 'right', position: 'relative', zIndex: showFollowAuctionCard ? 1001 : 'auto' }}>
           <button
             type="button"
             onClick={(e) => {
-              // User wants to click the price value and see data provenance popup
               e.preventDefault();
               e.stopPropagation();
-              setShowProvenancePopup(true);
+              
+              // If this is a future auction date display, show follow card instead of provenance
+              const isFutureAuctionDate = futureAuctionListing && 
+                priceDisplay !== 'Set a price' && 
+                priceDisplay !== 'SOLD' && 
+                !priceDisplay.startsWith('$') &&
+                !priceDisplay.startsWith('Bid:') &&
+                !priceDisplay.startsWith('BID');
+              
+              if (isFutureAuctionDate) {
+                setShowFollowAuctionCard(!showFollowAuctionCard);
+                setShowProvenancePopup(false);
+              } else {
+                // User wants to click the price value and see data provenance popup
+                setShowProvenancePopup(true);
+                setShowFollowAuctionCard(false);
+              }
             }}
             style={{
               background: 'transparent',
@@ -2412,7 +2503,22 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 className={`provenance-price-clickable${auctionPulseMs && isAuctionLive ? ' auction-price-pulse' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowProvenancePopup(true);
+                  
+                  // If this is a future auction date display, show follow card instead of provenance
+                  const isFutureAuctionDate = futureAuctionListing && 
+                    priceDisplay !== 'Set a price' && 
+                    priceDisplay !== 'SOLD' && 
+                    !priceDisplay.startsWith('$') &&
+                    !priceDisplay.startsWith('Bid:') &&
+                    !priceDisplay.startsWith('BID');
+                  
+                  if (isFutureAuctionDate) {
+                    setShowFollowAuctionCard(!showFollowAuctionCard);
+                    setShowProvenancePopup(false);
+                  } else {
+                    setShowProvenancePopup(true);
+                    setShowFollowAuctionCard(false);
+                  }
                 }}
                 style={{
                   cursor: 'pointer',
@@ -2774,6 +2880,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             window.location.reload();
           }}
         />
+      )}
+
+      {/* Follow Auction Card - positioned relative to price button */}
+      {vehicle && showFollowAuctionCard && futureAuctionListing && (
+        <div 
+          style={{ 
+            position: 'absolute',
+            top: '100%',
+            right: 0,
+            zIndex: 1002,
+            marginTop: '8px'
+          }}
+        >
+          <FollowAuctionCard
+            vehicleId={vehicle.id}
+            listingUrl={futureAuctionListing.listing_url}
+            platform={futureAuctionListing.platform}
+            auctionDate={futureAuctionListing.start_date || futureAuctionListing.end_date}
+            onClose={() => setShowFollowAuctionCard(false)}
+          />
+        </div>
       )}
     </div>
   );
