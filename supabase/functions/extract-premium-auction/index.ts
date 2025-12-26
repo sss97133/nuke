@@ -273,7 +273,35 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     }
   }
   
-  return Array.from(urls);
+  // CRITICAL: Prioritize exterior images over interior/engine bay shots
+  // Sort URLs to put exterior shots first (they typically come first in gallery)
+  const sortedUrls = Array.from(urls);
+  
+  // Filter and prioritize: exterior shots first, then others
+  const exteriorUrls: string[] = [];
+  const interiorUrls: string[] = [];
+  const otherUrls: string[] = [];
+  
+  for (const url of sortedUrls) {
+    const lower = url.toLowerCase();
+    // Exclude interior/engine bay shots from primary position
+    if (lower.includes('interior') || lower.includes('dashboard') || lower.includes('engine') || 
+        lower.includes('bay') || lower.includes('underhood') || lower.includes('under-hood') ||
+        lower.includes('trunk') || lower.includes('cargo') || lower.includes('wheel') ||
+        lower.includes('rim') || lower.includes('tire') || lower.includes('brake') ||
+        lower.includes('suspension') || lower.includes('exhaust') || lower.includes('drivetrain')) {
+      interiorUrls.push(url);
+    } else {
+      // Prioritize exterior shots
+      exteriorUrls.push(url);
+    }
+  }
+  
+  // Return: exterior first, then others (interior shots can be in gallery but not primary)
+  const finalUrls = [...exteriorUrls, ...otherUrls, ...interiorUrls];
+  
+  // Limit to reasonable number (prioritize first 50 exterior shots)
+  return finalUrls.slice(0, 100);
 }
 
 function extractCarsAndBidsAuctionData(html: string): {
