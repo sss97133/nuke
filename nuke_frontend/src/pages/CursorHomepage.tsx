@@ -2091,6 +2091,7 @@ const CursorHomepage: React.FC = () => {
     url: string;
   }>>([]);
   const [sourcesLoading, setSourcesLoading] = useState(true);
+  const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     async function loadActiveSources() {
@@ -2098,7 +2099,6 @@ const CursorHomepage: React.FC = () => {
         const { data, error } = await supabase
           .from('scrape_sources')
           .select('id, domain, source_name, url')
-          .eq('is_active', true)
           .order('source_name', { ascending: true });
 
         if (error) {
@@ -2135,6 +2135,59 @@ const CursorHomepage: React.FC = () => {
     // For new sources, use domain as key
     return domainLower.replace(/[^a-z0-9]/g, '_');
   }, []);
+
+  // Load vehicle counts per source
+  useEffect(() => {
+    async function loadSourceCounts() {
+      try {
+        // Get all public vehicles with source info
+        const { data: vehicles, error } = await supabase
+          .from('vehicles')
+          .select('discovery_url, discovery_source, profile_origin')
+          .eq('is_public', true)
+          .neq('status', 'pending');
+
+        if (error) {
+          console.error('Error loading source counts:', error);
+          return;
+        }
+
+        // Count vehicles per source key using classifySource
+        const counts: Record<string, number> = {};
+        (vehicles || []).forEach((v: any) => {
+          const sourceKey = classifySource(v);
+          counts[sourceKey] = (counts[sourceKey] || 0) + 1;
+        });
+
+        // Map source keys to domain keys for display
+        const domainCounts: Record<string, number> = {};
+        activeSources.forEach(source => {
+          const domainKey = domainToFilterKey(source.domain);
+          // For known sources, classifySource returns the same key as domainToFilterKey
+          // For new sources, match by domain from discovery_url
+          if (counts[domainKey] !== undefined) {
+            domainCounts[domainKey] = counts[domainKey];
+          } else {
+            // For new sources, try to match by domain from discovery_url
+            const domainLower = source.domain.toLowerCase();
+            const matchingCount = (vehicles || []).filter((v: any) => {
+              const url = (v.discovery_url || '').toLowerCase();
+              return url.includes(domainLower);
+            }).length;
+            domainCounts[domainKey] = matchingCount;
+          }
+        });
+
+        setSourceCounts(domainCounts);
+      } catch (err) {
+        console.error('Error loading source counts:', err);
+      }
+    }
+
+    if (activeSources.length > 0) {
+      loadSourceCounts();
+    }
+  }, [activeSources, domainToFilterKey]);
 
   const includedSources = useMemo(() => {
     const base: Record<string, boolean> = {};
@@ -2186,7 +2239,8 @@ const CursorHomepage: React.FC = () => {
         title: source.source_name || source.domain,
         included: includedSources[key] !== false, // Default to true if not explicitly set
         id: source.id,
-        url: source.url
+        url: source.url,
+        count: sourceCounts[key] || 0
       };
     });
 
@@ -2195,7 +2249,7 @@ const CursorHomepage: React.FC = () => {
       selected: all.filter((x) => x.included),
       hiddenCount: all.filter((x) => !x.included).length
     };
-  }, [activeSources, includedSources, domainToFilterKey]);
+  }, [activeSources, includedSources, domainToFilterKey, sourceCounts]);
 
   const domainHue = useCallback((domain: string) => {
     // Deterministic pseudo-“dominant color” per domain without needing canvas/CORS.
@@ -2664,7 +2718,7 @@ const CursorHomepage: React.FC = () => {
                         type="button"
                         onClick={() => setSourceIncluded(p.key, !p.included)}
                         aria-label={p.included ? `${p.title} (selected)` : `${p.title} (not selected)`}
-                        title={p.included ? `${p.title}: Selected (click to remove)` : `${p.title}: Not selected (click to add)`}
+                        title={p.included ? `${p.title}: ${p.count.toLocaleString()} vehicles (click to remove)` : `${p.title}: ${p.count.toLocaleString()} vehicles (click to add)`}
                         style={{
                           width: '22px',
                           height: '22px',
@@ -2730,7 +2784,7 @@ const CursorHomepage: React.FC = () => {
                         setSourceIncluded(p.key, false);
                       }}
                       aria-label={`${p.title} (selected)`}
-                      title={`${p.title}: Selected (click to remove)`}
+                      title={`${p.title}: ${p.count.toLocaleString()} vehicles (click to remove)`}
                       style={{
                         width: '18px',
                         height: '18px',

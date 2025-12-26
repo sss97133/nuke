@@ -32,6 +32,7 @@ import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
 import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
 import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
 import { getOrganizationProfileData } from '../services/profileStatsService';
+import { AdminNotificationService } from '../services/adminNotificationService';
 import '../design-system.css';
 
 interface Organization {
@@ -1114,7 +1115,11 @@ export default function OrganizationProfile() {
                 const contributor = enriched.find((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled' && r.value.user_id === user.id);
                 const userRole = contributor?.value?.role || null;
                 setCurrentUserRole(userRole);
-                setCanEdit(['owner', 'co_founder', 'board_member', 'manager', 'employee', 'technician', 'moderator', 'contractor', 'contributor'].includes(userRole || ''));
+                
+                // Check if user has edit permissions via role OR admin status
+                const hasRoleEdit = ['owner', 'co_founder', 'board_member', 'manager', 'employee', 'technician', 'moderator', 'contractor', 'contributor'].includes(userRole || '');
+                const isAdmin = await AdminNotificationService.isCurrentUserAdmin();
+                setCanEdit(hasRoleEdit || isAdmin);
                 
                 const { data: ownership } = await supabase.from('business_ownership').select('id').eq('business_id', org.id).eq('owner_id', user.id).eq('status', 'active').maybeSingle();
                 setIsOwner(!!ownership);

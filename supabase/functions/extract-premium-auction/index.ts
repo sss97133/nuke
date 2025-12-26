@@ -1991,15 +1991,42 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       images = vehicle.images.map((u: string) => upgradeBatImageUrl(u));
     }
 
-    // Upgrade all image URLs to highest resolution
+    // Upgrade all image URLs to highest resolution and filter out non-vehicle images
     images = images.map(upgradeBatImageUrl).filter((u: string) => {
       const lower = u.toLowerCase();
-      return !lower.includes('logo') && 
-             !lower.includes('icon') && 
-             !lower.includes('placeholder') &&
-             !lower.includes('no-image') &&
-             !lower.includes('/assets/') &&
-             !lower.includes('/icons/');
+      // Filter out logos, icons, UI elements
+      if (lower.includes('logo') || 
+          lower.includes('icon') || 
+          lower.includes('placeholder') ||
+          lower.includes('no-image') ||
+          lower.includes('/assets/') ||
+          lower.includes('/icons/') ||
+          lower.includes('favicon') ||
+          lower.endsWith('.svg') ||
+          lower.endsWith('.ico')) {
+        return false;
+      }
+      // Aggressively filter out ALL flag images (American flag, banners, etc.)
+      if (/(?:^|\/|\-|_)(flag|flags|banner)(?:$|\/|\-|_|\.)/i.test(lower) ||
+          lower.includes('stars-and-stripes') ||
+          lower.includes('stars_and_stripes') ||
+          lower.includes('american-flag') ||
+          lower.includes('american_flag') ||
+          lower.includes('us-flag') ||
+          lower.includes('us_flag') ||
+          lower.includes('usa-flag') ||
+          lower.includes('usa_flag') ||
+          lower.includes('flag-usa') ||
+          lower.includes('flag_usa') ||
+          lower.includes('united-states-flag') ||
+          lower.includes('united_states_flag') ||
+          lower.includes('old-glory') ||
+          lower.includes('old_glory') ||
+          /(?:^|\/|\-|_)(flag|flags)(?:.*usa|.*us|.*american)/i.test(lower) ||
+          /(?:usa|us|american).*(?:flag|flags)/i.test(lower)) {
+        return false;
+      }
+      return true;
     });
 
     // Merge ALL extracted data comprehensively

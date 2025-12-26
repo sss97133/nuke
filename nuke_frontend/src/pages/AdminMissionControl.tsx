@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, getSupabaseFunctionsUrl } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
-import { ImageHoverPreview, AnalysisModelPopup } from '../components/admin';
+import { ImageHoverPreview, AnalysisModelPopup, FunctionResultMonitor } from '../components/admin';
 import { useAdminAccess } from '../hooks/useAdminAccess';
 
 interface SystemStats {
@@ -24,6 +24,26 @@ interface ImageRadarRow {
   sample_vehicle_id: string | null;
 }
 
+interface FunctionInvocation {
+  id: string;
+  functionName: string;
+  timestamp: Date;
+  request: {
+    url: string;
+    method: string;
+    body?: any;
+    headers?: Record<string, string>;
+  };
+  response: {
+    status: number;
+    statusText?: string;
+    data?: any;
+    error?: any;
+  };
+  duration?: number;
+  success: boolean;
+}
+
 const AdminMissionControl: React.FC = () => {
   const navigate = useNavigate();
   const { loading: adminLoading, isAdmin } = useAdminAccess();
@@ -42,26 +62,26 @@ const AdminMissionControl: React.FC = () => {
   // 0 means "no cap" (ingest all images).
   const [originBackfillMaxImages, setOriginBackfillMaxImages] = useState(0);
   const [originBackfillIncludePartials, setOriginBackfillIncludePartials] = useState(true);
-  const [originBackfillLastResult, setOriginBackfillLastResult] = useState<any | null>(null);
+  const [originBackfillInvocation, setOriginBackfillInvocation] = useState<FunctionInvocation | null>(null);
   const [batBackfillRunning, setBatBackfillRunning] = useState(false);
   const [batBackfillBatchSize, setBatBackfillBatchSize] = useState(10);
-  const [batBackfillLastResult, setBatBackfillLastResult] = useState<any | null>(null);
+  const [batBackfillInvocation, setBatBackfillInvocation] = useState<FunctionInvocation | null>(null);
   const [batRepairRunning, setBatRepairRunning] = useState(false);
   const [batRepairBatchSize, setBatRepairBatchSize] = useState(10);
-  const [batRepairLastResult, setBatRepairLastResult] = useState<any | null>(null);
+  const [batRepairInvocation, setBatRepairInvocation] = useState<FunctionInvocation | null>(null);
   const [batCleanupRunning, setBatCleanupRunning] = useState(false);
   const [batCleanupBatchSize, setBatCleanupBatchSize] = useState(25);
-  const [batCleanupLastResult, setBatCleanupLastResult] = useState<any | null>(null);
+  const [batCleanupInvocation, setBatCleanupInvocation] = useState<FunctionInvocation | null>(null);
   const [batCleanupVehicleId, setBatCleanupVehicleId] = useState('');
   const [batDomHealthRunning, setBatDomHealthRunning] = useState(false);
   const [batDomHealthBatchSize, setBatDomHealthBatchSize] = useState(50);
-  const [batDomHealthLastResult, setBatDomHealthLastResult] = useState<any | null>(null);
+  const [batDomHealthInvocation, setBatDomHealthInvocation] = useState<FunctionInvocation | null>(null);
   const [batDomHealthSummary, setBatDomHealthSummary] = useState<any | null>(null);
   const [batDomFieldBreakdown, setBatDomFieldBreakdown] = useState<any[] | null>(null);
   const [angleBackfillRunning, setAngleBackfillRunning] = useState(false);
   const [angleBackfillBatchSize, setAngleBackfillBatchSize] = useState(25);
   const [angleBackfillMinConfidence, setAngleBackfillMinConfidence] = useState(80);
-  const [angleBackfillLastResult, setAngleBackfillLastResult] = useState<any | null>(null);
+  const [angleBackfillInvocation, setAngleBackfillInvocation] = useState<FunctionInvocation | null>(null);
   const [imageRadarKind, setImageRadarKind] = useState<'normalized_url' | 'file_hash' | 'perceptual_hash' | 'dhash'>('normalized_url');
   const [imageRadarSource, setImageRadarSource] = useState<string>('');
   const [imageRadarMinCount, setImageRadarMinCount] = useState<number>(25);
@@ -101,6 +121,41 @@ const AdminMissionControl: React.FC = () => {
       clearInterval(interval);
     };
   }, [imageRadarKind, imageRadarSource, imageRadarMinCount, imageRadarLimit]);
+
+  const createInvocation = (
+    functionName: string,
+    url: string,
+    method: string,
+    body: any,
+    response: Response,
+    responseData: any,
+    startTime: number
+  ): FunctionInvocation => {
+    const duration = Date.now() - startTime;
+    const success = response.ok && (responseData?.success !== false);
+    
+    return {
+      id: `${functionName}-${Date.now()}`,
+      functionName,
+      timestamp: new Date(),
+      request: {
+        url,
+        method,
+        body,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      },
+      response: {
+        status: response.status,
+        statusText: response.statusText,
+        data: success ? responseData : undefined,
+        error: success ? undefined : responseData,
+      },
+      duration,
+      success,
+    };
+  };
 
   const loadImageRadar = async () => {
     if (imageRadarInFlightRef.current) return;
@@ -289,6 +344,16 @@ const AdminMissionControl: React.FC = () => {
 
   const runOriginImageBackfill = async () => {
     setOriginBackfillRunning(true);
+    const startTime = Date.now();
+    const requestBody = {
+      batch_size: originBackfillBatchSize,
+      max_images_per_vehicle: originBackfillMaxImages,
+      include_partials: originBackfillIncludePartials,
+      dry_run: false,
+      force: false,
+      include_profile_origins: ['url_scraper', 'bat_import', 'craigslist_scrape'],
+    };
+    
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) {
@@ -297,35 +362,30 @@ const AdminMissionControl: React.FC = () => {
       }
 
       const functionsUrl = getSupabaseFunctionsUrl();
+      const url = `${functionsUrl}/admin-backfill-origin-images`;
 
-      const resp = await fetch(`${functionsUrl}/admin-backfill-origin-images`, {
+      const resp = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          batch_size: originBackfillBatchSize,
-          max_images_per_vehicle: originBackfillMaxImages,
-          include_partials: originBackfillIncludePartials,
-          dry_run: false,
-          force: false,
-          include_profile_origins: ['url_scraper', 'bat_import', 'craigslist_scrape'],
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const text = await resp.text();
       let parsed: any = null;
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
 
+      const invocation = createInvocation('admin-backfill-origin-images', url, 'POST', requestBody, resp, parsed, startTime);
+      setOriginBackfillInvocation(invocation);
+
       if (!resp.ok || parsed?.success === false) {
         console.error('Backfill failed:', parsed);
         alert(`Backfill failed: ${parsed?.error || resp.status}`);
-        setOriginBackfillLastResult(parsed);
         return;
       }
 
-      setOriginBackfillLastResult(parsed);
       alert(`Backfill complete. Attempted: ${parsed.attempted || 0}. Backfilled: ${parsed.backfilled || 0}. Failed: ${parsed.failed || 0}.`);
       loadDashboard();
     } catch (e: any) {
@@ -338,6 +398,12 @@ const AdminMissionControl: React.FC = () => {
 
   const runBatMissingImagesBackfill = async () => {
     setBatBackfillRunning(true);
+    const startTime = Date.now();
+    const requestBody = {
+      batch_size: batBackfillBatchSize,
+      dry_run: false,
+    };
+    
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) {
@@ -346,31 +412,30 @@ const AdminMissionControl: React.FC = () => {
       }
 
       const functionsUrl = getSupabaseFunctionsUrl();
+      const url = `${functionsUrl}/admin-backfill-bat-missing-images`;
 
-      const resp = await fetch(`${functionsUrl}/admin-backfill-bat-missing-images`, {
+      const resp = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          batch_size: batBackfillBatchSize,
-          dry_run: false,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const text = await resp.text();
       let parsed: any = null;
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
 
+      const invocation = createInvocation('admin-backfill-bat-missing-images', url, 'POST', requestBody, resp, parsed, startTime);
+      setBatBackfillInvocation(invocation);
+
       if (!resp.ok || parsed?.success === false) {
         console.error('BaT backfill failed:', parsed);
         alert(`BaT backfill failed: ${parsed?.error || resp.status}`);
-        setBatBackfillLastResult(parsed);
         return;
       }
 
-      setBatBackfillLastResult(parsed);
       alert(`BaT backfill complete. Candidates: ${parsed.candidates || 0}. Invoked: ${parsed.invoked || 0}. Failed: ${parsed.failed || 0}.`);
       loadDashboard();
     } catch (e: any) {
@@ -383,6 +448,14 @@ const AdminMissionControl: React.FC = () => {
 
   const runBatDomHealthBatch = async () => {
     setBatDomHealthRunning(true);
+    const startTime = Date.now();
+    const requestBody = {
+      limit: batDomHealthBatchSize,
+      force_rescrape: false,
+      persist_html: true,
+      extractor_version: 'v1',
+    };
+    
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) {
@@ -391,33 +464,30 @@ const AdminMissionControl: React.FC = () => {
       }
 
       const functionsUrl = getSupabaseFunctionsUrl();
+      const url = `${functionsUrl}/bat-dom-map-health-runner`;
 
-      const resp = await fetch(`${functionsUrl}/bat-dom-map-health-runner`, {
+      const resp = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          limit: batDomHealthBatchSize,
-          force_rescrape: false,
-          persist_html: true,
-          extractor_version: 'v1',
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const text = await resp.text();
       let parsed: any = null;
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
 
+      const invocation = createInvocation('bat-dom-map-health-runner', url, 'POST', requestBody, resp, parsed, startTime);
+      setBatDomHealthInvocation(invocation);
+
       if (!resp.ok || parsed?.success === false) {
         console.error('BaT DOM health batch failed:', parsed);
         alert(`BaT DOM health batch failed: ${parsed?.error || resp.status}`);
-        setBatDomHealthLastResult(parsed);
         return;
       }
 
-      setBatDomHealthLastResult(parsed);
       alert(`BaT DOM health batch complete. Processed: ${parsed.processed || 0}. OK: ${parsed.ok || 0}. Failed: ${parsed.failed || 0}.`);
       loadDashboard();
     } catch (e: any) {
@@ -430,6 +500,13 @@ const AdminMissionControl: React.FC = () => {
 
   const runBatMakeProfilesCorrectBatch = async () => {
     setBatRepairRunning(true);
+    const startTime = Date.now();
+    const requestBody = {
+      batch_size: batRepairBatchSize,
+      dry_run: false,
+      min_vehicle_age_hours: 6,
+    };
+    
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) {
@@ -438,32 +515,30 @@ const AdminMissionControl: React.FC = () => {
       }
 
       const functionsUrl = getSupabaseFunctionsUrl();
+      const url = `${functionsUrl}/bat-make-profiles-correct-runner`;
 
-      const resp = await fetch(`${functionsUrl}/bat-make-profiles-correct-runner`, {
+      const resp = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          batch_size: batRepairBatchSize,
-          dry_run: false,
-          min_vehicle_age_hours: 6,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const text = await resp.text();
       let parsed: any = null;
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
 
+      const invocation = createInvocation('bat-make-profiles-correct-runner', url, 'POST', requestBody, resp, parsed, startTime);
+      setBatRepairInvocation(invocation);
+
       if (!resp.ok || parsed?.success === false) {
         console.error('BaT repair batch failed:', parsed);
         alert(`BaT repair batch failed: ${parsed?.error || resp.status}`);
-        setBatRepairLastResult(parsed);
         return;
       }
 
-      setBatRepairLastResult(parsed);
       alert(`BaT repair batch complete. Scanned: ${parsed.scanned || 0}. Candidates: ${parsed.candidates || 0}. Repaired: ${parsed.repaired || 0}. Failed: ${parsed.failed || 0}.`);
       loadDashboard();
     } catch (e: any) {
@@ -476,6 +551,14 @@ const AdminMissionControl: React.FC = () => {
 
   const runBatImageCleanup = async () => {
     setBatCleanupRunning(true);
+    const startTime = Date.now();
+    const requestBody = {
+      vehicle_id: batCleanupVehicleId.trim() || undefined,
+      dry_run: false,
+      limit: 1000, // Scan up to 1000 vehicles
+      batch_size: batCleanupBatchSize,
+    };
+    
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) {
@@ -484,33 +567,30 @@ const AdminMissionControl: React.FC = () => {
       }
 
       const functionsUrl = getSupabaseFunctionsUrl();
+      const url = `${functionsUrl}/cleanup-bat-image-contamination`;
 
-      const resp = await fetch(`${functionsUrl}/cleanup-bat-image-contamination`, {
+      const resp = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          vehicle_id: batCleanupVehicleId.trim() || undefined,
-          dry_run: false,
-          limit: 1000, // Scan up to 1000 vehicles
-          batch_size: batCleanupBatchSize,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const text = await resp.text();
       let parsed: any = null;
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
 
+      const invocation = createInvocation('cleanup-bat-image-contamination', url, 'POST', requestBody, resp, parsed, startTime);
+      setBatCleanupInvocation(invocation);
+
       if (!resp.ok || parsed?.success === false) {
         console.error('BaT cleanup failed:', parsed);
         alert(`BaT cleanup failed: ${parsed?.error || resp.status}`);
-        setBatCleanupLastResult(parsed);
         return;
       }
 
-      setBatCleanupLastResult(parsed);
       alert(
         `BaT hygiene batch complete. Scanned: ${parsed.scanned || 0}. Candidates: ${parsed.candidates || 0}. Repaired: ${parsed.repaired || 0}. Refreshed canonical: ${parsed.refreshed_canonical || 0}. Skipped: ${parsed.skipped || 0}. Failed: ${parsed.failed || 0}.`
       );
@@ -525,6 +605,14 @@ const AdminMissionControl: React.FC = () => {
 
   const runAnglePoseBackfill = async () => {
     setAngleBackfillRunning(true);
+    const startTime = Date.now();
+    const requestBody = {
+      batchSize: angleBackfillBatchSize,
+      dryRun: false,
+      minConfidence: angleBackfillMinConfidence,
+      requireReview: true,
+    };
+    
     try {
       const token = (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) {
@@ -533,33 +621,30 @@ const AdminMissionControl: React.FC = () => {
       }
 
       const functionsUrl = getSupabaseFunctionsUrl();
+      const url = `${functionsUrl}/backfill-image-angles`;
 
-      const resp = await fetch(`${functionsUrl}/backfill-image-angles`, {
+      const resp = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          batchSize: angleBackfillBatchSize,
-          dryRun: false,
-          minConfidence: angleBackfillMinConfidence,
-          requireReview: true,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const text = await resp.text();
       let parsed: any = null;
       try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
 
+      const invocation = createInvocation('backfill-image-angles', url, 'POST', requestBody, resp, parsed, startTime);
+      setAngleBackfillInvocation(invocation);
+
       if (!resp.ok || parsed?.success === false) {
         console.error('Angle backfill failed:', parsed);
         alert(`Angle backfill failed: ${parsed?.error || resp.status}`);
-        setAngleBackfillLastResult(parsed);
         return;
       }
 
-      setAngleBackfillLastResult(parsed);
       alert(`Angle/Pose backfill complete. Processed: ${parsed.processed || 0}. Needs review: ${parsed.needsReview || 0}. Failed: ${parsed.failed || 0}.`);
       loadDashboard();
     } catch (e: any) {
@@ -664,11 +749,11 @@ const AdminMissionControl: React.FC = () => {
               Include partial profiles (top off galleries)
             </label>
           </div>
-          {originBackfillLastResult && (
-            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
-{JSON.stringify(originBackfillLastResult, null, 2)}
-            </pre>
-          )}
+          <FunctionResultMonitor
+            invocation={originBackfillInvocation}
+            functionName="admin-backfill-origin-images"
+            isRunning={originBackfillRunning}
+          />
         </div>
       </div>
 
@@ -702,11 +787,11 @@ const AdminMissionControl: React.FC = () => {
               />
             </label>
           </div>
-          {batBackfillLastResult && (
-            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
-{JSON.stringify(batBackfillLastResult, null, 2)}
-            </pre>
-          )}
+          <FunctionResultMonitor
+            invocation={batBackfillInvocation}
+            functionName="admin-backfill-bat-missing-images"
+            isRunning={batBackfillRunning}
+          />
         </div>
       </div>
 
@@ -811,11 +896,11 @@ const AdminMissionControl: React.FC = () => {
             </div>
           )}
 
-          {batDomHealthLastResult && (
-            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
-{JSON.stringify(batDomHealthLastResult, null, 2)}
-            </pre>
-          )}
+          <FunctionResultMonitor
+            invocation={batDomHealthInvocation}
+            functionName="bat-dom-map-health-runner"
+            isRunning={batDomHealthRunning}
+          />
         </div>
       </div>
 
@@ -849,11 +934,11 @@ const AdminMissionControl: React.FC = () => {
               />
             </label>
           </div>
-          {batRepairLastResult && (
-            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
-{JSON.stringify(batRepairLastResult, null, 2)}
-            </pre>
-          )}
+          <FunctionResultMonitor
+            invocation={batRepairInvocation}
+            functionName="bat-make-profiles-correct-runner"
+            isRunning={batRepairRunning}
+          />
         </div>
       </div>
 
@@ -897,11 +982,11 @@ const AdminMissionControl: React.FC = () => {
               />
             </label>
           </div>
-          {batCleanupLastResult && (
-            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
-{JSON.stringify(batCleanupLastResult, null, 2)}
-            </pre>
-          )}
+          <FunctionResultMonitor
+            invocation={batCleanupInvocation}
+            functionName="cleanup-bat-image-contamination"
+            isRunning={batCleanupRunning}
+          />
         </div>
       </div>
 
@@ -947,89 +1032,90 @@ const AdminMissionControl: React.FC = () => {
               />
             </label>
           </div>
-          {angleBackfillLastResult && (
-            <pre style={{ marginTop: 12, fontSize: '8pt', background: 'var(--grey-100)', padding: 10, border: '1px solid var(--border)', overflow: 'auto', maxHeight: 220 }}>
-{JSON.stringify(angleBackfillLastResult, null, 2)}
-            </pre>
-          )}
+          <FunctionResultMonitor
+            invocation={angleBackfillInvocation}
+            functionName="backfill-image-angles"
+            isRunning={angleBackfillRunning}
+          />
         </div>
       </div>
 
       {/* AI SCANNING STATUS - PROMINENT */}
       {(scanProgress || imageScanStats) && (
-        <div style={{ marginBottom: '24px', border: '2px solid #000', background: '#f8f8f8' }}>
+        <div style={{ marginBottom: 'var(--space-6)', border: '2px solid var(--border)', backgroundColor: 'var(--white)' }} className="card">
           <div style={{
-            background: '#000',
-            color: '#fff',
-            padding: '12px 16px',
+            backgroundColor: 'var(--grey-100)',
+            color: 'var(--text)',
+            padding: 'var(--space-3) var(--space-4)',
             fontSize: '8pt',
-            fontWeight: 700,
+            fontWeight: 600,
             letterSpacing: '0.5px',
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            borderBottom: '2px solid var(--border)'
           }}>
             <span>AI IMAGE SCANNING</span>
             {scanProgress?.status === 'running' && (
-              <span style={{ background: '#10b981', color: '#000', padding: '4px 8px', fontSize: '8pt', fontWeight: 700 }}>
+              <span style={{ backgroundColor: 'var(--success)', color: 'var(--white)', padding: '2px var(--space-2)', fontSize: '8pt', fontWeight: 600 }}>
                 ACTIVE
               </span>
             )}
           </div>
-          <div style={{ padding: '20px' }}>
+          <div style={{ padding: 'var(--space-4)' }}>
             {/* Overall Progress Bar */}
             {imageScanStats && (
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '8pt', fontWeight: 600 }}>OVERALL PROGRESS</span>
-                  <span style={{ fontSize: '10pt', fontWeight: 700 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+                  <span style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>OVERALL PROGRESS</span>
+                  <span style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>
                     {imageScanStats.scan_percentage || 0}%
                   </span>
                 </div>
                 <div style={{
                   width: '100%',
                   height: '24px',
-                  background: '#e0e0e0',
-                  border: '2px solid #000',
+                  backgroundColor: 'var(--grey-200)',
+                  border: '2px solid var(--border)',
                   position: 'relative',
                   overflow: 'hidden'
                 }}>
                   <div style={{
                     width: `${imageScanStats.scan_percentage || 0}%`,
                     height: '100%',
-                    background: '#000',
+                    backgroundColor: 'var(--text)',
                     transition: 'width 0.5s ease',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <span style={{ color: '#fff', fontSize: '8pt', fontWeight: 700 }}>
+                    <span style={{ color: 'var(--white)', fontSize: '8pt', fontWeight: 600 }}>
                       {imageScanStats.scan_percentage > 10 && `${imageScanStats.scan_percentage}%`}
                     </span>
                   </div>
-      </div>
+                </div>
 
-      {/* Stats Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '24px' }}>
-                  <div style={{ border: '2px solid #000', padding: '16px', background: 'var(--surface)' }}>
-                    <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
+                {/* Stats Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginTop: 'var(--space-4)' }}>
+                  <div style={{ border: '2px solid var(--border)', padding: 'var(--space-3)', backgroundColor: 'var(--white)' }}>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', fontWeight: 600 }}>
                       VEHICLE IMAGES
                     </div>
-                    <div style={{ fontSize: '16pt', fontWeight: 700, marginBottom: '4px' }}>
+                    <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>
                       {imageScanStats.scanned_vehicle_images?.toLocaleString()} / {imageScanStats.total_vehicle_images?.toLocaleString()}
                     </div>
-                    <div style={{ fontSize: '8pt', color: '#666' }}>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                       {imageScanStats.unscanned_vehicle_images?.toLocaleString()} REMAINING
                     </div>
                   </div>
-                  <div style={{ border: '2px solid #000', padding: '16px', background: 'var(--surface)' }}>
-                    <div style={{ fontSize: '8pt', color: '#666', marginBottom: '8px', fontWeight: 600 }}>
+                  <div style={{ border: '2px solid var(--border)', padding: 'var(--space-3)', backgroundColor: 'var(--white)' }}>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', fontWeight: 600 }}>
                       ORGANIZATION IMAGES
                     </div>
-                    <div style={{ fontSize: '16pt', fontWeight: 700, marginBottom: '4px' }}>
+                    <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)', marginBottom: 'var(--space-1)' }}>
                       {imageScanStats.scanned_org_images?.toLocaleString()} / {imageScanStats.total_org_images?.toLocaleString()}
                     </div>
-                    <div style={{ fontSize: '8pt', color: '#666' }}>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                       {imageScanStats.unscanned_org_images?.toLocaleString()} REMAINING
                     </div>
                   </div>
@@ -1040,25 +1126,25 @@ const AdminMissionControl: React.FC = () => {
             {/* Current Scan Details */}
             {scanProgress && scanProgress.status === 'running' && (
               <div style={{
-                marginTop: '20px',
-                padding: '16px',
-                background: '#10b98110',
-                border: '2px solid #10b981'
+                marginTop: 'var(--space-4)',
+                padding: 'var(--space-3)',
+                backgroundColor: 'var(--success-dim)',
+                border: '2px solid var(--success)'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                   <div>
-                    <div style={{ fontSize: '8pt', fontWeight: 700, marginBottom: '4px' }}>
+                    <div style={{ fontSize: '8pt', fontWeight: 600, marginBottom: 'var(--space-1)', color: 'var(--text)' }}>
                       CURRENT SCAN: {scanProgress.scan_type?.toUpperCase().replace(/_/g, ' ')}
                     </div>
-                    <div style={{ fontSize: '8pt', color: '#666' }}>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                       Started: {new Date(scanProgress.started_at).toLocaleString()}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '12pt', fontWeight: 700 }}>
+                    <div style={{ fontSize: '8pt', fontWeight: 600, color: 'var(--text)' }}>
                       {scanProgress.processed_images}/{scanProgress.total_images}
                     </div>
-                    <div style={{ fontSize: '8pt', color: '#ef4444', fontWeight: 600 }}>
+                    <div style={{ fontSize: '8pt', color: 'var(--error)', fontWeight: 600 }}>
                       {scanProgress.failed_images} FAILED
                     </div>
                   </div>
@@ -1067,13 +1153,13 @@ const AdminMissionControl: React.FC = () => {
                   <div style={{
                     width: '100%',
                     height: '6px',
-                    background: '#e0e0e0',
-                    border: '1px solid #000'
+                    backgroundColor: 'var(--grey-200)',
+                    border: '1px solid var(--border)'
                   }}>
                     <div style={{
                       width: `${(scanProgress.processed_images / scanProgress.total_images) * 100}%`,
                       height: '100%',
-                      background: '#10b981',
+                      backgroundColor: 'var(--success)',
                       transition: 'width 0.3s ease'
                     }} />
                   </div>
