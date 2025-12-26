@@ -17,7 +17,7 @@ serve(async (req) => {
 
   try {
     const { 
-      batch_size = 50, // Increased for Large compute (160 direct, 800 pooler connections)
+      batch_size = 20, // Reduced from 50 to avoid timeouts (image processing is slow)
       user_id = null // Optional: user_id for vehicle creation
     } = await req.json()
 
@@ -220,8 +220,19 @@ serve(async (req) => {
       failed: 0
     }
 
+    // Track execution time to avoid timeout (Edge Functions have 60s limit, or 400s on paid plans)
+    const startTime = Date.now()
+    const maxExecutionTime = 50000 // 50 seconds - leave 10s buffer for response
+    const skipImageProcessingAfter = 40000 // Skip images after 40s to save time
+
     // Process each listing
     for (const queueItem of queueItems) {
+      // Check if we're running out of time
+      const elapsed = Date.now() - startTime
+      if (elapsed > maxExecutionTime) {
+        console.log(`⏰ Time limit reached (${elapsed}ms). Stopping early. Processed ${stats.processed} listings.`)
+        break
+      }
       try {
         // Mark as processing
         await supabase
@@ -679,16 +690,24 @@ serve(async (req) => {
             } else {
 }
 
-            // Download and upload images
-            if (data.images && data.images.length > 0) {
+            // Download and upload images (skip if running low on time)
+            const elapsedForImages = Date.now() - startTime
+            if (data.images && data.images.length > 0 && elapsedForImages < skipImageProcessingAfter) {
               console.log(`  📸 Downloading ${data.images.length} images...`)
               let imagesUploaded = 0
               
               for (let i = 0; i < data.images.length; i++) {
+                // Check time before each image
+                const elapsedBeforeImage = Date.now() - startTime
+                if (elapsedBeforeImage > skipImageProcessingAfter) {
+                  console.log(`  ⏰ Skipping remaining ${data.images.length - i} images (time limit approaching)`)
+                  break
+                }
+                
                 const imageUrl = data.images[i]
                 try {
                   const imageResponse = await fetch(imageUrl, {
-                    signal: AbortSignal.timeout(10000)
+                    signal: AbortSignal.timeout(5000) // Reduced from 10s to 5s
                   })
                   
                   if (!imageResponse.ok) continue
@@ -787,7 +806,8 @@ serve(async (req) => {
                   }
                   
                   imagesUploaded++
-                  await new Promise(resolve => setTimeout(resolve, 500))
+                  // Reduced delay from 500ms to 200ms
+                  await new Promise(resolve => setTimeout(resolve, 200))
                   
                 } catch (imgError) {
                   console.warn(`    ⚠️ Error processing image ${i + 1}:`, imgError)
@@ -795,6 +815,8 @@ serve(async (req) => {
               }
               
               console.log(`  📸 Uploaded ${imagesUploaded} images`)
+            } else if (data.images && data.images.length > 0) {
+              console.log(`  ⏰ Skipping ${data.images.length} images (time limit approaching)`)
             }
           }
         } else {
@@ -875,8 +897,8 @@ serve(async (req) => {
         stats.processed++
         console.log(`  ✅ Complete: ${yearNum} ${finalMake} ${finalModel}`)
 
-        // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500))
+        // Rate limiting (reduced from 500ms to 200ms)
+        await new Promise(resolve => setTimeout(resolve, 200))
 
       } catch (error: any) {
         console.error(`  ❌ Error processing ${queueItem.listing_url}:`, error)

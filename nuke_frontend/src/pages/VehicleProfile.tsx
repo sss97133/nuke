@@ -54,6 +54,7 @@ import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUplo
 import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
 import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel';
 import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
+import { AdminNotificationService } from '../services/adminNotificationService';
 
 const WORKSPACE_TABS = [
   { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
@@ -123,6 +124,7 @@ const VehicleProfile: React.FC = () => {
   const ranBatSyncRef = React.useRef<string | null>(null);
   const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
   const [lastMemeDrop, setLastMemeDrop] = useState<ContentActionEvent | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // For BaT-import vehicles with no `vehicle_images` yet, fetch listing gallery URLs so the profile isn't empty.
   useEffect(() => {
@@ -686,6 +688,12 @@ const VehicleProfile: React.FC = () => {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       setSession(currentSession);
       setAuthChecked(true);
+      
+      // Check admin status
+      if (currentSession?.user) {
+        const adminStatus = await AdminNotificationService.isCurrentUserAdmin();
+        setIsAdmin(adminStatus);
+      }
     };
     checkInitialAuth();
   }, []);
@@ -767,6 +775,61 @@ const VehicleProfile: React.FC = () => {
     if (!vehicle?.id) return;
     loadLinkedOrgs(vehicle.id);
   }, [vehicle?.id]); // Removed loadLinkedOrgs from deps - it's useCallback with [] deps so never changes
+
+  // Realtime vehicle and image updates: refresh when database changes
+  // This ensures profile pages update immediately when fix scripts or other processes update the database
+  useEffect(() => {
+    if (!vehicle?.id) return;
+
+    const vehicleIdForFilter = vehicle.id;
+
+    const channel = supabase
+      .channel(`vehicle-updates:${vehicleIdForFilter}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'vehicles',
+          filter: `id=eq.${vehicleIdForFilter}`,
+        },
+        (payload) => {
+          const updatedVehicle = (payload as any)?.new as any;
+          if (updatedVehicle) {
+            console.log('[VehicleProfile] Vehicle updated via realtime, refreshing...');
+            // Reload vehicle data to get all updated fields (bat_seller, bat_location, etc.)
+            loadVehicle();
+          }
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'vehicle_images',
+          filter: `vehicle_id=eq.${vehicleIdForFilter}`,
+        },
+        (payload) => {
+          const event = (payload as any)?.eventType || (payload as any)?.event;
+          console.log(`[VehicleProfile] Vehicle images ${event} via realtime, refreshing...`);
+          // Reload images immediately when source changes, new images added, or images deleted
+          loadVehicleImages();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch {
+        try {
+          channel.unsubscribe();
+        } catch {}
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle?.id]); // Only re-subscribe when vehicle ID changes
 
   // Realtime auction pulse: update header telemetry as external listing rows change
   // (BaT/Classic/etc) and as auction_comments stream in.
@@ -2012,9 +2075,37 @@ const VehicleProfile: React.FC = () => {
 
       // Likely non-photo assets (avoid using as hero/gallery)
       if (s.endsWith('.ico')) return true;
-      // In practice, SVGs from listing/service sites are almost always logos or UI assets.
-      if (s.endsWith('.svg')) return true;
-      if (s.includes('/logo') || s.includes('logo.')) return true;
+      // Filter SVGs that are clearly UI elements (social icons, navigation, etc.)
+      // BUT preserve business/auction/dealer logos stored in proper paths
+      if (s.endsWith('.svg')) {
+        // Allow logos from known business/auction paths
+        if (s.includes('/businesses/') || s.includes('/organizations/') || 
+            s.includes('/dealers/') || s.includes('/auctions/') ||
+            s.includes('logo_url') || s.includes('business_logo')) {
+          return false; // Keep these
+        }
+        // Filter out UI chrome SVGs (social icons, navigation, etc.)
+        if (s.includes('social-') || s.includes('nav-') || s.includes('icon-') ||
+            s.includes('/assets/') || s.includes('/icons/') || s.includes('/themes/')) {
+          return true; // Filter these
+        }
+        return true; // Default: filter other SVGs
+      }
+      // Filter generic logo paths that are site chrome, but preserve business logos
+      if (s.includes('/logo') || s.includes('logo.')) {
+        // Allow business/auction/dealer logos
+        if (s.includes('/businesses/') || s.includes('/organizations/') || 
+            s.includes('/dealers/') || s.includes('/auctions/') ||
+            s.includes('logo_url') || s.includes('business_logo')) {
+          return false; // Keep these
+        }
+        // Filter site chrome logos (navigation, header, footer)
+        if (s.includes('/assets/') || s.includes('/themes/') || 
+            s.includes('/header') || s.includes('/footer') || s.includes('/nav')) {
+          return true; // Filter these
+        }
+        return true; // Default: filter other logo paths
+      }
       if (s.includes('avatar') || s.includes('badge') || s.includes('sprite')) return true;
 
       // Query-param size heuristics (favicons/icons are commonly <= 64px)
@@ -2057,13 +2148,25 @@ const VehicleProfile: React.FC = () => {
 
       // Flag/banner/site chrome frequently leaks into naive scrapes and even imports.
       // Treat these as noise so they can never become the computed hero/primary.
-      // Keep this conservative: only match explicit "flag"/"flags"/"banner" URL tokens.
+      // Aggressive filtering: catch all flag variations and patterns
       if (
         /(?:^|\/|\-|_)(flag|flags|banner)(?:$|\/|\-|_|\.)/i.test(s) ||
         s.includes('stars-and-stripes') ||
+        s.includes('stars_and_stripes') ||
         s.includes('american-flag') ||
+        s.includes('american_flag') ||
         s.includes('us-flag') ||
-        s.includes('usa-flag')
+        s.includes('us_flag') ||
+        s.includes('usa-flag') ||
+        s.includes('usa_flag') ||
+        s.includes('flag-usa') ||
+        s.includes('flag_usa') ||
+        s.includes('united-states-flag') ||
+        s.includes('united_states_flag') ||
+        s.includes('old-glory') ||
+        s.includes('old_glory') ||
+        /(?:^|\/|\-|_)(flag|flags)(?:.*usa|.*us|.*american)/i.test(s) ||
+        /(?:usa|us|american).*(?:flag|flags)/i.test(s)
       ) return true;
 
       return false;
@@ -2462,7 +2565,77 @@ const VehicleProfile: React.FC = () => {
           }
         }
 
-        // Fallback: If all DB images were filtered out (e.g., all were import_queue), use originImages
+        // Fallback: If all DB images were filtered out (e.g., all were import_queue), try BaT URLs from external_listings first
+        if (images.length === 0) {
+          try {
+            const { data: externalListing } = await supabase
+              .from('external_listings')
+              .select('metadata, listing_url')
+              .eq('vehicle_id', vehicle.id)
+              .eq('platform', 'bat')
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            
+            if (externalListing?.metadata) {
+              const metadata = externalListing.metadata as any;
+              const metadataImages = metadata.images || metadata.image_urls || [];
+              if (Array.isArray(metadataImages) && metadataImages.length > 0) {
+                // Clean BaT URLs: remove resize params and -scaled suffixes (matches extract-premium-auction logic)
+                const cleanBatUrl = (url: string): string => {
+                  if (!url || typeof url !== 'string' || !url.includes('bringatrailer.com')) {
+                    return url;
+                  }
+                  return String(url || '')
+                    .replace(/&#038;/g, '&')
+                    .replace(/&#039;/g, "'")
+                    .replace(/&amp;/g, '&')
+                    .replace(/&quot;/g, '"')
+                    .replace(/[?&]w=\d+/g, '')
+                    .replace(/[?&]h=\d+/g, '')
+                    .replace(/[?&]resize=[^&]*/g, '')
+                    .replace(/[?&]fit=[^&]*/g, '')
+                    .replace(/[?&]quality=[^&]*/g, '')
+                    .replace(/[?&]strip=[^&]*/g, '')
+                    .replace(/[?&]+$/, '')
+                    .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+                    .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+                    .trim();
+                };
+                
+                const cleaned = metadataImages
+                  .map(cleanBatUrl)
+                  .filter((url: string) => {
+                    const s = url.toLowerCase();
+                    // Filter out flags and banners (but preserve business/auction logos if needed)
+                    if (s.includes('flag') || s.includes('banner')) return false;
+                    // Filter out UI icons (social, navigation) but NOT business logos
+                    if (s.includes('icon') && (s.includes('social-') || s.includes('nav-') || s.includes('/assets/'))) return false;
+                    // Filter out generic site chrome logos, but preserve business logos
+                    if (s.includes('logo') && (s.includes('/assets/') || s.includes('/themes/') || s.includes('/header'))) return false;
+                    // Filter out SVGs that are UI elements (but business logos are handled separately)
+                    if (s.endsWith('.svg') && (s.includes('social-') || s.includes('/assets/') || s.includes('/icons/'))) return false;
+                    // Only include actual vehicle images from BaT uploads
+                    return s.includes('bringatrailer.com/wp-content/uploads/');
+                  });
+                
+                if (cleaned.length > 0) {
+                  const filtered = filterProfileImages(cleaned, vehicle);
+                  if (filtered.length > 0) {
+                    images = filtered;
+                    const batLead = filtered.find((u) => isSupabaseHostedImageUrl(u)) || filtered[0] || null;
+                    if (batLead) setLeadImageUrl(batLead);
+                    console.log(`✅ Using ${filtered.length} BaT URLs from external_listings metadata (fallback)`);
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Error loading BaT URLs from external_listings (fallback):', err);
+          }
+        }
+        
+        // Final fallback: If still no images, use originImages
         if (images.length === 0 && originImages.length > 0) {
           images = filterProfileImages(originImages, vehicle);
           // Also set lead image from originImages if current lead is invalid or missing
@@ -2499,6 +2672,80 @@ const VehicleProfile: React.FC = () => {
           }
         } catch {
           // ignore
+        }
+        
+        // If still no images, try BaT URLs from external_listings metadata
+        if (images.length === 0) {
+          try {
+            const { data: externalListing } = await supabase
+              .from('external_listings')
+              .select('metadata, listing_url')
+              .eq('vehicle_id', vehicle.id)
+              .eq('platform', 'bat')
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            
+            if (externalListing?.metadata) {
+              const metadata = externalListing.metadata as any;
+              // Check for image URLs in metadata (from extract-premium-auction)
+              const metadataImages = metadata.images || metadata.image_urls || [];
+              if (Array.isArray(metadataImages) && metadataImages.length > 0) {
+                // Clean BaT URLs: remove resize params and -scaled suffixes (matches extract-premium-auction logic)
+                const cleanBatUrl = (url: string): string => {
+                  if (!url || typeof url !== 'string' || !url.includes('bringatrailer.com')) {
+                    return url;
+                  }
+                  return String(url || '')
+                    .replace(/&#038;/g, '&')
+                    .replace(/&#039;/g, "'")
+                    .replace(/&amp;/g, '&')
+                    .replace(/&quot;/g, '"')
+                    .replace(/[?&]w=\d+/g, '')
+                    .replace(/[?&]h=\d+/g, '')
+                    .replace(/[?&]resize=[^&]*/g, '')
+                    .replace(/[?&]fit=[^&]*/g, '')
+                    .replace(/[?&]quality=[^&]*/g, '')
+                    .replace(/[?&]strip=[^&]*/g, '')
+                    .replace(/[?&]+$/, '')
+                    .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+                    .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+                    .trim();
+                };
+                
+                const cleaned = metadataImages
+                  .map(cleanBatUrl)
+                  .filter((url: string) => {
+                    const s = url.toLowerCase();
+                    // Filter out flags and banners (but preserve business/auction logos if needed)
+                    if (s.includes('flag') || s.includes('banner')) return false;
+                    // Filter out UI icons (social, navigation) but NOT business logos
+                    if (s.includes('icon') && (s.includes('social-') || s.includes('nav-') || s.includes('/assets/'))) return false;
+                    // Filter out generic site chrome logos, but preserve business logos
+                    if (s.includes('logo') && (s.includes('/assets/') || s.includes('/themes/') || s.includes('/header'))) return false;
+                    // Filter out SVGs that are UI elements (but business logos are handled separately)
+                    if (s.endsWith('.svg') && (s.includes('social-') || s.includes('/assets/') || s.includes('/icons/'))) return false;
+                    // Only include actual vehicle images from BaT uploads
+                    return s.includes('bringatrailer.com/wp-content/uploads/');
+                  });
+                
+                if (cleaned.length > 0) {
+                  const filtered = filterProfileImages(cleaned, vehicle);
+                  if (filtered.length > 0) {
+                    images = filtered;
+                    setVehicleImages(images);
+                    if (!leadImageUrl && images[0]) {
+                      setLeadImageUrl(images[0]);
+                    }
+                    console.log(`✅ Using ${filtered.length} BaT URLs from external_listings metadata`);
+                    return; // Skip storage fallback
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Error loading BaT URLs from external_listings:', err);
+          }
         }
         
         // If still no images, attempt storage fallback (canonical + legacy) to avoid empty hero/gallery
@@ -2578,6 +2825,53 @@ const VehicleProfile: React.FC = () => {
     }
 
     setVehicleImages(images);
+  };
+
+  const handleSetPrimaryImage = async (imageId: string) => {
+    if (!vehicle || !isAdmin) {
+      alert('Admin privileges required to set primary image');
+      return;
+    }
+
+    try {
+      // Clear all primary flags for this vehicle
+      await supabase
+        .from('vehicle_images')
+        .update({ is_primary: false })
+        .eq('vehicle_id', vehicle.id);
+
+      // Set the selected image as primary
+      const { error: updateError } = await supabase
+        .from('vehicle_images')
+        .update({ is_primary: true })
+        .eq('id', imageId);
+
+      if (updateError) throw updateError;
+
+      // Also update vehicle's primary_image_url if the image has a URL
+      const { data: imageData } = await supabase
+        .from('vehicle_images')
+        .select('image_url, large_url, medium_url')
+        .eq('id', imageId)
+        .single();
+
+      if (imageData) {
+        const imageUrl = imageData.large_url || imageData.medium_url || imageData.image_url;
+        if (imageUrl) {
+          await supabase
+            .from('vehicles')
+            .update({ primary_image_url: imageUrl })
+            .eq('id', vehicle.id);
+        }
+      }
+
+      // Reload images to reflect the change
+      await loadVehicleImages();
+      alert('Primary image updated successfully');
+    } catch (error: any) {
+      console.error('Error setting primary image:', error);
+      alert(`Failed to set primary image: ${error.message}`);
+    }
   };
 
   // Auto-run BaT import once for bat_import vehicles that have no images / broken identity.

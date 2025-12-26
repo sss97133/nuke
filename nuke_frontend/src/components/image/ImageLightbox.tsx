@@ -13,6 +13,7 @@ import { ManualAnnotationViewer } from './ManualAnnotationViewer';
 import { ClickablePartModal } from '../parts/ClickablePartModal';
 import { AnnotoriousImageTagger } from './AnnotoriousImageTagger';
 import { ImageInfoPanel } from './ImageInfoPanel';
+import { AdminNotificationService } from '../../services/adminNotificationService';
 import '../../design-system.css';
 
 interface ImageLightboxProps {
@@ -20,6 +21,7 @@ interface ImageLightboxProps {
   imageId?: string;
   timelineEventId?: string;
   vehicleId?: string;
+  organizationId?: string;
   vehicleYMM?: { year?: number; make?: string; model?: string };
   isOpen: boolean;
   onClose: () => void;
@@ -126,6 +128,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   imageId,
   timelineEventId,
   vehicleId,
+  organizationId,
   vehicleYMM,
   isOpen,
   onClose,
@@ -160,6 +163,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [isSensitive, setIsSensitive] = useState(false);
   const [showTagger, setShowTagger] = useState(false);
   const [analyzingImage, setAnalyzingImage] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -187,7 +191,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       // Start long-press timer
       const timer = setTimeout(() => {
         // Long press detected
-        if (canEdit) {
+        if (canEdit || isAdmin) {
           setContextMenuPos({ x: touch.clientX, y: touch.clientY });
           setShowContextMenu(true);
           // Haptic feedback if available
@@ -412,42 +416,112 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
   // Set as primary image
   const setAsPrimary = useCallback(async () => {
-    if (!imageId || !vehicleId) return;
+    if (!imageId) return;
+    
+    // Check permissions: must be admin OR canEdit
+    if (!isAdmin && !canEdit) {
+      alert('You do not have permission to set primary image');
+      return;
+    }
     
     try {
-      // Clear all primary flags for this vehicle
-      await supabase
-        .from('vehicle_images')
-        .update({ is_primary: false })
-        .eq('vehicle_id', vehicleId);
-      
-      // Set this image as primary
-      const { error } = await supabase
-        .from('vehicle_images')
-        .update({ is_primary: true })
-        .eq('id', imageId);
-      
-      if (error) {
-        console.error('Error setting as primary:', error);
-        return;
+      if (vehicleId) {
+        // Handle vehicle images
+        // Clear all primary flags for this vehicle
+        await supabase
+          .from('vehicle_images')
+          .update({ is_primary: false })
+          .eq('vehicle_id', vehicleId);
+        
+        // Set this image as primary
+        const { error } = await supabase
+          .from('vehicle_images')
+          .update({ is_primary: true })
+          .eq('id', imageId);
+        
+        if (error) {
+          console.error('Error setting as primary:', error);
+          return;
+        }
+        
+        // Also update vehicle's primary_image_url if available
+        const { data: imageData } = await supabase
+          .from('vehicle_images')
+          .select('image_url, large_url, medium_url')
+          .eq('id', imageId)
+          .single();
+        
+        if (imageData) {
+          const imageUrl = imageData.large_url || imageData.medium_url || imageData.image_url;
+          if (imageUrl) {
+            await supabase
+              .from('vehicles')
+              .update({ primary_image_url: imageUrl })
+              .eq('id', vehicleId);
+          }
+        }
+        
+        // Update local state
+        if (imageMetadata) {
+          setImageMetadata({ ...imageMetadata, is_primary: true });
+        }
+        
+        // Emit events to refresh other components
+        window.dispatchEvent(new CustomEvent('lead_image_updated', { 
+          detail: { vehicleId } 
+        } as any));
+        window.dispatchEvent(new CustomEvent('vehicle_images_updated', { 
+          detail: { vehicleId } 
+        } as any));
+      } else if (organizationId) {
+        // Handle organization images
+        // Clear all primary flags for this organization
+        await supabase
+          .from('organization_images')
+          .update({ is_primary: false })
+          .eq('organization_id', organizationId);
+        
+        // Set this image as primary
+        const { error } = await supabase
+          .from('organization_images')
+          .update({ is_primary: true })
+          .eq('id', imageId);
+        
+        if (error) {
+          console.error('Error setting as primary:', error);
+          return;
+        }
+        
+        // Also update organization's logo_url if available
+        const { data: imageData } = await supabase
+          .from('organization_images')
+          .select('image_url, large_url, medium_url')
+          .eq('id', imageId)
+          .single();
+        
+        if (imageData) {
+          const imageUrl = imageData.large_url || imageData.medium_url || imageData.image_url;
+          if (imageUrl) {
+            await supabase
+              .from('businesses')
+              .update({ logo_url: imageUrl })
+              .eq('id', organizationId);
+          }
+        }
+        
+        // Update local state
+        if (imageMetadata) {
+          setImageMetadata({ ...imageMetadata, is_primary: true });
+        }
+        
+        // Reload page or emit event to refresh
+        window.location.reload();
       }
-      
-      // Update local state
-      if (imageMetadata) {
-        setImageMetadata({ ...imageMetadata, is_primary: true });
-      }
-      
-      // Emit events to refresh other components
-      window.dispatchEvent(new CustomEvent('lead_image_updated', { 
-        detail: { vehicleId } 
-      } as any));
-      window.dispatchEvent(new CustomEvent('vehicle_images_updated', { 
-        detail: { vehicleId } 
-      } as any));
     } catch (err) {
       console.error('Error setting as primary:', err);
+      alert('Failed to set primary image: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
-  }, [imageId, vehicleId, imageMetadata]);
+  }, [imageId, vehicleId, organizationId, imageMetadata, isAdmin, canEdit]);
 
   // Delete image
   const deleteImage = useCallback(async () => {
@@ -483,14 +557,18 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
   // Get session
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
+      if (session?.user) {
+        const adminStatus = await AdminNotificationService.isCurrentUserAdmin();
+        setIsAdmin(adminStatus);
+      }
     });
   }, []);
 
   // Load Metadata & Attribution
   const loadImageMetadata = useCallback(async () => {
-    if (!imageId || !vehicleId) return;
+    if (!imageId || (!vehicleId && !organizationId)) return;
 
     // Load vehicle ownership info
     try {
@@ -1034,7 +1112,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             </button>
           )}
           
-          {canEdit && (
+          {(canEdit || isAdmin) && (
             <>
               <div className="h-6 w-[1px] bg-white/20"></div>
               <button
@@ -1123,7 +1201,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       </div>
 
       {/* Two-Finger Quick Actions Bar (Mobile) */}
-      {showQuickActions && canEdit && (
+      {showQuickActions && (canEdit || isAdmin) && (
         <div 
           className="block sm:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0a] border-t-2 border-white/20 p-2 flex justify-around items-center"
           style={{ zIndex: 10002 }}
@@ -1165,7 +1243,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       )}
 
       {/* Long-Press Context Menu (Mobile) */}
-      {showContextMenu && canEdit && (
+      {showContextMenu && (canEdit || isAdmin) && (
         <>
           <div 
             className="block sm:hidden fixed inset-0"
@@ -1322,7 +1400,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           >
             {/* Tabs - Cursor Style */}
             <div className="flex border-b-2 border-white/20">
-              {canEdit && (
+              {(canEdit || isAdmin) && (
                 <button 
                   onClick={() => setActiveTab('actions')}
                   className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wide transition-all duration-150 ${
@@ -1372,7 +1450,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
             <div className="flex-1 overflow-y-auto p-4" style={{ WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
               {/* Actions Tab (Mobile Quick Actions) */}
-              {activeTab === 'actions' && canEdit && (
+              {activeTab === 'actions' && (canEdit || isAdmin) && (
                 <div className="space-y-3">
                   <button
                     onClick={() => {
@@ -2069,7 +2147,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       
 
                   {/* Action Buttons - At bottom of info tab */}
-                  {canEdit && (
+                  {(canEdit || isAdmin) && (
                     <div className="pt-6 mt-6 border-t-2 border-white/20 space-y-2">
                       <button
                         onClick={setAsPrimary}

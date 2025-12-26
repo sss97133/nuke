@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { extractImageMetadata } from '../../utils/imageMetadata';
 import ImageLightbox from '../image/ImageLightbox';
+import { AdminNotificationService } from '../../services/adminNotificationService';
 
 interface OrgImage {
   id: string;
@@ -33,10 +34,17 @@ const OrganizationImagesTab: React.FC<Props> = ({ organizationId, userId, canEdi
   const [uploading, setUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<OrgImage | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadImages();
+    checkAdminStatus();
   }, [organizationId]);
+
+  const checkAdminStatus = async () => {
+    const adminStatus = await AdminNotificationService.isCurrentUserAdmin();
+    setIsAdmin(adminStatus);
+  };
 
   const loadImages = async () => {
     setLoading(true);
@@ -130,7 +138,7 @@ const OrganizationImagesTab: React.FC<Props> = ({ organizationId, userId, canEdi
   };
 
   const handleSetPrimary = async (imageId: string) => {
-    if (!canEdit) {
+    if (!canEdit && !isAdmin) {
       alert('You do not have permission to set primary image');
       return;
     }

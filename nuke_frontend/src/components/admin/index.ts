@@ -7,4 +7,5 @@ export { AnalysisModelPopup } from './AnalysisModelPopup';
 export { IDHoverCard } from './IDHoverCard';
 export { AutoIDWrapper } from './AutoIDWrapper';
 export { IDText } from './IDText';
+export { FunctionResultMonitor } from './FunctionResultMonitor';
 

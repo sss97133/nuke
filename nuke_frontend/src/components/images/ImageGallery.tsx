@@ -333,8 +333,58 @@ const ImageGallery = ({
   // Helper to detect icon/logo images
   const isIconOrLogo = (url: string): boolean => {
     const s = url.toLowerCase();
-    if (s.includes('.svg')) return true;
-    if (s.includes('logo') || s.includes('icon') || s.includes('badge') || s.includes('avatar')) return true;
+    // Filter SVGs that are UI elements, but preserve business/auction logos
+    if (s.includes('.svg')) {
+      // Allow business/auction/dealer logos
+      if (s.includes('/businesses/') || s.includes('/organizations/') || 
+          s.includes('/dealers/') || s.includes('/auctions/') ||
+          s.includes('logo_url') || s.includes('business_logo')) {
+        return false; // Keep these
+      }
+      // Filter UI chrome SVGs
+      if (s.includes('social-') || s.includes('nav-') || s.includes('icon-') ||
+          s.includes('/assets/') || s.includes('/icons/') || s.includes('/themes/')) {
+        return true; // Filter these
+      }
+      return true; // Default: filter other SVGs
+    }
+    // Filter generic logo/icon paths that are site chrome, but preserve business logos
+    if (s.includes('logo') || s.includes('icon')) {
+      // Allow business/auction/dealer logos
+      if (s.includes('/businesses/') || s.includes('/organizations/') || 
+          s.includes('/dealers/') || s.includes('/auctions/') ||
+          s.includes('logo_url') || s.includes('business_logo')) {
+        return false; // Keep these
+      }
+      // Filter site chrome (navigation, header, footer, social icons)
+      if (s.includes('/assets/') || s.includes('/themes/') || 
+          s.includes('/header') || s.includes('/footer') || s.includes('/nav') ||
+          s.includes('social-') || s.includes('nav-')) {
+        return true; // Filter these
+      }
+      return true; // Default: filter other logo/icon paths
+    }
+    if (s.includes('badge') || s.includes('avatar')) return true;
+    // Aggressively filter out ALL flag images (American flag, banners, etc.)
+    if (/(?:^|\/|\-|_)(flag|flags|banner)(?:$|\/|\-|_|\.)/i.test(s) ||
+        s.includes('stars-and-stripes') ||
+        s.includes('stars_and_stripes') ||
+        s.includes('american-flag') ||
+        s.includes('american_flag') ||
+        s.includes('us-flag') ||
+        s.includes('us_flag') ||
+        s.includes('usa-flag') ||
+        s.includes('usa_flag') ||
+        s.includes('flag-usa') ||
+        s.includes('flag_usa') ||
+        s.includes('united-states-flag') ||
+        s.includes('united_states_flag') ||
+        s.includes('old-glory') ||
+        s.includes('old_glory') ||
+        /(?:^|\/|\-|_)(flag|flags)(?:.*usa|.*us|.*american)/i.test(s) ||
+        /(?:usa|us|american).*(?:flag|flags)/i.test(s)) {
+      return true;
+    }
     if (s.includes('framerusercontent.com')) {
       // Check for small square images or images with width/height params indicating UI elements
       if (/width=\d+.*height=\d+/.test(s)) {
@@ -383,7 +433,25 @@ const ImageGallery = ({
         f.includes('site-post-') || f.includes('thumbnail-template') ||
         f.includes('screenshot-') || f.includes('countries/') ||
         f.includes('themes/') || f.includes('assets/img/') ||
-        /\/web-\d{3,}-/i.test(f)
+        /\/web-\d{3,}-/i.test(f) ||
+        // Aggressively filter out ALL flag images (American flag, banners, etc.)
+        /(?:^|\/|\-|_)(flag|flags|banner)(?:$|\/|\-|_|\.)/i.test(f) ||
+        f.includes('stars-and-stripes') ||
+        f.includes('stars_and_stripes') ||
+        f.includes('american-flag') ||
+        f.includes('american_flag') ||
+        f.includes('us-flag') ||
+        f.includes('us_flag') ||
+        f.includes('usa-flag') ||
+        f.includes('usa_flag') ||
+        f.includes('flag-usa') ||
+        f.includes('flag_usa') ||
+        f.includes('united-states-flag') ||
+        f.includes('united_states_flag') ||
+        f.includes('old-glory') ||
+        f.includes('old_glory') ||
+        /(?:^|\/|\-|_)(flag|flags)(?:.*usa|.*us|.*american)/i.test(f) ||
+        /(?:usa|us|american).*(?:flag|flags)/i.test(f)
       );
     };
     
