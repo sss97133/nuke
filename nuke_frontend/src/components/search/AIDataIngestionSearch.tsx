@@ -42,6 +42,17 @@ export default function AIDataIngestionSearch() {
   const [wiringMessages, setWiringMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([]);
   const [showWiringUploader, setShowWiringUploader] = useState(false);
 
+  // Autocomplete state
+  const [autocompleteResults, setAutocompleteResults] = useState<Array<{
+    id: string;
+    title: string;
+    type: 'vehicle' | 'organization' | 'vin' | 'url';
+    subtitle?: string;
+  }>>([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [selectedAutocompleteIndex, setSelectedAutocompleteIndex] = useState(-1);
+  const autocompleteDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -60,6 +71,104 @@ export default function AIDataIngestionSearch() {
       setExtractionPreview(null);
     }
   }, [vehicleIdFromRoute, showPreview]);
+
+  // Autocomplete as user types
+  useEffect(() => {
+    if (autocompleteDebounceRef.current) {
+      clearTimeout(autocompleteDebounceRef.current);
+    }
+
+    const trimmedInput = input.trim();
+    
+    // Don't show autocomplete if:
+    // - Input is too short (< 2 chars)
+    // - Processing
+    // - Has attached image
+    // - Already showing preview
+    if (trimmedInput.length < 2 || isProcessing || attachedImage || showPreview) {
+      setAutocompleteResults([]);
+      setShowAutocomplete(false);
+      return;
+    }
+
+    // Check if it's a URL or VIN (don't autocomplete these)
+    const isURL = /^https?:\/\//i.test(trimmedInput) || /^www\./i.test(trimmedInput);
+    const isVIN = /^[A-HJ-NPR-Z0-9]{11,17}$/i.test(trimmedInput.replace(/[^A-Z0-9]/gi, ''));
+    
+    if (isURL || isVIN) {
+      setAutocompleteResults([]);
+      setShowAutocomplete(false);
+      return;
+    }
+
+    autocompleteDebounceRef.current = setTimeout(async () => {
+      try {
+        const escapeILike = (s: string) => String(s || '').replace(/([%_\\])/g, '\\$1');
+        const searchLower = trimmedInput.toLowerCase();
+        const searchLowerSafe = escapeILike(searchLower);
+
+        const results: Array<{
+          id: string;
+          title: string;
+          type: 'vehicle' | 'organization' | 'vin' | 'url';
+          subtitle?: string;
+        }> = [];
+
+        // Search vehicles
+        const { data: vehicles } = await supabase
+          .from('vehicles')
+          .select('id, year, make, model, vin')
+          .eq('is_public', true)
+          .or(`make.ilike.%${searchLowerSafe}%,model.ilike.%${searchLowerSafe}%,year::text.ilike.%${searchLowerSafe}%,vin.ilike.%${searchLowerSafe}%`)
+          .limit(5);
+
+        if (vehicles) {
+          vehicles.forEach((v: any) => {
+            const title = `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || 'Vehicle';
+            results.push({
+              id: v.id,
+              title,
+              type: 'vehicle',
+              subtitle: v.vin ? `VIN: ${v.vin}` : undefined,
+            });
+          });
+        }
+
+        // Search organizations
+        const { data: orgs } = await supabase
+          .from('businesses')
+          .select('id, business_name, website')
+          .eq('is_public', true)
+          .ilike('business_name', `%${searchLowerSafe}%`)
+          .limit(3);
+
+        if (orgs) {
+          orgs.forEach((o: any) => {
+            results.push({
+              id: o.id,
+              title: o.business_name,
+              type: 'organization',
+              subtitle: o.website ? new URL(o.website).hostname : undefined,
+            });
+          });
+        }
+
+        setAutocompleteResults(results);
+        setShowAutocomplete(results.length > 0);
+        setSelectedAutocompleteIndex(-1);
+      } catch (error) {
+        console.error('Autocomplete error:', error);
+        setAutocompleteResults([]);
+        setShowAutocomplete(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => {
+      if (autocompleteDebounceRef.current) {
+        clearTimeout(autocompleteDebounceRef.current);
+      }
+    };
+  }, [input, isProcessing, attachedImage, showPreview]);
 
   const isWiringIntent = (text: string) => {
     const t = (text || '').toLowerCase();
@@ -290,6 +399,8 @@ export default function AIDataIngestionSearch() {
   };
 
   const processInput = async () => {
+    console.log('processInput called', { input: input.trim(), hasImage: !!attachedImage, isProcessing });
+    
     if (!input.trim() && !attachedImage) {
       setError('Please enter text or attach an image');
       return;
@@ -591,8 +702,55 @@ export default function AIDataIngestionSearch() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    console.log('handleKeyDown', { key: e.key, showAutocomplete, autocompleteResultsLength: autocompleteResults.length, selectedIndex: selectedAutocompleteIndex });
+    
+    // Handle autocomplete navigation
+    if (showAutocomplete && autocompleteResults.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedAutocompleteIndex(prev => 
+          prev < autocompleteResults.length - 1 ? prev + 1 : prev
+        );
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedAutocompleteIndex(prev => prev > 0 ? prev - 1 : -1);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        // If an item is selected, navigate to it
+        if (selectedAutocompleteIndex >= 0) {
+          const selected = autocompleteResults[selectedAutocompleteIndex];
+          handleAutocompleteSelect(selected);
+        } else {
+          // Otherwise, close autocomplete and process input
+          setShowAutocomplete(false);
+          setSelectedAutocompleteIndex(-1);
+          // Process input directly
+          if (!showPreview) {
+            processInput();
+          } else {
+            confirmAndSave();
+          }
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowAutocomplete(false);
+        setSelectedAutocompleteIndex(-1);
+        return;
+      }
+    }
+
+    // Handle Enter key when autocomplete is not showing or empty
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      e.stopPropagation();
+      console.log('Enter pressed, processing input', { showPreview, input: input.trim() });
       if (!showPreview) {
         processInput();
       } else {
@@ -603,6 +761,23 @@ export default function AIDataIngestionSearch() {
       setShowPreview(false);
       setExtractionPreview(null);
       setActionsOpen(false);
+      setShowAutocomplete(false);
+    }
+  };
+
+  const handleAutocompleteSelect = (result: { id: string; type: string; title: string }) => {
+    setShowAutocomplete(false);
+    setSelectedAutocompleteIndex(-1);
+    
+    if (result.type === 'vehicle') {
+      navigate(`/vehicle/${result.id}`);
+      setInput('');
+    } else if (result.type === 'organization') {
+      navigate(`/organization/${result.id}`);
+      setInput('');
+    } else {
+      // For VIN or URL, just set the input
+      setInput(result.title);
     }
   };
 
@@ -643,8 +818,23 @@ export default function AIDataIngestionSearch() {
           placeholder="VIN, URL, search query, or image..."
           aria-label="AI input"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            setShowAutocomplete(true);
+          }}
           onKeyDown={handleKeyDown}
+          onFocus={() => {
+            if (autocompleteResults.length > 0) {
+              setShowAutocomplete(true);
+            }
+          }}
+          onBlur={() => {
+            // Delay hiding to allow click on autocomplete items
+            setTimeout(() => {
+              setShowAutocomplete(false);
+              setSelectedAutocompleteIndex(-1);
+            }, 200);
+          }}
           disabled={isProcessing}
           style={{
             flex: 1,
@@ -682,6 +872,55 @@ export default function AIDataIngestionSearch() {
           ...
         </button>
       </div>
+
+      {/* Autocomplete Dropdown */}
+      {showAutocomplete && autocompleteResults.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: '4px',
+            background: 'var(--white)',
+            border: '2px solid var(--border)',
+            boxShadow: '2px 2px 8px rgba(0,0,0,0.2)',
+            zIndex: 1203,
+            maxHeight: '300px',
+            overflowY: 'auto',
+            fontSize: '8pt'
+          }}
+        >
+          {autocompleteResults.map((result, index) => (
+            <div
+              key={`${result.type}-${result.id}`}
+              onClick={() => handleAutocompleteSelect(result)}
+              onMouseEnter={() => setSelectedAutocompleteIndex(index)}
+              style={{
+                padding: '6px 8px',
+                cursor: 'pointer',
+                background: selectedAutocompleteIndex === index ? '#e3f2fd' : 'transparent',
+                borderBottom: '1px solid var(--border-light)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px'
+              }}
+            >
+              <div style={{ fontWeight: 'bold', color: result.type === 'vehicle' ? '#1976d2' : '#388e3c' }}>
+                {result.title}
+              </div>
+              {result.subtitle && (
+                <div style={{ fontSize: '7pt', color: '#666' }}>
+                  {result.subtitle}
+                </div>
+              )}
+              <div style={{ fontSize: '7pt', color: '#999', textTransform: 'uppercase' }}>
+                {result.type}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Actions Menu (Win95-style) */}
       {actionsOpen && (
@@ -750,8 +989,12 @@ export default function AIDataIngestionSearch() {
           {!showPreview ? (
             <button
               type="button"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('GO button clicked', { input: input.trim(), hasImage: !!attachedImage, isProcessing });
                 setActionsOpen(false);
+                setShowAutocomplete(false);
                 processInput();
               }}
               disabled={isProcessing || (!input.trim() && !attachedImage)}

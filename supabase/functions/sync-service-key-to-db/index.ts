@@ -19,24 +19,39 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // This function uses service role key from Edge Function secrets
-    // It doesn't need JWT verification because it's called by cron jobs
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Check multiple possible env var names and prioritize JWT format keys
+    const keyCandidates = [
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      Deno.env.get('SERVICE_ROLE_KEY'),
+      Deno.env.get('SUPABASE_SERVICE_KEY'),
+    ].filter(Boolean) as string[];
 
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY');
+    // Prioritize JWT format keys (start with 'eyJ') over sb_secret format
+    const jwtKeys = keyCandidates.filter(k => k.startsWith('eyJ'));
+    const otherKeys = keyCandidates.filter(k => !k.startsWith('eyJ'));
+    
+    // Prefer JWT format, fallback to others
+    const serviceRoleKey = jwtKeys.length > 0 ? jwtKeys[0] : (otherKeys.length > 0 ? otherKeys[0] : null);
     
     if (!serviceRoleKey) {
       return new Response(JSON.stringify({
         success: false,
-        error: 'SUPABASE_SERVICE_ROLE_KEY not found in Edge Function secrets'
+        error: 'SUPABASE_SERVICE_ROLE_KEY not found in Edge Function secrets',
+        checked_vars: ['SUPABASE_SERVICE_ROLE_KEY', 'SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_KEY'],
+        found_keys: keyCandidates.length,
+        jwt_keys_found: jwtKeys.length
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // This function uses service role key from Edge Function secrets
+    // It doesn't need JWT verification because it's called by cron jobs
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      serviceRoleKey
+    );
 
     // Store in database secrets table
     const { error } = await supabase
@@ -63,7 +78,9 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'Service role key synced to database and set automatically'
+      message: 'Service role key synced to database and set automatically',
+      key_format: serviceRoleKey.startsWith('eyJ') ? 'JWT' : serviceRoleKey.startsWith('sb_') ? 'SB_SECRET' : 'UNKNOWN',
+      key_length: serviceRoleKey.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
