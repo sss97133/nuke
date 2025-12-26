@@ -2291,6 +2291,46 @@ const VehicleProfile: React.FC = () => {
       }
     };
 
+    const filterCarsAndBidsNoise = (urls: string[], v: any): string[] => {
+      const cleaned = (urls || []).map(u => normalizeUrl(u)).filter(Boolean);
+      
+      // Never filter out non-Cars & Bids URLs (user uploads, Supabase storage, etc.)
+      const nonCarsAndBids = cleaned.filter(u => !u.includes('media.carsandbids.com'));
+      const carsAndBidsUrls = cleaned.filter(u => u.includes('media.carsandbids.com'));
+      
+      if (carsAndBidsUrls.length === 0) return cleaned;
+      
+      // Filter out known Cars & Bids noise: video thumbnails, UI elements, small thumbnails
+      const isKnownNoise = (u: string) => {
+        const f = u.toLowerCase();
+        // Exclude video thumbnails/freeze frames
+        if (f.includes('/video') || f.includes('video') || f.includes('thumbnail') || f.includes('thumb')) {
+          return true;
+        }
+        // Exclude UI elements and icons
+        if (f.includes('/icon') || f.includes('/logo') || f.includes('/button') || f.includes('/ui/') || f.includes('/assets/')) {
+          return true;
+        }
+        // Exclude small thumbnails (common patterns: -thumb, -small, -150x, -300x)
+        if (f.match(/-\d+x\d+\.(jpg|jpeg|png|webp)$/) || f.includes('-thumb') || f.includes('-small')) {
+          return true;
+        }
+        // Exclude static assets
+        if (f.includes('/static/')) {
+          return true;
+        }
+        return false;
+      };
+      
+      let filtered = carsAndBidsUrls.filter(u => !isKnownNoise(u));
+      
+      // Combine filtered Cars & Bids URLs with non-Cars & Bids URLs
+      const result = [...nonCarsAndBids, ...filtered];
+      
+      // Safety: if we filtered everything out, keep at least the non-Cars & Bids URLs
+      return result.length > 0 ? result : (nonCarsAndBids.length > 0 ? nonCarsAndBids : urls);
+    };
+
     const filterProfileImages = (urls: string[], v: any): string[] => {
       const normalized = (Array.isArray(urls) ? urls : []).map(normalizeUrl).filter(Boolean);
       // Exclude import_queue images from profile display
@@ -2298,7 +2338,7 @@ const VehicleProfile: React.FC = () => {
         const urlLower = String(u || '').toLowerCase();
         return !urlLower.includes('import_queue');
       });
-      return filterIconNoise(filterClassicNoise(filterBatNoise(withoutImportQueue, v), v));
+      return filterIconNoise(filterCarsAndBidsNoise(filterClassicNoise(filterBatNoise(withoutImportQueue, v), v), v));
     };
 
     const getOriginImages = (v: any): { images: string[]; declaredCount: number | null } => {
@@ -2633,7 +2673,15 @@ const VehicleProfile: React.FC = () => {
                     if (platform === 'bat') {
                       return s.includes('bringatrailer.com/wp-content/uploads/');
                     } else if (platform === 'carsandbids') {
-                      return s.includes('media.carsandbids.com');
+                      // Cars & Bids: filter out video thumbnails, UI elements, and small thumbnails
+                      if (!s.includes('media.carsandbids.com')) return false;
+                      // Exclude video thumbnails/freeze frames
+                      if (s.includes('/video') || s.includes('video') || s.includes('thumbnail') || s.includes('thumb')) return false;
+                      // Exclude UI elements
+                      if (s.includes('/icon') || s.includes('/logo') || s.includes('/button') || s.includes('/ui/') || s.includes('/assets/') || s.includes('/static/')) return false;
+                      // Exclude small thumbnails
+                      if (s.match(/-\d+x\d+\.(jpg|jpeg|png|webp)$/) || s.includes('-thumb') || s.includes('-small')) return false;
+                      return true;
                     } else if (platform === 'mecum') {
                       return s.includes('images.mecum.com');
                     } else if (platform === 'barrettjackson') {

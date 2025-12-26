@@ -313,14 +313,20 @@ export default function VehicleMemePanel({
                           🔒
                         </div>
                       )}
-                      {hasImage ? (
-                        <div
+                      {hasImage && a.image_url ? (
+                        <img
+                          src={a.image_url}
+                          alt={a.title}
                           style={{
                             width: '100%',
                             height: 54,
+                            objectFit: 'cover',
                             border: '1px solid rgba(255,255,255,0.12)',
-                            background: `url(${a.image_url}) center/cover`,
                             opacity: isOwned ? 1 : 0.6,
+                            display: 'block',
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
                           }}
                         />
                       ) : null}
@@ -416,13 +422,19 @@ export default function VehicleMemePanel({
                       onPointerCancel={() => clearHoldTimer()}
                       onPointerLeave={() => clearHoldTimer()}
                     >
-                      {hasImage ? (
-                        <div
+                      {hasImage && a.image_url ? (
+                        <img
+                          src={a.image_url}
+                          alt={a.title}
                           style={{
                             width: '100%',
                             height: 54,
+                            objectFit: 'cover',
                             border: '1px solid rgba(255,255,255,0.12)',
-                            background: `url(${a.image_url}) center/cover`,
+                            display: 'block',
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
                           }}
                         />
                       ) : null}

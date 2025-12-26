@@ -157,6 +157,9 @@ export default function VehicleMemeOverlay({
                   display: 'block',
                   border: '1px solid rgba(255, 255, 255, 0.12)',
                 }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
               />
             )}
           </div>

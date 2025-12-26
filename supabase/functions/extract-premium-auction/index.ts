@@ -116,15 +116,163 @@ function parseCarsAndBidsIdentityFromUrl(listingUrl: string): { year: number | n
 function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   const h = String(html || "");
   const urls = new Set<string>();
-  const re = /https?:\/\/media\.carsandbids\.com\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
-  for (const m of h.match(re) || []) {
-    // Clean URL: remove resize params, get full resolution
-    let url = m.trim();
-    // Remove query params that resize images
-    url = url.split('?')[0];
-    urls.add(url);
-    // No limit - get ALL images
+  
+  // Upgrade thumbnail/small URLs to full resolution
+  const upgradeToFullRes = (url: string): string => {
+    if (!url || typeof url !== 'string') return url;
+    let upgraded = url
+      // Remove all query params (resize, width, height, etc.)
+      .split('?')[0]
+      // Remove size suffixes like -150x150, -300x300, -thumb, -small
+      .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-thumb(?:nail)?\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-small\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-medium\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .trim();
+    return upgraded;
+  };
+  
+  // Filter function to exclude non-vehicle images
+  const isVehicleImage = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    const lower = url.toLowerCase();
+    // Must be from media.carsandbids.com
+    if (!lower.includes('media.carsandbids.com')) return false;
+    // Exclude video thumbnails/freeze frames
+    if (lower.includes('/video') || lower.includes('/videos/') || lower.match(/video[\/\-]/)) return false;
+    if (lower.includes('thumbnail') || (lower.includes('thumb') && !lower.match(/thumbnail/i))) {
+      // Allow 'thumbnail' in path only if it's clearly a gallery image path
+      if (!lower.match(/\/photos\/|\/images\/|\/gallery\//)) return false;
+    }
+    // Exclude UI elements and icons
+    if (lower.includes('/icon') || lower.includes('/icons/') || lower.includes('/logo') || lower.includes('/logos/') || 
+        lower.includes('/button') || lower.includes('/ui/') || lower.includes('/assets/') || lower.includes('/static/')) {
+      return false;
+    }
+    // Exclude small thumbnails by size suffix (but we'll upgrade them)
+    // Don't exclude here, let upgradeToFullRes handle it
+    return true;
+  };
+  
+  // Method 1: Extract from script tags with JSON data (React/Next.js apps often embed data here)
+  try {
+    // Look for script tags containing gallery/photo data
+    const scriptPattern = /<script[^>]*>(.*?)<\/script>/gis;
+    let scriptMatch;
+    while ((scriptMatch = scriptPattern.exec(h)) !== null) {
+      const scriptContent = scriptMatch[1];
+      // Look for gallery/photo arrays in JSON
+      const jsonPatterns = [
+        /"photos":\s*(\[[^\]]+\])/gi,
+        /"images":\s*(\[[^\]]+\])/gi,
+        /"gallery":\s*(\[[^\]]+\])/gi,
+        /photos:\s*(\[[^\]]+\])/gi,
+        /images:\s*(\[[^\]]+\])/gi,
+        /gallery:\s*(\[[^\]]+\])/gi,
+      ];
+      
+      for (const pattern of jsonPatterns) {
+        const matches = scriptContent.matchAll(pattern);
+        for (const match of matches) {
+          try {
+            const jsonStr = match[1];
+            const parsed = JSON.parse(jsonStr);
+            if (Array.isArray(parsed)) {
+              for (const item of parsed) {
+                // Handle object with size variants (prioritize full/original/large)
+                let url: string | null = null;
+                if (typeof item === 'string') {
+                  url = item;
+                } else if (typeof item === 'object' && item !== null) {
+                  url = item.full || item.original || item.large || item.url || item.src || item.image || null;
+                }
+                if (url && typeof url === 'string' && isVehicleImage(url)) {
+                  const upgraded = upgradeToFullRes(url);
+                  if (upgraded) urls.add(upgraded);
+                }
+              }
+            }
+          } catch {
+            // Not valid JSON, continue
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('Error extracting from script tags:', e?.message);
   }
+  
+  // Method 2: Extract from data attributes (data-src, data-full, data-original, data-image)
+  try {
+    const dataAttrPatterns = [
+      /data-src=["']([^"']+)["']/gi,
+      /data-full=["']([^"']+)["']/gi,
+      /data-original=["']([^"']+)["']/gi,
+      /data-image=["']([^"']+)["']/gi,
+      /data-large=["']([^"']+)["']/gi,
+      /data-url=["']([^"']+)["']/gi,
+    ];
+    
+    for (const pattern of dataAttrPatterns) {
+      const matches = h.matchAll(pattern);
+      for (const match of matches) {
+        const url = match[1];
+        if (url && isVehicleImage(url)) {
+          const upgraded = upgradeToFullRes(url);
+          if (upgraded) urls.add(upgraded);
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('Error extracting from data attributes:', e?.message);
+  }
+  
+  // Method 3: Extract from img src in gallery/photo sections only
+  try {
+    // Find gallery/photo containers
+    const gallerySectionPatterns = [
+      /<div[^>]*class=["'][^"']*(?:gallery|photos|images|photo-gallery)[^"']*["'][^>]*>([\s\S]{0,50000})<\/div>/gi,
+      /<section[^>]*class=["'][^"']*(?:gallery|photos|images)[^"']*["'][^>]*>([\s\S]{0,50000})<\/section>/gi,
+      /<div[^>]*id=["'][^"']*(?:gallery|photos|images)[^"']*["'][^>]*>([\s\S]{0,50000})<\/div>/gi,
+    ];
+    
+    const gallerySections: string[] = [];
+    for (const pattern of gallerySectionPatterns) {
+      const matches = h.matchAll(pattern);
+      for (const match of matches) {
+        if (match[1]) gallerySections.push(match[1]);
+      }
+    }
+    
+    // If we found gallery sections, extract from those; otherwise use full HTML
+    const searchHtml = gallerySections.length > 0 ? gallerySections.join('\n') : h;
+    
+    // Extract img src, prioritizing data-src (lazy loading) then src
+    const imgPattern = /<img[^>]+(?:data-src=["']([^"']+)["']|src=["']([^"']+)["'])[^>]*>/gi;
+    let imgMatch;
+    while ((imgMatch = imgPattern.exec(searchHtml)) !== null) {
+      const url = imgMatch[1] || imgMatch[2]; // data-src takes priority
+      if (url && isVehicleImage(url)) {
+        const upgraded = upgradeToFullRes(url);
+        if (upgraded) urls.add(upgraded);
+      }
+    }
+  } catch (e: any) {
+    console.warn('Error extracting from img tags:', e?.message);
+  }
+  
+  // Method 4: Fallback - extract all media.carsandbids.com images, upgrade thumbnails, filter noise
+  if (urls.size === 0) {
+    const re = /https?:\/\/media\.carsandbids\.com\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
+    for (const m of h.match(re) || []) {
+      const url = m.trim();
+      if (isVehicleImage(url)) {
+        const upgraded = upgradeToFullRes(url);
+        if (upgraded) urls.add(upgraded);
+      }
+    }
+  }
+  
   return Array.from(urls);
 }
 
@@ -520,7 +668,11 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
       auction_end_date: { type: "string", description: "Auction end time/date" },
       location: { type: "string", description: "Location" },
       description: { type: "string", description: "Description" },
-      images: { type: "array", items: { type: "string" }, description: "Image URLs" },
+      images: { 
+        type: "array", 
+        items: { type: "string" }, 
+        description: "ALL high-resolution full-size image URLs from the vehicle gallery. Extract from gallery JSON/data attributes, prioritize 'full', 'original', or 'large' size URLs. Remove all resize parameters (?w=, ?h=, ?resize=). Get ONLY full-resolution gallery images, NOT thumbnails, NOT video frames, NOT UI elements. Exclude any URLs containing 'thumb', 'thumbnail', 'video', 'icon', 'logo', or size suffixes like -150x150." 
+      },
     },
   };
 
@@ -560,7 +712,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
             url: listingUrl,
             formats: ["extract", "html"],
             onlyMainContent: false,
-            waitFor: 2000, // Reduced for speed
+            waitFor: 5000, // Wait for gallery to fully load
             extract: { schema: listingSchema },
           }),
         },
@@ -575,12 +727,24 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
       const empty = !vehicle || (typeof vehicle === "object" && Object.keys(vehicle).length === 0);
       const fallback = parseCarsAndBidsIdentityFromUrl(listingUrl);
 
-      // Extract and clean images
+      // Extract and clean images - PRIORITIZE HTML extraction (more reliable for full-res)
       let images: string[] = [];
-      if (Array.isArray(vehicle?.images) && vehicle.images.length > 0) {
-        images = vehicle.images.map((u: string) => cleanImageUrl(u, 'carsandbids'));
-      } else if (html) {
-        images = extractCarsAndBidsImagesFromHtml(html).map((u: string) => cleanImageUrl(u, 'carsandbids'));
+      // Method 1: HTML extraction (most reliable for full-resolution images)
+      if (html) {
+        const htmlImages = extractCarsAndBidsImagesFromHtml(html);
+        if (htmlImages.length > 0) {
+          images = htmlImages.map((u: string) => cleanImageUrl(u, 'carsandbids'));
+        }
+      }
+      // Method 2: Fallback to Firecrawl extraction if HTML extraction failed
+      if (images.length === 0 && Array.isArray(vehicle?.images) && vehicle.images.length > 0) {
+        images = vehicle.images
+          .map((u: string) => cleanImageUrl(u, 'carsandbids'))
+          .filter((u: string) => {
+            // Filter out thumbnails and video frames from Firecrawl extraction
+            const lower = u.toLowerCase();
+            return !lower.includes('thumb') && !lower.includes('video') && !lower.includes('icon');
+          });
       }
       
       const merged = {
@@ -1155,8 +1319,14 @@ function cleanImageUrl(url: string, platform?: string): string {
       .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
       .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1');
   } else if (cleaned.includes('carsandbids.com')) {
-    // Cars & Bids: remove query params (already done above)
+    // Cars & Bids: remove query params and upgrade thumbnails to full-res
     cleaned = cleaned.split('?')[0];
+    // Remove size suffixes to get full resolution
+    cleaned = cleaned
+      .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-thumb(?:nail)?\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-small\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-medium\.(jpg|jpeg|png|webp)$/i, '.$1');
   } else if (cleaned.includes('mecum.com')) {
     // Mecum: already constructs clean URLs, but ensure no query params
     cleaned = cleaned.split('?')[0];
@@ -1427,7 +1597,11 @@ async function extractMecum(url: string, maxVehicles: number) {
       estimate_high: { type: "number", description: "High estimate" },
       sale_price: { type: "number", description: "Sold price / hammer price if available" },
       sale_date: { type: "string", description: "Sale date" },
-      images: { type: "array", items: { type: "string" }, description: "Image URLs" },
+      images: { 
+        type: "array", 
+        items: { type: "string" }, 
+        description: "ALL high-resolution full-size image URLs from the vehicle gallery. Extract from gallery JSON/data attributes, prioritize 'full', 'original', or 'large' size URLs. Remove all resize parameters (?w=, ?h=, ?resize=). Get ONLY full-resolution gallery images, NOT thumbnails, NOT video frames, NOT UI elements. Exclude any URLs containing 'thumb', 'thumbnail', 'video', 'icon', 'logo', or size suffixes like -150x150." 
+      },
     },
   };
 
