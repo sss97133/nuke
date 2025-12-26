@@ -38,10 +38,16 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
   }
 
   const getStatusColor = () => {
-    if (isRunning) return 'var(--text-muted)';
-    if (!invocation) return 'var(--text-muted)';
+    if (isRunning) return 'var(--grey-300)';
+    if (!invocation) return 'var(--grey-300)';
     if (invocation.success) return 'var(--success)';
     return 'var(--error)';
+  };
+
+  const getStatusTextColor = () => {
+    if (isRunning || !invocation) return 'var(--text)';
+    // Success and error colors work with white text
+    return 'var(--white)';
   };
 
   const getStatusText = () => {
@@ -92,7 +98,7 @@ export const FunctionResultMonitor: React.FC<FunctionResultMonitorProps> = ({
             style={{
               padding: '2px var(--space-2)',
               backgroundColor: getStatusColor(),
-              color: 'var(--white)',
+              color: getStatusTextColor(),
               fontWeight: 600,
               fontSize: '8pt',
             }}
