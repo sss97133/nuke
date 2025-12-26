@@ -141,7 +141,17 @@ serve(async (req) => {
     }
     console.log('');
 
-    // Step 6: Store complete site map
+    // Step 6: Ensure organization profile exists for this source
+    console.log('🏢 Step 6: Ensuring organization profile exists...');
+    const orgId = await ensureSourceOrganization(source_url, siteAnalysis, supabase);
+    if (orgId) {
+      console.log(`   ✅ Organization profile: ${orgId}`);
+    } else {
+      console.log(`   ⚠️  Could not create organization profile`);
+    }
+    console.log('');
+
+    // Step 7: Store complete site map
     const siteMap: CompleteSiteMap = {
       source_domain: extractDomain(source_url),
       source_name: source?.source_name || extractDomain(source_url),
@@ -320,73 +330,190 @@ async function discoverAllPageTypes(baseUrl: string, html: string, markdown: str
 }
 
 async function identifyAllFields(siteAnalysis: any, supabase: any): Promise<any[]> {
-  // Use AI to identify EVERY field available on the site
-  // Not just obvious fields - EVERYTHING
+  // Use database-driven checklist to systematically find ALL required fields
+  // The LLM goes through the checklist and finds each field on the site
   
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
   
-  // For each page type, identify all fields
+  if (!OPENAI_API_KEY) {
+    console.warn('No OpenAI API key - skipping AI field identification');
+    return [];
+  }
+  
+  // Get the master checklist from database
+  const { data: checklist, error: checklistError } = await supabase
+    .from('extraction_field_checklist')
+    .select('*')
+    .order('priority', { ascending: false });
+  
+  if (checklistError || !checklist || checklist.length === 0) {
+    console.warn('Could not load field checklist from database - using fallback');
+    return await identifyAllFieldsFallback(siteAnalysis, supabase);
+  }
+  
+  console.log(`   📋 Loaded ${checklist.length} fields from database checklist`);
+  
+  // For each page type, use checklist to systematically find fields
   const allFields: any[] = [];
   
   for (const [pageTypeName, pageType] of Object.entries(siteAnalysis.page_types)) {
     const pageTypeData = pageType as any;
     
-    // Use AI to identify all fields
-    const prompt = `You are analyzing an automotive website for complete data extraction.
+    // Get sample page content for analysis
+    let sampleHtml = '';
+    let sampleMarkdown = '';
+    
+    if (pageTypeData.sample_urls && pageTypeData.sample_urls.length > 0 && FIRECRAWL_API_KEY) {
+      try {
+        const sampleUrl = pageTypeData.sample_urls[0];
+        const crawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            url: sampleUrl,
+            formats: ['html', 'markdown'],
+            onlyMainContent: false
+          })
+        });
+        
+        if (crawlResponse.ok) {
+          const crawlData = await crawlResponse.json();
+          sampleHtml = (crawlData.html || '').substring(0, 50000); // Limit to 50KB
+          sampleMarkdown = (crawlData.markdown || '').substring(0, 10000); // Limit to 10KB
+        }
+      } catch (err: any) {
+        console.warn(`Failed to fetch sample page: ${err.message}`);
+      }
+    }
+    
+    // Build checklist-based prompt for LLM
+    const checklistJson = JSON.stringify(
+      checklist.map(f => ({
+        field_name: f.field_name,
+        db_table: f.db_table,
+        db_column: f.db_column,
+        data_type: f.data_type,
+        is_required: f.is_required,
+        priority: f.priority,
+        llm_question: f.llm_question,
+        llm_instructions: f.llm_instructions,
+        extraction_hints: f.extraction_hints || [],
+        common_patterns: f.common_patterns || [],
+        example_values: f.example_values || []
+      })),
+      null,
+      2
+    );
+    
+    const prompt = `You are an expert automotive data extraction agent. Your job is to systematically go through a CHECKLIST and find EVERY field on this page.
 
 PAGE TYPE: ${pageTypeName}
 URL PATTERN: ${pageTypeData.url_pattern}
 
-TASK: Identify EVERY data field available on this page type.
+${sampleHtml ? `HTML CONTENT (first 50KB):
+${sampleHtml}
 
-Don't just list obvious fields (year, make, model, price).
-List EVERYTHING available:
-- All technical specifications (year, make, model, trim, VIN, mileage, color, transmission, engine, horsepower, torque, drivetrain, body_style, doors, seats, weight, dimensions, fuel_type, mpg, etc.)
-- All pricing information (asking_price, sale_price, reserve_price, current_bid, buyer_premium, currency, etc.)
-- All description sections (full narrative, highlights, features, options, etc.)
-- All history/service records (service_history, accident_history, ownership_history, modifications, etc.)
-- All seller information (seller_name, seller_type, seller_website, seller_phone, seller_email, seller_location, etc.)
-- All location data (city, state, zip_code, country, coordinates, etc.)
-- All auction details (if applicable: lot_number, auction_status, auction_end_date, bid_count, bid_history, etc.)
-- All images (primary_image, gallery_images, thumbnail, etc.)
-- All metadata (structured data, JSON-LD, microdata, etc.)
-- All hidden fields in HTML
-- All data in JavaScript variables
-- Everything visible and extractable
+MARKDOWN CONTENT:
+${sampleMarkdown}` : 'No sample content available - analyze based on page type and checklist.'}
 
-For each field, provide:
-- Field name
-- Where it appears (section, selector)
-- Extraction method (CSS selector, regex, AI extraction)
-- Data type
-- Example value
+DATABASE CHECKLIST (${checklist.length} fields to find):
+${checklistJson}
 
-Return comprehensive JSON list of ALL fields.`;
+YOUR TASK:
+1. Go through the checklist SYSTEMATICALLY
+2. For EACH field in the checklist, answer the "llm_question"
+3. Find where that field appears on the page
+4. Provide CSS selectors, XPath, or extraction patterns
+5. If field is not found, mark it as "not_available" with confidence 0
 
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
-        temperature: 0.1
-      })
-    });
-    
-    const aiData = await aiResponse.json();
-    const fields = JSON.parse(aiData.choices[0].message.content);
-    
-    allFields.push(...(fields.fields || []));
+For EACH field you find, return:
+{
+  "field_name": "exact field name from checklist",
+  "found": true|false,
+  "selectors": ["primary_css_selector", "fallback_selector"],
+  "extraction_method": "css|regex|json-ld|script|ai",
+  "pattern": "regex_pattern_if_needed",
+  "data_type": "string|number|date|boolean|array",
+  "example_value": "actual example from page",
+  "confidence": 0.0-1.0,
+  "section": "where it appears on page",
+  "notes": "any important notes"
+}
+
+Return JSON:
+{
+  "fields_found": [/* array of found fields */],
+  "fields_not_found": [/* array of field names not found */],
+  "coverage_percentage": 0-100,
+  "recommendations": [/* extraction recommendations */]
+}`;
+
+    try {
+      const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert web scraping analyst specializing in automotive data extraction. You systematically go through checklists to find all required fields. Always return valid JSON.'
+            },
+            { role: 'user', content: prompt }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.1,
+          max_tokens: 4000
+        })
+      });
+      
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json();
+        const result = JSON.parse(aiData.choices[0].message.content);
+        allFields.push(...(result.fields_found || []));
+        
+        // Log coverage for this page type
+        if (result.coverage_percentage !== undefined) {
+          console.log(`   📊 ${pageTypeName}: ${result.coverage_percentage.toFixed(1)}% coverage (${result.fields_found?.length || 0} found, ${result.fields_not_found?.length || 0} not found)`);
+        }
+      } else {
+        console.warn(`OpenAI API error for ${pageTypeName}: ${aiResponse.status}`);
+      }
+    } catch (err: any) {
+      console.warn(`AI field identification failed for ${pageTypeName}: ${err.message}`);
+    }
   }
   
-  // Deduplicate
-  const uniqueFields = Array.from(new Map(allFields.map(f => [f.name, f])).values());
+  // Deduplicate by field name
+  const uniqueFields = Array.from(
+    new Map(allFields.map(f => [f.field_name || f.name, f])).values()
+  );
   
   return uniqueFields;
+}
+
+async function identifyAllFieldsFallback(siteAnalysis: any, supabase: any): Promise<any[]> {
+  // Fallback if checklist not available - use basic field list
+  const basicFields = [
+    'year', 'make', 'model', 'vin', 'mileage', 'color', 'transmission', 
+    'engine_size', 'drivetrain', 'body_style', 'trim', 'asking_price',
+    'description', 'location', 'seller_name', 'seller_website'
+  ];
+  
+  return basicFields.map(name => ({
+    name,
+    selectors: [],
+    extraction_method: 'css',
+    data_type: 'text',
+    confidence: 0.5
+  }));
 }
 
 async function mapAllFieldsToDatabase(
@@ -394,10 +521,15 @@ async function mapAllFieldsToDatabase(
   siteAnalysis: any,
   supabase: any
 ): Promise<CompleteFieldMapping> {
-  // Get database schemas
-  const vehicleSchema = await getVehicleSchema(supabase);
-  const organizationSchema = await getOrganizationSchema(supabase);
-  const rawDataSchema = getRawDataSchema();
+  // Use database checklist to map fields (already has db_table and db_column)
+  // Get checklist for reference
+  const { data: checklist } = await supabase
+    .from('extraction_field_checklist')
+    .select('field_name, db_table, db_column, is_required');
+  
+  const checklistMap = new Map(
+    (checklist || []).map(f => [f.field_name, f])
+  );
   
   const mappings: CompleteFieldMapping = {
     vehicle_fields: {},
@@ -406,28 +538,38 @@ async function mapAllFieldsToDatabase(
     external_identity_fields: {}
   };
   
-  // Map each field to best database match
+  // Map each found field using checklist
   for (const field of fields) {
-    const match = findBestSchemaMatch(field, vehicleSchema, organizationSchema, rawDataSchema);
+    const fieldName = field.field_name || field.name;
+    const checklistItem = checklistMap.get(fieldName);
+    
+    // Use checklist mapping if available, otherwise infer
+    const dbTable = checklistItem?.db_table || (field.db_table || 'raw_data');
+    const dbColumn = checklistItem?.db_column || fieldName;
     
     const fieldMapping: FieldMapping = {
-      selector: field.selector || field.selectors || '',
+      selector: Array.isArray(field.selectors) ? field.selectors[0] : (field.selector || field.selectors || ''),
       pattern: field.pattern || '',
       transform: field.transform || null,
       confidence: field.confidence || 0.8,
-      required: field.required || false,
-      db_field: match.db_field,
-      db_table: match.table
+      required: checklistItem?.is_required || field.required || false,
+      db_field: dbColumn,
+      db_table: dbTable
     };
     
-    if (match.table === 'vehicles') {
-      mappings.vehicle_fields[field.name] = fieldMapping;
-    } else if (match.table === 'raw_data') {
-      mappings.raw_data_fields[field.name] = fieldMapping;
-    } else if (match.table === 'businesses') {
-      mappings.organization_fields[field.name] = fieldMapping;
-    } else if (match.table === 'external_identities') {
-      mappings.external_identity_fields[field.name] = fieldMapping;
+    // Add fallback selectors if available
+    if (Array.isArray(field.selectors) && field.selectors.length > 1) {
+      fieldMapping.selector = field.selectors; // Store as array for multiple fallbacks
+    }
+    
+    if (dbTable === 'vehicles') {
+      mappings.vehicle_fields[fieldName] = fieldMapping;
+    } else if (dbTable === 'raw_data') {
+      mappings.raw_data_fields[fieldName] = fieldMapping;
+    } else if (dbTable === 'businesses') {
+      mappings.organization_fields[fieldName] = fieldMapping;
+    } else if (dbTable === 'external_identities') {
+      mappings.external_identity_fields[fieldName] = fieldMapping;
     }
   }
   
@@ -538,13 +680,135 @@ function detectSiteType(url: string, html: string): string {
 }
 
 async function analyzePageType(pageType: any, html: string, markdown: string, openaiKey: string): Promise<PageTypeMap> {
-  // Analyze specific page type
-  return {
-    url_pattern: pageType.url_pattern,
-    sections: [],
-    fields: [],
-    extraction_rules: []
-  };
+  // Use LLM to intelligently analyze page structure and identify all sections and fields
+  if (!openaiKey) {
+    console.warn('No OpenAI API key - using basic analysis');
+    return {
+      url_pattern: pageType.url_pattern,
+      sections: [],
+      fields: [],
+      extraction_rules: []
+    };
+  }
+
+  // Get sample HTML for this page type (first 50KB to stay within token limits)
+  const sampleHtml = html.substring(0, 50000);
+  const sampleMarkdown = markdown.substring(0, 10000);
+
+  const analysisPrompt = `You are an expert web scraping analyst. Analyze this automotive listing page and create a complete DOM mapping.
+
+PAGE TYPE: ${pageType.name}
+URL PATTERN: ${pageType.url_pattern}
+
+HTML SAMPLE (first 50KB):
+${sampleHtml}
+
+MARKDOWN SAMPLE:
+${sampleMarkdown}
+
+TASK: Create a comprehensive DOM mapping with:
+1. All sections on the page (header, gallery, specs, pricing, description, seller, etc.)
+2. All fields in each section with:
+   - CSS selectors (multiple fallbacks)
+   - XPath (if needed)
+   - Data extraction patterns
+   - Field names
+   - Data types
+   - Example values
+3. Intelligent extraction rules for each field
+
+REQUIREMENTS:
+- Map EVERY available field, not just obvious ones
+- Provide multiple selector fallbacks for robustness
+- Identify hidden data (JSON-LD, microdata, script tags)
+- Map to standard automotive fields (year, make, model, VIN, mileage, price, etc.)
+- Include site-specific fields in raw_data
+- Identify organization/seller fields
+- Identify image sources (gallery, thumbnails, lazy-loaded)
+
+Return JSON with structure:
+{
+  "sections": [
+    {
+      "name": "section_name",
+      "selector": "css_selector",
+      "fields": [
+        {
+          "name": "field_name",
+          "selectors": ["primary_selector", "fallback_selector"],
+          "extraction_method": "css|regex|json-ld|script",
+          "pattern": "regex_pattern_if_needed",
+          "transform": "transformation_function_if_needed",
+          "data_type": "string|number|date|boolean|array",
+          "example_value": "example",
+          "db_field": "suggested_database_field",
+          "db_table": "vehicles|businesses|raw_data",
+          "required": true|false,
+          "confidence": 0.0-1.0
+        }
+      ]
+    }
+  ],
+  "extraction_rules": [
+    {
+      "rule_name": "rule_description",
+      "condition": "when_to_apply",
+      "action": "what_to_do"
+    }
+  ]
+}`;
+
+  try {
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert web scraping analyst specializing in automotive data extraction. Always return valid JSON.'
+          },
+          { role: 'user', content: analysisPrompt }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.1,
+        max_tokens: 4000
+      })
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.warn(`OpenAI API error: ${aiResponse.status} - ${errorText}`);
+      return {
+        url_pattern: pageType.url_pattern,
+        sections: [],
+        fields: [],
+        extraction_rules: []
+      };
+    }
+
+    const aiData = await aiResponse.json();
+    const analysis = JSON.parse(aiData.choices[0].message.content);
+
+    return {
+      url_pattern: pageType.url_pattern,
+      sections: analysis.sections || [],
+      fields: (analysis.sections || []).flatMap((s: any) => s.fields || []),
+      extraction_rules: analysis.extraction_rules || []
+    };
+  } catch (error: any) {
+    console.warn(`AI analysis failed: ${error.message}`);
+    return {
+      url_pattern: pageType.url_pattern,
+      sections: [],
+      fields: [],
+      extraction_rules: []
+    };
+  }
 }
 
 async function getVehicleSchema(supabase: any): Promise<any> {
@@ -596,6 +860,60 @@ function findBestSchemaMatch(field: any, vehicleSchema: any, orgSchema: any, raw
   
   // Default to raw_data for unmapped fields
   return { table: 'raw_data', db_field: fieldName };
+}
+
+async function ensureSourceOrganization(sourceUrl: string, siteAnalysis: any, supabase: any): Promise<string | null> {
+  // Automatically create organization profile for the source platform
+  const domain = extractDomain(sourceUrl);
+  const siteName = domain.replace(/\.(com|net|org|io)$/, '').split('.').pop() || domain;
+  
+  // Determine business type from site analysis
+  const siteType = siteAnalysis.site_type || 'marketplace';
+  let businessType = 'other';
+  if (siteType === 'auction_house') businessType = 'auction_house';
+  else if (siteType === 'marketplace') businessType = 'other'; // marketplace not in allowed types
+  
+  // Check if org already exists
+  const { data: existingOrg } = await supabase
+    .from('businesses')
+    .select('id')
+    .or(`website.eq.https://${domain},website.eq.https://www.${domain},website.eq.http://${domain},website.eq.http://www.${domain}`)
+    .maybeSingle();
+  
+  if (existingOrg) {
+    return existingOrg.id;
+  }
+  
+  // Create new organization
+  const orgName = siteName.split('-').map((w: string) => 
+    w.charAt(0).toUpperCase() + w.slice(1)
+  ).join(' ');
+  
+  const { data: newOrg, error } = await supabase
+    .from('businesses')
+    .insert({
+      business_name: orgName,
+      business_type: businessType,
+      website: `https://${domain}`,
+      description: `Automotive ${siteType} platform`,
+      is_public: true,
+      is_verified: false,
+      metadata: {
+        source_type: siteType,
+        discovered_via: 'thorough-site-mapper',
+        discovered_at: new Date().toISOString(),
+        domain: domain
+      }
+    })
+    .select('id')
+    .single();
+  
+  if (error) {
+    console.warn(`Failed to create organization: ${error.message}`);
+    return null;
+  }
+  
+  return newOrg.id;
 }
 
 async function getOrCreateSourceId(url: string, supabase: any): Promise<string> {

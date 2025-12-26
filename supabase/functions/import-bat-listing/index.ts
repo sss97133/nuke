@@ -156,8 +156,12 @@ function parseBatLiveMetricsFromHtml(html: string): {
 
 async function tryFirecrawlHtml(url: string): Promise<{ html: string; title: string } | null> {
   const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
-  if (!firecrawlApiKey) return null;
+  if (!firecrawlApiKey) {
+    console.log('[import-bat-listing] FIRECRAWL_API_KEY not set, skipping Firecrawl');
+    return null;
+  }
   try {
+    console.log(`[import-bat-listing] Calling Firecrawl for ${url}`);
     const r = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
@@ -167,19 +171,28 @@ async function tryFirecrawlHtml(url: string): Promise<{ html: string; title: str
       body: JSON.stringify({
         url,
         formats: ['html', 'markdown'],
-        onlyMainContent: false,
-        waitFor: 6500,
+        onlyMainContent: false, // CRITICAL: Must be false to get full HTML with data-gallery-items
+        waitFor: 12000, // Increased to allow more time for gallery images to load
+        timeout: 60000, // 60 second timeout for large pages
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(90000), // 90 second timeout for the fetch itself
     });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      const errorText = await r.text().catch(() => '');
+      console.warn(`[import-bat-listing] Firecrawl returned ${r.status}: ${errorText.slice(0, 200)}`);
+      return null;
+    }
     const j = await r.json().catch(() => ({}));
-    if (!j?.success) return null;
-    return {
-      html: String(j?.data?.html || ''),
-      title: String(j?.data?.metadata?.title || ''),
-    };
-  } catch {
+    if (!j?.success) {
+      console.warn(`[import-bat-listing] Firecrawl returned success=false: ${JSON.stringify(j).slice(0, 200)}`);
+      return null;
+    }
+    const html = String(j?.data?.html || '');
+    const title = String(j?.data?.metadata?.title || '');
+    console.log(`[import-bat-listing] Firecrawl success: HTML length=${html.length}, title="${title.slice(0, 50)}"`);
+    return { html, title };
+  } catch (e) {
+    console.warn(`[import-bat-listing] Firecrawl error: ${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
 }
@@ -346,13 +359,17 @@ serve(async (req) => {
     const firecrawl = await tryFirecrawlHtml(batUrl);
     let html = '';
     let title = '';
+    let htmlSource = 'none';
 
     if (firecrawl?.html) {
       html = firecrawl.html;
       title = String(firecrawl.title || '').trim();
+      htmlSource = 'firecrawl';
+      console.log(`[import-bat-listing] Using Firecrawl HTML (${html.length} chars)`);
     }
 
     if (!html) {
+      console.log(`[import-bat-listing] Firecrawl failed, using direct fetch`);
       const response = await fetch(batUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; N-Zero Bot/1.0)',
@@ -361,6 +378,30 @@ serve(async (req) => {
         }
       });
       html = await response.text();
+      htmlSource = 'direct-fetch';
+      console.log(`[import-bat-listing] Direct fetch HTML (${html.length} chars)`);
+    }
+
+    // Debug: Check if data-gallery-items exists and how many items it contains
+    const galleryItemsMatch = html.match(/data-gallery-items\s*=\s*["']([^"']+)["']/i);
+    if (galleryItemsMatch) {
+      try {
+        const decoded = galleryItemsMatch[1]
+          .replace(/&quot;/g, '"')
+          .replace(/&#039;/g, "'")
+          .replace(/&#038;/g, '&')
+          .replace(/&amp;/g, '&');
+        const items = JSON.parse(decoded);
+        if (Array.isArray(items)) {
+          console.log(`[import-bat-listing] Found data-gallery-items with ${items.length} items in HTML (source: ${htmlSource})`);
+        } else {
+          console.warn(`[import-bat-listing] data-gallery-items is not an array`);
+        }
+      } catch (e) {
+        console.warn(`[import-bat-listing] Failed to parse data-gallery-items: ${e}`);
+      }
+    } else {
+      console.warn(`[import-bat-listing] data-gallery-items attribute not found in HTML (source: ${htmlSource}, length: ${html.length})`);
     }
 
     // Parse title (h1 is the most reliable on BaT listing pages)
@@ -736,7 +777,9 @@ serve(async (req) => {
     // Persist BaT gallery images into vehicle_images (fixes: "images show up via UI fallback but DB has 0 images").
     // IMPORTANT: do not cap galleries; use backfill-images chaining to stay within runtime limits.
     try {
+      console.log(`[import-bat-listing] Extracting images from HTML (source: ${htmlSource}, length: ${html.length})`);
       const images = extractBatGalleryImagesFromHtml(html);
+      console.log(`[import-bat-listing] Extracted ${images.length} images from HTML`);
       if (vehicleId && images.length > 0) {
         await supabase.functions.invoke('backfill-images', {
           body: {

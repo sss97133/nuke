@@ -1285,10 +1285,96 @@ serve(async (req) => {
     if (url.includes('sbxcars.com')) {
       data.source = 'SBX Cars'
 
-      // Extract title
-      const titleElement = doc?.querySelector('h1') || doc?.querySelector('[class*="title"]')
-      if (titleElement) {
-        data.title = titleElement.textContent?.trim() || data.title
+      // Extract lot number from URL first (most reliable)
+      const lotMatch = url.match(/\/listing\/(\d+)\//)
+      if (lotMatch && lotMatch[1]) {
+        data.lot_number = lotMatch[1]
+      }
+
+      // Extract year/make/model from URL slug (most reliable for SBX Cars)
+      // URL pattern: /listing/{lot}/{year}-{make}-{model}-{rest}
+      // Examples: 
+      //   /listing/555/2024-mercedes-amg-gt-63-4matic (mercedes without benz)
+      //   /listing/405/1987-mercedes-benz-300slr (mercedes-benz)
+      //   /listing/564/1966-jaguar-xke-coupe-3-8l (single-word make)
+      const urlSlugMatch = url.match(/\/listing\/\d+\/([^/?]+)/)
+      if (urlSlugMatch && urlSlugMatch[1]) {
+        const slug = urlSlugMatch[1]
+        const slugParts = slug.split('-')
+        
+        // First part should be year
+        if (slugParts.length > 0 && /^(19|20)\d{2}$/.test(slugParts[0])) {
+          data.year = parseInt(slugParts[0])
+          
+          // Rest is make and model
+          if (slugParts.length > 1) {
+            // Handle Mercedes-Benz (two-word make: mercedes-benz)
+            if (slugParts[1].toLowerCase() === 'mercedes' && slugParts.length > 2 && slugParts[2].toLowerCase() === 'benz') {
+              data.make = 'Mercedes-Benz'
+              data.model = slugParts.slice(3).join('-').replace(/-/g, ' ') || null
+            } 
+            // Handle Mercedes (without benz) - common in SBX Cars URLs
+            else if (slugParts[1].toLowerCase() === 'mercedes' && slugParts.length > 2) {
+              data.make = 'Mercedes-Benz' // Normalize to Mercedes-Benz
+              data.model = slugParts.slice(2).join('-').replace(/-/g, ' ') || null
+            }
+            // Single-word make
+            else if (slugParts.length > 1) {
+              // Capitalize first letter, lowercase rest for make
+              const makeWord = slugParts[1]
+              data.make = makeWord.charAt(0).toUpperCase() + makeWord.slice(1).toLowerCase()
+              // Rest is model
+              if (slugParts.length > 2) {
+                data.model = slugParts.slice(2).join('-').replace(/-/g, ' ') || null
+              }
+            }
+          }
+        }
+      }
+
+      // Try to get title from page (more specific selectors to avoid site branding)
+      const titleSelectors = [
+        'h1[class*="listing"]',
+        'h1[class*="title"]',
+        '[class*="listing-title"]',
+        '[class*="vehicle-title"]',
+        'h1'
+      ]
+      
+      let titleElement: any = null
+      for (const selector of titleSelectors) {
+        titleElement = doc?.querySelector(selector)
+        if (titleElement) {
+          const titleText = titleElement.textContent?.trim() || ''
+          // Skip if it looks like site branding
+          if (titleText && !titleText.toLowerCase().includes('sbx cars by supercar blondie')) {
+            data.title = titleText
+            break
+          }
+        }
+      }
+
+      // If we don't have year/make/model yet, try parsing from title
+      if (data.title && (!data.year || !data.make || !data.model)) {
+        const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
+        if (yearMatch && !data.year) {
+          data.year = parseInt(yearMatch[0])
+        }
+
+        const parts = data.title.split(/\s+/)
+        if (parts.length >= 3) {
+          const yearIndex = parts.findIndex((p) => /^(19|20)\d{2}$/.test(p))
+          if (yearIndex >= 0 && yearIndex < parts.length - 1) {
+            // Handle Mercedes-Benz (two words)
+            if (parts[yearIndex + 1]?.toLowerCase() === 'mercedes' && parts[yearIndex + 2]?.toLowerCase() === 'benz') {
+              if (!data.make) data.make = 'Mercedes-Benz'
+              if (!data.model) data.model = parts.slice(yearIndex + 3).join(' ') || null
+            } else {
+              if (!data.make) data.make = parts[yearIndex + 1] || null
+              if (!data.model) data.model = parts.slice(yearIndex + 2).join(' ') || null
+            }
+          }
+        }
       }
 
       // Extract price/bid information
@@ -1311,16 +1397,6 @@ serve(async (req) => {
         }
       }
 
-      // Extract lot number
-      const lotElement = doc?.querySelector('[class*="lot"]')
-      if (lotElement) {
-        const lotText = lotElement.textContent?.trim()
-        const lotMatch = lotText.match(/lot[:\s#]+([A-Z0-9-]+)/i)
-        if (lotMatch) {
-          data.lot_number = lotMatch[1]
-        }
-      }
-
       // Extract description
       const descriptionElement = doc?.querySelector('[class*="description"]')
       if (descriptionElement) {
@@ -1331,23 +1407,6 @@ serve(async (req) => {
       const locationElement = doc?.querySelector('[class*="location"]')
       if (locationElement) {
         data.location = locationElement.textContent?.trim()
-      }
-
-      // Extract year, make, model from title if not already set
-      if (data.title && (!data.year || !data.make || !data.model)) {
-        const yearMatch = data.title.match(/\b(19|20)\d{2}\b/)
-        if (yearMatch) {
-          data.year = parseInt(yearMatch[0])
-        }
-
-        const parts = data.title.split(/\s+/)
-        if (parts.length >= 3) {
-          const yearIndex = parts.findIndex((p) => /^(19|20)\d{2}$/.test(p))
-          if (yearIndex >= 0 && yearIndex < parts.length - 1) {
-            if (!data.make) data.make = parts[yearIndex + 1] || null
-            if (!data.model) data.model = parts.slice(yearIndex + 2).join(' ') || null
-          }
-        }
       }
 
       // Determine auction status
@@ -1563,8 +1622,8 @@ function extractBatGalleryImagesFromHtml(html: string): string[] {
 
   // 1) Canonical source: listing gallery JSON
   try {
-    let idx = h.indexOf('id=\"bat_listing_page_photo_gallery\"')
-    if (idx < 0) idx = h.indexOf(\"id='bat_listing_page_photo_gallery'\")
+    let idx = h.indexOf('id="bat_listing_page_photo_gallery"')
+    if (idx < 0) idx = h.indexOf("id='bat_listing_page_photo_gallery'")
     if (idx >= 0) {
       const window = h.slice(idx, idx + 300000)
       const m = window.match(/data-gallery-items=(?:\"([^\"]+)\"|'([^']+)')/i)
