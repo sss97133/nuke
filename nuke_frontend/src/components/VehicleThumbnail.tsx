@@ -88,12 +88,13 @@ const VehicleThumbnail: React.FC<VehicleThumbnailProps> = ({
         // Step 3: Generate proper render URL
         if (selectedImageUrl) {
           const width = size === 'small' ? 220 : size === 'medium' ? 420 : 640;
+          const quality = size === 'small' ? 80 : 85; // Consistent quality settings
 
           // Check if it's a Supabase storage URL that needs transformation
           if (selectedImageUrl.includes('/storage/v1/object/public/')) {
             const transformUrl = selectedImageUrl
               .replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
-              + `?width=${width}&quality=70`;
+              + `?width=${width}&quality=${quality}`;
 
             console.log('🔄 Transform URL:', transformUrl);
             setImageUrl(transformUrl);

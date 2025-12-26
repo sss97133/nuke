@@ -330,6 +330,9 @@ serve(async (req) => {
       case 'barrettjackson':
         result = await extractBarrettJackson(url, max_vehicles);
         break;
+      case 'bringatrailer':
+        result = await extractBringATrailer(url, max_vehicles);
+        break;
       case 'russoandsteele':
         result = await extractRussoAndSteele(url, max_vehicles);
         break;
@@ -804,6 +807,7 @@ async function storeVehiclesInDatabase(
           listing_source: source.toLowerCase(),
           listing_title: title,
           auction_end_date: vehicle.auction_end_date || null,
+          current_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
           bid_count: Number.isFinite(vehicle.bid_count) ? Math.trunc(vehicle.bid_count) : null,
           is_public: true,
           discovery_source: `${source.toLowerCase()}_agent_extraction`,
@@ -887,6 +891,53 @@ async function storeVehiclesInDatabase(
         // Persist raw listing description as a provenance-backed "description entry"
         // (shown in UI as a dated, source-linked post).
         await saveRawListingDescription(String(data.id), listingUrl, rawListingDescription);
+
+        // Create external_listing for BaT auctions to enable current_bid and timer display
+        const isBatListing = listingUrl && String(listingUrl).includes('bringatrailer.com');
+        if (isBatListing && (vehicle.current_bid || vehicle.auction_end_date)) {
+          try {
+            const lotMatch = String(listingUrl).match(/-(\d+)\/?$/);
+            const lotNumber = lotMatch ? lotMatch[1] : null;
+            
+            // Calculate end_date in ISO format
+            let endDateIso: string | null = null;
+            if (vehicle.auction_end_date) {
+              try {
+                const endDate = new Date(vehicle.auction_end_date);
+                if (Number.isFinite(endDate.getTime())) {
+                  endDate.setUTCHours(23, 59, 59, 999);
+                  endDateIso = endDate.toISOString();
+                }
+              } catch {
+                // ignore date parsing errors
+              }
+            }
+            
+            await supabase
+              .from('external_listings')
+              .upsert({
+                vehicle_id: data.id,
+                organization_id: sourceOrgId,
+                platform: 'bat',
+                listing_url: listingUrl,
+                listing_status: endDateIso && new Date(endDateIso) > new Date() ? 'active' : 'ended',
+                listing_id: lotNumber || listingUrl.split('/').filter(Boolean).pop() || null,
+                end_date: endDateIso,
+                current_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
+                bid_count: Number.isFinite(vehicle.bid_count) ? Math.trunc(vehicle.bid_count) : null,
+                metadata: {
+                  source: 'extract-premium-auction',
+                  lot_number: lotNumber,
+                  auction_end_date: vehicle.auction_end_date,
+                },
+                updated_at: nowIso(),
+              }, {
+                onConflict: 'vehicle_id,platform,listing_id',
+              });
+          } catch (e: any) {
+            console.warn(`external_listings upsert failed (non-fatal): ${e?.message || String(e)}`);
+          }
+        }
 
         // organization_vehicles link is created by DB trigger auto_link_vehicle_to_origin_org()
         // when origin_organization_id is set.
@@ -996,7 +1047,10 @@ async function insertVehicleImages(
           vehicle_id: vehicleId,
           image_url: imageUrl,
           // Must satisfy vehicle_images_attribution_check
-          source: "external_import",
+          // For BaT, use 'bat_import' source so badges show correctly
+          source: source.toLowerCase().includes('bring a trailer') || source.toLowerCase().includes('bringatrailer') 
+            ? "bat_import" 
+            : "external_import",
           source_url: imageUrl,
           is_external: true,
           ai_processing_status: "pending",
@@ -1684,6 +1738,196 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
       map_url_sample: (mapRaw?.data?.urls || mapRaw?.urls || mapRaw?.data || mapRaw?.links || []).slice?.(0, 5) || null,
       discovered_listing_urls: listingUrls.slice(0, 5),
     },
+  };
+}
+
+async function extractBringATrailer(url: string, maxVehicles: number) {
+  console.log("Bring a Trailer: extracting listing with high-res images");
+
+  const normalizedUrl = String(url || "").trim();
+  const isDirectListing = normalizedUrl.includes("bringatrailer.com/listing/");
+  
+  if (!isDirectListing) {
+    return {
+      success: false,
+      source: "Bring a Trailer",
+      site_type: "bringatrailer",
+      error: "URL must be a direct BaT listing URL (bringatrailer.com/listing/...)",
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  const sourceWebsite = "https://bringatrailer.com";
+
+  // Import BaT extraction utilities
+  const upgradeBatImageUrl = (url: string): string => {
+    if (!url || typeof url !== 'string' || !url.includes('bringatrailer.com')) {
+      return url;
+    }
+    return url
+      .replace(/&#038;/g, '&')
+      .replace(/&#039;/g, "'")
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/[?&]w=\d+/g, '')
+      .replace(/[?&]h=\d+/g, '')
+      .replace(/[?&]resize=[^&]*/g, '')
+      .replace(/[?&]fit=[^&]*/g, '')
+      .replace(/[?&]quality=[^&]*/g, '')
+      .replace(/[?&]strip=[^&]*/g, '')
+      .replace(/[?&]+$/, '')
+      .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .trim();
+  };
+
+  const extractBatGalleryImagesFromHtml = (html: string): string[] => {
+    const h = String(html || '');
+    const urls: string[] = [];
+    
+    try {
+      // Extract from data-gallery-items JSON (most reliable)
+      const idx = h.indexOf('id="bat_listing_page_photo_gallery"');
+      if (idx >= 0) {
+        const window = h.slice(idx, idx + 300000);
+        const m = window.match(/data-gallery-items=(?:"([^"]+)"|'([^']+)')/i);
+        const encoded = (m?.[1] || m?.[2] || '').trim();
+        if (encoded) {
+          const jsonText = encoded.replace(/&quot;/g, '"').replace(/&#038;/g, '&').replace(/&amp;/g, '&');
+          const items = JSON.parse(jsonText);
+          if (Array.isArray(items)) {
+            for (const it of items) {
+              let u = it?.full?.url || it?.original?.url || it?.large?.url || it?.small?.url;
+              if (typeof u === 'string' && u.trim()) {
+                u = upgradeBatImageUrl(u);
+                const normalized = u.split('#')[0].split('?')[0].replace(/-scaled\./g, '.').trim();
+                if (normalized.includes('bringatrailer.com/wp-content/uploads/') && 
+                    !normalized.endsWith('.svg') && !normalized.endsWith('.pdf')) {
+                  urls.push(normalized);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      console.warn('Error extracting BaT gallery images:', e?.message);
+    }
+    
+    return Array.from(new Set(urls));
+  };
+
+  const listingSchema = {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Listing title" },
+      year: { type: "number", description: "Vehicle year" },
+      make: { type: "string", description: "Vehicle make" },
+      model: { type: "string", description: "Vehicle model" },
+      trim: { type: "string", description: "Trim level" },
+      vin: { type: "string", description: "VIN if available" },
+      mileage: { type: "number", description: "Mileage / odometer" },
+      color: { type: "string", description: "Exterior color" },
+      interior_color: { type: "string", description: "Interior color" },
+      transmission: { type: "string", description: "Transmission" },
+      drivetrain: { type: "string", description: "Drivetrain" },
+      engine_size: { type: "string", description: "Engine" },
+      fuel_type: { type: "string", description: "Fuel type" },
+      body_style: { type: "string", description: "Body style" },
+      current_bid: { type: "number", description: "Current bid amount" },
+      bid_count: { type: "number", description: "Number of bids" },
+      reserve_met: { type: "boolean", description: "Reserve met" },
+      auction_end_date: { type: "string", description: "Auction end date/time (ISO format preferred)" },
+      auction_start_date: { type: "string", description: "Auction start date" },
+      location: { type: "string", description: "Location" },
+      description: { type: "string", description: "Description" },
+      images: { type: "array", items: { type: "string" }, description: "ALL high-resolution image URLs from gallery" },
+    },
+  };
+
+  const extracted: any[] = [];
+  const issues: string[] = [];
+
+  try {
+    const firecrawlData = await fetchJsonWithTimeout(
+      FIRECRAWL_SCRAPE_URL,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${firecrawlKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: normalizedUrl,
+          formats: ["extract", "html"],
+          onlyMainContent: false,
+          waitFor: 5000, // Wait for gallery to load
+          extract: { schema: listingSchema },
+        }),
+      },
+      FIRECRAWL_LISTING_TIMEOUT_MS,
+      "Firecrawl BaT listing scrape",
+    );
+
+    const vehicle = firecrawlData?.data?.extract || {};
+    const html = String(firecrawlData?.data?.html || "");
+
+    // Extract high-res images from HTML gallery (more reliable than Firecrawl extraction)
+    let images: string[] = [];
+    if (html) {
+      images = extractBatGalleryImagesFromHtml(html);
+    }
+    
+    // Merge Firecrawl images if any, but prioritize HTML extraction
+    if (images.length === 0 && Array.isArray(vehicle?.images) && vehicle.images.length > 0) {
+      images = vehicle.images.map((u: string) => upgradeBatImageUrl(u));
+    }
+
+    // Upgrade all image URLs to highest resolution
+    images = images.map(upgradeBatImageUrl).filter((u: string) => {
+      const lower = u.toLowerCase();
+      return !lower.includes('logo') && 
+             !lower.includes('icon') && 
+             !lower.includes('placeholder') &&
+             !lower.includes('no-image') &&
+             !lower.includes('/assets/') &&
+             !lower.includes('/icons/');
+    });
+
+    const merged = {
+      ...vehicle,
+      listing_url: normalizedUrl,
+      images,
+      // Ensure current_bid and auction_end_date are preserved
+      current_bid: typeof vehicle?.current_bid === 'number' ? vehicle.current_bid : null,
+      auction_end_date: vehicle?.auction_end_date || null,
+      auction_start_date: vehicle?.auction_start_date || null,
+    };
+
+    extracted.push(merged);
+  } catch (e: any) {
+    issues.push(`BaT listing scrape failed: ${normalizedUrl} (${e?.message || String(e)})`);
+  }
+
+  // Store extracted vehicles in DB
+  const created = await storeVehiclesInDatabase(extracted, "Bring a Trailer", sourceWebsite);
+
+  return {
+    success: true,
+    source: "Bring a Trailer",
+    site_type: "bringatrailer",
+    listing_index_url: normalizedUrl,
+    listings_discovered: 1,
+    vehicles_extracted: extracted.length,
+    vehicles_created: created.created_ids.length,
+    vehicles_updated: created.updated_ids.length,
+    vehicles_saved: created.created_ids.length + created.updated_ids.length,
+    created_vehicle_ids: created.created_ids,
+    updated_vehicle_ids: created.updated_ids,
+    issues: [...issues, ...created.errors],
+    extraction_method: "firecrawl_extract_with_html_gallery_parsing",
+    timestamp: new Date().toISOString(),
   };
 }
 

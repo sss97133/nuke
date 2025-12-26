@@ -184,3 +184,4 @@ SELECT * FROM extraction_checklist_by_category;
 SELECT * FROM extraction_field_checklist WHERE is_required = true;
 ```
 
+

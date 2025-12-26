@@ -473,6 +473,8 @@ serve(async (req) => {
               year: yearNum,
               make: finalMake ? (finalMake.charAt(0).toUpperCase() + finalMake.slice(1)) : null,
               model: finalModel || null,
+              asking_price: (data as any)?.asking_price || (data as any)?.price || null,
+              description: rawDesc || null,
               discovery_source: 'craigslist_scrape',
               discovery_url: queueItem.listing_url,
               listing_source: 'craigslist',
@@ -802,6 +804,7 @@ serve(async (req) => {
             .from('vehicles')
             .update({
               asking_price: data.asking_price || data.price || null,
+              description: rawDesc || null,
               mileage: data.mileage || null,
               listing_source: 'craigslist',
               listing_url: queueItem.listing_url,

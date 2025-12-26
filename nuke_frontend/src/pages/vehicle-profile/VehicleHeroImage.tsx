@@ -7,7 +7,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
   const [showGallery, setShowGallery] = useState(false);
   const isMobile = useIsMobile();
   
-  const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality: number = 80): string | null => {
+  const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality: number = 90): string | null => {
     try {
       const url = String(publicObjectUrl || '').trim();
       if (!url) return null;
@@ -33,7 +33,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
   }
   
   // Build sources array - try to get render URL first for optimization, but always include original as fallback
-  const renderFallback = getSupabaseRenderUrl(src, 1600, 85);
+  const renderFallback = getSupabaseRenderUrl(src, 1600, 90);
   // Always include original URL as fallback - ResilientImage will try render URL first, then fall back to original
   const sources = renderFallback ? [renderFallback, src] : [src];
   const finalSources = sources.filter(Boolean) as string[];

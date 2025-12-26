@@ -41,12 +41,15 @@ function cleanMakeName(raw: any): string | null {
   const lower = s0.toLowerCase()
   if (lower === 'chevy') return 'Chevrolet'
   if (lower === 'vw') return 'Volkswagen'
-  if (lower === 'benz') return 'Mercedes'
-  // Title-case-ish
+  if (lower === 'benz') return 'Mercedes-Benz'
+  // Normalize Mercedes-Benz variations
+  if (lower === 'mercedes-benz' || lower === 'mercedes' || lower === 'mercedes benz') return 'Mercedes-Benz'
+  // Title-case-ish - handle both spaces and hyphens
   return s0
-    .split(' ')
+    .split(/[\s-]+/)
     .map((p) => (p.length <= 2 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
-    .join(' ')
+    .join('-')
+    .replace(/-+/g, '-') // Normalize multiple hyphens
 }
 
 function normalizeImageUrls(urls: any[]): string[] {
@@ -1183,6 +1186,10 @@ serve(async (req) => {
     }
 
     // Final normalization pass (regardless of source)
+    // Normalize Mercedes-Benz variations BEFORE cleanMakeName
+    if (data.make && (data.make.toLowerCase() === 'mercedes-benz' || data.make.toLowerCase() === 'mercedes' || data.make.toLowerCase() === 'mercedes benz')) {
+      data.make = 'Mercedes-Benz'
+    }
     data.make = cleanMakeName(data.make) || data.make
     data.model = cleanModelName(data.model) || data.model
 
@@ -1316,16 +1323,39 @@ serve(async (req) => {
             // Handle Mercedes (without benz) - common in SBX Cars URLs
             else if (slugParts[1].toLowerCase() === 'mercedes' && slugParts.length > 2) {
               data.make = 'Mercedes-Benz' // Normalize to Mercedes-Benz
-              data.model = slugParts.slice(2).join('-').replace(/-/g, ' ') || null
+              // Capitalize model words properly (AMG, GT, etc. should be uppercase)
+              const modelParts = slugParts.slice(2).map((part, idx) => {
+                const lower = part.toLowerCase()
+                // Keep common abbreviations uppercase
+                if (['amg', 'gt', 'gts', 'gtr', 'gtrs', 'sl', 'sls', 'slr', 'cls', 'gl', 'gle', 'glc', 'gla', 'g', 's', 'e', 'c', 'a', 'b'].includes(lower)) {
+                  return part.toUpperCase()
+                }
+                // Capitalize first letter
+                return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+              })
+              data.model = modelParts.join(' ') || null
             }
             // Single-word make
             else if (slugParts.length > 1) {
               // Capitalize first letter, lowercase rest for make
               const makeWord = slugParts[1]
               data.make = makeWord.charAt(0).toUpperCase() + makeWord.slice(1).toLowerCase()
-              // Rest is model
+              // Normalize common makes
+              if (data.make.toLowerCase() === 'mercedes-benz' || data.make.toLowerCase() === 'mercedes') {
+                data.make = 'Mercedes-Benz'
+              }
+              // Rest is model - capitalize properly
               if (slugParts.length > 2) {
-                data.model = slugParts.slice(2).join('-').replace(/-/g, ' ') || null
+                const modelParts = slugParts.slice(2).map((part, idx) => {
+                  const lower = part.toLowerCase()
+                  // Keep common abbreviations uppercase
+                  if (['amg', 'gt', 'gts', 'gtr', 'gtrs', 'sl', 'sls', 'slr', 'cls', 'gl', 'gle', 'glc', 'gla', 'g', 's', 'e', 'c', 'a', 'b', 'xke', 'xkr', 'sv', 'gts', 'gtb', 'gto', 'gtr'].includes(lower)) {
+                    return part.toUpperCase()
+                  }
+                  // Capitalize first letter
+                  return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+                })
+                data.model = modelParts.join(' ') || null
               }
             }
           }
@@ -1432,6 +1462,10 @@ serve(async (req) => {
     }
 
     // Final normalization pass (regardless of source)
+    // Normalize Mercedes-Benz variations BEFORE cleanMakeName
+    if (data.make && (data.make.toLowerCase() === 'mercedes-benz' || data.make.toLowerCase() === 'mercedes' || data.make.toLowerCase() === 'mercedes benz')) {
+      data.make = 'Mercedes-Benz'
+    }
     data.make = cleanMakeName(data.make) || data.make
     data.model = cleanModelName(data.model) || data.model
 

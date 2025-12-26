@@ -94,3 +94,4 @@ Earlier scrapings likely worked because:
 
 The current issue is that Firecrawl is failing, so it falls back to direct fetch, but the extraction might not be working correctly with the current deployed code.
 
+

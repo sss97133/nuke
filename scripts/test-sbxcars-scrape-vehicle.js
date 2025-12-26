@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Process SBX Cars import queue items
+// Test scrape-vehicle function with a single SBX Cars URL
 
 import { createClient } from '@supabase/supabase-js'
 import { config } from 'dotenv'
@@ -27,14 +27,11 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   },
 })
 
-async function processQueue(batchSize = 10) {
-  console.log(`⚡ Processing import queue (batch size: ${batchSize})...\n`)
+async function testScrapeVehicle(url) {
+  console.log(`🔍 Testing scrape-vehicle with URL: ${url}\n`)
 
-  const { data, error } = await supabase.functions.invoke('process-import-queue', {
-    body: {
-      batch_size: batchSize,
-      priority_only: false,
-    },
+  const { data, error } = await supabase.functions.invoke('scrape-vehicle', {
+    body: { url },
   })
 
   if (error) {
@@ -47,18 +44,25 @@ async function processQueue(batchSize = 10) {
     return null
   }
 
-  console.log('✅ Processing Results:\n')
+  console.log('✅ Scrape Results:\n')
+  console.log('Year:', data.year)
+  console.log('Make:', data.make)
+  console.log('Model:', data.model)
+  console.log('Title:', data.title)
+  console.log('Source:', data.source)
+  console.log('Lot Number:', data.lot_number)
+  console.log('Asking Price:', data.asking_price)
+  console.log('\nFull data structure:')
   console.log(JSON.stringify(data, null, 2))
+  
   return data
 }
 
 async function main() {
-  const args = process.argv.slice(2)
-  const batchSize = parseInt(args[0]) || 10
-
-  await processQueue(batchSize)
+  const testUrl = process.argv[2] || 'https://sbxcars.com/listing/555/2024-mercedes-amg-gt-63-4matic'
+  
+  await testScrapeVehicle(testUrl)
 }
 
 main().catch(console.error)
-
 
