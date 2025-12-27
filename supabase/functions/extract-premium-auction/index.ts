@@ -347,6 +347,7 @@ function extractCarsAndBidsAuctionData(html: string): {
   reserve_price?: number | null;
   auction_end_date?: string | null;
   final_price?: number | null;
+  sale_date?: string | null;
   view_count?: number | null;
   watcher_count?: number | null;
 } {
@@ -483,6 +484,52 @@ function extractCarsAndBidsAuctionData(html: string): {
       if (price) {
         result.final_price = price;
         break;
+      }
+    }
+  }
+  
+  // Extract sale date (for ended auctions) - e.g., "5/22/25" or "May 22, 2025"
+  const saleDatePatterns = [
+    // Cars & Bids pattern: <span class="time-ended">5/22/25</span>
+    /<span[^>]*class[^>]*time-ended[^>]*>(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+    // Generic patterns
+    /Sold\s+(?:for|on)[^>]*>.*?(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+    /Sold\s+on[^>]*>.*?(\w+\s+\d{1,2},\s+\d{4})/i,
+    /Ended[^>]*>.*?(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+    // JSON
+    /"saleDate"\s*:\s*"([^"]+)"/i,
+    /"soldAt"\s*:\s*"([^"]+)"/i,
+  ];
+  
+  for (const pattern of saleDatePatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const dateStr = match[1].trim();
+      // Parse date string (handles M/D/YY, MM/DD/YYYY, and "Month DD, YYYY" formats)
+      const parsed = Date.parse(dateStr);
+      if (Number.isFinite(parsed)) {
+        result.sale_date = new Date(parsed).toISOString().split('T')[0]; // Store as YYYY-MM-DD
+        break;
+      }
+      // Try manual parsing for M/D/YY format (e.g., "5/22/25")
+      const mdyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+      if (mdyMatch) {
+        const month = parseInt(mdyMatch[1], 10);
+        const day = parseInt(mdyMatch[2], 10);
+        let year = parseInt(mdyMatch[3], 10);
+        // Convert 2-digit year to 4-digit (assume 2000s if < 50, else 1900s)
+        if (year < 100) {
+          year = year < 50 ? 2000 + year : 1900 + year;
+        }
+        try {
+          const date = new Date(year, month - 1, day);
+          if (Number.isFinite(date.getTime())) {
+            result.sale_date = date.toISOString().split('T')[0];
+            break;
+          }
+        } catch {
+          // continue to next pattern
+        }
       }
     }
   }
@@ -1026,6 +1073,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         reserve_price: auctionData.reserve_price ?? vehicle?.reserve_price ?? null,
         auction_end_date: auctionData.auction_end_date ?? vehicle?.auction_end_date ?? null,
         final_price: auctionData.final_price ?? vehicle?.final_price ?? vehicle?.sale_price ?? null,
+        sale_date: auctionData.sale_date ?? vehicle?.sale_date ?? null,
         view_count: auctionData.view_count ?? vehicle?.view_count ?? null,
         watcher_count: auctionData.watcher_count ?? vehicle?.watcher_count ?? null,
       };
