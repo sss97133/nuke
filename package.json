@@ -20,6 +20,7 @@
     "ingest:bat-live-auctions": "tsx scripts/bat-import-live-auctions.ts",
     "ingest:classic-auctions": "tsx scripts/classic-import-auctions.ts",
     "extract-all-orgs": "tsx scripts/extract-all-orgs.ts",
+    "extract-inventory": "node scripts/invoke-extract-inventory.js",
     "trickle-backfill-images": "tsx scripts/trickle-backfill-images.ts"
   },
   "dependencies": {
