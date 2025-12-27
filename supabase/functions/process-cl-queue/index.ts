@@ -938,6 +938,106 @@ serve(async (req) => {
   }
 })
 
+// Helper function to extract price from text, avoiding monthly payments
+// Handles European-style formatting where period is thousands separator (e.g., $14.500 = $14,500)
+function extractVehiclePrice(text: string): number | null {
+  if (!text) return null;
+  
+  // Helper to normalize price string (handles both comma and period as thousands separators)
+  const normalizePriceString = (priceStr: string): number | null => {
+    // Remove $ and spaces
+    let cleaned = priceStr.replace(/[\$\s]/g, '');
+    
+    // Handle European-style: $14.500 (period as thousands separator)
+    // Pattern: digits.three_digits at the end suggests thousands separator
+    const euroMatch = cleaned.match(/^(\d+)\.(\d{3})$/);
+    if (euroMatch) {
+      // This is European format (e.g., "14.500" = 14500)
+      return parseInt(euroMatch[1] + euroMatch[2]);
+    }
+    
+    // Handle standard format: $14,500 (comma as thousands separator)
+    // Also handle mixed: $1,234.56 (comma thousands, period decimal)
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      // Has both comma and period - comma is thousands, period is decimal
+      cleaned = cleaned.replace(/,/g, '');
+      return Math.round(parseFloat(cleaned));
+    }
+    
+    // Handle comma-only (thousands separator)
+    if (cleaned.includes(',')) {
+      cleaned = cleaned.replace(/,/g, '');
+      return parseInt(cleaned);
+    }
+    
+    // Handle period-only - need to determine if it's decimal or thousands separator
+    if (cleaned.includes('.')) {
+      const parts = cleaned.split('.');
+      // If exactly 3 digits after period, likely thousands separator (e.g., "14.500")
+      if (parts.length === 2 && parts[1].length === 3 && parts[1].match(/^\d{3}$/)) {
+        // Thousands separator
+        return parseInt(parts[0] + parts[1]);
+      } else {
+        // Decimal separator, round to integer
+        return Math.round(parseFloat(cleaned));
+      }
+    }
+    
+    // No separators, just digits
+    return parseInt(cleaned);
+  };
+  
+  // First, try to find structured price fields (especially "Asking" which is common on Craigslist)
+  const structuredPatterns = [
+    /Asking[:\s]*\$?\s*([\d,.]+)/i,  // "Asking $14.500" or "Asking $14,500"
+    /Price[:\s]*\$?\s*([\d,.]+)/i,
+    /Sale\s+Price[:\s]*\$?\s*([\d,.]+)/i,
+    /Vehicle\s+Price[:\s]*\$?\s*([\d,.]+)/i
+  ];
+  
+  for (const pattern of structuredPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const price = normalizePriceString(match[1]);
+      if (price && price >= 1000 && price < 10000000) {
+        return price;
+      }
+    }
+  }
+  
+  // Avoid monthly payment patterns
+  if (text.match(/Est\.\s*payment|Monthly\s*payment|OAC[†]?/i)) {
+    // Look for actual vehicle price, not monthly payment
+    const vehiclePriceMatch = text.match(/(?:Price|Asking|Sale)[:\s]*\$?\s*([\d,.]+)/i);
+    if (vehiclePriceMatch && vehiclePriceMatch[1]) {
+      const price = normalizePriceString(vehiclePriceMatch[1]);
+      if (price && price >= 1000 && price < 10000000) {
+        return price;
+      }
+    }
+    return null; // Don't extract if only monthly payment found
+  }
+  
+  // Extract all prices and prefer the largest (vehicle prices are typically $5,000+)
+  // Match both $14.500 (European) and $14,500 (US) formats
+  const priceMatches = text.match(/\$\s*([\d,.]+)/g);
+  if (priceMatches) {
+    const prices = priceMatches
+      .map(m => {
+        const numMatch = m.match(/\$\s*([\d,.]+)/);
+        return numMatch ? normalizePriceString(numMatch[1]) : null;
+      })
+      .filter((p): p is number => p !== null && p >= 1000 && p < 10000000);
+    
+    if (prices.length > 0) {
+      // Return the largest valid price (likely the vehicle price)
+      return Math.max(...prices);
+    }
+  }
+  
+  return null;
+}
+
 // Inline Craigslist scraping function (same as scrape-all-craigslist-squarebodies)
 function scrapeCraigslistInline(doc: any, url: string): any {
 const data: any = {
@@ -1010,15 +1110,19 @@ const priceMatch = data.title.match(/\$\s*([\d,]+)/)
   }
 
   // Extract price from .price element (primary method - more reliable than title)
+  let initialPrice: number | null = null
   if (!data.asking_price) {
     const priceElement = doc.querySelector('.price')
     if (priceElement) {
       const priceText = priceElement.textContent?.trim() || ''
-      const priceMatch = priceText.match(/\$?\s*([\d,]+)/)
-      if (priceMatch) {
-        data.asking_price = parseInt(priceMatch[1].replace(/,/g, ''))
+      const extractedPrice = extractVehiclePrice(priceText)
+      if (extractedPrice) {
+        initialPrice = extractedPrice
+        data.asking_price = extractedPrice
       }
     }
+  } else {
+    initialPrice = data.asking_price
   }
 
   // Prefer Craigslist's map address/location when present (more precise than title parentheses).
@@ -1185,6 +1289,20 @@ const attrGroups = doc.querySelectorAll('.attrgroup')
     // Store full description (up to 10k chars for comprehensive details)
     if (descText) {
       data.description = descText.substring(0, 10000)
+      
+      // IMPORTANT: Check description for price if:
+      // 1. No price found yet, OR
+      // 2. Price found is suspiciously low (< $3000) - Craigslist sellers often hide real price in description
+      // This handles cases where seller puts fake/low price in price field but real price in description
+      if (!data.asking_price || (initialPrice && initialPrice < 3000)) {
+        const descPrice = extractVehiclePrice(descText)
+        if (descPrice && descPrice >= 1000) {
+          // If description has a higher/valid price, prefer it (likely the real asking price)
+          if (!data.asking_price || descPrice > (data.asking_price || 0)) {
+            data.asking_price = descPrice
+          }
+        }
+      }
     }
   }
   
@@ -1200,6 +1318,16 @@ const attrGroups = doc.querySelectorAll('.attrgroup')
         descText = descText.replace(/\s+/g, ' ').trim()
         if (descText) {
           data.description = descText.substring(0, 10000)
+          
+          // Check description for price if price is missing or suspiciously low
+          if (!data.asking_price || (initialPrice && initialPrice < 3000)) {
+            const descPrice = extractVehiclePrice(descText)
+            if (descPrice && descPrice >= 1000) {
+              if (!data.asking_price || descPrice > (data.asking_price || 0)) {
+                data.asking_price = descPrice
+              }
+            }
+          }
         }
       }
     }
