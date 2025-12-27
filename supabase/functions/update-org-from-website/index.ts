@@ -136,13 +136,105 @@ serve(async (req) => {
       updates.phone = phoneMatch[0].replace(/\s+/g, '-');
     }
 
-    // Extract address
-    const addressEl = doc.querySelector('[itemprop="address"], .address, [class*="address"]');
-    if (addressEl && !org.address) {
-      const addressText = addressEl.textContent?.trim();
-      if (addressText && addressText.length > 10) {
-        updates.address = addressText;
+    // Extract address and location (comprehensive patterns)
+    const addressPatterns = [
+      // Structured data (schema.org)
+      doc.querySelector('[itemprop="address"]'),
+      doc.querySelector('[itemprop="addressLocality"]')?.parentElement,
+      // Common class names
+      doc.querySelector('.address, .business-address, .contact-address, .location-address'),
+      doc.querySelector('[class*="address"]:not([class*="email"])'),
+      // Footer addresses (common location)
+      doc.querySelector('footer .address, footer [class*="address"]'),
+      // Contact sections
+      doc.querySelector('.contact-info .address, .contact .address'),
+      // Meta tags
+      doc.querySelector('meta[property="business:contact_data:street_address"]')?.parentElement,
+    ].filter(Boolean);
+
+    let addressText: string | null = null;
+    let city: string | null = null;
+    let state: string | null = null;
+    let zipCode: string | null = null;
+
+    // Try structured data first
+    for (const el of addressPatterns) {
+      if (!el) continue;
+      const text = el.textContent?.trim() || '';
+      if (text.length > 10) {
+        addressText = text;
+        break;
       }
+    }
+
+    // If no structured address found, try parsing from body text
+    if (!addressText || addressText.length < 10) {
+      const bodyText = doc.body?.textContent || '';
+      
+      // Pattern: Full address with zip (most reliable)
+      const fullAddressPattern = /(\d+\s+[A-Za-z0-9\s,]+(?:Ave|Avenue|St|Street|Rd|Road|Dr|Drive|Blvd|Boulevard|Ln|Lane|Way|Ct|Court)[^,]*),\s*([A-Za-z\s]+),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/i;
+      const fullMatch = bodyText.match(fullAddressPattern);
+      if (fullMatch) {
+        addressText = fullMatch[1].trim();
+        city = fullMatch[2].trim();
+        state = fullMatch[3].trim();
+        zipCode = fullMatch[4].trim();
+      } else {
+        // Pattern: City, State ZIP
+        const cityStatePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/g;
+        const cityStateMatch = bodyText.match(cityStatePattern);
+        if (cityStateMatch && cityStateMatch.length > 0) {
+          // Take the first match that looks like a location (not a date)
+          const match = cityStateMatch[0].match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/);
+          if (match) {
+            city = match[1].trim();
+            state = match[2].trim();
+            zipCode = match[3].trim();
+          }
+        } else {
+          // Pattern: Just City, State (more flexible)
+          const simplePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})(?:\s|$)/g;
+          const simpleMatch = bodyText.match(simplePattern);
+          if (simpleMatch && simpleMatch.length > 0) {
+            const match = simpleMatch[0].match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})/);
+            if (match) {
+              city = match[1].trim();
+              state = match[2].trim();
+            }
+          }
+        }
+      }
+    } else {
+      // Parse city/state from addressText if we have it
+      const cityStateZipPattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/;
+      const match = addressText.match(cityStateZipPattern);
+      if (match) {
+        city = match[1].trim();
+        state = match[2].trim();
+        zipCode = match[3].trim();
+        addressText = addressText.replace(/,?\s*[A-Z]{2}\s*\d{5}(?:-\d{4})?$/, '').trim();
+      } else {
+        const cityStatePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})(?:\s|$)/;
+        const match2 = addressText.match(cityStatePattern);
+        if (match2) {
+          city = match2[1].trim();
+          state = match2[2].trim();
+        }
+      }
+    }
+
+    // Update location fields (only if missing and we found data)
+    if (addressText && addressText.length > 10 && !org.address) {
+      updates.address = addressText;
+    }
+    if (city && !org.city) {
+      updates.city = city;
+    }
+    if (state && !org.state) {
+      updates.state = state;
+    }
+    if (zipCode && !org.zip_code) {
+      updates.zip_code = zipCode;
     }
 
     // Extract business type from content
@@ -178,6 +270,34 @@ serve(async (req) => {
             inventoryLinks.push(fullUrl);
           }
         }
+      }
+    }
+
+    // Geocode address to get coordinates if we have location data
+    if ((city && state) || addressText) {
+      try {
+        const query = [addressText, city, state, zipCode].filter(Boolean).join(', ');
+        if (query && (!org.latitude || !org.longitude)) {
+          const geoResponse = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`,
+            {
+              headers: {
+                'User-Agent': 'Nuke-Platform/1.0'
+              }
+            }
+          );
+          
+          if (geoResponse.ok) {
+            const geoResults = await geoResponse.json();
+            if (geoResults.length > 0) {
+              updates.latitude = parseFloat(geoResults[0].lat);
+              updates.longitude = parseFloat(geoResults[0].lon);
+              console.log(`✅ Geocoded location: ${query} -> ${updates.latitude}, ${updates.longitude}`);
+            }
+          }
+        }
+      } catch (geoError) {
+        console.warn('Geocoding failed (non-blocking):', geoError);
       }
     }
 

@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { OrganizationSearchService } from '../services/organizationSearch';
+import { getOrgInvestorMetrics, OrgMetricData } from '../utils/orgInvestorMetrics';
+import { FaviconIcon } from '../components/common/FaviconIcon';
 
 interface Organization {
   id: string;
@@ -11,11 +13,13 @@ interface Organization {
   business_type: string;
   description?: string;
   logo_url?: string;
+  website?: string;
+  address?: string;
   city?: string;
   state?: string;
+  zip_code?: string;
   phone?: string;
   email?: string;
-  website?: string;
   is_tradable: boolean;
   stock_symbol?: string;
   created_at: string;
@@ -123,7 +127,7 @@ export default function Organizations() {
                 // Load those organizations
                 const { data, error: orgError } = await supabase
                   .from('businesses')
-                  .select('id, business_name, business_type, description, logo_url, city, state, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
+                  .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
                   .eq('is_public', true)
                   .in('id', orgIds);
                 
@@ -158,7 +162,7 @@ export default function Organizations() {
           if (orgIds.length > 0) {
             const { data, error: orgError } = await supabase
               .from('businesses')
-              .select('id, business_name, business_type, description, logo_url, city, state, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
+              .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
               .eq('is_public', true)
               .in('id', orgIds);
             
@@ -171,7 +175,7 @@ export default function Organizations() {
         // No search - load all organizations
         const { data, error: orgError } = await supabase
           .from('businesses')
-          .select('id, business_name, business_type, description, logo_url, city, state, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
+          .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
           .eq('is_public', true)
           .order('created_at', { ascending: false });
         
@@ -438,7 +442,7 @@ export default function Organizations() {
               }}
               className="hover-lift"
             >
-              {/* Primary Image - LARGER */}
+              {/* Primary Image - with Logo overlay if available */}
               <div
                 onClick={() => navigate(`/org/${org.id}`)}
                 style={{
@@ -449,6 +453,35 @@ export default function Organizations() {
                   position: 'relative'
                 }}
               >
+                {/* Logo overlay (if no primary image, show logo prominently) */}
+                {!primaryImage && org.logo_url && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    maxWidth: '200px',
+                    maxHeight: '80px',
+                    background: 'rgba(255,255,255,0.95)',
+                    padding: '12px',
+                    borderRadius: '4px'
+                  }}>
+                    <img
+                      src={org.logo_url}
+                      alt=""
+                      style={{
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                        display: 'block'
+                      }}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                
                 {/* Stock symbol badge */}
                 {org.is_tradable && org.stock_symbol && (
                   <div style={{
@@ -496,13 +529,38 @@ export default function Organizations() {
 
               {/* Content */}
               <div onClick={() => navigate(`/org/${org.id}`)} style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                {/* Header */}
+                {/* Header with Logo/Favicon */}
                 <div style={{ marginBottom: '6px' }}>
-                  <h3 style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '3px' }}>
-                    {org.business_name}
-                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                    {/* Logo or Favicon */}
+                    {org.logo_url ? (
+                      <img
+                        src={org.logo_url}
+                        alt=""
+                        style={{
+                          height: '24px',
+                          maxWidth: '80px',
+                          objectFit: 'contain',
+                          display: 'block'
+                        }}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : org.website ? (
+                      <FaviconIcon
+                        url={org.website}
+                        size={16}
+                        style={{ flexShrink: 0 }}
+                      />
+                    ) : null}
+                    
+                    <h3 style={{ fontSize: '9pt', fontWeight: 700, margin: 0, flex: 1 }}>
+                      {org.business_name}
+                    </h3>
+                  </div>
                   
-                  {/* Type & Location */}
+                  {/* Type */}
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
                     <div style={{
                       fontSize: '7pt',
@@ -513,17 +571,6 @@ export default function Organizations() {
                     }}>
                       {org.business_type?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                     </div>
-                    {org.city && org.state && (
-                      <div style={{
-                        fontSize: '7pt',
-                        color: 'var(--text-muted)',
-                        background: 'var(--surface)',
-                        padding: '2px 6px',
-                        borderRadius: '2px'
-                      }}>
-                        {org.city}, {org.state}
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -544,56 +591,79 @@ export default function Organizations() {
                   </div>
                 )}
 
-                {/* Key Metrics Row */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: '8px',
-                  marginBottom: '8px',
-                  paddingTop: '8px',
-                  borderTop: '1px solid var(--border-light)'
-                }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '11pt', fontWeight: 700, color: 'var(--accent)' }}>
-                      {org.total_events || 0}
-                    </div>
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                      Work Orders
-                    </div>
+                {/* Full HQ Address (prominent for investors) */}
+                {(org.address || (org.city && org.state)) && (
+                  <div style={{
+                    fontSize: '7pt',
+                    color: 'var(--text)',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '4px',
+                    lineHeight: 1.4
+                  }}>
+                    <span style={{ fontSize: '8pt', marginTop: '1px' }}>📍</span>
+                    <span>
+                      {org.address ? (
+                        <span>
+                          {org.address}
+                          {org.city && org.state && `, ${org.city}, ${org.state}`}
+                          {org.zip_code && ` ${org.zip_code}`}
+                        </span>
+                      ) : (
+                        <span>{org.city}, {org.state}{org.zip_code && ` ${org.zip_code}`}</span>
+                      )}
+                    </span>
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '11pt', fontWeight: 700, color: 'var(--accent)' }}>
-                      {org.labor_rate ? `$${org.labor_rate}` : '—'}
-                    </div>
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                      Labor/hr
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '11pt', fontWeight: 700, color: 'var(--accent)' }}>
-                      {org.followers || 0}
-                    </div>
-                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                      Followers
-                    </div>
-                  </div>
-                </div>
+                )}
 
-                {/* Activity indicators */}
-                <div style={{
-                  display: 'flex',
-                  gap: '8px',
-                  fontSize: '7pt',
-                  color: 'var(--text-muted)',
-                  paddingTop: '6px',
-                  borderTop: '1px solid var(--border-light)'
-                }}>
-                  {org.current_viewers > 0 && (
-                    <span>{org.current_viewers} viewing</span>
-                  )}
-                  <span>{org.total_images || 0} images</span>
-                  <span>{org.total_inventory || 0} inventory</span>
-                </div>
+                {/* Key Metrics Row - Dynamic based on org type and data availability */}
+                {(() => {
+                  const metrics = getOrgInvestorMetrics(org as OrgMetricData, {
+                    type: session?.user?.id ? 'public' : 'public'
+                  });
+                  
+                  return (
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: '8px',
+                      marginBottom: '8px',
+                      paddingTop: '8px',
+                      borderTop: '1px solid var(--border-light)'
+                    }}>
+                      {metrics.map((metric, idx) => (
+                        <div key={idx} style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '11pt', fontWeight: 700, color: 'var(--accent)' }}>
+                            {typeof metric.value === 'number' 
+                              ? metric.value.toLocaleString() 
+                              : metric.value}
+                          </div>
+                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                            {metric.label}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {/* Investment-focused indicators */}
+                {org.total_inventory !== undefined && org.total_inventory > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    fontSize: '7pt',
+                    color: 'var(--text-muted)',
+                    paddingTop: '6px',
+                    borderTop: '1px solid var(--border-light)'
+                  }}>
+                    <span><strong>{org.total_inventory}</strong> inventory</span>
+                    {org.total_vehicles !== undefined && org.total_vehicles > 0 && (
+                      <span><strong>{org.total_vehicles}</strong> vehicles</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
