@@ -93,6 +93,7 @@ curl -X POST "https://YOUR_PROJECT.supabase.co/functions/v1/discover-organizatio
     "learned_patterns_stored": true,
     "vehicles_found": 45,
     "vehicles_extracted": 45,
+    "vehicles_created": 45,
     "images_found": 230,
     "next_steps": [...]
   }
