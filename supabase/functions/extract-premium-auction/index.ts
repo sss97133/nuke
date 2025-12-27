@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 
 /**
  * EXTRACT PREMIUM AUCTION - WORKING MULTI-SITE EXTRACTOR
@@ -687,6 +688,110 @@ function extractMecumImagesFromHtml(html: string): string[] {
   }
   
   return Array.from(urls);
+}
+
+/**
+ * Extract sold price from Mecum listing HTML using DOM parsing
+ * Based on user-provided DOM paths for sold listings
+ */
+function extractMecumSoldPrice(html: string): { sale_price: number | null; method: string } {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    if (!doc) {
+      return { sale_price: null, method: 'none' };
+    }
+
+    // Strategy 1: Try the specific classes mentioned by user
+    // TopNLots_price__DKxnz or TopNLots_saleResult__Y0Ayv
+    const priceSelectors = [
+      '.TopNLots_price__DKxnz',
+      '.TopNLots_saleResult__Y0Ayv',
+      '[class*="TopNLots_price"]',
+      '[class*="TopNLots_saleResult"]',
+      '[class*="saleResult"]',
+    ];
+
+    for (const selector of priceSelectors) {
+      const element = doc.querySelector(selector);
+      if (element) {
+        const text = element.textContent || '';
+        const priceMatch = text.match(/\$?([\d,]+)/);
+        if (priceMatch) {
+          const price = parseInt(priceMatch[1].replace(/,/g, ''), 10);
+          if (price >= 1000 && price < 100000000) { // Sanity check
+            return { sale_price: price, method: `dom:${selector}` };
+          }
+        }
+      }
+    }
+
+    // Strategy 2: Look for "Top N Lots" section and find price within it
+    // DOM path: div.TopNLot._topNLot > div.TopNLot._re.ultCard > div.TopNLot._meta > div.TopNLot._.aleRe.ult
+    const topNLotsSection = doc.querySelector('[class*="TopNLot"]') || 
+                            doc.querySelector('[class*="topNLot"]') ||
+                            doc.querySelector('[class*="saleResult"]');
+    
+    if (topNLotsSection) {
+      // Look for price-like text in the section
+      const sectionText = topNLotsSection.textContent || '';
+      const pricePatterns = [
+        /\$([\d,]+)/g,
+        /USD\s*\$([\d,]+)/gi,
+      ];
+
+      for (const pattern of pricePatterns) {
+        const matches = sectionText.matchAll(pattern);
+        for (const match of matches) {
+          const price = parseInt(match[1].replace(/,/g, ''), 10);
+          if (price >= 1000 && price < 100000000) {
+            return { sale_price: price, method: 'dom:topNLots_section' };
+          }
+        }
+      }
+    }
+
+    // Strategy 3: Look for "sold" context with price in nearby elements
+    const bodyText = doc.body?.textContent || '';
+    const soldPricePatterns = [
+      /sold\s+for\s+\$?([\d,]+)/i,
+      /sold\s+\$?([\d,]+)/i,
+      /final\s+price[:\s]*\$?([\d,]+)/i,
+      /hammer\s+price[:\s]*\$?([\d,]+)/i,
+    ];
+
+    for (const pattern of soldPricePatterns) {
+      const match = bodyText.match(pattern);
+      if (match) {
+        const price = parseInt(match[1].replace(/,/g, ''), 10);
+        if (price >= 1000 && price < 100000000) {
+          return { sale_price: price, method: 'text:sold_pattern' };
+        }
+      }
+    }
+
+    // Strategy 4: Look for large numbers that look like prices in "sold" context
+    // Find elements containing "sold" and look for price nearby
+    const soldElements = Array.from(doc.querySelectorAll('*')).filter((el: any) => {
+      const text = (el.textContent || '').toLowerCase();
+      return text.includes('sold') || text.includes('final price') || text.includes('hammer');
+    });
+
+    for (const el of soldElements) {
+      const elText = el.textContent || '';
+      const priceMatch = elText.match(/\$?([\d,]+)/);
+      if (priceMatch) {
+        const price = parseInt(priceMatch[1].replace(/,/g, ''), 10);
+        if (price >= 1000 && price < 100000000) {
+          return { sale_price: price, method: 'dom:sold_context' };
+        }
+      }
+    }
+
+    return { sale_price: null, method: 'none' };
+  } catch (e: any) {
+    console.warn(`Mecum sold price extraction error: ${e?.message || String(e)}`);
+    return { sale_price: null, method: 'error' };
+  }
 }
 
 function extractBarrettJacksonImagesFromHtml(html: string): string[] {
@@ -2221,10 +2326,11 @@ async function extractMecum(url: string, maxVehicles: number) {
       }
       
       // Step 5: Direct fetch as last resort (often blocked by Cloudflare)
-      if (images.length === 0) {
+      // Fetch HTML even if we have images, since we need it for sold price extraction
+      if (images.length === 0 || !html) {
         try {
           html = await fetchTextWithTimeout(listingUrl, 20000, "Direct Mecum page fetch");
-          if (html) {
+          if (html && images.length === 0) {
             const directImages = extractMecumImagesFromHtml(html);
             images = [...images, ...directImages];
           }
@@ -2260,10 +2366,24 @@ async function extractMecum(url: string, maxVehicles: number) {
         console.log(`Sample images: ${images.slice(0, 3).join(', ')}`);
       }
 
+      // Extract sold price using DOM parsing (for sold listings)
+      let domSoldPrice: number | null = null;
+      if (html) {
+        const soldPriceResult = extractMecumSoldPrice(html);
+        if (soldPriceResult.sale_price) {
+          domSoldPrice = soldPriceResult.sale_price;
+          console.log(`Extracted sold price via ${soldPriceResult.method}: $${domSoldPrice.toLocaleString()}`);
+        }
+      }
+
+      // Merge sold price: prioritize DOM extraction over Firecrawl (more reliable for sold listings)
+      const finalSalePrice = domSoldPrice || vehicle?.sale_price || null;
+
       return {
         ...vehicle,
         listing_url: listingUrl,
         images, // CRITICAL: Always include images array, even if empty
+        sale_price: finalSalePrice, // Use DOM-extracted sold price if available
       };
     } catch (e: any) {
       issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);

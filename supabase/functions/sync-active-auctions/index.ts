@@ -139,12 +139,17 @@ Deno.serve(async (req: Request) => {
       for (const listing of platformListings) {
         try {
           // Call the appropriate sync function
-          const syncUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/${syncFunctionName}`;
+          // Use service role key for internal function-to-function calls
+          const supabaseUrl = Deno.env.get('SUPABASE_URL');
+          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+          const syncUrl = `${supabaseUrl}/functions/v1/${syncFunctionName}`;
+          
           const syncResponse = await fetch(syncUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+              'Authorization': `Bearer ${serviceRoleKey}`,
+              'apikey': serviceRoleKey || '' // Some functions require apikey header
             },
             body: JSON.stringify({
               externalListingId: listing.id

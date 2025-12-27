@@ -1224,6 +1224,36 @@ serve(async (req) => {
                   scrapeData.data.asking_price = descPrice;
                 }
               }
+              
+              // Fallback to LLM extraction if regex didn't find a price (handles obfuscated formats)
+              // Only call LLM if regex failed and we have a substantial description
+              if (!scrapeData.data.asking_price && description.length > 50) {
+                try {
+                  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+                  const response = await fetch(`${supabaseUrl}/functions/v1/extract-price-from-description`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`
+                    },
+                    body: JSON.stringify({
+                      description: description,
+                      current_price: initialPrice
+                    })
+                  });
+                  
+                  if (response.ok) {
+                    const llmResult = await response.json();
+                    if (llmResult.success && llmResult.price && llmResult.price >= 1000) {
+                      scrapeData.data.asking_price = llmResult.price;
+                      console.log(`✅ LLM extracted price from description: $${llmResult.price.toLocaleString()} (confidence: ${llmResult.confidence})`);
+                    }
+                  }
+                } catch (llmError) {
+                  // Non-blocking: LLM extraction failure shouldn't break the import
+                  console.warn('LLM price extraction failed (non-blocking):', llmError);
+                }
+              }
             }
             
             // Extract VIN from description if present
