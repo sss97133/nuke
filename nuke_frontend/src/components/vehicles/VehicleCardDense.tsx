@@ -189,13 +189,20 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       ? v.asking_price
       : null;
 
-    // CORRECT PRIORITY ORDER (DO NOT USE current_value):
+    // CORRECT PRIORITY ORDER:
     // 1. Sale price (actual sold price)
     // 2. Winning bid (auction result)
     // 3. High bid (RNM auctions)
     // 4. Live bid (from external_listings for active auctions)
     // 5. Current bid (from vehicle, if no external listing)
     // 6. Asking price (only if for sale)
+    // 7. Current value (estimated value - fallback for regular vehicles)
+    // 8. Purchase price (fallback)
+    // 9. MSRP (last resort)
+    const currentValue = typeof v.current_value === 'number' && Number.isFinite(v.current_value) && v.current_value > 0 ? v.current_value : null;
+    const purchasePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) && v.purchase_price > 0 ? v.purchase_price : null;
+    const msrp = typeof v.msrp === 'number' && Number.isFinite(v.msrp) && v.msrp > 0 ? v.msrp : null;
+    
     const priceValue =
       salePrice ??
       winningBid ??
@@ -203,6 +210,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       liveBid ??
       currentBid ??
       asking ??
+      currentValue ??
+      purchasePrice ??
+      msrp ??
       null;
 
     const formatted = priceValue ? new Intl.NumberFormat('en-US', {
@@ -729,7 +739,18 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     
     // PRIORITY 4: REGULAR PRICE (for sale, estimated value, etc.)
     // For non-auction vehicles, use displayPrice which handles: sale_price > asking_price > etc.
-    return displayPrice;
+    // But also check marketValue/ownerCost as fallback if displayPrice is "—"
+    if (displayPrice && displayPrice !== '—') {
+      return displayPrice;
+    }
+    // Fallback to market value if displayPrice is empty
+    if (marketValue) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(marketValue);
+    }
+    if (ownerCost) {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(ownerCost);
+    }
+    return displayPrice; // Will be "—" if nothing found
   }, [isActiveAuction, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost]);
 
   // LIST VIEW: Cursor-style - compact, dense, single row
