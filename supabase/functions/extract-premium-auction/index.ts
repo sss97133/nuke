@@ -762,7 +762,9 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
   let mapRaw: any = null;
 
   if (isDirectListing) {
-    listingUrls = [normalizedUrl.split("?")[0]];
+    // Strip /video suffix - that's not the actual listing URL
+    let cleanUrl = normalizedUrl.split("?")[0].replace(/\/video\/?$/, '');
+    listingUrls = [cleanUrl];
   }
 
   if (listingUrls.length === 0) {
@@ -802,8 +804,11 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
           const lower = u.toLowerCase();
           if (lower.endsWith(".xml")) return false;
           if (lower.includes("sitemap")) return false;
+          // CRITICAL: Exclude /video URLs - those are not the actual listing pages
+          if (lower.includes("/video")) return false;
           return true;
         })
+        .map((u: string) => u.replace(/\/video\/?$/, '')) // Strip /video suffix just in case
         .slice(0, 300);
     }
   } catch (e: any) {
@@ -967,9 +972,12 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         auctionData = extractCarsAndBidsAuctionData(html);
       }
       
+      // CRITICAL: Clean listing URL - strip /video suffix
+      const cleanListingUrl = listingUrl.replace(/\/video\/?$/, '');
+      
       const merged = {
         ...(empty ? {} : vehicle),
-        listing_url: listingUrl,
+        listing_url: cleanListingUrl,
         year: (vehicle?.year ?? fallback.year) ?? null,
         make: (vehicle?.make ?? fallback.make) ?? null,
         model: (vehicle?.model ?? fallback.model) ?? null,
@@ -1221,9 +1229,8 @@ async function storeVehiclesInDatabase(
           listing_title: title,
           auction_end_date: vehicle.auction_end_date || null,
           sale_date: vehicle.sale_date || null,
-          current_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : 
-                      (Number.isFinite(vehicle.high_bid) ? vehicle.high_bid : null),
-          bid_count: Number.isFinite(vehicle.bid_count) ? Math.trunc(vehicle.bid_count) : null,
+          // Note: current_bid and bid_count are stored in external_listings, not vehicles table
+          // Only high_bid/winning_bid go in vehicles table for auction outcomes
           // BaT-specific fields
           bat_seller: vehicle.seller || vehicle.seller_username || null,
           bat_location: vehicle.location || null,
@@ -1291,14 +1298,46 @@ async function storeVehiclesInDatabase(
           if (!insertErr && inserted?.id) createdIds.push(String(inserted.id));
         }
       } else {
-        const { data: inserted, error: insertErr } = await supabase
+        // Check for existing vehicle by discovery_url (canonical for listing imports)
+        const { data: existingByUrl, error: urlCheckErr } = await supabase
           .from("vehicles")
-          .insert(payload)
           .select("id")
-          .single();
-        data = inserted;
-        error = insertErr;
-        if (!insertErr && inserted?.id) createdIds.push(String(inserted.id));
+          .eq("discovery_url", listingUrl)
+          .maybeSingle();
+        
+        if (urlCheckErr) {
+          error = urlCheckErr;
+        } else if (existingByUrl?.id) {
+          // Update existing vehicle
+          const { data: updated, error: updateErr } = await supabase
+            .from("vehicles")
+            .update(payload)
+            .eq("id", existingByUrl.id)
+            .select("id")
+            .single();
+          data = updated;
+          error = updateErr;
+          if (!updateErr && updated?.id) {
+            updatedIds.push(String(updated.id));
+            // CRITICAL: Also insert images for updated vehicles
+            if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
+              console.log(`Inserting ${vehicle.images.length} images for UPDATED vehicle ${updated.id}`);
+              const img = await insertVehicleImages(supabase, updated.id, vehicle.images, source, listingUrl);
+              console.log(`Inserted ${img.inserted} images for updated vehicle, ${img.errors.length} errors`);
+              errors.push(...img.errors);
+            }
+          }
+        } else {
+          // Insert new vehicle
+          const { data: inserted, error: insertErr } = await supabase
+            .from("vehicles")
+            .insert(payload)
+            .select("id")
+            .single();
+          data = inserted;
+          error = insertErr;
+          if (!insertErr && inserted?.id) createdIds.push(String(inserted.id));
+        }
       }
 
       if (error) {
@@ -1588,10 +1627,21 @@ async function insertVehicleImages(
   const errors: string[] = [];
   let inserted = 0;
   
-  // Clean all URLs before processing
+  // Clean all URLs before processing and filter out organization/dealer logos
   const urls = (Array.isArray(imageUrls) ? imageUrls : [])
     .map((u) => cleanImageUrl(String(u || "").trim(), source))
-    .filter((u) => u && u.startsWith("http"));
+    .filter((u) => {
+      if (!u || !u.startsWith("http")) return false;
+      const urlLower = u.toLowerCase();
+      // CRITICAL: Exclude organization/dealer logos - these should NEVER be vehicle images
+      if (urlLower.includes('organization-logos/') || urlLower.includes('organization_logos/')) return false;
+      if (urlLower.includes('images.classic.com/uploads/dealer/')) return false;
+      if (urlLower.includes('/uploads/dealer/')) return false;
+      // Exclude logos in storage paths
+      if ((urlLower.includes('/logo') || urlLower.includes('logo.')) && 
+          (urlLower.includes('/storage/') || urlLower.includes('supabase.co'))) return false;
+      return true;
+    });
 
   // Avoid duplicates and append positions after existing images
   let existingUrls = new Set<string>();
@@ -1624,16 +1674,41 @@ async function insertVehicleImages(
     if (existingUrls.has(imageUrl)) continue;
     try {
       const makePrimary = !hasPrimary && nextPosition === 0;
+      
+      // Determine correct source based on listing URL (most reliable) or source string
+      // Match actual source values used in database for proper attribution
+      let imageSource = "external_import"; // default fallback
+      const listingUrlLower = (listingUrl || "").toLowerCase();
+      const sourceLower = (source || "").toLowerCase();
+      
+      if (listingUrlLower.includes("bringatrailer.com") || sourceLower.includes("bring a trailer") || sourceLower.includes("bringatrailer")) {
+        imageSource = "bat_import"; // BaT uses bat_import
+      } else if (listingUrlLower.includes("carsandbids.com") || sourceLower.includes("cars & bids") || sourceLower.includes("carsandbids")) {
+        // Cars & Bids: use external_import (matches existing usage in DB)
+        imageSource = "external_import";
+      } else if (listingUrlLower.includes("craigslist.org") || sourceLower.includes("craigslist")) {
+        // Craigslist: use craigslist_scrape (user says this works, matches DB pattern)
+        imageSource = "craigslist_scrape";
+      } else if (listingUrlLower.includes("cars.ksl.com") || listingUrlLower.includes("ksl.com") || sourceLower.includes("ksl")) {
+        imageSource = "ksl_scrape";
+      } else if (listingUrlLower.includes("pcarmarket.com") || sourceLower.includes("pcarmarket")) {
+        imageSource = "pcarmarket_listing";
+      } else if (listingUrlLower.includes("mecum.com") || sourceLower.includes("mecum")) {
+        imageSource = "external_import"; // Mecum: use generic external_import
+      } else if (listingUrlLower.includes("barrett-jackson.com") || listingUrlLower.includes("barrettjackson.com") || sourceLower.includes("barrett")) {
+        imageSource = "external_import"; // Barrett-Jackson: use generic external_import
+      } else {
+        // Default to external_import for unknown platforms
+        imageSource = "external_import";
+      }
+      
       const { error } = await supabase
         .from("vehicle_images")
         .insert({
           vehicle_id: vehicleId,
           image_url: imageUrl,
-          // Must satisfy vehicle_images_attribution_check
-          // For BaT, use 'bat_import' source so badges show correctly
-          source: source.toLowerCase().includes('bring a trailer') || source.toLowerCase().includes('bringatrailer') 
-            ? "bat_import" 
-            : "external_import",
+          // Must satisfy vehicle_images_attribution_check - use correct source for platform
+          source: imageSource,
           source_url: imageUrl,
           is_external: true,
           ai_processing_status: "pending",
@@ -1669,33 +1744,79 @@ async function insertVehicleImages(
 }
 
 function extractCarsAndBidsListingUrls(html: string, limit: number): string[] {
-  // Cars & Bids listing URLs are usually /auctions/<slug>
   const urls = new Set<string>();
-  const re = /href=\"(\/auctions\/[a-zA-Z0-9-]+)\"/g;
+  
+  // PRIORITY 1: Look for auction-link class with actual listing URLs (most reliable)
+  // Pattern: <a class="auction-link" href="/auctions/ID/year-make-model">
+  const auctionLinkPattern = /<a[^>]*class=["'][^"']*auction-link[^"']*["'][^>]*href=["'](\/auctions\/[^"']+)["']/gi;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
+  while ((m = auctionLinkPattern.exec(html)) !== null) {
     const path = m[1];
     if (!path) continue;
-    urls.add(`https://carsandbids.com${path}`);
+    // Exclude /video URLs
+    if (path.includes('/video')) continue;
+    urls.add(`https://carsandbids.com${path.split('?')[0]}`);
     if (urls.size >= Math.max(1, limit)) break;
   }
+  
+  // PRIORITY 2: Look for full listing URLs with year-make-model pattern
+  // Pattern: /auctions/ID/year-make-model (this is the actual listing, not /video)
+  if (urls.size < limit) {
+    const fullListingPattern = /href=["'](\/auctions\/[a-zA-Z0-9]+\/[0-9]{4}-[^"']+)["']/gi;
+    while ((m = fullListingPattern.exec(html)) !== null) {
+      const path = m[1];
+      if (!path || path.includes('/video')) continue;
+      urls.add(`https://carsandbids.com${path.split('?')[0]}`);
+      if (urls.size >= Math.max(1, limit)) break;
+    }
+  }
+  
+  // PRIORITY 3: Fallback to any /auctions/ URL (but exclude /video)
+  if (urls.size < limit) {
+    const re = /href=["'](\/auctions\/[a-zA-Z0-9-]+(?:\/[^"']+)?)["']/gi;
+    while ((m = re.exec(html)) !== null) {
+      const path = m[1];
+      if (!path) continue;
+      // Exclude /video URLs
+      if (path.includes('/video')) continue;
+      urls.add(`https://carsandbids.com${path.split('?')[0]}`);
+      if (urls.size >= Math.max(1, limit)) break;
+    }
+  }
+  
   return Array.from(urls);
 }
 
 function extractCarsAndBidsListingUrlsFromText(text: string, limit: number): string[] {
   const urls = new Set<string>();
-  const abs = /https?:\/\/carsandbids\.com\/auctions\/[a-zA-Z0-9-]+/g;
-  const rel = /\/auctions\/[a-zA-Z0-9-]+/g;
-
-  for (const m of text.match(abs) || []) {
-    urls.add(m);
-    if (urls.size >= Math.max(1, limit)) break;
+  
+  // Pattern for full listing URLs (with year-make-model) - these are the actual listings
+  const fullListingPattern = /https?:\/\/carsandbids\.com\/auctions\/[a-zA-Z0-9]+\/[0-9]{4}-[^\s"')]+/g;
+  for (const m of text.match(fullListingPattern) || []) {
+    if (!m.includes('/video')) {
+      urls.add(m.split('?')[0].replace(/\/video\/?$/, ''));
+      if (urls.size >= Math.max(1, limit)) break;
+    }
+  }
+  
+  // Fallback to any /auctions/ URL (but exclude /video)
+  if (urls.size < Math.max(1, limit)) {
+    const abs = /https?:\/\/carsandbids\.com\/auctions\/[a-zA-Z0-9-]+(?:\/[^\s"')]+)?/g;
+    for (const m of text.match(abs) || []) {
+      if (!m.includes('/video')) {
+        urls.add(m.split('?')[0].replace(/\/video\/?$/, ''));
+        if (urls.size >= Math.max(1, limit)) break;
+      }
+    }
   }
 
   if (urls.size < Math.max(1, limit)) {
+    const rel = /\/auctions\/[a-zA-Z0-9-]+(?:\/[^\s"')]+)?/g;
     for (const m of text.match(rel) || []) {
-      urls.add(`https://carsandbids.com${m}`);
-      if (urls.size >= Math.max(1, limit)) break;
+      if (!m.includes('/video')) {
+        urls.add(`https://carsandbids.com${m.split('?')[0].replace(/\/video\/?$/, '')}`);
+        if (urls.size >= Math.max(1, limit)) break;
+      }
     }
   }
 
