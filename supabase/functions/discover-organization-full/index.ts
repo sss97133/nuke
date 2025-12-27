@@ -67,6 +67,7 @@ interface DiscoveryResult {
   learned_patterns_stored: boolean;
   vehicles_found: number;
   vehicles_extracted: number;
+  vehicles_created: number;
   images_found: number;
   other_data_extracted: any;
   next_steps: string[];
@@ -174,7 +175,8 @@ Deno.serve(async (req) => {
     );
     console.log(`✅ Extraction complete:`);
     console.log(`   - Vehicles found: ${extractionResult.vehicles_found}`);
-    console.log(`   - Vehicles extracted: ${extractionResult.vehicles_extracted}`);
+    console.log(`   - Vehicles queued: ${extractionResult.vehicles_extracted}`);
+    console.log(`   - Vehicle profiles created: ${extractionResult.vehicles_created}`);
     console.log(`   - Images found: ${extractionResult.images_found}\n`);
 
     // Step 7: Build result
@@ -186,6 +188,7 @@ Deno.serve(async (req) => {
       learned_patterns_stored: patternsStored,
       vehicles_found: extractionResult.vehicles_found,
       vehicles_extracted: extractionResult.vehicles_extracted,
+      vehicles_created: extractionResult.vehicles_created,
       images_found: extractionResult.images_found,
       other_data_extracted: extractionResult.other_data,
       next_steps: [
@@ -525,7 +528,7 @@ async function storeLearnedPatterns(
 }
 
 /**
- * Extract all data using learned patterns
+ * Extract all data using learned patterns and create vehicle profiles
  */
 async function extractAllData(
   organizationId: string,
@@ -536,10 +539,10 @@ async function extractAllData(
 ): Promise<{
   vehicles_found: number;
   vehicles_extracted: number;
+  vehicles_created: number;
   images_found: number;
   other_data: any;
 }> {
-  // Use scrape-multi-source with learned patterns
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -547,8 +550,13 @@ async function extractAllData(
   const inventoryPage = siteStructure.page_types.find((pt) => pt.type === 'inventory');
   const inventoryUrl = inventoryPage?.sample_urls[0] || `${siteUrl}/inventory`;
 
+  let vehiclesQueued = 0;
+  let vehiclesFound = 0;
+
+  // Step 1: Scrape and queue listings
   try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
+    console.log(`   Scraping inventory from: ${inventoryUrl}`);
+    const scrapeResponse = await fetch(`${supabaseUrl}/functions/v1/scrape-multi-source`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -563,27 +571,108 @@ async function extractAllData(
       }),
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      return {
-        vehicles_found: data.listings_found || 0,
-        vehicles_extracted: data.listings_queued || 0,
-        images_found: 0, // Will be extracted by process-import-queue
-        other_data: {
-          listings_queued: data.listings_queued,
-          extraction_method: data.extraction_method,
-        },
-      };
+    if (scrapeResponse.ok) {
+      const scrapeData = await scrapeResponse.json();
+      vehiclesFound = scrapeData.listings_found || 0;
+      vehiclesQueued = scrapeData.listings_queued || 0;
+      console.log(`   ✅ Queued ${vehiclesQueued} listings for processing`);
+    } else {
+      const errorText = await scrapeResponse.text();
+      console.warn(`   ⚠️  Scraping failed: ${scrapeResponse.status} - ${errorText.substring(0, 200)}`);
     }
   } catch (error: any) {
-    console.warn('Data extraction failed:', error.message);
+    console.warn(`   ⚠️  Scraping error: ${error.message}`);
+  }
+
+  // Step 2: Process import queue to create vehicle profiles
+  let vehiclesCreated = 0;
+  if (vehiclesQueued > 0) {
+    try {
+      console.log(`   Processing import queue to create vehicle profiles...`);
+      
+      // Process in batches
+      const batchSize = 20;
+      const maxBatches = 10; // Process up to 200 vehicles per discovery run
+      
+      for (let batch = 0; batch < maxBatches; batch++) {
+        const processResponse = await fetch(`${supabaseUrl}/functions/v1/process-import-queue`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            batch_size: batchSize,
+            max_images_immediate: 3, // Get a few images immediately
+          }),
+        });
+
+        if (processResponse.ok) {
+          const processData = await processResponse.json();
+          const batchCreated = processData.vehicles_created || 0;
+          vehiclesCreated += batchCreated;
+          
+          console.log(`   ✅ Batch ${batch + 1}: Created ${batchCreated} vehicles`);
+          
+          // If no vehicles were created this batch, likely done
+          if (batchCreated === 0) {
+            break;
+          }
+          
+          // If we processed fewer than batch_size, we're done
+          if (batchCreated < batchSize) {
+            break;
+          }
+        } else {
+          const errorText = await processResponse.text();
+          console.warn(`   ⚠️  Processing batch ${batch + 1} failed: ${errorText.substring(0, 200)}`);
+          break;
+        }
+      }
+      
+      console.log(`   ✅ Created ${vehiclesCreated} vehicle profiles total`);
+    } catch (error: any) {
+      console.warn(`   ⚠️  Queue processing error: ${error.message}`);
+    }
+  }
+
+  // Step 3: Count images for vehicles linked to this org
+  let imageCount = 0;
+  if (vehiclesCreated > 0) {
+    try {
+      // Get vehicle IDs linked to this organization
+      const { data: orgVehicles } = await supabase
+        .from('organization_vehicles')
+        .select('vehicle_id')
+        .eq('organization_id', organizationId)
+        .limit(500);
+      
+      if (orgVehicles && orgVehicles.length > 0) {
+        const vehicleIds = orgVehicles.map((ov: any) => ov.vehicle_id);
+        
+        // Count images for these vehicles
+        const { count } = await supabase
+          .from('vehicle_images')
+          .select('*', { count: 'exact', head: true })
+          .in('vehicle_id', vehicleIds);
+        
+        imageCount = count || 0;
+      }
+    } catch (error: any) {
+      // Non-blocking - image counting is optional
+      console.warn(`   ⚠️  Could not count images: ${error.message}`);
+    }
   }
 
   return {
-    vehicles_found: 0,
-    vehicles_extracted: 0,
-    images_found: 0,
-    other_data: {},
+    vehicles_found: vehiclesFound,
+    vehicles_extracted: vehiclesQueued,
+    vehicles_created: vehiclesCreated,
+    images_found: imageCount,
+    other_data: {
+      listings_queued: vehiclesQueued,
+      vehicles_created: vehiclesCreated,
+    },
   };
 }
 

@@ -65,7 +65,8 @@ async function discoverOrganization(organizationId: string, forceRediscover: boo
     console.log(`  - Extraction Patterns: ${data.extraction_patterns.length}`);
     console.log(`  - Patterns Stored: ${data.learned_patterns_stored ? 'YES' : 'NO'}`);
     console.log(`  - Vehicles Found: ${data.vehicles_found}`);
-    console.log(`  - Vehicles Extracted: ${data.vehicles_extracted}`);
+    console.log(`  - Vehicles Queued: ${data.vehicles_extracted}`);
+    console.log(`  - Vehicle Profiles Created: ${data.vehicles_created}`);
     console.log(`  - Images Found: ${data.images_found}\n`);
 
     if (data.extraction_patterns.length > 0) {
