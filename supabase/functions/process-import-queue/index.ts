@@ -2614,6 +2614,72 @@ serve(async (req) => {
 
           const deferredImageUrls = [...deferredImageUrlsBase].filter(Boolean);
 
+          // CRITICAL: When skip_image_upload is true, create vehicle_images records with external URLs
+          // This allows frontend to show images immediately while we download them gradually
+          if (imageUrls.length > 0 && skip_image_upload) {
+            try {
+              // Create vehicle_images records with external URLs
+              const imageRecords = imageUrls.slice(0, 50).map((url: string, idx: number) => ({
+                vehicle_id: newVehicle.id,
+                user_id: importUserId || null,
+                image_url: url.trim(),
+                thumbnail_url: url.trim(),
+                medium_url: url.trim(),
+                large_url: url.trim(),
+                is_external: true, // Mark as external URL
+                source: organizationId ? 'organization_import' : 'external_import',
+                source_url: item.listing_url || null,
+                is_primary: idx === 0,
+                position: idx,
+                display_order: idx,
+                approval_status: 'auto_approved',
+                is_approved: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }));
+
+              const { error: insertError } = await supabase
+                .from('vehicle_images')
+                .insert(imageRecords);
+
+              if (insertError) {
+                console.warn(`⚠️ Failed to create external image records (non-blocking): ${insertError.message}`);
+              } else {
+                console.log(`  💾 Created ${imageRecords.length} vehicle_images records with external URLs (will download later)`);
+              }
+
+              // Also store in origin_metadata for backup
+              try {
+                const { data: vrow } = await supabase
+                  .from('vehicles')
+                  .select('origin_metadata')
+                  .eq('id', newVehicle.id)
+                  .maybeSingle();
+                
+                const om = (vrow?.origin_metadata && typeof vrow.origin_metadata === 'object') 
+                  ? vrow.origin_metadata 
+                  : {};
+                
+                const nextOm = {
+                  ...om,
+                  image_urls: imageUrls,
+                  image_count: imageUrls.length,
+                  images_stored_at: new Date().toISOString(),
+                  images_backfilled: false,
+                };
+                
+                await supabase
+                  .from('vehicles')
+                  .update({ origin_metadata: nextOm, updated_at: new Date().toISOString() } as any)
+                  .eq('id', newVehicle.id);
+              } catch (metadataErr: any) {
+                // Non-blocking
+              }
+            } catch (extErr: any) {
+              console.warn(`⚠️ Failed to create external image records (non-blocking): ${extErr.message}`);
+            }
+          }
+
           // Defer remaining images to background backfill (best-effort).
           if (!skip_image_upload && (deferredImageUrls.length > 0 || immediateImageUrls.length > 0)) {
             try {

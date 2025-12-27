@@ -603,7 +603,7 @@ async function extractAllData(
           },
           body: JSON.stringify({
             batch_size: batchSize,
-            max_images_immediate: 3, // Get a few images immediately
+            skip_image_upload: true, // Skip images - get all data first, trickle images later
           }),
         });
 

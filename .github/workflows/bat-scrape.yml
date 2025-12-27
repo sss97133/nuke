@@ -15,38 +15,64 @@ jobs:
     timeout-minutes: 10
     
     steps:
-      - name: Trigger BAT Scrape
+      - name: Validate Secrets
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "🔍 Starting BAT scrape for VivaLasVegasAutos..."
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "❌ Missing required secret: SUPABASE_URL"
+            exit 1
+          fi
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "❌ Missing required secret: SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          echo "✅ All required secrets are set"
+      
+      - name: Trigger BAT Scrape (go-grinder)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "🔍 Starting BaT scrape via go-grinder (proven pattern)..."
           
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "${SUPABASE_URL}/functions/v1/monitor-bat-seller" \
+          # Use go-grinder which is the proven, secure pattern for BaT scraping
+          # It handles discovery, self-invocation, and time budgets safely
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            "${SUPABASE_URL}/functions/v1/go-grinder" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
-            -d '{"sellerUsername":"VivaLasVegasAutos","organizationId":"c433d27e-2159-4f8c-b4ae-32a5e44a77cf"}')
+            --max-time 70 \
+            -d '{
+              "do_seed": true,
+              "chain_depth": 6,
+              "seed_every": 1,
+              "bat_import_batch": 1,
+              "max_listings": 800
+            }')
           
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
           
-          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 202 ]; then
-            echo "✅ Scrape triggered successfully (HTTP $HTTP_CODE)"
-            echo "Response: $BODY"
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY" | head -c 2000
+          
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo ""
+            echo "✅ BaT scrape triggered successfully"
+            # Parse and display key metrics if available
+            echo "$BODY" | grep -o '"discovered_listing_urls":[0-9]*' || echo "Response parsing skipped"
           else
-            echo "❌ Scrape failed (HTTP $HTTP_CODE)"
-            echo "Response: $BODY"
+            echo ""
+            echo "❌ BaT scrape failed (HTTP $HTTP_CODE)"
             exit 1
           fi
       
-      - name: Check Results
+      - name: Summary
         if: always()
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "📊 Checking recent scrape results..."
-          # Optional: Query Supabase to verify results
-          # This could check bat_scrape_jobs table or similar
+          echo "📊 BaT scrape workflow completed"
+          echo "The go-grinder function will continue processing via self-invocation"
+          echo "Check Supabase logs or scrape_sources table for full results"
 

@@ -18,7 +18,9 @@
     "import:bat-results": "tsx scripts/bat-import-results.ts",
     "import:bat-local-partner-vehicles": "tsx scripts/bat-import-local-partner-vehicles.ts",
     "ingest:bat-live-auctions": "tsx scripts/bat-import-live-auctions.ts",
-    "ingest:classic-auctions": "tsx scripts/classic-import-auctions.ts"
+    "ingest:classic-auctions": "tsx scripts/classic-import-auctions.ts",
+    "extract-all-orgs": "tsx scripts/extract-all-orgs.ts",
+    "trickle-backfill-images": "tsx scripts/trickle-backfill-images.ts"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.8.2",

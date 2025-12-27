@@ -2396,10 +2396,23 @@ const VehicleProfile: React.FC = () => {
       return u.includes('/storage/v1/object/public/');
     };
 
-    const resolveDbImageUrl = (row: any): string | null => {
+    const resolveDbImageUrl = (row: any, preferFullRes: boolean = false): string | null => {
       try {
         const variantsRaw = (row as any)?.variants;
         const variants = variantsRaw && typeof variantsRaw === 'object' ? variantsRaw : null;
+        // For primary images, prioritize full resolution
+        if (preferFullRes) {
+          return (
+            (variants as any)?.full ||
+            (variants as any)?.large ||
+            (row as any)?.image_url ||
+            (variants as any)?.medium ||
+            (row as any)?.medium_url ||
+            (row as any)?.thumbnail_url ||
+            null
+          );
+        }
+        // For gallery display, use appropriate size
         return (
           (variants as any)?.large ||
           (variants as any)?.medium ||
@@ -2511,12 +2524,28 @@ const VehicleProfile: React.FC = () => {
         const shouldHealPrimary = (!hasPrimary && imageRecords[0]) || (hasPrimary && !primaryOk);
         if (shouldHealPrimary && session?.user?.id) {
           const isValidForPrimary = (r: any) => {
+            // Exclude documents (spec sheets, window stickers, etc.)
+            if (r?.is_document === true) return false;
             // Exclude import_queue images from primary selection
             if (isImportedStoragePath(r?.storage_path)) return false;
-            const url = resolveDbImageUrl(r) || r?.image_url;
+            // Use full-resolution URL for primary images
+            const url = resolveDbImageUrl(r, true) || r?.image_url;
+            if (!url) return false;
             // Exclude organization/dealer logos
-            if (url && isOrganizationLogo(url)) return false;
-            return url && filterProfileImages([url], vehicle).length > 0;
+            if (isOrganizationLogo(url)) return false;
+            // Exclude documents by URL patterns (window sticker, spec sheet, monroney, etc.)
+            const urlLower = url.toLowerCase();
+            if (urlLower.includes('window-sticker') || urlLower.includes('window_sticker') ||
+                urlLower.includes('monroney') || urlLower.includes('spec-sheet') ||
+                urlLower.includes('spec_sheet') || urlLower.includes('build-sheet') ||
+                urlLower.includes('build_sheet') || urlLower.includes('spid') ||
+                urlLower.includes('service-parts') || urlLower.includes('rpo') ||
+                urlLower.includes('document') || urlLower.includes('sticker') ||
+                urlLower.includes('sheet') || urlLower.includes('receipt') ||
+                urlLower.includes('invoice') || urlLower.includes('title')) {
+              return false;
+            }
+            return filterProfileImages([url], vehicle).length > 0;
           };
           // Prefer Supabase-hosted images to avoid hotlink/403 issues on external sources.
           const bestDbRow =
