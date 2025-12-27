@@ -133,7 +133,7 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     return upgraded;
   };
   
-  // Filter function to exclude non-vehicle images
+  // Filter function to exclude non-vehicle images (but KEEP documents - they're valuable!)
   const isVehicleImage = (url: string): boolean => {
     if (!url || typeof url !== 'string') return false;
     const lower = url.toLowerCase();
@@ -150,6 +150,8 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
         lower.includes('/button') || lower.includes('/ui/') || lower.includes('/assets/') || lower.includes('/static/')) {
       return false;
     }
+    // NOTE: Documents (window stickers, spec sheets, etc.) are KEPT - they're valuable data
+    // They'll just be marked as is_document=true and excluded from primary selection
     // Exclude small thumbnails by size suffix (but we'll upgrade them)
     // Don't exclude here, let upgradeToFullRes handle it
     return true;
@@ -337,8 +339,8 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   // Return: exterior first, then others (interior shots can be in gallery but not primary)
   const finalUrls = [...exteriorUrls, ...otherUrls, ...interiorUrls];
   
-  // Limit to reasonable number (prioritize first 50 exterior shots)
-  return finalUrls.slice(0, 100);
+  // Return ALL images - no limit (galleries can have 100+ images)
+  return finalUrls;
 }
 
 function extractCarsAndBidsAuctionData(html: string): {
@@ -1119,7 +1121,39 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
             url: listingUrl,
             formats: ["extract", "html"],
             onlyMainContent: false,
-            waitFor: 8000, // Wait for gallery to fully load (increased for better gallery detection)
+            waitFor: 12000, // Wait for gallery to fully load and expand
+            actions: [
+              {
+                type: "wait",
+                milliseconds: 3000, // Initial page load
+              },
+              {
+                type: "scroll",
+                direction: "down",
+                pixels: 1000, // Scroll to gallery
+              },
+              {
+                type: "wait",
+                milliseconds: 2000, // Wait for gallery to render
+              },
+              {
+                type: "click",
+                selector: "button:has-text('Show more'), button:has-text('Load more'), button:has-text('View all'), [aria-label*='more'], [aria-label*='all']",
+              },
+              {
+                type: "wait",
+                milliseconds: 3000, // Wait for expanded images to load
+              },
+              {
+                type: "scroll",
+                direction: "down",
+                pixels: 2000, // Scroll to load lazy-loaded images
+              },
+              {
+                type: "wait",
+                milliseconds: 2000, // Final wait for all images
+              },
+            ],
             extract: { schema: listingSchema },
           }),
         },
@@ -1379,7 +1413,17 @@ async function storeVehiclesInDatabase(
 
   for (const vehicle of cleaned) {
     try {
-      const listingUrl = vehicle.listing_url || vehicle.platform_url || vehicle.url || null;
+      let listingUrl = vehicle.listing_url || vehicle.platform_url || vehicle.url || null;
+      // CRITICAL: Reject /video URLs - these are not actual listing pages
+      if (listingUrl && (listingUrl.includes('/video') || listingUrl.endsWith('/video'))) {
+        console.warn(`⚠️ Rejecting /video URL: ${listingUrl}`);
+        errors.push(`Rejected /video URL: ${listingUrl}`);
+        continue;
+      }
+      // Clean any /video suffix just in case
+      if (listingUrl) {
+        listingUrl = listingUrl.replace(/\/video\/?$/, '').replace(/\/video\//, '/');
+      }
       const title = vehicle.title || vehicle.listing_title || null;
       const vinRaw = typeof vehicle.vin === "string" ? vehicle.vin.trim() : "";
       const vin = vinRaw && vinRaw.toLowerCase() !== "n/a" ? vinRaw : null;
@@ -1858,11 +1902,33 @@ async function insertVehicleImages(
     errors.push(`vehicle_images read existing exception (${vehicleId}): ${e?.message || String(e)}`);
   }
 
+  // Helper to detect if URL is a document (window sticker, spec sheet, etc.)
+  // Documents are valuable and should be extracted, just not used as primary images
+  const isDocumentUrl = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    const lower = url.toLowerCase();
+    return (
+      lower.includes('window-sticker') || lower.includes('window_sticker') ||
+      lower.includes('monroney') || lower.includes('spec-sheet') ||
+      lower.includes('spec_sheet') || lower.includes('build-sheet') ||
+      lower.includes('build_sheet') || lower.includes('spid') ||
+      lower.includes('service-parts') || lower.includes('rpo') ||
+      (lower.includes('document') && !lower.includes('photo')) ||
+      (lower.includes('sticker') && !lower.includes('decal')) ||
+      (lower.includes('sheet') && !lower.includes('bedsheet')) ||
+      lower.includes('receipt') || lower.includes('invoice') ||
+      lower.includes('title') || lower.includes('registration')
+    );
+  };
+
   // Insert ALL images (no limit) - BaT listings can have 100+ images
+  // Documents are included but marked and excluded from primary selection
   for (const imageUrl of urls) {
     if (existingUrls.has(imageUrl)) continue;
     try {
-      const makePrimary = !hasPrimary && nextPosition === 0;
+      // Detect documents but still extract them - just don't make them primary
+      const isDocument = isDocumentUrl(imageUrl);
+      const makePrimary = !hasPrimary && nextPosition === 0 && !isDocument;
       
       // Determine correct source based on listing URL (most reliable) or source string
       // Match actual source values used in database for proper attribution
@@ -1904,6 +1970,7 @@ async function insertVehicleImages(
           position: nextPosition,
           display_order: nextPosition,
           is_primary: makePrimary,
+          is_document: isDocument, // Mark documents so they're excluded from primary selection
           is_approved: true,
           approval_status: "auto_approved",
           redaction_level: "none",
@@ -2577,7 +2644,39 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
             url: listingUrl,
             formats: ["extract", "html"],
             onlyMainContent: false,
-            waitFor: 10000, // 10s wait for PhotoSwipe gallery to render (pswp__img images)
+            waitFor: 12000, // Wait for PhotoSwipe gallery to render and expand
+            actions: [
+              {
+                type: "wait",
+                milliseconds: 3000, // Initial page load
+              },
+              {
+                type: "scroll",
+                direction: "down",
+                pixels: 1000, // Scroll to gallery
+              },
+              {
+                type: "wait",
+                milliseconds: 2000, // Wait for gallery to render
+              },
+              {
+                type: "click",
+                selector: "button:has-text('Show more'), button:has-text('Load more'), button:has-text('View all'), [aria-label*='more'], [aria-label*='all']",
+              },
+              {
+                type: "wait",
+                milliseconds: 3000, // Wait for expanded images to load
+              },
+              {
+                type: "scroll",
+                direction: "down",
+                pixels: 2000, // Scroll to load lazy-loaded images
+              },
+              {
+                type: "wait",
+                milliseconds: 2000, // Final wait for all images
+              },
+            ],
             extract: { schema: listingSchema },
           }),
         },
@@ -2706,8 +2805,8 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       // Extract from data-gallery-items JSON (most reliable)
       const idx = h.indexOf('id="bat_listing_page_photo_gallery"');
       if (idx >= 0) {
-        // Increase window size to handle large galleries (148+ images)
-        const window = h.slice(idx, idx + 1000000);
+        // Increase window size to handle large galleries (200+ images)
+        const window = h.slice(idx, idx + 5000000);
         const m = window.match(/data-gallery-items=(?:"([^"]+)"|'([^']+)')/i);
         const encoded = (m?.[1] || m?.[2] || '').trim();
         if (encoded) {
@@ -2810,7 +2909,39 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
           url: normalizedUrl,
           formats: ["extract", "html"],
           onlyMainContent: false,
-          waitFor: 5000, // Wait for gallery to load
+          waitFor: 12000, // Wait for gallery to fully load and expand
+          actions: [
+            {
+              type: "wait",
+              milliseconds: 3000, // Initial page load
+            },
+            {
+              type: "scroll",
+              direction: "down",
+              pixels: 1000, // Scroll to gallery
+            },
+            {
+              type: "wait",
+              milliseconds: 2000, // Wait for gallery to render
+            },
+            {
+              type: "click",
+              selector: "button:has-text('Show more'), button:has-text('Load more'), button:has-text('View all'), [aria-label*='more'], [aria-label*='all'], .gallery-load-more, [data-action='load-more']",
+            },
+            {
+              type: "wait",
+              milliseconds: 3000, // Wait for expanded images to load
+            },
+            {
+              type: "scroll",
+              direction: "down",
+              pixels: 2000, // Scroll to load lazy-loaded images
+            },
+            {
+              type: "wait",
+              milliseconds: 2000, // Final wait for all images
+            },
+          ],
           extract: { schema: listingSchema },
         }),
       },
@@ -2835,6 +2966,10 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     // Upgrade all image URLs to highest resolution and filter out non-vehicle images
     images = images.map(upgradeBatImageUrl).filter((u: string) => {
       const lower = u.toLowerCase();
+      // CRITICAL: Exclude storage URLs - we want external BaT URLs only
+      if (lower.includes('supabase.co') || lower.includes('storage/') || lower.includes('import_queue')) {
+        return false;
+      }
       // Filter out logos, icons, UI elements
       if (lower.includes('logo') || 
           lower.includes('icon') || 
