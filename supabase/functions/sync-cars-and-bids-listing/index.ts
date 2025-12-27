@@ -26,11 +26,12 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get the external listing
+    // Handle both 'cars_and_bids' (DB format) and 'carsandbids' (legacy format)
     const { data: listing, error: listingError } = await supabase
       .from('external_listings')
       .select('*')
       .eq('id', externalListingId)
-      .eq('platform', 'carsandbids')
+      .in('platform', ['cars_and_bids', 'carsandbids'])
       .single();
 
     if (listingError || !listing) {
