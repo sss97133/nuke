@@ -2092,20 +2092,22 @@ const VehicleProfile: React.FC = () => {
         }
         return true; // Default: filter other SVGs
       }
-      // Filter generic logo paths that are site chrome, but preserve business logos
+      // CRITICAL: Filter out organization/dealer logos - these should NEVER be vehicle images
+      // Organization logos are stored in organization-logos/ and should only appear as favicons
+      if (s.includes('organization-logos/') || s.includes('organization_logos/')) return true;
+      if (s.includes('images.classic.com/uploads/dealer/')) return true;
+      if (s.includes('/uploads/dealer/')) return true;
+      
+      // Filter generic logo paths that are site chrome, but preserve business logos in specific contexts
       if (s.includes('/logo') || s.includes('logo.')) {
-        // Allow business/auction/dealer logos
-        if (s.includes('/businesses/') || s.includes('/organizations/') || 
-            s.includes('/dealers/') || s.includes('/auctions/') ||
-            s.includes('logo_url') || s.includes('business_logo')) {
-          return false; // Keep these
-        }
+        // Filter ALL logos in storage paths (these are organization/dealer logos)
+        if (s.includes('/storage/') || s.includes('supabase.co')) return true;
         // Filter site chrome logos (navigation, header, footer)
         if (s.includes('/assets/') || s.includes('/themes/') || 
             s.includes('/header') || s.includes('/footer') || s.includes('/nav')) {
           return true; // Filter these
         }
-        return true; // Default: filter other logo paths
+        return true; // Default: filter other logo paths (vehicle images should not be logos)
       }
       if (s.includes('avatar') || s.includes('badge') || s.includes('sprite')) return true;
 
@@ -2333,12 +2335,21 @@ const VehicleProfile: React.FC = () => {
 
     const filterProfileImages = (urls: string[], v: any): string[] => {
       const normalized = (Array.isArray(urls) ? urls : []).map(normalizeUrl).filter(Boolean);
-      // Exclude import_queue images from profile display
-      const withoutImportQueue = normalized.filter((u: string) => {
+      // Exclude organization/dealer logos and import_queue images from profile display
+      const withoutOrgLogos = normalized.filter((u: string) => {
         const urlLower = String(u || '').toLowerCase();
-        return !urlLower.includes('import_queue');
+        // Exclude import_queue images (these are organization/dealer images)
+        if (urlLower.includes('import_queue')) return false;
+        // Exclude organization logo storage paths
+        if (urlLower.includes('organization-logos/') || urlLower.includes('organization_logos/')) return false;
+        // Exclude Classic.com dealer logos
+        if (urlLower.includes('images.classic.com/uploads/dealer/')) return false;
+        if (urlLower.includes('/uploads/dealer/')) return false;
+        // Exclude any storage path that looks like a logo
+        if (urlLower.includes('/logo') && (urlLower.includes('/storage/') || urlLower.includes('supabase.co'))) return false;
+        return true;
       });
-      return filterIconNoise(filterCarsAndBidsNoise(filterClassicNoise(filterBatNoise(withoutImportQueue, v), v), v));
+      return filterIconNoise(filterCarsAndBidsNoise(filterClassicNoise(filterBatNoise(withoutOrgLogos, v), v), v));
     };
 
     const getOriginImages = (v: any): { images: string[]; declaredCount: number | null } => {
@@ -2450,16 +2461,37 @@ const VehicleProfile: React.FC = () => {
           const s = String(p || '').toLowerCase();
           return s.includes('external_import') || s.includes('organization_import') || s.includes('import_queue');
         };
+        
+        // Check if image URL is an organization/dealer logo (should never be used as vehicle image)
+        const isOrganizationLogo = (url: string): boolean => {
+          const urlLower = String(url || '').toLowerCase();
+          // Organization logo storage paths
+          if (urlLower.includes('organization-logos/') || urlLower.includes('organization_logos/')) return true;
+          // Classic.com dealer logos
+          if (urlLower.includes('images.classic.com/uploads/dealer/')) return true;
+          if (urlLower.includes('/uploads/dealer/')) return true;
+          // Storage paths containing "logo"
+          if (urlLower.includes('/logo') && (urlLower.includes('/storage/') || urlLower.includes('supabase.co'))) return true;
+          return false;
+        };
 
         const primaryRow = imageRecords.find((r: any) => r?.is_primary === true) || null;
         const primaryCandidate = primaryRow ? (resolveDbImageUrl(primaryRow) || null) : null;
-        // Exclude import_queue images from primary selection
+        // Exclude import_queue images and organization logos from primary selection
         const primaryIsImportQueue = primaryRow && isImportedStoragePath(primaryRow?.storage_path);
-        const primaryOk = primaryCandidate && !primaryIsImportQueue && filterProfileImages([primaryCandidate], vehicle).length > 0;
+        const primaryIsOrgLogo = primaryCandidate && isOrganizationLogo(primaryCandidate);
+        const primaryOk = primaryCandidate && !primaryIsImportQueue && !primaryIsOrgLogo && filterProfileImages([primaryCandidate], vehicle).length > 0;
 
-        // Build fallback pool, excluding import_queue images
+        // Build fallback pool, excluding import_queue images and organization logos
         const fallbackPool = imageRecords
-          .filter((r: any) => !isImportedStoragePath(r?.storage_path)) // Exclude import_queue images
+          .filter((r: any) => {
+            // Exclude import_queue images
+            if (isImportedStoragePath(r?.storage_path)) return false;
+            // Exclude organization/dealer logos
+            const url = resolveDbImageUrl(r) || r?.image_url;
+            if (url && isOrganizationLogo(url)) return false;
+            return true;
+          })
           .map((r: any) => resolveDbImageUrl(r))
           .filter(Boolean) as string[];
         
@@ -2482,6 +2514,8 @@ const VehicleProfile: React.FC = () => {
             // Exclude import_queue images from primary selection
             if (isImportedStoragePath(r?.storage_path)) return false;
             const url = resolveDbImageUrl(r) || r?.image_url;
+            // Exclude organization/dealer logos
+            if (url && isOrganizationLogo(url)) return false;
             return url && filterProfileImages([url], vehicle).length > 0;
           };
           // Prefer Supabase-hosted images to avoid hotlink/403 issues on external sources.

@@ -72,7 +72,18 @@ async function findProblematicListings() {
     }
     
     // Remove /video suffix - that's not the correct listing URL
+    // Also look for the actual listing URL in origin_metadata if available
     listingUrl = listingUrl.replace(/\/video\/?$/, '');
+    
+    // If URL still looks incomplete (just /auctions/ID without year-make-model), 
+    // try to find the full URL in metadata or construct it from vehicle data
+    if (listingUrl.match(/\/auctions\/[a-zA-Z0-9]+\/?$/)) {
+      const fullUrl = vehicle.origin_metadata?.listing_url || 
+                     vehicle.origin_metadata?.bat_listing_url;
+      if (fullUrl && fullUrl.includes('carsandbids.com/auctions/') && !fullUrl.includes('/video')) {
+        listingUrl = fullUrl;
+      }
+    }
     
     // Check for problematic images (thumbnails, video frames, low-res)
     const { data: images } = await supabase
