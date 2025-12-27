@@ -55,24 +55,13 @@ Deno.serve(async (req) => {
     console.log(`Dry Run: ${dry_run}\n`);
 
     // Step 1: Find organizations that need extraction
+    // First get all orgs, then we'll count vehicles separately
     let query = supabase
       .from('businesses')
-      .select(`
-        id,
-        business_name,
-        website,
-        business_type,
-        (
-          SELECT COUNT(*)
-          FROM organization_vehicles
-          WHERE organization_id = businesses.id
-          AND status = 'active'
-        ) as vehicle_count
-      `)
+      .select('id, business_name, website, business_type, created_at')
       .eq('is_public', true)
       .not('website', 'is', null)
       .neq('website', '')
-      .order('vehicle_count', { ascending: true }) // Process orgs with no/few vehicles first
       .order('created_at', { ascending: true })
       .range(offset, offset + limit - 1);
 
@@ -100,11 +89,32 @@ Deno.serve(async (req) => {
 
     console.log(`📋 Found ${orgs.length} organizations to process\n`);
 
+    // Get vehicle counts for each organization
+    const orgIds = orgs.map((o: any) => o.id);
+    const { data: vehicleCounts } = await supabase
+      .from('organization_vehicles')
+      .select('organization_id')
+      .in('organization_id', orgIds)
+      .eq('status', 'active');
+    
+    const countMap = new Map<string, number>();
+    for (const vc of vehicleCounts || []) {
+      const orgId = (vc as any).organization_id;
+      countMap.set(orgId, (countMap.get(orgId) || 0) + 1);
+    }
+
+    // Sort orgs by vehicle count (ascending - process empty ones first)
+    orgs.sort((a: any, b: any) => {
+      const countA = countMap.get(a.id) || 0;
+      const countB = countMap.get(b.id) || 0;
+      return countA - countB;
+    });
+
     // Step 2: Process each organization
     const results = [];
     
     for (const org of orgs) {
-      const vehicleCount = (org as any).vehicle_count || 0;
+      const vehicleCount = countMap.get(org.id) || 0;
       
       // Skip if already has enough vehicles
       if (vehicleCount >= min_vehicle_threshold) {
@@ -134,8 +144,9 @@ Deno.serve(async (req) => {
         const discoverResponse = await fetch(discoverUrl, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'apikey': SERVICE_KEY,
             'Authorization': `Bearer ${SERVICE_KEY}`,
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             organization_id: org.id,
