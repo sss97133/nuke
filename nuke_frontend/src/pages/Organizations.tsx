@@ -35,6 +35,24 @@ interface Organization {
   latitude?: number;
   longitude?: number;
   distance?: number;
+  // Investor metrics
+  primary_focus?: string;
+  total_listings?: number;
+  total_bids?: number;
+  total_sold?: number;
+  total_sales?: number;
+  total_revenue?: number;
+  gross_margin_pct?: number;
+  inventory_turnover?: number;
+  avg_days_to_sell?: number;
+  project_completion_rate?: number;
+  repeat_customer_rate?: number;
+  repeat_customer_count?: number;
+  gmv?: number;
+  receipt_count?: number;
+  listing_count?: number;
+  total_projects?: number;
+  transaction_volume?: number;
 }
 
 interface OrgImage {
@@ -58,6 +76,7 @@ export default function Organizations() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedAddressOrg, setSelectedAddressOrg] = useState<string | null>(null);
 
   useEffect(() => {
     // Get user location if "near me" is in search
@@ -127,7 +146,7 @@ export default function Organizations() {
                 // Load those organizations
                 const { data, error: orgError } = await supabase
                   .from('businesses')
-                  .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
+                  .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, primary_focus, total_listings, total_bids, total_sold, total_revenue, gross_margin_pct, inventory_turnover, avg_days_to_sell, project_completion_rate, repeat_customer_rate, repeat_customer_count, gmv, receipt_count, listing_count, total_projects, created_at')
                   .eq('is_public', true)
                   .in('id', orgIds);
                 
@@ -162,7 +181,7 @@ export default function Organizations() {
           if (orgIds.length > 0) {
             const { data, error: orgError } = await supabase
               .from('businesses')
-              .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
+              .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, primary_focus, total_listings, total_bids, total_sold, total_revenue, gross_margin_pct, inventory_turnover, avg_days_to_sell, project_completion_rate, repeat_customer_rate, repeat_customer_count, gmv, receipt_count, listing_count, total_projects, created_at')
               .eq('is_public', true)
               .in('id', orgIds);
             
@@ -175,7 +194,7 @@ export default function Organizations() {
         // No search - load all organizations
         const { data, error: orgError } = await supabase
           .from('businesses')
-          .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, created_at')
+          .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, primary_focus, total_listings, total_bids, total_sold, total_revenue, gross_margin_pct, inventory_turnover, avg_days_to_sell, project_completion_rate, repeat_customer_rate, repeat_customer_count, gmv, receipt_count, listing_count, total_projects, created_at')
           .eq('is_public', true)
           .order('created_at', { ascending: false });
         
@@ -260,7 +279,10 @@ export default function Organizations() {
         contributor_count: contributorCounts[org.id] || 0,
         followers: followerCounts[org.id] || 0,
         current_viewers: 0,
-        recent_work_orders: 0
+        recent_work_orders: 0,
+        // Map fields for metric function compatibility
+        total_sales: org.total_sold || org.total_sales,
+        vehicle_count: org.total_vehicles || org.vehicle_count
       }));
 
       setOrganizations(enriched);
@@ -591,36 +613,30 @@ export default function Organizations() {
                   </div>
                 )}
 
-                {/* Full HQ Address (prominent for investors) */}
-                {(org.address || (org.city && org.state)) && (
-                  <div style={{
-                    fontSize: '7pt',
-                    color: 'var(--text)',
-                    marginBottom: '8px',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '4px',
-                    lineHeight: 1.4
-                  }}>
-                    <span style={{ fontSize: '8pt', marginTop: '1px' }}>📍</span>
-                    <span>
-                      {org.address ? (
-                        <span>
-                          {org.address}
-                          {org.city && org.state && `, ${org.city}, ${org.state}`}
-                          {org.zip_code && ` ${org.zip_code}`}
-                        </span>
-                      ) : (
-                        <span>{org.city}, {org.state}{org.zip_code && ` ${org.zip_code}`}</span>
-                      )}
-                    </span>
+                {/* Address - clickable */}
+                {(org.address || org.zip_code) && (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedAddressOrg(org.id);
+                    }}
+                    style={{
+                      fontSize: '7pt',
+                      color: 'var(--text-secondary)',
+                      marginBottom: '8px',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    {org.address || ''}{org.address && org.zip_code ? ' ' : ''}{org.zip_code || ''}
                   </div>
                 )}
 
                 {/* Key Metrics Row - Dynamic based on org type and data availability */}
                 {(() => {
                   const metrics = getOrgInvestorMetrics(org as OrgMetricData, {
-                    type: session?.user?.id ? 'public' : 'public'
+                    type: session?.user?.id ? 'owner' : 'public',
+                    isOwner: !!session?.user?.id
                   });
                   
                   return (
@@ -670,6 +686,86 @@ export default function Organizations() {
           })}
         </div>
       )}
+
+      {/* Address Card Modal */}
+      {selectedAddressOrg && (() => {
+        const org = organizations.find(o => o.id === selectedAddressOrg);
+        if (!org) return null;
+        
+        return (
+          <div
+            onClick={() => setSelectedAddressOrg(null)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--white)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '20px',
+                maxWidth: '400px',
+                width: '90%'
+              }}
+            >
+              <div style={{ marginBottom: '12px', fontSize: '10pt', fontWeight: 700 }}>
+                {org.business_name}
+              </div>
+              <div style={{ fontSize: '8pt', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                {org.address && <div>{org.address}</div>}
+                {(org.city || org.state) && (
+                  <div>
+                    {org.city && org.state ? `${org.city}, ${org.state}` : org.city || org.state}
+                    {org.zip_code && ` ${org.zip_code}`}
+                  </div>
+                )}
+                {!org.address && !org.city && org.zip_code && <div>{org.zip_code}</div>}
+              </div>
+              {(org.latitude && org.longitude) && (
+                <a
+                  href={`https://www.google.com/maps?q=${org.latitude},${org.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-block',
+                    marginTop: '12px',
+                    fontSize: '8pt',
+                    color: 'var(--accent)',
+                    textDecoration: 'none'
+                  }}
+                >
+                  View on Map →
+                </a>
+              )}
+              <button
+                onClick={() => setSelectedAddressOrg(null)}
+                style={{
+                  marginTop: '16px',
+                  padding: '6px 12px',
+                  fontSize: '8pt',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

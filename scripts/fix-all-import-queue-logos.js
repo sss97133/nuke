@@ -34,35 +34,59 @@ async function fixAllImportQueueLogos() {
   console.log(`   Starting from index: ${START_INDEX}\n`);
   
   // Step 1: Get all DISTINCT vehicles with import_queue images
-  // Query in chunks to handle large datasets efficiently
+  // Use multiple queries to work around Supabase pagination limits
   console.log('   Fetching all vehicles with import_queue images...');
-  let offset = 0;
-  const chunkSize = 5000;
-  const seenIds = new Set();
   
-  while (true) {
+  const seenIds = new Set();
+  let offset = 0;
+  const chunkSize = 1000; // Smaller chunks to work around limits
+  let totalFetched = 0;
+  let consecutiveEmpty = 0;
+  const maxConsecutiveEmpty = 3; // Stop after 3 empty chunks
+  
+  while (consecutiveEmpty < maxConsecutiveEmpty) {
     const { data: chunk, error: chunkError } = await supabase
       .from('vehicle_images')
       .select('vehicle_id')
       .or('storage_path.ilike.%import_queue%,image_url.ilike.%import_queue%')
-      .range(offset, offset + chunkSize - 1);
+      .range(offset, offset + chunkSize - 1)
+      .limit(chunkSize);
     
     if (chunkError) {
       console.error('❌ Error fetching vehicle IDs:', chunkError);
+      // If we have some IDs, continue with what we have
+      if (seenIds.size > 0) break;
       return;
     }
     
-    if (!chunk || chunk.length === 0) break;
+    if (!chunk || chunk.length === 0) {
+      consecutiveEmpty++;
+      offset += chunkSize;
+      continue;
+    }
+    
+    consecutiveEmpty = 0; // Reset counter
     
     chunk.forEach(v => {
       if (v && v.vehicle_id) seenIds.add(v.vehicle_id);
     });
     
-    if (chunk.length < chunkSize) break; // Last chunk
+    totalFetched += chunk.length;
+    process.stdout.write(`   Fetched ${totalFetched} images, found ${seenIds.size} unique vehicles...\r`);
+    
+    if (chunk.length < chunkSize) {
+      // Last chunk, but continue a bit more to be sure
+      offset += chunkSize;
+      consecutiveEmpty++;
+      continue;
+    }
+    
     offset += chunkSize;
     
-    if (seenIds.size % 1000 === 0) {
-      process.stdout.write(`   Found ${seenIds.size} unique vehicles so far...\r`);
+    // Safety limit: if we've fetched a lot, break
+    if (totalFetched > 100000) {
+      console.log(`\n⚠️  Reached safety limit of 100k images. Found ${seenIds.size} unique vehicles.`);
+      break;
     }
   }
   
