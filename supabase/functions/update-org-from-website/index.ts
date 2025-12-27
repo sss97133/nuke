@@ -137,97 +137,166 @@ serve(async (req) => {
     }
 
     // Extract address and location (comprehensive patterns)
-    const addressPatterns = [
-      // Structured data (schema.org)
-      doc.querySelector('[itemprop="address"]'),
-      doc.querySelector('[itemprop="addressLocality"]')?.parentElement,
-      // Common class names
-      doc.querySelector('.address, .business-address, .contact-address, .location-address'),
-      doc.querySelector('[class*="address"]:not([class*="email"])'),
-      // Footer addresses (common location)
-      doc.querySelector('footer .address, footer [class*="address"]'),
-      // Contact sections
-      doc.querySelector('.contact-info .address, .contact .address'),
-      // Meta tags
-      doc.querySelector('meta[property="business:contact_data:street_address"]')?.parentElement,
-    ].filter(Boolean);
+    // Helper function to extract address from HTML
+    const extractAddressFromHTML = (htmlContent: string, docInstance: any): {
+      addressText: string | null;
+      city: string | null;
+      state: string | null;
+      zipCode: string | null;
+    } => {
+      const addressPatterns = [
+        // Structured data (schema.org)
+        docInstance.querySelector('[itemprop="address"]'),
+        docInstance.querySelector('[itemprop="addressLocality"]')?.parentElement,
+        // Common class names
+        docInstance.querySelector('.address, .business-address, .contact-address, .location-address'),
+        docInstance.querySelector('[class*="address"]:not([class*="email"])'),
+        // Footer addresses (common location)
+        docInstance.querySelector('footer .address, footer [class*="address"]'),
+        // Contact sections
+        docInstance.querySelector('.contact-info .address, .contact .address'),
+        // Meta tags
+        docInstance.querySelector('meta[property="business:contact_data:street_address"]')?.parentElement,
+      ].filter(Boolean);
 
-    let addressText: string | null = null;
-    let city: string | null = null;
-    let state: string | null = null;
-    let zipCode: string | null = null;
+      let addressText: string | null = null;
+      let city: string | null = null;
+      let state: string | null = null;
+      let zipCode: string | null = null;
 
-    // Try structured data first
-    for (const el of addressPatterns) {
-      if (!el) continue;
-      const text = el.textContent?.trim() || '';
-      if (text.length > 10) {
-        addressText = text;
-        break;
+      // Try structured data first
+      for (const el of addressPatterns) {
+        if (!el) continue;
+        const text = el.textContent?.trim() || '';
+        if (text.length > 10) {
+          addressText = text;
+          break;
+        }
       }
-    }
 
-    // If no structured address found, try parsing from body text
-    if (!addressText || addressText.length < 10) {
-      const bodyText = doc.body?.textContent || '';
-      
-      // Pattern: Full address with zip (most reliable)
-      const fullAddressPattern = /(\d+\s+[A-Za-z0-9\s,]+(?:Ave|Avenue|St|Street|Rd|Road|Dr|Drive|Blvd|Boulevard|Ln|Lane|Way|Ct|Court)[^,]*),\s*([A-Za-z\s]+),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/i;
-      const fullMatch = bodyText.match(fullAddressPattern);
-      if (fullMatch) {
-        addressText = fullMatch[1].trim();
-        city = fullMatch[2].trim();
-        state = fullMatch[3].trim();
-        zipCode = fullMatch[4].trim();
-      } else {
-        // Pattern: City, State ZIP
-        const cityStatePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/g;
-        const cityStateMatch = bodyText.match(cityStatePattern);
-        if (cityStateMatch && cityStateMatch.length > 0) {
-          // Take the first match that looks like a location (not a date)
-          const match = cityStateMatch[0].match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/);
-          if (match) {
-            city = match[1].trim();
-            state = match[2].trim();
-            zipCode = match[3].trim();
-          }
+      // If no structured address found, try parsing from body text
+      if (!addressText || addressText.length < 10) {
+        const bodyText = docInstance.body?.textContent || htmlContent;
+        
+        // Pattern: Full address with zip (most reliable)
+        const fullAddressPattern = /(\d+\s+[A-Za-z0-9\s,]+(?:Ave|Avenue|St|Street|Rd|Road|Dr|Drive|Blvd|Boulevard|Ln|Lane|Way|Ct|Court)[^,]*),\s*([A-Za-z\s]+),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/i;
+        const fullMatch = bodyText.match(fullAddressPattern);
+        if (fullMatch) {
+          addressText = fullMatch[1].trim();
+          city = fullMatch[2].trim();
+          state = fullMatch[3].trim();
+          zipCode = fullMatch[4].trim();
         } else {
-          // Pattern: Just City, State (more flexible)
-          const simplePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})(?:\s|$)/g;
-          const simpleMatch = bodyText.match(simplePattern);
-          if (simpleMatch && simpleMatch.length > 0) {
-            const match = simpleMatch[0].match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})/);
+          // Pattern: City, State ZIP
+          const cityStatePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/g;
+          const cityStateMatch = bodyText.match(cityStatePattern);
+          if (cityStateMatch && cityStateMatch.length > 0) {
+            // Take the first match that looks like a location (not a date)
+            const match = cityStateMatch[0].match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/);
             if (match) {
               city = match[1].trim();
               state = match[2].trim();
+              zipCode = match[3].trim();
+            }
+          } else {
+            // Pattern: Just City, State (more flexible)
+            const simplePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})(?:\s|$)/g;
+            const simpleMatch = bodyText.match(simplePattern);
+            if (simpleMatch && simpleMatch.length > 0) {
+              const match = simpleMatch[0].match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})/);
+              if (match) {
+                city = match[1].trim();
+                state = match[2].trim();
+              }
             }
           }
         }
-      }
-    } else {
-      // Parse city/state from addressText if we have it
-      const cityStateZipPattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/;
-      const match = addressText.match(cityStateZipPattern);
-      if (match) {
-        city = match[1].trim();
-        state = match[2].trim();
-        zipCode = match[3].trim();
-        addressText = addressText.replace(/,?\s*[A-Z]{2}\s*\d{5}(?:-\d{4})?$/, '').trim();
       } else {
-        const cityStatePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})(?:\s|$)/;
-        const match2 = addressText.match(cityStatePattern);
-        if (match2) {
-          city = match2[1].trim();
-          state = match2[2].trim();
+        // Parse city/state from addressText if we have it
+        const cityStateZipPattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/;
+        const match = addressText.match(cityStateZipPattern);
+        if (match) {
+          city = match[1].trim();
+          state = match[2].trim();
+          zipCode = match[3].trim();
+          addressText = addressText.replace(/,?\s*[A-Z]{2}\s*\d{5}(?:-\d{4})?$/, '').trim();
+        } else {
+          const cityStatePattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*),\s*([A-Z]{2})(?:\s|$)/;
+          const match2 = addressText.match(cityStatePattern);
+          if (match2) {
+            city = match2[1].trim();
+            state = match2[2].trim();
+          }
+        }
+      }
+
+      return { addressText, city, state, zipCode };
+    };
+
+    // Try extracting from homepage first
+    let { addressText, city, state, zipCode } = extractAddressFromHTML(html, doc);
+
+    // If no address found on homepage, try common contact/about pages
+    if ((!addressText || addressText.length < 10) && (!city || !state)) {
+      const baseUrl = new URL(url);
+      const contactPages = [
+        '/contact',
+        '/contact-us',
+        '/about',
+        '/about-us',
+        '/location',
+        '/locations',
+        '/find-us',
+        '/visit-us',
+        '/store-locator',
+      ];
+
+      for (const page of contactPages) {
+        try {
+          const contactUrl = `${baseUrl.origin}${page}`;
+          console.log(`🔍 Checking ${contactUrl} for address...`);
+          
+          const contactResponse = await fetch(contactUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          });
+
+          if (contactResponse.ok) {
+            const contactHtml = await contactResponse.text();
+            const contactDoc = new DOMParser().parseFromString(contactHtml, 'text/html');
+            const contactAddress = extractAddressFromHTML(contactHtml, contactDoc);
+            
+            if (contactAddress.addressText && contactAddress.addressText.length > 10) {
+              addressText = contactAddress.addressText;
+              city = contactAddress.city || city;
+              state = contactAddress.state || state;
+              zipCode = contactAddress.zipCode || zipCode;
+              console.log(`✅ Found address on ${page} page`);
+              break;
+            } else if (contactAddress.city && contactAddress.state) {
+              city = contactAddress.city;
+              state = contactAddress.state;
+              zipCode = contactAddress.zipCode || zipCode;
+              console.log(`✅ Found location on ${page} page`);
+              break;
+            }
+          }
+        } catch (e) {
+          // Continue to next page if this one fails
+          continue;
         }
       }
     }
 
-    // Update location fields (only if missing and we found data)
-    if (addressText && addressText.length > 10 && !org.address) {
-      updates.address = addressText;
+    // Update location fields (prefer more complete data)
+    if (addressText && addressText.length > 10) {
+      // Update if missing or if new address is more complete
+      if (!org.address || addressText.length > (org.address?.length || 0)) {
+        updates.address = addressText;
+      }
     }
-    if (city && !org.city) {
+    if (city && (!org.city || city.length > (org.city?.length || 0))) {
       updates.city = city;
     }
     if (state && !org.state) {
