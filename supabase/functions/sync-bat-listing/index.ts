@@ -33,18 +33,25 @@ serve(async (req) => {
 
     const { externalListingId } = await req.json();
 
-    // Verify user token quickly (even though we use service role for writes).
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data: authData, error: authErr } = await supabaseAuth.auth.getUser();
-    if (authErr || !authData?.user) {
-      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Verify authentication - accept either JWT token OR service role key (for function-to-function calls)
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const token = authHeader.replace('Bearer ', '').trim();
+    const isServiceRoleKey = token === serviceRoleKey.trim();
+    
+    if (!isServiceRoleKey) {
+      // For non-service-role calls, validate JWT token
+      const supabaseAuth = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: authData, error: authErr } = await supabaseAuth.auth.getUser();
+      if (authErr || !authData?.user) {
+        return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const supabase = createClient(
