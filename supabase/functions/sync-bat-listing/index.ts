@@ -180,9 +180,10 @@ serve(async (req) => {
       // Create timeline event for significant bid increases (every $5k or milestone)
       const isMilestone = bidIncrease >= 5000 || (currentBid % 10000) < bidIncrease;
       
+      // Note: create_auction_timeline_event function may not exist, so wrap in try-catch
       if (isMilestone && listing.vehicle_id) {
         try {
-          await supabase.rpc('create_auction_timeline_event', {
+          const { error: rpcError } = await supabase.rpc('create_auction_timeline_event', {
             p_vehicle_id: listing.vehicle_id,
             p_event_type: 'auction_bid_placed',
             p_listing_id: listing.id,
@@ -195,6 +196,10 @@ serve(async (req) => {
               view_count: viewCount
             }
           });
+          // Silently ignore if function doesn't exist - it's optional
+          if (rpcError && !rpcError.message.includes('does not exist')) {
+            console.error('Timeline event creation error:', rpcError);
+          }
           console.log(`Created timeline event for bid increase: $${bidIncrease}`);
         } catch (error) {
           console.error('Failed to create timeline event:', error);
