@@ -357,22 +357,67 @@ function coerceDateOnly(input: any): string | null {
 }
 
 // Helper function to extract price from text, avoiding monthly payments
+// Handles European-style formatting where period is thousands separator (e.g., $14.500 = $14,500)
 function extractVehiclePrice(text: string): number | null {
   if (!text) return null;
   
-  // First, try to find structured price fields
+  // Helper to normalize price string (handles both comma and period as thousands separators)
+  const normalizePriceString = (priceStr: string): number | null => {
+    // Remove $ and spaces
+    let cleaned = priceStr.replace(/[\$\s]/g, '');
+    
+    // Handle European-style: $14.500 (period as thousands separator)
+    // Pattern: digits.three_digits at the end suggests thousands separator
+    const euroMatch = cleaned.match(/^(\d+)\.(\d{3})$/);
+    if (euroMatch) {
+      // This is European format (e.g., "14.500" = 14500)
+      return parseInt(euroMatch[1] + euroMatch[2]);
+    }
+    
+    // Handle standard format: $14,500 (comma as thousands separator)
+    // Also handle mixed: $1,234.56 (comma thousands, period decimal)
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      // Has both comma and period - comma is thousands, period is decimal
+      cleaned = cleaned.replace(/,/g, '');
+      return Math.round(parseFloat(cleaned));
+    }
+    
+    // Handle comma-only (thousands separator)
+    if (cleaned.includes(',')) {
+      cleaned = cleaned.replace(/,/g, '');
+      return parseInt(cleaned);
+    }
+    
+    // Handle period-only - need to determine if it's decimal or thousands separator
+    if (cleaned.includes('.')) {
+      const parts = cleaned.split('.');
+      // If exactly 3 digits after period, likely thousands separator (e.g., "14.500")
+      if (parts.length === 2 && parts[1].length === 3 && parts[1].match(/^\d{3}$/)) {
+        // Thousands separator
+        return parseInt(parts[0] + parts[1]);
+      } else {
+        // Decimal separator, round to integer
+        return Math.round(parseFloat(cleaned));
+      }
+    }
+    
+    // No separators, just digits
+    return parseInt(cleaned);
+  };
+  
+  // First, try to find structured price fields (especially "Asking" which is common on Craigslist)
   const structuredPatterns = [
-    /Price[:\s]*\$?([\d,]+(?:\.\d{2})?)/i,
-    /Asking[:\s]*\$?([\d,]+(?:\.\d{2})?)/i,
-    /Sale\s+Price[:\s]*\$?([\d,]+(?:\.\d{2})?)/i,
-    /Vehicle\s+Price[:\s]*\$?([\d,]+(?:\.\d{2})?)/i
+    /Asking[:\s]*\$?\s*([\d,.]+)/i,  // "Asking $14.500" or "Asking $14,500"
+    /Price[:\s]*\$?\s*([\d,.]+)/i,
+    /Sale\s+Price[:\s]*\$?\s*([\d,.]+)/i,
+    /Vehicle\s+Price[:\s]*\$?\s*([\d,.]+)/i
   ];
   
   for (const pattern of structuredPatterns) {
     const match = text.match(pattern);
-    if (match) {
-      const price = parseInt(match[1].replace(/,/g, ''));
-      if (price >= 1000 && price < 10000000) {
+    if (match && match[1]) {
+      const price = normalizePriceString(match[1]);
+      if (price && price >= 1000 && price < 10000000) {
         return price;
       }
     }
@@ -381,10 +426,10 @@ function extractVehiclePrice(text: string): number | null {
   // Avoid monthly payment patterns
   if (text.match(/Est\.\s*payment|Monthly\s*payment|OAC[†]?/i)) {
     // Look for actual vehicle price, not monthly payment
-    const vehiclePriceMatch = text.match(/(?:Price|Asking|Sale)[:\s]*\$?([\d,]+(?:\.\d{2})?)/i);
-    if (vehiclePriceMatch) {
-      const price = parseInt(vehiclePriceMatch[1].replace(/,/g, ''));
-      if (price >= 1000 && price < 10000000) {
+    const vehiclePriceMatch = text.match(/(?:Price|Asking|Sale)[:\s]*\$?\s*([\d,.]+)/i);
+    if (vehiclePriceMatch && vehiclePriceMatch[1]) {
+      const price = normalizePriceString(vehiclePriceMatch[1]);
+      if (price && price >= 1000 && price < 10000000) {
         return price;
       }
     }
@@ -392,13 +437,19 @@ function extractVehiclePrice(text: string): number | null {
   }
   
   // Extract all prices and prefer the largest (vehicle prices are typically $5,000+)
-  const priceMatches = text.match(/\$([\d,]+(?:\.\d{2})?)/g);
+  // Match both $14.500 (European) and $14,500 (US) formats
+  const priceMatches = text.match(/\$\s*([\d,.]+)/g);
   if (priceMatches) {
-    const prices = priceMatches.map(m => parseInt(m.replace(/[$,]/g, '')));
-    const validPrices = prices.filter(p => p >= 1000 && p < 10000000);
-    if (validPrices.length > 0) {
+    const prices = priceMatches
+      .map(m => {
+        const numMatch = m.match(/\$\s*([\d,.]+)/);
+        return numMatch ? normalizePriceString(numMatch[1]) : null;
+      })
+      .filter((p): p is number => p !== null && p >= 1000 && p < 10000000);
+    
+    if (prices.length > 0) {
       // Return the largest valid price (likely the vehicle price)
-      return Math.max(...validPrices);
+      return Math.max(...prices);
     }
   }
   
@@ -1128,21 +1179,25 @@ serve(async (req) => {
           }
           // Extract price from Craigslist - use helper to avoid monthly payments
           const priceElement = doc.querySelector('.price');
+          let initialPrice: number | null = null;
           if (priceElement) {
             const priceText = priceElement.textContent?.trim();
             const extractedPrice = extractVehiclePrice(priceText || '');
             if (extractedPrice) {
+              initialPrice = extractedPrice;
               scrapeData.data.asking_price = extractedPrice;
             }
           }
           
-          // Also try extracting from title/description if not found
+          // Also try extracting from title if not found
           if (!scrapeData.data.asking_price) {
             const titlePrice = extractVehiclePrice(scrapeData.data.title || '');
             if (titlePrice) {
+              initialPrice = titlePrice;
               scrapeData.data.asking_price = titlePrice;
             }
           }
+          
           const locationElement = doc.querySelector('.postingtitle .postingtitletext small');
           if (locationElement) {
             scrapeData.data.location = locationElement.textContent?.trim().replace(/[()]/g, '');
@@ -1156,6 +1211,21 @@ serve(async (req) => {
             description = description.replace(/QR\s+Code[\s\S]{0,200}/gi, '');
             // Remove lines like "70,094 mi. - Automatic - 2D Coupe - 8 Cyl - RWD: Rear Wheel Drive - VIN# 1X27F3L112036"
             description = description.replace(/^\s*\d+[,\d]*\s*mi\.\s*-\s*[^-]+-\s*[^-]+-\s*[^-]+-\s*[^-]+-\s*RWD:?\s*[^-]+-\s*VIN#?\s*[A-HJ-NPR-Z0-9]{17}\s*$/gmi, '');
+            
+            // IMPORTANT: Check description for price if:
+            // 1. No price found yet, OR
+            // 2. Price found is suspiciously low (< $3000) - Craigslist sellers often hide real price in description
+            // This handles cases where seller puts fake/low price in price field but real price in description
+            if (!scrapeData.data.asking_price || (initialPrice && initialPrice < 3000)) {
+              const descPrice = extractVehiclePrice(description);
+              if (descPrice && descPrice >= 1000) {
+                // If description has a higher/valid price, prefer it (likely the real asking price)
+                if (!scrapeData.data.asking_price || descPrice > (scrapeData.data.asking_price || 0)) {
+                  scrapeData.data.asking_price = descPrice;
+                }
+              }
+            }
+            
             // Extract VIN from description if present
             const vinMatch = description.match(/VIN#?\s*([A-HJ-NPR-Z0-9]{17})/i);
             if (vinMatch && !scrapeData.data.vin) {

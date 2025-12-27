@@ -33,20 +33,41 @@ async function fixAllImportQueueLogos() {
   console.log(`   Batch size: ${BATCH_SIZE}`);
   console.log(`   Starting from index: ${START_INDEX}\n`);
   
-  // Step 1: Get all vehicles with import_queue images
-  const { data: vehiclesWithImportQueue, error: countError } = await supabase
-    .from('vehicle_images')
-    .select('vehicle_id')
-    .or('storage_path.ilike.%import_queue%,image_url.ilike.%import_queue%')
-    .limit(10000);
+  // Step 1: Get all DISTINCT vehicles with import_queue images
+  // Query in chunks to handle large datasets efficiently
+  console.log('   Fetching all vehicles with import_queue images...');
+  let offset = 0;
+  const chunkSize = 5000;
+  const seenIds = new Set();
   
-  if (countError) {
-    console.error('❌ Error:', countError);
-    return;
+  while (true) {
+    const { data: chunk, error: chunkError } = await supabase
+      .from('vehicle_images')
+      .select('vehicle_id')
+      .or('storage_path.ilike.%import_queue%,image_url.ilike.%import_queue%')
+      .range(offset, offset + chunkSize - 1);
+    
+    if (chunkError) {
+      console.error('❌ Error fetching vehicle IDs:', chunkError);
+      return;
+    }
+    
+    if (!chunk || chunk.length === 0) break;
+    
+    chunk.forEach(v => {
+      if (v && v.vehicle_id) seenIds.add(v.vehicle_id);
+    });
+    
+    if (chunk.length < chunkSize) break; // Last chunk
+    offset += chunkSize;
+    
+    if (seenIds.size % 1000 === 0) {
+      process.stdout.write(`   Found ${seenIds.size} unique vehicles so far...\r`);
+    }
   }
   
-  const uniqueVehicleIds = [...new Set((vehiclesWithImportQueue || []).map(v => v.vehicle_id))];
-  console.log(`📊 Found ${uniqueVehicleIds.length} vehicles with import_queue images\n`);
+  const uniqueVehicleIds = Array.from(seenIds);
+  console.log(`\n📊 Found ${uniqueVehicleIds.length} vehicles with import_queue images\n`);
   
   const vehiclesToProcess = uniqueVehicleIds.slice(START_INDEX, START_INDEX + BATCH_SIZE);
   console.log(`🔄 Processing ${vehiclesToProcess.length} vehicles (${START_INDEX} to ${START_INDEX + vehiclesToProcess.length - 1})...\n`);
