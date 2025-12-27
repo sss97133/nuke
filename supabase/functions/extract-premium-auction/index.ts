@@ -227,38 +227,74 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     console.warn('Error extracting from data attributes:', e?.message);
   }
   
-  // Method 3: Extract from img src in gallery/photo sections only
+  // Method 3: Extract from img src in gallery/photo sections only (PRIORITY: Find actual gallery)
   try {
-    // Find gallery/photo containers
-    const gallerySectionPatterns = [
-      /<div[^>]*class=["'][^"']*(?:gallery|photos|images|photo-gallery)[^"']*["'][^>]*>([\s\S]{0,50000})<\/div>/gi,
-      /<section[^>]*class=["'][^"']*(?:gallery|photos|images)[^"']*["'][^>]*>([\s\S]{0,50000})<\/section>/gi,
-      /<div[^>]*id=["'][^"']*(?:gallery|photos|images)[^"']*["'][^>]*>([\s\S]{0,50000})<\/div>/gi,
+    // PRIORITY: Look for specific Cars & Bids gallery containers/IDs
+    // Common patterns: photo-gallery, image-gallery, photos-container, vehicle-photos
+    const specificGalleryPatterns = [
+      // ID-based (most specific)
+      /<div[^>]*id=["'][^"']*(?:photo[_-]?gallery|image[_-]?gallery|photos[_-]?container|vehicle[_-]?photos|listing[_-]?gallery)[^"']*["'][^>]*>([\s\S]{0,200000})<\/div>/gi,
+      // Class-based (more specific gallery classes)
+      /<div[^>]*class=["'][^"']*(?:photo[_-]?gallery|image[_-]?gallery|photos[_-]?container|vehicle[_-]?photos|listing[_-]?gallery|auction[_-]?photos)[^"']*["'][^>]*>([\s\S]{0,200000})<\/div>/gi,
+      // Generic gallery patterns (fallback)
+      /<div[^>]*class=["'][^"']*(?:gallery|photos|images)[^"']*["'][^>]*>([\s\S]{0,100000})<\/div>/gi,
+      /<section[^>]*class=["'][^"']*(?:gallery|photos|images|photo[_-]?gallery)[^"']*["'][^>]*>([\s\S]{0,100000})<\/section>/gi,
     ];
     
-    const gallerySections: string[] = [];
-    for (const pattern of gallerySectionPatterns) {
+    let gallerySections: string[] = [];
+    for (const pattern of specificGalleryPatterns) {
       const matches = h.matchAll(pattern);
       for (const match of matches) {
-        if (match[1]) gallerySections.push(match[1]);
+        if (match[1] && match[1].length > 100) { // Only include substantial sections
+          gallerySections.push(match[1]);
+        }
+      }
+      // If we found specific gallery sections, prioritize those and stop
+      if (gallerySections.length > 0 && pattern === specificGalleryPatterns[0] || pattern === specificGalleryPatterns[1]) {
+        break;
       }
     }
     
-    // If we found gallery sections, extract from those; otherwise use full HTML
+    // Also look for data attributes that indicate galleries (React/Next.js pattern)
+    if (gallerySections.length === 0) {
+      const dataGalleryPattern = /<div[^>]*data[_-]?(?:gallery|photos|images)[^>]*>([\s\S]{0,200000})<\/div>/gi;
+      const matches = h.matchAll(dataGalleryPattern);
+      for (const match of matches) {
+        if (match[1] && match[1].length > 100) {
+          gallerySections.push(match[1]);
+        }
+      }
+    }
+    
+    // If we found gallery sections, extract from those ONLY; otherwise use full HTML
     const searchHtml = gallerySections.length > 0 ? gallerySections.join('\n') : h;
     
-    // Extract img src, prioritizing data-src (lazy loading) then src
-    const imgPattern = /<img[^>]+(?:data-src=["']([^"']+)["']|src=["']([^"']+)["'])[^>]*>/gi;
+    // Extract img src, prioritizing data-src (lazy loading) then src, then data-full
+    const imgPattern = /<img[^>]+(?:data[_-]?full=["']([^"']+)["']|data[_-]?src=["']([^"']+)["']|data[_-]?original=["']([^"']+)["']|src=["']([^"']+)["'])[^>]*>/gi;
     let imgMatch;
     while ((imgMatch = imgPattern.exec(searchHtml)) !== null) {
-      const url = imgMatch[1] || imgMatch[2]; // data-src takes priority
+      // Priority: data-full > data-src > data-original > src
+      const url = imgMatch[1] || imgMatch[2] || imgMatch[3] || imgMatch[4];
       if (url && isVehicleImage(url)) {
         const upgraded = upgradeToFullRes(url);
         if (upgraded) urls.add(upgraded);
       }
     }
+    
+    // Also check for background-image in CSS (some galleries use CSS backgrounds)
+    if (gallerySections.length > 0) {
+      const bgImagePattern = /background[_-]?image:\s*url\(["']?([^"')]+)["']?\)/gi;
+      let bgMatch;
+      while ((bgMatch = bgImagePattern.exec(searchHtml)) !== null) {
+        const url = bgMatch[1];
+        if (url && isVehicleImage(url)) {
+          const upgraded = upgradeToFullRes(url);
+          if (upgraded) urls.add(upgraded);
+        }
+      }
+    }
   } catch (e: any) {
-    console.warn('Error extracting from img tags:', e?.message);
+    console.warn('Error extracting from gallery sections:', e?.message);
   }
   
   // Method 4: Fallback - extract all media.carsandbids.com images, upgrade thumbnails, filter noise
@@ -931,7 +967,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
             url: listingUrl,
             formats: ["extract", "html"],
             onlyMainContent: false,
-            waitFor: 5000, // Wait for gallery to fully load
+            waitFor: 8000, // Wait for gallery to fully load (increased for better gallery detection)
             extract: { schema: listingSchema },
           }),
         },
