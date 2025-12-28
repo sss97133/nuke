@@ -1403,6 +1403,71 @@ function extractMecumImagesFromHtml(html: string): string[] {
 }
 
 /**
+ * Extract lot header data (lot number, date, location) from Mecum listing HTML
+ * Extracts from: <p class="LotHeader_number__80rBB">...</p>
+ */
+function extractMecumLotHeader(html: string): { lot_number: string | null; date: string | null; location: string | null } {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    if (!doc) {
+      return { lot_number: null, date: null, location: null };
+    }
+
+    // Find the lot header element
+    const lotHeader = doc.querySelector('[class*="LotHeader_number"], [class*="lotHeader_number"]');
+    if (!lotHeader) {
+      return { lot_number: null, date: null, location: null };
+    }
+
+    const text = lotHeader.textContent || '';
+    
+    // Extract lot number: "Lot S109" or "Lot 1154350"
+    let lotNumber: string | null = null;
+    const lotMatch = text.match(/Lot\s+([A-Z]?\d+)/i);
+    if (lotMatch && lotMatch[1]) {
+      lotNumber = lotMatch[1];
+    }
+
+    // Extract date: <time datetime="2026-01-17">Saturday, January 17th</time>
+    let date: string | null = null;
+    const timeElement = lotHeader.querySelector('time[datetime]');
+    if (timeElement) {
+      const datetime = timeElement.getAttribute('datetime');
+      if (datetime) {
+        date = datetime;
+      }
+    } else {
+      // Fallback: try to extract date from text
+      const dateMatch = text.match(/(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d+)(?:st|nd|rd|th)?/i);
+      if (dateMatch) {
+        // Try to parse the date
+        try {
+          const dateStr = `${dateMatch[2]} ${dateMatch[1]} ${new Date().getFullYear()}`;
+          const parsed = new Date(dateStr);
+          if (Number.isFinite(parsed.getTime())) {
+            date = parsed.toISOString().split('T')[0];
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // Extract location: text after the last "//" separator
+    let location: string | null = null;
+    const parts = text.split('//');
+    if (parts.length >= 3) {
+      location = parts[parts.length - 1].trim();
+    }
+
+    return { lot_number: lotNumber, date, location };
+  } catch (e: any) {
+    console.warn(`Mecum lot header extraction error: ${e?.message || String(e)}`);
+    return { lot_number: null, date: null, location: null };
+  }
+}
+
+/**
  * Extract sold price from Mecum listing HTML using DOM parsing
  * Based on user-provided DOM paths for sold listings
  * CRITICAL: Excludes lot header elements (lot number, date, location) to avoid false matches
@@ -3771,14 +3836,31 @@ async function extractMecum(url: string, maxVehicles: number) {
         }
       }
 
+      // Extract lot header data (lot number, date, location) from HTML
+      let lotHeaderData: { lot_number: string | null; date: string | null; location: string | null } = { lot_number: null, date: null, location: null };
+      if (html) {
+        lotHeaderData = extractMecumLotHeader(html);
+        if (lotHeaderData.lot_number || lotHeaderData.date || lotHeaderData.location) {
+          console.log(`Extracted lot header: lot=${lotHeaderData.lot_number}, date=${lotHeaderData.date}, location=${lotHeaderData.location}`);
+        }
+      }
+
       // Merge sold price: prioritize DOM extraction over Firecrawl (more reliable for sold listings)
       const finalSalePrice = domSoldPrice || vehicle?.sale_price || null;
+
+      // Merge lot header data with vehicle data (lot header is more reliable)
+      const finalLotNumber = lotHeaderData.lot_number || vehicle?.lot_number || null;
+      const finalLocation = lotHeaderData.location || vehicle?.location || null;
+      const finalSaleDate = lotHeaderData.date || vehicle?.sale_date || null;
 
       return {
         ...vehicle,
         listing_url: listingUrl,
         images, // CRITICAL: Always include images array, even if empty
         sale_price: finalSalePrice, // Use DOM-extracted sold price if available
+        lot_number: finalLotNumber, // Use DOM-extracted lot number if available
+        location: finalLocation, // Use DOM-extracted location if available
+        sale_date: finalSaleDate, // Use DOM-extracted date if available
       };
     } catch (e: any) {
       issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);

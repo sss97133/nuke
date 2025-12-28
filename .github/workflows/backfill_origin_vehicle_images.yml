@@ -15,32 +15,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
+      - name: Validate Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "❌ Missing required secret: SUPABASE_URL"
+            exit 1
+          fi
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "❌ Missing required secret: SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          echo "✅ All required secrets are set"
+
       - name: Backfill origin vehicle images (small batches)
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || secrets.SUPABASE_PROJECT_URL || secrets.SUPABASEPROJECTURL }}
-          # Must be a JWT (legacy anon key), not an sb_publishable_* key.
-          SUPABASE_ANON_JWT: ${{ secrets.SUPABASE_ANON_JWT || secrets.SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set -euo pipefail
-
-          if [ -z "${SUPABASE_URL:-}" ]; then
-            echo "Missing secret SUPABASE_URL"
-            exit 2
-          fi
-          if [ -z "${SUPABASE_ANON_JWT:-}" ]; then
-            echo "Missing secret SUPABASE_ANON_JWT"
-            exit 2
-          fi
-          if echo "${SUPABASE_ANON_JWT}" | grep -q '^sb_'; then
-            echo "SUPABASE_ANON_JWT must be a legacy JWT (starts with eyJ...), not an sb_* key"
-            exit 2
-          fi
 
           post() {
             local path="$1"
             local body="$2"
             curl -sS -w "\nHTTP:%{http_code}\n" "${SUPABASE_URL%/}/functions/v1/${path}" \
-              -H "Authorization: Bearer ${SUPABASE_ANON_JWT}" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
               -H "Content-Type: application/json" \
               --data-binary "${body}"
           }

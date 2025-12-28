@@ -7,6 +7,7 @@ import ResilientImage from '../images/ResilientImage';
 import { OdometerBadge } from '../vehicle/OdometerBadge';
 import { useVehicleImages } from '../../hooks/useVehicleImages';
 import { LotBadge } from '../auction/LotBadge';
+import { getAuctionMode, isActiveAuction as isInActiveAuction, getAuctionStateInfo } from '../../services/unifiedAuctionStateService';
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -482,51 +483,19 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     '';
 
   // STATE-BASED: Is this vehicle in an ACTIVE AUCTION right now?
-  // This is the first question - what's the current state, not the source
+  // Uses unified auction state service - treats auction as temporary mode, not permanent state
   const isActiveAuction = React.useMemo(() => {
-    const v: any = vehicle as any;
-    const now = Date.now();
-    
-    // Check 1: Active external listing (BaT, Cars & Bids, etc.) - most reliable
-    const externalListing = v?.external_listings?.[0];
-    if (externalListing) {
-      const status = String(externalListing.listing_status || '').toLowerCase();
-      if (status === 'active' || status === 'live') {
-        // Must have future end date (or be actively running)
-        const extEndDate = externalListing.end_date;
-        if (extEndDate) {
-          const extEnd = new Date(extEndDate).getTime();
-          if (Number.isFinite(extEnd) && extEnd > now) {
-            // Active listing with future end date - this is live!
-            return true;
-          }
-        } else {
-          // No end date but status is active/live - assume it's running
-          // (some live auctions don't have specific end times)
-          return true;
-        }
-      }
-    }
-    
-    // Check 2: Vehicle-level auction_end_date in future
-    const endDate = v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date;
-    if (endDate) {
-      const end = new Date(endDate).getTime();
-      if (Number.isFinite(end) && end > now) {
-        // Has future end date, but must also check it's not ended/sold
-        const outcome = String(v.auction_outcome || '').toLowerCase();
-        const saleStatus = String(v.sale_status || '').toLowerCase();
-        const isEnded = ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) || 
-                        ['sold', 'ended'].includes(saleStatus);
-        
-        if (!isEnded) {
-          // Future end date + not ended = active auction
-          return true;
-        }
-      }
-    }
-    
-    return false;
+    return isInActiveAuction(vehicle);
+  }, [vehicle]);
+  
+  // Get auction mode for additional context
+  const auctionMode = React.useMemo(() => {
+    return getAuctionMode(vehicle);
+  }, [vehicle]);
+  
+  // Get complete auction state info
+  const auctionState = React.useMemo(() => {
+    return getAuctionStateInfo(vehicle);
   }, [vehicle]);
   
   // Keep isAuctionSource for backward compatibility (used in badge animations, etc.)
@@ -775,14 +744,40 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // PRIORITY 2: RECENTLY COMPLETED TRANSACTION (what just happened)
     const outcome = String(v.auction_outcome || '').toLowerCase();
     const saleStatus = String(v.sale_status || '').toLowerCase();
-    const isRecentlySold = outcome === 'sold' || saleStatus === 'sold' || (typeof v.sale_price === 'number' && v.sale_price > 0);
+    
+    // Check external_listings for more reliable status
+    const externalListing = v?.external_listings?.[0];
+    const externalStatus = externalListing ? String(externalListing.listing_status || '').toLowerCase() : '';
+    const hasFinalPrice = externalListing?.final_price || null;
+    const hasSoldAt = externalListing?.sold_at || null;
+    
+    // For timed auctions, sale_price alone doesn't mean sold - need explicit status
+    // Only consider it sold if:
+    // 1. auction_outcome is explicitly 'sold', OR
+    // 2. sale_status is explicitly 'sold', OR
+    // 3. external_listings has listing_status='sold' with final_price/sold_at, OR
+    // 4. sale_price exists AND sale_status is 'sold' (not just 'available')
+    const isRecentlySold = 
+      outcome === 'sold' || 
+      saleStatus === 'sold' || 
+      (externalStatus === 'sold' && (hasFinalPrice || hasSoldAt)) ||
+      (typeof v.sale_price === 'number' && v.sale_price > 0 && saleStatus === 'sold');
     
     if (isRecentlySold) {
       return `SOLD ${auctionHighBidText || ''}`.trim();
     }
     
-    if (outcome === 'reserve_not_met' || outcome === 'ended' || outcome === 'no_sale') {
+    // Check if auction ended but didn't sell (RNM, no sale, etc.)
+    if (outcome === 'reserve_not_met' || outcome === 'ended' || outcome === 'no_sale' || externalStatus === 'ended') {
       return auctionHighBidText ? `RESULT ${auctionHighBidText}`.trim() : 'ENDED';
+    }
+    
+    // If we have sale_price but status is 'available', it's likely just a high bid for a timed auction
+    // Show it as a bid/result, not as sold
+    if (typeof v.sale_price === 'number' && v.sale_price > 0 && saleStatus === 'available' && !isActiveAuction) {
+      // Auction ended but status is available - likely high bid, not sold
+      // Just show the price without "SOLD" prefix
+      return auctionHighBidText || formatPrice(v.sale_price);
     }
     
     // PRIORITY 3: CURRENT ASSET VALUE (what it's worth NOW)
