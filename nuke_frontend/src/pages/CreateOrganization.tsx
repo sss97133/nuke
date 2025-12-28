@@ -53,6 +53,15 @@ export default function CreateOrganization() {
 
       if (orgError) throw orgError;
 
+      // Auto-merge duplicates after creation
+      try {
+        await supabase.functions.invoke('auto-merge-duplicate-orgs', {
+          body: { organizationId: org.id }
+        });
+      } catch (mergeError) {
+        console.warn('Auto-merge check failed (non-critical):', mergeError);
+      }
+
       // Auto-create contributor record
       await supabase.from('organization_contributors').insert({
         organization_id: org.id,

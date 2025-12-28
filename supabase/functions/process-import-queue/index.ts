@@ -1629,6 +1629,15 @@ serve(async (req) => {
               organizationId = newOrg.id;
               console.log(`Created new business: ${orgData.business_name || dealerWebsite} (${organizationId})`);
               
+              // Auto-merge duplicates after creation
+              try {
+                await supabase.functions.invoke('auto-merge-duplicate-orgs', {
+                  body: { organizationId: newOrg.id }
+                });
+              } catch (mergeError) {
+                console.warn('⚠️ Auto-merge check failed (non-critical):', mergeError);
+              }
+              
               // Trigger inventory sync for new dealer
               if (dealerWebsite) {
                 triggerDealerInventorySync(newOrg.id, dealerWebsite, supabase).catch(err => {
