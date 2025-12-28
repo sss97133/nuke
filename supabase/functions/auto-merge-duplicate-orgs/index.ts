@@ -250,6 +250,36 @@ async function mergeOrganizations(
     .from('businesses')
     .update({ is_public: false })
     .eq('id', sourceId);
+
+  // Enrich target organization with due diligence report if missing description
+  const { data: finalTarget } = await supabase
+    .from('businesses')
+    .select('id, description, business_type, website, metadata')
+    .eq('id', targetId)
+    .single();
+
+  if (finalTarget && (!finalTarget.description || finalTarget.business_type === 'other') && finalTarget.website) {
+    try {
+      // Generate comprehensive due diligence report
+      await supabase.functions.invoke('generate-org-due-diligence', {
+        body: { 
+          organizationId: targetId, 
+          websiteUrl: finalTarget.website,
+          forceRegenerate: false
+        }
+      });
+    } catch (enrichError) {
+      console.warn('⚠️ Failed to generate due diligence report (non-critical):', enrichError);
+      // Fallback to basic enrichment
+      try {
+        await supabase.functions.invoke('update-org-from-website', {
+          body: { organizationId: targetId, websiteUrl: finalTarget.website }
+        });
+      } catch (basicEnrichError) {
+        console.warn('⚠️ Failed to enrich merged organization (non-critical):', basicEnrichError);
+      }
+    }
+  }
 }
 
 /**

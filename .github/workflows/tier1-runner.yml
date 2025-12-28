@@ -12,14 +12,14 @@ jobs:
       - name: Call tier1-batch-runner
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         run: |
-          if [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_PROJECT_URL" ]; then
-            echo "Missing SUPABASE_ANON_KEY or SUPABASE_PROJECT_URL secrets" >&2
+          if [ -z "$SUPABASE_ANON_KEY" ] || [ -z "$SUPABASE_URL" ]; then
+            echo "Missing SUPABASE_ANON_KEY or SUPABASE_URL secrets" >&2
             exit 1
           fi
           curl -sS -X POST \
-            "$SUPABASE_PROJECT_URL/functions/v1/tier1-batch-runner" \
+            "$SUPABASE_URL/functions/v1/tier1-batch-runner" \
             -H "Content-Type: application/json" \
             -H "apikey: $SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \

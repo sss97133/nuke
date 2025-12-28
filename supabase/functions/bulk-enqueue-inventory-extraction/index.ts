@@ -32,6 +32,29 @@ function safeString(v: unknown): string | null {
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
+function getEasyTargetScore(org: any): number {
+  // Lower score = easier target = process first
+  const website = safeString(org.website)?.toLowerCase() || "";
+  
+  // Priority 1: Classic.com (well-structured, easy to extract)
+  if (website.includes("classic.com") || website.includes("classiccars.com")) {
+    return 1;
+  }
+  
+  // Priority 2: Dealers (usually simpler structure than modern JS apps)
+  if (org.business_type === "dealership" || org.business_type === "dealer") {
+    return 2;
+  }
+  
+  // Priority 3: DealerFire/DealerOn (common CMS, predictable structure)
+  if (website.includes("dealerfire") || website.includes("dealeron")) {
+    return 2;
+  }
+  
+  // Priority 4: Everything else (might be JS-heavy, needs Firecrawl)
+  return 4;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -104,7 +127,16 @@ serve(async (req) => {
       return vehicleCount < minInventoryThreshold;
     });
 
+    // PRIORITIZE: Sort candidates by "easy target" score
+    // Easy targets = dealers, classic.com, sites with simple structure
+    candidates.sort((a: any, b: any) => {
+      const scoreA = getEasyTargetScore(a);
+      const scoreB = getEasyTargetScore(b);
+      return scoreA - scoreB; // Lower score = easier = process first
+    });
+
     console.log(`   Found ${candidates.length} organizations with low inventory (out of ${all.length} total)`);
+    console.log(`   Prioritizing easy targets (dealers, classic.com, simple sites)`);
 
     const candidateIds = candidates.map((o: any) => String(o.id));
 

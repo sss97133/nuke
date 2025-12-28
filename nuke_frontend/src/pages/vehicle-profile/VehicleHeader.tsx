@@ -1801,31 +1801,67 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   </span>
                 </span>
               ) : null}
-              {isAuctionLive && auctionTelemetryFresh && typeof auctionPulse.bid_count === 'number' ? (
-                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Bid count">
-                  {auctionPulse.bid_count} bids
-                </span>
-              ) : null}
-              {auctionTelemetryFresh && typeof auctionPulse.watcher_count === 'number' ? (
-                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Watchers">
-                  {auctionPulse.watcher_count.toLocaleString()} watching
-                </span>
-              ) : null}
-              {auctionTelemetryFresh && typeof auctionPulse.view_count === 'number' ? (
-                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Views">
-                  {auctionPulse.view_count.toLocaleString()} views
-                </span>
-              ) : null}
-              {isAuctionLive && auctionTelemetryFresh && typeof auctionPulse.comment_count === 'number' ? (
-                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Comments">
-                  {auctionPulse.comment_count.toLocaleString()} comments
-                </span>
-              ) : null}
-              {auctionTelemetryFresh && auctionPulse.last_bid_at ? (
-                <span className="badge badge-secondary" style={{ fontSize: '10px', fontWeight: 700 }} title="Time since last bid">
-                  last bid {formatAge(auctionPulse.last_bid_at) || '—'} ago
-                </span>
-                ) : null}
+              {/* Reserve status - CRITICAL: tells you if it will sell */}
+              {isAuctionLive && (() => {
+                // Check for reserve price in auctionPulse metadata or vehicle
+                const reservePrice = 
+                  typeof (auctionPulse as any)?.reserve_price === 'number' ? (auctionPulse as any).reserve_price :
+                  typeof (vehicle as any)?.reserve_price === 'number' ? (vehicle as any).reserve_price :
+                  typeof (auctionPulse as any)?.metadata?.reserve_price === 'number' ? (auctionPulse as any).metadata.reserve_price :
+                  null;
+                const currentBid = typeof auctionPulse.current_bid === 'number' ? auctionPulse.current_bid : null;
+                const reserveMet = reservePrice && currentBid && currentBid >= reservePrice;
+                
+                if (reservePrice && currentBid) {
+                  return (
+                    <span 
+                      className="badge badge-secondary" 
+                      style={{ 
+                        fontSize: '10px', 
+                        fontWeight: 700,
+                        color: reserveMet ? '#22c55e' : '#f59e0b',
+                        border: `1px solid ${reserveMet ? '#22c55e' : '#f59e0b'}`,
+                        backgroundColor: reserveMet ? '#dcfce7' : '#fef3c7'
+                      }} 
+                      title={reserveMet ? 'Reserve met - will sell' : `Reserve: ${formatCurrency(reservePrice)}`}
+                    >
+                      {reserveMet ? '✓ Reserve Met' : `Reserve: ${formatCurrency(reservePrice)}`}
+                    </span>
+                  );
+                }
+                return null;
+              })()}
+              {/* Performance indicator - outperforming/underperforming typical sale */}
+              {isAuctionLive && (() => {
+                const currentBid = typeof auctionPulse.current_bid === 'number' ? auctionPulse.current_bid : null;
+                const marketValue = typeof (vehicle as any)?.current_value === 'number' ? (vehicle as any).current_value : null;
+                const typicalSale = typeof (vehicle as any)?.market_value === 'number' ? (vehicle as any).market_value : marketValue;
+                
+                if (currentBid && typicalSale && typicalSale > 0) {
+                  const diffPct = ((currentBid - typicalSale) / typicalSale) * 100;
+                  const isOutperforming = diffPct > 10; // 10% above typical
+                  const isUnderperforming = diffPct < -10; // 10% below typical
+                  
+                  if (isOutperforming || isUnderperforming) {
+                    return (
+                      <span 
+                        className="badge badge-secondary" 
+                        style={{ 
+                          fontSize: '10px', 
+                          fontWeight: 700,
+                          color: isOutperforming ? '#22c55e' : '#f59e0b',
+                          border: `1px solid ${isOutperforming ? '#22c55e' : '#f59e0b'}`,
+                          backgroundColor: isOutperforming ? '#dcfce7' : '#fef3c7'
+                        }} 
+                        title={`${isOutperforming ? 'Outperforming' : 'Underperforming'} typical sale by ${Math.abs(diffPct).toFixed(0)}%`}
+                      >
+                        {isOutperforming ? '↑ Outperforming' : '↓ Underperforming'}
+                      </span>
+                    );
+                  }
+                }
+                return null;
+              })()}
               </span>
             );
           })()}
@@ -2625,7 +2661,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   }
                 }}
               >
-                {String(priceDisplay).toUpperCase() !== 'SOLD' && priceDisplay}
+                {(() => {
+                  // Check if bid is RNM and make it red
+                  if (isAuctionLive && typeof priceDisplay === 'string' && priceDisplay.startsWith('Bid: ')) {
+                    const reservePrice = 
+                      typeof (auctionPulse as any)?.reserve_price === 'number' ? (auctionPulse as any).reserve_price :
+                      typeof (vehicle as any)?.reserve_price === 'number' ? (vehicle as any).reserve_price :
+                      typeof (auctionPulse as any)?.metadata?.reserve_price === 'number' ? (auctionPulse as any).metadata.reserve_price :
+                      null;
+                    const currentBid = typeof auctionPulse.current_bid === 'number' ? auctionPulse.current_bid : null;
+                    const isRNM = reservePrice && currentBid && currentBid < reservePrice;
+                    
+                    return (
+                      <span style={{ color: isRNM ? '#dc2626' : undefined }}>
+                        {priceDisplay}
+                      </span>
+                    );
+                  }
+                  return String(priceDisplay).toUpperCase() !== 'SOLD' ? priceDisplay : null;
+                })()}
               </span>
               {priceWasCorrected && (
                 <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 500 }}>*</span>
