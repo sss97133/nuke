@@ -316,7 +316,16 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     
     // Extract lot data from external_listings metadata or vehicle fields
     const metadata = externalListing?.metadata || {};
-    const lotNumber = metadata?.lot_number || null;
+    
+    // Extract lot number from URL if not in metadata: /lots/1154350/... -> 1154350
+    let lotNumber = metadata?.lot_number || null;
+    if (!lotNumber && discoveryUrl) {
+      const lotMatch = String(v?.discovery_url || '').match(/\/lots\/(\d+)/);
+      if (lotMatch && lotMatch[1]) {
+        lotNumber = lotMatch[1];
+      }
+    }
+    
     const location = metadata?.location || v?.location || null;
     const saleDate = metadata?.sale_date || v?.sale_date || externalListing?.sold_at || null;
     const auctionDate = metadata?.auction_start_date || externalListing?.start_date || v?.auction_end_date || saleDate;
@@ -327,6 +336,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     
     // Use auction date if available, otherwise sale date
     const date = auctionDate || saleDate;
+    
+    // Only return data if we have at least lot number or date
+    if (!lotNumber && !date && !location) {
+      return null;
+    }
     
     return {
       lotNumber,
