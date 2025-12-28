@@ -3721,9 +3721,26 @@ async function insertVehicleImages(
                 return { success: false, error: 'Invalid URL' };
               }
 
-              // Download image
+              // Download image with proper headers (hotlink protection bypass)
+              const headers: HeadersInit = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+              };
+              // Add Referer for auction sites with hotlink protection
+              if (imageUrl.includes('mecum.com') || imageUrl.includes('images.mecum.com')) {
+                headers['Referer'] = 'https://www.mecum.com/';
+              } else if (imageUrl.includes('barrett-jackson')) {
+                headers['Referer'] = 'https://www.barrett-jackson.com/';
+              } else if (imageUrl.includes('rmsothebys')) {
+                headers['Referer'] = 'https://rmsothebys.com/';
+              } else if (imageUrl.includes('bonhams')) {
+                headers['Referer'] = 'https://www.bonhams.com/';
+              } else if (imageUrl.includes('bringatrailer')) {
+                headers['Referer'] = 'https://bringatrailer.com/';
+              }
               const imageResponse = await fetch(imageUrl, {
                 signal: AbortSignal.timeout(30000), // 30 second timeout
+                headers,
               });
 
               if (!imageResponse.ok) {

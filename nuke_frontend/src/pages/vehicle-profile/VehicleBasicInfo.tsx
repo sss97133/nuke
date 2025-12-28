@@ -525,39 +525,31 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
             </span>
           </div>
           
-          {/* Owner Section - show BaT username with claim option */}
-          {currentOwnerUsername && !isVerifiedOwner && (
+          {/* Owner Section moved to header - keeping verified owner badge here */}
+          {isVerifiedOwner && currentOwnerUsername && (
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+              <span>Owner</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: '8pt', color: 'var(--success)' }}>
+                  @{currentOwnerUsername}
+                </span>
+                <span style={{ 
+                  background: 'var(--success)', 
+                  color: 'var(--white)', 
+                  padding: '1px 4px', 
+                  fontSize: '6pt',
+                  fontWeight: 'bold'
+                }}>
+                  VERIFIED
+                </span>
+              </span>
+            </div>
+          )}
+          {/* Legacy owner claim card removed - now in header */}
+          {false && currentOwnerUsername && !isVerifiedOwner && (
             <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0, position: 'relative' }}>
               <span>Owner</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowClaimCard(!showClaimCard);
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text)',
-                    cursor: 'pointer',
-                    fontSize: '8pt',
-                    fontFamily: 'monospace',
-                    padding: 0,
-                    display: 'inline-flex',
-                    alignItems: 'baseline',
-                  }}
-                  title="Claim this profile"
-                >
-                  @{currentOwnerUsername}<sup style={{ fontSize: '6pt', color: 'var(--primary)', marginLeft: '1px' }}>*</sup>
-                </button>
-                {previousOwnerUsername && (
-                  <span style={{ fontSize: '6pt', color: 'var(--text-muted)', marginLeft: '4px' }}>
-                    from @{previousOwnerUsername}
-                  </span>
-                )}
-              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}></span>
               
               {/* Claim Card Popup */}
               {showClaimCard && (
