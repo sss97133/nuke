@@ -94,8 +94,11 @@ function looksLikeNonListingPage(url: string): boolean {
     const u = new URL(url);
     const path = (u.pathname || '').toLowerCase();
     if (path === '/' || path.length < 2) return true;
+    // DealerCenter pattern: /inventory/make/model/stocknumber/ - has numeric stock at end
+    const dealerCenterPattern = /\/inventory\/[\w-]+\/[\w-]+\/\d+\/?$/;
+    if (dealerCenterPattern.test(path)) return false; // Valid DealerCenter detail page
     // Common inventory/category/marketing paths that should not become vehicles.
-    if (path.includes('/inventory') && !/\b(19|20)\d{2}\b/.test(path)) return true;
+    if (path.includes('/inventory') && !/\b(19|20)\d{2}\b/.test(path) && !dealerCenterPattern.test(path)) return true;
     if (path.includes('/sold') && !/\b(19|20)\d{2}\b/.test(path)) return true;
     if (path.includes('/location/') || path.includes('/about') || path.includes('/contact')) return true;
     if (path.includes('/auth/') || path.includes('/sign-up') || path.includes('/signup')) return true;
@@ -1170,8 +1173,9 @@ serve(async (req) => {
             scrapeData.data.body_style = 'Pickup';
           }
         }
+        
         // Craigslist parsing
-        else if (item.listing_url.includes('craigslist.org')) {
+        if (item.listing_url.includes('craigslist.org')) {
           scrapeData.data.source = 'Craigslist';
           const titleElement = doc.querySelector('h1 .postingtitletext');
           if (titleElement) {

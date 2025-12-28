@@ -277,62 +277,40 @@ export async function extractWithLLM(
   supabase: any,
   openaiKey?: string
 ): Promise<Record<string, any>> {
+  // Only get high-priority fields (the simple ones we actually need)
   const checklist = await getFieldChecklist(supabase);
-  
-  // Truncate HTML to avoid token limits (keep first 50k chars - usually enough for main content)
-  const htmlSnippet = html.substring(0, 50000);
-  
-  // Build comprehensive prompt with database schema as checklist
-  const fieldsList = checklist
+  const priorityFields = checklist
+    .filter(f => f.priority >= 80) // Only high-priority fields (the important ones)
     .sort((a, b) => b.priority - a.priority)
-    .map(f => {
-      const hints = f.extraction_hints.join(', ');
-      return `- ${f.field_name} (${f.db_column}, ${f.data_type}, ${f.is_required ? 'REQUIRED' : 'optional'}): ${f.llm_question}\n  Instructions: ${f.llm_instructions}\n  Look in: ${hints}\n  Examples: ${f.example_values.slice(0, 3).join(', ')}`;
-    })
+    .slice(0, 15); // Limit to top 15 fields to reduce prompt size
+  
+  // Truncate HTML to reduce cost (20k chars is enough for most listings)
+  const htmlSnippet = html.substring(0, 20000);
+  
+  // Build simple, focused prompt
+  const fieldsList = priorityFields
+    .map(f => `- ${f.field_name}: ${f.llm_question}`)
     .join('\n');
 
-  const prompt = `You are extracting vehicle data from a Cars & Bids auction listing HTML.
+  const prompt = `Extract these vehicle fields from the HTML. Return JSON only:
 
-DATABASE SCHEMA CHECKLIST (extract ALL of these if present):
 ${fieldsList}
 
-HTML CONTENT (first 50k chars):
+HTML:
 ${htmlSnippet}
 
-LISTING URL: ${listingUrl}
-
-TASK:
-1. Analyze the HTML structure to locate where each field is located
-2. Extract ALL fields from the checklist that are present in the HTML
-3. For each field, provide:
-   - The extracted value
-   - Where you found it (CSS selector, element description, or section name)
-   - Your confidence level (high/medium/low)
-
-Return a JSON object with this structure:
+Return JSON:
 {
   "extracted_fields": {
-    "year": { "value": 1967, "location": "h1.title element", "confidence": "high" },
-    "make": { "value": "Chevrolet", "location": "h1.title element", "confidence": "high" },
-    "model": { "value": "Corvette Convertible", "location": "h1.title element", "confidence": "high" },
-    "vin": { "value": "194677S123456", "location": "specs table, VIN row", "confidence": "medium" },
-    "mileage": { "value": 45000, "location": "specs table, Mileage row", "confidence": "high" },
-    "description": { "value": "Full description text...", "location": "article.content section", "confidence": "high" },
-    "current_bid": { "value": 50000, "location": "auction header, current bid display", "confidence": "high" },
-    "structured_sections": { "value": { "dougs_take": "...", "highlights": ["...", "..."], "equipment": ["..."] }, "location": "structured sections in main content", "confidence": "high" }
-  },
-  "html_structure_analysis": {
-    "main_content_selector": "article.main-content or div.listing-content",
-    "specs_table_selector": "table.specs or div.specs-grid",
-    "auction_header_selector": "div.auction-header or header.auction",
-    "image_gallery_selector": "div.gallery or script#__NEXT_DATA__",
-    "description_section_selector": "div.description or article.content"
-  },
-  "missing_fields": ["field1", "field2"],
-  "extraction_notes": "Any important notes about the extraction"
+    "mileage": 45000,
+    "color": "Red",
+    "transmission": "Manual",
+    "engine_size": "5.7L V8",
+    "vin": "194677S123456"
+  }
 }
 
-CRITICAL: Extract EVERYTHING that's present. Don't skip fields just because they're in a different location than expected.`;
+Extract only fields that are clearly present. Use null for missing fields.`;
 
   try {
     const apiKey = openaiKey || Deno.env.get('OPENAI_API_KEY');
@@ -348,18 +326,14 @@ CRITICAL: Extract EVERYTHING that's present. Don't skip fields just because they
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini', // Much cheaper than gpt-4o, still very capable
         messages: [
-          {
-            role: 'system',
-            content: 'You are an expert at extracting structured data from HTML. You analyze HTML structure and locate data fields intelligently.'
-          },
           {
             role: 'user',
             content: prompt
           }
         ],
-        max_tokens: 4000,
+        max_tokens: 1000, // Reduced from 4000 - simple extractions don't need that much
         temperature: 0.1,
         response_format: { type: 'json_object' }
       })
@@ -382,26 +356,26 @@ CRITICAL: Extract EVERYTHING that's present. Don't skip fields just because they
     try {
       const result = JSON.parse(content);
       
-      // Convert extracted_fields to flat object for easier merging
+      // Convert extracted_fields to flat object (simplified - no nested structure)
       const extracted: Record<string, any> = {};
       if (result.extracted_fields) {
-        for (const [fieldName, fieldData] of Object.entries(result.extracted_fields)) {
-          const data = fieldData as any;
-          extracted[fieldName] = data.value;
-          
-          // Log extraction for debugging
-          console.log(`✅ LLM extracted ${fieldName}: ${JSON.stringify(data.value).substring(0, 100)} (${data.confidence} confidence, found in: ${data.location})`);
+        for (const [fieldName, fieldValue] of Object.entries(result.extracted_fields)) {
+          // Handle both simple values and nested {value, location, confidence} objects
+          if (typeof fieldValue === 'object' && fieldValue !== null && 'value' in fieldValue) {
+            extracted[fieldName] = (fieldValue as any).value;
+          } else {
+            extracted[fieldName] = fieldValue;
+          }
         }
-      }
-
-      // Log missing fields
-      if (result.missing_fields && result.missing_fields.length > 0) {
-        console.log(`⚠️ LLM could not find: ${result.missing_fields.join(', ')}`);
-      }
-
-      // Log HTML structure analysis for future reference
-      if (result.html_structure_analysis) {
-        console.log(`📊 HTML Structure Analysis:`, result.html_structure_analysis);
+        
+        const extractedCount = Object.keys(extracted).filter(k => extracted[k] !== null && extracted[k] !== undefined).length;
+        if (extractedCount > 0) {
+          console.log(`✅ LLM extracted ${extractedCount} fields: ${Object.keys(extracted).filter(k => extracted[k] !== null && extracted[k] !== undefined).join(', ')}`);
+          console.log(`📋 LLM extracted values:`, JSON.stringify(extracted, null, 2));
+        } else {
+          console.log(`⚠️ LLM extraction returned ${Object.keys(extracted).length} fields but all are null/empty`);
+          console.log(`📋 LLM raw response:`, JSON.stringify(result, null, 2).substring(0, 1000));
+        }
       }
 
       return extracted;

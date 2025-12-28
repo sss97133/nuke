@@ -227,9 +227,15 @@ async function scrapeDealerCenterInventory(inventoryUrl, organizationId) {
             const imgEl = el.querySelector('img');
             const imageUrl = bgImage || imgEl?.src || imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-lazy-src') || null;
 
-            if (url && url.includes('autogroup.theshopclubs.com')) {
+            // Only include URLs that look like detail pages (have /inventory/make/model/stock format)
+            // Reject listing pages, home pages, or generic inventory pages
+            if (url && 
+                url.includes('autogroup.theshopclubs.com') && 
+                url.match(/\/inventory\/[\w-]+\/[\w-]+\/\d+\/?$/) &&  // Must have /inventory/make/model/stock pattern
+                !url.includes('/inventory/?') &&  // Not the main inventory page
+                !url.match(/\/inventory\/\?/)) {  // Not inventory with just query params
               listings.push({
-                url: url,
+                url: url.split('?')[0].split('#')[0],  // Clean URL, remove query params and fragments
                 title: title || `${year || ''} ${make || ''} ${model || ''}`.trim(),
                 year: year,
                 make: make,
@@ -256,9 +262,16 @@ async function scrapeDealerCenterInventory(inventoryUrl, organizationId) {
       
       console.log(`   Found ${newVehicles.length} new vehicles on page ${pageNum} (${allVehicles.length} total)`);
       
-      // If no vehicles found, we're done
+      // If no vehicles found on first page, we're done
       if (newVehicles.length === 0 && pageNum === 1) {
         console.log('⚠️  No vehicles found on first page. The page may not have loaded correctly.');
+        hasMorePages = false;
+        break;
+      }
+      
+      // If we found fewer vehicles than expected, might be last page, but continue checking
+      if (newVehicles.length === 0 && pageNum > 1) {
+        console.log(`   ℹ️  No new vehicles on page ${pageNum}, reached end`);
         hasMorePages = false;
         break;
       }

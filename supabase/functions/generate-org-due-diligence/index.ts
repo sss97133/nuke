@@ -473,9 +473,9 @@ Return JSON with this structure:
     "average_sale_price": "Average vehicle sale price if mentioned or inferable",
     "inventory_value": "Total inventory value if mentioned (e.g., '$2M inventory', '50 vehicles averaging $40k')",
     "inventory_count": "Number of vehicles in inventory if mentioned",
-    "estimated_annual_revenue": "Estimated annual revenue if calculable from visible data (e.g., '100 vehicles/year × $50k avg × 3% commission = $150k')",
-    "estimated_gross_margin_pct": "Estimated gross margin percentage if calculable (e.g., for auction house: commission rate; for service: labor rate vs cost)",
-    "estimated_gmv": "Estimated Gross Merchandise Value for auction houses (total value of all transactions, e.g., '500 vehicles/year × $30k avg = $15M GMV')"
+    "estimated_annual_revenue": "ONLY if explicitly stated on website (e.g., 'We process $5M annually'). Do NOT calculate.",
+    "estimated_gross_margin_pct": "ONLY if explicitly reported as profit margin on website (e.g., 'Our profit margin is 15%'). Do NOT infer from commission rates or calculate.",
+    "estimated_gmv": "ONLY if explicitly stated (e.g., 'We've sold $50M in vehicles'). Do NOT calculate from vehicle counts × prices."
   },
   "missing_critical_fields": [
     {"field": "field_name", "importance": "critical|high|medium|low", "reason": "Why this field is important for investment decision"}
@@ -501,12 +501,21 @@ CRITICAL: The "database_fields" object is the PRIMARY DATA SOURCE for populating
 - **Service Businesses**: Extract labor rates, parts markup, service margins. Look in pricing pages, service descriptions. Example: "$125/hour" → labor_rate: 125, "30% parts markup" → parts_markup_pct: 30.0
 - **Dealerships**: Extract average sale prices, inventory counts, inventory values. Look in inventory pages, about pages. Example: "50 vehicles in stock" → inventory_count: 50, "average sale price $45k" → average_sale_price: 45000
 
-**Calculated Financial Metrics:**
-- **estimated_annual_revenue**: Calculate if possible (e.g., auction house: "500 vehicles/year × $30k avg × 3% commission = $450k")
-- **estimated_gross_margin_pct**: For auction houses, this is typically the commission rate. For service businesses, calculate from labor rate vs cost.
-- **estimated_gmv**: For auction houses, calculate total transaction value (vehicles/year × average price)
+**Reported Financial Metrics (ONLY if explicitly stated on website):**
+- **estimated_annual_revenue**: ONLY if website explicitly states revenue (e.g., "We generate $5M annually"). Do NOT calculate.
+- **estimated_gross_margin_pct**: ONLY if website explicitly reports profit margin (e.g., "Our profit margin is 15%"). Do NOT infer from commission rates.
+- **estimated_gmv**: ONLY if website explicitly states GMV (e.g., "We've sold $50M in vehicles"). Do NOT calculate.
 
-Be aggressive in extraction - if you see "established in 1995", calculate years_in_business. If you see "team of 15", set employee_count to 15. If you see "state-of-the-art paint booth", set has_paint_booth to true. For financial data, be especially thorough - commission rates and fees are critical for profit margin calculations. Only set fields to null/undefined if you're confident the information is NOT on the website.
+**CRITICAL: We are building the EQUATION, not calculating final numbers. Extract reported components (commission rates, fees, pricing) so users can input their actual data later.**
+
+Be aggressive in extraction of REPORTED data - if you see "established in 1995", calculate years_in_business. If you see "team of 15", set employee_count to 15. If you see "state-of-the-art paint booth", set has_paint_booth to true. 
+
+For financial data, extract ONLY what's explicitly stated:
+- Commission rates: "5% buyer's premium" → buyer_premium_rate: 5.0
+- Fees: "$500 listing fee" → listing_fee: 500
+- Pricing: "$125/hour" → labor_rate: 125
+
+DO NOT calculate profit margins, revenue, or GMV unless explicitly stated. We're building the equation structure (revenue = GMV × commission_rate), not the final numbers. Users will input their actual data to complete the equation.
 
 In "missing_critical_fields", identify which database fields are still missing that would be critical for investment decisions (e.g., financial data, legal registration, contact info, operational capabilities).`;
 
@@ -785,35 +794,76 @@ serve(async (req) => {
     if (dbFields.cover_image_url && !org.banner_url) updates.banner_url = dbFields.cover_image_url;
     
     // Financial & Pricing Data (for profit margin calculation)
-    if (dbFields.labor_rate !== undefined && !org.labor_rate) updates.labor_rate = dbFields.labor_rate;
-    if (dbFields.estimated_gross_margin_pct !== undefined && !org.gross_margin_pct) {
-      updates.gross_margin_pct = dbFields.estimated_gross_margin_pct;
-    }
-    if (dbFields.estimated_gmv !== undefined && !org.gmv) updates.gmv = dbFields.estimated_gmv;
+    // Parse and validate numeric values
+    const parseNumeric = (val: any): number | undefined => {
+      if (val === undefined || val === null) return undefined;
+      if (typeof val === 'number') return val;
+      if (typeof val === 'string') {
+        // Remove currency symbols, commas, spaces
+        const cleaned = val.replace(/[$,\s]/g, '').toLowerCase();
+        // Handle "M" for millions, "K" for thousands
+        if (cleaned.includes('m')) {
+          return parseFloat(cleaned.replace('m', '')) * 1000000;
+        }
+        if (cleaned.includes('k')) {
+          return parseFloat(cleaned.replace('k', '')) * 1000;
+        }
+        const parsed = parseFloat(cleaned);
+        return isNaN(parsed) ? undefined : parsed;
+      }
+      return undefined;
+    };
+
+    const parsedLaborRate = parseNumeric(dbFields.labor_rate);
+    if (parsedLaborRate !== undefined && !org.labor_rate) updates.labor_rate = parsedLaborRate;
     
-    // Store commission rates and fees in metadata for auction houses
+    const parsedGmv = parseNumeric(dbFields.estimated_gmv);
+    if (parsedGmv !== undefined && !org.gmv) updates.gmv = parsedGmv;
+    
+    // DO NOT calculate profit margins - only store reported components
+    // Users will input their actual data to calculate final margins
+    // We're building the equation structure, not the final numbers
+    
+    // Only populate gross_margin_pct if it's EXPLICITLY reported on the website
+    // (e.g., "Our profit margin is 15%", not inferred from commission rates)
+    const reportedMargin = parseNumeric(dbFields.estimated_gross_margin_pct);
+    if (reportedMargin !== undefined && reportedMargin > 0 && !org.gross_margin_pct) {
+      // Only use if it's explicitly stated as a margin/profit percentage
+      // This should be rare - most sites don't report margins directly
+      updates.gross_margin_pct = reportedMargin;
+    }
+    
+    // Store commission rates and fees in metadata for reference
     if (dbFields.buyer_premium_rate !== undefined || dbFields.seller_commission_rate !== undefined || 
         dbFields.listing_fee !== undefined || dbFields.reserve_fee !== undefined ||
         dbFields.photography_fee !== undefined || dbFields.processing_fee !== undefined ||
         dbFields.parts_markup_pct !== undefined || dbFields.service_margin_pct !== undefined) {
       updates.metadata = {
         ...updates.metadata,
-        pricing_structure: {
-          buyer_premium_rate: dbFields.buyer_premium_rate,
+        // Equation components (reported numbers only - users will input actual data to complete equation)
+        equation_components: {
+          // Auction house equation: Revenue = GMV × (seller_commission_rate + buyer_premium_rate) / 100
           seller_commission_rate: dbFields.seller_commission_rate,
+          buyer_premium_rate: dbFields.buyer_premium_rate,
           listing_fee: dbFields.listing_fee,
           reserve_fee: dbFields.reserve_fee,
           photography_fee: dbFields.photography_fee,
           processing_fee: dbFields.processing_fee,
+          
+          // Service business equation: Revenue = labor_rate × hours, Cost = (labor_rate × hours) - profit
+          labor_rate: dbFields.labor_rate,
           parts_markup_pct: dbFields.parts_markup_pct,
-          service_margin_pct: dbFields.service_margin_pct
-        },
-        estimated_financials: {
-          estimated_annual_revenue: dbFields.estimated_annual_revenue,
-          estimated_gmv: dbFields.estimated_gmv,
+          service_margin_pct: dbFields.service_margin_pct,
+          
+          // Dealership equation: Revenue = inventory_count × average_sale_price, Margin = (sale_price - cost) / sale_price
           average_sale_price: dbFields.average_sale_price,
           inventory_value: dbFields.inventory_value,
-          inventory_count: dbFields.inventory_count
+          inventory_count: dbFields.inventory_count,
+          
+          // Only include if EXPLICITLY reported on website (not calculated)
+          reported_annual_revenue: dbFields.estimated_annual_revenue, // Only if website states it
+          reported_gmv: dbFields.estimated_gmv, // Only if website states it
+          reported_profit_margin: dbFields.estimated_gross_margin_pct // Only if website states it
         }
       };
     }
