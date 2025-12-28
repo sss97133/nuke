@@ -355,11 +355,19 @@ serve(async (req: Request) => {
           'Accept-Language': 'en-US,en;q=0.9'
         };
         
-        // Add Referer for specific sites
+        // Add Referer for specific sites (hotlink protection bypass)
         if (rawUrl.includes('craigslist')) {
           headers['Referer'] = 'https://craigslist.org/';
         } else if (rawUrl.includes('bringatrailer')) {
           headers['Referer'] = 'https://bringatrailer.com/';
+        } else if (rawUrl.includes('mecum.com') || rawUrl.includes('images.mecum.com')) {
+          headers['Referer'] = 'https://www.mecum.com/';
+        } else if (rawUrl.includes('barrett-jackson')) {
+          headers['Referer'] = 'https://www.barrett-jackson.com/';
+        } else if (rawUrl.includes('rmsothebys')) {
+          headers['Referer'] = 'https://rmsothebys.com/';
+        } else if (rawUrl.includes('bonhams')) {
+          headers['Referer'] = 'https://www.bonhams.com/';
         }
         
         const candidates = candidateUrlsForSourceUrl(rawUrl);

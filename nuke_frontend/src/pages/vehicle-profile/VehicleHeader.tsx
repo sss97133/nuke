@@ -63,20 +63,42 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [trendPct, setTrendPct] = useState<number | null>(null);
   const [trendPeriod, setTrendPeriod] = useState<'live' | '1w' | '30d' | '6m' | '1y' | '5y'>('30d');
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [showOwnerClaimDropdown, setShowOwnerClaimDropdown] = useState(false);
   const locationRef = useRef<HTMLDivElement>(null);
+  const ownerClaimRef = useRef<HTMLDivElement>(null);
 
-  // Close location dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (locationRef.current && !locationRef.current.contains(e.target as Node)) {
         setShowLocationDropdown(false);
       }
+      if (ownerClaimRef.current && !ownerClaimRef.current.contains(e.target as Node)) {
+        setShowOwnerClaimDropdown(false);
+      }
     };
-    if (showLocationDropdown) {
+    if (showLocationDropdown || showOwnerClaimDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLocationDropdown]);
+  }, [showLocationDropdown, showOwnerClaimDropdown]);
+
+  // Derive current owner (best guess) from BaT data
+  const ownerGuess = useMemo(() => {
+    const v = vehicle as any;
+    const isSold = v?.sale_status === 'sold' || v?.sale_price > 0 || v?.auction_outcome === 'sold';
+    
+    // If sold, buyer is current owner; otherwise seller owns it
+    if (isSold) {
+      const buyer = v?.bat_buyer?.trim();
+      const seller = v?.bat_seller?.trim();
+      return buyer ? { username: buyer, from: seller, role: 'buyer' } : null;
+    }
+    
+    // Not sold - seller is current owner (consigning)
+    const seller = v?.bat_seller?.trim();
+    return seller ? { username: seller, from: null, role: 'seller' } : null;
+  }, [(vehicle as any)?.bat_buyer, (vehicle as any)?.bat_seller, (vehicle as any)?.sale_status, (vehicle as any)?.sale_price, (vehicle as any)?.auction_outcome]);
 
   // Derive location display - prefer city codes (ATL, LAX, NYC) or state abbrev
   const locationDisplay = useMemo(() => {
@@ -1819,6 +1841,117 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     }}>
                       Source: {(vehicle as any)?.listing_location_source || (vehicle as any)?.bat_location ? 'BaT listing' : 'Vehicle record'}
                     </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Owner Badge with Claim Dropdown - shows best guess owner */}
+          {ownerGuess && !permissions?.isVerifiedOwner && (
+            <div ref={ownerClaimRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowOwnerClaimDropdown(!showOwnerClaimDropdown);
+                }}
+                style={{
+                  fontSize: '9px',
+                  fontWeight: 600,
+                  fontFamily: 'monospace',
+                  display: 'inline-flex',
+                  alignItems: 'baseline',
+                  cursor: 'pointer',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '2px 4px',
+                  color: 'var(--text-muted)',
+                }}
+                title={`Owner (unverified): @${ownerGuess.username}`}
+              >
+                @{ownerGuess.username}<sup style={{ fontSize: '6px', color: 'var(--warning)', marginLeft: '1px' }}>*</sup>
+              </button>
+              
+              {/* Owner Claim Dropdown */}
+              {showOwnerClaimDropdown && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    zIndex: 1000,
+                    background: 'var(--bg)',
+                    border: '2px solid var(--primary)',
+                    padding: '12px',
+                    width: '280px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    marginTop: '4px',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '8px',
+                    borderBottom: '1px solid var(--border)',
+                    paddingBottom: '6px'
+                  }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '9pt' }}>Claim This Vehicle</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowOwnerClaimDropdown(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '12pt',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      x
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '7pt', color: 'var(--text)', lineHeight: 1.4 }}>
+                    <p style={{ margin: '0 0 8px 0' }}>
+                      <span style={{ color: 'var(--warning)' }}>*</span> Based on auction data, we believe <strong>@{ownerGuess.username}</strong> is the current owner.
+                    </p>
+                    {ownerGuess.from && (
+                      <p style={{ margin: '0 0 8px 0', fontSize: '6pt', color: 'var(--text-muted)' }}>
+                        Purchased from @{ownerGuess.from}
+                      </p>
+                    )}
+                    <p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>
+                      Is this you?
+                    </p>
+                    <ol style={{ margin: '0 0 8px 0', paddingLeft: '16px', fontSize: '7pt' }}>
+                      <li style={{ marginBottom: '4px' }}>Login or create an n-zero account</li>
+                      <li style={{ marginBottom: '4px' }}>Link your BaT username</li>
+                      <li style={{ marginBottom: '4px' }}>Claim ownership of this vehicle</li>
+                    </ol>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '6pt', color: 'var(--text-muted)' }}>
+                      Verified owners can update specs, add service history, and track value.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowOwnerClaimDropdown(false);
+                        navigate('/login?claim=' + encodeURIComponent(ownerGuess.username || ''));
+                      }}
+                      style={{
+                        width: '100%',
+                        background: 'var(--primary)',
+                        color: 'var(--white)',
+                        border: 'none',
+                        padding: '6px 12px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '8pt',
+                      }}
+                    >
+                      Claim Vehicle
+                    </button>
                   </div>
                 </div>
               )}
