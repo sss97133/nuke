@@ -2302,7 +2302,7 @@ const VehicleProfile: React.FC = () => {
       
       if (carsAndBidsUrls.length === 0) return cleaned;
       
-      // Filter out known Cars & Bids noise: video thumbnails, UI elements, small thumbnails
+      // Filter out known Cars & Bids noise: video thumbnails, UI elements, small thumbnails, edited versions
       const isKnownNoise = (u: string) => {
         const f = u.toLowerCase();
         // Exclude video thumbnails/freeze frames
@@ -2312,6 +2312,22 @@ const VehicleProfile: React.FC = () => {
         // Exclude UI elements and icons
         if (f.includes('/icon') || f.includes('/logo') || f.includes('/button') || f.includes('/ui/') || f.includes('/assets/')) {
           return true;
+        }
+        // Exclude edited/watermarked versions (common pattern: /edit/ in path)
+        if (f.includes('/edit/')) {
+          return true;
+        }
+        // Exclude small thumbnails via query parameters (width=80,height=80, etc.)
+        const urlObj = new URL(u);
+        const width = urlObj.searchParams.get('width');
+        const height = urlObj.searchParams.get('height');
+        if (width && height) {
+          const w = parseInt(width, 10);
+          const h = parseInt(height, 10);
+          // Filter out thumbnails smaller than 200x200
+          if (w < 200 || h < 200) {
+            return true;
+          }
         }
         // Exclude small thumbnails (common patterns: -thumb, -small, -150x, -300x)
         if (f.match(/-\d+x\d+\.(jpg|jpeg|png|webp)$/) || f.includes('-thumb') || f.includes('-small')) {

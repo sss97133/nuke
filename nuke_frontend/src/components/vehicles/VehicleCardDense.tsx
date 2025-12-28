@@ -6,6 +6,7 @@ import { UserInteractionService } from '../../services/userInteractionService';
 import ResilientImage from '../images/ResilientImage';
 import { OdometerBadge } from '../vehicle/OdometerBadge';
 import { useVehicleImages } from '../../hooks/useVehicleImages';
+import { LotBadge } from '../auction/LotBadge';
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -293,6 +294,50 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       maximumFractionDigits: 0,
     }).format(price);
   };
+
+  // Check if vehicle is from Mecum and extract lot data
+  const mecumLotData = React.useMemo(() => {
+    const v: any = vehicle as any;
+    
+    // Check if vehicle is from Mecum
+    const discoveryUrl = String(v?.discovery_url || '').toLowerCase();
+    const discoverySource = String(v?.discovery_source || '').toLowerCase();
+    const externalListing = v?.external_listings?.[0];
+    const platform = String(externalListing?.platform || '').toLowerCase();
+    
+    const isMecum = 
+      discoveryUrl.includes('mecum.com') ||
+      discoverySource.includes('mecum') ||
+      platform === 'mecum';
+    
+    if (!isMecum) {
+      return null;
+    }
+    
+    // Extract lot data from external_listings metadata or vehicle fields
+    const metadata = externalListing?.metadata || {};
+    const lotNumber = metadata?.lot_number || null;
+    const location = metadata?.location || v?.location || null;
+    const saleDate = metadata?.sale_date || v?.sale_date || externalListing?.sold_at || null;
+    const auctionDate = metadata?.auction_start_date || externalListing?.start_date || v?.auction_end_date || saleDate;
+    const salePrice = v?.sale_price || externalListing?.final_price || null;
+    const estimateLow = metadata?.estimate_low || null;
+    const estimateHigh = metadata?.estimate_high || null;
+    const listingUrl = externalListing?.listing_url || v?.discovery_url || null;
+    
+    // Use auction date if available, otherwise sale date
+    const date = auctionDate || saleDate;
+    
+    return {
+      lotNumber,
+      date,
+      location,
+      salePrice,
+      estimateLow,
+      estimateHigh,
+      listingUrl,
+    };
+  }, [vehicle]);
 
   // Calculate alphabet-based tier (F, E, D, C, B, A, S, SSS)
   // Tier is based on COMPLETENESS and QUALITY of information
@@ -850,9 +895,21 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           {vehicle.image_count || 0} img • {vehicle.event_count || 0} evt
         </div>
         
-        {/* Value */}
+        {/* Value - Show LotBadge for Mecum, otherwise show price */}
         <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '9pt' }}>
-          {badgeMainText}
+          {mecumLotData ? (
+            <LotBadge
+              lotNumber={mecumLotData.lotNumber}
+              date={mecumLotData.date}
+              location={mecumLotData.location}
+              salePrice={mecumLotData.salePrice}
+              estimateLow={mecumLotData.estimateLow}
+              estimateHigh={mecumLotData.estimateHigh}
+              listingUrl={mecumLotData.listingUrl}
+            />
+          ) : (
+            badgeMainText
+          )}
         </div>
         
         {/* Profit (if valid) */}
@@ -960,10 +1017,20 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             </div>
           )}
 
-          {/* Price/Bid badge (no favicon here) */}
-          {showPriceOverlay && badgeMainText !== '—' && (
+          {/* Price/Bid badge (no favicon here) - Show LotBadge for Mecum, otherwise show price */}
+          {showPriceOverlay && (mecumLotData || badgeMainText !== '—') && (
             <div style={{ ...badgeStyle, top: '8px', right: '8px' }}>
-              {isActiveAuction ? (
+              {mecumLotData ? (
+                <LotBadge
+                  lotNumber={mecumLotData.lotNumber}
+                  date={mecumLotData.date}
+                  location={mecumLotData.location}
+                  salePrice={mecumLotData.salePrice}
+                  estimateLow={mecumLotData.estimateLow}
+                  estimateHigh={mecumLotData.estimateHigh}
+                  listingUrl={mecumLotData.listingUrl}
+                />
+              ) : isActiveAuction ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
                   <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
                     BID
@@ -1426,10 +1493,20 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           </div>
         )}
 
-        {/* Price/Bid badge (no favicon here) */}
-        {showPriceOverlay && badgeMainText !== '—' && (
+        {/* Price/Bid badge (no favicon here) - Show LotBadge for Mecum, otherwise show price */}
+        {showPriceOverlay && (mecumLotData || badgeMainText !== '—') && (
           <div style={badgeStyle}>
-            {isActiveAuction ? (
+            {mecumLotData ? (
+              <LotBadge
+                lotNumber={mecumLotData.lotNumber}
+                date={mecumLotData.date}
+                location={mecumLotData.location}
+                salePrice={mecumLotData.salePrice}
+                estimateLow={mecumLotData.estimateLow}
+                estimateHigh={mecumLotData.estimateHigh}
+                listingUrl={mecumLotData.listingUrl}
+              />
+            ) : isActiveAuction ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
                 <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
                   BID

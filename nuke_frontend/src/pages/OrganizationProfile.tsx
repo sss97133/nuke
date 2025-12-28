@@ -26,6 +26,7 @@ import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationServiceTab } from '../components/organization/OrganizationServiceTab';
 import { OrganizationAuctionsTab } from '../components/organization/OrganizationAuctionsTab';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
+import { LiveAuctionBadge } from '../components/auction/AuctionBadges';
 import VehicleThumbnail from '../components/VehicleThumbnail';
 import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
 import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
@@ -1529,11 +1530,14 @@ export default function OrganizationProfile() {
             }}>
               {displayName}
             </h1>
-            {organization.business_type && (
-              <div style={{ fontSize: '9pt', color: 'var(--text-muted)', marginTop: '4px' }}>
-                {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
-              </div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+              {organization.business_type && (
+                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
+                  {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
+                </div>
+              )}
+              <LiveAuctionBadge organization={organization} />
+            </div>
           </div>
 
           {/* Stock price (if tradable) - Secondary */}

@@ -141,4 +141,51 @@ export const ParticipantBadge: React.FC<{
   return content;
 };
 
+/**
+ * Live Auction Badge
+ * Simple, reusable badge for organizations that conduct live auctions (e.g., Mecum, Barrett-Jackson)
+ * Checks if organization is an auction house (business_type = 'auction_house')
+ */
+export const LiveAuctionBadge: React.FC<{
+  organization?: {
+    business_type?: string;
+    organization?: {
+      business_type?: string;
+    };
+  } | null;
+  className?: string;
+  style?: React.CSSProperties;
+}> = ({ organization, className, style }) => {
+  // Check if organization is an auction house
+  const isAuctionHouse = 
+    organization?.business_type === 'auction_house' ||
+    organization?.organization?.business_type === 'auction_house';
+
+  if (!isAuctionHouse) {
+    return null;
+  }
+
+  return (
+    <span
+      className={className || 'badge'}
+      title="Live Auction House"
+      style={{
+        background: '#dcfce7',
+        color: '#166534',
+        borderColor: '#166534',
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        fontWeight: 700,
+        fontSize: '10px',
+        padding: '3px 8px',
+        borderRadius: '4px',
+        display: 'inline-block',
+        ...style,
+      }}
+    >
+      LIVE AUCTION
+    </span>
+  );
+};
+
 

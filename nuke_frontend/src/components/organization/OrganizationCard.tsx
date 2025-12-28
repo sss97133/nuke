@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { MyOrganization } from '../../services/myOrganizationsService';
+import { LiveAuctionBadge } from '../auction/AuctionBadges';
 import '../../design-system.css';
 
 interface OrganizationCardProps {
@@ -189,6 +190,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
               VERIFIED
             </span>
           )}
+          <LiveAuctionBadge organization={organization.organization} />
         </div>
 
         {/* Quick Stats */}

@@ -178,43 +178,63 @@ async function forceReimport() {
       let extractData = null;
       let extractError = null;
       
-      // Use backfill-images directly for BaT if images exist in origin_metadata
+      // For BaT: Use backfill-images with URLs from origin_metadata, but filter properly
       if (listingUrl.includes('bringatrailer.com')) {
-        // Check if vehicle has image URLs in origin_metadata
+        // Get image URLs from origin_metadata
         const { data: vehicleData } = await supabase
           .from('vehicles')
           .select('origin_metadata')
           .eq('id', vehicle.id)
           .single();
         
-        const imageUrls = vehicleData?.origin_metadata?.image_urls || [];
-        if (imageUrls.length > 0) {
-          console.log(`   📸 Using backfill-images directly (${imageUrls.length} URLs from origin_metadata)...`);
-          const result = await supabase.functions.invoke('backfill-images', {
+        const rawUrls = vehicleData?.origin_metadata?.image_urls || [];
+        
+        // Filter: Only BaT wp-content/uploads URLs, exclude logos/themes/SVGs, remove resize params
+        const batImageUrls = rawUrls
+          .filter(url => {
+            if (typeof url !== 'string') return false;
+            const u = url.toLowerCase();
+            return u.includes('bringatrailer.com/wp-content/uploads/') &&
+                   !u.includes('/themes/') &&
+                   !u.includes('assets/img/') &&
+                   !u.includes('.svg') &&
+                   !u.includes('countries/') &&
+                   !u.includes('/logo') &&
+                   !u.includes('supabase.co') &&
+                   !u.includes('import_queue');
+          })
+          .map(url => {
+            // Remove resize parameters for full-res
+            return String(url)
+              .replace(/[?&]w=\d+/g, '')
+              .replace(/[?&]h=\d+/g, '')
+              .replace(/[?&]resize=[^&]*/g, '')
+              .replace(/[?&]fit=[^&]*/g, '')
+              .replace(/[?&]+$/, '')
+              .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+              .trim();
+          })
+          .filter((url, index, self) => self.indexOf(url) === index); // Dedupe
+        
+        if (batImageUrls.length > 0) {
+          console.log(`   📸 Using ${batImageUrls.length} clean BaT URLs from origin_metadata, uploading...`);
+          const backfillResult = await supabase.functions.invoke('backfill-images', {
             body: {
               vehicle_id: vehicle.id,
-              image_urls: imageUrls,
+              image_urls: batImageUrls,
               source: 'bat_import',
               run_analysis: false,
-              max_images: 0, // Upload all
+              max_images: 0,
               continue: true,
               sleep_ms: 150,
               max_runtime_ms: 60000
             }
           });
-          extractData = result.data;
-          extractError = result.error;
+          extractData = backfillResult.data;
+          extractError = backfillResult.error;
         } else {
-          // Fallback to comprehensive-bat-extraction if no stored URLs
-          console.log(`   📸 Using comprehensive-bat-extraction (no stored URLs found)...`);
-          const result = await supabase.functions.invoke('comprehensive-bat-extraction', {
-            body: {
-              url: listingUrl,
-              max_vehicles: 1
-            }
-          });
-          extractData = result.data;
-          extractError = result.error;
+          console.log(`   ⚠️  No clean BaT URLs found in origin_metadata`);
+          extractError = { message: 'No clean BaT URLs in origin_metadata' };
         }
       } else {
         // Use extract-premium-auction for other sites

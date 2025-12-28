@@ -28,7 +28,15 @@ interface ExtractRequest {
 }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || '';
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY') || '';
+
+if (!SUPABASE_URL || !SERVICE_KEY) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Edge Function secrets');
+}
+
+// For function-to-function calls, apikey header typically uses anon key, Authorization uses service role
+const API_KEY = ANON_KEY || SERVICE_KEY;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -139,13 +147,29 @@ Deno.serve(async (req) => {
       }
 
       try {
+        // Get service key fresh each time (in case it wasn't set at module load)
+        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || SERVICE_KEY;
+        
+        if (!serviceKey) {
+          console.log(`   ⚠️  SERVICE_KEY is empty - check Edge Function secrets`);
+          throw new Error('SERVICE_KEY is empty - check Edge Function secrets');
+        }
+        
+        // Verify key format (should be JWT starting with eyJ)
+        if (!serviceKey.startsWith('eyJ')) {
+          console.log(`   ⚠️  SERVICE_KEY doesn't appear to be a JWT (should start with 'eyJ')`);
+        }
+        
         // Call discover-organization-full for this org
+        // Use anon key for apikey header (Supabase convention), service role for Authorization
+        const anonKey = ANON_KEY || serviceKey; // Fallback to service key if anon not available
         const discoverUrl = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/discover-organization-full`;
+        console.log(`   📡 Calling discover-organization-full for ${org.id}...`);
         const discoverResponse = await fetch(discoverUrl, {
           method: 'POST',
           headers: {
-            'apikey': SERVICE_KEY,
-            'Authorization': `Bearer ${SERVICE_KEY}`,
+            'apikey': anonKey,
+            'Authorization': `Bearer ${serviceKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -153,6 +177,8 @@ Deno.serve(async (req) => {
             website: org.website,
           }),
         });
+        
+        console.log(`   📥 Response status: ${discoverResponse.status}`);
 
         if (discoverResponse.ok) {
           const discoverData = await discoverResponse.json();
@@ -175,7 +201,16 @@ Deno.serve(async (req) => {
           });
         } else {
           const errorText = await discoverResponse.text();
-          console.log(`   ❌ Failed: ${discoverResponse.status} - ${errorText.substring(0, 200)}`);
+          let errorMessage = errorText.substring(0, 500);
+          console.log(`   ❌ Failed: ${discoverResponse.status} - ${errorMessage}`);
+          
+          // Log more details for 401 errors to help debug
+          if (discoverResponse.status === 401) {
+            console.log(`   ⚠️  401 Error Details:`);
+            console.log(`      - Service key length: ${serviceKey.length}`);
+            console.log(`      - Service key starts with: ${serviceKey.substring(0, 10)}...`);
+            console.log(`      - Full error: ${errorText}`);
+          }
           
           results.push({
             organization_id: org.id,
@@ -183,7 +218,7 @@ Deno.serve(async (req) => {
             website: org.website,
             status: 'failed',
             vehicles_before: vehicleCount,
-            error: errorText.substring(0, 500),
+            error: errorMessage,
           });
         }
       } catch (error: any) {
