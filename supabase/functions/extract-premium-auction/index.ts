@@ -2295,10 +2295,14 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
     }
   }
 
+  // Track LLM extraction results for visibility
+  const llmResults: Array<{ url: string; called: boolean; fields_found: string[]; raw_response?: any }> = [];
+
   for (const listingUrl of urlsToScrape) {
     try {
       let vehicle: any = {};
       let html = "";
+      let llmExtractedForThisVehicle: Record<string, any> = {};
       
       // Try Firecrawl first, but fall back to direct fetch if it fails
       try {
@@ -2430,9 +2434,11 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         descriptionFromHtml = extractCarsAndBidsDescription(html);
       }
       
-      // LLM-based extraction to find everything that regex/pattern matching missed
+      // LLM-based extraction - only run if we're missing key fields (to save cost)
       let llmExtracted: Record<string, any> = {};
-      if (html && html.length > 1000) {
+      const missingKeyFields = !vehicle?.mileage || !vehicle?.color || !vehicle?.transmission || !vehicle?.engine_size || !vehicle?.vin;
+      
+      if (html && html.length > 1000 && missingKeyFields) {
         try {
           const openaiKey = Deno.env.get('OPENAI_API_KEY');
           if (openaiKey) {
@@ -2440,15 +2446,49 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
             const supabaseForLLM = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
             llmExtracted = await extractWithLLM(html, listingUrl, supabaseForLLM, openaiKey);
             
+            llmExtractedForThisVehicle = llmExtracted;
             if (Object.keys(llmExtracted).length > 0) {
-              console.log(`✅ LLM extracted ${Object.keys(llmExtracted).length} additional fields: ${Object.keys(llmExtracted).join(', ')}`);
+              const nonNullFields = Object.keys(llmExtracted).filter(k => llmExtracted[k] !== null && llmExtracted[k] !== undefined);
+              if (nonNullFields.length > 0) {
+                console.log(`✅ LLM extracted ${nonNullFields.length} non-null fields: ${nonNullFields.join(', ')}`);
+                console.log(`📋 LLM values being merged:`, JSON.stringify(Object.fromEntries(nonNullFields.map(k => [k, llmExtracted[k]])), null, 2));
+                llmResults.push({
+                  url: listingUrl,
+                  called: true,
+                  fields_found: nonNullFields,
+                  raw_response: Object.fromEntries(nonNullFields.map(k => [k, llmExtracted[k]]))
+                });
+              } else {
+                console.log(`⚠️ LLM returned ${Object.keys(llmExtracted).length} fields but all are null - no data found`);
+                llmResults.push({
+                  url: listingUrl,
+                  called: true,
+                  fields_found: [],
+                  raw_response: llmExtracted
+                });
+              }
+            } else {
+              console.log(`⚠️ LLM extraction returned empty object - no fields extracted`);
+              llmResults.push({
+                url: listingUrl,
+                called: true,
+                fields_found: [],
+                raw_response: {}
+              });
             }
           } else {
             console.log('⚠️ OPENAI_API_KEY not found, skipping LLM extraction');
+            llmResults.push({ url: listingUrl, called: false, fields_found: [] });
           }
         } catch (llmError: any) {
           console.warn(`LLM extraction failed (non-fatal): ${llmError?.message || String(llmError)}`);
+          llmResults.push({ url: listingUrl, called: true, fields_found: [], raw_response: { error: llmError?.message } });
         }
+      } else if (!missingKeyFields) {
+        console.log('ℹ️ Skipping LLM extraction - key fields already present');
+        llmResults.push({ url: listingUrl, called: false, fields_found: [], raw_response: { reason: 'key_fields_already_present' } });
+      } else {
+        llmResults.push({ url: listingUrl, called: false, fields_found: [], raw_response: { reason: 'html_too_short' } });
       }
       
       // CRITICAL: Clean listing URL - strip /video suffix
@@ -2519,6 +2559,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
     issues: [...issues, ...created.errors],
     extraction_method: "index_link_discovery + firecrawl_per_listing_extract",
     timestamp: new Date().toISOString(),
+    llm_extraction_results: llmResults, // Show what LLM found
   };
 
   if (debug) {

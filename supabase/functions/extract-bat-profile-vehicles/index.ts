@@ -226,150 +226,192 @@ Deno.serve(async (req: Request) => {
     };
 
     if (extract_vehicles && listingUrlsArray.length > 0) {
-      // Import vehicles in batches to avoid overwhelming the system
-      // Process listings sequentially to avoid timeouts (Firecrawl takes 10+ seconds per listing)
-      for (const listingUrl of listingUrlsArray) {
+      // Process listings in parallel batches to restore throughput
+      // Use concurrency limit of 5 to balance speed and timeout prevention
+      const CONCURRENCY_LIMIT = 5;
+      
+      // Helper function to process a single listing
+      const processListing = async (listingUrl: string) => {
         try {
           console.log(`Processing listing: ${listingUrl}`);
             
-            // Extract listing data directly using Firecrawl (bypassing broken comprehensive-bat-extraction)
-            const firecrawlResult = await extractBatListingWithFirecrawl(listingUrl, FIRECRAWL_API_KEY || '');
+          // Extract listing data directly using Firecrawl (bypassing broken comprehensive-bat-extraction)
+          const firecrawlResult = await extractBatListingWithFirecrawl(listingUrl, FIRECRAWL_API_KEY || '');
+          
+          if (!firecrawlResult.data) {
+            throw new Error(`Firecrawl extraction failed: ${firecrawlResult.error || 'No data returned'}`);
+          }
+
+          const data = firecrawlResult.data;
+          
+          // Find or create vehicle
+          let vehicleId: string | null = null;
+          
+          // Try to find by VIN first
+          if (data.vin) {
+            const { data: existingByVin } = await supabase
+              .from('vehicles')
+              .select('id')
+              .eq('vin', data.vin.toUpperCase())
+              .maybeSingle();
+            if (existingByVin) vehicleId = existingByVin.id;
+          }
+          
+          // Try to find by listing URL
+          if (!vehicleId) {
+            const { data: existingByUrl } = await supabase
+              .from('vehicles')
+              .select('id')
+              .eq('bat_auction_url', listingUrl)
+              .maybeSingle();
+            if (existingByUrl) vehicleId = existingByUrl.id;
+          }
+          
+          // Create or update vehicle
+          const vehicleData: any = {
+            year: data.year || null,
+            make: data.make?.toLowerCase() || null,
+            model: data.model?.toLowerCase() || null,
+            trim: data.trim?.toLowerCase() || null,
+            vin: data.vin?.toUpperCase() || null,
+            mileage: data.mileage || null,
+            sale_price: data.sale_price || null,
+            sale_date: data.sale_date || null,
+            auction_end_date: data.auction_end_date || null,
+            auction_outcome: data.sale_price ? 'sold' : (data.reserve_not_met ? 'reserve_not_met' : null),
+            description: data.description || null,
+            bat_auction_url: listingUrl,
+            listing_url: listingUrl,
+            discovery_url: listingUrl,
+            profile_origin: 'bat_import',
+            discovery_source: 'bat_profile_extraction',
+            origin_metadata: {
+              source: 'bat_profile_extraction',
+              bat_url: listingUrl,
+              bat_seller_username: data.seller_username || data.seller || null,
+              bat_buyer_username: data.buyer_username || data.buyer || null,
+              lot_number: data.lot_number || null,
+              imported_at: new Date().toISOString(),
+            },
+          };
+          
+          if (vehicleId) {
+            await supabase
+              .from('vehicles')
+              .update(vehicleData)
+              .eq('id', vehicleId);
+          } else {
+            const { data: newVehicle, error: vehicleError } = await supabase
+              .from('vehicles')
+              .insert(vehicleData)
+              .select('id')
+              .single();
             
-            if (!firecrawlResult.data) {
-              throw new Error(`Firecrawl extraction failed: ${firecrawlResult.error || 'No data returned'}`);
+            if (vehicleError) throw vehicleError;
+            vehicleId = newVehicle.id;
+          }
+
+          if (vehicleId) {
+            // Check if this vehicle was newly created or updated
+            const { data: vehicle } = await supabase
+              .from('vehicles')
+              .select('created_at, updated_at')
+              .eq('id', vehicleId)
+              .single();
+
+            const justCreated = vehicle && new Date(vehicle.created_at).getTime() > Date.now() - 60000;
+
+            // Link the vehicle to the BaT user via bat_listings
+            const { data: batListing } = await supabase
+              .from('bat_listings')
+              .select('id, seller_external_identity_id')
+              .eq('bat_listing_url', listingUrl)
+              .single();
+
+            if (batListing && !batListing.seller_external_identity_id) {
+              await supabase
+                .from('bat_listings')
+                .update({ seller_external_identity_id: externalIdentityId })
+                .eq('id', batListing.id);
             }
 
-            const data = firecrawlResult.data;
-            
-            // Find or create vehicle
-            let vehicleId: string | null = null;
-            
-            // Try to find by VIN first
-            if (data.vin) {
-              const { data: existingByVin } = await supabase
-                .from('vehicles')
-                .select('id')
-                .eq('vin', data.vin.toUpperCase())
-                .maybeSingle();
-              if (existingByVin) vehicleId = existingByVin.id;
-            }
-            
-            // Try to find by listing URL
-            if (!vehicleId) {
-              const { data: existingByUrl } = await supabase
-                .from('vehicles')
-                .select('id')
-                .eq('bat_auction_url', listingUrl)
-                .maybeSingle();
-              if (existingByUrl) vehicleId = existingByUrl.id;
-            }
-            
-            // Create or update vehicle
-            const vehicleData: any = {
-              year: data.year || null,
-              make: data.make?.toLowerCase() || null,
-              model: data.model?.toLowerCase() || null,
-              trim: data.trim?.toLowerCase() || null,
-              vin: data.vin?.toUpperCase() || null,
-              mileage: data.mileage || null,
-              sale_price: data.sale_price || null,
-              sale_date: data.sale_date || null,
-              auction_end_date: data.auction_end_date || null,
-              auction_outcome: data.sale_price ? 'sold' : (data.reserve_not_met ? 'reserve_not_met' : null),
-              description: data.description || null,
-              bat_auction_url: listingUrl,
-              listing_url: listingUrl,
-              discovery_url: listingUrl,
-              profile_origin: 'bat_import',
-              discovery_source: 'bat_profile_extraction',
-              origin_metadata: {
-                source: 'bat_profile_extraction',
-                bat_url: listingUrl,
-                bat_seller_username: data.seller_username || data.seller || null,
-                bat_buyer_username: data.buyer_username || data.buyer || null,
-                lot_number: data.lot_number || null,
-                imported_at: new Date().toISOString(),
-              },
-            };
-            
-            if (vehicleId) {
+            // If the external identity is claimed by a user, link vehicle to that user
+            if (existingIdentity?.claimed_by_user_id) {
               await supabase
                 .from('vehicles')
-                .update(vehicleData)
-                .eq('id', vehicleId);
-            } else {
-              const { data: newVehicle, error: vehicleError } = await supabase
-                .from('vehicles')
-                .insert(vehicleData)
-                .select('id')
-                .single();
-              
-              if (vehicleError) throw vehicleError;
-              vehicleId = newVehicle.id;
-            }
-
-            if (vehicleId) {
-              results.vehicle_ids.push(vehicleId);
-
-              // Check if this vehicle was newly created or updated
-              const { data: vehicle } = await supabase
-                .from('vehicles')
-                .select('created_at, updated_at')
+                .update({ uploaded_by: existingIdentity.claimed_by_user_id })
                 .eq('id', vehicleId)
-                .single();
+                .is('uploaded_by', null);
 
-              if (vehicle) {
-                const justCreated = new Date(vehicle.created_at).getTime() > Date.now() - 60000;
-                if (justCreated) {
-                  results.vehicles_created++;
-                } else {
-                  results.vehicles_updated++;
-                }
-              }
-
-              // Link the vehicle to the BaT user via bat_listings
-              // The comprehensive-bat-extraction should have already created bat_listings
-              // We just need to ensure seller_external_identity_id is set
-              const { data: batListing } = await supabase
-                .from('bat_listings')
-                .select('id, seller_external_identity_id')
-                .eq('bat_listing_url', listingUrl)
-                .single();
-
-              if (batListing && !batListing.seller_external_identity_id) {
-                await supabase
-                  .from('bat_listings')
-                  .update({ seller_external_identity_id: externalIdentityId })
-                  .eq('id', batListing.id);
-              }
-
-              // If the external identity is claimed by a user, link vehicle to that user
-              if (existingIdentity?.claimed_by_user_id) {
-                await supabase
-                  .from('vehicles')
-                  .update({ uploaded_by: existingIdentity.claimed_by_user_id })
-                  .eq('id', vehicleId)
-                  .is('uploaded_by', null);
-
-                // Update user profile stats
-                await supabase.rpc('backfill_user_profile_stats', {
-                  p_user_id: existingIdentity.claimed_by_user_id,
-                });
-              }
-
-              console.log(`✓ Imported vehicle: ${vehicleId}`);
-            } else {
-              results.vehicles_skipped++;
-              console.log(`Skipped listing (no vehicle created): ${listingUrl}`);
+              // Update user profile stats
+              await supabase.rpc('backfill_user_profile_stats', {
+                p_user_id: existingIdentity.claimed_by_user_id,
+              });
             }
-            
-            // Small delay between listings to avoid rate limits
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (err: any) {
-            const errorMsg = `Failed to import ${listingUrl}: ${err.message}`;
-            results.errors.push(errorMsg);
-            console.error(errorMsg);
+
+            console.log(`✓ Imported vehicle: ${vehicleId}`);
+            return { 
+              success: true, 
+              vehicleId, 
+              justCreated,
+              listingUrl 
+            };
+          } else {
+            return { 
+              success: false, 
+              error: 'No vehicle created',
+              listingUrl 
+            };
           }
+        } catch (err: any) {
+          const errorMsg = `Failed to import ${listingUrl}: ${err.message}`;
+          console.error(errorMsg);
+          return { 
+            success: false, 
+            error: errorMsg,
+            listingUrl 
+          };
+        }
+      };
+
+      // Process in parallel batches with concurrency limit
+      for (let i = 0; i < listingUrlsArray.length; i += CONCURRENCY_LIMIT) {
+        const batch = listingUrlsArray.slice(i, i + CONCURRENCY_LIMIT);
+        const batchNum = Math.floor(i / CONCURRENCY_LIMIT) + 1;
+        const totalBatches = Math.ceil(listingUrlsArray.length / CONCURRENCY_LIMIT);
+        
+        console.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} listings)...`);
+        
+        // Process batch in parallel
+        const batchResults = await Promise.allSettled(
+          batch.map(listingUrl => processListing(listingUrl))
+        );
+        
+        // Aggregate results
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value.success) {
+            results.vehicle_ids.push(result.value.vehicleId);
+            if (result.value.justCreated) {
+              results.vehicles_created++;
+            } else {
+              results.vehicles_updated++;
+            }
+          } else {
+            if (result.status === 'fulfilled' && result.value.error) {
+              results.errors.push(result.value.error);
+              if (result.value.error.includes('No vehicle created')) {
+                results.vehicles_skipped++;
+              }
+            } else if (result.status === 'rejected') {
+              results.errors.push(result.reason?.message || 'Unknown error');
+            }
+          }
+        }
+        
+        // Small delay between batches to avoid rate limits
+        if (i + CONCURRENCY_LIMIT < listingUrlsArray.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
     }
 
