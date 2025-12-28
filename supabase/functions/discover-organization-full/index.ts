@@ -548,7 +548,18 @@ async function extractAllData(
 
   // Find inventory URL
   const inventoryPage = siteStructure.page_types.find((pt) => pt.type === 'inventory');
-  const inventoryUrl = inventoryPage?.sample_urls[0] || `${siteUrl}/inventory`;
+  let inventoryUrl = inventoryPage?.sample_urls[0] || `${siteUrl}/inventory`;
+  
+  // Detect if URL redirects to Motorious
+  const isMotoriousUrl = inventoryUrl.toLowerCase().includes('motorious.com') || 
+                         inventoryUrl.toLowerCase().includes('buy.motorious.com');
+  
+  // If we detect Motorious, use marketplace source type instead of dealer_website
+  const sourceType = isMotoriousUrl ? 'marketplace' : 'dealer_website';
+  
+  if (isMotoriousUrl) {
+    console.log(`   🔍 Detected Motorious marketplace - using marketplace source type`);
+  }
 
   let vehiclesQueued = 0;
   let vehiclesFound = 0;
@@ -564,7 +575,7 @@ async function extractAllData(
       },
       body: JSON.stringify({
         source_url: inventoryUrl,
-        source_type: 'dealer_website',
+        source_type: sourceType,
         organization_id: organizationId,
         max_results: 500,
         use_llm_extraction: true,

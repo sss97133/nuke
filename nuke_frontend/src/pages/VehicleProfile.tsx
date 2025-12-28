@@ -2317,40 +2317,56 @@ const VehicleProfile: React.FC = () => {
       
       if (carsAndBidsUrls.length === 0) return cleaned;
       
-      // Filter out known Cars & Bids noise: video thumbnails, UI elements, small thumbnails, edited versions
+      // LESS AGGRESSIVE: Only filter obvious noise, keep all valid gallery images
+      // This allows external URLs to display immediately
       const isKnownNoise = (u: string) => {
         const f = u.toLowerCase();
-        // Exclude video thumbnails/freeze frames
-        if (f.includes('/video') || f.includes('video') || f.includes('thumbnail') || f.includes('thumb')) {
+        // Only exclude explicit video paths (not just "video" anywhere in URL)
+        if (f.includes('/video/') || f.includes('/videos/') || f.match(/\/video[\/\-]/)) {
           return true;
         }
-        // Exclude UI elements and icons
-        if (f.includes('/icon') || f.includes('/logo') || f.includes('/button') || f.includes('/ui/') || f.includes('/assets/')) {
+        // Only exclude explicit thumbnail paths (not just "thumb" anywhere)
+        if (f.includes('/thumbnail') || f.includes('/thumbnails/')) {
           return true;
         }
-        // Exclude edited/watermarked versions (common pattern: /edit/ in path)
-        if (f.includes('/edit/')) {
+        // Exclude UI elements and icons (be more specific)
+        if (f.includes('/icon/') || f.includes('/icons/') || f.includes('/logo/') || f.includes('/logos/') || 
+            f.includes('/button/') || f.includes('/ui/') || f.includes('/assets/') || f.includes('/static/')) {
           return true;
         }
-        // Exclude small thumbnails via query parameters (width=80,height=80, etc.)
-        const urlObj = new URL(u);
-        const width = urlObj.searchParams.get('width');
-        const height = urlObj.searchParams.get('height');
-        if (width && height) {
-          const w = parseInt(width, 10);
-          const h = parseInt(height, 10);
-          // Filter out thumbnails smaller than 200x200
-          if (w < 200 || h < 200) {
+        // Only exclude /edit/ if it's clearly an edited version path (not in /photos/)
+        if (f.includes('/edit/') && !f.includes('/photos/')) {
+          return true;
+        }
+        // Only exclude VERY small thumbnails (80x80 or smaller), not all small images
+        // Check both query params AND path-based params (CarsAndBids uses path format)
+        try {
+          const urlObj = new URL(u);
+          // Method 1: Check query parameters
+          const widthParam = urlObj.searchParams.get('width');
+          const heightParam = urlObj.searchParams.get('height');
+          
+          // Method 2: Check path for CarsAndBids CDN format: /cdn-cgi/image/width=80,height=80,...
+          const pathMatch = urlObj.pathname.match(/width=(\d+).*?height=(\d+)/i) || 
+                           urlObj.pathname.match(/width=(\d+),height=(\d+)/i);
+          
+          let width: number | null = null;
+          let height: number | null = null;
+          
+          if (widthParam && heightParam) {
+            width = parseInt(widthParam, 10);
+            height = parseInt(heightParam, 10);
+          } else if (pathMatch) {
+            width = parseInt(pathMatch[1], 10);
+            height = parseInt(pathMatch[2], 10);
+          }
+          
+          // Only filter if BOTH width and height are explicitly set to very small values
+          if (width && height && width > 0 && width <= 80 && height > 0 && height <= 80) {
             return true;
           }
-        }
-        // Exclude small thumbnails (common patterns: -thumb, -small, -150x, -300x)
-        if (f.match(/-\d+x\d+\.(jpg|jpeg|png|webp)$/) || f.includes('-thumb') || f.includes('-small')) {
-          return true;
-        }
-        // Exclude static assets
-        if (f.includes('/static/')) {
-          return true;
+        } catch {
+          // If URL parsing fails, don't filter it out - show it
         }
         return false;
       };
@@ -2544,15 +2560,108 @@ const VehicleProfile: React.FC = () => {
           ? [...originImages, ...fallbackPool] // Origin images first for BaT
           : [...fallbackPool, ...originImages]; // Default: DB images first, then origin
         const filteredPool = filterProfileImages(poolForFiltering, vehicle);
+        
+        // Score images for "money shot" quality (exterior, full vehicle, good for hero)
+        const scoreMoneyShot = (url: string, record?: any): number => {
+          if (!url) return 0;
+          let score = 50; // Base score
+          const urlLower = url.toLowerCase();
+          
+          // Prefer earlier positions (first few images are usually best)
+          if (record?.position !== null && record?.position !== undefined) {
+            const pos = record.position;
+            if (pos <= 2) score += 30; // First 3 images are usually money shots
+            else if (pos <= 5) score += 15;
+            else if (pos <= 10) score += 5;
+          }
+          
+          // Prefer Supabase-hosted (more reliable than external CDNs)
+          if (isSupabaseHostedImageUrl(url)) score += 10;
+          
+          // Prefer full-resolution images (not thumbnails/resized)
+          if (!urlLower.includes('width=') && !urlLower.includes('height=') && 
+              !urlLower.includes('thumb') && !urlLower.includes('80x80')) {
+            score += 15;
+          }
+          
+          // Boost for CarsAndBids full-res photos (usually good quality)
+          if (urlLower.includes('media.carsandbids.com') && 
+              urlLower.includes('/photos/') && 
+              !urlLower.includes('/edit/') &&
+              !urlLower.includes('width=')) {
+            score += 20;
+          }
+          
+          // Penalize interior/detail/document shots
+          if (urlLower.includes('interior') || urlLower.includes('inside') || 
+              urlLower.includes('cabin') || urlLower.includes('dash') ||
+              urlLower.includes('engine') || urlLower.includes('underhood') ||
+              urlLower.includes('detail') || urlLower.includes('close') ||
+              urlLower.includes('document') || urlLower.includes('spec') ||
+              urlLower.includes('sticker') || urlLower.includes('monroney')) {
+            score -= 30;
+          }
+          
+          // Boost for exterior keywords (if in filename/path)
+          if (urlLower.includes('exterior') || urlLower.includes('side') || 
+              urlLower.includes('front') || urlLower.includes('rear') ||
+              urlLower.includes('profile') || urlLower.includes('full')) {
+            score += 15;
+          }
+          
+          // Penalize very small images
+          if (urlLower.includes('80x80') || urlLower.includes('width=80')) {
+            score -= 50;
+          }
+          
+          return score;
+        };
+        
+        // Score all filtered images and pick the best "money shot"
+        const scoredImages = filteredPool.map((url, idx) => {
+          const record = imageRecords.find((r: any) => {
+            const recordUrl = resolveDbImageUrl(r) || r?.image_url;
+            return recordUrl === url;
+          });
+          return {
+            url,
+            score: scoreMoneyShot(url, record),
+            position: record?.position ?? idx,
+            isPrimary: record?.is_primary ?? false
+          };
+        });
+        
+        // Sort by score (highest first), but prioritize primary if it has a good score
+        scoredImages.sort((a, b) => {
+          // If one is primary and has decent score, prefer it
+          if (a.isPrimary && a.score >= 50 && (!b.isPrimary || b.score < a.score)) return -1;
+          if (b.isPrimary && b.score >= 50 && (!a.isPrimary || a.score < b.score)) return 1;
+          // Otherwise sort by score
+          return b.score - a.score;
+        });
+        
+        const bestMoneyShot = scoredImages.length > 0 ? scoredImages[0].url : null;
         const firstFiltered = filteredPool.find((u) => isSupabaseHostedImageUrl(u)) || filteredPool[0] || null;
 
-        const lead = (primaryOk ? primaryCandidate : firstFiltered) || null;
+        // Use primary if it's good, otherwise use best money shot, otherwise fallback
+        const lead = (primaryOk && primaryCandidate) ? primaryCandidate : 
+                     (bestMoneyShot) ? bestMoneyShot : 
+                     firstFiltered;
         if (lead) setLeadImageUrl(lead as any);
 
-        // Auto-set primary if none exists OR if existing primary is filtered out.
+        // Auto-set primary if none exists OR if existing primary is filtered out OR if better money shot exists.
         // Only attempt when authenticated; otherwise just render using filtered lead.
         const hasPrimary = !!primaryRow;
-        const shouldHealPrimary = (!hasPrimary && imageRecords[0]) || (hasPrimary && !primaryOk);
+        const primaryScore = primaryOk && primaryCandidate ? scoreMoneyShot(primaryCandidate, primaryRow) : 0;
+        const bestMoneyShotScore = bestMoneyShot ? scoreMoneyShot(bestMoneyShot, imageRecords.find((r: any) => {
+          const recordUrl = resolveDbImageUrl(r) || r?.image_url;
+          return recordUrl === bestMoneyShot;
+        })) : 0;
+        
+        // Heal primary if: missing, filtered out, OR if a significantly better money shot exists
+        const shouldHealPrimary = (!hasPrimary && imageRecords[0]) || 
+                                  (hasPrimary && !primaryOk) ||
+                                  (hasPrimary && primaryOk && bestMoneyShotScore > primaryScore + 20); // 20 point threshold
         if (shouldHealPrimary && session?.user?.id) {
           const isValidForPrimary = (r: any) => {
             // Exclude documents (spec sheets, window stickers, etc.)
@@ -2578,11 +2687,28 @@ const VehicleProfile: React.FC = () => {
             }
             return filterProfileImages([url], vehicle).length > 0;
           };
-          // Prefer Supabase-hosted images to avoid hotlink/403 issues on external sources.
-          const bestDbRow =
-            imageRecords.find((r: any) => isValidForPrimary(r) && (r?.storage_path || isSupabaseHostedImageUrl(r?.image_url))) ||
-            imageRecords.find((r: any) => isValidForPrimary(r)) ||
-            null;
+          // Find the best money shot from available images using scoring
+          const scoredDbRows = imageRecords
+            .filter((r: any) => isValidForPrimary(r))
+            .map((r: any) => {
+              const url = resolveDbImageUrl(r, true) || r?.image_url;
+              return {
+                record: r,
+                url,
+                score: scoreMoneyShot(url, r),
+                isSupabase: r?.storage_path || isSupabaseHostedImageUrl(r?.image_url)
+              };
+            })
+            .sort((a, b) => {
+              // Prefer Supabase-hosted if scores are close (within 10 points)
+              if (Math.abs(a.score - b.score) <= 10) {
+                if (a.isSupabase && !b.isSupabase) return -1;
+                if (b.isSupabase && !a.isSupabase) return 1;
+              }
+              return b.score - a.score;
+            });
+          
+          const bestDbRow = scoredDbRows.length > 0 ? scoredDbRows[0].record : null;
 
           if (bestDbRow?.id) {
             try {

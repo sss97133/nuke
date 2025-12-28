@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+/**
+ * Check images for a specific vehicle
+ */
+
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -7,63 +11,106 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+dotenv.config({ path: join(__dirname, '../.env') });
 dotenv.config({ path: join(__dirname, '../.env.local') });
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qkgaybvrernstplzjaam.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Check specific vehicles that showed "No images found"
-const vehicleIds = [
-  '69571d27-d590-432f-abf6-f78e2885b401', // 1989 Chevrolet Truck
-  'a78733d2-e1db-49fd-a456-5507602696ff', // 1984 Chevrolet Truck
-  'c1b04f00-7abf-4e1c-afd2-43fba17a6a1b', // 1964 jaguar xke
-];
+if (!supabaseKey) {
+  console.error('❌ SUPABASE_SERVICE_ROLE_KEY not found in .env');
+  process.exit(1);
+}
 
-for (const vehicleId of vehicleIds) {
-  console.log(`\n=== Checking vehicle ${vehicleId} ===`);
-  
-  // Get vehicle info
-  const { data: vehicle } = await supabase
-    .from('vehicles')
-    .select('id, year, make, model')
-    .eq('id', vehicleId)
-    .single();
-  
-  console.log(`Vehicle: ${vehicle?.year} ${vehicle?.make} ${vehicle?.model}`);
-  
-  // Check ALL images (no filter)
-  const { data: allImages, count: allCount } = await supabase
-    .from('vehicle_images')
-    .select('id, image_url, is_document', { count: 'exact' })
-    .eq('vehicle_id', vehicleId);
-  
-  console.log(`Total images (no filter): ${allCount || 0}`);
-  
-  // Check with is_document = false
-  const { data: falseImages, count: falseCount } = await supabase
-    .from('vehicle_images')
-    .select('id, image_url, is_document', { count: 'exact' })
-    .eq('vehicle_id', vehicleId)
-    .eq('is_document', false);
-  
-  console.log(`Images with is_document = false: ${falseCount || 0}`);
-  
-  // Check with is_document = NULL or false
-  const { data: nullOrFalseImages, count: nullOrFalseCount } = await supabase
-    .from('vehicle_images')
-    .select('id, image_url, is_document', { count: 'exact' })
-    .eq('vehicle_id', vehicleId)
-    .or('is_document.is.null,is_document.eq.false');
-  
-  console.log(`Images with is_document NULL or false: ${nullOrFalseCount || 0}`);
-  
-  if (allImages && allImages.length > 0) {
-    console.log(`\nSample images:`);
-    allImages.slice(0, 3).forEach(img => {
-      console.log(`  - ${img.id}: is_document=${img.is_document}, url=${img.image_url?.substring(0, 60)}...`);
+const supabase = createClient(supabaseUrl, supabaseKey);
+const vehicleId = process.argv[2] || '69f35ba1-00d3-4b63-8406-731d226c45e1';
+
+async function checkVehicleImages() {
+  try {
+    console.log(`Checking images for vehicle: ${vehicleId}\n`);
+
+    // Get vehicle info
+    const { data: vehicle, error: vehicleError } = await supabase
+      .from('vehicles')
+      .select('id, year, make, model, platform_url, discovery_url, primary_image_url')
+      .eq('id', vehicleId)
+      .single();
+
+    if (vehicleError) {
+      throw new Error(`Failed to fetch vehicle: ${vehicleError.message}`);
+    }
+
+    console.log(`Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
+    console.log(`Platform URL: ${vehicle.platform_url || vehicle.discovery_url || 'N/A'}`);
+    console.log(`Primary Image: ${vehicle.primary_image_url || 'N/A'}\n`);
+
+    // Get all images
+    const { data: images, error: imagesError } = await supabase
+      .from('vehicle_images')
+      .select('id, image_url, is_external, storage_path, is_primary, position, source, created_at')
+      .eq('vehicle_id', vehicleId)
+      .order('position', { ascending: true });
+
+    if (imagesError) {
+      throw new Error(`Failed to fetch images: ${imagesError.message}`);
+    }
+
+    console.log(`Total images: ${images.length}\n`);
+
+    const externalImages = images.filter(img => img.is_external);
+    const storedImages = images.filter(img => !img.is_external && img.storage_path);
+    const brokenImages = images.filter(img => {
+      const url = img.image_url || '';
+      return url.includes('/edit/') || 
+             url.includes('thumb') || 
+             url.includes('logo') ||
+             (url.includes('carsandbids.com') && (url.includes('width=80') || url.includes('height=80')));
     });
+
+    console.log(`📊 Image Breakdown:`);
+    console.log(`   External URLs: ${externalImages.length}`);
+    console.log(`   Stored in Supabase: ${storedImages.length}`);
+    console.log(`   Potentially broken/irrelevant: ${brokenImages.length}\n`);
+
+    if (externalImages.length > 0) {
+      console.log(`🔗 External Images (${externalImages.length}):`);
+      externalImages.slice(0, 10).forEach((img, i) => {
+        console.log(`   ${i + 1}. ${img.image_url?.substring(0, 80)}...`);
+      });
+      if (externalImages.length > 10) {
+        console.log(`   ... and ${externalImages.length - 10} more`);
+      }
+      console.log('');
+    }
+
+    if (brokenImages.length > 0) {
+      console.log(`⚠️  Potentially Broken/Irrelevant Images (${brokenImages.length}):`);
+      brokenImages.slice(0, 10).forEach((img, i) => {
+        console.log(`   ${i + 1}. ${img.image_url?.substring(0, 80)}...`);
+        console.log(`      - is_external: ${img.is_external}, storage_path: ${img.storage_path || 'none'}`);
+      });
+      if (brokenImages.length > 10) {
+        console.log(`   ... and ${brokenImages.length - 10} more`);
+      }
+      console.log('');
+    }
+
+    // Check origin_metadata for image URLs
+    const { data: vehicleWithMetadata } = await supabase
+      .from('vehicles')
+      .select('origin_metadata')
+      .eq('id', vehicleId)
+      .single();
+
+    if (vehicleWithMetadata?.origin_metadata?.images) {
+      const originImages = vehicleWithMetadata.origin_metadata.images;
+      console.log(`📦 Origin Metadata has ${originImages.length} image URLs stored`);
+    }
+
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    process.exit(1);
   }
 }
 
+checkVehicleImages();

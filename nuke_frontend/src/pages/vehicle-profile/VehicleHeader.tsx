@@ -17,6 +17,7 @@ import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
 import vinDecoderService from '../../services/vinDecoder';
 import UpdateSalePriceModal from '../../components/vehicle/UpdateSalePriceModal';
 import { FollowAuctionCard } from '../../components/auction/FollowAuctionCard';
+import OrganizationInvestmentCard from '../../components/organization/OrganizationInvestmentCard';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -94,6 +95,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [showUpdateSalePriceModal, setShowUpdateSalePriceModal] = useState(false);
   const [showFollowAuctionCard, setShowFollowAuctionCard] = useState(false);
   const [futureAuctionListing, setFutureAuctionListing] = useState<any | null>(null);
+  const [showOrgInvestmentCard, setShowOrgInvestmentCard] = useState<string | null>(null);
+  const [orgCardAnchor, setOrgCardAnchor] = useState<HTMLElement | null>(null);
 
   const { summary: vinProofSummary } = useVINProofs(vehicle?.id);
   // STRICT: "VIN VERIFIED" only when we have at least one conclusive, cited proof
@@ -1628,6 +1631,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             // Hide seller badge if BaT platform badge OR origin badge is showing BaT
             if (isBatConsigner && (isBatPulse || isBatOrigin)) return null;
             
+            // Don't show "Cars & Bids" consigner badge if we're already showing Cars & Bids platform badge or origin badge
+            const isCarsAndBidsConsigner = sellerBadge.label?.toLowerCase().includes('cars & bids') || sellerBadge.label?.toLowerCase().includes('carsandbids');
+            const isCarsAndBidsPulse = auctionPulse?.listing_url && (String(auctionPulse.platform || '').toLowerCase() === 'cars_and_bids' || String(auctionPulse.platform || '').toLowerCase() === 'carsandbids');
+            const isCarsAndBidsOrigin = String((vehicle as any)?.discovery_url || '').toLowerCase().includes('carsandbids.com');
+            // Hide seller badge if Cars & Bids platform badge OR origin badge is showing Cars & Bids
+            if (isCarsAndBidsConsigner && (isCarsAndBidsPulse || isCarsAndBidsOrigin)) return null;
+            
             return (sellerBadge as any)?.href ? (
               <Link
                 to={String((sellerBadge as any).href)}
@@ -1839,6 +1849,19 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               const isBatPulse = String(auctionPulse.platform || '').toLowerCase() === 'bat';
               if (isBatOrigin && isBatPulse) return null;
             }
+            
+            // Hide origin badge if consigner badge is showing the same platform
+            const discoveryUrl = String((vehicle as any).discovery_url || '').toLowerCase();
+            const sellerLabel = sellerBadge?.label?.toLowerCase() || '';
+            const isCarsAndBidsOrigin = discoveryUrl.includes('carsandbids.com');
+            const isCarsAndBidsConsigner = sellerLabel.includes('cars & bids') || sellerLabel.includes('carsandbids');
+            // If origin is Cars & Bids and consigner badge is also Cars & Bids, hide origin badge
+            if (isCarsAndBidsOrigin && isCarsAndBidsConsigner) return null;
+            
+            // Also hide if platform badge is showing Cars & Bids
+            const isCarsAndBidsPulse = String(auctionPulse?.platform || '').toLowerCase() === 'cars_and_bids' || 
+                                       String(auctionPulse?.platform || '').toLowerCase() === 'carsandbids';
+            if (isCarsAndBidsOrigin && isCarsAndBidsPulse) return null;
             
             return (
               <span 
@@ -2424,7 +2447,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   .map((org) => {
                     const orgName = String(org?.business_name || '');
                     const isBatOrg = orgName.toLowerCase().includes('bring a trailer') || orgName.toLowerCase() === 'bat' || orgName.toLowerCase().includes('ba t');
+                    const isCarsAndBidsOrg = orgName.toLowerCase().includes('cars & bids') || orgName.toLowerCase().includes('carsandbids');
                     const batUrl = 'https://bringatrailer.com';
+                    const carsAndBidsUrl = (vehicle as any)?.discovery_url?.includes('carsandbids.com') 
+                      ? (vehicle as any).discovery_url.split('/').slice(0, 3).join('/')
+                      : 'https://carsandbids.com';
+                    
+                    // Get website URL from vehicle discovery_url if it matches the org
+                    let orgWebsiteUrl = org.website_url;
+                    if (!orgWebsiteUrl && isCarsAndBidsOrg) {
+                      orgWebsiteUrl = carsAndBidsUrl;
+                    }
                     
                     return (
                       <Link
@@ -2433,24 +2466,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         data-discover="true"
                         onClick={(e) => {
                           e.preventDefault();
-                          toast.success(
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <div style={{ fontWeight: 'bold', fontSize: '11px' }}>{org.business_name}</div>
-                              <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
-                                {formatRelationship(org.relationship_type)}
-                              </div>
-                            </div>,
-                            { 
-                              duration: 3000, 
-                              position: 'top-right',
-                              style: {
-                                borderRadius: '4px',
-                                padding: '8px 12px',
-                                fontSize: '10px'
-                              }
-                            }
-                          );
-                          setTimeout(() => navigate(`/org/${org.organization_id}`), 100);
+                          e.stopPropagation();
+                          setOrgCardAnchor(e.currentTarget);
+                          setShowOrgInvestmentCard(org.organization_id);
                         }}
                         title={`${org.business_name} (${formatRelationship(org.relationship_type)})`}
                         style={{
@@ -2480,6 +2498,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           <img src={org.logo_url} alt={org.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : isBatOrg ? (
                           <FaviconIcon url={batUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+                        ) : isCarsAndBidsOrg ? (
+                          <FaviconIcon url={carsAndBidsUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+                        ) : orgWebsiteUrl ? (
+                          <FaviconIcon url={orgWebsiteUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
                         ) : (
                           org.business_name.charAt(0).toUpperCase()
                         )}
@@ -2490,6 +2512,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   <span style={{ fontSize: '8px', color: mutedTextColor }}>+{extraOrgCount}</span>
                 )}
               </div>
+            );
+          })()}
+          
+          {/* Organization Investment Card */}
+          {showOrgInvestmentCard && (() => {
+            const org = visibleOrganizations.find((o: any) => o.organization_id === showOrgInvestmentCard) ||
+                       (organizationLinks || []).find((o: any) => o.organization_id === showOrgInvestmentCard);
+            if (!org) return null;
+            return (
+              <OrganizationInvestmentCard
+                organizationId={showOrgInvestmentCard}
+                organizationName={org.business_name || 'Unknown'}
+                relationshipType={org.relationship_type || 'collaborator'}
+                onClose={() => {
+                  setShowOrgInvestmentCard(null);
+                  setOrgCardAnchor(null);
+                }}
+                anchorElement={orgCardAnchor}
+              />
             );
           })()}
         </div>

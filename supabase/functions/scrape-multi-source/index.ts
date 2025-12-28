@@ -323,7 +323,18 @@ serve(async (req) => {
     const maxListingsToProcess = max_results || max_listings || 100;
     const startOffset = Number.isFinite(start_offset) ? Math.max(0, Math.floor(start_offset)) : 0;
 
-    console.log(`Scraping ${source_url} (${source_type})`);
+    // Detect and normalize source type based on URL patterns
+    const urlLower = source_url.toLowerCase();
+    let normalizedSourceType = source_type;
+    
+    // Motorious detection - marketplace for dealers
+    const isMotorious = urlLower.includes('buy.motorious.com') || urlLower.includes('motorious.com/inventory');
+    if (isMotorious && source_type === 'dealer_website') {
+      normalizedSourceType = 'marketplace';
+      console.log(`Motorious detected: treating as marketplace instead of dealer_website`);
+    }
+
+    console.log(`Scraping ${source_url} (${normalizedSourceType})`);
 
     const isLartIndex =
       source_url.includes('lartdelautomobile.com/voitures-a-vendre') ||
@@ -346,7 +357,9 @@ serve(async (req) => {
       console.log('Using Firecrawl structured extraction for inventory...');
     }
     
-    const isAuctionHouse = source_type === 'auction' || source_type === 'auction_house';
+    const isAuctionHouse = normalizedSourceType === 'auction' || normalizedSourceType === 'auction_house';
+    // Motorious needs extra wait time for JavaScript-rendered content
+    const needsExtendedWait = isMotorious;
     const extractionSchema = {
       type: 'object',
       properties: {
@@ -604,8 +617,12 @@ serve(async (req) => {
               formats,
               ...(cheap_mode ? {} : { extract: { schema: extractionSchema } }),
               onlyMainContent: false,
-              // Give JS-heavy pages (BaT /auctions, Classic /auctions) time to render listing cards.
-              waitFor: cheap_mode ? 6500 : 4000
+              // Give JS-heavy pages (BaT /auctions, Classic /auctions, Motorious) time to render listing cards.
+              // Motorious needs significantly more time as it's a heavily JavaScript-rendered marketplace.
+              // Also use actions to ensure we wait for vehicle listings to load.
+              waitFor: needsExtendedWait ? 12000 : (cheap_mode ? 6500 : 4000),
+              // For Motorious, also wait for specific selectors if available
+              ...(needsExtendedWait ? { actions: [] } : {})
             }),
             signal: AbortSignal.timeout(30000),
           });
@@ -996,10 +1013,11 @@ Return ONLY valid JSON in this format:
     let sourceId: string | null = null;
     const totalListingsFound = listings.length;
     // `scrape_sources.source_type` is constrained; normalize newer request types to legacy enum values.
-    const scrapeSourceTypeForDb =
-      source_type === 'dealer_website'
-        ? 'dealer'
-        : source_type;
+    // Motorious should be treated as marketplace, not dealer_website
+    const scrapeSourceTypeForDb = 
+      normalizedSourceType === 'marketplace' ? 'marketplace' :
+      normalizedSourceType === 'dealer_website' ? 'dealer' :
+      normalizedSourceType;
     
     const { data: existingSource } = await supabase
       .from('scrape_sources')

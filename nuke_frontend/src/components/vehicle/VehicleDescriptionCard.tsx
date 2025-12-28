@@ -108,7 +108,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
         .order('extracted_at', { ascending: false })
         .limit(5);
 
-      const mapped = (rows || [])
+      let mapped = (rows || [])
         .map((r: any) => ({
           text: (r?.field_value || '').toString(),
           extracted_at: r?.extracted_at ? String(r.extracted_at) : null,
@@ -132,15 +132,35 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                               batListing.bat_listing_title;
         
         if (batDescription && batDescription.trim().length > 0) {
-          mapped.unshift({
-            text: batDescription.toString(),
-            extracted_at: batListing.created_at ? String(batListing.created_at) : null,
-            source_url: batListing.bat_listing_url || null
+          const batText = batDescription.toString();
+          // Only add if not already present (check if any existing entry has same text)
+          const isDuplicate = mapped.some((entry: any) => {
+            const entryStart = entry.text.trim().substring(0, 200);
+            const batStart = batText.trim().substring(0, 200);
+            return entryStart === batStart || entry.text.trim() === batText.trim();
           });
+          
+          if (!isDuplicate) {
+            mapped.unshift({
+              text: batText,
+              extracted_at: batListing.created_at ? String(batListing.created_at) : null,
+              source_url: batListing.bat_listing_url || null
+            });
+          }
         }
       }
 
-      setRawListingDescriptions(mapped);
+      // Final deduplication pass: remove entries with identical or very similar text (same source URL)
+      const deduplicated = mapped.filter((r: any, idx: number, arr: any[]) => {
+        // Keep first occurrence of each unique text+source_url combination
+        const firstMatch = arr.findIndex((other: any) => 
+          other.source_url === r.source_url && 
+          other.text.trim().substring(0, 200) === r.text.trim().substring(0, 200)
+        );
+        return firstMatch === idx;
+      });
+
+      setRawListingDescriptions(deduplicated);
     } catch (err) {
       // Non-fatal if table missing in some environments
       setRawListingDescriptions([]);
@@ -282,6 +302,14 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
               const isSubstantial = cleaned && cleaned.length > 100 && !cleaned.toLowerCase().includes('chrome-finished') && !cleaned.toLowerCase().includes('braking is provide');
               // Hide if it's too short or looks like bad AI generation
               if (!isSubstantial && !isEmpty) return null;
+              
+              // Hide CURATED SUMMARY if it's identical to any raw listing description (it's not curated, it's raw)
+              const isRawListingText = rawListingDescriptions.some((entry: any) => {
+                const entryStart = entry.text.trim().substring(0, 150);
+                const descStart = cleaned.trim().substring(0, 150);
+                return entryStart === descStart || entry.text.trim() === cleaned.trim();
+              });
+              if (isRawListingText && !isEmpty) return null;
               
               return (
                 <div>
