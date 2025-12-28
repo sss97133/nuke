@@ -22,7 +22,7 @@ const corsHeaders = {
 
 const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v1/scrape";
 const FIRECRAWL_MAP_URL = "https://api.firecrawl.dev/v1/map";
-const FIRECRAWL_LISTING_TIMEOUT_MS = 20000; // Reduced from 35s to 20s for speed
+const FIRECRAWL_LISTING_TIMEOUT_MS = 60000; // Increased to 60s for Cars & Bids (large galleries take time)
 
 function requiredEnv(name: string): string {
   const v = Deno.env.get(name);
@@ -121,15 +121,28 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   // Upgrade thumbnail/small URLs to full resolution
   const upgradeToFullRes = (url: string): string => {
     if (!url || typeof url !== 'string') return url;
-    let upgraded = url
-      // Remove all query params (resize, width, height, etc.)
-      .split('?')[0]
-      // Remove size suffixes like -150x150, -300x300, -thumb, -small
+    let upgraded = url;
+    
+    // Cars & Bids CDN: Remove width/quality params and use full resolution
+    // Example: cdn-cgi/image/width=456,quality=70/... -> cdn-cgi/image/... (full res)
+    if (upgraded.includes('cdn-cgi/image/')) {
+      // Remove width and quality parameters from CDN URL
+      upgraded = upgraded.replace(/cdn-cgi\/image\/width=\d+,quality=\d+\//, 'cdn-cgi/image/');
+      upgraded = upgraded.replace(/cdn-cgi\/image\/width=\d+\//, 'cdn-cgi/image/');
+      upgraded = upgraded.replace(/cdn-cgi\/image\/quality=\d+\//, 'cdn-cgi/image/');
+    }
+    
+    // Remove all query params (resize, width, height, etc.)
+    upgraded = upgraded.split('?')[0];
+    
+    // Remove size suffixes like -150x150, -300x300, -thumb, -small
+    upgraded = upgraded
       .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
       .replace(/-thumb(?:nail)?\.(jpg|jpeg|png|webp)$/i, '.$1')
       .replace(/-small\.(jpg|jpeg|png|webp)$/i, '.$1')
       .replace(/-medium\.(jpg|jpeg|png|webp)$/i, '.$1')
       .trim();
+    
     return upgraded;
   };
   
@@ -272,7 +285,19 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     // If we found gallery sections, extract from those ONLY; otherwise use full HTML
     const searchHtml = gallerySections.length > 0 ? gallerySections.join('\n') : h;
     
-    // Extract img src, prioritizing data-src (lazy loading) then src, then data-full
+    // Extract img src, prioritizing full-res gallery images (pswp__img) then data-src, then src
+    // Look for full-res gallery images first (Photoswipe pattern)
+    const pswpImgPattern = /<img[^>]*class=["'][^"']*pswp__img[^"']*["'][^>]*src=["']([^"']+)["'][^>]*>/gi;
+    let pswpMatch;
+    while ((pswpMatch = pswpImgPattern.exec(searchHtml)) !== null) {
+      const url = pswpMatch[1];
+      if (url && isVehicleImage(url)) {
+        const upgraded = upgradeToFullRes(url);
+        if (upgraded) urls.add(upgraded);
+      }
+    }
+    
+    // Then extract from regular img tags, prioritizing data-src (lazy loading) then src, then data-full
     const imgPattern = /<img[^>]+(?:data[_-]?full=["']([^"']+)["']|data[_-]?src=["']([^"']+)["']|data[_-]?original=["']([^"']+)["']|src=["']([^"']+)["'])[^>]*>/gi;
     let imgMatch;
     while ((imgMatch = imgPattern.exec(searchHtml)) !== null) {
@@ -300,16 +325,175 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     console.warn('Error extracting from gallery sections:', e?.message);
   }
   
-  // Method 4: Fallback - extract all media.carsandbids.com images, upgrade thumbnails, filter noise
-  if (urls.size === 0) {
-    const re = /https?:\/\/media\.carsandbids\.com\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
-    for (const m of h.match(re) || []) {
-      const url = m.trim();
-      if (isVehicleImage(url)) {
-        const upgraded = upgradeToFullRes(url);
-        if (upgraded) urls.add(upgraded);
+  // Method 4: Extract from JSON-LD structured data (if present)
+  try {
+    const jsonLdPattern = /<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gis;
+    let jsonLdMatch;
+    while ((jsonLdMatch = jsonLdPattern.exec(h)) !== null) {
+      try {
+        const jsonData = JSON.parse(jsonLdMatch[1]);
+        // Look for image arrays in structured data
+        if (jsonData.image && Array.isArray(jsonData.image)) {
+          for (const img of jsonData.image) {
+            const url = typeof img === 'string' ? img : (img.url || img.contentUrl || null);
+            if (url && isVehicleImage(url)) {
+              const upgraded = upgradeToFullRes(url);
+              if (upgraded) urls.add(upgraded);
+            }
+          }
+        }
+      } catch {
+        // Not valid JSON, continue
       }
     }
+  } catch (e: any) {
+    console.warn('Error extracting from JSON-LD:', e?.message);
+  }
+  
+  // Method 5: Extract from __NEXT_DATA__ or window.__INITIAL_STATE__ (Next.js/React apps)
+  try {
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
+    const nextDataMatch = h.match(nextDataPattern);
+    if (nextDataMatch && nextDataMatch[1]) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]);
+        // Navigate through Next.js data structure to find images
+        const findImagesInObject = (obj: any, depth = 0): string[] => {
+          if (depth > 10) return []; // Prevent infinite recursion
+          if (!obj || typeof obj !== 'object') return [];
+          
+          const found: string[] = [];
+          
+          // Check if this object has image arrays
+          if (Array.isArray(obj)) {
+            for (const item of obj) {
+              if (typeof item === 'string' && isVehicleImage(item)) {
+                found.push(upgradeToFullRes(item));
+              } else if (typeof item === 'object') {
+                found.push(...findImagesInObject(item, depth + 1));
+              }
+            }
+          } else {
+            // Check common image property names
+            const imageKeys = ['images', 'photos', 'gallery', 'imageUrls', 'photoUrls', 'image_urls', 'photo_urls'];
+            for (const key of imageKeys) {
+              if (Array.isArray(obj[key])) {
+                for (const img of obj[key]) {
+                  const url = typeof img === 'string' ? img : (img?.url || img?.src || img?.image || img?.full || img?.original || null);
+                  if (url && typeof url === 'string' && isVehicleImage(url)) {
+                    found.push(upgradeToFullRes(url));
+                  }
+                }
+              } else if (typeof obj[key] === 'string' && isVehicleImage(obj[key])) {
+                found.push(upgradeToFullRes(obj[key]));
+              }
+            }
+            
+            // Recursively search nested objects
+            for (const value of Object.values(obj)) {
+              if (typeof value === 'object' && value !== null) {
+                found.push(...findImagesInObject(value, depth + 1));
+              }
+            }
+          }
+          
+          return found;
+        };
+        
+        const nextDataImages = findImagesInObject(nextData);
+        for (const img of nextDataImages) {
+          if (img) urls.add(img);
+        }
+      } catch {
+        // Not valid JSON, continue
+      }
+    }
+  } catch (e: any) {
+    console.warn('Error extracting from __NEXT_DATA__:', e?.message);
+  }
+  
+  // Method 6: Aggressive extraction - find ALL media.carsandbids.com URLs in HTML
+  // This catches images that might be in data attributes, CSS, or other places
+  const mediaCarsAndBidsPattern = /https?:\/\/media\.carsandbids\.com\/[^"'\\s>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s>]*)?/gi;
+  const allMediaUrls = h.match(mediaCarsAndBidsPattern) || [];
+  for (const urlMatch of allMediaUrls) {
+    const url = urlMatch.trim();
+    if (isVehicleImage(url)) {
+      const upgraded = upgradeToFullRes(url);
+      if (upgraded) urls.add(upgraded);
+    }
+  }
+  
+  // Method 7: Extract from srcset attributes (responsive images)
+  const srcsetPattern = /srcset=["']([^"']+)["']/gi;
+  let srcsetMatch;
+  while ((srcsetMatch = srcsetPattern.exec(h)) !== null) {
+    const srcsetValue = srcsetMatch[1];
+    // Parse srcset: "url1 1x, url2 2x" or "url1 800w, url2 1200w"
+    const urlMatches = srcsetValue.match(/https?:\/\/media\.carsandbids\.com\/[^"'\\s,>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s,>]*)?/gi);
+    if (urlMatches) {
+      for (const url of urlMatches) {
+        if (isVehicleImage(url)) {
+          const upgraded = upgradeToFullRes(url);
+          if (upgraded) urls.add(upgraded);
+        }
+      }
+    }
+  }
+  
+  // Method 8: Look for gallery JSON in script tags with more flexible patterns
+  try {
+    const scriptPattern = /<script[^>]*>(.*?)<\/script>/gis;
+    let scriptMatch;
+    while ((scriptMatch = scriptPattern.exec(h)) !== null && urls.size < 200) {
+      const scriptContent = scriptMatch[1];
+      // Look for arrays of image objects or URLs
+      const flexiblePatterns = [
+        /(?:photos|images|gallery|media)\s*[:=]\s*\[([^\]]{0,500000})\]/gi,
+        /\[([^\]]{0,500000})\]/g, // Any large array that might contain images
+      ];
+      
+      for (const pattern of flexiblePatterns) {
+        const matches = scriptContent.matchAll(pattern);
+        for (const match of matches) {
+          try {
+            // Try to parse as JSON array
+            const jsonStr = `[${match[1]}]`;
+            const parsed = JSON.parse(jsonStr);
+            if (Array.isArray(parsed)) {
+              for (const item of parsed) {
+                if (typeof item === 'string' && item.includes('media.carsandbids.com')) {
+                  if (isVehicleImage(item)) {
+                    urls.add(upgradeToFullRes(item));
+                  }
+                } else if (typeof item === 'object' && item !== null) {
+                  // Check all string properties for image URLs
+                  for (const value of Object.values(item)) {
+                    if (typeof value === 'string' && value.includes('media.carsandbids.com')) {
+                      if (isVehicleImage(value)) {
+                        urls.add(upgradeToFullRes(value));
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } catch {
+            // Not valid JSON, try regex extraction from the match
+            const urlMatches = match[1].match(/https?:\/\/media\.carsandbids\.com\/[^"'\\s,>]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\\s,>]*)?/gi);
+            if (urlMatches) {
+              for (const url of urlMatches) {
+                if (isVehicleImage(url)) {
+                  urls.add(upgradeToFullRes(url));
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn('Error in flexible script extraction:', e?.message);
   }
   
   // CRITICAL: Prioritize exterior images over interior/engine bay shots
@@ -472,9 +656,12 @@ function extractCarsAndBidsAuctionData(html: string): {
     }
   }
   
-  // Extract final/sale price (for ended auctions)
+  // Extract final/sale price (for ended auctions) - improved patterns
   const finalPricePatterns = [
+    // Cars & Bids specific: "Sold for <span class="bid-value">$19,500</span>"
+    /Sold\s+for[^>]*>.*?<span[^>]*class=["'][^"']*bid[_-]?value[^"']*["'][^>]*>\$?([\d,]+)<\/span>/i,
     /Sold\s+for[^>]*>.*?\$([\d,]+)/i,
+    /<span[^>]*class=["'][^"']*bid[_-]?value[^"']*["'][^>]*>\$?([\d,]+)<\/span>/i,
     /Final\s+Price[^>]*>.*?\$([\d,]+)/i,
     /"finalPrice":\s*(\d+)/i,
     /"salePrice":\s*(\d+)/i,
@@ -574,6 +761,529 @@ function extractCarsAndBidsAuctionData(html: string): {
   }
   
   return result;
+}
+
+function extractCarsAndBidsVIN(html: string): string | null {
+  const h = String(html || "");
+  
+  // Pattern 1: VIN in specs table - look for "VIN:" label followed by VIN
+  const vinPatterns = [
+    /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+    /VIN[:\s]*<[^>]*>([A-HJ-NPR-Z0-9]{17})/i,
+    /VIN[:\s]*<\/[^>]*>([A-HJ-NPR-Z0-9]{17})/i,
+    /<td[^>]*>VIN[:\s]*<\/td>\s*<td[^>]*>([A-HJ-NPR-Z0-9]{17})/i,
+    /<dt[^>]*>VIN[:\s]*<\/dt>\s*<dd[^>]*>([A-HJ-NPR-Z0-9]{17})/i,
+    // Pattern 2: VIN in title/heading
+    /VIN:\s*([A-HJ-NPR-Z0-9]{17})/i,
+    // Pattern 3: Standalone 17-character VIN (alphanumeric, no I, O, Q)
+    /\b([A-HJ-NPR-Z0-9]{17})\b/,
+  ];
+  
+  for (const pattern of vinPatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const vin = match[1].trim().toUpperCase();
+      // Validate VIN format (17 chars, no I, O, Q)
+      if (vin.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+        return vin;
+      }
+    }
+  }
+  
+  return null;
+}
+
+function extractCarsAndBidsDescription(html: string): string | null {
+  const h = String(html || "");
+  
+  // Pattern 1: Look for description in common containers
+  const descriptionPatterns = [
+    // Cars & Bids specific patterns
+    /<div[^>]*class=["'][^"']*description[^"']*["'][^>]*>([\s\S]{100,10000})<\/div>/i,
+    /<section[^>]*class=["'][^"']*description[^"']*["'][^>]*>([\s\S]{100,10000})<\/section>/i,
+    /<div[^>]*id=["'][^"']*description[^"']*["'][^>]*>([\s\S]{100,10000})<\/div>/i,
+    // Generic content areas
+    /<article[^>]*>([\s\S]{200,10000})<\/article>/i,
+    /<div[^>]*class=["'][^"']*content[^"']*["'][^>]*>([\s\S]{200,10000})<\/div>/i,
+    // Look for paragraphs after title/heading
+    /<h[1-6][^>]*>[\s\S]{0,200}<\/h[1-6]>[\s\S]{0,50}(<p[^>]*>[\s\S]{100,5000}<\/p>)/i,
+  ];
+  
+  for (const pattern of descriptionPatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      // Clean HTML tags and extract text
+      let text = match[1]
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Filter out very short or very long text (likely not description)
+      if (text.length >= 100 && text.length <= 10000) {
+        // Remove common noise patterns
+        if (!text.toLowerCase().includes('cookie') && 
+            !text.toLowerCase().includes('privacy policy') &&
+            !text.toLowerCase().includes('terms of service')) {
+          return text;
+        }
+      }
+    }
+  }
+  
+  // Pattern 2: Extract all paragraph text and combine
+  const paragraphPattern = /<p[^>]*>([\s\S]{50,2000})<\/p>/gi;
+  const paragraphs: string[] = [];
+  let paraMatch;
+  while ((paraMatch = paragraphPattern.exec(h)) !== null && paragraphs.length < 10) {
+    let text = paraMatch[1]
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    if (text.length >= 50 && text.length <= 2000) {
+      // Skip navigation, footer, header text
+      const lower = text.toLowerCase();
+      if (!lower.includes('sign up') && 
+          !lower.includes('log in') &&
+          !lower.includes('cookie') &&
+          !lower.includes('privacy')) {
+        paragraphs.push(text);
+      }
+    }
+  }
+  
+  if (paragraphs.length > 0) {
+    const combined = paragraphs.join('\n\n').trim();
+    if (combined.length >= 100) {
+      return combined;
+    }
+  }
+  
+  return null;
+}
+
+function extractCarsAndBidsBidHistory(html: string): Array<{ amount: number; timestamp?: string; bidder?: string }> {
+  const h = String(html || "");
+  const bids: Array<{ amount: number; timestamp?: string; bidder?: string }> = [];
+  
+  // Helper to parse currency
+  const parseCurrency = (text: string): number | null => {
+    const match = text.match(/[\$]?([\d,]+)/);
+    if (match && match[1]) {
+      const amount = parseInt(match[1].replace(/,/g, ''), 10);
+      return Number.isFinite(amount) && amount > 0 ? amount : null;
+    }
+    return null;
+  };
+  
+  // Helper to parse timestamp
+  const parseTimestamp = (text: string): string | undefined => {
+    // Look for date patterns: "on 12/30/24", "December 30, 2024", etc.
+    const datePatterns = [
+      /on\s+(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+      /(\d{1,2}\/\d{1,2}\/\d{2,4})/,
+      /(\w+\s+\d{1,2},\s+\d{4})/,
+    ];
+    
+    for (const pattern of datePatterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        try {
+          const date = new Date(match[1]);
+          if (Number.isFinite(date.getTime())) {
+            return date.toISOString();
+          }
+        } catch {
+          // Try manual parsing for M/D/YY format
+          const mdyMatch = match[1].match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+          if (mdyMatch) {
+            const month = parseInt(mdyMatch[1], 10);
+            const day = parseInt(mdyMatch[2], 10);
+            let year = parseInt(mdyMatch[3], 10);
+            if (year < 100) {
+              year = year < 50 ? 2000 + year : 1900 + year;
+            }
+            const date = new Date(year, month - 1, day);
+            if (Number.isFinite(date.getTime())) {
+              return date.toISOString();
+            }
+          }
+        }
+      }
+    }
+    return undefined;
+  };
+  
+  // Pattern 1: Bid comments - "USD $X bid placed by username on date"
+  const bidCommentPatterns = [
+    /USD\s*\$([0-9,]+)\s+bid\s+placed\s+by\s+([A-Za-z0-9_]+)[^<]*(?:on\s+([^<]+))?/gi,
+    /\$([0-9,]+)\s+bid\s+placed\s+by\s+([A-Za-z0-9_]+)[^<]*(?:on\s+([^<]+))?/gi,
+    /Bid\s+of\s+\$([0-9,]+)\s+by\s+([A-Za-z0-9_]+)[^<]*(?:on\s+([^<]+))?/gi,
+  ];
+  
+  for (const pattern of bidCommentPatterns) {
+    let match;
+    while ((match = pattern.exec(h)) !== null) {
+      const amount = parseCurrency(match[1]);
+      const bidder = match[2]?.trim();
+      const timestamp = match[3] ? parseTimestamp(match[3]) : undefined;
+      
+      if (amount && bidder) {
+        bids.push({ amount, timestamp, bidder });
+      }
+    }
+  }
+  
+  // Pattern 2: Bid history table/list
+  const bidTablePattern = /<[^>]*class=["'][^"']*(?:bid[_-]?history|bid[_-]?list|bids[_-]?table)[^"']*["'][^>]*>([\s\S]{0,5000})<\/[^>]+>/i;
+  const tableMatch = h.match(bidTablePattern);
+  if (tableMatch) {
+    const tableHtml = tableMatch[1];
+    const rowPattern = /<tr[^>]*>[\s\S]{0,500}<\/tr>/gi;
+    let rowMatch;
+    while ((rowMatch = rowPattern.exec(tableHtml)) !== null) {
+      const rowHtml = rowMatch[0];
+      const amountMatch = rowHtml.match(/\$([0-9,]+)/);
+      const bidderMatch = rowHtml.match(/>([A-Za-z0-9_]+)</);
+      const dateMatch = rowHtml.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+      
+      if (amountMatch) {
+        const amount = parseCurrency(amountMatch[1]);
+        const bidder = bidderMatch ? bidderMatch[1] : undefined;
+        const timestamp = dateMatch ? parseTimestamp(dateMatch[1]) : undefined;
+        
+        if (amount) {
+          bids.push({ amount, timestamp, bidder });
+        }
+      }
+    }
+  }
+  
+  // Sort by amount (descending) and remove duplicates
+  const uniqueBids = new Map<string, { amount: number; timestamp?: string; bidder?: string }>();
+  for (const bid of bids) {
+    const key = `${bid.amount}-${bid.bidder || ''}`;
+    if (!uniqueBids.has(key) || (bid.timestamp && !uniqueBids.get(key)?.timestamp)) {
+      uniqueBids.set(key, bid);
+    }
+  }
+  
+  return Array.from(uniqueBids.values()).sort((a, b) => b.amount - a.amount);
+}
+
+function extractCarsAndBidsStructuredSections(html: string): {
+  dougs_take?: string;
+  highlights?: string[];
+  equipment?: string[];
+  modifications?: string[];
+  known_flaws?: string[];
+  recent_service_history?: string;
+  other_items?: string[];
+  ownership_history?: string;
+  seller_notes?: string;
+} {
+  const h = String(html || "");
+  const result: any = {};
+  
+  // Extract "Doug's Take" section - try multiple patterns
+  const dougsTakePatterns = [
+    /<div[^>]*class=["'][^"']*dougs[_-]?take[^"']*["'][^>]*>[\s\S]*?<div[^>]*class=["'][^"']*detail[_-]?body[^"']*["'][^>]*>([\s\S]{0,10000})<\/div>/i,
+    /<h4[^>]*>Doug['"]s\s+Take<\/h4>[\s\S]*?<div[^>]*class=["'][^"']*detail[_-]?body[^"']*["'][^>]*>([\s\S]{0,10000})<\/div>/i,
+    /<section[^>]*class=["'][^"']*dougs[_-]?take[^"']*["'][^>]*>([\s\S]{0,10000})<\/section>/i,
+    /"dougsTake":\s*"([^"]+)"/i,
+    /"dougs_take":\s*"([^"]+)"/i,
+  ];
+  
+  for (const pattern of dougsTakePatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      result.dougs_take = match[1]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .replace(/\\n/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (result.dougs_take.length > 50) break; // Found valid content
+    }
+  }
+  
+  // Extract Highlights (ul list) - try multiple patterns
+  const highlightsPatterns = [
+    /<h4[^>]*>Highlights<\/h4>[\s\S]*?<div[^>]*class=["'][^"']*detail[_-]?body[^"']*["'][^>]*>([\s\S]{0,20000})<\/div>/i,
+    /<h3[^>]*>Highlights<\/h3>[\s\S]*?<ul[^>]*>([\s\S]{0,20000})<\/ul>/i,
+    /"highlights":\s*\[([^\]]+)\]/i,
+  ];
+  
+  for (const pattern of highlightsPatterns) {
+    const match = h.match(pattern);
+    if (match && match[1]) {
+      const liMatches = match[1].matchAll(/<li[^>]*>([^<]+(?:<[^>]+>[^<]+<\/[^>]+>)*[^<]*)<\/li>/gi);
+      result.highlights = [];
+      for (const liMatch of liMatches) {
+        const text = liMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (text.length > 10) result.highlights.push(text);
+      }
+      // Also try JSON array format
+      if (result.highlights.length === 0 && pattern.source.includes('"highlights"')) {
+        try {
+          const jsonArray = JSON.parse(`[${match[1]}]`);
+          if (Array.isArray(jsonArray)) {
+            result.highlights = jsonArray.filter((item: any) => typeof item === 'string' && item.length > 10);
+          }
+        } catch {
+          // Not valid JSON, continue
+        }
+      }
+      if (result.highlights.length > 0) break; // Found valid highlights
+    }
+  }
+  
+  // Helper function to extract list sections
+  const extractListSection = (sectionName: string, html: string, maxLength = 20000): string[] => {
+    const patterns = [
+      new RegExp(`<h4[^>]*>${sectionName}<\\/h4>[\\s\\S]*?<div[^>]*class=["'][^"']*detail[_-]?body[^"']*["'][^>]*>([\\s\\S]{0,${maxLength}})<\\/div>`, 'i'),
+      new RegExp(`<h3[^>]*>${sectionName}<\\/h3>[\\s\\S]*?<ul[^>]*>([\\s\\S]{0,${maxLength}})<\\/ul>`, 'i'),
+      new RegExp(`"${sectionName.toLowerCase().replace(/\s+/g, '_')}":\\s*\\[([^\\]]+)\\]`, 'i'),
+    ];
+    
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        const items: string[] = [];
+        // Try HTML list items
+        const liMatches = match[1].matchAll(/<li[^>]*>([^<]+(?:<[^>]+>[^<]+<\/[^>]+>)*[^<]*)<\/li>/gi);
+        for (const liMatch of liMatches) {
+          const text = liMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          if (text.length > 5) items.push(text);
+        }
+        // If no HTML items found, try JSON array
+        if (items.length === 0 && pattern.source.includes('"')) {
+          try {
+            const jsonArray = JSON.parse(`[${match[1]}]`);
+            if (Array.isArray(jsonArray)) {
+              items.push(...jsonArray.filter((item: any) => typeof item === 'string' && item.length > 5));
+            }
+          } catch {
+            // Not valid JSON, continue
+          }
+        }
+        if (items.length > 0) return items;
+      }
+    }
+    return [];
+  };
+  
+  // Extract Equipment (ul list)
+  result.equipment = extractListSection('Equipment', h, 20000);
+  
+  // Extract Modifications
+  result.modifications = extractListSection('Modifications', h, 30000);
+  
+  // Extract Known Flaws
+  result.known_flaws = extractListSection('Known Flaws', h, 20000);
+  
+  // Helper function to extract text sections
+  const extractTextSection = (sectionName: string, html: string, maxLength = 10000): string | null => {
+    const patterns = [
+      new RegExp(`<h4[^>]*>${sectionName}<\\/h4>[\\s\\S]*?<div[^>]*class=["'][^"']*detail[_-]?body[^"']*["'][^>]*>([\\s\\S]{0,${maxLength}})<\\/div>`, 'i'),
+      new RegExp(`<h3[^>]*>${sectionName}<\\/h3>[\\s\\S]*?<div[^>]*class=["'][^"']*content[^"']*["'][^>]*>([\\s\\S]{0,${maxLength}})<\\/div>`, 'i'),
+      new RegExp(`"${sectionName.toLowerCase().replace(/\s+/g, '_')}":\\s*"([^"]+)"`, 'i'),
+    ];
+    
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        const text = match[1]
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"')
+          .replace(/&apos;/g, "'")
+          .replace(/\\n/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (text.length > 20) return text;
+      }
+    }
+    return null;
+  };
+  
+  // Extract Recent Service History
+  result.recent_service_history = extractTextSection('Recent Service History', h, 20000);
+  
+  // Extract Other Items
+  result.other_items = extractListSection('Other Items Included in Sale', h, 20000);
+  
+  // Extract Ownership History
+  result.ownership_history = extractTextSection('Ownership History', h, 10000);
+  
+  // Extract Seller Notes
+  result.seller_notes = extractTextSection('Seller Notes', h, 10000);
+  
+  return result;
+}
+
+function extractCarsAndBidsBidders(html: string): Array<{ username: string; profile_url: string; is_buyer?: boolean; is_seller?: boolean }> {
+  const h = String(html || "");
+  const bidders = new Map<string, { username: string; profile_url: string; is_buyer?: boolean; is_seller?: boolean }>();
+  
+  // Extract buyer (Sold to)
+  const soldToMatch = h.match(/Sold\s+to[^>]*>[\s\S]*?<a[^>]*title=["']([^"']+)["'][^>]*class=["'][^"']*user[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>/i);
+  if (soldToMatch && soldToMatch[1] && soldToMatch[2]) {
+    const username = soldToMatch[1].trim();
+    const profileUrl = soldToMatch[2].startsWith('http') ? soldToMatch[2] : `https://carsandbids.com${soldToMatch[2]}`;
+    bidders.set(username, { username, profile_url: profileUrl, is_buyer: true });
+  }
+  
+  // Extract all user links (bidders, commenters, etc.)
+  const userLinkPattern = /<a[^>]*title=["']([^"']+)["'][^>]*class=["'][^"']*user[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>/gi;
+  let userMatch;
+  while ((userMatch = userLinkPattern.exec(h)) !== null) {
+    const username = userMatch[1].trim();
+    const profileUrl = userMatch[2].startsWith('http') ? userMatch[2] : `https://carsandbids.com${userMatch[2]}`;
+    if (username && !bidders.has(username)) {
+      bidders.set(username, { username, profile_url: profileUrl });
+    }
+  }
+  
+  // Extract from bid history (bidder usernames)
+  const bidderPattern = /bid\s+placed\s+by\s+([A-Za-z0-9_]+)/gi;
+  let bidderMatch;
+  while ((bidderMatch = bidderPattern.exec(h)) !== null) {
+    const username = bidderMatch[1].trim();
+    if (username && !bidders.has(username)) {
+      bidders.set(username, { 
+        username, 
+        profile_url: `https://carsandbids.com/user/${username}` 
+      });
+    }
+  }
+  
+  return Array.from(bidders.values());
+}
+
+function extractCarsAndBidsComments(html: string): Array<{ author: string; text: string; timestamp?: string; is_seller?: boolean; is_bid?: boolean; bid_amount?: number; profile_url?: string }> {
+  const h = String(html || "");
+  const comments: Array<{ author: string; text: string; timestamp?: string; is_seller?: boolean; is_bid?: boolean; bid_amount?: number; profile_url?: string }> = [];
+  
+  // Helper to parse timestamp
+  const parseTimestamp = (text: string): string | undefined => {
+    const datePatterns = [
+      /(\d{1,2}\/\d{1,2}\/\d{2,4})/,
+      /(\w+\s+\d{1,2},\s+\d{4})/,
+      /(\d{4}-\d{2}-\d{2})/,
+    ];
+    
+    for (const pattern of datePatterns) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        try {
+          const date = new Date(match[1]);
+          if (Number.isFinite(date.getTime())) {
+            return date.toISOString();
+          }
+        } catch {
+          // continue
+        }
+      }
+    }
+    return undefined;
+  };
+  
+  // Pattern 1: Comment containers - look for common comment class patterns
+  const commentContainerPatterns = [
+    /<div[^>]*class=["'][^"']*comment[^"']*["'][^>]*>([\s\S]{0,2000})<\/div>/gi,
+    /<article[^>]*class=["'][^"']*comment[^"']*["'][^>]*>([\s\S]{0,2000})<\/article>/gi,
+    /<li[^>]*class=["'][^"']*comment[^"']*["'][^>]*>([\s\S]{0,2000})<\/li>/gi,
+  ];
+  
+  for (const pattern of commentContainerPatterns) {
+    let match;
+    while ((match = pattern.exec(h)) !== null && comments.length < 200) {
+      const commentHtml = match[1];
+      
+      // Extract author and profile URL
+      const authorPatterns = [
+        /<a[^>]*title=["']([^"']+)["'][^>]*class=["'][^"']*user[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>/i,
+        /<[^>]*class=["'][^"']*author[^"']*["'][^>]*>([^<]+)<\/[^>]+>/i,
+        /<[^>]*class=["'][^"']*username[^"']*["'][^>]*>([^<]+)<\/[^>]+>/i,
+        /<strong[^>]*>([^<]+)<\/strong>/,
+        /by\s+([A-Za-z0-9_]+)/i,
+      ];
+      
+      let author = 'Unknown';
+      let profileUrl: string | undefined = undefined;
+      for (const authorPattern of authorPatterns) {
+        const authorMatch = commentHtml.match(authorPattern);
+        if (authorMatch && authorMatch[1]) {
+          author = authorMatch[1].trim();
+          // If pattern captured profile URL (first pattern)
+          if (authorMatch[2]) {
+            profileUrl = authorMatch[2].startsWith('http') ? authorMatch[2] : `https://carsandbids.com${authorMatch[2]}`;
+          }
+          break;
+        }
+      }
+      
+      // Extract text
+      let text = commentHtml
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Extract timestamp
+      const timestamp = parseTimestamp(commentHtml);
+      
+      // Check if it's a bid comment
+      const isBid = /bid\s+placed\s+by|bid\s+of/i.test(text);
+      let bidAmount: number | undefined = undefined;
+      if (isBid) {
+        const bidMatch = text.match(/\$([0-9,]+)/);
+        if (bidMatch) {
+          bidAmount = parseInt(bidMatch[1].replace(/,/g, ''), 10);
+        }
+      }
+      
+      // Check if it's a seller comment
+      const isSeller = /seller|owner|listed\s+by/i.test(text) || 
+                      commentHtml.toLowerCase().includes('seller') ||
+                      commentHtml.toLowerCase().includes('owner');
+      
+      if (text.length >= 10) { // Only include substantial comments
+        comments.push({
+          author,
+          text,
+          timestamp,
+          is_seller: isSeller,
+          is_bid: isBid,
+          bid_amount: bidAmount,
+          profile_url: profileUrl,
+        });
+      }
+    }
+  }
+  
+  return comments;
 }
 
 function extractMecumListingUrlsFromText(text: string, limit: number): string[] {
@@ -695,6 +1405,7 @@ function extractMecumImagesFromHtml(html: string): string[] {
 /**
  * Extract sold price from Mecum listing HTML using DOM parsing
  * Based on user-provided DOM paths for sold listings
+ * CRITICAL: Excludes lot header elements (lot number, date, location) to avoid false matches
  */
 function extractMecumSoldPrice(html: string): { sale_price: number | null; method: string } {
   try {
@@ -702,6 +1413,69 @@ function extractMecumSoldPrice(html: string): { sale_price: number | null; metho
     if (!doc) {
       return { sale_price: null, method: 'none' };
     }
+
+    // Helper: Check if element is in lot header (should be excluded)
+    const isLotHeaderElement = (el: any): boolean => {
+      if (!el) return false;
+      const className = (el.className || '').toLowerCase();
+      const id = (el.id || '').toLowerCase();
+      const tagName = (el.tagName || '').toLowerCase();
+      
+      // Exclude lot header elements
+      if (className.includes('lotheader') || id.includes('lotheader')) {
+        return true;
+      }
+      
+      // Exclude time elements (dates) and elements containing lot numbers
+      if (tagName === 'time' || className.includes('lot') && className.includes('num')) {
+        return true;
+      }
+      
+      // Check parent chain for lot header
+      let parent = el.parentElement;
+      let depth = 0;
+      while (parent && depth < 5) {
+        const parentClass = (parent.className || '').toLowerCase();
+        const parentId = (parent.id || '').toLowerCase();
+        if (parentClass.includes('lotheader') || parentId.includes('lotheader')) {
+          return true;
+        }
+        parent = parent.parentElement;
+        depth++;
+      }
+      
+      return false;
+    };
+
+    // Helper: Check if text looks like lot number, date, or location (not a price)
+    const isInvalidPriceText = (text: string, price: number): boolean => {
+      const lower = text.toLowerCase();
+      
+      // Exclude if contains lot number patterns (Lot S109, Lot #123, etc.)
+      if (/\blot\s*[#s]?\s*\d+/i.test(lower)) {
+        return true;
+      }
+      
+      // Exclude if contains date patterns (January 17, 2026, 2026-01-17, etc.)
+      if (/\b(january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{2}-\d{2})\b/i.test(lower)) {
+        return true;
+      }
+      
+      // Exclude if contains location keywords (Kissimmee, Las Vegas, etc.)
+      if (/\b(kissimmee|las vegas|indianapolis|dallas|kansas city|monterey|scottsdale|auction|location)\b/i.test(lower)) {
+        return true;
+      }
+      
+      // Exclude if price looks like a year (1900-2100 range, especially if near date/lot context)
+      if (price >= 1900 && price <= 2100) {
+        // Only exclude if it's in a context that suggests it's a year
+        if (/\b(19|20)\d{2}\b/.test(lower) && (lower.includes('lot') || lower.includes('january') || lower.includes('february') || lower.includes('march') || lower.includes('april') || lower.includes('may') || lower.includes('june') || lower.includes('july') || lower.includes('august') || lower.includes('september') || lower.includes('october') || lower.includes('november') || lower.includes('december'))) {
+          return true;
+        }
+      }
+      
+      return false;
+    };
 
     // Strategy 1: Try the specific classes mentioned by user
     // TopNLots_price__DKxnz or TopNLots_saleResult__Y0Ayv
@@ -715,12 +1489,12 @@ function extractMecumSoldPrice(html: string): { sale_price: number | null; metho
 
     for (const selector of priceSelectors) {
       const element = doc.querySelector(selector);
-      if (element) {
+      if (element && !isLotHeaderElement(element)) {
         const text = element.textContent || '';
         const priceMatch = text.match(/\$?([\d,]+)/);
         if (priceMatch) {
           const price = parseInt(priceMatch[1].replace(/,/g, ''), 10);
-          if (price >= 1000 && price < 100000000) { // Sanity check
+          if (price >= 1000 && price < 100000000 && !isInvalidPriceText(text, price)) {
             return { sale_price: price, method: `dom:${selector}` };
           }
         }
@@ -733,47 +1507,61 @@ function extractMecumSoldPrice(html: string): { sale_price: number | null; metho
                             doc.querySelector('[class*="topNLot"]') ||
                             doc.querySelector('[class*="saleResult"]');
     
-    if (topNLotsSection) {
-      // Look for price-like text in the section
-      const sectionText = topNLotsSection.textContent || '';
-      const pricePatterns = [
-        /\$([\d,]+)/g,
-        /USD\s*\$([\d,]+)/gi,
-      ];
+    if (topNLotsSection && !isLotHeaderElement(topNLotsSection)) {
+      // Look for price-like text in the section, but exclude lot header children
+      const allElements = topNLotsSection.querySelectorAll('*');
+      for (const el of Array.from(allElements)) {
+        if (isLotHeaderElement(el)) continue;
+        
+        const text = el.textContent || '';
+        const pricePatterns = [
+          /\$([\d,]+)/g,
+          /USD\s*\$([\d,]+)/gi,
+        ];
 
-      for (const pattern of pricePatterns) {
-        const matches = sectionText.matchAll(pattern);
-        for (const match of matches) {
-          const price = parseInt(match[1].replace(/,/g, ''), 10);
-          if (price >= 1000 && price < 100000000) {
-            return { sale_price: price, method: 'dom:topNLots_section' };
+        for (const pattern of pricePatterns) {
+          const matches = text.matchAll(pattern);
+          for (const match of matches) {
+            const price = parseInt(match[1].replace(/,/g, ''), 10);
+            if (price >= 1000 && price < 100000000 && !isInvalidPriceText(text, price)) {
+              return { sale_price: price, method: 'dom:topNLots_section' };
+            }
           }
         }
       }
     }
 
     // Strategy 3: Look for "sold" context with price in nearby elements
-    const bodyText = doc.body?.textContent || '';
-    const soldPricePatterns = [
-      /sold\s+for\s+\$?([\d,]+)/i,
-      /sold\s+\$?([\d,]+)/i,
-      /final\s+price[:\s]*\$?([\d,]+)/i,
-      /hammer\s+price[:\s]*\$?([\d,]+)/i,
-    ];
+    // Exclude lot header elements from body text search
+    const bodyClone = doc.body?.cloneNode(true) as any;
+    if (bodyClone) {
+      // Remove lot header elements from cloned body
+      const lotHeaders = bodyClone.querySelectorAll('[class*="LotHeader"], [class*="lotHeader"], [id*="LotHeader"], [id*="lotHeader"]');
+      lotHeaders.forEach((el: any) => el.remove());
+      
+      const bodyText = bodyClone.textContent || '';
+      const soldPricePatterns = [
+        /sold\s+for\s+\$?([\d,]+)/i,
+        /sold\s+\$?([\d,]+)/i,
+        /final\s+price[:\s]*\$?([\d,]+)/i,
+        /hammer\s+price[:\s]*\$?([\d,]+)/i,
+      ];
 
-    for (const pattern of soldPricePatterns) {
-      const match = bodyText.match(pattern);
-      if (match) {
-        const price = parseInt(match[1].replace(/,/g, ''), 10);
-        if (price >= 1000 && price < 100000000) {
-          return { sale_price: price, method: 'text:sold_pattern' };
+      for (const pattern of soldPricePatterns) {
+        const match = bodyText.match(pattern);
+        if (match) {
+          const price = parseInt(match[1].replace(/,/g, ''), 10);
+          if (price >= 1000 && price < 100000000 && !isInvalidPriceText(match[0], price)) {
+            return { sale_price: price, method: 'text:sold_pattern' };
+          }
         }
       }
     }
 
     // Strategy 4: Look for large numbers that look like prices in "sold" context
-    // Find elements containing "sold" and look for price nearby
+    // Find elements containing "sold" and look for price nearby, but exclude lot headers
     const soldElements = Array.from(doc.querySelectorAll('*')).filter((el: any) => {
+      if (isLotHeaderElement(el)) return false;
       const text = (el.textContent || '').toLowerCase();
       return text.includes('sold') || text.includes('final price') || text.includes('hammer');
     });
@@ -783,7 +1571,7 @@ function extractMecumSoldPrice(html: string): { sale_price: number | null; metho
       const priceMatch = elText.match(/\$?([\d,]+)/);
       if (priceMatch) {
         const price = parseInt(priceMatch[1].replace(/,/g, ''), 10);
-        if (price >= 1000 && price < 100000000) {
+        if (price >= 1000 && price < 100000000 && !isInvalidPriceText(elText, price)) {
           return { sale_price: price, method: 'dom:sold_context' };
         }
       }
@@ -1062,7 +1850,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
       make: { type: "string", description: "Vehicle make" },
       model: { type: "string", description: "Vehicle model" },
       trim: { type: "string", description: "Trim level" },
-      vin: { type: "string", description: "VIN if available" },
+      vin: { type: "string", description: "VIN if available - look in specs table, title, or description. Format: 17 alphanumeric characters (no I, O, Q). Example: 1G1YY32G5X5114539" },
       mileage: { type: "number", description: "Mileage / odometer" },
       color: { type: "string", description: "Exterior color" },
       interior_color: { type: "string", description: "Interior color" },
@@ -1071,16 +1859,47 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
       engine_size: { type: "string", description: "Engine" },
       fuel_type: { type: "string", description: "Fuel type" },
       body_style: { type: "string", description: "Body style" },
-      current_bid: { type: "number", description: "Current bid" },
-      bid_count: { type: "number", description: "Bid count" },
+      current_bid: { type: "number", description: "Current bid amount in USD" },
+      bid_count: { type: "number", description: "Total number of bids placed" },
+      bid_history: { 
+        type: "array", 
+        items: { 
+          type: "object",
+          properties: {
+            amount: { type: "number" },
+            timestamp: { type: "string" },
+            bidder: { type: "string" }
+          }
+        },
+        description: "ALL bid history - extract every bid with amount, timestamp, and bidder username. Look in comments section, bid history table, or bid timeline. Format: [{\"amount\": 50000, \"timestamp\": \"2024-12-30T15:19:00Z\", \"bidder\": \"username\"}]"
+      },
+      comment_count: { type: "number", description: "Total number of comments on the listing" },
+      comments: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            author: { type: "string" },
+            text: { type: "string" },
+            timestamp: { type: "string" },
+            is_seller: { type: "boolean" },
+            is_bid: { type: "boolean" },
+            bid_amount: { type: "number" }
+          }
+        },
+        description: "ALL comments from the listing - extract every comment with author, text, timestamp. Mark if it's a bid comment (is_bid: true, bid_amount: number) or seller comment (is_seller: true). Extract from comments section, discussion thread, or comment feed."
+      },
       reserve_met: { type: "boolean", description: "Reserve met" },
+      reserve_price: { type: "number", description: "Reserve price if disclosed" },
       auction_end_date: { type: "string", description: "Auction end time/date" },
+      sale_price: { type: "number", description: "Final sale price if auction ended (look for 'Sold for $X' or 'Final Price')" },
+      sale_date: { type: "string", description: "Sale date if auction ended" },
       location: { type: "string", description: "Location" },
-      description: { type: "string", description: "Description" },
+      description: { type: "string", description: "FULL listing description - all text content describing the vehicle, its condition, history, modifications, etc. Extract from description section, article content, or main content area. Include ALL paragraphs and details. Minimum 100 characters." },
       images: { 
         type: "array", 
         items: { type: "string" }, 
-        description: "ALL high-resolution full-size image URLs from the vehicle gallery. Extract from gallery JSON/data attributes, prioritize 'full', 'original', or 'large' size URLs. Remove all resize parameters (?w=, ?h=, ?resize=). Get ONLY full-resolution gallery images, NOT thumbnails, NOT video frames, NOT UI elements. Exclude any URLs containing 'thumb', 'thumbnail', 'video', 'icon', 'logo', or size suffixes like -150x150." 
+        description: "ALL high-resolution full-size image URLs from the vehicle gallery. CRITICAL: Extract EVERY image from the gallery - Cars & Bids listings typically have 40-100+ photos. Look in: 1) Gallery JSON data in script tags, 2) data-src/data-full attributes, 3) img src attributes in gallery containers, 4) srcset attributes, 5) background-image CSS. Prioritize 'full', 'original', or 'large' size URLs. Remove all resize parameters (?w=, ?h=, ?resize=). Get ONLY full-resolution gallery images from media.carsandbids.com, NOT thumbnails, NOT video frames, NOT UI elements. Exclude any URLs containing 'thumb', 'thumbnail', 'video', 'icon', 'logo', or size suffixes like -150x150. Return ALL images found, not just a few." 
       },
     },
   };
@@ -1109,60 +1928,51 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
 
   for (const listingUrl of urlsToScrape) {
     try {
-      const firecrawlData = await fetchJsonWithTimeout(
-        FIRECRAWL_SCRAPE_URL,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${firecrawlKey}`,
-            "Content-Type": "application/json",
+      let vehicle: any = {};
+      let html = "";
+      
+      // Try Firecrawl first, but fall back to direct fetch if it fails
+      try {
+        const firecrawlData = await fetchJsonWithTimeout(
+          FIRECRAWL_SCRAPE_URL,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${firecrawlKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              url: listingUrl,
+              formats: ["html"], // Just get HTML, no schema extraction (more reliable)
+              onlyMainContent: false,
+              waitFor: 10000, // Reduced wait time
+              // Simplified actions - just scroll, no clicks
+              actions: [
+                { type: "wait", milliseconds: 3000 },
+                { type: "scroll", direction: "down", pixels: 2000 },
+                { type: "wait", milliseconds: 3000 },
+                { type: "scroll", direction: "down", pixels: 3000 },
+                { type: "wait", milliseconds: 3000 },
+              ],
+            }),
           },
-          body: JSON.stringify({
-            url: listingUrl,
-            formats: ["extract", "html"],
-            onlyMainContent: false,
-            waitFor: 12000, // Wait for gallery to fully load and expand
-            actions: [
-              {
-                type: "wait",
-                milliseconds: 3000, // Initial page load
-              },
-              {
-                type: "scroll",
-                direction: "down",
-                pixels: 1000, // Scroll to gallery
-              },
-              {
-                type: "wait",
-                milliseconds: 2000, // Wait for gallery to render
-              },
-              {
-                type: "click",
-                selector: "button:has-text('Show more'), button:has-text('Load more'), button:has-text('View all'), [aria-label*='more'], [aria-label*='all']",
-              },
-              {
-                type: "wait",
-                milliseconds: 3000, // Wait for expanded images to load
-              },
-              {
-                type: "scroll",
-                direction: "down",
-                pixels: 2000, // Scroll to load lazy-loaded images
-              },
-              {
-                type: "wait",
-                milliseconds: 2000, // Final wait for all images
-              },
-            ],
-            extract: { schema: listingSchema },
-          }),
-        },
-        FIRECRAWL_LISTING_TIMEOUT_MS,
-        "Firecrawl listing scrape",
-      );
+          FIRECRAWL_LISTING_TIMEOUT_MS,
+          "Firecrawl listing scrape",
+        );
 
-      const vehicle = firecrawlData?.data?.extract || {};
-      const html = String(firecrawlData?.data?.html || "");
+        vehicle = firecrawlData?.data?.extract || {};
+        html = String(firecrawlData?.data?.html || "");
+      } catch (firecrawlError: any) {
+        console.warn(`⚠️ Firecrawl failed (${firecrawlError?.message}), falling back to direct HTML fetch`);
+        // Fallback: Direct HTML fetch
+        try {
+          html = await fetchTextWithTimeout(listingUrl, 30000, "Direct HTML fetch");
+          console.log(`✅ Got HTML via direct fetch (${html.length} chars)`);
+        } catch (directError: any) {
+          console.error(`❌ Direct fetch also failed: ${directError?.message}`);
+          throw new Error(`Both Firecrawl and direct fetch failed: ${directError?.message}`);
+        }
+      }
 
       // If extraction is empty, fall back to parsing the listing URL so we still insert vehicles.
       const empty = !vehicle || (typeof vehicle === "object" && Object.keys(vehicle).length === 0);
@@ -1194,6 +2004,42 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         auctionData = extractCarsAndBidsAuctionData(html);
       }
       
+      // Extract bid history from HTML
+      let bidHistory: any[] = [];
+      if (html) {
+        bidHistory = extractCarsAndBidsBidHistory(html);
+      }
+      
+      // Extract comments from HTML
+      let comments: any[] = [];
+      if (html) {
+        comments = extractCarsAndBidsComments(html);
+      }
+      
+      // Extract structured sections (Doug's Take, Highlights, Equipment, etc.)
+      let structuredSections: any = {};
+      if (html) {
+        structuredSections = extractCarsAndBidsStructuredSections(html);
+      }
+      
+      // Extract bidder profiles
+      let bidders: any[] = [];
+      if (html) {
+        bidders = extractCarsAndBidsBidders(html);
+      }
+      
+      // Extract VIN from HTML (often visible in specs table)
+      let vinFromHtml: string | null = null;
+      if (html) {
+        vinFromHtml = extractCarsAndBidsVIN(html);
+      }
+      
+      // Extract description from HTML (full listing description)
+      let descriptionFromHtml: string | null = null;
+      if (html) {
+        descriptionFromHtml = extractCarsAndBidsDescription(html);
+      }
+      
       // CRITICAL: Clean listing URL - strip /video suffix
       const cleanListingUrl = listingUrl.replace(/\/video\/?$/, '');
       
@@ -1204,14 +2050,22 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         make: (vehicle?.make ?? fallback.make) ?? null,
         model: (vehicle?.model ?? fallback.model) ?? null,
         title: (vehicle?.title ?? fallback.title) ?? null,
+        vin: vinFromHtml || vehicle?.vin || null, // Prioritize HTML extraction for VIN
+        description: descriptionFromHtml || vehicle?.description || null, // Prioritize HTML extraction for description
         images, // Cleaned high-res images
         // Auction data - prioritize HTML extraction, fallback to Firecrawl
         current_bid: auctionData.current_bid ?? vehicle?.current_bid ?? null,
-        bid_count: auctionData.bid_count ?? vehicle?.bid_count ?? null,
+        bid_count: bidHistory.length > 0 ? bidHistory.length : (auctionData.bid_count ?? vehicle?.bid_count ?? null),
+        bid_history: bidHistory.length > 0 ? bidHistory : (vehicle?.bid_history || []),
+        comment_count: comments.length > 0 ? comments.length : (vehicle?.comment_count ?? null),
+        comments: comments.length > 0 ? comments : (vehicle?.comments || []),
+        structured_sections: Object.keys(structuredSections).length > 0 ? structuredSections : (vehicle?.structured_sections || {}),
+        bidders: bidders.length > 0 ? bidders : (vehicle?.bidders || []),
         reserve_met: auctionData.reserve_met ?? vehicle?.reserve_met ?? null,
         reserve_price: auctionData.reserve_price ?? vehicle?.reserve_price ?? null,
         auction_end_date: auctionData.auction_end_date ?? vehicle?.auction_end_date ?? null,
         final_price: auctionData.final_price ?? vehicle?.final_price ?? vehicle?.sale_price ?? null,
+        sale_price: auctionData.final_price ?? vehicle?.final_price ?? vehicle?.sale_price ?? null, // Also set sale_price
         sale_date: auctionData.sale_date ?? vehicle?.sale_date ?? null,
         view_count: auctionData.view_count ?? vehicle?.view_count ?? null,
         watcher_count: auctionData.watcher_count ?? vehicle?.watcher_count ?? null,
@@ -1420,9 +2274,15 @@ async function storeVehiclesInDatabase(
         errors.push(`Rejected /video URL: ${listingUrl}`);
         continue;
       }
-      // Clean any /video suffix just in case
+      // Clean any /video suffix just in case (multiple passes to catch edge cases)
       if (listingUrl) {
-        listingUrl = listingUrl.replace(/\/video\/?$/, '').replace(/\/video\//, '/');
+        listingUrl = listingUrl.replace(/\/video\/?$/, '').replace(/\/video\//, '/').replace(/\/video$/, '');
+        // Double-check after cleaning
+        if (listingUrl.includes('/video')) {
+          console.warn(`⚠️ Rejecting /video URL after cleaning: ${listingUrl}`);
+          errors.push(`Rejected /video URL after cleaning: ${listingUrl}`);
+          continue;
+        }
       }
       const title = vehicle.title || vehicle.listing_title || null;
       const vinRaw = typeof vehicle.vin === "string" ? vehicle.vin.trim() : "";
@@ -1481,6 +2341,22 @@ async function storeVehiclesInDatabase(
             source,
             extracted_at: nowIso(),
             extractor: "extract-premium-auction",
+            discovery_url: listingUrl, // Store cleaned URL (not video URL)
+            structured_sections: vehicle.structured_sections || null, // Doug's Take, Highlights, Equipment, etc.
+          },
+          origin_metadata: {
+            import_source: source.toLowerCase(),
+            import_date: nowIso().split('T')[0],
+            discovery_url: listingUrl, // Store cleaned URL (not video URL)
+            source_url: listingUrl,
+            images: Array.isArray(vehicle.images) ? vehicle.images : [],
+            image_urls: Array.isArray(vehicle.images) ? vehicle.images : [],
+            structured_sections: vehicle.structured_sections || {},
+            bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : [],
+            comments: Array.isArray(vehicle.comments) ? vehicle.comments : [],
+            bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : [],
+            auction_id: vehicle.auction_id || null,
+            listing_status: vehicle.listing_status || 'active',
           },
           // This is effectively a URL-based scraper import; using url_scraper makes downstream org-link triggers
           // attach the vehicle as a 'consigner' (allowed by organization_vehicles_relationship_type_check).
@@ -1502,6 +2378,33 @@ async function storeVehiclesInDatabase(
         if (existingErr) {
           error = existingErr;
         } else if (existing?.id) {
+          // For updates, merge origin_metadata instead of replacing
+          const { data: existingVehicle } = await supabase
+            .from("vehicles")
+            .select("origin_metadata")
+            .eq("id", existing.id)
+            .single();
+          
+          const existingOriginMetadata = (existingVehicle?.origin_metadata as any) || {};
+          const newOriginMetadata = {
+            ...existingOriginMetadata,
+            import_source: source.toLowerCase(),
+            import_date: nowIso().split('T')[0],
+            discovery_url: listingUrl,
+            source_url: listingUrl,
+            images: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.images || []),
+            image_urls: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.image_urls || []),
+            structured_sections: vehicle.structured_sections || existingOriginMetadata.structured_sections || {},
+            bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : (existingOriginMetadata.bid_history || []),
+            comments: Array.isArray(vehicle.comments) ? vehicle.comments : (existingOriginMetadata.comments || []),
+            bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : (existingOriginMetadata.bidders || []),
+            auction_id: vehicle.auction_id || existingOriginMetadata.auction_id || null,
+            listing_status: vehicle.listing_status || existingOriginMetadata.listing_status || 'active',
+            last_updated: nowIso(),
+          };
+          
+          payload.origin_metadata = newOriginMetadata;
+          
           const { data: updated, error: updateErr } = await supabase
             .from("vehicles")
             .update(payload)
@@ -1721,6 +2624,8 @@ async function storeVehiclesInDatabase(
                   // CRITICAL: Store ALL extracted images for fallback display
                   images: extractedImages,
                   image_urls: extractedImages, // Alias for compatibility
+                  // Store bid history
+                  bid_history: Array.isArray(vehicle.bid_history) && vehicle.bid_history.length > 0 ? vehicle.bid_history : null,
                 },
                 updated_at: nowIso(),
               }, {
@@ -1728,6 +2633,226 @@ async function storeVehiclesInDatabase(
               });
           } catch (e: any) {
             console.warn(`external_listings upsert failed (non-fatal): ${e?.message || String(e)}`);
+          }
+        }
+        
+        // Store comments and bid history in auction_comments table
+        if (data?.id && listingUrl && (Array.isArray(vehicle.comments) || Array.isArray(vehicle.bid_history))) {
+          try {
+            // Create or get auction_event (using unique constraint on platform, listing_url)
+            let auctionEventId: string | null = null;
+            const eventPlatform = platform || 'carsandbids';
+            const { data: existingEvent } = await supabase
+              .from('auction_events')
+              .select('id')
+              .eq('platform', eventPlatform)
+              .eq('listing_url', listingUrl)
+              .maybeSingle();
+            
+            if (existingEvent?.id) {
+              auctionEventId = existingEvent.id;
+            } else {
+              // Create new auction_event
+              const endDate = vehicle.auction_end_date ? new Date(vehicle.auction_end_date) : null;
+              const { data: newEvent, error: eventError } = await supabase
+                .from('auction_events')
+                .upsert({
+                  platform: eventPlatform,
+                  listing_url: listingUrl,
+                  vehicle_id: data.id,
+                  outcome: vehicle.sale_price ? 'sold' : (endDate && new Date(endDate) > new Date() ? 'active' : 'ended'),
+                  high_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
+                  reserve_price: Number.isFinite(vehicle.reserve_price) ? vehicle.reserve_price : null,
+                  reserve_met: vehicle.reserve_met ?? null,
+                  auction_start_at: vehicle.auction_start_date ? new Date(vehicle.auction_start_date).toISOString() : null,
+                  auction_end_at: endDate && Number.isFinite(endDate.getTime()) ? endDate.toISOString() : null,
+                  metadata: {
+                    listing_id: listingId || null,
+                    current_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
+                    final_price: Number.isFinite(vehicle.sale_price) ? vehicle.sale_price : 
+                                (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid : null),
+                    bid_count: Array.isArray(vehicle.bid_history) ? vehicle.bid_history.length : 
+                              (Number.isFinite(vehicle.bid_count) ? vehicle.bid_count : null),
+                    comment_count: Array.isArray(vehicle.comments) ? vehicle.comments.length :
+                                  (Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null),
+                  },
+                }, {
+                  onConflict: 'platform,listing_url',
+                })
+                .select('id')
+                .single();
+              
+              if (!eventError && newEvent?.id) {
+                auctionEventId = newEvent.id;
+              } else if (eventError) {
+                console.warn(`Failed to create/update auction_event: ${eventError.message}`);
+              }
+            }
+            
+            // Store comments
+            if (auctionEventId && Array.isArray(vehicle.comments) && vehicle.comments.length > 0) {
+              const commentsToInsert = vehicle.comments.map((c: any, idx: number) => ({
+                auction_event_id: auctionEventId,
+                vehicle_id: data.id,
+                platform: platform || 'carsandbids',
+                source_url: listingUrl,
+                sequence_number: idx + 1,
+                posted_at: c.timestamp ? new Date(c.timestamp).toISOString() : new Date().toISOString(),
+                author_username: c.author || 'Unknown',
+                is_seller: c.is_seller || false,
+                comment_type: c.is_bid ? 'bid' : (c.is_seller ? 'seller_response' : 'observation'),
+                comment_text: c.text || '',
+                word_count: (c.text || '').split(/\s+/).length,
+                bid_amount: c.bid_amount || (c.is_bid && c.text ? parseFloat(c.text.match(/\$([0-9,]+)/)?.[1]?.replace(/,/g, '') || '0') : null),
+                has_question: (c.text || '').includes('?'),
+              }));
+              
+              // Insert in batches
+              const batchSize = 20;
+              for (let i = 0; i < commentsToInsert.length; i += batchSize) {
+                const batch = commentsToInsert.slice(i, i + batchSize);
+                const { error: commentError } = await supabase
+                  .from('auction_comments')
+                  .upsert(batch, {
+                    onConflict: 'auction_event_id,sequence_number',
+                    ignoreDuplicates: false,
+                  });
+                
+                if (commentError) {
+                  console.warn(`Failed to insert comment batch ${i / batchSize + 1}: ${commentError.message}`);
+                }
+              }
+              
+              console.log(`✅ Stored ${commentsToInsert.length} comments for vehicle ${data.id}`);
+            }
+            
+            // Store bid history as comments (if not already stored)
+            if (auctionEventId && Array.isArray(vehicle.bid_history) && vehicle.bid_history.length > 0) {
+              const bidComments = vehicle.bid_history
+                .filter((bid: any) => bid.amount && bid.bidder)
+                .map((bid: any, idx: number) => ({
+                  auction_event_id: auctionEventId,
+                  vehicle_id: data.id,
+                  platform: platform || 'carsandbids',
+                  source_url: listingUrl,
+                  sequence_number: 10000 + idx, // High sequence number to avoid conflicts
+                  posted_at: bid.timestamp ? new Date(bid.timestamp).toISOString() : new Date().toISOString(),
+                  author_username: bid.bidder || 'Unknown',
+                  is_seller: false,
+                  comment_type: 'bid',
+                  comment_text: `Bid of $${bid.amount.toLocaleString()} placed by ${bid.bidder || 'Unknown'}`,
+                  word_count: 8,
+                  bid_amount: bid.amount,
+                  has_question: false,
+                }));
+              
+              if (bidComments.length > 0) {
+                const { error: bidError } = await supabase
+                  .from('auction_comments')
+                  .upsert(bidComments, {
+                    onConflict: 'auction_event_id,sequence_number',
+                    ignoreDuplicates: false,
+                  });
+                
+                if (bidError) {
+                  console.warn(`Failed to insert bid history: ${bidError.message}`);
+                } else {
+                  console.log(`✅ Stored ${bidComments.length} bid history entries for vehicle ${data.id}`);
+                }
+              }
+            }
+          } catch (e: any) {
+            console.warn(`Failed to store comments/bid history (non-fatal): ${e?.message || String(e)}`);
+          }
+        }
+        
+        // Create external_identities for bidders and link them to comments/bids
+        if (data?.id && Array.isArray(vehicle.bidders) && vehicle.bidders.length > 0) {
+          try {
+            const nowIso = new Date().toISOString();
+            const identityRows = vehicle.bidders.map((bidder: any) => ({
+              platform: 'carsandbids',
+              handle: bidder.username || 'Unknown',
+              profile_url: bidder.profile_url || `https://carsandbids.com/user/${bidder.username}`,
+              display_name: bidder.username,
+              last_seen_at: nowIso,
+              updated_at: nowIso,
+              metadata: {
+                is_buyer: bidder.is_buyer || false,
+                is_seller: bidder.is_seller || false,
+              },
+            }));
+            
+            // Upsert external identities
+            const { data: upsertedIdentities, error: identityError } = await supabase
+              .from('external_identities')
+              .upsert(identityRows, { onConflict: 'platform,handle' })
+              .select('id, handle');
+            
+            if (identityError) {
+              console.warn(`Failed to upsert external identities: ${identityError.message}`);
+            } else if (upsertedIdentities && upsertedIdentities.length > 0) {
+              // Create map of username to identity ID
+              const handleToIdentityId = new Map<string, string>();
+              upsertedIdentities.forEach((identity: any) => {
+                if (identity.handle && identity.id) {
+                  handleToIdentityId.set(identity.handle, identity.id);
+                }
+              });
+              
+              // Link comments to external identities
+              if (Array.isArray(vehicle.comments) && vehicle.comments.length > 0 && auctionEventId) {
+                const commentUpdates = vehicle.comments
+                  .filter((c: any) => c.author && handleToIdentityId.has(c.author))
+                  .map((c: any) => ({
+                    auction_event_id: auctionEventId,
+                    vehicle_id: data.id,
+                    author_username: c.author,
+                    external_identity_id: handleToIdentityId.get(c.author),
+                  }));
+                
+                if (commentUpdates.length > 0) {
+                  // Update comments with external_identity_id
+                  for (const update of commentUpdates) {
+                    await supabase
+                      .from('auction_comments')
+                      .update({ external_identity_id: update.external_identity_id })
+                      .eq('auction_event_id', update.auction_event_id)
+                      .eq('author_username', update.author_username);
+                  }
+                  
+                  console.log(`✅ Linked ${commentUpdates.length} comments to external identities`);
+                }
+              }
+              
+              // Link bid history to external identities
+              if (Array.isArray(vehicle.bid_history) && vehicle.bid_history.length > 0 && auctionEventId) {
+                const bidUpdates = vehicle.bid_history
+                  .filter((b: any) => b.bidder && handleToIdentityId.has(b.bidder))
+                  .map((b: any) => ({
+                    auction_event_id: auctionEventId,
+                    vehicle_id: data.id,
+                    author_username: b.bidder,
+                    external_identity_id: handleToIdentityId.get(b.bidder),
+                  }));
+                
+                if (bidUpdates.length > 0) {
+                  // Update bid comments with external_identity_id
+                  for (const update of bidUpdates) {
+                    await supabase
+                      .from('auction_comments')
+                      .update({ external_identity_id: update.external_identity_id })
+                      .eq('auction_event_id', update.auction_event_id)
+                      .eq('author_username', update.author_username)
+                      .eq('comment_type', 'bid');
+                  }
+                  
+                  console.log(`✅ Linked ${bidUpdates.length} bids to external identities`);
+                }
+              }
+            }
+          } catch (e: any) {
+            console.warn(`Failed to create external identities for bidders (non-fatal): ${e?.message || String(e)}`);
           }
         }
 
@@ -1873,6 +2998,19 @@ async function insertVehicleImages(
       // Exclude logos in storage paths
       if ((urlLower.includes('/logo') || urlLower.includes('logo.')) && 
           (urlLower.includes('/storage/') || urlLower.includes('supabase.co'))) return false;
+      // CRITICAL: Reject Vimeo CDN thumbnails (low-quality video thumbnails, not vehicle photos)
+      if (urlLower.includes('vimeocdn.com')) {
+        // Check for thumbnail size parameters (mw=80, mw=100, mw=120 = very small thumbnails)
+        if (urlLower.includes('mw=80') || urlLower.includes('mw=100') || urlLower.includes('mw=120')) {
+          console.warn(`⚠️ Rejecting Vimeo thumbnail (too small): ${u}`);
+          return false;
+        }
+        // Also reject if it's clearly a video thumbnail path
+        if (urlLower.includes('/video/') && (urlLower.includes('?mw=') || urlLower.includes('&mw='))) {
+          console.warn(`⚠️ Rejecting Vimeo video thumbnail: ${u}`);
+          return false;
+        }
+      }
       return true;
     });
 

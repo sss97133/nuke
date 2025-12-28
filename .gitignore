@@ -30,6 +30,12 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+# Scraper logs (keep in archive/logs, not root)
+lmc-*.log
+catalog-*.log
+assembly-*.log
+image-scraping.log
+tier1_analysis_errors.log
 
 # Runtime data
 pids
@@ -43,6 +49,12 @@ coverage/
 # Temporary folders
 tmp/
 temp/
+
+# Scraped data files (keep in data/, not root)
+lmc-*.json
+lmc-*.html
+lmc-*.md
+lmc-*.txt
 
 # Supabase
 .branches
