@@ -225,14 +225,14 @@ serve(async (req) => {
     const maxExecutionTime = 50000 // 50 seconds - leave 10s buffer for response
     const skipImageProcessingAfter = 40000 // Skip images after 40s to save time
 
-    // Process each listing
-    for (const queueItem of queueItems) {
-      // Check if we're running out of time
-      const elapsed = Date.now() - startTime
-      if (elapsed > maxExecutionTime) {
-        console.log(`⏰ Time limit reached (${elapsed}ms). Stopping early. Processed ${stats.processed} listings.`)
-        break
-      }
+    // PARALLEL PROCESSING: Process listings in batches of 5 for 5x throughput
+    const CONCURRENCY_LIMIT = 5
+    
+    // Helper function to process a single queue item (returns stats delta)
+    const processQueueItem = async (queueItem: any): Promise<{ 
+      status: 'created' | 'updated' | 'skipped' | 'failed',
+      vehicleId?: string 
+    }> => {
       try {
         // Mark as processing
         await supabase
@@ -306,9 +306,8 @@ serve(async (req) => {
             })
             .eq('id', queueItem.id)
 
-          stats.failed++
           console.error(`  ❌ Scrape failed: ${scrapeError.message}`)
-          continue
+          return { status: 'failed' }
         }
 
         if (!scrapeData?.success || !scrapeData?.data) {
@@ -321,8 +320,7 @@ serve(async (req) => {
             })
             .eq('id', queueItem.id)
 
-          stats.failed++
-          continue
+          return { status: 'failed' }
         }
 
         // Extract and validate vehicle data
@@ -405,9 +403,8 @@ serve(async (req) => {
             })
             .eq('id', queueItem.id)
 
-          stats.skipped++
           console.log(`  ⏭️  Skipped: Not a squarebody`)
-          continue
+          return { status: 'skipped' }
         }
 
         // Validate required fields
@@ -421,8 +418,7 @@ serve(async (req) => {
             })
             .eq('id', queueItem.id)
 
-          stats.failed++
-          continue
+          return { status: 'failed' }
         }
 
         // Validate required fields - but don't fail if optional fields are missing
@@ -437,8 +433,7 @@ serve(async (req) => {
             })
             .eq('id', queueItem.id)
 
-          stats.failed++
-          continue
+          return { status: 'failed' }
         }
 
         // Find or create vehicle
@@ -528,15 +523,13 @@ serve(async (req) => {
               })
               .eq('id', queueItem.id)
 
-            stats.failed++
             console.error(`  ❌ Vehicle insert error: ${vehicleError.message}`)
-            continue
+            return { status: 'failed' }
           }
 
           if (newVehicle?.id) {
             vehicleId = newVehicle.id
             isNew = true
-            stats.created++
 
             // Persist extraction provenance for the listing (raw + parsed fields).
             const provenanceSnippets = extractProvenanceSnippets(rawDesc)
@@ -880,10 +873,22 @@ serve(async (req) => {
             }
           })
 
-          stats.updated++
+          // Mark as complete for updated vehicles
+          await supabase
+            .from('craigslist_listing_queue')
+            .update({
+              status: 'complete',
+              vehicle_id: vehicleId,
+              processed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', queueItem.id)
+
+          console.log(`  ✅ Updated: ${yearNum} ${finalMake} ${finalModel}`)
+          return { status: 'updated', vehicleId: vehicleId || undefined }
         }
 
-        // Mark as complete
+        // Mark as complete for new vehicles
         await supabase
           .from('craigslist_listing_queue')
           .update({
@@ -894,11 +899,8 @@ serve(async (req) => {
           })
           .eq('id', queueItem.id)
 
-        stats.processed++
-        console.log(`  ✅ Complete: ${yearNum} ${finalMake} ${finalModel}`)
-
-        // Rate limiting (reduced from 500ms to 200ms)
-        await new Promise(resolve => setTimeout(resolve, 200))
+        console.log(`  ✅ Created: ${yearNum} ${finalMake} ${finalModel}`)
+        return { status: 'created', vehicleId: vehicleId || undefined }
 
       } catch (error: any) {
         console.error(`  ❌ Error processing ${queueItem.listing_url}:`, error)
@@ -916,7 +918,54 @@ serve(async (req) => {
           })
           .eq('id', queueItem.id)
 
-        stats.failed++
+        return { status: 'failed' }
+      }
+    }
+
+    // Process in parallel batches with concurrency limit
+    for (let i = 0; i < queueItems.length; i += CONCURRENCY_LIMIT) {
+      // Check if we're running out of time before starting a new batch
+      const elapsed = Date.now() - startTime
+      if (elapsed > maxExecutionTime) {
+        console.log(`⏰ Time limit reached (${elapsed}ms). Stopping early. Processed ${stats.processed} listings.`)
+        break
+      }
+
+      const batch = queueItems.slice(i, i + CONCURRENCY_LIMIT)
+      const batchNum = Math.floor(i / CONCURRENCY_LIMIT) + 1
+      const totalBatches = Math.ceil(queueItems.length / CONCURRENCY_LIMIT)
+      
+      console.log(`\n📦 Processing batch ${batchNum}/${totalBatches} (${batch.length} listings in parallel)...`)
+
+      // Process batch in parallel
+      const batchResults = await Promise.allSettled(
+        batch.map(queueItem => processQueueItem(queueItem))
+      )
+
+      // Aggregate results
+      for (const result of batchResults) {
+        stats.processed++
+        if (result.status === 'fulfilled') {
+          const outcome = result.value
+          if (outcome.status === 'created') {
+            stats.created++
+          } else if (outcome.status === 'updated') {
+            stats.updated++
+          } else if (outcome.status === 'skipped') {
+            stats.skipped++
+          } else if (outcome.status === 'failed') {
+            stats.failed++
+          }
+        } else {
+          // Promise rejected - unexpected error
+          console.error('Unexpected processing error:', result.reason)
+          stats.failed++
+        }
+      }
+
+      // Small delay between batches to avoid overwhelming the system
+      if (i + CONCURRENCY_LIMIT < queueItems.length) {
+        await new Promise(resolve => setTimeout(resolve, 300))
       }
     }
 

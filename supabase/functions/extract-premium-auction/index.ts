@@ -2434,7 +2434,9 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         descriptionFromHtml = extractCarsAndBidsDescription(html);
       }
       
-      // LLM-based extraction - only run if we're missing key fields (to save cost)
+      // LLM-based extraction - TWO PHASE APPROACH
+      // Phase 1: Analyze page structure to find WHERE data is located
+      // Phase 2: Extract data using that map
       let llmExtracted: Record<string, any> = {};
       const missingKeyFields = !vehicle?.mileage || !vehicle?.color || !vehicle?.transmission || !vehicle?.engine_size || !vehicle?.vin;
       
@@ -2442,9 +2444,33 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         try {
           const openaiKey = Deno.env.get('OPENAI_API_KEY');
           if (openaiKey) {
-            const { extractWithLLM } = await import('./llm-extractor.ts');
+            const { analyzePageStructure, extractWithLLM } = await import('./llm-extractor.ts');
             const supabaseForLLM = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
-            llmExtracted = await extractWithLLM(html, listingUrl, supabaseForLLM, openaiKey);
+            
+            // PHASE 1: Analyze structure first
+            console.log('🔍 Phase 1: Analyzing page structure to find data locations...');
+            const { strategy, extraction_map } = await analyzePageStructure(html, listingUrl, openaiKey);
+            
+            // PHASE 2: Always try code extraction first (even if map is empty, it will do smart search)
+            console.log('📥 Phase 2: Extracting data using CODE...');
+            const { extractUsingStrategy } = await import('./data-extractor.ts');
+            const codeExtracted = extractUsingStrategy(html, strategy, extraction_map);
+            
+            if (Object.keys(extraction_map).length > 0) {
+              console.log(`✅ LLM found ${Object.keys(extraction_map).length} data locations`);
+              console.log(`📋 Extraction strategy: ${strategy.extraction_strategy || 'unknown'}`);
+            } else {
+              console.log('⚠️ LLM structure analysis found no locations, using smart search in __NEXT_DATA__...');
+            }
+            
+            // If code extraction found data, use it. Otherwise fall back to LLM extraction
+            if (Object.keys(codeExtracted).filter(k => codeExtracted[k] !== null).length > 0) {
+              console.log(`✅ Code extraction found ${Object.keys(codeExtracted).filter(k => codeExtracted[k] !== null).length} fields`);
+              llmExtracted = codeExtracted;
+            } else {
+              console.log('⚠️ Code extraction found nothing, falling back to LLM extraction...');
+              llmExtracted = await extractWithLLM(html, listingUrl, supabaseForLLM, openaiKey, extraction_map);
+            }
             
             llmExtractedForThisVehicle = llmExtracted;
             if (Object.keys(llmExtracted).length > 0) {
@@ -2456,7 +2482,11 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
                   url: listingUrl,
                   called: true,
                   fields_found: nonNullFields,
-                  raw_response: Object.fromEntries(nonNullFields.map(k => [k, llmExtracted[k]]))
+                  raw_response: {
+                    strategy: strategy.extraction_strategy,
+                    extraction_map: extraction_map,
+                    extracted_values: Object.fromEntries(nonNullFields.map(k => [k, llmExtracted[k]]))
+                  }
                 });
               } else {
                 console.log(`⚠️ LLM returned ${Object.keys(llmExtracted).length} fields but all are null - no data found`);
@@ -2464,7 +2494,11 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
                   url: listingUrl,
                   called: true,
                   fields_found: [],
-                  raw_response: llmExtracted
+                  raw_response: {
+                    strategy: strategy.extraction_strategy,
+                    extraction_map: extraction_map,
+                    extracted_values: llmExtracted
+                  }
                 });
               }
             } else {
@@ -2473,7 +2507,11 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
                 url: listingUrl,
                 called: true,
                 fields_found: [],
-                raw_response: {}
+                raw_response: {
+                  strategy: strategy.extraction_strategy,
+                  extraction_map: extraction_map,
+                  extracted_values: {}
+                }
               });
             }
           } else {
