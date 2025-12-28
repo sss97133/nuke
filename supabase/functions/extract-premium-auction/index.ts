@@ -1650,7 +1650,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url, site_type, max_vehicles = 10, debug = false } = await req.json();
+    const { url, site_type, max_vehicles = 10, debug = false, download_images } = await req.json();
     
     if (!url) {
       throw new Error('Missing url parameter');
@@ -1663,11 +1663,21 @@ serve(async (req) => {
     const detectedSite = site_type || detectAuctionSite(url);
     console.log(`Site type: ${detectedSite}`);
     
+    // Default download_images based on site (Cars & Bids defaults to true due to large image counts)
+    let shouldDownload = download_images;
+    if (shouldDownload === undefined) {
+      shouldDownload = detectedSite === 'carsandbids'; // Default to true for Cars & Bids
+    }
+    
+    if (shouldDownload) {
+      console.log(`📥 Slow image download enabled (will capture URLs first, then download in batches)`);
+    }
+    
     // Route to site-specific extractor
     let result;
     switch (detectedSite) {
       case 'carsandbids':
-        result = await extractCarsAndBids(url, max_vehicles, Boolean(debug));
+        result = await extractCarsAndBids(url, max_vehicles, Boolean(debug), Boolean(shouldDownload));
         break;
       case 'mecum':
         result = await extractMecum(url, max_vehicles);
@@ -1723,8 +1733,13 @@ function detectAuctionSite(url: string): string {
   }
 }
 
-async function extractCarsAndBids(url: string, maxVehicles: number, debug: boolean) {
+async function extractCarsAndBids(url: string, maxVehicles: number, debug: boolean, downloadImages: boolean = true) {
   console.log("Cars & Bids: discovering listing URLs then extracting per-listing");
+  // Slow downloads enabled by default for Cars & Bids (often have 100+ images)
+  // URLs captured first, then downloaded in batches to avoid timeouts/rate limits
+  if (downloadImages) {
+    console.log("📥 Slow image download enabled - URLs will be captured first, then downloaded in batches");
+  }
 
   const normalizedUrl = String(url || "").trim();
   const isDirectListing =
@@ -2078,7 +2093,10 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
   }
 
   // Step 3: Store extracted vehicles in DB + link to source org profile
-  const created = await storeVehiclesInDatabase(extracted, "Cars & Bids", sourceWebsite);
+  // Enable slow downloads by default for Cars & Bids (they often have 100+ images)
+  // This prevents timeouts and rate limiting when extracting large galleries
+  const shouldDownload = downloadImages !== false; // Default to true for Cars & Bids
+  const created = await storeVehiclesInDatabase(extracted, "Cars & Bids", sourceWebsite, shouldDownload);
 
   const baseResult: any = {
     success: true,
@@ -2197,6 +2215,7 @@ async function storeVehiclesInDatabase(
   vehicles: any[],
   source: string,
   sourceWebsite: string | null,
+  downloadImages: boolean = false,
 ): Promise<{ created_ids: string[]; updated_ids: string[]; errors: string[]; source_org_id: string | null }> {
   const cleaned = vehicles.filter((v) => v && (v.make || v.model || v.year || v.title));
   console.log(`Storing ${cleaned.length} vehicles from ${source} in database...`);
@@ -2418,8 +2437,12 @@ async function storeVehiclesInDatabase(
             // CRITICAL: Also insert images for updated vehicles
             if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
               console.log(`Inserting ${vehicle.images.length} images for UPDATED vehicle ${updated.id}`);
-              const img = await insertVehicleImages(supabase, updated.id, vehicle.images, source, listingUrl);
-              console.log(`Inserted ${img.inserted} images for updated vehicle, ${img.errors.length} errors`);
+              const img = await insertVehicleImages(supabase, updated.id, vehicle.images, source, listingUrl, { 
+                downloadImages,
+                batchSize: 5,
+                delayMs: 1000,
+              });
+              console.log(`Inserted ${img.inserted} images${img.downloaded ? `, downloaded ${img.downloaded}` : ''} for updated vehicle, ${img.errors.length} errors`);
               errors.push(...img.errors);
             }
           }
@@ -2485,8 +2508,12 @@ async function storeVehiclesInDatabase(
             // CRITICAL: Also insert images for updated vehicles
             if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
               console.log(`Inserting ${vehicle.images.length} images for UPDATED vehicle ${updated.id}`);
-              const img = await insertVehicleImages(supabase, updated.id, vehicle.images, source, listingUrl);
-              console.log(`Inserted ${img.inserted} images for updated vehicle, ${img.errors.length} errors`);
+              const img = await insertVehicleImages(supabase, updated.id, vehicle.images, source, listingUrl, { 
+                downloadImages,
+                batchSize: 5,
+                delayMs: 1000,
+              });
+              console.log(`Inserted ${img.inserted} images${img.downloaded ? `, downloaded ${img.downloaded}` : ''} for updated vehicle, ${img.errors.length} errors`);
               errors.push(...img.errors);
             }
           }
@@ -2889,8 +2916,12 @@ async function storeVehiclesInDatabase(
         // when origin_organization_id is set.
         if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
           console.log(`Inserting ${vehicle.images.length} images for vehicle ${data.id}`);
-          const img = await insertVehicleImages(supabase, data.id, vehicle.images, source, listingUrl);
-          console.log(`Inserted ${img.inserted} images, ${img.errors.length} errors`);
+          const img = await insertVehicleImages(supabase, data.id, vehicle.images, source, listingUrl, { 
+            downloadImages,
+            batchSize: 5,
+            delayMs: 1000,
+          });
+          console.log(`Inserted ${img.inserted} images${img.downloaded ? `, downloaded ${img.downloaded}` : ''}, ${img.errors.length} errors`);
           errors.push(...img.errors);
         } else {
           console.log(`No images to insert for vehicle ${data.id} (images: ${vehicle.images ? 'exists but empty/invalid' : 'missing'})`);
@@ -3010,9 +3041,14 @@ async function insertVehicleImages(
   imageUrls: any[],
   source: string,
   listingUrl: string | null,
-): Promise<{ inserted: number; errors: string[] }> {
+  options?: { downloadImages?: boolean; batchSize?: number; delayMs?: number },
+): Promise<{ inserted: number; errors: string[]; downloaded?: number }> {
   const errors: string[] = [];
   let inserted = 0;
+  let downloaded = 0;
+  const downloadImages = options?.downloadImages ?? false;
+  const batchSize = options?.batchSize ?? 5; // Process 5 images at a time
+  const delayMs = options?.delayMs ?? 1000; // 1 second delay between batches
   
   // Clean all URLs before processing and filter out organization/dealer logos
   const urls = (Array.isArray(imageUrls) ? imageUrls : [])
@@ -3163,7 +3199,132 @@ async function insertVehicleImages(
       errors.push(msg);
     }
   }
-  return { inserted, errors };
+
+  // If downloadImages is true, slowly download images in batches
+  if (downloadImages && inserted > 0) {
+    console.log(`📥 Starting slow batch download of ${inserted} images for vehicle ${vehicleId}...`);
+    
+    // Get all external images we just created
+    const { data: externalImages, error: fetchError } = await supabase
+      .from("vehicle_images")
+      .select("id, image_url")
+      .eq("vehicle_id", vehicleId)
+      .eq("is_external", true)
+      .is("storage_path", null) // Only download images not yet in storage
+      .order("position", { ascending: true })
+      .limit(1000); // Safety limit
+
+    if (fetchError) {
+      errors.push(`Failed to fetch external images for download: ${fetchError.message}`);
+    } else if (externalImages && externalImages.length > 0) {
+      console.log(`📥 Downloading ${externalImages.length} images in batches of ${batchSize} with ${delayMs}ms delays...`);
+      
+      // Process in batches with delays
+      for (let i = 0; i < externalImages.length; i += batchSize) {
+        const batch = externalImages.slice(i, i + batchSize);
+        const batchNum = Math.floor(i / batchSize) + 1;
+        const totalBatches = Math.ceil(externalImages.length / batchSize);
+        
+        console.log(`📥 Processing batch ${batchNum}/${totalBatches} (${batch.length} images)...`);
+        
+        // Process batch in parallel
+        const batchResults = await Promise.allSettled(
+          batch.map(async (img: any) => {
+            try {
+              const imageUrl = img.image_url;
+              if (!imageUrl || !imageUrl.startsWith('http')) {
+                return { success: false, error: 'Invalid URL' };
+              }
+
+              // Download image
+              const imageResponse = await fetch(imageUrl, {
+                signal: AbortSignal.timeout(30000), // 30 second timeout
+              });
+
+              if (!imageResponse.ok) {
+                return { success: false, error: `HTTP ${imageResponse.status}` };
+              }
+
+              const imageBlob = await imageResponse.blob();
+              const arrayBuffer = await imageBlob.arrayBuffer();
+              const uint8Array = new Uint8Array(arrayBuffer);
+
+              // Determine file extension
+              const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+              const ext = contentType.includes('png') ? 'png' : 
+                         contentType.includes('webp') ? 'webp' : 'jpg';
+              
+              // Generate storage path
+              const fileName = `${Date.now()}_${img.id}.${ext}`;
+              const storagePath = `${vehicleId}/${fileName}`;
+
+              // Upload to Supabase Storage
+              const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('vehicle-images')
+                .upload(storagePath, uint8Array, {
+                  contentType: contentType,
+                  cacheControl: '3600',
+                  upsert: false,
+                });
+
+              if (uploadError) {
+                return { success: false, error: uploadError.message };
+              }
+
+              // Get public URL
+              const { data: { publicUrl } } = supabase.storage
+                .from('vehicle-images')
+                .getPublicUrl(storagePath);
+
+              // Update vehicle_images record with storage path and remove is_external flag
+              const { error: updateError } = await supabase
+                .from("vehicle_images")
+                .update({
+                  image_url: publicUrl,
+                  storage_path: storagePath,
+                  is_external: false,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", img.id);
+
+              if (updateError) {
+                return { success: false, error: updateError.message };
+              }
+
+              return { success: true };
+            } catch (e: any) {
+              return { success: false, error: e?.message || String(e) };
+            }
+          })
+        );
+
+        // Count successes and errors
+        let batchDownloaded = 0;
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value.success) {
+            batchDownloaded++;
+            downloaded++;
+          } else {
+            const errorMsg = result.status === 'rejected' 
+              ? result.reason?.message || 'Unknown error'
+              : result.value.error || 'Unknown error';
+            errors.push(`Image download failed: ${errorMsg}`);
+          }
+        }
+
+        console.log(`✅ Batch ${batchNum}/${totalBatches} complete: ${batchDownloaded}/${batch.length} downloaded`);
+
+        // Delay between batches (except for the last batch)
+        if (i + batchSize < externalImages.length) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+
+      console.log(`✅ Slow download complete: ${downloaded}/${externalImages.length} images downloaded for vehicle ${vehicleId}`);
+    }
+  }
+
+  return { inserted, errors, ...(downloadImages ? { downloaded } : {}) };
 }
 
 function extractCarsAndBidsListingUrls(html: string, limit: number): string[] {
