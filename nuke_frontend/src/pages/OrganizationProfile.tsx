@@ -1531,11 +1531,11 @@ export default function OrganizationProfile() {
               {displayName}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-              {organization.business_type && (
+            {organization.business_type && (
                 <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                  {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
-                </div>
-              )}
+                {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
+              </div>
+            )}
               <LiveAuctionBadge organization={organization} />
             </div>
           </div>

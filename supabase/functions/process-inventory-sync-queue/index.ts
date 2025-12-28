@@ -112,6 +112,15 @@ serve(async (req) => {
         const website = safeString(org.website);
         const origin = website ? normalizeOrigin(website) : null;
         const meta = (org.metadata && typeof org.metadata === "object") ? org.metadata : {};
+        
+        // Get current vehicle count for this org (to determine if zero inventory)
+        const { count: vehicleCount } = await supabase
+          .from("organization_vehicles")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", org.id)
+          .eq("status", "active");
+        const currentVehicleCount = vehicleCount || 0;
+        const isZeroInventory = currentVehicleCount === 0;
 
         const classicProfileUrl = safeString((meta as any).classic_com_profile) || null;
 
@@ -167,15 +176,17 @@ serve(async (req) => {
           // Current inventory
           if (runMode === "both" || runMode === "current") {
             if (inventoryUrl) {
+              // For zero-inventory orgs, be more thorough (use the count we got above)
               await callScrape("dealer_current", {
                 source_url: inventoryUrl,
                 source_type: "dealer_website",
                 organization_id: org.id,
-                max_results: maxResults,
-                use_llm_extraction: true,
+                max_results: isZeroInventory ? Math.max(maxResults, 500) : maxResults, // Higher limit for zero inventory
+                use_llm_extraction: true, // Always use LLM for thorough profiles
                 extract_dealer_info: true,
                 include_sold: false,
                 force_listing_status: "in_stock",
+                cheap_mode: false, // Never use cheap mode for zero inventory (thorough extraction)
               }, true);
             } else {
               out.calls.push({ organization_id: org.id, kind: "dealer_current_skipped_no_website", ok: true, listings_queued: 0 });

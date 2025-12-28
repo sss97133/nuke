@@ -84,11 +84,32 @@ serve(async (req) => {
       }
     }
 
-    // Extract description
-    const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content');
-    const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content');
-    if (metaDesc || ogDesc) {
-      updates.description = metaDesc || ogDesc;
+    // For descriptions, prefer LLM-generated due diligence report
+    // Only use basic extraction as fallback if due diligence hasn't been run
+    const hasDueDiligence = org.metadata?.due_diligence_report?.description;
+    
+    if (!hasDueDiligence && !org.description) {
+      // Trigger due diligence report generation (async, non-blocking)
+      try {
+        supabase.functions.invoke('generate-org-due-diligence', {
+          body: { organizationId: org.id, websiteUrl: url }
+        }).catch(err => {
+          console.warn('⚠️ Due diligence generation failed (non-critical):', err);
+        });
+      } catch (err) {
+        console.warn('⚠️ Could not trigger due diligence:', err);
+      }
+
+      // Fallback: Extract basic description from meta tags
+      const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content');
+      const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content');
+      
+      if (metaDesc || ogDesc) {
+        updates.description = (metaDesc || ogDesc)?.substring(0, 500);
+      }
+    } else if (hasDueDiligence) {
+      // Use the due diligence report description
+      updates.description = org.metadata.due_diligence_report.description;
     }
 
     // Extract logo
@@ -127,6 +148,41 @@ serve(async (req) => {
 
     if (logoUrl && !org.logo_url) {
       updates.logo_url = logoUrl;
+    }
+
+    // Infer business type from website content
+    if (!org.business_type || org.business_type === 'other') {
+      const pageText = doc.body?.textContent?.toLowerCase() || '';
+      const title = doc.querySelector('title')?.textContent?.toLowerCase() || '';
+      const h1 = doc.querySelector('h1')?.textContent?.toLowerCase() || '';
+      const combinedText = `${title} ${h1} ${pageText}`;
+      
+      let inferredType: string | null = null;
+      
+      // Strong signals first
+      if (/(restoration|coachwork|coachworks|frame-off|concours|restore)/i.test(combinedText)) {
+        inferredType = 'restoration_shop';
+      } else if (/(performance|racing|dyno|tuning|race|turbo|supercharger)/i.test(combinedText)) {
+        inferredType = 'performance_shop';
+      } else if (/(body\s*shop|collision|paint\s*shop|autobody|panel\s*beating)/i.test(combinedText)) {
+        inferredType = 'body_shop';
+      } else if (/(detail|detailing|ceramic|ppf|paint\s*correction)/i.test(combinedText)) {
+        inferredType = 'detailing';
+      } else if (/(auction|auction\s*house|auctioneer)/i.test(combinedText)) {
+        inferredType = 'auction_house';
+      } else if (/(dealer|dealership|showroom|inventory|for\s*sale|used\s*cars|new\s*cars)/i.test(combinedText)) {
+        inferredType = 'dealership';
+      } else if (/(garage|mechanic|repair|service\s*center|auto\s*repair)/i.test(combinedText)) {
+        inferredType = 'garage';
+      } else if (/(fabrication|custom\s*build|custom\s*shop|welding)/i.test(combinedText)) {
+        inferredType = 'fabrication';
+      } else if (/(specialty|specialized|exotic|classic|vintage)/i.test(combinedText)) {
+        inferredType = 'specialty_shop';
+      }
+      
+      if (inferredType) {
+        updates.business_type = inferredType;
+      }
     }
 
     // Extract contact info
