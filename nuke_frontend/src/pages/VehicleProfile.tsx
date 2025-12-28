@@ -1598,6 +1598,13 @@ const VehicleProfile: React.FC = () => {
             ? String((vehicleData as any)?.discovery_url)
             : null);
 
+        // Determine listing_status from vehicle data - check sale_status, auction_outcome, or sale_price
+        const inferredStatus = 
+          String((vehicleData as any)?.sale_status || '').toLowerCase() === 'sold' ? 'sold' :
+          String((vehicleData as any)?.auction_outcome || '').toLowerCase() === 'sold' ? 'sold' :
+          (typeof (vehicleData as any)?.sale_price === 'number' && (vehicleData as any).sale_price > 0) ? 'sold' :
+          String((vehicleData as any)?.auction_outcome || 'unknown');
+
         const effective = best?.listing_url && best?.platform
           ? best
           : (fallbackListingUrl
@@ -1605,7 +1612,7 @@ const VehicleProfile: React.FC = () => {
                   external_listing_id: null,
                   platform: 'bat',
                   listing_url: fallbackListingUrl,
-                  listing_status: String((vehicleData as any)?.auction_outcome || 'unknown'),
+                  listing_status: inferredStatus,
                   end_date: (vehicleData as any)?.auction_end_date || null,
                   current_bid: typeof (vehicleData as any)?.current_bid === 'number' ? (vehicleData as any).current_bid : null,
                   bid_count: typeof (vehicleData as any)?.bid_count === 'number' ? (vehicleData as any).bid_count : null,

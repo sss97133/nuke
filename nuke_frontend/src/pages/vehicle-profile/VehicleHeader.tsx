@@ -62,6 +62,65 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [rpcSignal, setRpcSignal] = useState<any | null>(initialPriceSignal || null);
   const [trendPct, setTrendPct] = useState<number | null>(null);
   const [trendPeriod, setTrendPeriod] = useState<'live' | '1w' | '30d' | '6m' | '1y' | '5y'>('30d');
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const locationRef = useRef<HTMLDivElement>(null);
+
+  // Close location dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (locationRef.current && !locationRef.current.contains(e.target as Node)) {
+        setShowLocationDropdown(false);
+      }
+    };
+    if (showLocationDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLocationDropdown]);
+
+  // Derive location display - prefer city codes (ATL, LAX, NYC) or state abbrev
+  const locationDisplay = useMemo(() => {
+    const v = vehicle as any;
+    const city = v?.city;
+    const state = v?.state;
+    const country = v?.country;
+    const batLoc = v?.bat_location;
+    const listingLoc = v?.listing_location || v?.listing_location_raw;
+    
+    // City code mappings for major metro areas
+    const cityCodes: Record<string, string> = {
+      'atlanta': 'ATL', 'los angeles': 'LAX', 'new york': 'NYC', 'chicago': 'CHI',
+      'miami': 'MIA', 'dallas': 'DFW', 'houston': 'HOU', 'phoenix': 'PHX',
+      'san francisco': 'SFO', 'seattle': 'SEA', 'denver': 'DEN', 'boston': 'BOS',
+      'detroit': 'DTW', 'minneapolis': 'MSP', 'san diego': 'SAN', 'las vegas': 'LAS',
+      'portland': 'PDX', 'austin': 'AUS', 'nashville': 'BNA', 'charlotte': 'CLT',
+      'raleigh': 'RDU', 'tampa': 'TPA', 'orlando': 'MCO', 'philadelphia': 'PHL',
+      'pittsburgh': 'PIT', 'cleveland': 'CLE', 'cincinnati': 'CVG', 'st louis': 'STL',
+      'kansas city': 'MCI', 'indianapolis': 'IND', 'columbus': 'CMH', 'milwaukee': 'MKE',
+      'salt lake city': 'SLC', 'sacramento': 'SMF', 'san jose': 'SJC', 'san antonio': 'SAT',
+    };
+    
+    // Best: city code if major metro
+    if (city) {
+      const code = cityCodes[city.toLowerCase()];
+      if (code) return { short: code, full: `${city}, ${state || ''}`.trim() };
+    }
+    // Next: state abbreviation
+    if (state) return { short: state, full: city ? `${city}, ${state}` : state };
+    // Fallback: bat_location or listing_location (extract state if possible)
+    if (batLoc && batLoc !== 'United States') {
+      const stateMatch = batLoc.match(/,\s*([A-Z]{2})\b/);
+      return { short: stateMatch ? stateMatch[1] : batLoc.slice(0, 3).toUpperCase(), full: batLoc };
+    }
+    if (listingLoc) {
+      const stateMatch = listingLoc.match(/,\s*([A-Z]{2})\b/);
+      return { short: stateMatch ? stateMatch[1] : listingLoc.slice(0, 3).toUpperCase(), full: listingLoc };
+    }
+    // Country only
+    if (country && country !== 'USA' && country !== 'US') return { short: country.slice(0, 3).toUpperCase(), full: country };
+    
+    return null;
+  }, [(vehicle as any)?.city, (vehicle as any)?.state, (vehicle as any)?.country, (vehicle as any)?.bat_location, (vehicle as any)?.listing_location]);
   
   // Cycle through trend periods
   const toggleTrendPeriod = (e: React.MouseEvent) => {
@@ -748,14 +807,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     return () => window.clearInterval(id);
   }, [auctionPulse?.end_date]);
 
-  const formatCountdownClock = (iso?: string | null) => {
+  const formatCountdownClock = (iso?: string | null, skipEndedText?: boolean) => {
     if (!iso) return null;
     const end = new Date(iso).getTime();
     if (!Number.isFinite(end)) return null;
     const diff = end - auctionNow;
     const maxReasonable = 14 * 24 * 60 * 60 * 1000;
     if (diff > maxReasonable) return null;
-    if (diff <= 0) return 'Ended';
+    // Don't show redundant "Ended" when SOLD badge is already visible
+    if (diff <= 0) return skipEndedText ? null : 'Ended';
     const totalSeconds = Math.floor(diff / 1000);
     const d = Math.floor(totalSeconds / 86400);
     const h = Math.floor((totalSeconds % 86400) / 3600);
@@ -1621,6 +1681,150 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
           ) : null}
 
+          {/* Location Badge with Dropdown */}
+          {locationDisplay && (
+            <div ref={locationRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLocationDropdown(!showLocationDropdown);
+                }}
+                style={{
+                  fontSize: '9px',
+                  fontWeight: 600,
+                  fontFamily: 'monospace',
+                  letterSpacing: '0.5px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '2px 4px',
+                  color: 'var(--text-muted)',
+                }}
+                title={`Location: ${locationDisplay.full}`}
+              >
+                {locationDisplay.short}
+              </button>
+              
+              {/* Location Dropdown */}
+              {showLocationDropdown && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    zIndex: 1000,
+                    background: 'var(--bg)',
+                    border: '2px solid var(--primary)',
+                    padding: '12px',
+                    width: '260px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    marginTop: '4px',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '8px',
+                    borderBottom: '1px solid var(--border)',
+                    paddingBottom: '6px'
+                  }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '9pt' }}>Last Known Location</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowLocationDropdown(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '12pt',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      x
+                    </button>
+                  </div>
+                  
+                  <div style={{ fontSize: '8pt' }}>
+                    {/* Location Details */}
+                    <div style={{ marginBottom: '8px' }}>
+                      {(vehicle as any)?.city && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>City</span>
+                          <span>{(vehicle as any).city}</span>
+                        </div>
+                      )}
+                      {(vehicle as any)?.state && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>State</span>
+                          <span>{(vehicle as any).state}</span>
+                        </div>
+                      )}
+                      {(vehicle as any)?.zip_code && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>ZIP Code</span>
+                          <span style={{ fontFamily: 'monospace' }}>{(vehicle as any).zip_code}</span>
+                        </div>
+                      )}
+                      {!(vehicle as any)?.zip_code && !(vehicle as any)?.city && (vehicle as any)?.bat_location && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Region</span>
+                          <span>{(vehicle as any).bat_location}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Area Demographics (placeholder - would need API) */}
+                    <div style={{ 
+                      borderTop: '1px solid var(--border)', 
+                      paddingTop: '8px',
+                      marginTop: '8px'
+                    }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '4px', color: 'var(--text-muted)', fontSize: '7pt' }}>
+                        AREA VEHICLE DEMOGRAPHICS
+                      </div>
+                      <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        {(vehicle as any)?.zip_code ? (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                              <span>Similar vehicles nearby</span>
+                              <span>--</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                              <span>Avg. market price</span>
+                              <span>--</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                              <span>Climate rating</span>
+                              <span>--</span>
+                            </div>
+                          </>
+                        ) : (
+                          <span>Add ZIP code for area demographics</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Source */}
+                    <div style={{ 
+                      marginTop: '8px', 
+                      paddingTop: '6px', 
+                      borderTop: '1px solid var(--border)',
+                      fontSize: '6pt',
+                      color: 'var(--text-muted)'
+                    }}>
+                      Source: {(vehicle as any)?.listing_location_source || (vehicle as any)?.bat_location ? 'BaT listing' : 'Vehicle record'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Seller visibility (do not hide the seller behind tiny icons) */}
           {sellerBadge?.label && (() => {
             // Don't show "Bring a Trailer" consigner badge if we're already showing BaT platform badge
@@ -1779,7 +1983,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   updated {formatAge(auctionPulse.updated_at) || '—'} ago
                 </span>
               ) : null}
-              {auctionPulse.end_date ? (
+              {/* Hide countdown for sold auctions - SOLD badge is enough */}
+              {auctionPulse.end_date && !isSold ? (
                 <span
                   className="badge badge-secondary"
                   style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}
