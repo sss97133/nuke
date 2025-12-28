@@ -1511,9 +1511,9 @@ function extractMecumSoldPrice(html: string): { sale_price: number | null; metho
       // Look for price-like text in the section, but exclude lot header children
       const allElements = topNLotsSection.querySelectorAll('*');
       for (const el of Array.from(allElements)) {
-        if (isLotHeaderElement(el)) continue;
+        if (isLotHeaderElement(el as Element)) continue;
         
-        const text = el.textContent || '';
+        const text = (el as Element).textContent || '';
         const pricePatterns = [
           /\$([\d,]+)/g,
           /USD\s*\$([\d,]+)/gi,
@@ -1567,7 +1567,7 @@ function extractMecumSoldPrice(html: string): { sale_price: number | null; metho
     });
 
     for (const el of soldElements) {
-      const elText = el.textContent || '';
+      const elText = (el as Element).textContent || '';
       const priceMatch = elText.match(/\$?([\d,]+)/);
       if (priceMatch) {
         const price = parseInt(priceMatch[1].replace(/,/g, ''), 10);
@@ -2444,6 +2444,33 @@ async function storeVehiclesInDatabase(
         if (urlCheckErr) {
           error = urlCheckErr;
         } else if (existingByUrl?.id) {
+          // For updates by discovery_url, merge origin_metadata instead of replacing
+          const { data: existingVehicle } = await supabase
+            .from("vehicles")
+            .select("origin_metadata")
+            .eq("id", existingByUrl.id)
+            .single();
+          
+          const existingOriginMetadata = (existingVehicle?.origin_metadata as any) || {};
+          const newOriginMetadata = {
+            ...existingOriginMetadata,
+            import_source: source.toLowerCase(),
+            import_date: nowIso().split('T')[0],
+            discovery_url: listingUrl,
+            source_url: listingUrl,
+            images: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.images || []),
+            image_urls: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.image_urls || []),
+            structured_sections: vehicle.structured_sections || existingOriginMetadata.structured_sections || {},
+            bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : (existingOriginMetadata.bid_history || []),
+            comments: Array.isArray(vehicle.comments) ? vehicle.comments : (existingOriginMetadata.comments || []),
+            bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : (existingOriginMetadata.bidders || []),
+            auction_id: vehicle.auction_id || existingOriginMetadata.auction_id || null,
+            listing_status: vehicle.listing_status || existingOriginMetadata.listing_status || 'active',
+            last_updated: nowIso(),
+          };
+          
+          payload.origin_metadata = newOriginMetadata;
+          
           // Update existing vehicle
           const { data: updated, error: updateErr } = await supabase
             .from("vehicles")
@@ -2637,10 +2664,12 @@ async function storeVehiclesInDatabase(
         }
         
         // Store comments and bid history in auction_comments table
+        // Hoist auctionEventId to outer scope so it can be used in bidders block
+        let auctionEventId: string | null = null;
+        
         if (data?.id && listingUrl && (Array.isArray(vehicle.comments) || Array.isArray(vehicle.bid_history))) {
           try {
             // Create or get auction_event (using unique constraint on platform, listing_url)
-            let auctionEventId: string | null = null;
             const eventPlatform = platform || 'carsandbids';
             const { data: existingEvent } = await supabase
               .from('auction_events')
@@ -2667,7 +2696,7 @@ async function storeVehiclesInDatabase(
                   auction_start_at: vehicle.auction_start_date ? new Date(vehicle.auction_start_date).toISOString() : null,
                   auction_end_at: endDate && Number.isFinite(endDate.getTime()) ? endDate.toISOString() : null,
                   metadata: {
-                    listing_id: listingId || null,
+                    listing_id: vehicle.auction_id || vehicle.listing_id || (listingUrl ? listingUrl.split('/').pop() || null : null),
                     current_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
                     final_price: Number.isFinite(vehicle.sale_price) ? vehicle.sale_price : 
                                 (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid : null),
