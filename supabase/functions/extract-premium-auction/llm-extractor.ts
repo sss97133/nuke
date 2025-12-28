@@ -269,32 +269,200 @@ async function getFieldChecklist(supabase: any): Promise<FieldChecklist[]> {
 }
 
 /**
- * Use LLM to intelligently locate and extract all fields from HTML
+ * PHASE 1: Use LLM to analyze page structure and create extraction strategy
+ * Returns a map of where each field is located (CSS selectors, JSON paths, etc.)
+ */
+export async function analyzePageStructure(
+  html: string,
+  listingUrl: string,
+  openaiKey?: string
+): Promise<{ strategy: Record<string, any>; extraction_map: Record<string, string> }> {
+  const htmlSnippet = html.substring(0, 30000); // More HTML for structure analysis
+  
+  const prompt = `Analyze this Cars & Bids auction page HTML and create an extraction strategy.
+
+Your job is to FIND WHERE the data is located, not extract it yet.
+
+HTML:
+${htmlSnippet}
+
+Return JSON with:
+{
+  "data_locations": {
+    "mileage": "CSS selector or JSON path where mileage is found",
+    "color": "CSS selector or JSON path where color is found",
+    "transmission": "CSS selector or JSON path where transmission is found",
+    "engine_size": "CSS selector or JSON path where engine is found",
+    "vin": "CSS selector or JSON path where VIN is found"
+  },
+  "data_format": "html_text | json_embedded | javascript_variable | structured_data",
+  "json_paths": ["path.to.data if JSON found"],
+  "css_selectors": ["selector if HTML found"],
+  "extraction_strategy": "How to best extract: 'parse_json', 'query_selector', 'regex_pattern', or 'llm_extract'"
+}
+
+Be specific - give exact selectors or paths.`;
+
+  try {
+    // Try Google Gemini first (free tier), fall back to OpenAI
+    const googleKey = Deno.env.get('GOOGLE_API_KEY') || Deno.env.get('GEMINI_API_KEY');
+    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    
+    if (googleKey) {
+      // Use Google Gemini API (free tier)
+      console.log('🔍 Using Google Gemini API for structure analysis...');
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt + '\n\nIMPORTANT: Return ONLY valid JSON, no markdown, no code blocks.'
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`Google Gemini structure analysis failed: ${response.status} - ${errorText}`);
+        // Fall back to OpenAI if available
+        if (openaiKey) {
+          console.log('🔄 Falling back to OpenAI...');
+        } else {
+          return { strategy: {}, extraction_map: {} };
+        }
+      } else {
+        const data = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (content) {
+          try {
+            const result = JSON.parse(content);
+            console.log(`✅ Google Gemini analyzed page structure. Strategy: ${result.extraction_strategy || 'unknown'}`);
+            return {
+              strategy: result,
+              extraction_map: result.data_locations || {}
+            };
+          } catch (parseError) {
+            console.warn(`⚠️ Failed to parse Gemini JSON response:`, parseError);
+            console.warn(`Raw response:`, content.substring(0, 500));
+            // Fall through to OpenAI if available
+          }
+        }
+      }
+    }
+    
+    // Fall back to OpenAI if Google failed or not available
+    const apiKey = openaiKey;
+    if (!apiKey) {
+      console.warn('⚠️ No Google or OpenAI API key found');
+      return { strategy: {}, extraction_map: {} };
+    }
+
+    console.log('🔍 Using OpenAI API for structure analysis...');
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1500,
+        temperature: 0.1,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!response.ok) {
+      console.warn(`LLM structure analysis failed: ${response.status}`);
+      return { strategy: {}, extraction_map: {} };
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+    if (!content) return { strategy: {}, extraction_map: {} };
+
+    try {
+      const result = JSON.parse(content);
+      console.log(`✅ LLM analyzed page structure. Strategy: ${result.extraction_strategy || 'unknown'}`);
+      console.log(`📋 LLM structure analysis response:`, JSON.stringify(result, null, 2).substring(0, 1000));
+      
+      const extraction_map = result.data_locations || {};
+      if (Object.keys(extraction_map).length === 0) {
+        console.warn(`⚠️ LLM structure analysis found no data_locations. Full response:`, JSON.stringify(result, null, 2).substring(0, 500));
+      }
+      
+      return {
+        strategy: result,
+        extraction_map: extraction_map
+      };
+    } catch (parseError) {
+      console.warn(`⚠️ Failed to parse LLM structure analysis response:`, parseError);
+      console.warn(`Raw response:`, content.substring(0, 500));
+      return { strategy: {}, extraction_map: {} };
+    }
+  } catch (error: any) {
+    console.warn(`LLM structure analysis error: ${error?.message}`);
+    return { strategy: {}, extraction_map: {} };
+  }
+}
+
+/**
+ * PHASE 2: Use LLM to extract data based on the strategy map
  */
 export async function extractWithLLM(
   html: string,
   listingUrl: string,
   supabase: any,
-  openaiKey?: string
+  openaiKey?: string,
+  extractionMap?: Record<string, string>
 ): Promise<Record<string, any>> {
-  // Only get high-priority fields (the simple ones we actually need)
-  const checklist = await getFieldChecklist(supabase);
-  const priorityFields = checklist
-    .filter(f => f.priority >= 80) // Only high-priority fields (the important ones)
-    .sort((a, b) => b.priority - a.priority)
-    .slice(0, 15); // Limit to top 15 fields to reduce prompt size
+  // If we have an extraction map from structure analysis, use it
+  // Otherwise fall back to simple extraction
+  const htmlSnippet = html.substring(0, 30000);
   
-  // Truncate HTML to reduce cost (20k chars is enough for most listings)
-  const htmlSnippet = html.substring(0, 20000);
+  let prompt: string;
   
-  // Build simple, focused prompt
-  const fieldsList = priorityFields
-    .map(f => `- ${f.field_name}: ${f.llm_question}`)
-    .join('\n');
+  if (extractionMap && Object.keys(extractionMap).length > 0) {
+    // Use the extraction map to guide extraction
+    const mapInstructions = Object.entries(extractionMap)
+      .map(([field, location]) => `- ${field}: Look at ${location}`)
+      .join('\n');
+    
+    prompt = `Extract vehicle data using these specific locations I found:
 
-  const prompt = `Extract these vehicle fields from the HTML. Return JSON only:
+${mapInstructions}
 
-${fieldsList}
+HTML:
+${htmlSnippet}
+
+Extract the values from the locations specified above. Return JSON:
+{
+  "extracted_fields": {
+    "mileage": <number or null>,
+    "color": <string or null>,
+    "transmission": <string or null>,
+    "engine_size": <string or null>,
+    "vin": <string or null>
+  }
+}`;
+  } else {
+    // Fallback: simple extraction without map
+    prompt = `Extract these vehicle fields from the HTML:
+
+- mileage: What is the vehicle mileage/odometer reading?
+- color: What is the exterior color?
+- transmission: What is the transmission type?
+- engine_size: What is the engine size/description?
+- vin: What is the VIN (17 characters)?
 
 HTML:
 ${htmlSnippet}
@@ -302,22 +470,106 @@ ${htmlSnippet}
 Return JSON:
 {
   "extracted_fields": {
-    "mileage": 45000,
-    "color": "Red",
-    "transmission": "Manual",
-    "engine_size": "5.7L V8",
-    "vin": "194677S123456"
+    "mileage": <number or null>,
+    "color": <string or null>,
+    "transmission": <string or null>,
+    "engine_size": <string or null>,
+    "vin": <string or null>
   }
 }
 
 Extract only fields that are clearly present. Use null for missing fields.`;
+  }
 
   try {
+    // Try Google Gemini first (free tier), fall back to OpenAI
+    const googleKey = Deno.env.get('GOOGLE_API_KEY') || Deno.env.get('GEMINI_API_KEY');
     const apiKey = openaiKey || Deno.env.get('OPENAI_API_KEY');
+    
+    if (googleKey) {
+      // Use Google Gemini API (free tier)
+      console.log('📥 Using Google Gemini API for extraction...');
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt + '\n\nIMPORTANT: Return ONLY valid JSON, no markdown, no code blocks.'
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`Google Gemini extraction failed: ${response.status} - ${errorText}`);
+        // Fall back to OpenAI if available
+        if (apiKey) {
+          console.log('🔄 Falling back to OpenAI...');
+        } else {
+          return {};
+        }
+      } else {
+        const data = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (content) {
+          try {
+            const result = JSON.parse(content);
+            const extracted: Record<string, any> = {};
+            if (result.extracted_fields) {
+              for (const [fieldName, fieldData] of Object.entries(result.extracted_fields)) {
+                const value = (fieldData as any).value;
+                if (value !== null && value !== undefined) {
+                  extracted[fieldName] = value;
+                }
+              }
+            }
+            const extractedCount = Object.keys(extracted).filter(k => extracted[k] !== null && extracted[k] !== undefined).length;
+            if (extractedCount > 0) {
+              console.log(`✅ Google Gemini extracted ${extractedCount} fields: ${Object.keys(extracted).filter(k => extracted[k] !== null && extracted[k] !== undefined).join(', ')}`);
+            }
+            return extracted;
+          } catch (parseError) {
+            console.warn(`⚠️ Failed to parse Gemini JSON response:`, parseError);
+            // Try to extract JSON from markdown
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try {
+                const result = JSON.parse(jsonMatch[0]);
+                const extracted: Record<string, any> = {};
+                if (result.extracted_fields) {
+                  for (const [fieldName, fieldData] of Object.entries(result.extracted_fields)) {
+                    const value = (fieldData as any).value;
+                    if (value !== null && value !== undefined) {
+                      extracted[fieldName] = value;
+                    }
+                  }
+                }
+                return extracted;
+              } catch {
+                // Failed to parse
+              }
+            }
+          }
+        }
+        // If we got here, Gemini didn't work, fall through to OpenAI
+      }
+    }
+    
+    // Fall back to OpenAI if Google failed or not available
     if (!apiKey) {
-      console.warn('⚠️ No OpenAI API key found, skipping LLM extraction');
+      console.warn('⚠️ No Google or OpenAI API key found, skipping LLM extraction');
       return {};
     }
+
+    console.log('📥 Using OpenAI API for extraction...');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
