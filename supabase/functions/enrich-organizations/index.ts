@@ -195,11 +195,56 @@ serve(async (req) => {
 
 async function extractLogoFromWebsite(website: string): Promise<string | null> {
   try {
+    const baseUrl = new URL(website);
+    const origin = baseUrl.origin;
+
+    // Helper to make absolute URL
+    const toAbsoluteUrl = (url: string): string => {
+      if (!url) return '';
+      if (url.startsWith('http')) return url;
+      if (url.startsWith('//')) return `https:${url}`;
+      if (url.startsWith('/')) return `${origin}${url}`;
+      return `${origin}/${url}`;
+    };
+
+    // Helper to score logo quality
+    const scoreLogo = (url: string, context: { isSvg?: boolean; isMeta?: boolean; hasLogoInPath?: boolean; size?: string }): number => {
+      const lower = url.toLowerCase();
+      let score = 0;
+      
+      // Prefer SVG logos (scalable, usually better quality)
+      if (context.isSvg || lower.endsWith('.svg')) score += 10;
+      
+      // Prefer larger sizes
+      if (context.size) {
+        const sizeMatch = context.size.match(/(\d+)x(\d+)/);
+        if (sizeMatch) {
+          const size = parseInt(sizeMatch[1]) * parseInt(sizeMatch[2]);
+          if (size > 10000) score += 5;
+          if (size > 50000) score += 5;
+        }
+      }
+      
+      // Prefer logos in common paths
+      if (context.hasLogoInPath || lower.includes('/logo')) score += 3;
+      
+      // Prefer meta og:image (usually high quality)
+      if (context.isMeta) score += 2;
+      
+      // Penalize favicons and icons
+      if (lower.includes('favicon') || lower.includes('icon') || lower.endsWith('.ico')) score -= 20;
+      
+      // Penalize tiny images
+      if (lower.includes('16x16') || lower.includes('32x32') || lower.includes('64x64')) score -= 10;
+      
+      return score;
+    };
+
     const response = await fetch(website, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!response.ok) return null;
@@ -207,53 +252,175 @@ async function extractLogoFromWebsite(website: string): Promise<string | null> {
     const html = await response.text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
 
-    // Try multiple logo selectors
-    const logoSelectors = [
-      'meta[property="og:image"]',
-      'link[rel="apple-touch-icon"]',
-      'link[rel="icon"][sizes="192x192"]',
-      'link[rel="icon"][sizes="512x512"]',
-      'img[alt*="logo" i]',
-      'img[class*="logo" i]',
-      'img[id*="logo" i]',
-      '.logo img',
-      '#logo img',
-    ];
+    const candidates: Array<{ url: string; score: number }> = [];
 
-    for (const selector of logoSelectors) {
-      const el = doc.querySelector(selector);
-      if (el) {
-        let logoUrl: string | null = null;
-        
-        if (el.tagName === 'META') {
-          logoUrl = el.getAttribute('content');
-        } else if (el.tagName === 'LINK') {
-          logoUrl = el.getAttribute('href');
-        } else {
-          logoUrl = (el as any).getAttribute('src') || (el as any).getAttribute('data-src');
+    // 1. Try meta tags (og:image, twitter:image) - usually high quality
+    const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
+    const twitterImage = doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content');
+    
+    if (ogImage) {
+      const url = toAbsoluteUrl(ogImage);
+      if (url) candidates.push({ url, score: scoreLogo(url, { isMeta: true }) });
+    }
+    if (twitterImage) {
+      const url = toAbsoluteUrl(twitterImage);
+      if (url) candidates.push({ url, score: scoreLogo(url, { isMeta: true }) });
+    }
+
+    // 2. Try JSON-LD structured data
+    const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+    for (const script of Array.from(jsonLdScripts)) {
+      try {
+        const data = JSON.parse(script.textContent || '{}');
+        const items = Array.isArray(data) ? data : [data];
+        for (const item of items) {
+          if (item.logo) {
+            const url = toAbsoluteUrl(typeof item.logo === 'string' ? item.logo : item.logo.url);
+            if (url) candidates.push({ url, score: scoreLogo(url, { hasLogoInPath: true }) });
+          }
+          if (item.image) {
+            const url = toAbsoluteUrl(typeof item.image === 'string' ? item.image : item.image.url);
+            if (url) candidates.push({ url, score: scoreLogo(url, { isMeta: true }) });
+          }
         }
+      } catch (e) {
+        // Skip invalid JSON
+      }
+    }
 
-        if (logoUrl) {
-          // Make absolute URL
-          if (logoUrl.startsWith('//')) {
-            logoUrl = `https:${logoUrl}`;
-          } else if (logoUrl.startsWith('/')) {
-            const baseUrl = new URL(website);
-            logoUrl = `${baseUrl.origin}${logoUrl}`;
-          } else if (!logoUrl.startsWith('http')) {
-            const baseUrl = new URL(website);
-            logoUrl = `${baseUrl.origin}/${logoUrl}`;
-          }
+    // 3. Try img tags with logo indicators
+    const imgTags = doc.querySelectorAll('img');
+    for (const img of Array.from(imgTags)) {
+      const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
+      if (!src) continue;
 
-          // Validate it's not a favicon
-          const lowerUrl = logoUrl.toLowerCase();
-          if (lowerUrl.includes('favicon') || lowerUrl.endsWith('.ico')) {
-            continue;
-          }
+      const alt = (img.getAttribute('alt') || '').toLowerCase();
+      const className = (img.getAttribute('class') || '').toLowerCase();
+      const id = (img.getAttribute('id') || '').toLowerCase();
+      const srcLower = src.toLowerCase();
 
-          return logoUrl;
+      const isLogo = 
+        alt.includes('logo') || 
+        className.includes('logo') || 
+        id.includes('logo') ||
+        srcLower.includes('logo');
+
+      if (isLogo) {
+        const url = toAbsoluteUrl(src);
+        if (url) {
+          const size = img.getAttribute('width') && img.getAttribute('height') 
+            ? `${img.getAttribute('width')}x${img.getAttribute('height')}`
+            : undefined;
+          candidates.push({ 
+            url, 
+            score: scoreLogo(url, { 
+              isSvg: url.endsWith('.svg'),
+              hasLogoInPath: true,
+              size
+            }) 
+          });
         }
       }
+    }
+
+    // 4. Try common logo paths
+    const commonPaths = [
+      '/logo.png',
+      '/logo.svg',
+      '/images/logo.png',
+      '/images/logo.svg',
+      '/assets/logo.png',
+      '/assets/logo.svg',
+      '/img/logo.png',
+      '/img/logo.svg',
+      '/static/logo.png',
+      '/static/logo.svg',
+    ];
+
+    for (const path of commonPaths) {
+      try {
+        const testUrl = `${origin}${path}`;
+        const testResponse = await fetch(testUrl, { 
+          method: 'HEAD',
+          signal: AbortSignal.timeout(3000)
+        });
+        if (testResponse.ok) {
+          candidates.push({ 
+            url: testUrl, 
+            score: scoreLogo(testUrl, { 
+              isSvg: path.endsWith('.svg'),
+              hasLogoInPath: true 
+            }) 
+          });
+        }
+      } catch (e) {
+        // Skip failed requests
+      }
+    }
+
+    // 5. Try link tags with larger icon sizes (but not favicons)
+    const linkTags = doc.querySelectorAll('link[rel*="icon"]');
+    for (const link of Array.from(linkTags)) {
+      const href = link.getAttribute('href');
+      const sizes = link.getAttribute('sizes');
+      if (!href) continue;
+
+      const hrefLower = href.toLowerCase();
+      // Skip actual favicons
+      if (hrefLower.includes('favicon') || hrefLower.endsWith('.ico')) continue;
+
+      // Prefer larger sizes (192x192, 512x512, etc.)
+      if (sizes && (sizes.includes('192') || sizes.includes('512') || sizes.includes('apple'))) {
+        const url = toAbsoluteUrl(href);
+        if (url) {
+          candidates.push({ 
+            url, 
+            score: scoreLogo(url, { 
+              isSvg: url.endsWith('.svg'),
+              size: sizes 
+            }) 
+          });
+        }
+      }
+    }
+
+    // Sort by score and return best candidate
+    candidates.sort((a, b) => b.score - a.score);
+    
+    // Filter out low-scoring candidates (likely not logos)
+    const bestCandidates = candidates.filter(c => c.score > 0);
+    
+    if (bestCandidates.length > 0) {
+      // Validate the best candidate by checking if it's actually an image
+      const best = bestCandidates[0];
+      try {
+        const imgCheck = await fetch(best.url, { 
+          method: 'HEAD',
+          signal: AbortSignal.timeout(5000)
+        });
+        const contentType = imgCheck.headers.get('content-type') || '';
+        if (contentType.startsWith('image/')) {
+          return best.url;
+        }
+      } catch (e) {
+        // If HEAD fails, try the URL anyway (might be CORS issue)
+        return best.url;
+      }
+    }
+
+    // Fallback: Try Clearbit Logo API (free tier available)
+    try {
+      const domain = baseUrl.hostname.replace('www.', '');
+      const clearbitUrl = `https://logo.clearbit.com/${domain}`;
+      const clearbitCheck = await fetch(clearbitUrl, { 
+        method: 'HEAD',
+        signal: AbortSignal.timeout(3000)
+      });
+      if (clearbitCheck.ok && clearbitCheck.status === 200) {
+        return clearbitUrl;
+      }
+    } catch (e) {
+      // Clearbit fallback failed
     }
 
     return null;

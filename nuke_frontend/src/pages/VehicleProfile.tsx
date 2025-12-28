@@ -410,13 +410,28 @@ const VehicleProfile: React.FC = () => {
         return ts?.iso || null;
       })();
 
+      // Ensure current_bid is a number (handle string values from DB)
+      const parseCurrentBid = (val: any): number | null => {
+        if (typeof val === 'number' && Number.isFinite(val)) return val;
+        if (typeof val === 'string') {
+          const parsed = parseFloat(val.replace(/[^0-9.]/g, ''));
+          return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+        }
+        return null;
+      };
+      
+      const currentBidCandidates = sorted
+        .map((r) => parseCurrentBid(r?.current_bid))
+        .filter((v): v is number => v !== null);
+      const mergedCurrentBid = currentBidCandidates.length > 0 ? Math.max(...currentBidCandidates) : null;
+
       return {
         external_listing_id: String(best.id || ''),
         platform: String(best.platform || ''),
         listing_url: String(best.listing_url || ''),
         listing_status: mergedStatus,
         end_date: mergedEndDate,
-        current_bid: maxNum(sorted.map((r) => r?.current_bid)),
+        current_bid: mergedCurrentBid,
         bid_count: pickNum('bid_count'),
         watcher_count: pickNum('watcher_count'),
         view_count: pickNum('view_count'),

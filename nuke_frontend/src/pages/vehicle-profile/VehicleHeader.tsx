@@ -153,7 +153,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           .from('external_listings')
           .select('id, platform, listing_url, listing_status, start_date, end_date, metadata')
           .eq('vehicle_id', vehicle.id)
-          .order('start_date', { ascending: true, nullsLast: true })
+          .order('start_date', { ascending: true, nullsFirst: false })
           .limit(10);
 
         if (error) {
@@ -766,19 +766,49 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const isAuctionLive = useMemo(() => {
     if (!auctionPulse?.listing_url) return false;
     const status = String(auctionPulse.listing_status || '').toLowerCase();
-    // Some environments may backfill listings with status='unknown' initially. If we have a future end_date,
-    // treat it as live so the header shows the auction pulse instead of hiding it.
-    if (status !== 'active' && status !== 'live') {
-      if (!auctionPulse?.end_date) return false;
+    
+    // If status is explicitly active/live, check end_date
+    if (status === 'active' || status === 'live') {
+      if (!auctionPulse.end_date) {
+        // No end date but status is active/live - assume it's live (some live auctions don't have specific end times)
+        return true;
+      }
       const end = new Date(auctionPulse.end_date).getTime();
-      if (!Number.isFinite(end)) return false;
+      if (!Number.isFinite(end)) return true; // Invalid date but status says active - assume live
       return end > auctionNow;
     }
-    if (!auctionPulse.end_date) return true;
-    const end = new Date(auctionPulse.end_date).getTime();
-    if (!Number.isFinite(end)) return true;
-    return end > auctionNow;
-  }, [auctionPulse, auctionNow]);
+    
+    // If status is not active/live, check if we have a future end_date anyway
+    // (handles cases where status might be 'ended' but auction is actually still running)
+    if (auctionPulse?.end_date) {
+      const end = new Date(auctionPulse.end_date).getTime();
+      if (Number.isFinite(end) && end > auctionNow) {
+        // Future end date means it's still live, regardless of status
+        return true;
+      }
+    }
+    
+    // Also check vehicle-level auction_end_date as fallback
+    if (vehicle) {
+      const v: any = vehicle as any;
+      const vehicleEndDate = v?.auction_end_date || v?.origin_metadata?.auction_times?.auction_end_date;
+      if (vehicleEndDate) {
+        const end = new Date(vehicleEndDate).getTime();
+        if (Number.isFinite(end) && end > auctionNow) {
+          // Vehicle has future end date - check it's not explicitly ended
+          const outcome = String(v?.auction_outcome || '').toLowerCase();
+          const saleStatus = String(v?.sale_status || '').toLowerCase();
+          const isEnded = ['sold', 'ended', 'reserve_not_met', 'no_sale'].includes(outcome) || 
+                          ['sold', 'ended'].includes(saleStatus);
+          if (!isEnded) {
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  }, [auctionPulse, auctionNow, vehicle]);
 
   const auctionTelemetryFresh = useMemo(() => {
     const updatedAt = auctionPulse?.updated_at ? new Date(auctionPulse.updated_at as any).getTime() : NaN;
