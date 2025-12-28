@@ -67,6 +67,42 @@ async function fetchJsonWithTimeout(
   }
 }
 
+async function fetchJsonWithRetry(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  label: string,
+  maxRetries: number = 3,
+): Promise<any> {
+  let lastError: any = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+        console.log(`⏳ Retry ${attempt}/${maxRetries - 1} for ${label} after ${delay}ms delay...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+      return await fetchJsonWithTimeout(url, init, timeoutMs, label);
+    } catch (error: any) {
+      lastError = error;
+      const isRetryable = error?.message?.includes('timeout') || 
+                        error?.message?.includes('aborted') ||
+                        error?.message?.includes('network') ||
+                        (error?.message?.includes('failed') && !error?.message?.includes('(4') && !error?.message?.includes('(5'));
+      
+      if (!isRetryable || attempt === maxRetries - 1) {
+        throw error;
+      }
+      
+      console.warn(`⚠️ ${label} attempt ${attempt + 1} failed (retryable: ${isRetryable}): ${error?.message}`);
+    }
+  }
+  
+  throw lastError;
+}
+
 async function fetchTextWithTimeout(url: string, timeoutMs: number, label: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -876,6 +912,60 @@ function extractCarsAndBidsBidHistory(html: string): Array<{ amount: number; tim
   const h = String(html || "");
   const bids: Array<{ amount: number; timestamp?: string; bidder?: string }> = [];
   
+  // PRIORITY: Extract from __NEXT_DATA__ (Next.js embeds all data here)
+  try {
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
+    const nextDataMatch = h.match(nextDataPattern);
+    if (nextDataMatch && nextDataMatch[1]) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]);
+        // Navigate through Next.js structure: props.pageProps.auction.bids or similar
+        const auction = nextData?.props?.pageProps?.auction || 
+                       nextData?.props?.pageProps?.data?.auction ||
+                       nextData?.props?.auction ||
+                       nextData?.auction;
+        
+        if (auction) {
+          // Extract bids from Next.js data
+          if (Array.isArray(auction.bids)) {
+            for (const bid of auction.bids) {
+              if (bid.amount && typeof bid.amount === 'number') {
+                bids.push({
+                  amount: bid.amount,
+                  timestamp: bid.timestamp || bid.created_at || bid.date,
+                  bidder: bid.bidder || bid.username || bid.user?.username,
+                });
+              }
+            }
+          }
+          
+          // Also check bid_history
+          if (Array.isArray(auction.bid_history)) {
+            for (const bid of auction.bid_history) {
+              if (bid.amount && typeof bid.amount === 'number') {
+                bids.push({
+                  amount: bid.amount,
+                  timestamp: bid.timestamp || bid.created_at || bid.date,
+                  bidder: bid.bidder || bid.username || bid.user?.username,
+                });
+              }
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn('Failed to parse __NEXT_DATA__ for bids:', e?.message);
+      }
+    }
+  } catch (e: any) {
+    console.warn('Error extracting bids from __NEXT_DATA__:', e?.message);
+  }
+  
+  // If we got bids from __NEXT_DATA__, return them (more reliable)
+  if (bids.length > 0) {
+    return bids.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+  }
+  
+  // Fallback: Parse from HTML
   // Helper to parse currency
   const parseCurrency = (text: string): number | null => {
     const match = text.match(/[\$]?([\d,]+)/);
@@ -995,6 +1085,63 @@ function extractCarsAndBidsStructuredSections(html: string): {
   const h = String(html || "");
   const result: any = {};
   
+  // PRIORITY: Extract from __NEXT_DATA__ (Next.js embeds all data here)
+  try {
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
+    const nextDataMatch = h.match(nextDataPattern);
+    if (nextDataMatch && nextDataMatch[1]) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]);
+        // Navigate through Next.js structure
+        const auction = nextData?.props?.pageProps?.auction || 
+                       nextData?.props?.pageProps?.data?.auction ||
+                       nextData?.props?.auction ||
+                       nextData?.auction;
+        
+        if (auction) {
+          // Extract structured sections from Next.js data
+          if (auction.dougs_take || auction.dougsTake) {
+            result.dougs_take = auction.dougs_take || auction.dougsTake;
+          }
+          if (Array.isArray(auction.highlights)) {
+            result.highlights = auction.highlights;
+          }
+          if (Array.isArray(auction.equipment)) {
+            result.equipment = auction.equipment;
+          }
+          if (Array.isArray(auction.modifications)) {
+            result.modifications = auction.modifications;
+          }
+          if (Array.isArray(auction.known_flaws) || Array.isArray(auction.knownFlaws)) {
+            result.known_flaws = auction.known_flaws || auction.knownFlaws;
+          }
+          if (auction.recent_service_history || auction.recentServiceHistory) {
+            result.recent_service_history = auction.recent_service_history || auction.recentServiceHistory;
+          }
+          if (Array.isArray(auction.other_items) || Array.isArray(auction.otherItems)) {
+            result.other_items = auction.other_items || auction.otherItems;
+          }
+          if (auction.ownership_history || auction.ownershipHistory) {
+            result.ownership_history = auction.ownership_history || auction.ownershipHistory;
+          }
+          if (auction.seller_notes || auction.sellerNotes) {
+            result.seller_notes = auction.seller_notes || auction.sellerNotes;
+          }
+          
+          // If we got data from __NEXT_DATA__, return it (more reliable)
+          if (Object.keys(result).length > 0) {
+            return result;
+          }
+        }
+      } catch (e: any) {
+        console.warn('Failed to parse __NEXT_DATA__ for structured sections:', e?.message);
+      }
+    }
+  } catch (e: any) {
+    console.warn('Error extracting structured sections from __NEXT_DATA__:', e?.message);
+  }
+  
+  // Fallback: Extract from HTML
   // Extract "Doug's Take" section - try multiple patterns
   const dougsTakePatterns = [
     /<div[^>]*class=["'][^"']*dougs[_-]?take[^"']*["'][^>]*>[\s\S]*?<div[^>]*class=["'][^"']*detail[_-]?body[^"']*["'][^>]*>([\s\S]{0,10000})<\/div>/i,
@@ -1140,12 +1287,84 @@ function extractCarsAndBidsBidders(html: string): Array<{ username: string; prof
   const h = String(html || "");
   const bidders = new Map<string, { username: string; profile_url: string; is_buyer?: boolean; is_seller?: boolean }>();
   
+  // PRIORITY: Extract from __NEXT_DATA__ (Next.js embeds all data here)
+  try {
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
+    const nextDataMatch = h.match(nextDataPattern);
+    if (nextDataMatch && nextDataMatch[1]) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]);
+        // Navigate through Next.js structure
+        const auction = nextData?.props?.pageProps?.auction || 
+                       nextData?.props?.pageProps?.data?.auction ||
+                       nextData?.props?.auction ||
+                       nextData?.auction;
+        
+        if (auction) {
+          // Extract buyer
+          if (auction.buyer || auction.winning_bidder) {
+            const buyer = auction.buyer || auction.winning_bidder;
+            const username = buyer.username || buyer.handle || buyer.name || String(buyer);
+            const profileUrl = buyer.profile_url || buyer.url || `https://carsandbids.com/user/${username}`;
+            if (username) {
+              bidders.set(username, { username, profile_url: profileUrl, is_buyer: true });
+            }
+          }
+          
+          // Extract seller
+          if (auction.seller) {
+            const seller = auction.seller;
+            const username = seller.username || seller.handle || seller.name || String(seller);
+            const profileUrl = seller.profile_url || seller.url || `https://carsandbids.com/user/${username}`;
+            if (username) {
+              bidders.set(username, { username, profile_url: profileUrl, is_seller: true });
+            }
+          }
+          
+          // Extract all bidders from bids
+          if (Array.isArray(auction.bids) || Array.isArray(auction.bid_history)) {
+            const bidList = auction.bids || auction.bid_history || [];
+            for (const bid of bidList) {
+              const bidder = bid.bidder || bid.username || bid.user?.username;
+              if (bidder && !bidders.has(bidder)) {
+                bidders.set(bidder, {
+                  username: bidder,
+                  profile_url: bid.profile_url || bid.user?.profile_url || `https://carsandbids.com/user/${bidder}`,
+                });
+              }
+            }
+          }
+          
+          // Extract bidders from comments
+          if (Array.isArray(auction.comments)) {
+            for (const comment of auction.comments) {
+              const author = comment.author || comment.username || comment.user?.username;
+              if (author && !bidders.has(author)) {
+                bidders.set(author, {
+                  username: author,
+                  profile_url: comment.profile_url || comment.user?.profile_url || `https://carsandbids.com/user/${author}`,
+                });
+              }
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn('Failed to parse __NEXT_DATA__ for bidders:', e?.message);
+      }
+    }
+  } catch (e: any) {
+    console.warn('Error extracting bidders from __NEXT_DATA__:', e?.message);
+  }
+  
+  // Fallback: Extract from HTML
   // Extract buyer (Sold to)
   const soldToMatch = h.match(/Sold\s+to[^>]*>[\s\S]*?<a[^>]*title=["']([^"']+)["'][^>]*class=["'][^"']*user[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>/i);
   if (soldToMatch && soldToMatch[1] && soldToMatch[2]) {
     const username = soldToMatch[1].trim();
     const profileUrl = soldToMatch[2].startsWith('http') ? soldToMatch[2] : `https://carsandbids.com${soldToMatch[2]}`;
-    bidders.set(username, { username, profile_url: profileUrl, is_buyer: true });
+    if (!bidders.has(username)) {
+      bidders.set(username, { username, profile_url: profileUrl, is_buyer: true });
+    }
   }
   
   // Extract all user links (bidders, commenters, etc.)
@@ -1179,6 +1398,70 @@ function extractCarsAndBidsComments(html: string): Array<{ author: string; text:
   const h = String(html || "");
   const comments: Array<{ author: string; text: string; timestamp?: string; is_seller?: boolean; is_bid?: boolean; bid_amount?: number; profile_url?: string }> = [];
   
+  // PRIORITY: Extract from __NEXT_DATA__ (Next.js embeds all data here)
+  try {
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
+    const nextDataMatch = h.match(nextDataPattern);
+    if (nextDataMatch && nextDataMatch[1]) {
+      try {
+        const nextData = JSON.parse(nextDataMatch[1]);
+        // Navigate through Next.js structure
+        const auction = nextData?.props?.pageProps?.auction || 
+                       nextData?.props?.pageProps?.data?.auction ||
+                       nextData?.props?.auction ||
+                       nextData?.auction;
+        
+        if (auction) {
+          // Extract comments from Next.js data
+          if (Array.isArray(auction.comments)) {
+            for (const comment of auction.comments) {
+              if (comment.text || comment.body || comment.content) {
+                const text = comment.text || comment.body || comment.content || '';
+                const author = comment.author || comment.username || comment.user?.username || 'Unknown';
+                const profileUrl = comment.profile_url || comment.user?.profile_url || 
+                                 (author !== 'Unknown' ? `https://carsandbids.com/user/${author}` : undefined);
+                
+                // Check if it's a bid comment
+                const isBid = comment.is_bid || comment.type === 'bid' || 
+                             /bid\s+placed\s+by|bid\s+of/i.test(text);
+                const bidAmount = isBid ? (comment.bid_amount || comment.amount || 
+                                          (text.match(/\$([0-9,]+)/)?.[1] ? 
+                                           parseInt(text.match(/\$([0-9,]+)/)?.[1].replace(/,/g, ''), 10) : undefined)) : undefined;
+                
+                // Check if it's a seller comment
+                const isSeller = comment.is_seller || comment.type === 'seller' || 
+                               comment.author_type === 'seller' ||
+                               /seller|owner|listed\s+by/i.test(text);
+                
+                if (text.length >= 10) {
+                  comments.push({
+                    author,
+                    text,
+                    timestamp: comment.timestamp || comment.created_at || comment.date || comment.posted_at,
+                    is_seller: isSeller,
+                    is_bid: isBid,
+                    bid_amount: bidAmount,
+                    profile_url: profileUrl,
+                  });
+                }
+              }
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn('Failed to parse __NEXT_DATA__ for comments:', e?.message);
+      }
+    }
+  } catch (e: any) {
+    console.warn('Error extracting comments from __NEXT_DATA__:', e?.message);
+  }
+  
+  // If we got comments from __NEXT_DATA__, return them (more reliable)
+  if (comments.length > 0) {
+    return comments;
+  }
+  
+  // Fallback: Parse from HTML
   // Helper to parse timestamp
   const parseTimestamp = (text: string): string | undefined => {
     const datePatterns = [
@@ -1987,23 +2270,29 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
   const extracted: any[] = [];
   const issues: string[] = [];
 
-  // Prefer unseen URLs to avoid repeatedly re-importing the same top listing.
+  // For single URL extraction (direct listing), always process it (even if exists - we want to update)
+  // For index pages, prefer unseen URLs to avoid repeatedly re-importing the same top listing.
   let urlsToScrape = listingUrls;
-  try {
-    const supabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
-    const sample = listingUrls.slice(0, 50);
-    if (sample.length > 0) {
-      const { data: existing } = await supabase
-        .from("vehicles")
-        .select("platform_url")
-        .in("platform_url", sample);
-      const existingSet = new Set((existing || []).map((r: any) => String(r?.platform_url || "")));
-      const unseen = sample.filter((u) => !existingSet.has(u));
-      // pick the first N unseen (or fallback to the sample)
-      urlsToScrape = (unseen.length > 0 ? unseen : sample).slice(0, Math.max(1, maxVehicles));
+  const isSingleDirectListing = listingUrls.length === 1 && listingUrls[0].includes('/auctions/');
+  
+  if (!isSingleDirectListing) {
+    // Only filter for index pages, not direct listings
+    try {
+      const supabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+      const sample = listingUrls.slice(0, 50);
+      if (sample.length > 0) {
+        const { data: existing } = await supabase
+          .from("vehicles")
+          .select("platform_url")
+          .in("platform_url", sample);
+        const existingSet = new Set((existing || []).map((r: any) => String(r?.platform_url || "")));
+        const unseen = sample.filter((u) => !existingSet.has(u));
+        // pick the first N unseen (or fallback to the sample)
+        urlsToScrape = (unseen.length > 0 ? unseen : sample).slice(0, Math.max(1, maxVehicles));
+      }
+    } catch {
+      // ignore (fallback to raw listingUrls)
     }
-  } catch {
-    // ignore (fallback to raw listingUrls)
   }
 
   for (const listingUrl of urlsToScrape) {
@@ -2013,7 +2302,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
       
       // Try Firecrawl first, but fall back to direct fetch if it fails
       try {
-        const firecrawlData = await fetchJsonWithTimeout(
+        const firecrawlData = await fetchJsonWithRetry(
           FIRECRAWL_SCRAPE_URL,
           {
             method: "POST",
@@ -2038,21 +2327,42 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
           },
           FIRECRAWL_LISTING_TIMEOUT_MS,
           "Firecrawl listing scrape",
+          3, // Max 3 retries
         );
 
         vehicle = firecrawlData?.data?.extract || {};
         html = String(firecrawlData?.data?.html || "");
       } catch (firecrawlError: any) {
-        console.warn(`⚠️ Firecrawl failed (${firecrawlError?.message}), falling back to direct HTML fetch`);
-        // Fallback: Direct HTML fetch
-        try {
-          html = await fetchTextWithTimeout(listingUrl, 30000, "Direct HTML fetch");
-          console.log(`✅ Got HTML via direct fetch (${html.length} chars)`);
-        } catch (directError: any) {
-          console.error(`❌ Direct fetch also failed: ${directError?.message}`);
-          throw new Error(`Both Firecrawl and direct fetch failed: ${directError?.message}`);
+      console.warn(`⚠️ Firecrawl failed (${firecrawlError?.message}), falling back to direct HTML fetch`);
+      // Fallback: Direct HTML fetch
+      try {
+        html = await fetchTextWithTimeout(listingUrl, 30000, "Direct HTML fetch");
+        console.log(`✅ Got HTML via direct fetch (${html.length} chars)`);
+        
+        // Debug: Check for __NEXT_DATA__
+        if (html.includes('__NEXT_DATA__')) {
+          console.log(`✅ Found __NEXT_DATA__ in HTML`);
+          const nextDataMatch = html.match(/<script[^>]*id=["']__NEXT_DATA__["'][^>]*>/i);
+          if (nextDataMatch) {
+            console.log(`✅ Found __NEXT_DATA__ script tag`);
+          }
+        } else {
+          console.warn(`⚠️ No __NEXT_DATA__ found in HTML - page may require JavaScript`);
         }
+      } catch (directError: any) {
+        console.error(`❌ Direct fetch also failed: ${directError?.message}`);
+        throw new Error(`Both Firecrawl and direct fetch failed: ${directError?.message}`);
       }
+    }
+    
+    // Debug: Log extraction results
+    if (debug && html) {
+      const hasNextData = html.includes('__NEXT_DATA__');
+      const imageCount = extractCarsAndBidsImagesFromHtml(html).length;
+      const commentCount = extractCarsAndBidsComments(html).length;
+      const bidderCount = extractCarsAndBidsBidders(html).length;
+      console.log(`🔍 Debug: HTML analysis - __NEXT_DATA__: ${hasNextData}, Images: ${imageCount}, Comments: ${commentCount}, Bidders: ${bidderCount}`);
+    }
 
       // If extraction is empty, fall back to parsing the listing URL so we still insert vehicles.
       const empty = !vehicle || (typeof vehicle === "object" && Object.keys(vehicle).length === 0);
@@ -2120,30 +2430,61 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         descriptionFromHtml = extractCarsAndBidsDescription(html);
       }
       
+      // LLM-based extraction to find everything that regex/pattern matching missed
+      let llmExtracted: Record<string, any> = {};
+      if (html && html.length > 1000) {
+        try {
+          const openaiKey = Deno.env.get('OPENAI_API_KEY');
+          if (openaiKey) {
+            const { extractWithLLM } = await import('./llm-extractor.ts');
+            const supabaseForLLM = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+            llmExtracted = await extractWithLLM(html, listingUrl, supabaseForLLM, openaiKey);
+            
+            if (Object.keys(llmExtracted).length > 0) {
+              console.log(`✅ LLM extracted ${Object.keys(llmExtracted).length} additional fields: ${Object.keys(llmExtracted).join(', ')}`);
+            }
+          } else {
+            console.log('⚠️ OPENAI_API_KEY not found, skipping LLM extraction');
+          }
+        } catch (llmError: any) {
+          console.warn(`LLM extraction failed (non-fatal): ${llmError?.message || String(llmError)}`);
+        }
+      }
+      
       // CRITICAL: Clean listing URL - strip /video suffix
       const cleanListingUrl = listingUrl.replace(/\/video\/?$/, '');
       
       const merged = {
         ...(empty ? {} : vehicle),
         listing_url: cleanListingUrl,
-        year: (vehicle?.year ?? fallback.year) ?? null,
-        make: (vehicle?.make ?? fallback.make) ?? null,
-        model: (vehicle?.model ?? fallback.model) ?? null,
-        title: (vehicle?.title ?? fallback.title) ?? null,
-        vin: vinFromHtml || vehicle?.vin || null, // Prioritize HTML extraction for VIN
-        description: descriptionFromHtml || vehicle?.description || null, // Prioritize HTML extraction for description
+        // Prioritize: LLM extraction > HTML regex extraction > Firecrawl > fallback
+        year: llmExtracted.year ?? (vehicle?.year ?? fallback.year) ?? null,
+        make: llmExtracted.make ?? (vehicle?.make ?? fallback.make) ?? null,
+        model: llmExtracted.model ?? (vehicle?.model ?? fallback.model) ?? null,
+        title: llmExtracted.title ?? (vehicle?.title ?? fallback.title) ?? null,
+        vin: llmExtracted.vin ?? vinFromHtml ?? vehicle?.vin ?? null,
+        mileage: llmExtracted.mileage ?? vehicle?.mileage ?? null,
+        color: llmExtracted.color ?? vehicle?.color ?? null,
+        interior_color: llmExtracted.interior_color ?? vehicle?.interior_color ?? null,
+        transmission: llmExtracted.transmission ?? vehicle?.transmission ?? null,
+        engine_size: llmExtracted.engine_size ?? vehicle?.engine_size ?? null,
+        drivetrain: llmExtracted.drivetrain ?? vehicle?.drivetrain ?? null,
+        fuel_type: llmExtracted.fuel_type ?? vehicle?.fuel_type ?? null,
+        body_style: llmExtracted.body_style ?? vehicle?.body_style ?? null,
+        location: llmExtracted.location ?? vehicle?.location ?? null,
+        description: llmExtracted.description ?? descriptionFromHtml ?? vehicle?.description ?? null,
         images, // Cleaned high-res images
-        // Auction data - prioritize HTML extraction, fallback to Firecrawl
-        current_bid: auctionData.current_bid ?? vehicle?.current_bid ?? null,
-        bid_count: bidHistory.length > 0 ? bidHistory.length : (auctionData.bid_count ?? vehicle?.bid_count ?? null),
+        // Auction data - prioritize LLM > HTML extraction > Firecrawl
+        current_bid: llmExtracted.current_bid ?? auctionData.current_bid ?? vehicle?.current_bid ?? null,
+        bid_count: llmExtracted.bid_count ?? (bidHistory.length > 0 ? bidHistory.length : (auctionData.bid_count ?? vehicle?.bid_count ?? null)),
         bid_history: bidHistory.length > 0 ? bidHistory : (vehicle?.bid_history || []),
-        comment_count: comments.length > 0 ? comments.length : (vehicle?.comment_count ?? null),
+        comment_count: llmExtracted.comment_count ?? (comments.length > 0 ? comments.length : (vehicle?.comment_count ?? null)),
         comments: comments.length > 0 ? comments : (vehicle?.comments || []),
-        structured_sections: Object.keys(structuredSections).length > 0 ? structuredSections : (vehicle?.structured_sections || {}),
+        structured_sections: llmExtracted.structured_sections ?? (Object.keys(structuredSections).length > 0 ? structuredSections : (vehicle?.structured_sections || {})),
         bidders: bidders.length > 0 ? bidders : (vehicle?.bidders || []),
-        reserve_met: auctionData.reserve_met ?? vehicle?.reserve_met ?? null,
-        reserve_price: auctionData.reserve_price ?? vehicle?.reserve_price ?? null,
-        auction_end_date: auctionData.auction_end_date ?? vehicle?.auction_end_date ?? null,
+        reserve_met: llmExtracted.reserve_met ?? auctionData.reserve_met ?? vehicle?.reserve_met ?? null,
+        reserve_price: llmExtracted.reserve_price ?? auctionData.reserve_price ?? vehicle?.reserve_price ?? null,
+        auction_end_date: llmExtracted.auction_end_date ?? auctionData.auction_end_date ?? vehicle?.auction_end_date ?? null,
         final_price: auctionData.final_price ?? vehicle?.final_price ?? vehicle?.sale_price ?? null,
         sale_price: auctionData.final_price ?? vehicle?.final_price ?? vehicle?.sale_price ?? null, // Also set sale_price
         sale_date: auctionData.sale_date ?? vehicle?.sale_date ?? null,

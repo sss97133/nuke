@@ -29,14 +29,14 @@ interface ExtractRequest {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || '';
-const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY') || '';
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || '';
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Edge Function secrets');
 }
 
-// For function-to-function calls, apikey header typically uses anon key, Authorization uses service role
-const API_KEY = ANON_KEY || SERVICE_KEY;
+// For function-to-function calls, use service role key for both headers (works for internal calls)
+const API_KEY = SERVICE_KEY;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -150,26 +150,15 @@ Deno.serve(async (req) => {
         // Get service key fresh each time (in case it wasn't set at module load)
         const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || SERVICE_KEY;
         
-        if (!serviceKey) {
-          console.log(`   ⚠️  SERVICE_KEY is empty - check Edge Function secrets`);
-          throw new Error('SERVICE_KEY is empty - check Edge Function secrets');
-        }
-        
-        // Verify key format (should be JWT starting with eyJ)
-        if (!serviceKey.startsWith('eyJ')) {
-          console.log(`   ⚠️  SERVICE_KEY doesn't appear to be a JWT (should start with 'eyJ')`);
-        }
-        
-        // Call discover-organization-full for this org
-        // Use anon key for apikey header (Supabase convention), service role for Authorization
-        const anonKey = ANON_KEY || serviceKey; // Fallback to service key if anon not available
+        // Call discover-organization-full using fetch with both apikey and Authorization headers
+        // Direct HTTP call works (curl test confirmed), supabase.functions.invoke() has auth issues
         const discoverUrl = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/discover-organization-full`;
         console.log(`   📡 Calling discover-organization-full for ${org.id}...`);
         const discoverResponse = await fetch(discoverUrl, {
           method: 'POST',
           headers: {
-            'apikey': anonKey,
-            'Authorization': `Bearer ${serviceKey}`,
+            'apikey': serviceKey, // Service role key for apikey header
+            'Authorization': `Bearer ${serviceKey}`, // Service role key for Authorization header
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -178,17 +167,20 @@ Deno.serve(async (req) => {
           }),
         });
         
-        console.log(`   📥 Response status: ${discoverResponse.status}`);
+        if (!discoverResponse.ok) {
+          const errorText = await discoverResponse.text();
+          throw new Error(`discover-organization-full failed: ${discoverResponse.status} - ${errorText.substring(0, 200)}`);
+        }
 
-        if (discoverResponse.ok) {
-          const discoverData = await discoverResponse.json();
+        const discoverData = await discoverResponse.json();
+        
+        if (discoverData && discoverData.success) {
           const result = discoverData.result || {};
           
           console.log(`   ✅ Success:`);
           console.log(`      - Vehicles found: ${result.vehicles_found || 0}`);
           console.log(`      - Vehicles created: ${result.vehicles_created || 0}`);
           console.log(`      - Patterns stored: ${result.learned_patterns_stored ? 'YES' : 'NO'}`);
-
           results.push({
             organization_id: org.id,
             business_name: org.business_name,
@@ -200,17 +192,8 @@ Deno.serve(async (req) => {
             patterns_stored: result.learned_patterns_stored || false,
           });
         } else {
-          const errorText = await discoverResponse.text();
-          let errorMessage = errorText.substring(0, 500);
-          console.log(`   ❌ Failed: ${discoverResponse.status} - ${errorMessage}`);
-          
-          // Log more details for 401 errors to help debug
-          if (discoverResponse.status === 401) {
-            console.log(`   ⚠️  401 Error Details:`);
-            console.log(`      - Service key length: ${serviceKey.length}`);
-            console.log(`      - Service key starts with: ${serviceKey.substring(0, 10)}...`);
-            console.log(`      - Full error: ${errorText}`);
-          }
+          const errorMessage = discoverData?.error || 'Unknown error';
+          console.log(`   ❌ Failed: ${errorMessage}`);
           
           results.push({
             organization_id: org.id,
