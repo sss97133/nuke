@@ -147,6 +147,25 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   const { isVerifiedOwner, hasContributorAccess, contributorRole } = permissions;
   const canEdit = isVerifiedOwner || hasContributorAccess;
   const [collapsed, setCollapsed] = React.useState(false); // Always expanded - user preference
+  const [showClaimCard, setShowClaimCard] = React.useState(false);
+
+  // Determine current owner from BaT data
+  const currentOwnerUsername = React.useMemo(() => {
+    const v = vehicle as any;
+    // If sold, buyer is current owner; otherwise seller is listing owner
+    if (v.sale_status === 'sold' || v.sale_price > 0) {
+      return v.bat_buyer?.trim() || null;
+    }
+    return v.bat_seller?.trim() || null;
+  }, [(vehicle as any).bat_buyer, (vehicle as any).bat_seller, (vehicle as any).sale_status, (vehicle as any).sale_price]);
+
+  const previousOwnerUsername = React.useMemo(() => {
+    const v = vehicle as any;
+    if (v.sale_status === 'sold' || v.sale_price > 0) {
+      return v.bat_seller?.trim() || null;
+    }
+    return null;
+  }, [(vehicle as any).bat_seller, (vehicle as any).sale_status, (vehicle as any).sale_price]);
 
   const listingSourceLabel = React.useMemo(() => {
     const rawSource = (vehicle.listing_source || vehicle.discovery_source || '').toString();
@@ -505,6 +524,140 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               )}
             </span>
           </div>
+          
+          {/* Owner Section - show BaT username with claim option */}
+          {currentOwnerUsername && !isVerifiedOwner && (
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0, position: 'relative' }}>
+              <span>Owner</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowClaimCard(!showClaimCard);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text)',
+                    cursor: 'pointer',
+                    fontSize: '8pt',
+                    fontFamily: 'monospace',
+                    padding: 0,
+                    display: 'inline-flex',
+                    alignItems: 'baseline',
+                  }}
+                  title="Claim this profile"
+                >
+                  @{currentOwnerUsername}<sup style={{ fontSize: '6pt', color: 'var(--primary)', marginLeft: '1px' }}>*</sup>
+                </button>
+                {previousOwnerUsername && (
+                  <span style={{ fontSize: '6pt', color: 'var(--text-muted)', marginLeft: '4px' }}>
+                    from @{previousOwnerUsername}
+                  </span>
+                )}
+              </span>
+              
+              {/* Claim Card Popup */}
+              {showClaimCard && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  zIndex: 100,
+                  background: 'var(--bg)',
+                  border: '2px solid var(--primary)',
+                  padding: '12px',
+                  width: '280px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                  marginTop: '4px',
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '8px',
+                    borderBottom: '1px solid var(--border)',
+                    paddingBottom: '6px'
+                  }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '9pt' }}>Claim This Profile</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowClaimCard(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '12pt',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      x
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '7pt', color: 'var(--text)', lineHeight: 1.4 }}>
+                    <p style={{ margin: '0 0 8px 0' }}>
+                      Are you <strong>@{currentOwnerUsername}</strong> on Bring a Trailer?
+                    </p>
+                    <p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>
+                      Steps to claim:
+                    </p>
+                    <ol style={{ margin: '0 0 8px 0', paddingLeft: '16px' }}>
+                      <li style={{ marginBottom: '4px' }}>Create an n-zero account (or login)</li>
+                      <li style={{ marginBottom: '4px' }}>Go to Profile Settings</li>
+                      <li style={{ marginBottom: '4px' }}>Link your BaT username: @{currentOwnerUsername}</li>
+                      <li style={{ marginBottom: '4px' }}>We'll verify ownership and merge your data</li>
+                    </ol>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '6pt', color: 'var(--text-muted)' }}>
+                      Your BaT purchase history, comments, and bids become part of your n-zero profile.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowClaimCard(false);
+                        navigate('/login?claim=' + encodeURIComponent(currentOwnerUsername || ''));
+                      }}
+                      style={{
+                        width: '100%',
+                        background: 'var(--primary)',
+                        color: 'var(--white)',
+                        border: 'none',
+                        padding: '6px 12px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '8pt',
+                      }}
+                    >
+                      Login to Claim
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Show verified owner badge if claimed */}
+          {isVerifiedOwner && currentOwnerUsername && (
+            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+              <span>Owner</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: '8pt', color: 'var(--success)' }}>
+                  @{currentOwnerUsername}
+                </span>
+                <span style={{ 
+                  background: 'var(--success)', 
+                  color: 'var(--white)', 
+                  padding: '1px 4px', 
+                  fontSize: '6pt',
+                  fontWeight: 'bold'
+                }}>
+                  VERIFIED
+                </span>
+              </span>
+            </div>
+          )}
+
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
