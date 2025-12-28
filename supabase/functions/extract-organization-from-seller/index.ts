@@ -113,6 +113,15 @@ Deno.serve(async (req) => {
 
       organizationId = newOrg.id;
       console.log(`✅ Created new organization: ${seller_name}`);
+      
+      // Auto-merge duplicates after creation
+      try {
+        await supabase.functions.invoke('auto-merge-duplicate-orgs', {
+          body: { organizationId: newOrg.id }
+        });
+      } catch (mergeError) {
+        console.warn('⚠️ Auto-merge check failed (non-critical):', mergeError);
+      }
     }
 
     // Step 3: Create external identity link for the seller

@@ -35,6 +35,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        working-directory: ${{ github.workspace }}
         run: |
           node scripts/test-all-edge-functions-health.js
       
@@ -53,7 +54,11 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            const resultsDir = 'test-results/edge-functions';
+            const resultsDir = path.join(process.env.GITHUB_WORKSPACE || '.', 'test-results', 'edge-functions');
+            if (!fs.existsSync(resultsDir)) {
+              console.log('No test results directory found');
+              return;
+            }
             const files = fs.readdirSync(resultsDir).filter(f => f.startsWith('health-'));
             if (files.length > 0) {
               const latest = files.sort().reverse()[0];
@@ -75,5 +80,4 @@ jobs:
                 body: body
               });
             }
-
 

@@ -411,6 +411,15 @@ class AIDataIngestionService {
         };
       }
 
+      // Auto-merge duplicates after creation
+      try {
+        await supabase.functions.invoke('auto-merge-duplicate-orgs', {
+          body: { organizationId: newOrg.id }
+        });
+      } catch (mergeError) {
+        console.warn('Auto-merge check failed (non-critical):', mergeError);
+      }
+
       // Now enrich it with website data
       const { data: enrichData, error: enrichError } = await supabase.functions.invoke('update-org-from-website', {
         body: {

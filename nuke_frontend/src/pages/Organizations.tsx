@@ -77,6 +77,11 @@ export default function Organizations() {
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedAddressOrg, setSelectedAddressOrg] = useState<string | null>(null);
+  const [organizeMode, setOrganizeMode] = useState(false);
+  const [selectedOrgs, setSelectedOrgs] = useState<Set<string>>(new Set());
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergeSource, setMergeSource] = useState<string | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<string | null>(null);
 
   useEffect(() => {
     // Get user location if "near me" is in search
@@ -398,9 +403,81 @@ export default function Organizations() {
           </button>
         </div>
 
+        {/* Organize Tools */}
+        {session?.user && (
+          <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                setOrganizeMode(!organizeMode);
+                if (organizeMode) setSelectedOrgs(new Set());
+              }}
+              className={organizeMode ? 'button button-secondary' : 'button button-secondary'}
+              style={{ fontSize: '8pt', whiteSpace: 'nowrap' }}
+            >
+              {organizeMode ? 'Cancel' : 'Organize'}
+            </button>
+            
+            {organizeMode && (
+              <>
+                <button
+                  onClick={() => {
+                    if (selectedOrgs.size === 2) {
+                      const [source, target] = Array.from(selectedOrgs);
+                      setMergeSource(source);
+                      setMergeTarget(target);
+                      setShowMergeModal(true);
+                    } else {
+                      alert('Select exactly 2 organizations to merge');
+                    }
+                  }}
+                  className="button button-secondary"
+                  disabled={selectedOrgs.size !== 2}
+                  style={{ fontSize: '8pt', whiteSpace: 'nowrap', opacity: selectedOrgs.size !== 2 ? 0.5 : 1 }}
+                >
+                  Merge Selected ({selectedOrgs.size})
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    if (selectedOrgs.size === 0) {
+                      alert('Select organizations to delete');
+                      return;
+                    }
+                    if (!confirm(`Delete ${selectedOrgs.size} organization(s)? This cannot be undone.`)) return;
+                    
+                    try {
+                      const { error } = await supabase
+                        .from('businesses')
+                        .update({ is_public: false })
+                        .in('id', Array.from(selectedOrgs));
+                      
+                      if (error) throw error;
+                      
+                      setSelectedOrgs(new Set());
+                      setOrganizeMode(false);
+                      loadOrganizations(session);
+                    } catch (error: any) {
+                      alert(`Error: ${error.message}`);
+                    }
+                  }}
+                  className="button button-secondary"
+                  style={{ fontSize: '8pt', whiteSpace: 'nowrap', color: '#dc2626' }}
+                >
+                  Hide Selected ({selectedOrgs.size})
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Results count */}
         <div style={{ marginTop: '12px', fontSize: '8pt', color: 'var(--text-muted)' }}>
           Showing {filteredOrgs.length} of {organizations.length} organizations
+          {organizeMode && selectedOrgs.size > 0 && (
+            <span style={{ marginLeft: '8px', fontWeight: 700 }}>
+              • {selectedOrgs.size} selected
+            </span>
+          )}
         </div>
       </div>
 
@@ -454,16 +531,53 @@ export default function Organizations() {
               key={org.id}
               style={{
                 background: 'var(--white)',
-                border: '1px solid var(--border)',
+                border: selectedOrgs.has(org.id) 
+                  ? '2px solid var(--accent)' 
+                  : '1px solid var(--border)',
                 borderRadius: '4px',
                 overflow: 'hidden',
-                cursor: 'pointer',
+                cursor: organizeMode ? 'default' : 'pointer',
                 transition: '0.12s',
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                position: 'relative'
               }}
-              className="hover-lift"
+              className={organizeMode ? '' : 'hover-lift'}
             >
+              {/* Selection checkbox in organize mode */}
+              {organizeMode && (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const newSelected = new Set(selectedOrgs);
+                    if (newSelected.has(org.id)) {
+                      newSelected.delete(org.id);
+                    } else {
+                      newSelected.add(org.id);
+                    }
+                    setSelectedOrgs(newSelected);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    left: '8px',
+                    zIndex: 10,
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid var(--border)',
+                    borderRadius: '3px',
+                    background: selectedOrgs.has(org.id) ? 'var(--accent)' : 'var(--white)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '12px',
+                    color: selectedOrgs.has(org.id) ? 'white' : 'transparent'
+                  }}
+                >
+                  {selectedOrgs.has(org.id) && '✓'}
+                </div>
+              )}
               {/* Primary Image - with Logo overlay if available */}
               <div
                 onClick={() => navigate(`/org/${org.id}`)}
@@ -484,7 +598,7 @@ export default function Organizations() {
                     transform: 'translate(-50%, -50%)',
                     maxWidth: '200px',
                     maxHeight: '80px',
-                    background: 'rgba(255,255,255,0.95)',
+                    background: 'transparent',
                     padding: '12px',
                     borderRadius: '4px'
                   }}>
@@ -762,6 +876,136 @@ export default function Organizations() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Merge Organizations Modal */}
+      {showMergeModal && mergeSource && mergeTarget && (() => {
+        const sourceOrg = organizations.find(o => o.id === mergeSource);
+        const targetOrg = organizations.find(o => o.id === mergeTarget);
+        if (!sourceOrg || !targetOrg) return null;
+
+        return (
+          <div
+            onClick={() => {
+              setShowMergeModal(false);
+              setMergeSource(null);
+              setMergeTarget(null);
+            }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--white)',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                padding: '20px',
+                maxWidth: '500px',
+                width: '90%'
+              }}
+            >
+              <div style={{ marginBottom: '16px', fontSize: '11pt', fontWeight: 700 }}>
+                Merge Organizations
+              </div>
+              
+              <div style={{ marginBottom: '16px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                This will merge <strong>{sourceOrg.business_name}</strong> into <strong>{targetOrg.business_name}</strong>.
+                All vehicles, images, and data from the source will be transferred to the target.
+              </div>
+
+              <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Source (will be merged):</div>
+                <div style={{ fontSize: '9pt', fontWeight: 600 }}>{sourceOrg.business_name}</div>
+                {sourceOrg.city && sourceOrg.state && (
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{sourceOrg.city}, {sourceOrg.state}</div>
+                )}
+              </div>
+
+              <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '4px' }}>Target (will keep):</div>
+                <div style={{ fontSize: '9pt', fontWeight: 600 }}>{targetOrg.business_name}</div>
+                {targetOrg.city && targetOrg.state && (
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{targetOrg.city}, {targetOrg.state}</div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    setShowMergeModal(false);
+                    setMergeSource(null);
+                    setMergeTarget(null);
+                  }}
+                  className="button button-secondary"
+                  style={{ fontSize: '8pt' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      // Merge organization_vehicles
+                      const { error: vehError } = await supabase
+                        .from('organization_vehicles')
+                        .update({ organization_id: mergeTarget })
+                        .eq('organization_id', mergeSource);
+                      
+                      if (vehError) throw vehError;
+
+                      // Merge organization_images
+                      const { error: imgError } = await supabase
+                        .from('organization_images')
+                        .update({ organization_id: mergeTarget })
+                        .eq('organization_id', mergeSource);
+                      
+                      if (imgError) throw imgError;
+
+                      // Merge organization_contributors
+                      const { error: contribError } = await supabase
+                        .from('organization_contributors')
+                        .update({ organization_id: mergeTarget })
+                        .eq('organization_id', mergeSource);
+                      
+                      if (contribError) throw contribError;
+
+                      // Hide source organization
+                      const { error: hideError } = await supabase
+                        .from('businesses')
+                        .update({ is_public: false })
+                        .eq('id', mergeSource);
+                      
+                      if (hideError) throw hideError;
+
+                      setShowMergeModal(false);
+                      setMergeSource(null);
+                      setMergeTarget(null);
+                      setSelectedOrgs(new Set());
+                      setOrganizeMode(false);
+                      loadOrganizations(session);
+                    } catch (error: any) {
+                      alert(`Error merging organizations: ${error.message}`);
+                    }
+                  }}
+                  className="button button-primary"
+                  style={{ fontSize: '8pt' }}
+                >
+                  Merge Organizations
+                </button>
+              </div>
             </div>
           </div>
         );
