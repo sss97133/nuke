@@ -1518,7 +1518,7 @@ const CursorHomepage: React.FC = () => {
         if (ids.length > 0) {
           const { data: listings, error: listErr } = await supabase
             .from('external_listings')
-            .select('vehicle_id, platform, listing_status, current_bid, final_price, end_date, bid_count, updated_at')
+            .select('vehicle_id, platform, listing_status, current_bid, final_price, start_date, end_date, bid_count, updated_at, listing_url')
             .in('vehicle_id', ids)
             .in('listing_status', ['active', 'live']) // Only fetch active listings for badge display
             .order('updated_at', { ascending: false })
