@@ -1,5 +1,6 @@
 {
   "scripts": {
+    "build": "cd nuke_frontend && npm install && npm run build && mv dist ../dist",
     "env:doctor": "node scripts/tools/env-doctor.cjs",
     "audit": "tsx scripts/run-autonomous-audit.ts",
     "audit:dry-run": "tsx scripts/run-autonomous-audit.ts --dry-run",
