@@ -21,6 +21,10 @@ export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = 
   const options: string[] = Array.isArray(lart?.options) ? lart.options : [];
   const infoBullets: string[] = Array.isArray(lart?.info_bullets) ? lart.info_bullets : [];
   const serviceHistory: string[] = Array.isArray(lart?.service_history) ? lart.service_history : [];
+  
+  // Mecum auction structured content
+  const mecumHighlights: string[] = Array.isArray(originMeta.highlights) ? originMeta.highlights : [];
+  const mecumStory: string = typeof originMeta.story === 'string' ? originMeta.story : '';
 
   // Extract Craigslist attributes from origin_metadata
   const craigslistAttrs: Array<{ label: string; value: string | number }> = [];
@@ -49,7 +53,8 @@ export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = 
 
   const sourceUrl = (vehicle as any)?.discovery_url || null;
   const isCraigslist = sourceUrl?.includes('craigslist');
-  const isEmpty = options.length === 0 && infoBullets.length === 0 && serviceHistory.length === 0 && craigslistAttrs.length === 0 && !locationData.lat;
+  const isMecum = sourceUrl?.includes('mecum.com');
+  const isEmpty = options.length === 0 && infoBullets.length === 0 && serviceHistory.length === 0 && craigslistAttrs.length === 0 && !locationData.lat && mecumHighlights.length === 0 && !mecumStory;
 
   if (isEmpty) return null;
 
@@ -196,6 +201,42 @@ export const VehicleStructuredListingDataCard: React.FC<{ vehicle: Vehicle }> = 
                 <div key={idx} style={{ padding: '2px 0' }}>
                   - {String(line).trim()}
                 </div>
+              ))}
+            </div>
+          </details>
+        )}
+
+        {/* Mecum Auction: Highlights */}
+        {mecumHighlights.length > 0 && (
+          <details open>
+            <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {isMecum && <FaviconIcon url="https://www.mecum.com" size={12} preserveAspectRatio={true} />}
+              Highlights ({mecumHighlights.length})
+            </summary>
+            <div style={{ marginTop: '8px', fontSize: '9pt', lineHeight: 1.6 }}>
+              <ul style={{ margin: 0, paddingLeft: '16px', listStyleType: 'disc' }}>
+                {mecumHighlights.map((highlight, idx) => (
+                  <li key={idx} style={{ padding: '2px 0', color: 'var(--text)' }}>
+                    {String(highlight).trim()}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </details>
+        )}
+
+        {/* Mecum Auction: The Story */}
+        {mecumStory && (
+          <details open>
+            <summary style={{ cursor: 'pointer', fontSize: '9pt', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {isMecum && <FaviconIcon url="https://www.mecum.com" size={12} preserveAspectRatio={true} />}
+              The Story
+            </summary>
+            <div style={{ marginTop: '8px', fontSize: '9pt', lineHeight: 1.7 }}>
+              {mecumStory.split('\n\n').map((paragraph, idx) => (
+                <p key={idx} style={{ margin: idx === 0 ? 0 : '12px 0 0 0', color: 'var(--text)' }}>
+                  {paragraph.trim()}
+                </p>
               ))}
             </div>
           </details>
