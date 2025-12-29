@@ -193,21 +193,21 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
                 CONTACT
               </a>
             )}
-            <button
-              onClick={onClose}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                fontSize: '14px',
-                color: 'var(--text-muted)',
-                lineHeight: 1
-              }}
-              title="Close"
-            >
-              ×
-            </button>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px',
+              fontSize: '14px',
+              color: 'var(--text-muted)',
+              lineHeight: 1
+            }}
+            title="Close"
+          >
+            ×
+          </button>
           </div>
         </div>
 

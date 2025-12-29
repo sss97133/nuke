@@ -280,13 +280,14 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           };
           
           // Extract buyer name and seller info from metadata
+          // Prefer context values (from live auction pulse) over database values (may be stale)
           auctionMetrics = {
             buyer_name: listing?.metadata?.buyer || saleEvent?.metadata?.buyer || saleEvent?.metadata?.buyer_username,
             seller_username: sellerUsername,
             seller_profile_url: sellerProfileUrl,
-            bid_count: listing?.bid_count,
-            view_count: listing?.view_count,
-            watcher_count: listing?.watcher_count
+            bid_count: (typeof context?.bid_count === 'number' && context.bid_count > 0) ? context.bid_count : (listing?.bid_count ?? null),
+            view_count: (typeof context?.view_count === 'number' && context.view_count > 0) ? context.view_count : (listing?.view_count ?? null),
+            watcher_count: (typeof context?.watcher_count === 'number' && context.watcher_count > 0) ? context.watcher_count : (listing?.watcher_count ?? null)
           };
           
           // Check if buyer has linked N-Zero profile (only for BaT for now)
@@ -787,93 +788,105 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           )}
 
           {/* Auction Metrics (bids, views, watchers) */}
-          {field === 'sale_price' && (provenance?.bid_count !== undefined || provenance?.view_count !== undefined || provenance?.watcher_count !== undefined) && (
+          {field === 'sale_price' && (provenance?.bid_count !== undefined || provenance?.view_count !== undefined || provenance?.watcher_count !== undefined || context?.bid_count !== undefined || context?.view_count !== undefined || context?.watcher_count !== undefined) && (
             <div style={{ marginBottom: '16px' }}>
               <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
                 Auction Metrics
               </div>
               <div style={{ fontSize: '9pt', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                {provenance.bid_count !== undefined && (
-                  <a
-                    href={provenance.bat_url || context?.evidence_url || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      color: 'var(--text)',
-                      textDecoration: 'none',
-                      cursor: 'pointer',
-                      padding: '2px 8px',
-                      borderRadius: '3px',
-                      background: 'var(--grey-100)',
-                      border: '1px solid var(--border)',
-                      fontWeight: 600,
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--grey-200)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'var(--grey-100)';
-                    }}
-                  >
-                    <strong>{provenance.bid_count.toLocaleString()}</strong> {provenance.bid_count === 1 ? 'bid' : 'bids'}
-                  </a>
-                )}
-                {provenance.view_count !== undefined && (
-                  <a
-                    href={provenance.bat_url || context?.evidence_url || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      color: 'var(--text)',
-                      textDecoration: 'none',
-                      cursor: 'pointer',
-                      padding: '2px 8px',
-                      borderRadius: '3px',
-                      background: 'var(--grey-100)',
-                      border: '1px solid var(--border)',
-                      fontWeight: 600,
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--grey-200)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'var(--grey-100)';
-                    }}
-                  >
-                    <strong>{provenance.view_count.toLocaleString()}</strong> {provenance.view_count === 1 ? 'view' : 'views'}
-                  </a>
-                )}
-                {provenance.watcher_count !== undefined && (
-                  <a
-                    href={provenance.bat_url || context?.evidence_url || '#'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      color: 'var(--text)',
-                      textDecoration: 'none',
-                      cursor: 'pointer',
-                      padding: '2px 8px',
-                      borderRadius: '3px',
-                      background: 'var(--grey-100)',
-                      border: '1px solid var(--border)',
-                      fontWeight: 600,
-                      transition: 'background 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'var(--grey-200)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'var(--grey-100)';
-                    }}
-                  >
-                    <strong>{provenance.watcher_count.toLocaleString()}</strong> {provenance.watcher_count === 1 ? 'watcher' : 'watchers'}
-                  </a>
-                )}
+                {(() => {
+                  // Prefer context (live data) over provenance (database), but show provenance if context is missing
+                  const bidCount = (typeof context?.bid_count === 'number' && context.bid_count > 0) ? context.bid_count : (provenance?.bid_count ?? null);
+                  return bidCount !== null && bidCount !== undefined ? (
+                    <a
+                      href={provenance?.bat_url || context?.evidence_url || context?.listing_url || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        color: 'var(--text)',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        padding: '2px 8px',
+                        borderRadius: '3px',
+                        background: 'var(--grey-100)',
+                        border: '1px solid var(--border)',
+                        fontWeight: 600,
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--grey-200)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--grey-100)';
+                      }}
+                    >
+                      <strong>{bidCount.toLocaleString()}</strong> {bidCount === 1 ? 'bid' : 'bids'}
+                    </a>
+                  ) : null;
+                })()}
+                {(() => {
+                  // Prefer context (live data) over provenance (database)
+                  const viewCount = (typeof context?.view_count === 'number' && context.view_count > 0) ? context.view_count : (provenance?.view_count ?? null);
+                  return viewCount !== null && viewCount !== undefined ? (
+                    <a
+                      href={provenance?.bat_url || context?.evidence_url || context?.listing_url || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        color: 'var(--text)',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        padding: '2px 8px',
+                        borderRadius: '3px',
+                        background: 'var(--grey-100)',
+                        border: '1px solid var(--border)',
+                        fontWeight: 600,
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--grey-200)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--grey-100)';
+                      }}
+                    >
+                      <strong>{viewCount.toLocaleString()}</strong> {viewCount === 1 ? 'view' : 'views'}
+                    </a>
+                  ) : null;
+                })()}
+                {(() => {
+                  // Prefer context (live data) over provenance (database)
+                  const watcherCount = (typeof context?.watcher_count === 'number' && context.watcher_count > 0) ? context.watcher_count : (provenance?.watcher_count ?? null);
+                  return watcherCount !== null && watcherCount !== undefined ? (
+                    <a
+                      href={provenance?.bat_url || context?.evidence_url || context?.listing_url || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        color: 'var(--text)',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        padding: '2px 8px',
+                        borderRadius: '3px',
+                        background: 'var(--grey-100)',
+                        border: '1px solid var(--border)',
+                        fontWeight: 600,
+                        transition: 'background 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'var(--grey-200)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'var(--grey-100)';
+                      }}
+                    >
+                      <strong>{watcherCount.toLocaleString()}</strong> {watcherCount === 1 ? 'watcher' : 'watchers'}
+                    </a>
+                  ) : null;
+                })()}
               </div>
             </div>
           )}
