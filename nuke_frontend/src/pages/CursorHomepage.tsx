@@ -1373,15 +1373,33 @@ const CursorHomepage: React.FC = () => {
     try {
       setDbStatsLoading(true);
       
-      // Get total vehicle count (ALL vehicles in DB, no filters)
-      const { count: totalCount } = await supabase
+      // Get total vehicle count (public vehicles only, matching the displayed count)
+      const { count: totalCount, error: countError } = await supabase
         .from('vehicles')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('is_public', true);
       
-      // Get comprehensive vehicle data for stats
-      const { data: allVehicles } = await supabase
+      if (countError) {
+        console.error('Error loading vehicle count:', countError);
+      }
+      
+      // Get comprehensive vehicle data for stats (public vehicles only)
+      const { data: allVehicles, error: vehiclesError } = await supabase
         .from('vehicles')
-        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, current_bid, is_for_sale, bid_count, auction_outcome');
+        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, current_bid, is_for_sale, bid_count, auction_outcome')
+        .eq('is_public', true);
+      
+      if (vehiclesError) {
+        console.error('Error loading vehicles for stats:', vehiclesError);
+        return;
+      }
+      
+      // Helper to safely parse numeric values (handles both number and string from DB)
+      const safeNum = (val: any): number => {
+        if (val == null) return 0;
+        const n = typeof val === 'number' ? val : parseFloat(String(val));
+        return Number.isFinite(n) ? n : 0;
+      };
       
       let totalValue = 0;
       let vehiclesWithValue = 0;
@@ -1409,13 +1427,6 @@ const CursorHomepage: React.FC = () => {
         
         // Calculate value - use the best/actual price per vehicle
         let vehiclePrice = 0;
-        
-        // Helper to safely parse numeric values (handles both number and string from DB)
-        const safeNum = (val: any): number => {
-          if (val == null) return 0;
-          const n = typeof val === 'number' ? val : parseFloat(String(val));
-          return Number.isFinite(n) ? n : 0;
-        };
         
         // If sold, use sale_price
         if (v.sale_price && (v.sale_status === 'sold' || safeNum(v.sale_price) > 0)) {
@@ -1450,6 +1461,7 @@ const CursorHomepage: React.FC = () => {
       const { data: recentSales } = await supabase
         .from('vehicles')
         .select('sale_price, sale_date')
+        .eq('is_public', true)
         .not('sale_price', 'is', null)
         .gte('sale_date', todayISO);
       
@@ -1458,7 +1470,7 @@ const CursorHomepage: React.FC = () => {
         return sum + (typeof price === 'number' && Number.isFinite(price) ? price : 0);
       }, 0);
       
-      setDbStats({
+      const stats = {
         totalVehicles: totalCount || 0,
         totalValue,
         salesVolume,
@@ -1466,7 +1478,16 @@ const CursorHomepage: React.FC = () => {
         activeAuctions,
         totalBids,
         avgValue
+      };
+      
+      console.log('Database stats loaded:', {
+        totalVehicles: stats.totalVehicles,
+        totalValue: stats.totalValue,
+        vehiclesWithValue,
+        vehiclesProcessed: (allVehicles || []).length
       });
+      
+      setDbStats(stats);
     } catch (error) {
       console.error('Error loading database stats:', error);
     } finally {

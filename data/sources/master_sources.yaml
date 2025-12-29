@@ -245,6 +245,20 @@ sources:
     typical_data: ["listings", "photos", "price", "location"]
     recommended_strategy: "firecrawl_schema_then_fallback"
 
+  - id: tbtfw
+    name: "TBTFW"
+    website: "https://www.tbtfw.com"
+    kind: "dealer"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "active"
+    monitoring_priority: "medium"
+    typical_data: ["dealer_inventory", "vdp_pages", "photos", "vin", "price", "mileage"]
+    recommended_strategy: "firecrawl_schema_then_fallback"
+    notes:
+      - "Inventory index: https://www.tbtfw.com/inventory"
+      - "Vehicle detail pages use /am-inventory/<slug> and often include VIN/stock in-page."
+
   - id: offerup
     name: "OfferUp"
     website: "https://offerup.com"
