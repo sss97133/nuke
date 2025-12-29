@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { OrganizationSearchService } from '../services/organizationSearch';
-import { getOrgInvestorMetrics, OrgMetricData } from '../utils/orgInvestorMetrics';
+import { getOrgInvestorMetrics, type OrgMetricData } from '../utils/orgInvestorMetrics';
 import { FaviconIcon } from '../components/common/FaviconIcon';
 
 interface Organization {
@@ -360,6 +360,13 @@ export default function Organizations() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                // Trigger search by updating state (useEffect will handle it)
+                setSearchQuery(e.currentTarget.value);
+              }
+            }}
             placeholder="Search organizations..."
             className="form-input"
             style={{ fontSize: '9pt' }}
