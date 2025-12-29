@@ -315,12 +315,20 @@ const classifySource = (v: any): SourceKind => {
   if (origin === 'classic_com_indexing' || host === 'classic.com' || host.endsWith('.classic.com') || discoveryUrl.includes('classic.com') || discoverySource.includes('classic')) {
     return 'classic';
   }
-  // Generic dealer site scrape
-  if (origin === 'url_scraper') {
+  // Mecum
+  if (discoveryUrl.includes('mecum.com') || discoverySource.includes('mecum')) {
+    return 'dealer_site'; // Treat as dealer for filtering purposes
+  }
+  // Generic dealer site scrape or organization imports
+  if (origin === 'url_scraper' || origin === 'organization_import' || origin.includes('dealer')) {
     return 'dealer_site';
   }
+  // Other imports (dropbox, agent, pcarmarket, classiccars)
+  if (origin.includes('import')) {
+    return 'dealer_site'; // Treat imports as dealer sites
+  }
   // User-ish
-  if (!origin || origin === 'user_upload' || origin === 'manual' || origin === 'user_import') {
+  if (!origin || origin === 'user_upload' || origin === 'user_uploaded' || origin === 'manual' || origin === 'manual_entry' || origin === 'user_import') {
     return 'user';
   }
   return 'unknown';
@@ -784,6 +792,11 @@ const CursorHomepage: React.FC = () => {
         
         // Check dynamic sources
         if (hiddenSourcesSet.has(src)) return false;
+
+        // If ALL main sources are hidden, also hide unknown sources
+        const allMainSourcesHidden = filters.hideCraigslist && filters.hideDealerSites && 
+          filters.hideKsl && filters.hideBat && filters.hideClassic;
+        if (allMainSourcesHidden && (src === 'unknown' || src === 'user')) return false;
 
         return true;
       });
