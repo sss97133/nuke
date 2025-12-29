@@ -689,10 +689,85 @@ serve(async (req) => {
       listings = extract.listings || [];
       console.log(`Firecrawl extracted: dealer=${!!dealerInfo}, listings=${listings.length}`);
       
-      // Handle pagination if next_page_url exists
-      if (extract.next_page_url && listings.length > 0) {
-        console.log(`Pagination detected: ${extract.next_page_url}`);
-        // Note: Could recursively scrape next pages here if needed
+      // Handle pagination if next_page_url exists (loop bounded for safety)
+      // We keep this conservative to avoid runaway costs/timeouts.
+      try {
+        let nextUrl = extract.next_page_url as string | null | undefined;
+        const visited = new Set<string>();
+        let pagesFetched = 0;
+        const PAGE_FETCH_LIMIT = 8; // cap pagination depth
+        const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+
+        while (
+          FIRECRAWL_API_KEY &&
+          nextUrl &&
+          typeof nextUrl === 'string' &&
+          nextUrl.trim().length > 0 &&
+          pagesFetched < PAGE_FETCH_LIMIT
+        ) {
+          const canonicalNext = (() => {
+            try {
+              const u = new URL(nextUrl);
+              return u.toString();
+            } catch {
+              // Make relative URLs absolute using the source origin
+              try {
+                const base = new URL(source_url);
+                const abs = `${base.origin}${nextUrl.startsWith('/') ? '' : '/'}${nextUrl}`;
+                return new URL(abs).toString();
+              } catch {
+                return null;
+              }
+            }
+          })();
+          if (!canonicalNext || visited.has(canonicalNext)) break;
+          visited.add(canonicalNext);
+          pagesFetched++;
+
+          console.log(`Fetching paginated page ${pagesFetched}: ${canonicalNext}`);
+          const resp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`
+            },
+            body: JSON.stringify({
+              url: canonicalNext,
+              formats: ['extract', 'html'],
+              onlyMainContent: false,
+              waitFor: 4000,
+              extract: { schema: extractionSchema }
+            }),
+            signal: AbortSignal.timeout(30000),
+          });
+
+          if (!resp.ok) {
+            console.warn(`Firecrawl pagination fetch error ${resp.status}: ${await resp.text().catch(()=>'')}`);
+            break;
+          }
+          const data = await resp.json().catch(() => null);
+          const pageExtract = data?.data?.extract;
+          const pageListings: any[] = Array.isArray(pageExtract?.listings) ? pageExtract.listings : [];
+          console.log(`Paginated page returned ${pageListings.length} listings`);
+          if (pageListings.length > 0) {
+            // Merge, de-dupe by URL
+            const seen = new Set<string>(listings.map((l: any) => String(l?.url || '').trim()).filter(Boolean));
+            for (const l of pageListings) {
+              const u = String(l?.url || '').trim();
+              if (!u || seen.has(u)) continue;
+              listings.push(l);
+              seen.add(u);
+            }
+            nextUrl = pageExtract?.next_page_url || null;
+          } else {
+            break; // stop if page is empty
+          }
+
+          // Friendly pacing
+          await new Promise(r => setTimeout(r, 500));
+        }
+      } catch (e: any) {
+        console.warn(`Pagination fetch failed (non-blocking): ${e?.message || String(e)}`);
       }
     }
 
@@ -817,6 +892,8 @@ Return ONLY valid JSON in this format:
       const listingPatterns = [
         /href="([^"]*\/listing\/[^"]+)"/gi,
         /href="([^"]*\/vehicle\/[^"]+)"/gi,
+        // TBTFW (Webflow + AutoManager embed): listing detail pages use /am-inventory/<slug>
+        /href="([^"]*\/am-inventory\/[^"]+)"/gi,
         // Classic.com listing detail pages often use /l/<id-or-slug>/
         /href="([^"]*\/l\/[^"]+)"/gi,
         // Cars & Bids: listing detail pages use /auctions/<id>/<slug>
@@ -916,6 +993,16 @@ Return ONLY valid JSON in this format:
           if (abs.includes('/fiche/')) found.add(abs);
         }
 
+        // TBTFW: enumerate /am-inventory/ links (detail pages include VIN/stock in URL).
+        const anyAmInventoryHref = /href="([^"]*\/am-inventory\/[^"]+)"/gi;
+        while ((m = anyAmInventoryHref.exec(html)) !== null) {
+          const raw = (m[1] || '').trim();
+          if (!raw) continue;
+          const abs = raw.startsWith('http') ? raw : `${baseUrl.origin}${raw.startsWith('/') ? '' : '/'}${raw}`;
+          // Avoid pulling unrelated "inventory" anchors; /am-inventory/ is strongly indicative.
+          if (abs.includes('/am-inventory/')) found.add(abs);
+        }
+
         // Classic.com: enumerate listing detail URLs from seller pages.
         // We keep this conservative: only pick /l/ links and normalize to the current origin.
         const baseHost = baseUrl.hostname.replace(/^www\./, '').toLowerCase();
@@ -969,6 +1056,79 @@ Return ONLY valid JSON in this format:
             } catch {
               // ignore
             }
+          }
+
+          // Attempt naive pagination on BaT /auctions index (common patterns: /page/N/, ?page=N, ?pg=N, ?paged=N)
+          // We fetch a few additional pages and collect links until no new links are found or limit reached.
+          try {
+            const basePath = baseUrl.pathname.replace(/\/+$/, '');
+            const isAuctionsIndex = basePath === '/auctions';
+            const canPaginate = isAuctionsIndex;
+            const PAGE_LIMIT = 8; // cap to avoid long runs
+            const paginationPatterns: ((p: number) => string)[] = [
+              (p) => p === 1 ? `${baseUrl.origin}${basePath}/` : `${baseUrl.origin}${basePath}/page/${p}/`,
+              (p) => p === 1 ? `${baseUrl.origin}${basePath}/` : `${baseUrl.origin}${basePath}/?page=${p}`,
+              (p) => p === 1 ? `${baseUrl.origin}${basePath}/` : `${baseUrl.origin}${basePath}/?pg=${p}`,
+              (p) => p === 1 ? `${baseUrl.origin}${basePath}/` : `${baseUrl.origin}${basePath}/?paged=${p}`,
+            ];
+            if (canPaginate) {
+              const seenBefore = new Set<string>(found);
+              for (let page = 2; page <= PAGE_LIMIT; page++) {
+                let pageFetched = false;
+                for (const pattern of paginationPatterns) {
+                  const pageUrl = pattern(page);
+                  if (!pageUrl) continue;
+                  try {
+                    const resp = await fetch(pageUrl, {
+                      headers: {
+                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                      },
+                      signal: AbortSignal.timeout(12000),
+                    });
+                    if (!resp.ok) continue;
+                    const pageHtml = await resp.text();
+                    const re = /href="([^"]*\/listing\/[^"]+)"/gi;
+                    let added = 0;
+                    let mm: RegExpExecArray | null;
+                    while ((mm = re.exec(pageHtml)) !== null) {
+                      const raw = (mm[1] || '').trim();
+                      if (!raw) continue;
+                      const abs = raw.startsWith('http') ? raw : `${baseUrl.origin}${raw.startsWith('/') ? '' : '/'}${raw}`;
+                      try {
+                        const u = new URL(abs);
+                        if (u.hostname.replace(/^www\./, '').toLowerCase() !== 'bringatrailer.com') continue;
+                        if (!u.pathname.toLowerCase().startsWith('/listing/')) continue;
+                        const normalized = u.pathname.endsWith('/') ? `${u.origin}${u.pathname}` : `${u.origin}${u.pathname}/`;
+                        if (!seenBefore.has(normalized)) {
+                          found.add(normalized);
+                          seenBefore.add(normalized);
+                          added++;
+                        }
+                      } catch {
+                        // ignore
+                      }
+                    }
+                    if (added > 0) {
+                      pageFetched = true;
+                      console.log(`BaT pagination page ${page}: added ${added} new listings`);
+                      // Pace requests slightly
+                      await new Promise(r => setTimeout(r, 400));
+                      break; // next page number with first successful pattern
+                    }
+                  } catch {
+                    // try next pattern
+                  }
+                }
+                if (!pageFetched) {
+                  // no new links or all patterns failed; stop paginating
+                  break;
+                }
+              }
+            }
+          } catch (e: any) {
+            console.warn(`BaT pagination failed (non-blocking): ${e?.message || String(e)}`);
           }
         }
 
