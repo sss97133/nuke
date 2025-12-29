@@ -1,14 +1,21 @@
 /**
- * TIER 2: EXPERT COMPONENT IDENTIFICATION (Reference-Grounded)
+ * DEPRECATED: analyze-image-tier2
  * 
- * Model: GPT-4o or Claude Opus
- * Cost: ~$0.01-0.05 per image
+ * This function is DEPRECATED. Use `analyze-image` instead.
  * 
- * Purpose: Detailed component identification with epistemic honesty
- * - Identifies specific components with citations
- * - Separates CONFIRMED (cited) vs INFERRED (reasoned) vs UNKNOWN (flagged)
- * - Logs knowledge gaps when reference data is missing
- * - Provides handoff notes for future analysis
+ * This function now forwards all requests to the main `analyze-image` function.
+ * The tier-2 specific features (component identification) should be requested
+ * via the `analysis_depth: 'detailed'` parameter to analyze-image.
+ * 
+ * Migration: Replace calls to this function with:
+ *   supabase.functions.invoke('analyze-image', {
+ *     body: { ...params, analysis_depth: 'detailed' }
+ *   })
+ * 
+ * ORIGINAL PURPOSE (now in analyze-image):
+ * - Detailed component identification with epistemic honesty
+ * - Separates CONFIRMED vs INFERRED vs UNKNOWN
+ * - Reference grounding against vehicle manuals/specs
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"

@@ -19,7 +19,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { profile_url, username, extract_vehicles = true } = await req.json();
+    const { profile_url, username, extract_vehicles = true, queue_only = false } = await req.json();
 
     if (!profile_url && !username) {
       return new Response(
@@ -218,12 +218,52 @@ Deno.serve(async (req: Request) => {
       username: batUsername,
       external_identity_id: externalIdentityId,
       listings_found: listingUrlsArray.length,
+      listing_urls: listingUrlsArray, // Always include the listing URLs
       vehicles_created: 0,
       vehicles_updated: 0,
       vehicles_skipped: 0,
       errors: [] as string[],
       vehicle_ids: [] as string[],
     };
+
+    // Queue-only mode: add listings to bat_extraction_queue for background processing
+    if (queue_only && listingUrlsArray.length > 0) {
+      console.log(`Queue-only mode: adding ${listingUrlsArray.length} listings to bat_extraction_queue`);
+      
+      let queued = 0;
+      for (const listingUrl of listingUrlsArray) {
+        // Check if already in queue
+        const { data: existing } = await supabase
+          .from('bat_extraction_queue')
+          .select('id')
+          .eq('bat_url', listingUrl)
+          .maybeSingle();
+        
+        if (!existing) {
+          const { error: queueError } = await supabase
+            .from('bat_extraction_queue')
+            .insert({
+              bat_url: listingUrl,
+              status: 'pending',
+              priority: 5, // Medium priority
+            });
+          
+          if (!queueError) {
+            queued++;
+          } else {
+            results.errors.push(`Queue error for ${listingUrl}: ${queueError.message}`);
+          }
+        }
+      }
+      
+      console.log(`Queued ${queued} new listings`);
+      results.vehicles_created = queued; // Repurpose this field for queued count
+      
+      return new Response(
+        JSON.stringify({ success: true, ...results, queued }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (extract_vehicles && listingUrlsArray.length > 0) {
       // Process listings in parallel batches to restore throughput

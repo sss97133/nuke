@@ -141,15 +141,16 @@ Deno.serve(async (req: Request) => {
           // Call the appropriate sync function
           // Use service role key for internal function-to-function calls
           const supabaseUrl = Deno.env.get('SUPABASE_URL');
-          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+          const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '';
           const syncUrl = `${supabaseUrl}/functions/v1/${syncFunctionName}`;
+          
+          console.log(`[sync-active-auctions] Syncing listing ${listing.id} via ${syncFunctionName}`);
           
           const syncResponse = await fetch(syncUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${serviceRoleKey}`,
-              'apikey': serviceRoleKey || '' // Some functions require apikey header
+              'Authorization': `Bearer ${serviceRoleKey.trim()}`,
             },
             body: JSON.stringify({
               externalListingId: listing.id

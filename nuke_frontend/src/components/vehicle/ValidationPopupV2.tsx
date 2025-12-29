@@ -3,13 +3,16 @@ import { supabase } from '../../lib/supabase';
 import { useVINProofs } from '../../hooks/useVINProofs';
 
 interface ValidationSource {
-  source_type: string; // "title_upload", "registration_image", etc.
+  source_type: string; // "title_upload", "registration_image", "bat_auction", "dealer_listing"
   document_type?: string; // "title", "registration", "bill_of_sale"
   document_state?: string; // "ARIZONA", "CALIFORNIA", etc.
   confidence_score: number;
   image_url?: string;
   created_at: string;
   verified_by?: string;
+  source_name?: string; // "Bring a Trailer", "Collective Auto Group"
+  source_url?: string; // Link to original source
+  logo_url?: string; // Logo for external source
 }
 
 interface ValidationPopupV2Props {
@@ -135,6 +138,83 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
         });
       }
 
+      // 3. BaT auction data (external validator)
+      const { data: batListing } = await supabase
+        .from('bat_listings')
+        .select('id, listing_url, sale_price, sale_date, vin, created_at')
+        .eq('vehicle_id', vehicleId)
+        .maybeSingle();
+
+      if (batListing) {
+        allSources.push({
+          source_type: 'bat_auction',
+          document_type: 'auction_listing',
+          confidence_score: 90,
+          created_at: batListing.created_at || batListing.sale_date || new Date().toISOString(),
+          source_name: 'Bring a Trailer',
+          source_url: batListing.listing_url,
+          logo_url: 'https://bringatrailer.com/wp-content/themes/flavor/bat/images/bat-icon.png',
+          verified_by: 'BaT'
+        });
+      }
+
+      // 4. Organization/dealer data (external validator)
+      const { data: orgVehicle } = await supabase
+        .from('organization_vehicles')
+        .select('id, organization_id, notes, created_at, businesses:organization_id(name, logo_url, website_url)')
+        .eq('vehicle_id', vehicleId)
+        .limit(1)
+        .maybeSingle();
+
+      if (orgVehicle && orgVehicle.businesses) {
+        const biz = orgVehicle.businesses as any;
+        allSources.push({
+          source_type: 'dealer_listing',
+          document_type: 'dealer_inventory',
+          confidence_score: 85,
+          created_at: orgVehicle.created_at || new Date().toISOString(),
+          source_name: biz.name || 'Dealer',
+          source_url: biz.website_url,
+          logo_url: biz.logo_url,
+          verified_by: biz.name
+        });
+      }
+
+      // 5. Check origin_organization_id on vehicle itself
+      const { data: vehicleOrigin } = await supabase
+        .from('vehicles')
+        .select('origin_organization_id, bat_auction_url, businesses:origin_organization_id(name, logo_url, website_url)')
+        .eq('id', vehicleId)
+        .maybeSingle();
+
+      if (vehicleOrigin?.bat_auction_url && !batListing) {
+        // BaT URL exists but no bat_listings record - still count as source
+        allSources.push({
+          source_type: 'bat_auction',
+          document_type: 'auction_listing',
+          confidence_score: 85,
+          created_at: new Date().toISOString(),
+          source_name: 'Bring a Trailer',
+          source_url: vehicleOrigin.bat_auction_url,
+          logo_url: 'https://bringatrailer.com/wp-content/themes/flavor/bat/images/bat-icon.png',
+          verified_by: 'BaT'
+        });
+      }
+
+      if (vehicleOrigin?.origin_organization_id && vehicleOrigin.businesses && !orgVehicle) {
+        const biz = vehicleOrigin.businesses as any;
+        allSources.push({
+          source_type: 'dealer_listing',
+          document_type: 'dealer_inventory',
+          confidence_score: 85,
+          created_at: new Date().toISOString(),
+          source_name: biz.name || 'Dealer',
+          source_url: biz.website_url,
+          logo_url: biz.logo_url,
+          verified_by: biz.name
+        });
+      }
+
       setSources(allSources);
     } catch (err) {
       console.error('Failed to load validations:', err);
@@ -190,6 +270,14 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
     const type = source.document_type || 'document';
     const state = source.document_state;
     
+    // External sources - use source_name
+    if (source.source_type === 'bat_auction') {
+      return source.source_name || 'BRING A TRAILER';
+    }
+    if (source.source_type === 'dealer_listing') {
+      return source.source_name || 'DEALER LISTING';
+    }
+    
     // Factory manual pages - show page context
     if (source.source_type === 'factory_manual_page') {
       return state || 'FACTORY MANUAL';  // state = "1987 Service Manual - Page 15"
@@ -227,7 +315,10 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
 
   const confidence = calculateConfidence();
   const emblemUrl = getEmblemUrl();
-  const uniqueValidators = new Set(sources.map(s => s.verified_by).filter(Boolean)).size;
+  // Count unique validators - include external sources by their source_name
+  const uniqueValidators = new Set(
+    sources.map(s => s.verified_by || s.source_name).filter(Boolean)
+  ).size;
 
   const attribution = (() => {
     if (!fieldAttribution) return null;
@@ -439,7 +530,99 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Validator Stamps - Round badges showing who verified */}
+              {sources.filter(s => s.logo_url || s.source_name).length > 0 && (
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  gap: '8px',
+                  padding: '12px',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px'
+                }}>
+                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Verified By
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    {sources.filter(s => s.logo_url || s.source_name).map((source, idx) => (
+                      <a
+                        key={idx}
+                        href={source.source_url || '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => !source.source_url && e.preventDefault()}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '4px',
+                          textDecoration: 'none',
+                          cursor: source.source_url ? 'pointer' : 'default'
+                        }}
+                        title={source.source_url ? `View on ${source.source_name}` : source.source_name || ''}
+                      >
+                        {/* Round badge */}
+                        <div style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: 'var(--surface)',
+                          border: `2px solid ${getConfidenceColor(source.confidence_score)}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                        }}>
+                          {source.logo_url ? (
+                            <img 
+                              src={source.logo_url} 
+                              alt={source.source_name || ''} 
+                              style={{ 
+                                width: '28px', 
+                                height: '28px', 
+                                objectFit: 'contain'
+                              }}
+                              onError={(e) => { 
+                                (e.target as HTMLImageElement).style.display = 'none';
+                                (e.target as HTMLImageElement).parentElement!.innerHTML = `<span style="font-size: 14px; font-weight: 700;">${(source.source_name || 'V')[0]}</span>`;
+                              }}
+                            />
+                          ) : (
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>
+                              {(source.source_name || 'V')[0]}
+                            </span>
+                          )}
+                        </div>
+                        {/* Label */}
+                        <span style={{ 
+                          fontSize: '6pt', 
+                          color: 'var(--text-muted)', 
+                          textAlign: 'center',
+                          maxWidth: '60px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {source.source_name || getSourceLabel(source)}
+                        </span>
+                        {/* Confidence indicator */}
+                        <span style={{ 
+                          fontSize: '6pt', 
+                          color: getConfidenceColor(source.confidence_score),
+                          fontWeight: 700
+                        }}>
+                          {source.confidence_score}%
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Document sources list */}
               {sources.map((source, idx) => (
                 <div
                   key={idx}
@@ -505,14 +688,43 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
                     </div>
                   )}
                   
-                  {/* No image fallback */}
+                  {/* No image fallback - external sources or text-only */}
                   {!source.image_url && (
                     <div style={{ padding: '12px', fontSize: '8pt' }}>
-                      <div style={{ fontWeight: 700, marginBottom: '4px' }}>
-                        {getSourceLabel(source)}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        {source.logo_url && (
+                          <img 
+                            src={source.logo_url} 
+                            alt={source.source_name || ''} 
+                            style={{ width: '20px', height: '20px', objectFit: 'contain', borderRadius: '2px' }}
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        )}
+                        <span style={{ fontWeight: 700 }}>
+                          {getSourceLabel(source)}
+                        </span>
+                        {source.source_url && (
+                          <a 
+                            href={source.source_url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            style={{ 
+                              fontSize: '7pt', 
+                              color: 'var(--accent)', 
+                              textDecoration: 'none',
+                              marginLeft: 'auto'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            VIEW SOURCE
+                          </a>
+                        )}
                       </div>
-                      <div style={{ color: 'var(--text-muted)' }}>
-                        {new Date(source.created_at).toLocaleDateString()} • {source.confidence_score}%
+                      <div style={{ color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{new Date(source.created_at).toLocaleDateString()}</span>
+                        <span style={{ color: getConfidenceColor(source.confidence_score), fontWeight: 600 }}>
+                          {source.confidence_score}%
+                        </span>
                       </div>
                     </div>
                   )}
@@ -643,13 +855,23 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
             What are Validators?
           </h3>
           <div style={{ fontSize: '9pt', lineHeight: 1.6, color: 'var(--text)' }}>
-            <p>Validators are users who independently verify vehicle data by:</p>
+            <p>Validators are sources that independently verify vehicle data:</p>
             <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
-              <li>Uploading matching documents</li>
-              <li>Confirming with their own evidence</li>
-              <li>Cross-referencing public records</li>
+              <li><strong>External:</strong> Auction houses (BaT, Cars & Bids), dealers, manufacturers</li>
+              <li><strong>User:</strong> Owners uploading matching documents</li>
+              <li><strong>Community:</strong> Cross-referencing public records</li>
             </ul>
-            <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '8pt' }}>
+            {uniqueValidators > 0 && (
+              <div style={{ marginTop: '12px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '8pt' }}>
+                <strong>Current validators ({uniqueValidators}):</strong>
+                <ul style={{ paddingLeft: '16px', margin: '4px 0 0 0' }}>
+                  {Array.from(new Set(sources.map(s => s.verified_by || s.source_name).filter(Boolean))).map((v, i) => (
+                    <li key={i}>{v}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '4px', fontSize: '8pt' }}>
               Data becomes <strong>verified</strong> when 2+ validators confirm the same information.
             </div>
           </div>
