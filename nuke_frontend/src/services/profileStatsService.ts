@@ -308,15 +308,25 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .order('auction_end_date', { ascending: false })
     .limit(100);
 
-  const { data: auctionListings } = await supabase
+  // auction_events doesn't have organization_id - need to join through vehicles
+  // First get vehicle IDs for this organization
+  const { data: orgVehicles } = await supabase
+    .from('organization_vehicles')
+    .select('vehicle_id')
+    .eq('organization_id', orgId)
+    .eq('status', 'active');
+  
+  const vehicleIds = orgVehicles?.map(ov => ov.vehicle_id).filter(Boolean) || [];
+  
+  const { data: auctionListings } = vehicleIds.length > 0 ? await supabase
     .from('auction_events')
     .select(`
       *,
       vehicle:vehicles(*)
     `)
-    .eq('organization_id', orgId)
-    .order('auction_end_time', { ascending: false })
-    .limit(100);
+    .in('vehicle_id', vehicleIds)
+    .order('auction_end_at', { ascending: false })
+    .limit(100) : { data: [] };
 
   // Get bids (from organization members)
   const { data: orgContributors } = await supabase
@@ -395,12 +405,12 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .eq('is_active', true)
     .order('service_name', { ascending: true });
 
-  // Get website mapping
+  // Get website mapping (use maybeSingle to handle missing rows gracefully)
   const { data: websiteMapping } = await supabase
     .from('organization_website_mappings')
     .select('*')
     .eq('organization_id', orgId)
-    .single();
+    .maybeSingle();
 
   // Calculate stats
   const stats: ProfileStats = {

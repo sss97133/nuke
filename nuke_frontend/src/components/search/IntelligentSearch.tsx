@@ -832,7 +832,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           const year = parseInt(yearMatch[0]);
           vehicleQuery = vehicleQuery.or(`year.eq.${year},make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
         } else {
-          // Text search across multiple fields
+          // Text search across multiple fields (PostgREST doesn't support type casting in or filters)
           vehicleQuery = vehicleQuery.or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
         }
 

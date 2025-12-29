@@ -114,13 +114,23 @@ export default function AIDataIngestionSearch() {
           subtitle?: string;
         }> = [];
 
-        // Search vehicles
-        const { data: vehicles } = await supabase
+        // Search vehicles - PostgREST doesn't support type casting in or filters
+        // So we search year separately if it's a number, otherwise use text search
+        let vehicleQuery = supabase
           .from('vehicles')
           .select('id, year, make, model, vin')
-          .eq('is_public', true)
-          .or(`make.ilike.%${searchLowerSafe}%,model.ilike.%${searchLowerSafe}%,year::text.ilike.%${searchLowerSafe}%,vin.ilike.%${searchLowerSafe}%`)
-          .limit(5);
+          .eq('is_public', true);
+        
+        // Check if search term is a 4-digit year
+        const yearMatch = searchLower.match(/^\d{4}$/);
+        if (yearMatch) {
+          const year = parseInt(yearMatch[0]);
+          vehicleQuery = vehicleQuery.or(`make.ilike.%${searchLowerSafe}%,model.ilike.%${searchLowerSafe}%,vin.ilike.%${searchLowerSafe}%,year.eq.${year}`);
+        } else {
+          vehicleQuery = vehicleQuery.or(`make.ilike.%${searchLowerSafe}%,model.ilike.%${searchLowerSafe}%,vin.ilike.%${searchLowerSafe}%`);
+        }
+        
+        const { data: vehicles } = await vehicleQuery.limit(5);
 
         if (vehicles) {
           vehicles.forEach((v: any) => {

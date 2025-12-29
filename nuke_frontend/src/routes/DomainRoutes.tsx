@@ -29,7 +29,11 @@ const Library = React.lazy(() => import('../pages/Library'));
 const AuctionMarketplace = React.lazy(() => import('../pages/AuctionMarketplace'));
 const Notifications = React.lazy(() => import('../pages/Notifications'));
 const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIdentity'));
-const Search = React.lazy(() => import('../pages/Search'));
+const Search = React.lazy(() => import('../pages/Search').catch((error) => {
+  console.error('Failed to load Search component:', error);
+  // Return a fallback component
+  return { default: () => <div className="p-4">Search temporarily unavailable. Please refresh the page.</div> };
+}));
 
 export const DomainRoutes = () => {
   return (
