@@ -2249,42 +2249,6 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               </span>
             );
           })()}
-          {/* CLAIM badge for unclaimed vehicles */}
-          {!isVerifiedOwner && !isPending && !hasClaim && vehicle && (
-            <a
-              href={claimHref}
-              style={{ 
-                fontSize: '7pt', 
-                color: '#0891b2',
-                padding: '1px 6px', 
-                background: '#ecfeff', 
-                border: '1px solid #06b6d4',
-                borderRadius: '3px', 
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                transition: 'all 0.12s ease',
-                textDecoration: 'none',
-                fontWeight: 600
-              }}
-              onClick={(e) => {
-                if (onClaimClick) {
-                  e.preventDefault();
-                  onClaimClick();
-                }
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#cffafe';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#ecfeff';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-              title="Claim ownership of this vehicle"
-            >
-              CLAIM
-            </a>
-          )}
           <div style={{ position: 'relative', fontSize: '7pt', color: mutedTextColor, display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
             {isVerifiedOwner ? (
             <button
