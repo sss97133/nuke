@@ -894,17 +894,17 @@ export default function OrganizationProfile() {
                     .gt('auction_end_time', now)
                     .maybeSingle(),
                   // Check for active external listing (BaT, Cars & Bids, etc.)
+                  // Use end_date > NOW() as primary check (more reliable than status)
                   supabase.from('external_listings')
                     .select('id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata')
                     .eq('vehicle_id', ov.vehicle_id)
-                    .in('listing_status', ['active', 'live'])
                     .gt('end_date', now)
                     .maybeSingle(),
                   // Check for active BaT listing
+                  // Use auction_end_date > NOW() as primary check (more reliable than status)
                   supabase.from('bat_listings')
-                    .select('id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url')
+                    .select('id, organization_id, seller_username, listing_status, auction_end_date, high_bid, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url')
                     .eq('vehicle_id', ov.vehicle_id)
-                    .eq('listing_status', 'active')
                     .gt('auction_end_date', now.split('T')[0])
                     .maybeSingle()
                 ]);
@@ -928,9 +928,20 @@ export default function OrganizationProfile() {
                   const endDate = externalAuction.data.end_date;
                   const meta = externalAuction.data.metadata && typeof externalAuction.data.metadata === 'object' ? externalAuction.data.metadata : {};
                   const metaLocation = typeof meta?.location === 'string' ? meta.location : null;
+                  // Parse current_bid (may be string or number)
+                  const parseBid = (bid: any): number | null => {
+                    if (bid === null || bid === undefined) return null;
+                    if (typeof bid === 'number') return Math.round(bid * 100);
+                    if (typeof bid === 'string') {
+                      const cleaned = bid.replace(/[^0-9.]/g, '');
+                      const num = parseFloat(cleaned);
+                      return Number.isFinite(num) ? Math.round(num * 100) : null;
+                    }
+                    return null;
+                  };
                   auctionData = {
                     auction_end_time: endDate,
-                    auction_current_bid: externalAuction.data.current_bid ? Math.round(Number(externalAuction.data.current_bid) * 100) : null,
+                    auction_current_bid: parseBid(externalAuction.data.current_bid),
                     auction_bid_count: externalAuction.data.bid_count || 0,
                     auction_reserve_price: externalAuction.data.reserve_price ? Math.round(Number(externalAuction.data.reserve_price) * 100) : null,
                     auction_platform: externalAuction.data.platform,
@@ -946,11 +957,14 @@ export default function OrganizationProfile() {
                   // Convert DATE to TIMESTAMPTZ for end of day
                   const endDate = new Date(batAuction.data.auction_end_date);
                   endDate.setHours(23, 59, 59, 999);
+                  // Use high_bid for live auctions, final_bid only for sold auctions
+                  const isLive = endDate.getTime() > Date.now();
+                  const currentBid = isLive ? (batAuction.data.high_bid || null) : (batAuction.data.final_bid || null);
                   auctionData = {
                     auction_end_time: endDate.toISOString(),
-                    auction_current_bid: batAuction.data.final_bid ? batAuction.data.final_bid * 100 : null,
+                    auction_current_bid: currentBid ? Math.round(Number(currentBid) * 100) : null,
                     auction_bid_count: batAuction.data.bid_count || 0,
-                    auction_reserve_price: batAuction.data.reserve_price ? batAuction.data.reserve_price * 100 : null,
+                    auction_reserve_price: batAuction.data.reserve_price ? Math.round(Number(batAuction.data.reserve_price) * 100) : null,
                     auction_platform: 'bat',
                     auction_url: batAuction.data.bat_listing_url,
                     auction_view_count: typeof batAuction.data.view_count === 'number' ? batAuction.data.view_count : null,

@@ -774,6 +774,15 @@ export default function AIDataIngestionSearch() {
       e.stopPropagation();
       console.log('Enter pressed, processing input', { showPreview, input: input.trim() });
       if (!showPreview) {
+        const trimmedInput = input.trim();
+        // If it's a simple text query (not VIN, not URL), navigate directly to search
+        if (trimmedInput && !trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !trimmedInput.match(/^https?:\/\//i)) {
+          // Simple text search - navigate immediately
+          navigate(`/search?q=${encodeURIComponent(trimmedInput)}`);
+          setInput('');
+          return;
+        }
+        // Otherwise, process through AI extraction
         processInput();
       } else {
         confirmAndSave();
