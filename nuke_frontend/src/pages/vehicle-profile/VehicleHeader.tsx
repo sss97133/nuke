@@ -2899,12 +2899,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           e.currentTarget.style.transform = 'scale(1)';
                         }}
                       >
-                        {org.logo_url ? (
-                          <img src={org.logo_url} alt={org.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : isBatOrg ? (
+                        {isBatOrg ? (
                           <FaviconIcon url={batUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
                         ) : isCarsAndBidsOrg ? (
                           <FaviconIcon url={carsAndBidsUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+                        ) : org.logo_url ? (
+                          <img src={org.logo_url} alt={org.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : orgWebsiteUrl ? (
                           <FaviconIcon url={orgWebsiteUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
                         ) : (
