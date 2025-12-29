@@ -162,7 +162,11 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+          <Link 
+            to={`/org/${organizationId}`}
+            onClick={onClose}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, textDecoration: 'none', color: 'inherit' }}
+          >
             {orgData?.logo_url ? (
               <img
                 src={orgData.logo_url}
@@ -180,7 +184,7 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
                 {formatRelationship(relationshipType)}
               </div>
             </div>
-          </div>
+          </Link>
           <button
             onClick={onClose}
             style={{
@@ -242,32 +246,6 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
                 ))}
               </div>
 
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-                <Link
-                  to={`/org/${organizationId}`}
-                  onClick={onClose}
-                  style={{
-                    display: 'block',
-                    textAlign: 'center',
-                    padding: '8px 16px',
-                    background: 'var(--accent)',
-                    color: 'white',
-                    textDecoration: 'none',
-                    borderRadius: '4px',
-                    fontSize: '9pt',
-                    fontWeight: 700,
-                    transition: 'opacity 0.12s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = '0.9';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = '1';
-                  }}
-                >
-                  View Full Profile →
-                </Link>
-              </div>
             </>
           )}
         </div>
