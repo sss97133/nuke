@@ -218,6 +218,8 @@ interface FilterState {
   hasImages: boolean;
   forSale: boolean;
   hideSold: boolean;
+  privateParty: boolean; // Filter for private party listings
+  dealer: boolean; // Filter for dealer listings
   // Source / dealer-ish filters
   hideDealerListings: boolean;
   hideCraigslist: boolean;
@@ -226,8 +228,9 @@ interface FilterState {
   hideBat: boolean;
   hideClassic: boolean;
   hiddenSources?: string[]; // For dynamic sources not in legacy filters
-  zipCode: string;
+  zipCode: string; // Legacy single location - keep for compatibility
   radiusMiles: number;
+  locations: Array<{ zipCode: string; radiusMiles: number; label?: string }>; // Multiple locations
   showPending: boolean;
 }
 
@@ -242,6 +245,8 @@ const DEFAULT_FILTERS: FilterState = {
   hasImages: false,
   forSale: false,
   hideSold: false,
+  privateParty: false,
+  dealer: false,
   hideDealerListings: false,
   hideCraigslist: false,
   hideDealerSites: false,
@@ -251,6 +256,7 @@ const DEFAULT_FILTERS: FilterState = {
   hiddenSources: [],
   zipCode: '',
   radiusMiles: 50, // Default to 50 miles as requested
+  locations: [],
   showPending: false
 };
 
@@ -375,6 +381,18 @@ const CursorHomepage: React.FC = () => {
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [infoDense, setInfoDense] = useState<boolean>(false);
+  
+  // Location favorites state
+  const [locationFavorites, setLocationFavorites] = useState<Array<{ zipCode: string; radiusMiles: number; label?: string }>>(() => {
+    try {
+      const saved = localStorage.getItem(LOCATION_FAVORITES_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [currentZip, setCurrentZip] = useState(filters.zipCode || '');
+  const [currentRadius, setCurrentRadius] = useState(filters.radiusMiles || 50);
   const [cardsPerRow, setCardsPerRow] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('nuke_homepage_cardsPerRow');
@@ -452,7 +470,7 @@ const CursorHomepage: React.FC = () => {
     if ((filters.makes?.length || 0) > 0) return true;
     if ((filters.bodyStyles?.length || 0) > 0) return true;
     if (filters.is4x4) return true;
-    if (filters.zipCode && filters.radiusMiles > 0) return true;
+    if ((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.radiusMiles > 0)) return true;
     if (filters.forSale) return true;
     if (filters.hideSold) return true;
     if (filters.showPending) return true;
@@ -802,9 +820,18 @@ const CursorHomepage: React.FC = () => {
       });
     }
     
-    if (filters.zipCode && filters.zipCode.length === 5) {
+    // Location filtering - support multiple locations
+    if ((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.zipCode.length === 5)) {
       result = result.filter(v => {
         const vehicleZip = (v as any).zip_code || (v as any).location_zip;
+        if (!vehicleZip) return false;
+        
+        // Check against multiple locations
+        if (filters.locations && filters.locations.length > 0) {
+          return filters.locations.some(loc => vehicleZip === loc.zipCode);
+        }
+        
+        // Fallback to single zipCode
         return vehicleZip === filters.zipCode;
       });
     }
@@ -892,7 +919,7 @@ const CursorHomepage: React.FC = () => {
     if (filters.hideKsl !== DEFAULT_FILTERS.hideKsl) n++;
     if (filters.hideBat !== DEFAULT_FILTERS.hideBat) n++;
     if (filters.hideClassic !== DEFAULT_FILTERS.hideClassic) n++;
-    if (filters.zipCode !== DEFAULT_FILTERS.zipCode) n++;
+    if ((filters.locations && filters.locations.length > 0) || filters.zipCode !== DEFAULT_FILTERS.zipCode) n++;
     if (filters.zipCode && filters.radiusMiles !== DEFAULT_FILTERS.radiusMiles) n++;
     if (filters.showPending !== DEFAULT_FILTERS.showPending) n++;
     return n;
@@ -1289,26 +1316,28 @@ const CursorHomepage: React.FC = () => {
         // Calculate value - use the best/actual price per vehicle
         let vehiclePrice = 0;
         
+        // Helper to safely parse numeric values (handles both number and string from DB)
+        const safeNum = (val: any): number => {
+          if (val == null) return 0;
+          const n = typeof val === 'number' ? val : parseFloat(String(val));
+          return Number.isFinite(n) ? n : 0;
+        };
+        
         // If sold, use sale_price
-        if (v.sale_price && (v.sale_status === 'sold' || v.sale_price > 0)) {
-          vehiclePrice = typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) ? v.sale_price : 0;
+        if (v.sale_price && (v.sale_status === 'sold' || safeNum(v.sale_price) > 0)) {
+          vehiclePrice = safeNum(v.sale_price);
         }
         // Otherwise use asking_price
         else if (v.asking_price) {
-          vehiclePrice = typeof v.asking_price === 'number' && Number.isFinite(v.asking_price) ? v.asking_price : 0;
-          // Handle string asking_price (from DB)
-          if (typeof v.asking_price === 'string') {
-            const parsed = parseFloat(v.asking_price);
-            vehiclePrice = Number.isFinite(parsed) ? parsed : 0;
-          }
+          vehiclePrice = safeNum(v.asking_price);
         }
         // Fall back to current_value
         else if (v.current_value) {
-          vehiclePrice = typeof v.current_value === 'number' && Number.isFinite(v.current_value) ? v.current_value : 0;
+          vehiclePrice = safeNum(v.current_value);
         }
         // Last resort: purchase_price
         else if (v.purchase_price) {
-          vehiclePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) ? v.purchase_price : 0;
+          vehiclePrice = safeNum(v.purchase_price);
         }
         
         if (vehiclePrice > 0) {
@@ -2186,7 +2215,17 @@ const CursorHomepage: React.FC = () => {
     }
     
     // Location
-    if (filters.zipCode && filters.radiusMiles > 0) {
+    if (filters.locations && filters.locations.length > 0) {
+      filters.locations.forEach((loc, idx) => {
+        badges.push({
+          label: `Location: ${loc.zipCode} (${loc.radiusMiles}mi)`,
+          onRemove: () => {
+            const updated = filters.locations?.filter((_, i) => i !== idx) || [];
+            setFilters({ ...filters, locations: updated });
+          }
+        });
+      });
+    } else if (filters.zipCode && filters.radiusMiles > 0) {
       badges.push({
         label: `Location: ${filters.zipCode} (${filters.radiusMiles}mi)`,
         onRemove: () => setFilters({ ...filters, zipCode: '', radiusMiles: 0 })
@@ -2922,78 +2961,20 @@ const CursorHomepage: React.FC = () => {
               padding: '6px',
               borderBottom: '1px solid var(--border)'
             }}>
-              {/* Year quick filters - inline */}
-              {[
-                { label: '64-91', min: 1964, max: 1991 },
-                { label: '73-87', min: 1973, max: 1987 },
-                { label: '67-72', min: 1967, max: 1972 },
-                { label: '87-00', min: 1987, max: 2000 },
-                { label: '60s', min: 1960, max: 1969 },
-                { label: '70s', min: 1970, max: 1979 },
-                { label: '80s', min: 1980, max: 1989 },
-                { label: '90s', min: 1990, max: 1999 },
-              ].map(range => {
-                const isActive = filters.yearMin === range.min && filters.yearMax === range.max;
-                return (
-                  <button
-                    key={range.label}
-                    onClick={() => {
-                      if (isActive) {
-                        setFilters({ ...filters, yearMin: null, yearMax: null });
-                      } else {
-                        setFilters({ ...filters, yearMin: range.min, yearMax: range.max });
-                      }
-                    }}
-                    className="button-win95"
-                    style={{
-                      padding: '3px 7px',
-                      fontSize: '7pt',
-                      background: isActive ? 'var(--grey-600)' : 'var(--white)',
-                      color: isActive ? 'var(--white)' : 'var(--text)',
-                      fontWeight: isActive ? 700 : 400,
-                      border: isActive ? '1px solid var(--grey-600)' : '1px solid var(--border)'
-                    }}
-                    title={`Year: ${range.min}-${range.max}`}
-                  >
-                    {range.label}
-                  </button>
-                );
-              })}
-              
-              <div style={{ width: '1px', background: 'var(--border)', margin: '0 2px' }} />
-              
-              {/* Price filter button */}
+              {/* Year filter button */}
               <button
-                onClick={() => toggleCollapsedSection('priceFilters')}
+                onClick={() => toggleCollapsedSection('yearFilters')}
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
                   fontSize: '7pt',
-                  background: !collapsedSections.priceFilters ? 'var(--grey-600)' : (filters.priceMin || filters.priceMax) ? 'var(--grey-300)' : 'var(--white)',
-                  color: !collapsedSections.priceFilters ? 'var(--white)' : 'var(--text)',
-                  fontWeight: (!collapsedSections.priceFilters || filters.priceMin || filters.priceMax) ? 700 : 400,
-                  border: !collapsedSections.priceFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                  background: !collapsedSections.yearFilters ? 'var(--grey-600)' : (filters.yearMin || filters.yearMax) ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.yearFilters ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.yearFilters || filters.yearMin || filters.yearMax) ? 700 : 400,
+                  border: !collapsedSections.yearFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
-                {(filters.priceMin || filters.priceMax) 
-                  ? `$${filters.priceMin ? (filters.priceMin/1000).toFixed(0) + 'k' : '?'}-${filters.priceMax ? (filters.priceMax/1000).toFixed(0) + 'k' : '?'}`
-                  : 'price'}
-              </button>
-              
-              {/* Location filter button */}
-              <button
-                onClick={() => toggleCollapsedSection('locationFilters')}
-                className="button-win95"
-                style={{
-                  padding: '3px 7px',
-                  fontSize: '7pt',
-                  background: !collapsedSections.locationFilters ? 'var(--grey-600)' : filters.zipCode ? 'var(--grey-300)' : 'var(--white)',
-                  color: !collapsedSections.locationFilters ? 'var(--white)' : 'var(--text)',
-                  fontWeight: (!collapsedSections.locationFilters || filters.zipCode) ? 700 : 400,
-                  border: !collapsedSections.locationFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
-                }}
-              >
-                {filters.zipCode ? `📍${filters.zipCode}` : 'location'}
+                {filters.yearMin && filters.yearMax ? `${filters.yearMin}-${filters.yearMax}` : 'year'}
               </button>
               
               {/* Make filter button */}
@@ -3010,6 +2991,74 @@ const CursorHomepage: React.FC = () => {
                 }}
               >
                 {filters.makes.length > 0 ? `make: ${filters.makes.join(', ')}` : 'make'}
+              </button>
+              
+              {/* Price sort button */}
+              <button
+                onClick={() => {
+                  if (sortBy === 'price_high') {
+                    // Currently high -> switch to low
+                    setSortBy('price_low');
+                    setSortDirection('asc');
+                  } else if (sortBy === 'price_low') {
+                    // Currently low -> switch to high
+                    setSortBy('price_high');
+                    setSortDirection('desc');
+                  } else {
+                    // Not sorted by price -> start with high
+                    setSortBy('price_high');
+                    setSortDirection('desc');
+                  }
+                }}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '7pt',
+                  background: (sortBy === 'price_high' || sortBy === 'price_low') ? 'var(--grey-600)' : 'var(--white)',
+                  color: (sortBy === 'price_high' || sortBy === 'price_low') ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (sortBy === 'price_high' || sortBy === 'price_low') ? 700 : 400,
+                  border: (sortBy === 'price_high' || sortBy === 'price_low') ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                }}
+              >
+                price
+              </button>
+              
+              {/* Price filter button */}
+              <button
+                onClick={() => toggleCollapsedSection('priceFilters')}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '7pt',
+                  background: !collapsedSections.priceFilters ? 'var(--grey-600)' : (filters.priceMin || filters.priceMax) ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.priceFilters ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.priceFilters || filters.priceMin || filters.priceMax) ? 700 : 400,
+                  border: !collapsedSections.priceFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                }}
+              >
+                {(filters.priceMin || filters.priceMax) 
+                  ? `$${filters.priceMin ? (filters.priceMin/1000).toFixed(0) + 'k' : '?'}-${filters.priceMax ? (filters.priceMax/1000).toFixed(0) + 'k' : '?'}`
+                  : 'price range'}
+              </button>
+              
+              {/* Location filter button */}
+              <button
+                onClick={() => toggleCollapsedSection('locationFilters')}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '7pt',
+                  background: !collapsedSections.locationFilters ? 'var(--grey-600)' : ((filters.locations && filters.locations.length > 0) || filters.zipCode) ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.locationFilters ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.locationFilters || (filters.locations && filters.locations.length > 0) || filters.zipCode) ? 700 : 400,
+                  border: !collapsedSections.locationFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                }}
+              >
+                {filters.locations && filters.locations.length > 0 
+                  ? `📍${filters.locations.length} loc${filters.locations.length > 1 ? 's' : ''}`
+                  : filters.zipCode 
+                    ? `📍${filters.zipCode}` 
+                    : 'location'}
               </button>
               
               {/* Type filter button (body style) */}
@@ -3053,9 +3102,9 @@ const CursorHomepage: React.FC = () => {
                 style={{
                   padding: '3px 7px',
                   fontSize: '7pt',
-                  background: !collapsedSections.statusFilters ? 'var(--grey-600)' : (filters.forSale || filters.hideSold || filters.showPending) ? 'var(--grey-300)' : 'var(--white)',
+                  background: !collapsedSections.statusFilters ? 'var(--grey-600)' : (filters.forSale || filters.hideSold || filters.showPending || filters.privateParty || filters.dealer) ? 'var(--grey-300)' : 'var(--white)',
                   color: !collapsedSections.statusFilters ? 'var(--white)' : 'var(--text)',
-                  fontWeight: (!collapsedSections.statusFilters || filters.forSale || filters.hideSold || filters.showPending) ? 700 : 400,
+                  fontWeight: (!collapsedSections.statusFilters || filters.forSale || filters.hideSold || filters.showPending || filters.privateParty || filters.dealer) ? 700 : 400,
                   border: !collapsedSections.statusFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
@@ -3083,6 +3132,22 @@ const CursorHomepage: React.FC = () => {
                 </button>
               )}
             </div>
+            
+            {/* Price sort direction indicator */}
+            {(sortBy === 'price_high' || sortBy === 'price_low') && (
+              <div style={{
+                marginBottom: '8px',
+                padding: '6px',
+                background: 'var(--grey-50)',
+                border: '1px solid var(--border)',
+                display: 'flex',
+                gap: '4px',
+                alignItems: 'center',
+                fontSize: '7pt'
+              }}>
+                {sortBy === 'price_high' ? 'highest first' : 'lowest first'} in price
+              </div>
+            )}
 
             {/* Expanded filter controls - shown when sections are open */}
             <div style={{ padding: '6px' }}>
@@ -3545,50 +3610,176 @@ const CursorHomepage: React.FC = () => {
               )}
 
               {/* Location inputs - expanded */}
-              {!collapsedSections.locationFilters && (
-                <div style={{
-                  marginBottom: '8px',
-                  padding: '6px',
-                  background: 'var(--grey-50)',
-                  border: '1px solid var(--border)',
-                  display: 'flex',
-                  gap: '4px',
-                  alignItems: 'center'
-                }}>
-                  <input
-                    type="text"
-                    placeholder="ZIP"
-                    value={filters.zipCode}
-                    onChange={(e) => setFilters({...filters, zipCode: e.target.value})}
-                    maxLength={5}
-                    style={{
-                      width: '60px',
-                      padding: '3px 5px',
-                      border: '1px solid var(--border)',
-                      fontSize: '7pt',
-                      fontFamily: '"MS Sans Serif", sans-serif'
-                    }}
-                  />
-                  <span style={{ fontSize: '7pt' }}>within</span>
-                  <select
-                    value={filters.radiusMiles}
-                    onChange={(e) => setFilters({...filters, radiusMiles: parseInt(e.target.value)})}
-                    style={{
-                      padding: '3px 5px',
-                      border: '1px solid var(--border)',
-                      fontSize: '7pt',
-                      fontFamily: '"MS Sans Serif", sans-serif'
-                    }}
-                  >
-                    <option value="10">10mi</option>
-                    <option value="25">25mi</option>
-                    <option value="50">50mi</option>
-                    <option value="100">100mi</option>
-                    <option value="250">250mi</option>
-                    <option value="500">500mi</option>
-                  </select>
-                </div>
-              )}
+              {!collapsedSections.locationFilters && (() => {
+                const saveLocationFavorites = (favs: Array<{ zipCode: string; radiusMiles: number; label?: string }>) => {
+                  try {
+                    localStorage.setItem(LOCATION_FAVORITES_KEY, JSON.stringify(favs));
+                    setLocationFavorites(favs);
+                  } catch (err) {
+                    console.warn('Failed to save location favorites:', err);
+                  }
+                };
+                
+                const addLocation = () => {
+                  if (currentZip.length === 5 && /^\d+$/.test(currentZip)) {
+                    const newLocation = { zipCode: currentZip, radiusMiles: currentRadius };
+                    const updated = [...(filters.locations || []), newLocation];
+                    setFilters({...filters, locations: updated, zipCode: currentZip, radiusMiles: currentRadius});
+                  }
+                };
+                
+                const addToFavorites = () => {
+                  if (currentZip.length === 5 && /^\d+$/.test(currentZip)) {
+                    // Check if already exists
+                    const exists = locationFavorites.some(f => f.zipCode === currentZip && f.radiusMiles === currentRadius);
+                    if (!exists) {
+                      const newFavorite = { zipCode: currentZip, radiusMiles: currentRadius };
+                      const updated = [...locationFavorites, newFavorite];
+                      saveLocationFavorites(updated);
+                    }
+                  }
+                };
+                
+                const removeLocation = (index: number) => {
+                  const updated = filters.locations?.filter((_, i) => i !== index) || [];
+                  setFilters({...filters, locations: updated});
+                };
+                
+                const useFavorite = (fav: { zipCode: string; radiusMiles: number }) => {
+                  setCurrentZip(fav.zipCode);
+                  setCurrentRadius(fav.radiusMiles);
+                  const newLocation = { zipCode: fav.zipCode, radiusMiles: fav.radiusMiles };
+                  const updated = [...(filters.locations || []), newLocation];
+                  setFilters({...filters, locations: updated, zipCode: fav.zipCode, radiusMiles: fav.radiusMiles});
+                };
+                
+                return (
+                  <div style={{
+                    marginBottom: '8px',
+                    padding: '6px',
+                    background: 'var(--grey-50)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    {/* Current location input */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '4px',
+                      alignItems: 'center',
+                      flexWrap: 'wrap'
+                    }}>
+                      <input
+                        type="text"
+                        placeholder="ZIP"
+                        value={currentZip}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+                          setCurrentZip(val);
+                        }}
+                        maxLength={5}
+                        style={{
+                          width: '60px',
+                          padding: '3px 5px',
+                          border: '1px solid var(--border)',
+                          fontSize: '7pt',
+                          fontFamily: '"MS Sans Serif", sans-serif'
+                        }}
+                      />
+                      <span style={{ fontSize: '7pt' }}>within</span>
+                      <div style={{ display: 'flex', gap: '2px' }}>
+                        {[10, 25, 50, 100, 250, 500].map(radius => (
+                          <button
+                            key={radius}
+                            onClick={() => setCurrentRadius(radius)}
+                            className="button-win95"
+                            style={{
+                              padding: '3px 5px',
+                              fontSize: '7pt',
+                              background: currentRadius === radius ? 'var(--grey-600)' : 'var(--white)',
+                              color: currentRadius === radius ? 'var(--white)' : 'var(--text)',
+                              fontWeight: currentRadius === radius ? 700 : 400,
+                              border: currentRadius === radius ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                            }}
+                          >
+                            {radius}mi
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={addLocation}
+                        className="button-win95"
+                        style={{
+                          padding: '3px 7px',
+                          fontSize: '7pt'
+                        }}
+                        disabled={currentZip.length !== 5}
+                      >
+                        add
+                      </button>
+                      <button
+                        onClick={addToFavorites}
+                        className="button-win95"
+                        style={{
+                          padding: '3px 7px',
+                          fontSize: '7pt'
+                        }}
+                        disabled={currentZip.length !== 5}
+                        title="Save to favorites"
+                      >
+                        save
+                      </button>
+                    </div>
+                    
+                    {/* Active locations */}
+                    {filters.locations && filters.locations.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '7pt' }}>active:</span>
+                        {filters.locations.map((loc, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => removeLocation(idx)}
+                            className="button-win95"
+                            style={{
+                              padding: '2px 5px',
+                              fontSize: '7pt',
+                              background: 'var(--grey-300)',
+                              border: '1px solid var(--border)'
+                            }}
+                            title="Remove location"
+                          >
+                            {loc.zipCode} ({loc.radiusMiles}mi) ×
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Favorites */}
+                    {locationFavorites.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '7pt' }}>favorites:</span>
+                        {locationFavorites.map((fav, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => useFavorite(fav)}
+                            className="button-win95"
+                            style={{
+                              padding: '2px 5px',
+                              fontSize: '7pt',
+                              background: 'var(--white)',
+                              border: '1px solid var(--border)'
+                            }}
+                            title="Use this location"
+                          >
+                            {fav.zipCode} ({fav.radiusMiles}mi)
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Status checkboxes - expanded */}
               {!collapsedSections.statusFilters && (

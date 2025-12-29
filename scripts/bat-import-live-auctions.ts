@@ -110,7 +110,24 @@ async function main() {
   console.log(`max_listings=${opts.maxListings} limit=${opts.limit} delay_ms=${opts.delayMs} images=${opts.writeImages ? 'on' : 'off'} mode=${opts.dryRun ? 'dry-run' : 'execute'}`);
 
   let sourceId: string | null = null;
-  if (!opts.dryRun) {
+  
+  // First, try to find existing pending items for this source URL
+  // This handles the case where scrape-multi-source reuses an existing source_id
+  const { data: existingSource } = await supabase
+    .from('import_queue')
+    .select('source_id')
+    .like('listing_url', '%bringatrailer.com/listing/%')
+    .eq('status', 'pending')
+    .not('source_id', 'is', null)
+    .limit(1)
+    .single();
+  
+  if (existingSource?.source_id) {
+    sourceId = existingSource.source_id;
+    console.log(`Using existing source_id with pending items: ${sourceId}`);
+  }
+  
+  if (!opts.dryRun && !sourceId) {
     const seed = await postJson(scrapeMultiSourceUrl, INVOKE_KEY, {
       source_url: 'https://bringatrailer.com/auctions/',
       source_type: 'auction',
@@ -121,7 +138,7 @@ async function main() {
       max_listings: opts.maxListings,
     });
     if (!seed?.success) throw new Error(seed?.error || 'scrape-multi-source failed');
-    sourceId = seed.source_id || null;
+    sourceId = seed.source_id || sourceId;
     console.log(`Seeded: listings_found=${seed.listings_found} queued=${seed.listings_queued} source_id=${sourceId}`);
   }
 
@@ -130,15 +147,37 @@ async function main() {
     return;
   }
 
-  const { data: queueRows, error: qErr } = await supabase
-    .from('import_queue')
-    .select('id, listing_url, status')
-    .eq('source_id', sourceId)
-    .order('created_at', { ascending: false })
-    .limit(opts.limit);
-  if (qErr) throw qErr;
+  // Query pending items - use source_id if available, otherwise query all BaT pending items
+  let queueRows: any[] = [];
+  if (sourceId) {
+    const { data, error: qErr } = await supabase
+      .from('import_queue')
+      .select('id, listing_url, status, attempts, max_attempts')
+      .eq('source_id', sourceId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(opts.limit);
+    if (qErr) throw qErr;
+    queueRows = data || [];
+  }
+  
+  // If no results with source_id, try querying all pending BaT listings
+  if (queueRows.length === 0) {
+    console.log(`No pending items found for source_id ${sourceId}, trying all BaT pending items...`);
+    const { data, error: qErr } = await supabase
+      .from('import_queue')
+      .select('id, listing_url, status, attempts, max_attempts')
+      .like('listing_url', '%bringatrailer.com/listing/%')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(opts.limit);
+    if (qErr) throw qErr;
+    queueRows = data || [];
+  }
 
-  const pending = (queueRows || []).filter((r: any) => r.status !== 'complete');
+  const pending = (queueRows || []).filter((r: any) => 
+    (r.attempts || 0) < (r.max_attempts || 3)
+  );
   console.log(`Queue rows fetched=${queueRows?.length || 0} pending=${pending.length}`);
 
   let ok = 0;
