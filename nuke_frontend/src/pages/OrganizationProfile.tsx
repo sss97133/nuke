@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import ReactDOM from 'react-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
@@ -204,23 +204,18 @@ export default function OrganizationProfile() {
   const params = useParams();
   const location = useLocation();
   
-  // Extract orgId from params first
-  const id = (params as any)?.id;
-  const orgId = (params as any)?.orgId;
-  
-  // Fallback: Extract from pathname if params don't work
-  // Path should be /org/{orgId}
-  const pathnameMatch = location.pathname.match(/\/org\/([^/]+)/);
-  const pathnameOrgId = pathnameMatch ? pathnameMatch[1] : null;
-  
-  const organizationId = id || orgId || pathnameOrgId;
-  
-  // Force console logs even in production for debugging
-  if (typeof window !== 'undefined') {
-    console.log('[OrgProfile] RAW PARAMS:', JSON.stringify(params), 'all keys:', Object.keys(params || {}));
-    console.log('[OrgProfile] Extracted - id:', id, 'orgId:', orgId, 'pathnameOrgId:', pathnameOrgId, 'organizationId:', organizationId);
-    console.log('[OrgProfile] Current pathname:', location.pathname);
-  }
+  // Extract orgId from params - memoized to prevent excessive re-renders
+  const organizationId = useMemo(() => {
+    const id = (params as any)?.id;
+    const orgId = (params as any)?.orgId;
+    
+    // Fallback: Extract from pathname if params don't work
+    // Path should be /org/{orgId}
+    const pathnameMatch = location.pathname.match(/\/org\/([^/]+)/);
+    const pathnameOrgId = pathnameMatch ? pathnameMatch[1] : null;
+    
+    return id || orgId || pathnameOrgId;
+  }, [params, location.pathname]);
 
   const isUuid = (value: string | null | undefined): boolean => {
     if (!value) return false;
@@ -676,26 +671,21 @@ export default function OrganizationProfile() {
 
   const loadOrganization = async () => {
     if (!organizationId) {
-      console.error('[OrgProfile] No organizationId - id:', id, 'orgId:', orgId);
       setLoading(false);
       return;
     }
 
     // Prevent PostgREST 400 spam when route params are malformed (e.g. "undefined", "null", etc.).
     if (!isUuid(organizationId)) {
-      console.warn('[OrgProfile] Invalid organizationId (not UUID):', organizationId);
       setLoading(false);
       return;
     }
-    
-    console.log('[OrgProfile] Loading organization:', organizationId);
     
     try {
       setLoading(true);
       setLoadError(null);
 
       // STEP 1: Load basic organization data - SIMPLE, no timeout complexity
-      console.log('[OrgProfile] Executing query for:', organizationId);
       
       // Use maybeSingle() instead of single() to avoid throwing on RLS/permission errors
       const { data: org, error: orgError } = await supabase
@@ -704,7 +694,6 @@ export default function OrganizationProfile() {
         .eq('id', organizationId)
         .maybeSingle();
       
-      console.log('[OrgProfile] Query completed - org:', org ? 'found' : 'null', 'error:', orgError?.message || 'none', 'code:', (orgError as any)?.code);
 
       if (orgError) {
         // Log full error for debugging
@@ -752,9 +741,7 @@ export default function OrganizationProfile() {
       // Load organization intelligence (respects explicit settings)
       (async () => {
         try {
-          console.log('[OrgProfile] Loading intelligence for:', organizationId);
           const intelligence = await OrganizationIntelligenceService.getIntelligence(organizationId);
-          console.log('[OrgProfile] Intelligence loaded:', intelligence);
           
           if (intelligence) {
             setIntelligence(intelligence);
@@ -762,17 +749,13 @@ export default function OrganizationProfile() {
             // Get data signals for tab priority calculation
             let dataSignals = intelligence.dataSignals;
             if (!dataSignals || Object.keys(dataSignals).length === 0) {
-              console.log('[OrgProfile] No data signals in intelligence, analyzing...');
               dataSignals = await OrganizationIntelligenceService.analyzeDataSignals(organizationId);
-              console.log('[OrgProfile] Data signals analyzed:', dataSignals);
             }
             
             // Determine tab priority based on intelligence
             const priorityTabs = OrganizationIntelligenceService.determineTabPriority(intelligence, dataSignals);
-            console.log('[OrgProfile] Tab priority determined:', priorityTabs);
             setTabs(priorityTabs);
           } else {
-            console.warn('[OrgProfile] No intelligence returned, using default tabs');
             // Fallback to default tabs
             setTabs([
               { id: 'overview', priority: 100, label: 'Overview' },
@@ -838,7 +821,6 @@ export default function OrganizationProfile() {
             console.error('Error loading images:', imagesError);
             setImages([]);
           } else {
-            console.log(`Loaded ${orgImages?.length || 0} images for organization`);
             setImages(orgImages || []);
             if (orgImages && orgImages.length > 0) {
               loadImageTags(orgImages.map(img => img.id)).catch(() => {});
@@ -1157,7 +1139,6 @@ export default function OrganizationProfile() {
             return;
           }
 
-          console.log(`Loading timeline events for organization: ${organizationId}`);
           const { data: eventsData, error: eventsError } = await supabase
             .from('business_timeline_events')
             .select('id, event_type, title, description, event_date, created_by, metadata, image_urls, documentation_urls')
@@ -1167,21 +1148,11 @@ export default function OrganizationProfile() {
           
           if (eventsError) {
             console.error('Error loading timeline events:', eventsError);
-            console.error('Error details:', JSON.stringify(eventsError, null, 2));
             setTimelineEvents([]);
             return;
           }
           
-          if (!eventsData) {
-            console.log('No timeline events data returned (null/undefined)');
-            setTimelineEvents([]);
-            return;
-          }
-          
-          console.log(`✅ Loaded ${eventsData.length} timeline events for organization ${organizationId}`);
-          
-          if (eventsData.length === 0) {
-            console.log('⚠️ Query returned 0 events (but query succeeded)');
+          if (!eventsData || eventsData.length === 0) {
             setTimelineEvents([]);
             return;
           }
@@ -1197,12 +1168,9 @@ export default function OrganizationProfile() {
           );
           
           const validEvents = enriched.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => r.value);
-          console.log(`✅ Enriched ${validEvents.length} timeline events with profiles`);
-          console.log('Sample event:', validEvents[0]);
           setTimelineEvents(validEvents);
         } catch (error) {
-          console.error('❌ Exception loading timeline events:', error);
-          console.error('Exception stack:', error instanceof Error ? error.stack : 'No stack');
+          console.error('Exception loading timeline events:', error);
           setTimelineEvents([]);
         }
       })();

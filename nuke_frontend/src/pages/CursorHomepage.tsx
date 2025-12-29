@@ -2723,650 +2723,447 @@ const CursorHomepage: React.FC = () => {
           </div>
         )}
 
-        {/* Filter Panel - Collapsible with integrated header */}
+        {/* Filter Panel - Redesigned clean version */}
         {showFilters && (
           <div ref={filterPanelRef} style={{
             background: 'var(--white)',
             border: '1px solid var(--border)',
-            padding: '12px',
             marginBottom: '16px',
             fontSize: '8pt',
             scrollMarginTop: 'var(--header-height, 40px)'
           }}>
-            {/* Header with vehicle stats and controls */}
+            {/* Compact stats bar */}
             <div style={{
               display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px',
+              gap: '10px',
               alignItems: 'center',
-              marginBottom: '12px',
-              paddingBottom: '8px',
-              borderBottom: '1px solid var(--border)'
+              padding: '5px 8px',
+              background: 'var(--grey-100)',
+              borderBottom: '1px solid var(--border)',
+              fontFamily: 'monospace',
+              fontSize: '7pt',
+              flexWrap: 'wrap'
             }}>
-              <div
-                style={{
-                  fontSize: '9pt',
-                  fontWeight: 700,
-                  color: 'var(--text)',
-                  cursor: 'default',
-                  display: 'flex',
-                  flexDirection: 'row',
-                  gap: '12px',
-                  alignItems: 'center'
-                }}
-                title="Market stats"
-              >
-                <span>{displayStats.totalVehicles.toLocaleString()} vehicles</span>
-                <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                  {formatCurrency(displayStats.totalValue)} total value
-                </span>
-                {displayStats.forSaleCount > 0 && (
-                  <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                    {displayStats.forSaleCount.toLocaleString()} for sale
-                  </span>
-                )}
-                {displayStats.activeAuctions > 0 && (
-                  <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                    {displayStats.activeAuctions} active auctions
-                    {displayStats.totalBids > 0 && ` (${displayStats.totalBids.toLocaleString()} bids)`}
-                  </span>
-                )}
-                {displayStats.salesVolume > 0 && (
-                  <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                    {formatCurrency(displayStats.salesVolume)} sales (24hrs)
-                  </span>
-                )}
-                {displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
-                  <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)' }}>
-                    {formatCurrency(displayStats.avgValue)} avg
-                  </span>
-                )}
-              </div>
-              
-              {/* Hide Filters Button */}
+              <span><b>{displayStats.totalVehicles.toLocaleString()}</b> veh</span>
+              <span style={{ opacity: 0.3 }}>|</span>
+              <span><b>{formatCurrency(displayStats.totalValue)}</b> val</span>
+              {displayStats.forSaleCount > 0 && (
+                <>
+                  <span style={{ opacity: 0.3 }}>|</span>
+                  <span><b>{displayStats.forSaleCount.toLocaleString()}</b> sale</span>
+                </>
+              )}
+              {displayStats.salesVolume > 0 && (
+                <>
+                  <span style={{ opacity: 0.3 }}>|</span>
+                  <span><b>{formatCurrency(displayStats.salesVolume)}</b> 24h</span>
+                </>
+              )}
+              {displayStats.activeAuctions > 0 && (
+                <>
+                  <span style={{ opacity: 0.3 }}>|</span>
+                  <span><b>{displayStats.activeAuctions}</b> auct</span>
+                </>
+              )}
+              {displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
+                <>
+                  <span style={{ opacity: 0.3 }}>|</span>
+                  <span><b>{formatCurrency(displayStats.avgValue)}</b> avg</span>
+                </>
+              )}
               <button
                 onClick={() => {
                   setShowFilters(false);
                   setFilterBarMinimized(true);
                 }}
                 style={{
-                  padding: '4px 8px',
-                  fontSize: '8pt',
+                  marginLeft: 'auto',
+                  padding: '2px 6px',
+                  fontSize: '7pt',
                   border: '1px solid var(--border)',
-                  background: 'var(--grey-600)',
-                  color: 'var(--white)',
+                  background: 'transparent',
                   cursor: 'pointer',
-                  borderRadius: '2px',
-                  fontFamily: '"MS Sans Serif", sans-serif',
-                  marginLeft: 'auto'
+                  fontFamily: '"MS Sans Serif", sans-serif'
                 }}
               >
-                Hide Filters
+                hide
               </button>
             </div>
 
-            {/* Source pog library (add/remove) - Collapsible */}
-            <div style={{ marginBottom: '12px' }}>
-              <div 
-                onClick={() => toggleCollapsedSection('sourcePogs')}
-                style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  marginBottom: '8px',
-                  paddingBottom: '4px',
-                  borderBottom: '1px solid var(--border)'
-                }}
-              >
-                <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 700 }}>
-                  Sources {sourcePogs.selected.length > 0 && `(${sourcePogs.selected.length}/${sourcePogs.all.length})`}
-                </span>
-                <span>{collapsedSections.sourcePogs ? '▼' : '▲'}</span>
-              </div>
-              {!collapsedSections.sourcePogs && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {sourcePogs.all.map((p) => (
-                      <button
-                        key={p.key}
-                        type="button"
-                        onClick={() => setSourceIncluded(p.key, !p.included)}
-                        aria-label={p.included ? `${p.title} (selected)` : `${p.title} (not selected)`}
-                        title={p.included ? `${p.title}: ${p.count.toLocaleString()} vehicles (click to remove)` : `${p.title}: ${p.count.toLocaleString()} vehicles (click to add)`}
-                        style={{
-                          width: '22px',
-                          height: '22px',
-                          padding: 0,
-                          borderRadius: '999px',
-                          border: `1px solid ${p.included ? 'var(--accent)' : 'var(--border)'}`,
-                          background: 'var(--white)',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: p.included ? '0 0 0 2px var(--accent-dim)' : 'none',
-                          opacity: p.included ? 1 : 0.5
-                        }}
-                      >
-                        <img
-                          src={faviconUrl(p.domain)}
-                          alt=""
-                          width={16}
-                          height={16}
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          style={{
-                            width: '16px',
-                            height: '16px',
-                            borderRadius: '3px',
-                            filter: p.included ? 'none' : 'grayscale(100%)'
-                          }}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFilters((prev) => ({
-                        ...prev,
-                        hideDealerListings: false,
-                        hideCraigslist: false,
-                        hideDealerSites: false,
-                        hideKsl: false,
-                        hideBat: false,
-                        hideClassic: false,
-                        hiddenSources: []
-                      }));
-                    }}
-                    className="button"
-                    style={{ fontSize: '8pt', padding: '4px 8px', height: '24px', minHeight: '24px' }}
-                    title="Include all sources"
-                  >
-                    All
-                  </button>
-                </div>
-              )}
-              {collapsedSections.sourcePogs && sourcePogs.selected.length > 0 && (
-                <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
-                  {sourcePogs.selected.map((p) => (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSourceIncluded(p.key, false);
-                      }}
-                      aria-label={`${p.title} (selected)`}
-                      title={`${p.title}: ${p.count.toLocaleString()} vehicles (click to remove)`}
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        padding: 0,
-                        borderRadius: '999px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--white)',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        opacity: 1
-                      }}
-                    >
-                      <img
-                        src={faviconUrl(p.domain)}
-                        alt=""
-                        width={14}
-                        height={14}
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        style={{
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '3px',
-                          filter: 'none'
-                        }}
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            {/* Year Quick Filters - Collapsible */}
-            <div style={{ marginBottom: '12px' }}>
-              <div 
-                onClick={() => toggleCollapsedSection('yearQuickFilters')}
-                style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  marginBottom: '8px',
-                  paddingBottom: '4px',
-                  borderBottom: '1px solid var(--border)'
-                }}
-              >
-                <span>Year Quick Filters</span>
-                <span>{collapsedSections.yearQuickFilters ? '▼' : '▲'}</span>
-              </div>
-              {!collapsedSections.yearQuickFilters && (
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {[
-                    { label: '64-91', min: 1964, max: 1991 },
-                    { label: '73-87', min: 1973, max: 1987 },
-                    { label: '67-72', min: 1967, max: 1972 },
-                    { label: '87-00', min: 1987, max: 2000 },
-                    { label: '60s', min: 1960, max: 1969 },
-                    { label: '70s', min: 1970, max: 1979 },
-                    { label: '80s', min: 1980, max: 1989 },
-                    { label: '90s', min: 1990, max: 1999 },
-                  ].map(range => {
-                    const isActive = filters.yearMin === range.min && filters.yearMax === range.max;
-                    return (
-                      <button
-                        key={range.label}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isActive) {
-                            setFilters({ ...filters, yearMin: null, yearMax: null });
-                          } else {
-                            setFilters({ ...filters, yearMin: range.min, yearMax: range.max });
-                          }
-                        }}
-                        style={{
-                          padding: '4px 8px',
-                          fontSize: '8pt',
-                          border: '1px solid var(--border)',
-                          background: isActive ? 'var(--grey-600)' : 'var(--white)',
-                          color: isActive ? 'var(--white)' : 'var(--text)',
-                          cursor: 'pointer',
-                          borderRadius: '2px',
-                          fontFamily: '"MS Sans Serif", sans-serif'
-                        }}
-                      >
-                        {range.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Full filter controls */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '12px'
+            {/* Unified filter buttons row */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '4px',
+              padding: '6px',
+              borderBottom: '1px solid var(--border)'
             }}>
-              {/* Year Range - Manual Input */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Year Range (Manual)</label>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="Min"
-                    value={filters.yearMin || ''}
-                    onChange={(e) => setFilters({...filters, yearMin: e.target.value ? parseInt(e.target.value) : null})}
-                    style={{
-                      width: '70px',
-                      padding: '4px 6px',
-                      border: '1px solid var(--border)',
-                      fontSize: '8pt',
-                      fontFamily: '"MS Sans Serif", sans-serif'
+              {/* Year quick filters - inline */}
+              {[
+                { label: '64-91', min: 1964, max: 1991 },
+                { label: '73-87', min: 1973, max: 1987 },
+                { label: '67-72', min: 1967, max: 1972 },
+                { label: '87-00', min: 1987, max: 2000 },
+                { label: '60s', min: 1960, max: 1969 },
+                { label: '70s', min: 1970, max: 1979 },
+                { label: '80s', min: 1980, max: 1989 },
+                { label: '90s', min: 1990, max: 1999 },
+              ].map(range => {
+                const isActive = filters.yearMin === range.min && filters.yearMax === range.max;
+                return (
+                  <button
+                    key={range.label}
+                    onClick={() => {
+                      if (isActive) {
+                        setFilters({ ...filters, yearMin: null, yearMax: null });
+                      } else {
+                        setFilters({ ...filters, yearMin: range.min, yearMax: range.max });
+                      }
                     }}
-                  />
-                  <span>–</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="Max"
-                    value={filters.yearMax || ''}
-                    onChange={(e) => setFilters({...filters, yearMax: e.target.value ? parseInt(e.target.value) : null})}
+                    className="button-win95"
                     style={{
-                      width: '70px',
-                      padding: '4px 6px',
-                      border: '1px solid var(--border)',
-                      fontSize: '8pt',
-                      fontFamily: '"MS Sans Serif", sans-serif'
+                      padding: '3px 7px',
+                      fontSize: '7pt',
+                      background: isActive ? 'var(--grey-300)' : 'var(--white)',
+                      fontWeight: isActive ? 700 : 400
                     }}
-                  />
-                </div>
-              </div>
-
-              {/* Price Range - Collapsible */}
-              <div>
-                <div 
-                  onClick={() => toggleCollapsedSection('priceFilters')}
-                  style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    marginBottom: '4px'
-                  }}
-                >
-                  <label style={{ margin: 0, cursor: 'pointer' }}>Price Range</label>
-                  <span style={{ fontSize: '8pt' }}>{collapsedSections.priceFilters ? '▼' : '▲'}</span>
-                </div>
-                {!collapsedSections.priceFilters && (
-                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="Min"
-                      value={filters.priceMin || ''}
-                      onChange={(e) => setFilters({...filters, priceMin: e.target.value ? parseInt(e.target.value) : null})}
-                      style={{
-                        width: '80px',
-                        padding: '4px 6px',
-                        border: '1px solid var(--border)',
-                        fontSize: '8pt',
-                        fontFamily: '"MS Sans Serif", sans-serif'
-                      }}
-                    />
-                    <span>–</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="Max"
-                      value={filters.priceMax || ''}
-                      onChange={(e) => setFilters({...filters, priceMax: e.target.value ? parseInt(e.target.value) : null})}
-                      style={{
-                        width: '80px',
-                        padding: '4px 6px',
-                        border: '1px solid var(--border)',
-                        fontSize: '8pt',
-                        fontFamily: '"MS Sans Serif", sans-serif'
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Location Filter - Collapsible */}
-              <div>
-                <div 
-                  onClick={() => toggleCollapsedSection('locationFilters')}
-                  style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    marginBottom: '4px'
-                  }}
-                >
-                  <label style={{ margin: 0, cursor: 'pointer' }}>Location</label>
-                  <span style={{ fontSize: '8pt' }}>{collapsedSections.locationFilters ? '▼' : '▲'}</span>
-                </div>
-                {!collapsedSections.locationFilters && (
-                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginBottom: '4px' }}>
-                    <input
-                      type="text"
-                      placeholder="ZIP code"
-                      value={filters.zipCode}
-                      onChange={(e) => setFilters({...filters, zipCode: e.target.value})}
-                      maxLength={5}
-                      style={{
-                        width: '70px',
-                        padding: '4px 6px',
-                        border: '1px solid var(--border)',
-                        fontSize: '8pt',
-                        fontFamily: '"MS Sans Serif", sans-serif'
-                      }}
-                    />
-                    <span>within</span>
-                    <select
-                      value={filters.radiusMiles}
-                      onChange={(e) => setFilters({...filters, radiusMiles: parseInt(e.target.value)})}
-                      style={{
-                        padding: '4px 6px',
-                        border: '1px solid var(--border)',
-                        fontSize: '8pt',
-                        fontFamily: '"MS Sans Serif", sans-serif'
-                      }}
-                    >
-                      <option value="10">10 mi</option>
-                      <option value="25">25 mi</option>
-                      <option value="50">50 mi</option>
-                      <option value="100">100 mi</option>
-                      <option value="250">250 mi</option>
-                      <option value="500">500 mi</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* Make Filter */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Make</label>
-                <input
-                  type="text"
-                  placeholder="Ford, Chevy, etc"
-                  value={filters.makes.join(', ')}
-                  onChange={(e) => {
-                    const makes = e.target.value.split(',').map(m => m.trim()).filter(m => m.length > 0);
+                    title={`Year: ${range.min}-${range.max}`}
+                  >
+                    {range.label}
+                  </button>
+                );
+              })}
+              
+              <div style={{ width: '1px', background: 'var(--border)', margin: '0 2px' }} />
+              
+              {/* Price filter button */}
+              <button
+                onClick={() => toggleCollapsedSection('priceFilters')}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '7pt',
+                  background: (filters.priceMin || filters.priceMax) ? 'var(--grey-300)' : 'var(--white)',
+                  fontWeight: (filters.priceMin || filters.priceMax) ? 700 : 400
+                }}
+              >
+                {(filters.priceMin || filters.priceMax) 
+                  ? `$${filters.priceMin ? (filters.priceMin/1000).toFixed(0) + 'k' : '?'}-${filters.priceMax ? (filters.priceMax/1000).toFixed(0) + 'k' : '?'}`
+                  : 'price'}
+              </button>
+              
+              {/* Location filter button */}
+              <button
+                onClick={() => toggleCollapsedSection('locationFilters')}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '7pt',
+                  background: filters.zipCode ? 'var(--grey-300)' : 'var(--white)',
+                  fontWeight: filters.zipCode ? 700 : 400
+                }}
+              >
+                {filters.zipCode ? `📍${filters.zipCode}` : 'location'}
+              </button>
+              
+              {/* Make filter button */}
+              <button
+                onClick={() => {
+                  const newMake = prompt('Enter makes (comma-separated):', filters.makes.join(', '));
+                  if (newMake !== null) {
+                    const makes = newMake.split(',').map(m => m.trim()).filter(m => m.length > 0);
                     setFilters({...filters, makes});
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '4px 6px',
-                    border: '1px solid var(--border)',
-                    fontSize: '8pt',
-                    fontFamily: '"MS Sans Serif", sans-serif'
-                  }}
-                />
-              </div>
-
-              {/* Status & Display Toggles - Collapsible */}
-              <div>
-                <div 
-                  onClick={() => toggleCollapsedSection('statusFilters')}
-                  style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    marginBottom: '4px'
-                  }}
-                >
-                  <label style={{ margin: 0, cursor: 'pointer' }}>Status</label>
-                  <span style={{ fontSize: '8pt' }}>{collapsedSections.statusFilters ? '▼' : '▲'}</span>
-                </div>
-                {!collapsedSections.statusFilters && (
-                  <>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.forSale}
-                        onChange={(e) => setFilters({...filters, forSale: e.target.checked})}
-                      />
-                      <span>For Sale Only</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.hideSold}
-                        onChange={(e) => setFilters({ ...filters, hideSold: e.target.checked })}
-                      />
-                      <span>Hide Sold</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.showPending}
-                        onChange={(e) => {
-                          setFilters({...filters, showPending: e.target.checked});
-                        }}
-                      />
-                      <span>Show Pending Vehicles</span>
-                    </label>
-                  </>
-                )}
-              </div>
-
-              {/* Source Filters - Collapsible Section */}
-              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', gridColumn: '1 / -1' }}>
-                <div 
-                  onClick={() => toggleCollapsedSection('sourceFilters')}
-                  style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    marginBottom: '8px',
-                    paddingBottom: '4px'
-                  }}
-                >
-                  <span>Source Filters</span>
-                  <span>{collapsedSections.sourceFilters ? '▼' : '▲'}</span>
-                </div>
-                {!collapsedSections.sourceFilters && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.hideDealerListings}
-                        onChange={(e) => setFilters({ ...filters, hideDealerListings: e.target.checked })}
-                      />
-                      <span>Hide dealer listings (CL + dealer sites + KSL)</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.hideCraigslist}
-                        onChange={(e) => setFilters({ ...filters, hideCraigslist: e.target.checked })}
-                      />
-                      <span>Hide Craigslist (CL)</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.hideDealerSites}
-                        onChange={(e) => setFilters({ ...filters, hideDealerSites: e.target.checked })}
-                      />
-                      <span>Hide dealer websites</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.hideKsl}
-                        onChange={(e) => setFilters({ ...filters, hideKsl: e.target.checked })}
-                      />
-                      <span>Hide KSL</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.hideBat}
-                        onChange={(e) => setFilters({ ...filters, hideBat: e.target.checked })}
-                      />
-                      <span>Hide BaT</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={filters.hideClassic}
-                        onChange={(e) => setFilters({ ...filters, hideClassic: e.target.checked })}
-                      />
-                      <span>Hide Classic.com</span>
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              {/* Display Toggles */}
-              <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '4px' }}>
-                  <input
-                    type="checkbox"
-                    checked={infoDense}
-                    onChange={(e) => setInfoDense(e.target.checked)}
-                  />
-                  <span>Info-dense</span>
-                </label>
-                {/* ARCHIVED: Thermal Pricing checkbox - disabled until we're more capable of handling it
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={thermalPricing}
-                    onChange={(e) => setThermalPricing(e.target.checked)}
-                  />
-                  <span>Thermal Pricing</span>
-                </label>
-                */}
-              </div>
-
-              {/* Sort By */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Sort By</label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortBy)}
-                  style={{
-                    width: '100%',
-                    padding: '4px 6px',
-                    border: '1px solid var(--border)',
-                    fontSize: '8pt',
-                    marginBottom: '4px',
-                    fontFamily: '"MS Sans Serif", sans-serif'
-                  }}
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="year">Year</option>
-                  <option value="make">Make</option>
-                  <option value="model">Model</option>
-                  <option value="mileage">Mileage</option>
-                  <option value="price_high">Price (High to Low)</option>
-                  <option value="price_low">Price (Low to High)</option>
-                  <option value="popular">Most Popular</option>
-                  <option value="images">Most Images</option>
-                  <option value="events">Most Events</option>
-                  <option value="views">Most Views</option>
-                </select>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={sortDirection === 'desc'}
-                    onChange={(e) => setSortDirection(e.target.checked ? 'desc' : 'asc')}
-                  />
-                  <span>Descending</span>
-                </label>
-              </div>
-
-              {/* Clear Filters */}
-              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                  }
+                }}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '7pt',
+                  background: filters.makes.length > 0 ? 'var(--grey-300)' : 'var(--white)',
+                  fontWeight: filters.makes.length > 0 ? 700 : 400
+                }}
+              >
+                {filters.makes.length > 0 ? `make: ${filters.makes.join(', ')}` : 'make'}
+              </button>
+              
+              {/* Sources button */}
+              <button
+                onClick={() => toggleCollapsedSection('sourcePogs')}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '7pt',
+                  background: sourcePogs.selected.length < sourcePogs.all.length ? 'var(--grey-300)' : 'var(--white)',
+                  fontWeight: sourcePogs.selected.length < sourcePogs.all.length ? 700 : 400
+                }}
+              >
+                sources: {sourcePogs.selected.length}/{sourcePogs.all.length}
+              </button>
+              
+              {/* Status filters button */}
+              <button
+                onClick={() => toggleCollapsedSection('statusFilters')}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '7pt',
+                  background: (filters.forSale || filters.hideSold || filters.showPending) ? 'var(--grey-300)' : 'var(--white)',
+                  fontWeight: (filters.forSale || filters.hideSold || filters.showPending) ? 700 : 400
+                }}
+              >
+                status
+              </button>
+              
+              {/* Reset button */}
+              {activeFilterCount > 0 && (
                 <button
                   onClick={() => {
                     setFilters(DEFAULT_FILTERS);
                     setSearchText('');
                   }}
                   style={{
-                    padding: '4px 12px',
-                    background: 'var(--white)',
+                    marginLeft: 'auto',
+                    padding: '3px 7px',
+                    fontSize: '7pt',
                     border: '1px solid var(--border)',
+                    background: 'transparent',
                     cursor: 'pointer',
-                    fontSize: '8pt',
-                    fontWeight: 'bold',
                     fontFamily: '"MS Sans Serif", sans-serif'
                   }}
                 >
-                  Reset
+                  reset
                 </button>
-              </div>
+              )}
+            </div>
+
+            {/* Expanded filter controls - shown when sections are open */}
+            <div style={{ padding: '6px' }}>
+              {/* Sources list - expanded */}
+              {!collapsedSections.sourcePogs && (
+                <div style={{
+                  marginBottom: '8px',
+                  padding: '6px',
+                  background: 'var(--grey-50)',
+                  border: '1px solid var(--border)',
+                  fontSize: '7pt'
+                }}>
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
+                    <button
+                      onClick={() => {
+                        setFilters((prev) => ({
+                          ...prev,
+                          hideDealerListings: false,
+                          hideCraigslist: false,
+                          hideDealerSites: false,
+                          hideKsl: false,
+                          hideBat: false,
+                          hideClassic: false,
+                          hiddenSources: []
+                        }));
+                      }}
+                      className="button-win95"
+                      style={{ padding: '2px 6px', fontSize: '7pt' }}
+                    >
+                      all
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFilters((prev) => ({
+                          ...prev,
+                          hideDealerListings: true,
+                          hideCraigslist: true,
+                          hideDealerSites: true,
+                          hideKsl: true,
+                          hideBat: true,
+                          hideClassic: true,
+                          hiddenSources: sourcePogs.all.map(p => p.key)
+                        }));
+                      }}
+                      className="button-win95"
+                      style={{ padding: '2px 6px', fontSize: '7pt' }}
+                    >
+                      none
+                    </button>
+                  </div>
+                  <div style={{ 
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                    gap: '2px',
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                  }}>
+                    {sourcePogs.all.map((p) => (
+                      <label
+                        key={p.key}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '2px 4px',
+                          cursor: 'pointer',
+                          background: p.included ? 'var(--white)' : 'transparent',
+                          borderRadius: '1px'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={p.included}
+                          onChange={() => setSourceIncluded(p.key, !p.included)}
+                          style={{ margin: 0 }}
+                        />
+                        <img
+                          src={faviconUrl(p.domain)}
+                          alt=""
+                          width={12}
+                          height={12}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          style={{
+                            width: '12px',
+                            height: '12px',
+                            opacity: p.included ? 1 : 0.4
+                          }}
+                        />
+                        <span style={{ flex: 1, opacity: p.included ? 1 : 0.6 }}>
+                          {p.title}
+                        </span>
+                        <span style={{ opacity: 0.5, fontFamily: 'monospace' }}>
+                          {p.count.toLocaleString()}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Price inputs - expanded */}
+              {!collapsedSections.priceFilters && (
+                <div style={{
+                  marginBottom: '8px',
+                  padding: '6px',
+                  background: 'var(--grey-50)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  gap: '4px',
+                  alignItems: 'center'
+                }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="min"
+                    value={filters.priceMin || ''}
+                    onChange={(e) => setFilters({...filters, priceMin: e.target.value ? parseInt(e.target.value) : null})}
+                    style={{
+                      width: '70px',
+                      padding: '3px 5px',
+                      border: '1px solid var(--border)',
+                      fontSize: '7pt',
+                      fontFamily: '"MS Sans Serif", sans-serif'
+                    }}
+                  />
+                  <span style={{ fontSize: '7pt' }}>–</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="max"
+                    value={filters.priceMax || ''}
+                    onChange={(e) => setFilters({...filters, priceMax: e.target.value ? parseInt(e.target.value) : null})}
+                    style={{
+                      width: '70px',
+                      padding: '3px 5px',
+                      border: '1px solid var(--border)',
+                      fontSize: '7pt',
+                      fontFamily: '"MS Sans Serif", sans-serif'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Location inputs - expanded */}
+              {!collapsedSections.locationFilters && (
+                <div style={{
+                  marginBottom: '8px',
+                  padding: '6px',
+                  background: 'var(--grey-50)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  gap: '4px',
+                  alignItems: 'center'
+                }}>
+                  <input
+                    type="text"
+                    placeholder="ZIP"
+                    value={filters.zipCode}
+                    onChange={(e) => setFilters({...filters, zipCode: e.target.value})}
+                    maxLength={5}
+                    style={{
+                      width: '60px',
+                      padding: '3px 5px',
+                      border: '1px solid var(--border)',
+                      fontSize: '7pt',
+                      fontFamily: '"MS Sans Serif", sans-serif'
+                    }}
+                  />
+                  <span style={{ fontSize: '7pt' }}>within</span>
+                  <select
+                    value={filters.radiusMiles}
+                    onChange={(e) => setFilters({...filters, radiusMiles: parseInt(e.target.value)})}
+                    style={{
+                      padding: '3px 5px',
+                      border: '1px solid var(--border)',
+                      fontSize: '7pt',
+                      fontFamily: '"MS Sans Serif", sans-serif'
+                    }}
+                  >
+                    <option value="10">10mi</option>
+                    <option value="25">25mi</option>
+                    <option value="50">50mi</option>
+                    <option value="100">100mi</option>
+                    <option value="250">250mi</option>
+                    <option value="500">500mi</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Status checkboxes - expanded */}
+              {!collapsedSections.statusFilters && (
+                <div style={{
+                  marginBottom: '8px',
+                  padding: '6px',
+                  background: 'var(--grey-50)',
+                  border: '1px solid var(--border)',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                  gap: '4px'
+                }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.forSale}
+                      onChange={(e) => setFilters({...filters, forSale: e.target.checked})}
+                    />
+                    <span>for sale only</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.hideSold}
+                      onChange={(e) => setFilters({ ...filters, hideSold: e.target.checked })}
+                    />
+                    <span>hide sold</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.showPending}
+                      onChange={(e) => setFilters({...filters, showPending: e.target.checked})}
+                    />
+                    <span>show pending</span>
+                  </label>
+                </div>
+              )}
             </div>
           </div>
         )}
