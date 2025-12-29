@@ -261,6 +261,7 @@ const DEFAULT_FILTERS: FilterState = {
 };
 
 const STORAGE_KEY = 'nuke_homepage_filters_v1';
+const LOCATION_FAVORITES_KEY = 'nuke_homepage_location_favorites';
 
 // Load filters from localStorage
 const loadSavedFilters = (): FilterState | null => {
@@ -444,7 +445,6 @@ const CursorHomepage: React.FC = () => {
 
   // Collapsible filter sections
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
-    yearQuickFilters: false,
     sourceFilters: true, // Source filters collapsed by default
     sourcePogs: true, // Source pogs library collapsed by default
     makeFilters: true, // Make filters collapsed by default
@@ -474,6 +474,8 @@ const CursorHomepage: React.FC = () => {
     if (filters.forSale) return true;
     if (filters.hideSold) return true;
     if (filters.showPending) return true;
+    if (filters.privateParty) return true;
+    if (filters.dealer) return true;
     if (filters.hideDealerListings) return true;
     if (filters.hideCraigslist) return true;
     if (filters.hideDealerSites) return true;
@@ -540,19 +542,89 @@ const CursorHomepage: React.FC = () => {
   useEffect(() => {
     const loadFilterOptions = async () => {
       try {
-        // Load distinct makes
+        const normalizeMake = (raw: unknown): string | null => {
+          const s = String(raw ?? '').trim();
+          if (!s) return null;
+
+          // Reject extreme lengths (garbage blobs / truncated scrape junk)
+          if (s.length < 2 || s.length > 30) return null;
+
+          // Reject anything with digits (kills "2017", "320i", etc.)
+          if (/\d/.test(s)) return null;
+
+          // Reject emoji / special unicode ranges commonly seen in corrupted fields
+          if (/[\u{1F300}-\u{1F9FF}]/u.test(s)) return null;
+
+          // Reject common scraped phrase patterns that indicate this isn't a make
+          if (/\b(for|with|powered|swap|engine|manual|auto|awd|4x4|parts|project)\b/i.test(s)) return null;
+
+          // Only allow simple make tokens: letters, spaces, hyphen, apostrophe, period
+          // Examples: "Aston Martin", "Mercedes-Benz", "Rolls-Royce", "AM General"
+          if (!/^[A-Za-z][A-Za-z .'-]*$/.test(s)) return null;
+
+          const cleaned = s.replace(/\s+/g, ' ').trim();
+          const words = cleaned.split(' ').filter(Boolean);
+          if (words.length > 3) return null;
+
+          return cleaned;
+        };
+
+        // Prefer canonical makes if the nomenclature system is present.
+        // This prevents UI from being polluted by scraper-corrupted `vehicles.make` values.
+        const canonicalMakes: string[] = [];
+        try {
+          const { data: canonicalData, error: canonicalError } = await supabase
+            .from('canonical_makes')
+            .select('display_name, canonical_name, is_active')
+            .eq('is_active', true)
+            .limit(5000);
+
+          if (!canonicalError && canonicalData) {
+            for (const row of canonicalData as any[]) {
+              const display = String(row?.display_name || '').trim();
+              const canon = String(row?.canonical_name || '').trim();
+              const name = display || canon;
+              if (name) canonicalMakes.push(name);
+            }
+          }
+        } catch {
+          // ignore: canonical tables may not exist in some environments
+        }
+
+        // Also load distinct makes from vehicles as a fallback / augmentation.
+        // We only keep "clean-looking" makes that appear more than once to reduce junk.
         const { data: makeData } = await supabase
           .from('vehicles')
           .select('make')
           .eq('is_public', true)
           .not('make', 'is', null)
           .limit(5000);
-        
-        if (makeData) {
-          const uniqueMakes = [...new Set(makeData.map(v => v.make).filter(Boolean))]
-            .sort((a, b) => a.localeCompare(b));
-          setAvailableMakes(uniqueMakes);
+
+        const makeCounts = new Map<string, number>();
+        for (const row of (makeData || []) as any[]) {
+          const cleaned = normalizeMake(row?.make);
+          if (!cleaned) continue;
+          makeCounts.set(cleaned, (makeCounts.get(cleaned) || 0) + 1);
         }
+
+        const frequentVehicleMakes = Array.from(makeCounts.entries())
+          .filter(([, count]) => count >= 2)
+          .map(([make]) => make);
+
+        // Merge canonical + frequent vehicle makes, case-insensitive.
+        const merged = [...canonicalMakes, ...frequentVehicleMakes];
+        const seenLower = new Set<string>();
+        const uniqueMakes: string[] = [];
+        for (const m of merged) {
+          const cleaned = String(m || '').trim();
+          if (!cleaned) continue;
+          const key = cleaned.toLowerCase();
+          if (seenLower.has(key)) continue;
+          seenLower.add(key);
+          uniqueMakes.push(cleaned);
+        }
+        uniqueMakes.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        setAvailableMakes(uniqueMakes);
 
         // Load distinct body styles
         const { data: bodyData } = await supabase
@@ -783,6 +855,26 @@ const CursorHomepage: React.FC = () => {
         return !isSold;
       });
     }
+    
+    // Private party filter - vehicles without organization_id or from private party sources
+    if (filters.privateParty) {
+      result = result.filter(v => {
+        const orgId = (v as any).origin_organization_id;
+        const source = classifySource(v);
+        // Private party: no org ID, or from Craigslist (typically private)
+        return !orgId || source === 'craigslist';
+      });
+    }
+    
+    // Dealer filter - vehicles with organization_id or from dealer sources
+    if (filters.dealer) {
+      result = result.filter(v => {
+        const orgId = (v as any).origin_organization_id;
+        const source = classifySource(v);
+        // Dealer: has org ID, or from dealer sites, or BaT (often dealers)
+        return !!orgId || source === 'dealer_site' || source === 'bat';
+      });
+    }
 
     // Source / dealer-ish filtering
     if (
@@ -913,6 +1005,8 @@ const CursorHomepage: React.FC = () => {
     if (filters.hasImages !== DEFAULT_FILTERS.hasImages) n++;
     if (filters.forSale !== DEFAULT_FILTERS.forSale) n++;
     if (filters.hideSold !== DEFAULT_FILTERS.hideSold) n++;
+    if (filters.privateParty !== DEFAULT_FILTERS.privateParty) n++;
+    if (filters.dealer !== DEFAULT_FILTERS.dealer) n++;
     if (filters.hideDealerListings !== DEFAULT_FILTERS.hideDealerListings) n++;
     if (filters.hideCraigslist !== DEFAULT_FILTERS.hideCraigslist) n++;
     if (filters.hideDealerSites !== DEFAULT_FILTERS.hideDealerSites) n++;
@@ -2251,6 +2345,18 @@ const CursorHomepage: React.FC = () => {
         onRemove: () => setFilters({ ...filters, showPending: false })
       });
     }
+    if (filters.privateParty) {
+      badges.push({
+        label: 'Private Party',
+        onRemove: () => setFilters({ ...filters, privateParty: false })
+      });
+    }
+    if (filters.dealer) {
+      badges.push({
+        label: 'Dealer',
+        onRemove: () => setFilters({ ...filters, dealer: false })
+      });
+    }
     
     // Source filters
     const sourceFilters: string[] = [];
@@ -2934,13 +3040,33 @@ const CursorHomepage: React.FC = () => {
                   <span><b>{formatCurrency(displayStats.avgValue)}</b> avg</span>
                 </>
               )}
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  title={`${cardsPerRow} per row`}
+                >
+                  <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                    {cardsPerRow}/row
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="16"
+                    step="1"
+                    value={cardsPerRow}
+                    onChange={(e) => setCardsPerRow(parseInt(e.target.value, 10))}
+                    className="nuke-range nuke-range-accent"
+                    style={{ width: '80px' }}
+                  />
+                </div>
+              </div>
               <button
                 onClick={() => {
                   setShowFilters(false);
                   setFilterBarMinimized(true);
                 }}
                 style={{
-                  marginLeft: 'auto',
                   padding: '2px 6px',
                   fontSize: '7pt',
                   border: '1px solid var(--border)',
@@ -3151,6 +3277,110 @@ const CursorHomepage: React.FC = () => {
 
             {/* Expanded filter controls - shown when sections are open */}
             <div style={{ padding: '6px' }}>
+              {/* Year filters - expanded */}
+              {!collapsedSections.yearFilters && (
+                <div style={{
+                  marginBottom: '8px',
+                  padding: '6px',
+                  background: 'var(--grey-50)',
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px'
+                }}>
+                  {/* Year range input */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '4px',
+                    alignItems: 'center',
+                    flexWrap: 'wrap'
+                  }}>
+                    <input
+                      type="number"
+                      placeholder="Min year"
+                      value={filters.yearMin || ''}
+                      onChange={(e) => {
+                        const val = e.target.value ? parseInt(e.target.value) : null;
+                        setFilters({...filters, yearMin: val});
+                      }}
+                      style={{
+                        width: '80px',
+                        padding: '3px 5px',
+                        border: '1px solid var(--border)',
+                        fontSize: '7pt',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    />
+                    <span style={{ fontSize: '7pt' }}>to</span>
+                    <input
+                      type="number"
+                      placeholder="Max year"
+                      value={filters.yearMax || ''}
+                      onChange={(e) => {
+                        const val = e.target.value ? parseInt(e.target.value) : null;
+                        setFilters({...filters, yearMax: val});
+                      }}
+                      style={{
+                        width: '80px',
+                        padding: '3px 5px',
+                        border: '1px solid var(--border)',
+                        fontSize: '7pt',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    />
+                    {(filters.yearMin || filters.yearMax) && (
+                      <button
+                        onClick={() => setFilters({...filters, yearMin: null, yearMax: null})}
+                        className="button-win95"
+                        style={{ padding: '3px 7px', fontSize: '7pt' }}
+                      >
+                        clear
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Quick year buttons */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {[
+                      { label: '64-91', min: 1964, max: 1991 },
+                      { label: '73-87', min: 1973, max: 1987 },
+                      { label: '67-72', min: 1967, max: 1972 },
+                      { label: '87-00', min: 1987, max: 2000 },
+                      { label: '60s', min: 1960, max: 1969 },
+                      { label: '70s', min: 1970, max: 1979 },
+                      { label: '80s', min: 1980, max: 1989 },
+                      { label: '90s', min: 1990, max: 1999 },
+                    ].map(range => {
+                      const isActive = filters.yearMin === range.min && filters.yearMax === range.max;
+                      return (
+                        <button
+                          key={range.label}
+                          onClick={() => {
+                            if (isActive) {
+                              setFilters({ ...filters, yearMin: null, yearMax: null });
+                            } else {
+                              setFilters({ ...filters, yearMin: range.min, yearMax: range.max });
+                            }
+                          }}
+                          className="button-win95"
+                          style={{
+                            padding: '3px 7px',
+                            fontSize: '7pt',
+                            background: isActive ? 'var(--grey-600)' : 'var(--white)',
+                            color: isActive ? 'var(--white)' : 'var(--text)',
+                            fontWeight: isActive ? 700 : 400,
+                            border: isActive ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                          }}
+                          title={`Year: ${range.min}-${range.max}`}
+                        >
+                          {range.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
               {/* Sources list - expanded */}
               {!collapsedSections.sourcePogs && (
                 <div style={{
@@ -3633,9 +3863,16 @@ const CursorHomepage: React.FC = () => {
                     // Check if already exists
                     const exists = locationFavorites.some(f => f.zipCode === currentZip && f.radiusMiles === currentRadius);
                     if (!exists) {
-                      const newFavorite = { zipCode: currentZip, radiusMiles: currentRadius };
+                      const label = prompt('Enter a name for this location (optional):');
+                      const newFavorite = { 
+                        zipCode: currentZip, 
+                        radiusMiles: currentRadius,
+                        label: label && label.trim() ? label.trim() : undefined
+                      };
                       const updated = [...locationFavorites, newFavorite];
                       saveLocationFavorites(updated);
+                    } else {
+                      alert('This location is already in your favorites');
                     }
                   }
                 };
@@ -3648,9 +3885,38 @@ const CursorHomepage: React.FC = () => {
                 const useFavorite = (fav: { zipCode: string; radiusMiles: number }) => {
                   setCurrentZip(fav.zipCode);
                   setCurrentRadius(fav.radiusMiles);
-                  const newLocation = { zipCode: fav.zipCode, radiusMiles: fav.radiusMiles };
-                  const updated = [...(filters.locations || []), newLocation];
-                  setFilters({...filters, locations: updated, zipCode: fav.zipCode, radiusMiles: fav.radiusMiles});
+                  // Check if already in active locations
+                  const isActive = filters.locations?.some(loc => loc.zipCode === fav.zipCode && loc.radiusMiles === fav.radiusMiles);
+                  if (!isActive) {
+                    const newLocation = { zipCode: fav.zipCode, radiusMiles: fav.radiusMiles };
+                    const updated = [...(filters.locations || []), newLocation];
+                    setFilters({...filters, locations: updated, zipCode: fav.zipCode, radiusMiles: fav.radiusMiles});
+                  }
+                };
+                
+                const toggleFavorite = (fav: { zipCode: string; radiusMiles: number }) => {
+                  // Check if already in active locations
+                  const isActive = filters.locations?.some(loc => loc.zipCode === fav.zipCode && loc.radiusMiles === fav.radiusMiles);
+                  if (isActive) {
+                    // Remove from active locations
+                    const updated = filters.locations?.filter(loc => !(loc.zipCode === fav.zipCode && loc.radiusMiles === fav.radiusMiles)) || [];
+                    setFilters({...filters, locations: updated});
+                  } else {
+                    // Add to active locations
+                    const newLocation = { zipCode: fav.zipCode, radiusMiles: fav.radiusMiles };
+                    const updated = [...(filters.locations || []), newLocation];
+                    setFilters({...filters, locations: updated});
+                  }
+                };
+                
+                const removeFavorite = (fav: { zipCode: string; radiusMiles: number }, index: number) => {
+                  const updated = locationFavorites.filter((_, i) => i !== index);
+                  saveLocationFavorites(updated);
+                  // Also remove from active locations if it's there
+                  const activeUpdated = filters.locations?.filter(loc => !(loc.zipCode === fav.zipCode && loc.radiusMiles === fav.radiusMiles)) || [];
+                  if (activeUpdated.length !== filters.locations?.length) {
+                    setFilters({...filters, locations: activeUpdated});
+                  }
                 };
                 
                 return (
@@ -3688,25 +3954,25 @@ const CursorHomepage: React.FC = () => {
                         }}
                       />
                       <span style={{ fontSize: '7pt' }}>within</span>
-                      <div style={{ display: 'flex', gap: '2px' }}>
+                      <select
+                        value={currentRadius}
+                        onChange={(e) => setCurrentRadius(Number(e.target.value))}
+                        style={{
+                          padding: '3px 5px',
+                          border: '1px solid var(--border)',
+                          fontSize: '7pt',
+                          fontFamily: '"MS Sans Serif", sans-serif',
+                          width: '80px',
+                          background: 'var(--white)',
+                          cursor: 'pointer'
+                        }}
+                      >
                         {[10, 25, 50, 100, 250, 500].map(radius => (
-                          <button
-                            key={radius}
-                            onClick={() => setCurrentRadius(radius)}
-                            className="button-win95"
-                            style={{
-                              padding: '3px 5px',
-                              fontSize: '7pt',
-                              background: currentRadius === radius ? 'var(--grey-600)' : 'var(--white)',
-                              color: currentRadius === radius ? 'var(--white)' : 'var(--text)',
-                              fontWeight: currentRadius === radius ? 700 : 400,
-                              border: currentRadius === radius ? '1px solid var(--grey-600)' : '1px solid var(--border)'
-                            }}
-                          >
+                          <option key={radius} value={radius}>
                             {radius}mi
-                          </button>
+                          </option>
                         ))}
-                      </div>
+                      </select>
                       <button
                         onClick={addLocation}
                         className="button-win95"
@@ -3757,24 +4023,46 @@ const CursorHomepage: React.FC = () => {
                     
                     {/* Favorites */}
                     {locationFavorites.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '7pt' }}>favorites:</span>
-                        {locationFavorites.map((fav, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => useFavorite(fav)}
-                            className="button-win95"
-                            style={{
-                              padding: '2px 5px',
-                              fontSize: '7pt',
-                              background: 'var(--white)',
-                              border: '1px solid var(--border)'
-                            }}
-                            title="Use this location"
-                          >
-                            {fav.zipCode} ({fav.radiusMiles}mi)
-                          </button>
-                        ))}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '7pt', fontWeight: 700 }}>favorites:</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                          {locationFavorites.map((fav, idx) => {
+                            const isActive = filters.locations?.some(loc => loc.zipCode === fav.zipCode && loc.radiusMiles === fav.radiusMiles);
+                            return (
+                              <div key={idx} style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+                                <button
+                                  onClick={() => toggleFavorite(fav)}
+                                  className="button-win95"
+                                  style={{
+                                    padding: '2px 5px',
+                                    fontSize: '7pt',
+                                    background: isActive ? 'var(--grey-600)' : 'var(--white)',
+                                    color: isActive ? 'var(--white)' : 'var(--text)',
+                                    fontWeight: isActive ? 700 : 400,
+                                    border: isActive ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                                  }}
+                                  title={isActive ? "Remove from active locations" : "Add to active locations"}
+                                >
+                                  {fav.label || fav.zipCode} ({fav.radiusMiles}mi)
+                                </button>
+                                <button
+                                  onClick={() => removeFavorite(fav, idx)}
+                                  className="button-win95"
+                                  style={{
+                                    padding: '2px 4px',
+                                    fontSize: '6pt',
+                                    background: 'var(--grey-100)',
+                                    border: '1px solid var(--border)',
+                                    color: 'var(--text-muted)'
+                                  }}
+                                  title="Remove from favorites"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3815,6 +4103,22 @@ const CursorHomepage: React.FC = () => {
                       onChange={(e) => setFilters({...filters, showPending: e.target.checked})}
                     />
                     <span>show pending</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.privateParty}
+                      onChange={(e) => setFilters({...filters, privateParty: e.target.checked})}
+                    />
+                    <span>private party</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '7pt' }}>
+                    <input
+                      type="checkbox"
+                      checked={filters.dealer}
+                      onChange={(e) => setFilters({...filters, dealer: e.target.checked})}
+                    />
+                    <span>dealer</span>
                   </label>
                 </div>
               )}
