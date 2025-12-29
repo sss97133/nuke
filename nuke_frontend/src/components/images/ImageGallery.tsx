@@ -115,16 +115,27 @@ const getImportedSourceDomain = (image: any): string | null => {
 };
 
 // Detect image source from storage_path or other metadata
-const getImageSource = (image: any): { type: string; label: string; color: string } => {
+const getImageSource = (image: any): { type: string; label: string; color: string; logoUrl?: string } => {
   const storagePath = String(image?.storage_path || image?.image_url || '').toLowerCase();
+  const imageUrl = String(image?.image_url || '').toLowerCase();
   const source = image?.source;
   
   // Check explicit source field first
-  if (source === 'bat_import' || storagePath.includes('bat_import')) {
-    return { type: 'bat', label: 'BaT', color: '#ef4444' };
+  if (source === 'bat_import' || storagePath.includes('bat_import') || imageUrl.includes('bringatrailer.com')) {
+    return { 
+      type: 'bat', 
+      label: 'BaT', 
+      color: '#ef4444',
+      logoUrl: 'https://bringatrailer.com/wp-content/themes/flavor/bat/images/bat-icon.png'
+    };
   }
-  if (source === 'organization_import' || storagePath.includes('organization_import')) {
-    return { type: 'org', label: 'Org', color: '#3b82f6' };
+  if (source === 'organization_import' || storagePath.includes('organization_import') || storagePath.includes('collective')) {
+    return { 
+      type: 'org', 
+      label: 'Dealer', 
+      color: '#3b82f6',
+      logoUrl: undefined // Will be set from organization data
+    };
   }
   if (source === 'external_import' || storagePath.includes('external_import')) {
     return { type: 'external', label: 'External', color: '#8b5cf6' };
@@ -134,6 +145,16 @@ const getImageSource = (image: any): { type: string; label: string; color: strin
   }
   if (image?.is_external || image?.source === 'external_import') {
     return { type: 'external', label: 'External', color: '#8b5cf6' };
+  }
+  
+  // Check if URL is from a known CDN
+  if (imageUrl.includes('cdn.dealeraccelerate.com')) {
+    return { 
+      type: 'org', 
+      label: 'Dealer', 
+      color: '#3b82f6',
+      logoUrl: 'https://www.collectiveauto.com/assets/collective/logo-83823e1f57b2700658375bf3477ed1c2.svg'
+    };
   }
   
   // Default: user upload
@@ -868,7 +889,50 @@ const ImageGallery = ({
       return null;
     };
     
+    // Extract Mecum/Cloudinary image path for deduplication (strips transformations and versions)
+    // e.g., images.mecum.com/image/upload/c_fill,f_auto,w_1920/v123456/auctions/FL26/1155407/123999.jpg
+    //   -> auctions/FL26/1155407/123999.jpg
+    const extractMecumPath = (url: string | null | undefined): string | null => {
+      if (!url) return null;
+      try {
+        const lower = url.toLowerCase();
+        if (!lower.includes('mecum.com') && !lower.includes('cloudinary')) return null;
+        
+        // Pattern: /image/upload/[transformations]/[version]/[path]
+        // or: /image/upload/[version]/[path]
+        const uploadMatch = url.match(/\/image\/upload\/(?:[^\/]+\/)*v+\d+\/(.+)/i);
+        if (uploadMatch && uploadMatch[1]) {
+          // Normalize: strip query params and return just the path
+          return uploadMatch[1].split('?')[0].split('#')[0].toLowerCase();
+        }
+        
+        // Fallback: extract path after /media/ or /auctions/
+        const pathMatch = url.match(/\/(media|auctions)\/(.+)/i);
+        if (pathMatch && pathMatch[2]) {
+          return pathMatch[2].split('?')[0].split('#')[0].toLowerCase();
+        }
+      } catch {
+        // ignore
+      }
+      return null;
+    };
+    
+    // Check if URL is blank/placeholder
+    const isBlankImage = (url: string | null | undefined): boolean => {
+      if (!url) return true;
+      const lower = url.toLowerCase();
+      return lower.includes('placeholder') || 
+             lower.includes('blank') || 
+             lower.includes('no-image') ||
+             lower.includes('default-') ||
+             lower.length < 20;
+    };
+    
     const keyFor = (img: any): string => {
+      // Priority 0: Mecum/Cloudinary path (strips transformations/resolutions)
+      const mecumPath = extractMecumPath(img?.image_url);
+      if (mecumPath) return `mecum:${mecumPath}`;
+      
       // Priority 1: file_hash (most reliable)
       if (img?.file_hash) return `hash:${String(img.file_hash).toLowerCase()}`;
       
@@ -924,7 +988,13 @@ const ImageGallery = ({
     const out: any[] = [];
     let skippedNoKey = 0;
     let skippedDuplicate = 0;
+    let skippedBlank = 0;
     for (const img of prioritized) {
+      // Skip blank/placeholder images
+      if (isBlankImage(img?.image_url)) {
+        skippedBlank++;
+        continue;
+      }
       const k = keyFor(img);
       if (!k) {
         skippedNoKey++;
@@ -2543,30 +2613,57 @@ const ImageGallery = ({
                 );
               })()}
 
-              {/* Source Badge - Bottom left */}
+              {/* Source Badge - Bottom left - Round stamp for validation */}
               {(() => {
                 const source = getImageSource(image);
                 // Only show badge if not a user upload (to reduce clutter)
                 if (source.type === 'user') return null;
                 return (
-                  <div style={{
-                    position: 'absolute',
-                    bottom: 'var(--space-1)',
-                    left: 'var(--space-1)',
-                    backgroundColor: source.color,
-                    color: '#fff',
-                    borderRadius: '0px',
-                    border: '1px solid #fff',
-                    padding: '2px 6px',
-                    fontSize: '7pt',
-                    fontWeight: 'bold',
-                    fontFamily: '"MS Sans Serif", sans-serif',
-                    zIndex: 10,
-                    cursor: 'help'
-                  }}
-                  title={`Source: ${source.label}`}
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      bottom: '4px',
+                      left: '4px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(0,0,0,0.75)',
+                      border: `2px solid ${source.color}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      zIndex: 10,
+                      cursor: 'help',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                    }}
+                    title={`Verified by: ${source.label}`}
                   >
-                    {source.label}
+                    {source.logoUrl ? (
+                      <img 
+                        src={source.logoUrl} 
+                        alt={source.label}
+                        style={{ 
+                          width: '16px', 
+                          height: '16px', 
+                          objectFit: 'contain',
+                          filter: 'brightness(1.1)'
+                        }}
+                        onError={(e) => { 
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          (e.target as HTMLImageElement).parentElement!.innerHTML = `<span style="font-size: 8px; font-weight: 700; color: ${source.color}">${source.label[0]}</span>`;
+                        }}
+                      />
+                    ) : (
+                      <span style={{ 
+                        fontSize: '9px', 
+                        fontWeight: 700, 
+                        color: source.color,
+                        textTransform: 'uppercase'
+                      }}>
+                        {source.label[0]}
+                      </span>
+                    )}
                   </div>
                 );
               })()}
@@ -2739,6 +2836,50 @@ const ImageGallery = ({
                 );
               })()}
 
+              {/* Source Badge - Round stamp for validation (masonry view) */}
+              {(() => {
+                const source = getImageSource(image);
+                if (source.type === 'user') return null;
+                return (
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      bottom: '50px',
+                      left: '8px',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(0,0,0,0.75)',
+                      border: `2px solid ${source.color}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      zIndex: 10,
+                      cursor: 'help',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                    }}
+                    title={`Verified by: ${source.label}`}
+                  >
+                    {source.logoUrl ? (
+                      <img 
+                        src={source.logoUrl} 
+                        alt={source.label}
+                        style={{ width: '18px', height: '18px', objectFit: 'contain', filter: 'brightness(1.1)' }}
+                        onError={(e) => { 
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          (e.target as HTMLImageElement).parentElement!.innerHTML = `<span style="font-size: 10px; font-weight: 700; color: ${source.color}">${source.label[0]}</span>`;
+                        }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: source.color, textTransform: 'uppercase' }}>
+                        {source.label[0]}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Image Info Overlay */}
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', padding: 'var(--space-2)' }}>
                 {image.is_primary && (
@@ -2785,8 +2926,8 @@ const ImageGallery = ({
               }}
               onClick={() => openLightbox(index)}
             >
-              {/* Thumbnail */}
-              <div style={{ flexShrink: 0, width: '100px', height: '100px', overflow: 'hidden', backgroundColor: 'var(--grey-100)' }}>
+              {/* Thumbnail with Source Badge */}
+              <div style={{ flexShrink: 0, width: '100px', height: '100px', overflow: 'hidden', backgroundColor: 'var(--grey-100)', position: 'relative' }}>
                 <img
                   src={getOptimalImageUrl(image, 'thumbnail')}
                   alt={image.caption || 'Vehicle image'}
@@ -2798,6 +2939,48 @@ const ImageGallery = ({
                   }}
                   loading="lazy"
                 />
+                {/* Source Badge - Round stamp (list view) */}
+                {(() => {
+                  const source = getImageSource(image);
+                  if (source.type === 'user') return null;
+                  return (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        bottom: '4px',
+                        left: '4px',
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(0,0,0,0.75)',
+                        border: `2px solid ${source.color}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        zIndex: 10,
+                        cursor: 'help',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                      }}
+                      title={`Verified by: ${source.label}`}
+                    >
+                      {source.logoUrl ? (
+                        <img 
+                          src={source.logoUrl} 
+                          alt={source.label}
+                          style={{ width: '14px', height: '14px', objectFit: 'contain', filter: 'brightness(1.1)' }}
+                          onError={(e) => { 
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '8px', fontWeight: 700, color: source.color }}>
+                          {source.label[0]}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Info - Everything compressed */}

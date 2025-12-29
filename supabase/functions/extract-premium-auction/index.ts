@@ -3043,8 +3043,14 @@ async function storeVehiclesInDatabase(
         }
       }
       const title = vehicle.title || vehicle.listing_title || null;
-      const vinRaw = typeof vehicle.vin === "string" ? vehicle.vin.trim() : "";
-      const vin = vinRaw && vinRaw.toLowerCase() !== "n/a" ? vinRaw : null;
+      const vinRaw = typeof vehicle.vin === "string" ? vehicle.vin.trim().toUpperCase() : "";
+      // Only consider valid 17-character VINs (excluding I, O, Q per spec)
+      const isValidVin = vinRaw.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(vinRaw);
+      const vin = isValidVin ? vinRaw : null;
+      
+      if (vinRaw && !isValidVin) {
+        console.log(`⚠️ Invalid VIN detected: "${vinRaw}" (length: ${vinRaw.length}) - using discovery_url for lookup`);
+      }
       const rawListingDescription = vehicle.description || null;
 
       // Determine sale price (priority: sale_price > final_bid > current_bid > high_bid)
@@ -3216,11 +3222,51 @@ async function storeVehiclesInDatabase(
         }
       } else {
         // Check for existing vehicle by discovery_url (canonical for listing imports)
-        const { data: existingByUrl, error: urlCheckErr } = await supabase
-          .from("vehicles")
-          .select("id")
-          .eq("discovery_url", listingUrl)
-          .maybeSingle();
+        console.log(`VIN is null/empty. Checking for existing vehicle by discovery_url: "${listingUrl}"`);
+        
+        // Use raw SQL to ensure we find the existing vehicle (supabase-js maybeSingle can be unreliable)
+        let existingByUrl: any = null;
+        let urlCheckErr: any = null;
+        
+        try {
+          const { data: sqlResult, error: sqlErr } = await supabase.rpc('get_vehicle_id_by_discovery_url', {
+            p_discovery_url: listingUrl
+          });
+          
+          if (sqlErr) {
+            console.log(`RPC lookup failed, trying direct query:`, sqlErr.message);
+            // Fallback to direct query
+            const { data: directResult, error: directErr } = await supabase
+              .from("vehicles")
+              .select("id")
+              .eq("discovery_url", listingUrl)
+              .limit(1);
+            
+            if (directErr) {
+              urlCheckErr = directErr;
+            } else if (directResult && directResult.length > 0) {
+              existingByUrl = directResult[0];
+            }
+          } else if (sqlResult) {
+            existingByUrl = { id: sqlResult };
+          }
+        } catch (e: any) {
+          console.log(`Lookup exception:`, e?.message);
+          // Last resort - direct query
+          const { data: directResult, error: directErr } = await supabase
+            .from("vehicles")
+            .select("id")
+            .eq("discovery_url", listingUrl)
+            .limit(1);
+          
+          if (!directErr && directResult && directResult.length > 0) {
+            existingByUrl = directResult[0];
+          } else {
+            urlCheckErr = directErr;
+          }
+        }
+        
+        console.log(`existingByUrl lookup result:`, existingByUrl?.id || 'NOT FOUND', 'error:', urlCheckErr?.message);
         
         if (urlCheckErr) {
           error = urlCheckErr;
@@ -5020,6 +5066,144 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     return Array.from(new Set(urls));
   };
 
+  // HTML-based extraction for BaT specs (fallback when Firecrawl AI fails)
+  const extractBatSpecsFromHtml = (html: string): Record<string, any> => {
+    const h = String(html || '');
+    const specs: Record<string, any> = {};
+    
+    try {
+      // Extract from "essentials" or "listing-essentials" section
+      // BaT uses a structured format like: <strong>Mileage</strong><span>36,000</span>
+      
+      // Mileage - look for patterns like "36,000 Miles" or "Mileage: 36,000"
+      const mileagePatterns = [
+        /(?:mileage|odometer)[:\s]*["']?([0-9,]+)(?:\s*miles)?/i,
+        /(?:showing\s*)?([0-9,]+)\s*miles?\b/i,
+        /"mileage"[:\s]*"?([0-9,]+)"?/i,
+        />([0-9,]+)\s*Miles?</i,
+      ];
+      for (const pattern of mileagePatterns) {
+        const m = h.match(pattern);
+        if (m?.[1]) {
+          const mileage = parseInt(m[1].replace(/,/g, ''), 10);
+          if (mileage > 0 && mileage < 10000000) {
+            specs.mileage = mileage;
+            break;
+          }
+        }
+      }
+      
+      // Color - look for exterior color mentions
+      const colorPatterns = [
+        /(?:exterior\s*)?color[:\s]*["']?([A-Za-z][A-Za-z\s]+?(?:Metallic|Pearl|Black|White|Red|Blue|Green|Silver|Gray|Grey|Yellow|Orange|Brown|Beige|Gold|Bronze|Purple|Maroon|Burgundy)?)\b/i,
+        /painted\s+(?:in\s+)?([A-Za-z][A-Za-z\s]+?(?:Metallic|Pearl)?)\b/i,
+        /"color"[:\s]*"([^"]+)"/i,
+        /(?:finished|painted|refinished)\s+(?:in\s+)?([A-Za-z][A-Za-z\s]+)\s+(?:over|with)/i,
+      ];
+      for (const pattern of colorPatterns) {
+        const m = h.match(pattern);
+        if (m?.[1] && m[1].length > 2 && m[1].length < 50 && !m[1].toLowerCase().includes('interior')) {
+          specs.color = m[1].trim();
+          break;
+        }
+      }
+      
+      // Transmission
+      const transPatterns = [
+        /(?:transmission|gearbox)[:\s]*["']?([^<"'\n]{3,50})/i,
+        /((?:five|six|four|three|seven|eight)\s*-?\s*speed\s*(?:manual|automatic|auto|sequential|dual-clutch|dct|dsg|tiptronic|pdk|smg))/i,
+        /(\d-speed\s*(?:manual|automatic|auto|sequential|dual-clutch|dct|dsg|tiptronic|pdk|smg))/i,
+        /"transmission"[:\s]*"([^"]+)"/i,
+      ];
+      for (const pattern of transPatterns) {
+        const m = h.match(pattern);
+        if (m?.[1] && m[1].length > 2 && m[1].length < 80) {
+          specs.transmission = m[1].trim();
+          break;
+        }
+      }
+      
+      // Engine
+      const enginePatterns = [
+        /(?:engine|motor|powertrain)[:\s]*["']?([^<"'\n]{3,80})/i,
+        /(\d+(?:\.\d+)?\s*-?\s*(?:liter|L)\s*[A-Za-z0-9\s\-]+(?:engine|motor)?)/i,
+        /((?:twin-turbo|turbo|supercharged|naturally\s*aspirated)?\s*\d+(?:\.\d+)?\s*(?:L|liter)\s*[VvIi]?\d*(?:\s*engine)?)/i,
+        /"engine_size"[:\s]*"([^"]+)"/i,
+        /"engine"[:\s]*"([^"]+)"/i,
+      ];
+      for (const pattern of enginePatterns) {
+        const m = h.match(pattern);
+        if (m?.[1] && m[1].length > 2 && m[1].length < 100) {
+          specs.engine_size = m[1].trim();
+          break;
+        }
+      }
+      
+      // Drivetrain
+      const drivePatterns = [
+        /(?:drivetrain|drive\s*type)[:\s]*["']?(AWD|4WD|RWD|FWD|4x4|All-Wheel|Rear-Wheel|Front-Wheel|Four-Wheel)/i,
+        /\b(AWD|4WD|RWD|FWD|4x4|All-Wheel\s*Drive|Rear-Wheel\s*Drive|Front-Wheel\s*Drive|Four-Wheel\s*Drive)\b/i,
+        /"drivetrain"[:\s]*"([^"]+)"/i,
+      ];
+      for (const pattern of drivePatterns) {
+        const m = h.match(pattern);
+        if (m?.[1]) {
+          specs.drivetrain = m[1].trim();
+          break;
+        }
+      }
+      
+      // VIN - look for 17-character alphanumeric strings (excluding I, O, Q)
+      const vinPatterns = [
+        /(?:vin|vehicle\s*identification)[:\s#]*["']?([A-HJ-NPR-Z0-9]{17})\b/i,
+        /\bvin[:\s#]*([A-HJ-NPR-Z0-9]{17})\b/i,
+        /"vin"[:\s]*"([A-HJ-NPR-Z0-9]{17})"/i,
+      ];
+      for (const pattern of vinPatterns) {
+        const m = h.match(pattern);
+        if (m?.[1]) {
+          specs.vin = m[1].toUpperCase();
+          break;
+        }
+      }
+      
+      // Location
+      const locationPatterns = [
+        /(?:location|located)[:\s]*["']?([A-Za-z][A-Za-z\s,]+(?:,\s*[A-Z]{2})?)/i,
+        /"location"[:\s]*"([^"]+)"/i,
+      ];
+      for (const pattern of locationPatterns) {
+        const m = h.match(pattern);
+        if (m?.[1] && m[1].length > 2 && m[1].length < 100) {
+          specs.location = m[1].trim();
+          break;
+        }
+      }
+      
+      // Sale price / high bid (for ended auctions)
+      const pricePatterns = [
+        /(?:sold\s*for|winning\s*bid|final\s*price|hammer\s*price)[:\s$]*([0-9,]+)/i,
+        /"sale_price"[:\s]*(\d+)/i,
+        /"high_bid"[:\s]*(\d+)/i,
+      ];
+      for (const pattern of pricePatterns) {
+        const m = h.match(pattern);
+        if (m?.[1]) {
+          const price = parseInt(m[1].replace(/,/g, ''), 10);
+          if (price > 100 && price < 100000000) {
+            specs.sale_price = price;
+            break;
+          }
+        }
+      }
+      
+    } catch (e: any) {
+      console.warn('Error extracting BaT specs from HTML:', e?.message);
+    }
+    
+    return specs;
+  };
+
   // Comprehensive schema to extract ALL BaT data
   const listingSchema = {
     type: "object",
@@ -5095,38 +5279,23 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
           url: normalizedUrl,
           formats: ["extract", "html"],
           onlyMainContent: false,
-          waitFor: 12000, // Wait for gallery to fully load and expand
+          waitFor: 8000, // Wait for gallery to load
           actions: [
             {
               type: "wait",
-              milliseconds: 3000, // Initial page load
+              milliseconds: 2000, // Initial page load
             },
             {
               type: "scroll",
               direction: "down",
-              pixels: 1000, // Scroll to gallery
+              pixels: 2000, // Scroll to trigger lazy loading
             },
             {
               type: "wait",
-              milliseconds: 2000, // Wait for gallery to render
+              milliseconds: 2000, // Wait for images to load
             },
-            {
-              type: "click",
-              selector: "button:has-text('Show more'), button:has-text('Load more'), button:has-text('View all'), [aria-label*='more'], [aria-label*='all'], .gallery-load-more, [data-action='load-more']",
-            },
-            {
-              type: "wait",
-              milliseconds: 3000, // Wait for expanded images to load
-            },
-            {
-              type: "scroll",
-              direction: "down",
-              pixels: 2000, // Scroll to load lazy-loaded images
-            },
-            {
-              type: "wait",
-              milliseconds: 2000, // Final wait for all images
-            },
+            // Note: BaT galleries have ALL image data embedded in data-gallery-items JSON
+            // No need to click "load more" - we extract from the JSON attribute directly
           ],
           extract: { schema: listingSchema },
         }),
@@ -5191,17 +5360,29 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       return true;
     });
 
-    // Merge ALL extracted data comprehensively
+    // Extract specs from HTML as fallback when Firecrawl AI extraction fails
+    const htmlSpecs = html ? extractBatSpecsFromHtml(html) : {};
+    console.log(`BaT HTML specs extracted:`, JSON.stringify(htmlSpecs));
+
+    // Merge ALL extracted data comprehensively - use HTML fallbacks for missing fields
     const merged = {
       ...vehicle,
       listing_url: normalizedUrl,
       images, // High-res images from HTML gallery extraction
+      // Vehicle specs with HTML fallback
+      mileage: vehicle?.mileage ?? htmlSpecs.mileage ?? null,
+      color: vehicle?.color || htmlSpecs.color || null,
+      transmission: vehicle?.transmission || htmlSpecs.transmission || null,
+      engine_size: vehicle?.engine_size || htmlSpecs.engine_size || null,
+      drivetrain: vehicle?.drivetrain || htmlSpecs.drivetrain || null,
+      vin: vehicle?.vin || htmlSpecs.vin || null,
+      location: vehicle?.location || htmlSpecs.location || null,
       // Preserve all auction data
       current_bid: typeof vehicle?.current_bid === 'number' ? vehicle.current_bid : 
                    (typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null),
       high_bid: typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null,
       final_bid: typeof vehicle?.final_bid === 'number' ? vehicle.final_bid : null,
-      sale_price: typeof vehicle?.sale_price === 'number' ? vehicle.sale_price : null,
+      sale_price: typeof vehicle?.sale_price === 'number' ? vehicle.sale_price : (htmlSpecs.sale_price ?? null),
       reserve_price: typeof vehicle?.reserve_price === 'number' ? vehicle.reserve_price : null,
       auction_end_date: vehicle?.auction_end_date || null,
       auction_start_date: vehicle?.auction_start_date || null,
@@ -5223,6 +5404,7 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       features: Array.isArray(vehicle?.features) ? vehicle.features : null,
     };
 
+    console.log(`Extracted merged object VIN: "${merged.vin}", mileage: ${merged.mileage}, images: ${merged.images?.length || 0}`);
     extracted.push(merged);
   } catch (e: any) {
     issues.push(`BaT listing scrape failed: ${normalizedUrl} (${e?.message || String(e)})`);
@@ -5246,6 +5428,15 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     issues: [...issues, ...created.errors],
     extraction_method: "firecrawl_extract_with_html_gallery_parsing",
     timestamp: new Date().toISOString(),
+    // Debug info
+    debug_extraction: extracted.length > 0 ? {
+      vin: extracted[0]?.vin || null,
+      mileage: extracted[0]?.mileage || null,
+      color: extracted[0]?.color || null,
+      transmission: extracted[0]?.transmission || null,
+      engine_size: extracted[0]?.engine_size || null,
+      images_count: extracted[0]?.images?.length || 0,
+    } : null,
   };
 }
 
