@@ -432,6 +432,11 @@ const CursorHomepage: React.FC = () => {
   // Search inputs for filtering
   const [sourceSearchText, setSourceSearchText] = useState('');
   const [makeSearchText, setMakeSearchText] = useState('');
+  const [showMakeSuggestions, setShowMakeSuggestions] = useState(false);
+
+  // Available makes from database for autocomplete
+  const [availableMakes, setAvailableMakes] = useState<string[]>([]);
+  const [availableBodyStyles, setAvailableBodyStyles] = useState<string[]>([]);
 
   const hasActiveFilters = useMemo(() => {
     if (filters.yearMin || filters.yearMax) return true;
@@ -504,6 +509,45 @@ const CursorHomepage: React.FC = () => {
       }
     };
   }, [showFilters, filterBarMinimized]);
+
+  // Load available makes and body styles for autocomplete
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      try {
+        // Load distinct makes
+        const { data: makeData } = await supabase
+          .from('vehicles')
+          .select('make')
+          .eq('is_public', true)
+          .not('make', 'is', null)
+          .limit(5000);
+        
+        if (makeData) {
+          const uniqueMakes = [...new Set(makeData.map(v => v.make).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b));
+          setAvailableMakes(uniqueMakes);
+        }
+
+        // Load distinct body styles
+        const { data: bodyData } = await supabase
+          .from('vehicles')
+          .select('body_style')
+          .eq('is_public', true)
+          .not('body_style', 'is', null)
+          .limit(5000);
+        
+        if (bodyData) {
+          const uniqueStyles = [...new Set(bodyData.map(v => v.body_style).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b));
+          setAvailableBodyStyles(uniqueStyles);
+        }
+      } catch (err) {
+        console.error('Error loading filter options:', err);
+      }
+    };
+
+    loadFilterOptions();
+  }, []);
 
   // Save filters to localStorage whenever they change
   useEffect(() => {
@@ -3166,37 +3210,105 @@ const CursorHomepage: React.FC = () => {
                   border: '1px solid var(--border)',
                   fontSize: '7pt'
                 }}>
-                  <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
-                    <input
-                      type="text"
-                      placeholder="search makes (Chevrolet, Ford...)"
-                      value={makeSearchText}
-                      onChange={(e) => setMakeSearchText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && makeSearchText.trim()) {
-                          const newMake = makeSearchText.trim();
-                          if (!filters.makes.includes(newMake)) {
-                            setFilters({...filters, makes: [...filters.makes, newMake]});
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '6px', position: 'relative' }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                      <input
+                        type="text"
+                        placeholder="search makes (Chevrolet, Ford...)"
+                        value={makeSearchText}
+                        onChange={(e) => {
+                          setMakeSearchText(e.target.value);
+                          setShowMakeSuggestions(true);
+                        }}
+                        onFocus={() => setShowMakeSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowMakeSuggestions(false), 150)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && makeSearchText.trim()) {
+                            const newMake = makeSearchText.trim();
+                            // Find exact match or use typed value
+                            const exactMatch = availableMakes.find(m => m.toLowerCase() === newMake.toLowerCase());
+                            const makeToAdd = exactMatch || newMake;
+                            if (!filters.makes.includes(makeToAdd)) {
+                              setFilters({...filters, makes: [...filters.makes, makeToAdd]});
+                            }
+                            setMakeSearchText('');
+                            setShowMakeSuggestions(false);
+                          } else if (e.key === 'Escape') {
+                            setShowMakeSuggestions(false);
                           }
-                          setMakeSearchText('');
-                        }
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '3px 6px',
-                        fontSize: '7pt',
-                        border: '1px solid var(--border)',
-                        fontFamily: '"MS Sans Serif", sans-serif'
-                      }}
-                    />
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '3px 6px',
+                          fontSize: '7pt',
+                          border: '1px solid var(--border)',
+                          fontFamily: '"MS Sans Serif", sans-serif'
+                        }}
+                      />
+                      {/* Autocomplete dropdown */}
+                      {showMakeSuggestions && makeSearchText.length > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          maxHeight: '150px',
+                          overflowY: 'auto',
+                          background: 'var(--white)',
+                          border: '1px solid var(--border)',
+                          borderTop: 'none',
+                          zIndex: 100,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                          {availableMakes
+                            .filter(m => 
+                              m.toLowerCase().startsWith(makeSearchText.toLowerCase()) &&
+                              !filters.makes.includes(m)
+                            )
+                            .slice(0, 10)
+                            .map((make) => (
+                              <div
+                                key={make}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setFilters({...filters, makes: [...filters.makes, make]});
+                                  setMakeSearchText('');
+                                  setShowMakeSuggestions(false);
+                                }}
+                                style={{
+                                  padding: '4px 8px',
+                                  cursor: 'pointer',
+                                  fontSize: '7pt',
+                                  borderBottom: '1px solid var(--grey-100)'
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--grey-100)')}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--white)')}
+                              >
+                                {make}
+                              </div>
+                            ))}
+                          {availableMakes.filter(m => 
+                            m.toLowerCase().startsWith(makeSearchText.toLowerCase()) &&
+                            !filters.makes.includes(m)
+                          ).length === 0 && (
+                            <div style={{ padding: '4px 8px', fontSize: '7pt', color: 'var(--text-muted)' }}>
+                              No matches - press Enter to add "{makeSearchText}"
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => {
                         if (makeSearchText.trim()) {
                           const newMake = makeSearchText.trim();
-                          if (!filters.makes.includes(newMake)) {
-                            setFilters({...filters, makes: [...filters.makes, newMake]});
+                          const exactMatch = availableMakes.find(m => m.toLowerCase() === newMake.toLowerCase());
+                          const makeToAdd = exactMatch || newMake;
+                          if (!filters.makes.includes(makeToAdd)) {
+                            setFilters({...filters, makes: [...filters.makes, makeToAdd]});
                           }
                           setMakeSearchText('');
+                          setShowMakeSuggestions(false);
                         }
                       }}
                       className="button-win95"
@@ -3249,9 +3361,12 @@ const CursorHomepage: React.FC = () => {
                       ))}
                     </div>
                   )}
-                  {/* Quick make chips */}
+                  {/* Quick make chips - show top makes from DB */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: filters.makes.length > 0 ? '6px' : 0 }}>
-                    {['Chevrolet', 'Ford', 'Dodge', 'GMC', 'Plymouth', 'Pontiac', 'Buick', 'Cadillac', 'Toyota', 'Porsche', 'Mercedes-Benz', 'BMW'].map((make) => (
+                    {(availableMakes.length > 0 
+                      ? availableMakes.slice(0, 20) 
+                      : ['Chevrolet', 'Ford', 'Dodge', 'GMC', 'Plymouth', 'Pontiac', 'Buick', 'Cadillac', 'Toyota', 'Porsche', 'Mercedes-Benz', 'BMW']
+                    ).map((make) => (
                       <button
                         key={make}
                         onClick={() => {
@@ -3272,6 +3387,11 @@ const CursorHomepage: React.FC = () => {
                         {make}
                       </button>
                     ))}
+                    {availableMakes.length > 20 && (
+                      <span style={{ fontSize: '6pt', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                        +{availableMakes.length - 20} more (type to search)
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
