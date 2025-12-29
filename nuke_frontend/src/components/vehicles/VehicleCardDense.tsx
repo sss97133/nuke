@@ -8,6 +8,19 @@ import { OdometerBadge } from '../vehicle/OdometerBadge';
 import { useVehicleImages } from '../../hooks/useVehicleImages';
 import { LotBadge } from '../auction/LotBadge';
 import { getAuctionMode, isActiveAuction as isInActiveAuction, getAuctionStateInfo } from '../../services/unifiedAuctionStateService';
+
+const parseMoneyNumber = (val: any): number | null => {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'number') return Number.isFinite(val) && val > 0 ? val : null;
+  if (typeof val === 'string') {
+    const cleaned = val.replace(/[^0-9.]/g, '');
+    if (!cleaned) return null;
+    const n = Number(cleaned);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return null;
+};
+
 interface VehicleCardDenseProps {
   vehicle: {
     id: string;
@@ -137,27 +150,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date || null;
   }, [vehicle]);
 
-  // Update timer every second for active auctions
-  React.useEffect(() => {
-    if (!isActiveAuction || !auctionEndDate) return;
-    const tick = () => setAuctionNow(Date.now());
-    // Update immediately
-    tick();
-    // Then update every second
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        tick();
-      }
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [isActiveAuction, auctionEndDate]);
-
   const formatAuctionTimer = React.useMemo(() => {
     if (!auctionEndDate) return null;
     const end = new Date(auctionEndDate).getTime();
     if (!Number.isFinite(end)) return null;
     const diff = end - auctionNow;
-    const maxReasonable = 14 * 24 * 60 * 60 * 1000;
+    // Allow up to 60 days for legitimate long auctions (BaT auctions can be up to 10 days, but allow buffer)
+    const maxReasonable = 60 * 24 * 60 * 60 * 1000;
     if (diff > maxReasonable) return null;
     if (diff <= 0) return 'Ended';
     
@@ -169,6 +168,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const pad = (n: number) => String(n).padStart(2, '0');
     
     // Show days when > 24 hours, HH:MM:SS when <= 24 hours
+    // For very long auctions (>7 days), show simplified format (e.g., "19d 18h")
+    if (totalSeconds > 7 * 86400) {
+      return `${days}d ${hours}h`;
+    }
     if (totalSeconds > 86400) {
       return `${days}d`;
     }
@@ -181,20 +184,20 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const v: any = vehicle as any;
     
     // Extract all price fields with proper validation
-    const salePrice = typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0 ? v.sale_price : null;
-    const winningBid = typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0 ? v.winning_bid : null;
-    const highBid = typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0 ? v.high_bid : null;
+    const salePrice = parseMoneyNumber(v.sale_price);
+    const winningBid = parseMoneyNumber(v.winning_bid);
+    const highBid = parseMoneyNumber(v.high_bid);
     
     // Live bid from external_listings (already in vehicle data from homepage query)
-    const listingLiveBid = typeof (v as any)?.external_listings?.[0]?.current_bid === 'number' 
-      ? (v as any).external_listings[0].current_bid 
-      : null;
-    const listingStatus = String((v as any)?.external_listings?.[0]?.listing_status || '').toLowerCase();
-    const isLive = listingStatus === 'active' || listingStatus === 'live';
-    const liveBid = (isLive && listingLiveBid && listingLiveBid > 0) ? listingLiveBid : null;
+    const externalListing = (v as any)?.external_listings?.[0];
+    const listingLiveBid = parseMoneyNumber(externalListing?.current_bid);
+    // Check if listing is truly live by looking at end_date (more reliable than status field)
+    const listingEndDate = externalListing?.end_date ? new Date(externalListing.end_date).getTime() : 0;
+    const isLive = Number.isFinite(listingEndDate) && listingEndDate > Date.now();
+    const liveBid = isLive ? listingLiveBid : null;
     
     // Current bid from vehicle (fallback if no external listing)
-    const currentBid = typeof v.current_bid === 'number' && Number.isFinite(v.current_bid) && v.current_bid > 0 ? v.current_bid : null;
+    const currentBid = parseMoneyNumber(v.current_bid);
     
     // Asking price (only if for sale)
     const asking = (typeof v.asking_price === 'number' && v.asking_price > 0 && (v.is_for_sale === true || String(v.sale_status || '').toLowerCase() === 'for_sale'))
@@ -211,9 +214,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // 7. Current value (estimated value - fallback for regular vehicles)
     // 8. Purchase price (fallback)
     // 9. MSRP (last resort)
-    const currentValue = typeof v.current_value === 'number' && Number.isFinite(v.current_value) && v.current_value > 0 ? v.current_value : null;
-    const purchasePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) && v.purchase_price > 0 ? v.purchase_price : null;
-    const msrp = typeof v.msrp === 'number' && Number.isFinite(v.msrp) && v.msrp > 0 ? v.msrp : null;
+    const currentValue = parseMoneyNumber(v.current_value);
+    const purchasePrice = parseMoneyNumber(v.purchase_price);
+    const msrp = parseMoneyNumber(v.msrp);
     
     const priceValue =
       salePrice ??
@@ -340,7 +343,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const location = metadata?.location || v?.location || null;
     const saleDate = metadata?.sale_date || v?.sale_date || externalListing?.sold_at || null;
     const auctionDate = metadata?.auction_start_date || externalListing?.start_date || v?.auction_end_date || saleDate;
-    const salePrice = v?.sale_price || externalListing?.final_price || null;
+    const salePrice = parseMoneyNumber(v?.sale_price) ?? parseMoneyNumber(externalListing?.final_price) ?? null;
     const estimateLow = metadata?.estimate_low || null;
     const estimateHigh = metadata?.estimate_high || null;
     const listingUrl = externalListing?.listing_url || v?.discovery_url || null;
@@ -497,6 +500,45 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const isActiveAuction = React.useMemo(() => {
     return isInActiveAuction(vehicle);
   }, [vehicle]);
+
+  // Update timer every second for active auctions (must be after isActiveAuction is defined)
+  const lastUpdateRef = React.useRef<number>(Date.now());
+  React.useEffect(() => {
+    if (!isActiveAuction || !auctionEndDate) return;
+    const tick = () => {
+      const now = Date.now();
+      setAuctionNow(now);
+      lastUpdateRef.current = now;
+    };
+    // Update immediately
+    tick();
+    // Update every second when visible, every 10 seconds when hidden (to keep it accurate)
+    const id = window.setInterval(() => {
+      const isVisible = document.visibilityState === 'visible';
+      const now = Date.now();
+      if (isVisible) {
+        tick();
+      } else {
+        // Update less frequently when hidden, but still update to keep it accurate
+        if (now - lastUpdateRef.current >= 10000) { // Update every 10 seconds when hidden
+          tick();
+        }
+      }
+    }, 1000);
+    
+    // Also update when page becomes visible again (to catch up after tab switch)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        tick();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isActiveAuction, auctionEndDate]);
   
   // Get auction mode for additional context
   const auctionMode = React.useMemo(() => {
@@ -541,10 +583,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       const externalListing = v?.external_listings?.[0];
       if (externalListing) {
         // Check current_bid first (most up-to-date for live auctions)
-        const listingLiveBid = typeof externalListing.current_bid === 'number' 
-          ? externalListing.current_bid 
-          : null;
-        if (listingLiveBid !== null && listingLiveBid > 0) {
+        const listingLiveBid = parseMoneyNumber(externalListing.current_bid);
+        if (listingLiveBid !== null) {
           return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(listingLiveBid);
         }
         // If current_bid is 0 or null, check if there are any bids at all
@@ -556,9 +596,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       }
       
       // Fallback: vehicle.current_bid for active auctions
-      const currentBid = typeof v.current_bid === 'number' && Number.isFinite(v.current_bid) && v.current_bid > 0
-        ? v.current_bid
-        : null;
+      const currentBid = parseMoneyNumber(v.current_bid);
       if (currentBid) {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(currentBid);
       }
@@ -569,9 +607,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     
     // For ended auctions or non-auction cases, show final results
     // Priority: sale price > winning bid > high bid
-    const salePrice = typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0 ? v.sale_price : null;
-    const winningBid = typeof v.winning_bid === 'number' && Number.isFinite(v.winning_bid) && v.winning_bid > 0 ? v.winning_bid : null;
-    const highBid = typeof v.high_bid === 'number' && Number.isFinite(v.high_bid) && v.high_bid > 0 ? v.high_bid : null;
+    const salePrice = parseMoneyNumber(v.sale_price);
+    const winningBid = parseMoneyNumber(v.winning_bid);
+    const highBid = parseMoneyNumber(v.high_bid);
     
     const finalBid = salePrice ?? winningBid ?? highBid;
     if (finalBid) {

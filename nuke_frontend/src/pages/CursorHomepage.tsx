@@ -1520,14 +1520,20 @@ const CursorHomepage: React.FC = () => {
             .from('external_listings')
             .select('vehicle_id, platform, listing_status, current_bid, final_price, start_date, end_date, bid_count, updated_at, listing_url')
             .in('vehicle_id', ids)
-            .in('listing_status', ['active', 'live']) // Only fetch active listings for badge display
+            // Fetch ALL listings with future end dates (not just 'active'/'live' status)
+            // Some scrapers use different status values ('pending', 'scheduled', etc.) for live auctions
+            .gt('end_date', new Date().toISOString())
             .order('updated_at', { ascending: false })
             .limit(2000);
           if (!listErr && Array.isArray(listings)) {
-            // Group all listings by vehicle_id (all are already active/live since we filtered)
+            // Group all listings by vehicle_id and filter for truly active ones (future end_date)
             for (const row of listings as any[]) {
               const vid = String(row?.vehicle_id || '');
               if (!vid) continue;
+              
+              // Double-check end_date is actually in the future (belt and suspenders)
+              const endDate = row.end_date ? new Date(row.end_date).getTime() : 0;
+              if (!Number.isFinite(endDate) || endDate <= Date.now()) continue;
               
               // Add to grouped array (for VehicleCardDense)
               if (!externalListingsByVehicleId.has(vid)) {
@@ -1542,7 +1548,6 @@ const CursorHomepage: React.FC = () => {
             }
             
             // Sort each vehicle's listings array by updated_at (most recent first)
-            // All listings are already active/live, so no need to check status
             for (const [vid, listingsArray] of externalListingsByVehicleId.entries()) {
               listingsArray.sort((a, b) => {
                 return (new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());

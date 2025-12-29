@@ -36,6 +36,18 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
   inspector: 'Inspector'
 };
 
+const parseMoneyNumber = (val: any): number | null => {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'number') return Number.isFinite(val) && val > 0 ? val : null;
+  if (typeof val === 'string') {
+    const cleaned = val.replace(/[^0-9.]/g, '');
+    if (!cleaned) return null;
+    const n = Number(cleaned);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return null;
+};
+
 const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   vehicle,
   isOwner,
@@ -595,16 +607,32 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     
     // 4. Live bid from auction telemetry (external_listings pulse)
     try {
+      // First check auctionPulse (most up-to-date)
       if (auctionPulse?.listing_url) {
         const status = String(auctionPulse.listing_status || '').toLowerCase();
         const isLive = status === 'active' || status === 'live';
         const isSold = status === 'sold';
 
-        if (isSold && typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) {
-          return { amount: (auctionPulse as any).final_price, label: 'SOLD FOR' };
+        const pulseFinal = parseMoneyNumber((auctionPulse as any).final_price);
+        if (isSold && pulseFinal) {
+          return { amount: pulseFinal, label: 'SOLD FOR' };
         }
-        if (isLive && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
-          return { amount: auctionPulse.current_bid, label: 'Current Bid' };
+        const pulseBid = parseMoneyNumber((auctionPulse as any).current_bid);
+        if (isLive && pulseBid) {
+          return { amount: pulseBid, label: 'Current Bid' };
+        }
+      }
+      
+      // Fallback: check external_listings directly from vehicle data
+      const v: any = vehicle as any;
+      const externalListing = v?.external_listings?.[0];
+      if (externalListing) {
+        // Check if listing is truly live by looking at end_date (more reliable than status field)
+        const listingEndDate = externalListing.end_date ? new Date(externalListing.end_date).getTime() : 0;
+        const isLive = Number.isFinite(listingEndDate) && listingEndDate > Date.now();
+        const listingBid = parseMoneyNumber(externalListing.current_bid);
+        if (isLive && listingBid) {
+          return { amount: listingBid, label: 'Current Bid' };
         }
       }
     } catch {
@@ -814,8 +842,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (!Number.isFinite(end)) return null;
     const diff = end - Date.now();
     // Guard against obviously-wrong countdowns (bad imports/backfills).
-    // We’d rather show nothing than lie.
-    const maxReasonable = 14 * 24 * 60 * 60 * 1000;
+    // We'd rather show nothing than lie. Allow up to 60 days for legitimate long auctions.
+    const maxReasonable = 60 * 24 * 60 * 60 * 1000;
     if (diff > maxReasonable) return null;
     if (diff <= 0) return 'Ended';
     const s = Math.floor(diff / 1000);
@@ -828,22 +856,65 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   };
 
   // Live auction timer (header should feel alive)
+  // Check for end_date from auctionPulse OR external_listings OR vehicle-level data
+  const auctionEndDateForTimer = useMemo(() => {
+    // Priority 1: auctionPulse (most up-to-date telemetry)
+    if (auctionPulse?.end_date) return auctionPulse.end_date;
+    // Priority 2: external_listings (if available in vehicle data)
+    const v: any = vehicle as any;
+    const externalListing = v?.external_listings?.[0];
+    if (externalListing?.end_date) return externalListing.end_date;
+    // Priority 3: vehicle-level auction_end_date
+    return v?.auction_end_date || v?.origin_metadata?.auction_times?.auction_end_date || null;
+  }, [auctionPulse?.end_date, vehicle]);
+
   const [auctionNow, setAuctionNow] = useState<number>(() => Date.now());
+  const lastUpdateRef = useRef<number>(Date.now());
   useEffect(() => {
-    if (!auctionPulse?.end_date) return;
-    const tick = () => setAuctionNow(Date.now());
+    if (!auctionEndDateForTimer) return;
+    const tick = () => {
+      const now = Date.now();
+      setAuctionNow(now);
+      lastUpdateRef.current = now;
+    };
+    // Update immediately
+    tick();
+    // Update every second when visible, every 10 seconds when hidden (to keep it accurate)
     const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') tick();
+      const isVisible = document.visibilityState === 'visible';
+      const now = Date.now();
+      if (isVisible) {
+        tick();
+      } else {
+        // Update less frequently when hidden, but still update to keep it accurate
+        if (now - lastUpdateRef.current >= 10000) { // Update every 10 seconds when hidden
+          tick();
+        }
+      }
     }, 1000);
-    return () => window.clearInterval(id);
-  }, [auctionPulse?.end_date]);
+    
+    // Also update when page becomes visible again (to catch up after tab switch)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        tick();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [auctionEndDateForTimer]);
 
   const formatCountdownClock = (iso?: string | null, skipEndedText?: boolean) => {
     if (!iso) return null;
     const end = new Date(iso).getTime();
     if (!Number.isFinite(end)) return null;
     const diff = end - auctionNow;
-    const maxReasonable = 14 * 24 * 60 * 60 * 1000;
+    // For very long auctions (>30 days), show days/hours format instead of full countdown
+    const veryLongThreshold = 30 * 24 * 60 * 60 * 1000;
+    const maxReasonable = 60 * 24 * 60 * 60 * 1000; // Allow up to 60 days
     if (diff > maxReasonable) return null;
     // Don't show redundant "Ended" when SOLD badge is already visible
     if (diff <= 0) return skipEndedText ? null : 'Ended';
@@ -853,38 +924,54 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
     const pad = (n: number) => String(n).padStart(2, '0');
+    // For very long auctions, show simplified format (e.g., "19d 18h")
+    if (diff > veryLongThreshold) {
+      return `${d}d ${h}h`;
+    }
     if (d > 0) return `${d}d ${pad(h)}:${pad(m)}:${pad(s)}`;
     return `${pad(h)}:${pad(m)}:${pad(s)}`;
   };
 
+  // Get the most up-to-date end_date for timer display
+  const timerEndDate = useMemo(() => {
+    // Priority 1: auctionPulse (most up-to-date telemetry)
+    if (auctionPulse?.end_date) return auctionPulse.end_date;
+    // Priority 2: external_listings (if available in vehicle data)
+    const v: any = vehicle as any;
+    const externalListing = v?.external_listings?.[0];
+    if (externalListing?.end_date) return externalListing.end_date;
+    // Priority 3: vehicle-level auction_end_date
+    return v?.auction_end_date || v?.origin_metadata?.auction_times?.auction_end_date || null;
+  }, [auctionPulse?.end_date, vehicle]);
+
   const isAuctionLive = useMemo(() => {
-    if (!auctionPulse?.listing_url) return false;
-    const status = String(auctionPulse.listing_status || '').toLowerCase();
+    const v: any = vehicle as any;
+    const externalListing = v?.external_listings?.[0];
+    const activeListing = auctionPulse || externalListing;
     
-    // If status is explicitly active/live, check end_date
-    if (status === 'active' || status === 'live') {
-      if (!auctionPulse.end_date) {
-        // No end date but status is active/live - assume it's live (some live auctions don't have specific end times)
+    if (!activeListing?.listing_url && !activeListing) return false;
+    
+    // CRITICAL: Trust end_date over status field (scrapers use inconsistent status values)
+    const endDate = activeListing.end_date || timerEndDate;
+    
+    // If we have an end_date, that's the source of truth for "live" status
+    if (endDate) {
+      const end = new Date(endDate).getTime();
+      if (Number.isFinite(end) && end > auctionNow) {
+        // Future end date means it's still live, regardless of status field
         return true;
       }
-      const end = new Date(auctionPulse.end_date).getTime();
-      if (!Number.isFinite(end)) return true; // Invalid date but status says active - assume live
-      return end > auctionNow;
     }
     
-    // If status is not active/live, check if we have a future end_date anyway
-    // (handles cases where status might be 'ended' but auction is actually still running)
-    if (auctionPulse?.end_date) {
-      const end = new Date(auctionPulse.end_date).getTime();
-      if (Number.isFinite(end) && end > auctionNow) {
-        // Future end date means it's still live, regardless of status
-        return true;
-      }
+    // Fallback: check status field only if no reliable end_date
+    const status = String(activeListing.listing_status || '').toLowerCase();
+    if (status === 'active' || status === 'live') {
+      // No end date but status is active/live - assume it's live
+      return true;
     }
     
     // Also check vehicle-level auction_end_date as fallback
     if (vehicle) {
-      const v: any = vehicle as any;
       const vehicleEndDate = v?.auction_end_date || v?.origin_metadata?.auction_times?.auction_end_date;
       if (vehicleEndDate) {
         const end = new Date(vehicleEndDate).getTime();
@@ -902,7 +989,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
     
     return false;
-  }, [auctionPulse, auctionNow, vehicle]);
+  }, [auctionPulse, timerEndDate, auctionNow, vehicle]);
 
   const auctionTelemetryFresh = useMemo(() => {
     const updatedAt = auctionPulse?.updated_at ? new Date(auctionPulse.updated_at as any).getTime() : NaN;
@@ -956,10 +1043,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   }, [vehicle, auctionPulse]);
 
   const auctionPulseMs = useMemo(() => {
-    if (!auctionPulse?.listing_url) return null;
     if (!isAuctionLive) return null;
-    if (!auctionPulse?.end_date) return 3800;
-    const end = new Date(auctionPulse.end_date).getTime();
+    if (!timerEndDate) return 3800;
+    const end = new Date(timerEndDate).getTime();
     if (!Number.isFinite(end)) return 3800;
     const diff = end - auctionNow;
     if (diff <= 0) return null;
@@ -971,7 +1057,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (s <= 2 * 60 * 60) return 2200;
     if (s <= 24 * 60 * 60) return 3200;
     return 4200;
-  }, [auctionPulse?.listing_url, auctionPulse?.end_date, auctionNow, isAuctionLive]);
+  }, [timerEndDate, auctionNow, isAuctionLive]);
 
 
   // Header org pills are tiny; if the same org is linked multiple times (e.g. legacy `consigner` + `sold_by`),
@@ -1216,7 +1302,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const highBid = (vehicle as any)?.high_bid || (vehicle as any)?.winning_bid;
   const priceDisplay = useMemo(() => {
     // HIGHEST PRIORITY: If vehicle has a sale_price, always show it (overrides auction pulse)
-    const vehicleSalePrice = typeof (vehicle as any)?.sale_price === 'number' && (vehicle as any).sale_price > 0 ? (vehicle as any).sale_price : null;
+    const vehicleSalePrice = parseMoneyNumber((vehicle as any)?.sale_price);
     const vehicleSaleDate = (vehicle as any)?.sale_date || saleDate;
     const vehicleIsSold = vehicleSaleDate !== null || 
                          String((vehicle as any)?.sale_status || '').toLowerCase() === 'sold' ||
@@ -1228,23 +1314,33 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
     
     // If we have external auction telemetry, reflect it directly in the header.
-    if (auctionPulse?.listing_url) {
-      const status = String(auctionPulse.listing_status || '').toLowerCase();
-      const isLive = status === 'active' || status === 'live';
+    // Check both auctionPulse and external_listings for the most up-to-date data
+    const v: any = vehicle as any;
+    const externalListing = v?.external_listings?.[0];
+    const activeListing = auctionPulse || externalListing;
+    
+    if (activeListing?.listing_url || activeListing) {
+      // CRITICAL: Use end_date to determine if auction is truly live (more reliable than status field)
+      const endDate = activeListing.end_date;
+      const endTimestamp = endDate ? new Date(endDate).getTime() : 0;
+      const isLive = Number.isFinite(endTimestamp) && endTimestamp > Date.now();
+      
+      const status = String(activeListing.listing_status || '').toLowerCase();
       const isSold = status === 'sold';
-      const isEnded = status === 'ended' || status === 'reserve_not_met';
+      const isEnded = (status === 'ended' || status === 'reserve_not_met') && !isLive; // Only ended if past end_date
+      
+      // Get current_bid from the most up-to-date source
+      const currentBid = parseMoneyNumber((activeListing as any).current_bid);
       
       // Live auction: show current bid (only if vehicle isn't sold)
-      if (isLive && !vehicleIsSold && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
-        return `Bid: ${formatCurrency(auctionPulse.current_bid)}`;
+      if (isLive && !vehicleIsSold && currentBid) {
+        return `Bid: ${formatCurrency(currentBid)}`;
       }
       if (isLive && !vehicleIsSold) return 'BID';
       
       // Sold: show final price (NO "Bid:" prefix) or SOLD badge
       if (isSold) {
-        const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
-          ? (auctionPulse as any).final_price
-          : vehicleSalePrice;
+        const finalPrice = parseMoneyNumber((activeListing as any).final_price) ?? vehicleSalePrice;
         if (finalPrice) {
           // Don't show "Bid:" prefix for sold vehicles - just show the price
           return formatCurrency(finalPrice);
@@ -1254,11 +1350,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       
       // Ended/RNM: show final price, high bid, or sale price if available (NO "Bid:" prefix)
       if (isEnded) {
-        const finalPrice = typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0
-          ? (auctionPulse as any).final_price
-          : null;
-        const winBid = typeof (vehicle as any)?.winning_bid === 'number' && (vehicle as any).winning_bid > 0 ? (vehicle as any).winning_bid : null;
-        const hBid = typeof (vehicle as any)?.high_bid === 'number' && (vehicle as any).high_bid > 0 ? (vehicle as any).high_bid : null;
+        const finalPrice = parseMoneyNumber((activeListing as any).final_price);
+        const winBid = parseMoneyNumber((vehicle as any)?.winning_bid);
+        const hBid = parseMoneyNumber((vehicle as any)?.high_bid);
         
         // Prioritize sale price over bid amounts for ended auctions
         if (vehicleSalePrice) return formatCurrency(vehicleSalePrice);
@@ -1323,11 +1417,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       const status = String(auctionPulse.listing_status || '').toLowerCase();
       const isSold = status === 'sold';
       const isLive = status === 'active' || status === 'live';
-      if (isSold && typeof (auctionPulse as any).final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) {
-        return `Sold price: ${formatCurrency((auctionPulse as any).final_price)}`;
+      const finalPrice = parseMoneyNumber((auctionPulse as any).final_price);
+      if (isSold && finalPrice) {
+        return `Sold price: ${formatCurrency(finalPrice)}`;
       }
-      if (isLive && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0) {
-        return `Current bid: ${formatCurrency(auctionPulse.current_bid)}`;
+      const bid = parseMoneyNumber((auctionPulse as any).current_bid);
+      if (isLive && bid) {
+        return `Current bid: ${formatCurrency(bid)}`;
       }
     }
     if (primaryAmount !== null) return `${priceDescriptor}: ${formatCurrency(primaryAmount)}`;
@@ -1370,12 +1466,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       if (outcome !== 'reserve_not_met') return true;
 
       // Prefer live telemetry when available.
-      if (auctionPulse?.listing_url) {
-        const status = String(auctionPulse.listing_status || '').toLowerCase();
+      const v: any = vehicle as any;
+      const externalListing = v?.external_listings?.[0];
+      const activeListing = auctionPulse || externalListing;
+      
+      if (activeListing?.listing_url || activeListing) {
+        const status = String(activeListing.listing_status || '').toLowerCase();
         if (status === 'reserve_not_met' || status === 'ended' || status === 'sold') return true;
         if (status === 'active' || status === 'live') return false;
-        if (auctionPulse.end_date) {
-          const end = new Date(auctionPulse.end_date).getTime();
+        const endDate = activeListing.end_date || timerEndDate;
+        if (endDate) {
+          const end = new Date(endDate).getTime();
           if (Number.isFinite(end)) return end <= auctionNow;
         }
         return false;
@@ -2163,11 +2264,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 </span>
               ) : null}
               {/* Hide countdown for sold auctions - SOLD badge is enough */}
-              {auctionPulse.end_date && !isSold ? (
+              {timerEndDate && !isSold ? (
                 <span
                   className="badge badge-secondary"
                   style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                  title={auctionPulse.end_date ? `Time remaining: ${formatRemaining(auctionPulse.end_date) || '—'}` : 'Time remaining'}
+                  title={timerEndDate ? `Time remaining: ${formatRemaining(timerEndDate) || '—'}` : 'Time remaining'}
                 >
                   <span
                     className={isAuctionLive ? 'auction-live-dot' : undefined}
@@ -2181,7 +2282,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     }}
                   />
                   <span style={{ fontFamily: 'monospace' }}>
-                    {formatCountdownClock(auctionPulse.end_date) || formatRemaining(auctionPulse.end_date) || '—'}
+                    {formatCountdownClock(timerEndDate) || formatRemaining(timerEndDate) || '—'}
                   </span>
                 </span>
               ) : null}
@@ -2937,7 +3038,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       typeof (vehicle as any)?.reserve_price === 'number' ? (vehicle as any).reserve_price :
                       typeof (auctionPulse as any)?.metadata?.reserve_price === 'number' ? (auctionPulse as any).metadata.reserve_price :
                       null;
-                    const currentBid = typeof auctionPulse.current_bid === 'number' ? auctionPulse.current_bid : null;
+                    const currentBid = auctionPulse && typeof auctionPulse.current_bid === 'number' ? auctionPulse.current_bid : null;
                     const isRNM = reservePrice && currentBid && currentBid < reservePrice;
                     
                     return (

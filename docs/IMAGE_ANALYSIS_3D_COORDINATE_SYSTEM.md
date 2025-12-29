@@ -431,11 +431,12 @@ ORDER BY v.year, v.make;
 
 ## Next Steps
 
-1. **Get Gemini API key** and add to Supabase secrets
-2. **Implement Gemini integration** in analyze-image function
-3. **Test on 100 images** and compare quality to GPT
-4. **Run batch processing** on all 334k images (~$33)
-5. **Update frontend** to display new fields
+1. ~~**Get Gemini API key** and add to Supabase secrets~~ ✅ Done (`free_api_key`)
+2. ~~**Implement Gemini integration** in analyze-image function~~ ✅ Done
+3. **Fix Gemini model name** - See `docs/GEMINI_INTEGRATION_STATUS.md`
+4. **Test on 100 images** and compare quality to GPT
+5. **Run batch processing** on all 334k images (~$33)
+6. **Update frontend** to display new fields
 
 ---
 
