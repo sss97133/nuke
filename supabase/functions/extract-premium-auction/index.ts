@@ -1751,6 +1751,113 @@ function extractMecumLotHeader(html: string): { lot_number: string | null; date:
 }
 
 /**
+ * Extract structured sections from Mecum listing HTML
+ * Extracts HIGHLIGHTS (bullet list), THE STORY (narrative), and full description
+ * DOM paths provided:
+ * - HIGHLIGHTS: div.Group_group__fEouc > ul.List_list__xS3rG > li items
+ * - THE STORY: div.Group_group__fEouc > div.ExpandShowMore_expandShowMore__bF34c > p elements
+ */
+function extractMecumStructuredSections(html: string): {
+  highlights: string[];
+  story: string;
+  description: string;
+} {
+  const result = {
+    highlights: [] as string[],
+    story: '',
+    description: '',
+  };
+  
+  try {
+    const h = String(html || '');
+    
+    // Extract HIGHLIGHTS section
+    // Look for the section with "HIGHLIGHTS" heading followed by a list
+    const highlightsMatch = h.match(/<h2[^>]*data-text=["']HIGHLIGHTS["'][^>]*>[\s\S]*?<\/h2>\s*<ul[^>]*class=["'][^"']*List_list[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i);
+    if (highlightsMatch && highlightsMatch[1]) {
+      const listContent = highlightsMatch[1];
+      const liMatches = listContent.matchAll(/<li[^>]*>([^<]+(?:<[^>]+>[^<]+<\/[^>]+>)*[^<]*)<\/li>/gi);
+      for (const liMatch of liMatches) {
+        const text = liMatch[1]
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (text.length > 10) {
+          result.highlights.push(text);
+        }
+      }
+    }
+    
+    // Extract THE STORY section
+    // Look for the section with "THE STORY" heading followed by paragraphs
+    const storyMatch = h.match(/<h2[^>]*data-text=["']THE STORY["'][^>]*>[\s\S]*?<\/h2>\s*<div[^>]*class=["'][^"']*ExpandShowMore[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*(?:<\/div>|<hr)/i);
+    if (storyMatch && storyMatch[1]) {
+      const storyContent = storyMatch[1];
+      const paragraphs: string[] = [];
+      const pMatches = storyContent.matchAll(/<p[^>]*class=["'][^"']*RichText_richtext[^"']*["'][^>]*>([\s\S]*?)<\/p>/gi);
+      for (const pMatch of pMatches) {
+        const text = pMatch[1]
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (text.length > 20) {
+          paragraphs.push(text);
+        }
+      }
+      result.story = paragraphs.join('\n\n');
+    }
+    
+    // Also try alternative patterns for story (without class selectors)
+    if (!result.story) {
+      const storyAltMatch = h.match(/data-text=["']THE STORY["'][^>]*>[\s\S]*?<\/h2>[\s\S]*?(<p[^>]*>[\s\S]*?<\/p>(?:\s*<p[^>]*>[\s\S]*?<\/p>)*)/i);
+      if (storyAltMatch && storyAltMatch[1]) {
+        const paragraphs: string[] = [];
+        const pMatches = storyAltMatch[1].matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi);
+        for (const pMatch of pMatches) {
+          const text = pMatch[1]
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (text.length > 20 && !text.toLowerCase().includes('read more') && !text.toLowerCase().includes('read less')) {
+            paragraphs.push(text);
+          }
+        }
+        result.story = paragraphs.join('\n\n');
+      }
+    }
+    
+    // Build full description from highlights + story
+    if (result.highlights.length > 0 || result.story) {
+      const parts: string[] = [];
+      if (result.highlights.length > 0) {
+        parts.push('HIGHLIGHTS:\n• ' + result.highlights.join('\n• '));
+      }
+      if (result.story) {
+        parts.push('THE STORY:\n' + result.story);
+      }
+      result.description = parts.join('\n\n');
+    }
+    
+    return result;
+  } catch (e: any) {
+    console.warn(`Mecum structured sections extraction error: ${e?.message || String(e)}`);
+    return result;
+  }
+}
+
+/**
  * Extract sold price from Mecum listing HTML using DOM parsing
  * Based on user-provided DOM paths for sold listings
  * CRITICAL: Excludes lot header elements (lot number, date, location) to avoid false matches
@@ -2856,6 +2963,9 @@ async function storeVehiclesInDatabase(
             images: Array.isArray(vehicle.images) ? vehicle.images : [],
             image_urls: Array.isArray(vehicle.images) ? vehicle.images : [],
             structured_sections: vehicle.structured_sections || {},
+            // Store highlights and story from Mecum extraction
+            highlights: Array.isArray(vehicle.highlights) ? vehicle.highlights : [],
+            story: typeof vehicle.story === 'string' ? vehicle.story : null,
             bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : [],
             comments: Array.isArray(vehicle.comments) ? vehicle.comments : [],
             bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : [],
@@ -2899,6 +3009,9 @@ async function storeVehiclesInDatabase(
             images: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.images || []),
             image_urls: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.image_urls || []),
             structured_sections: vehicle.structured_sections || existingOriginMetadata.structured_sections || {},
+            // Store highlights and story from Mecum extraction
+            highlights: Array.isArray(vehicle.highlights) ? vehicle.highlights : (existingOriginMetadata.highlights || []),
+            story: typeof vehicle.story === 'string' ? vehicle.story : (existingOriginMetadata.story || null),
             bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : (existingOriginMetadata.bid_history || []),
             comments: Array.isArray(vehicle.comments) ? vehicle.comments : (existingOriginMetadata.comments || []),
             bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : (existingOriginMetadata.bidders || []),
@@ -2969,6 +3082,9 @@ async function storeVehiclesInDatabase(
             images: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.images || []),
             image_urls: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.image_urls || []),
             structured_sections: vehicle.structured_sections || existingOriginMetadata.structured_sections || {},
+            // Store highlights and story from Mecum extraction
+            highlights: Array.isArray(vehicle.highlights) ? vehicle.highlights : (existingOriginMetadata.highlights || []),
+            story: typeof vehicle.story === 'string' ? vehicle.story : (existingOriginMetadata.story || null),
             bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : (existingOriginMetadata.bid_history || []),
             comments: Array.isArray(vehicle.comments) ? vehicle.comments : (existingOriginMetadata.comments || []),
             bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : (existingOriginMetadata.bidders || []),
@@ -4282,6 +4398,18 @@ async function extractMecum(url: string, maxVehicles: number) {
         }
       }
 
+      // Extract structured sections (HIGHLIGHTS, THE STORY) from HTML
+      let structuredSections: { highlights: string[]; story: string; description: string } = { highlights: [], story: '', description: '' };
+      if (html) {
+        structuredSections = extractMecumStructuredSections(html);
+        if (structuredSections.highlights.length > 0) {
+          console.log(`Extracted ${structuredSections.highlights.length} highlights`);
+        }
+        if (structuredSections.story) {
+          console.log(`Extracted story (${structuredSections.story.length} chars)`);
+        }
+      }
+
       // Merge sold price: prioritize DOM extraction over Firecrawl (more reliable for sold listings)
       const finalSalePrice = domSoldPrice || vehicle?.sale_price || null;
 
@@ -4289,6 +4417,9 @@ async function extractMecum(url: string, maxVehicles: number) {
       const finalLotNumber = lotHeaderData.lot_number || vehicle?.lot_number || null;
       const finalLocation = lotHeaderData.location || vehicle?.location || null;
       const finalSaleDate = lotHeaderData.date || vehicle?.sale_date || null;
+      
+      // Use DOM-extracted description if available (more complete than Firecrawl LLM extraction)
+      const finalDescription = structuredSections.description || vehicle?.description || null;
 
       return {
         ...vehicle,
@@ -4298,6 +4429,9 @@ async function extractMecum(url: string, maxVehicles: number) {
         lot_number: finalLotNumber, // Use DOM-extracted lot number if available
         location: finalLocation, // Use DOM-extracted location if available
         sale_date: finalSaleDate, // Use DOM-extracted date if available
+        description: finalDescription, // Use DOM-extracted full description if available
+        highlights: structuredSections.highlights.length > 0 ? structuredSections.highlights : undefined,
+        story: structuredSections.story || undefined,
       };
     } catch (e: any) {
       issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);
