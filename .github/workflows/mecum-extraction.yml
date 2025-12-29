@@ -1,0 +1,53 @@
+name: Mecum Auction Extraction
+
+on:
+  schedule:
+    # Run every 2 hours during active extraction period
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      auction:
+        description: 'Auction code (FL26, LV26, all, etc.)'
+        required: false
+        default: 'FL26'
+      limit:
+        description: 'Max vehicles per run'
+        required: false
+        default: '50'
+
+jobs:
+  extract-mecum:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Kissimmee 2026 Extraction
+        run: |
+          echo "Starting Mecum Kissimmee 2026 extraction..."
+          curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/extract-premium-auction" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -d '{
+              "url": "https://www.mecum.com/auctions/kissimmee-2026/lots/",
+              "max_listings": ${{ github.event.inputs.limit || 50 }}
+            }' --max-time 300 || echo "Request timed out or failed"
+          
+          echo "Waiting 30s before next auction..."
+          sleep 30
+
+      - name: Las Vegas Motorcycles 2026 Extraction
+        run: |
+          echo "Starting Las Vegas Motorcycles 2026 extraction..."
+          curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/extract-premium-auction" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -d '{
+              "url": "https://www.mecum.com/auctions/las-vegas-motorcycles-2026/lots/",
+              "max_listings": ${{ github.event.inputs.limit || 50 }}
+            }' --max-time 300 || echo "Request timed out or failed"
+
+      - name: Log extraction summary
+        run: |
+          echo "Extraction batch completed at $(date)"
+          echo "Next scheduled run in 2 hours"
+
