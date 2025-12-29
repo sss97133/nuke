@@ -68,7 +68,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   const [editing, setEditing] = useState(false);
   const [newValue, setNewValue] = useState(value);
   const [evidence, setEvidence] = useState<any[]>([]);
-  const [batAuctionInfo, setBatAuctionInfo] = useState<{ url?: string; lot_number?: string; sale_date?: string } | null>(null);
+  const [batAuctionInfo, setBatAuctionInfo] = useState<{ platform?: string; platform_name?: string; url?: string; lot_number?: string; sale_date?: string } | null>(null);
   const [buyerProfileLink, setBuyerProfileLink] = useState<{ url: string; isExternal: boolean } | null>(null);
   const [marketData, setMarketData] = useState<{ prices: number[]; mean: number; stdDev: number } | null>(null);
   
@@ -180,17 +180,25 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
       
-      // Check external_listings and auction_events for sale_price from BAT auctions
-      let batAuctionInfo: any = null;
+      // Check external_listings and auction_events for sale_price from auctions
+      let auctionInfo: any = null;
       let auctionMetrics: { buyer_name?: string; seller_username?: string; seller_profile_url?: string; bid_count?: number; view_count?: number; watcher_count?: number } = {};
       
       if (field === 'sale_price' && (vehicle?.bat_auction_url || vehicle?.discovery_url)) {
-        // Check auction_events first (most reliable source for BaT lot numbers)
+        // Detect platform from discovery_url
+        const discoveryUrl = vehicle?.discovery_url || vehicle?.bat_auction_url || '';
+        let detectedPlatform = 'bat';
+        if (discoveryUrl.includes('mecum.com')) detectedPlatform = 'mecum';
+        else if (discoveryUrl.includes('barrett-jackson')) detectedPlatform = 'barrett-jackson';
+        else if (discoveryUrl.includes('carsandbids.com')) detectedPlatform = 'carsandbids';
+        else if (discoveryUrl.includes('bonhams.com')) detectedPlatform = 'bonhams';
+        else if (discoveryUrl.includes('rmsothebys.com')) detectedPlatform = 'rmsothebys';
+        
+        // Check auction_events first (most reliable source for lot numbers)
         const { data: auctionEvent } = await supabase
           .from('auction_events')
           .select('metadata, auction_end_at')
           .eq('vehicle_id', vehicleId)
-          .eq('platform', 'bat')
           .order('auction_end_at', { ascending: false, nullsLast: true })
           .limit(1)
           .maybeSingle();
@@ -198,12 +206,14 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         // Check external_listings for comprehensive auction data
         const { data: listing } = await supabase
           .from('external_listings')
-          .select('sold_at, metadata, bid_count, view_count, watcher_count')
+          .select('platform, sold_at, metadata, bid_count, view_count, watcher_count, listing_url')
           .eq('vehicle_id', vehicleId)
-          .eq('platform', 'bat')
           .order('sold_at', { ascending: false, nullsLast: true })
           .limit(1)
           .maybeSingle();
+        
+        // Use listing platform if available, otherwise use detected
+        const platform = listing?.platform || detectedPlatform;
         
         // Also check timeline_events for sale event
         const { data: saleEvent } = await supabase
@@ -217,11 +227,20 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         
         const saleDate = listing?.sold_at || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date;
         
-        // Extract lot number from multiple possible sources (prioritize metadata.lot_number which has full number)
-        // DO NOT use listing_id as fallback - it's an internal ID, not the BaT lot number
+        // Extract lot number from URL for non-BaT platforms
+        const lotNumberFromUrl = (() => {
+          if (platform === 'mecum') {
+            const match = (listing?.listing_url || discoveryUrl).match(/\/lots\/(\d+)\//);
+            return match ? match[1] : null;
+          }
+          return null;
+        })();
+        
+        // Extract lot number from multiple possible sources
         const lotNumber = auctionEvent?.metadata?.lot_number ||
                          listing?.metadata?.lot_number || 
                          saleEvent?.metadata?.lot_number ||
+                         lotNumberFromUrl ||
                          null;
         
         // Extract seller username from multiple sources
@@ -233,17 +252,29 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                               (vehicle as any)?.bat_seller ||
                               null;
         
-        // Construct seller profile URL if we have username
-        const sellerProfileUrl = sellerUsername 
+        // Construct seller profile URL based on platform
+        const sellerProfileUrl = platform === 'bat' && sellerUsername
           ? `https://bringatrailer.com/member/${sellerUsername}/`
           : (listing?.metadata?.seller_profile_url || 
              saleEvent?.metadata?.seller_profile_url ||
              (vehicle as any)?.origin_metadata?.bat_seller_profile_url ||
              null);
         
+        // Platform display names
+        const platformNames: Record<string, string> = {
+          'bat': 'Bring a Trailer',
+          'mecum': 'Mecum Auctions',
+          'barrett-jackson': 'Barrett-Jackson',
+          'carsandbids': 'Cars & Bids',
+          'bonhams': 'Bonhams',
+          'rmsothebys': 'RM Sotheby\'s',
+        };
+        
         if (listing || saleEvent || saleDate) {
-          batAuctionInfo = {
-            url: vehicle.bat_auction_url || vehicle?.discovery_url,
+          auctionInfo = {
+            platform: platform,
+            platform_name: platformNames[platform] || platform,
+            url: listing?.listing_url || vehicle.bat_auction_url || vehicle?.discovery_url,
             lot_number: lotNumber,
             sale_date: saleDate
           };
@@ -258,8 +289,8 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             watcher_count: listing?.watcher_count
           };
           
-          // Check if buyer has linked N-Zero profile
-          if (auctionMetrics.buyer_name && field === 'sale_price') {
+          // Check if buyer has linked N-Zero profile (only for BaT for now)
+          if (auctionMetrics.buyer_name && field === 'sale_price' && platform === 'bat') {
             const { data: buyerIdentity } = await supabase
               .from('external_identities')
               .select('claimed_by_user_id, profile_url')
@@ -268,10 +299,8 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               .maybeSingle();
             
             if (buyerIdentity?.claimed_by_user_id) {
-              // They have a linked N-Zero profile
               setBuyerProfileLink({ url: `/profile/${buyerIdentity.claimed_by_user_id}`, isExternal: false });
             } else {
-              // Keep navigation internal: route to claim-identity (BaT profile remains available as proof elsewhere)
               const batProfileUrl = buyerIdentity?.profile_url || `https://bringatrailer.com/member/${auctionMetrics.buyer_name}/`;
               const internal = `/claim-identity?platform=bat&handle=${encodeURIComponent(auctionMetrics.buyer_name)}&profileUrl=${encodeURIComponent(batProfileUrl)}`;
               setBuyerProfileLink({ url: internal, isExternal: false });
@@ -287,8 +316,8 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       if (evidenceData && evidenceData.length > 0) {
         const latest = evidenceData[0];
         let sourceLabel = latest.source_type;
-        if (batAuctionInfo && field === 'sale_price') {
-          sourceLabel = `Bring a Trailer${batAuctionInfo.lot_number ? ` (Lot #${batAuctionInfo.lot_number})` : ''}`;
+        if (auctionInfo && field === 'sale_price') {
+          sourceLabel = `${auctionInfo.platform_name}${auctionInfo.lot_number ? ` (Lot #${auctionInfo.lot_number})` : ''}`;
         }
         
         setProvenance({
@@ -299,9 +328,9 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           inserted_at: latest.created_at,
           evidence_count: evidenceData.length,
           can_edit: user?.id === latest.profiles?.id,
-          bat_url: batAuctionInfo?.url,
-          lot_number: batAuctionInfo?.lot_number,
-          sale_date: batAuctionInfo?.sale_date,
+          bat_url: auctionInfo?.url,
+          lot_number: auctionInfo?.lot_number,
+          sale_date: auctionInfo?.sale_date,
           buyer_name: auctionMetrics.buyer_name,
           seller_username: auctionMetrics.seller_username,
           seller_profile_url: auctionMetrics.seller_profile_url,
@@ -309,20 +338,20 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           view_count: auctionMetrics.view_count,
           watcher_count: auctionMetrics.watcher_count
         });
-        if (batAuctionInfo) setBatAuctionInfo(batAuctionInfo);
-      } else if (batAuctionInfo && field === 'sale_price') {
-        // No evidence but we have BAT auction info - use that as source
+        if (auctionInfo) setBatAuctionInfo(auctionInfo);
+      } else if (auctionInfo && field === 'sale_price') {
+        // No evidence but we have auction info - use that as source
         setProvenance({
-          source: `Bring a Trailer${batAuctionInfo.lot_number ? ` (Lot #${batAuctionInfo.lot_number})` : ''}`,
+          source: `${auctionInfo.platform_name}${auctionInfo.lot_number ? ` (Lot #${auctionInfo.lot_number})` : ''}`,
           confidence: 100,
           inserted_by: 'system',
           inserted_by_name: 'System (auction telemetry)',
-          inserted_at: batAuctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString(),
+          inserted_at: auctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString(),
           evidence_count: 1,
           can_edit: false,
-          bat_url: batAuctionInfo.url,
-          lot_number: batAuctionInfo.lot_number,
-          sale_date: batAuctionInfo.sale_date,
+          bat_url: auctionInfo.url,
+          lot_number: auctionInfo.lot_number,
+          sale_date: auctionInfo.sale_date,
           buyer_name: auctionMetrics.buyer_name,
           seller_username: auctionMetrics.seller_username,
           seller_profile_url: auctionMetrics.seller_profile_url,
@@ -330,14 +359,14 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           view_count: auctionMetrics.view_count,
           watcher_count: auctionMetrics.watcher_count
         });
-        setBatAuctionInfo(batAuctionInfo);
-        // Add BAT info as evidence
+        setBatAuctionInfo(auctionInfo);
+        // Add auction info as evidence
         setEvidence([{
-          source_type: 'bat_auction',
+          source_type: `${auctionInfo.platform}_auction`,
           proposed_value: value.toString(),
           source_confidence: 100,
-          extraction_context: `Auction URL: ${batAuctionInfo.url}`,
-          created_at: batAuctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString()
+          extraction_context: `Auction URL: ${auctionInfo.url}`,
+          created_at: auctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString()
         }]);
       } else {
         // No evidence - check who last updated vehicle
@@ -434,7 +463,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
     if (
       status === 'sold' &&
       (platform === 'bat' || (context?.listing_url || '').includes('bringatrailer.com')) &&
-      (context?.evidence_url || batAuctionInfo?.url)
+      (context?.evidence_url || provenance?.bat_url || batAuctionInfo?.url)
     ) {
       return true;
     }
@@ -595,7 +624,8 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                   const platform = String(context?.platform || '').toLowerCase();
                   if (platform === 'bat') {
                     const lotNumber = provenance?.lot_number || batAuctionInfo?.lot_number;
-                    return lotNumber ? `Bring a Trailer (Lot #${lotNumber})` : 'Bring a Trailer';
+                    const platformName = batAuctionInfo?.platform_name || 'Bring a Trailer';
+                    return lotNumber ? `${platformName} (Lot #${lotNumber})` : platformName;
                   }
                   // Check if provenance source already includes lot number
                   const sourceText = provenance ? getSourceLabel(provenance.source) : 'Unknown';

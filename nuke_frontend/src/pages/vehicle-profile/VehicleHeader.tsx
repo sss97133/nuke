@@ -246,19 +246,28 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           return;
         }
 
-        // Find the first listing with a future start_date or end_date
+        // Find the first listing with a future date (start_date, end_date, or metadata.sale_date)
         const futureListing = (data || []).find((listing: any) => {
+          const nowMs = Date.now();
+          
           // Check start_date first (auction start)
           if (listing.start_date) {
             const startDate = new Date(listing.start_date).getTime();
-            if (Number.isFinite(startDate) && startDate > Date.now()) {
+            if (Number.isFinite(startDate) && startDate > nowMs) {
               return true;
             }
           }
           // Check end_date (auction end)
           if (listing.end_date) {
             const endDate = new Date(listing.end_date).getTime();
-            if (Number.isFinite(endDate) && endDate > Date.now()) {
+            if (Number.isFinite(endDate) && endDate > nowMs) {
+              return true;
+            }
+          }
+          // Check metadata.sale_date (Mecum and other auction houses store dates here)
+          if (listing.metadata?.sale_date) {
+            const saleDate = new Date(listing.metadata.sale_date).getTime();
+            if (Number.isFinite(saleDate) && saleDate > nowMs) {
               return true;
             }
           }
@@ -1278,18 +1287,19 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
 
     // Check for future auction date - if we have one and would show "Set a price", show the auction date instead
     if (futureAuctionListing && primaryAmount === null && !isRNM && !isSold) {
-      const auctionDate = futureAuctionListing.start_date || futureAuctionListing.end_date;
+      // Check start_date, end_date, or metadata.sale_date
+      const auctionDate = futureAuctionListing.start_date || 
+                          futureAuctionListing.end_date || 
+                          futureAuctionListing.metadata?.sale_date;
       if (auctionDate) {
         const dateTime = new Date(auctionDate).getTime();
         if (Number.isFinite(dateTime) && dateTime > Date.now()) {
-          // Format date nicely (e.g., "Jan 15, 2025")
+          // Format date as compact "JAN 17" badge style
           try {
-            const formatted = new Intl.DateTimeFormat('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric'
-            }).format(new Date(auctionDate));
-            return formatted;
+            const d = new Date(auctionDate);
+            const month = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+            const day = d.getDate();
+            return `${month} ${day}`;
           } catch {
             // Fall through to default
           }
@@ -1919,7 +1929,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     </p>
                     {ownerGuess.from && (
                       <p style={{ margin: '0 0 8px 0', fontSize: '6pt', color: 'var(--text-muted)' }}>
-                        Purchased from @{ownerGuess.from}
+                        Purchased from{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowOwnerClaimDropdown(false);
+                            navigate(`/org/${ownerGuess.from?.toLowerCase().replace(/\s+/g, '-')}`);
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: 0,
+                            color: 'var(--primary)',
+                            cursor: 'pointer',
+                            fontFamily: 'monospace',
+                            fontSize: '6pt',
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          @{ownerGuess.from}
+                        </button>
                       </p>
                     )}
                     <p style={{ margin: '0 0 8px 0', fontWeight: 'bold' }}>
@@ -1974,6 +2004,22 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             const isCarsAndBidsOrigin = String((vehicle as any)?.discovery_url || '').toLowerCase().includes('carsandbids.com');
             // Hide seller badge if Cars & Bids platform badge OR origin badge is showing Cars & Bids
             if (isCarsAndBidsConsigner && (isCarsAndBidsPulse || isCarsAndBidsOrigin)) return null;
+            
+            // Hide consigner badge entirely when org avatar is showing the same org
+            // The circular avatar is cleaner - no need for redundant text badge that drives traffic offsite
+            const sellerLabelLower = sellerBadge.label?.toLowerCase() || '';
+            const hasMatchingOrgAvatar = visibleOrganizations.some((org: any) => {
+              const orgName = String(org?.business_name || '').toLowerCase();
+              if (!orgName || !sellerLabelLower) return false;
+              // Match if org name contains first word of seller label or vice versa
+              const sellerFirstWord = sellerLabelLower.replace(/\s+auctions?$/i, '').split(/\s+/)[0];
+              const orgFirstWord = orgName.replace(/\s+auctions?$/i, '').split(/\s+/)[0];
+              return sellerFirstWord && orgFirstWord && (
+                orgFirstWord.includes(sellerFirstWord) || 
+                sellerFirstWord.includes(orgFirstWord)
+              );
+            });
+            if (hasMatchingOrgAvatar) return null;
             
             return (sellerBadge as any)?.href ? (
               <Link
@@ -2236,6 +2282,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             const isCarsAndBidsPulse = String(auctionPulse?.platform || '').toLowerCase() === 'cars_and_bids' || 
                                        String(auctionPulse?.platform || '').toLowerCase() === 'carsandbids';
             if (isCarsAndBidsOrigin && isCarsAndBidsPulse) return null;
+            
+            // Hide external link badge for live auction house listings - keep traffic on-site
+            // Users should use our proxy bidding service, not navigate to auction sites directly
+            const isLiveAuctionHouseListing = 
+              discoveryUrl.includes('mecum.com') ||
+              discoveryUrl.includes('barrett-jackson.com') ||
+              discoveryUrl.includes('barrettjackson.com') ||
+              discoveryUrl.includes('bonhams.com') ||
+              discoveryUrl.includes('rmsothebys.com') ||
+              discoveryUrl.includes('gooding') ||
+              discoveryUrl.includes('worldwide-auctioneers');
+            if (isLiveAuctionHouseListing) return null;
             
             return (
               <span 
@@ -3366,7 +3424,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             vehicleId={vehicle.id}
             listingUrl={futureAuctionListing.listing_url}
             platform={futureAuctionListing.platform}
-            auctionDate={futureAuctionListing.start_date || futureAuctionListing.end_date}
+            auctionDate={futureAuctionListing.start_date || futureAuctionListing.end_date || futureAuctionListing.metadata?.sale_date}
             onClose={() => setShowFollowAuctionCard(false)}
           />
         </div>

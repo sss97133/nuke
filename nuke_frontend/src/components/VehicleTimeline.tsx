@@ -458,12 +458,92 @@ const VehicleTimeline: React.FC<{
         // ignore auto-open failures
       }
 
+      // Load future auction listings to show as scheduled events in the timeline
+      let futureAuctionEvents: any[] = [];
+      try {
+        // Query all listings for this vehicle - we'll filter for future dates on frontend
+        // Don't filter by status since listings can be incorrectly marked as 'ended'
+        const { data: futureListings } = await supabase
+          .from('external_listings')
+          .select('id, platform, listing_url, start_date, end_date, listing_status, metadata')
+          .eq('vehicle_id', vehicleId)
+          .order('start_date', { ascending: true, nullsFirst: false })
+          .limit(10);
+
+        const nowMs = Date.now();
+        
+        // Convert future auctions to timeline event format
+        futureAuctionEvents = (futureListings || [])
+          .filter((listing: any) => {
+            // Use start_date/end_date from columns, or fallback to metadata.sale_date
+            const startDate = listing.start_date ? new Date(listing.start_date).getTime() : 
+                              listing.metadata?.sale_date ? new Date(listing.metadata.sale_date).getTime() : null;
+            const endDate = listing.end_date ? new Date(listing.end_date).getTime() : 
+                            listing.metadata?.sale_date ? new Date(listing.metadata.sale_date).getTime() : null;
+            return (startDate && startDate > nowMs) || (endDate && endDate > nowMs);
+          })
+          .map((listing: any) => {
+            // Build event name from location or platform
+            const location = listing.metadata?.location;
+            const eventName = listing.metadata?.event_name || 
+                              listing.metadata?.auction_name || 
+                              (location ? `${listing.platform ? listing.platform.charAt(0).toUpperCase() + listing.platform.slice(1) : ''} ${location}`.trim() : null) ||
+                              `${listing.platform ? listing.platform.charAt(0).toUpperCase() + listing.platform.slice(1) : 'Upcoming'} Auction`;
+            const lotNumber = listing.metadata?.lot_number;
+            const estimateLow = listing.metadata?.estimate_low;
+            const estimateHigh = listing.metadata?.estimate_high;
+            
+            // Get auction date from columns or fallback to metadata
+            const auctionDate = listing.start_date || listing.end_date || listing.metadata?.sale_date;
+            
+            return {
+              id: `future-auction-${listing.id}`,
+              vehicle_id: vehicleId,
+              event_type: 'scheduled_auction',
+              event_date: auctionDate,
+              title: `Scheduled: ${eventName}`,
+              description: lotNumber 
+                ? `Lot #${lotNumber}${estimateLow || estimateHigh ? ` | Est: $${(estimateLow || 0).toLocaleString()} - $${(estimateHigh || 0).toLocaleString()}` : ''}`
+                : 'Upcoming auction',
+              metadata: {
+                platform: listing.platform,
+                listing_url: listing.listing_url,
+                is_future: true,
+                lot_number: lotNumber,
+                estimate_low: estimateLow,
+                estimate_high: estimateHigh,
+                ...listing.metadata
+              },
+              __table: 'future_auction'
+            };
+          });
+        
+        if (futureAuctionEvents.length > 0) {
+          console.log(`Found ${futureAuctionEvents.length} upcoming auction event(s)`);
+        }
+      } catch (err) {
+        console.error('Error loading future auctions:', err);
+      }
+
       if (timelineError) {
         console.error('Error loading timeline events:', timelineError);
         setError(timelineError?.message || 'Failed to load timeline events');
-        setEvents([]);
+        setEvents(futureAuctionEvents.length > 0 ? futureAuctionEvents : []);
       } else {
         let merged: any[] = (timelineData || []).map((e: any) => ({ ...e, __table: 'timeline_events' }));
+        
+        // Add future auction events to the timeline
+        if (futureAuctionEvents.length > 0) {
+          merged = [...futureAuctionEvents, ...merged];
+          
+          // Also add future auction dates to the activity map so they show in calendar
+          for (const ev of futureAuctionEvents) {
+            if (ev.event_date) {
+              const dateKey = toDateOnly(ev.event_date);
+              activityDateMap.set(dateKey, (activityDateMap.get(dateKey) || 0) + 1);
+            }
+          }
+        }
 
         // ✅ PHOTOS ARE NOT EVENTS
         // But photo dates ARE loaded separately for the calendar heatmap
@@ -487,17 +567,29 @@ const VehicleTimeline: React.FC<{
         });
         
         if (Object.keys(yearCounts).length > 0) {
-          // Sort by activity count (most active year first), then by year (most recent first)
-          const sortedYears = Object.entries(yearCounts)
-            .sort(([yearA, countA], [yearB, countB]) => {
-              if (countB !== countA) return countB - countA;
-              return Number(yearB) - Number(yearA);
-            })
-            .map(([year]) => Number(year));
+          // Check if there are future scheduled events - prioritize showing those years
+          const futureYears = futureAuctionEvents
+            .filter(ev => ev.event_date)
+            .map(ev => yearFromDateOnly(toDateOnly(ev.event_date)));
           
-          // Always set to the year with the most activity (events + photos + auction)
-          setSelectedYear(sortedYears[0]);
-          console.log(`Setting timeline to year ${sortedYears[0]} with ${yearCounts[sortedYears[0]]} items (events + photos + auction)`);
+          // If there's a future auction, prioritize that year
+          if (futureYears.length > 0) {
+            const nearestFutureYear = Math.min(...futureYears);
+            setSelectedYear(nearestFutureYear);
+            console.log(`Setting timeline to year ${nearestFutureYear} (has scheduled auction)`);
+          } else {
+            // Sort by activity count (most active year first), then by year (most recent first)
+            const sortedYears = Object.entries(yearCounts)
+              .sort(([yearA, countA], [yearB, countB]) => {
+                if (countB !== countA) return countB - countA;
+                return Number(yearB) - Number(yearA);
+              })
+              .map(([year]) => Number(year));
+            
+            // Always set to the year with the most activity (events + photos + auction)
+            setSelectedYear(sortedYears[0]);
+            console.log(`Setting timeline to year ${sortedYears[0]} with ${yearCounts[sortedYears[0]]} items (events + photos + auction)`);
+          }
         }
       }
     } catch (error) {
@@ -532,7 +624,8 @@ const VehicleTimeline: React.FC<{
       insurance: 'badge-warning',
       general: 'badge-secondary',
       custom: 'badge-dark',
-      life: 'badge-info'
+      life: 'badge-info',
+      scheduled_auction: 'badge-primary'
     };
     return eventTypeColors[eventType] || 'badge-secondary';
   };
@@ -1376,9 +1469,17 @@ const VehicleTimeline: React.FC<{
                   const isCreator = ev.metadata?.who?.user_id === currentUser?.id;
                   const isEditing = editingEvent === ev.id;
                   const isAuctionEvent = String(ev.event_type || '').toLowerCase().startsWith('auction_');
+                  const isFutureAuction = ev.event_type === 'scheduled_auction' || ev.metadata?.is_future === true;
                   
                   return (
-                    <div key={ev.id} className="alert alert-default" style={{ cursor: 'pointer' }} onClick={() => {
+                    <div key={ev.id} className="alert alert-default" style={{ 
+                      cursor: 'pointer',
+                      ...(isFutureAuction ? {
+                        borderStyle: 'dashed',
+                        borderColor: '#3b82f6',
+                        background: 'var(--blue-50, #eff6ff)',
+                      } : {})
+                    }} onClick={() => {
                       // Open receipt directly, not image popup
                       setSelectedEventForDetail(ev.id);
                     }}>
@@ -1422,11 +1523,25 @@ const VehicleTimeline: React.FC<{
                             <>
                               {(() => {
                                 const isPhoto = String(ev.event_type || '').toLowerCase() === 'photo_added' || String(ev.title || '').toLowerCase().includes('photo') || String(ev.title || '').toLowerCase().includes('evidence');
+                                const isFuture = ev.event_type === 'scheduled_auction' || ev.metadata?.is_future === true;
                                 // Count unique images, not URLs (which may include variants)
                                 const imageCount = urls.length;
                                 const title = isPhoto ? `Evidence set (${imageCount} ${imageCount === 1 ? 'photo' : 'photos'})` : (ev.title || 'Work Session');
                                 return (
-                                  <h4 className="text" style={{ marginBottom: 'var(--space-1)' }}>
+                                  <h4 className="text" style={{ marginBottom: 'var(--space-1)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {isFuture && (
+                                      <span style={{
+                                        fontSize: '7pt',
+                                        fontWeight: 700,
+                                        color: '#1d4ed8',
+                                        background: '#dbeafe',
+                                        padding: '2px 6px',
+                                        borderRadius: '3px',
+                                        letterSpacing: '0.5px',
+                                      }}>
+                                        SCHEDULED
+                                      </span>
+                                    )}
                                     {title}
                                   </h4>
                                 );
