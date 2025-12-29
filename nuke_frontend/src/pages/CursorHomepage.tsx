@@ -211,6 +211,8 @@ interface FilterState {
   yearMin: number | null;
   yearMax: number | null;
   makes: string[];
+  bodyStyles: string[]; // Car types: Coupe, Sedan, Pickup, SUV, etc.
+  is4x4: boolean; // 4WD/4x4/AWD filter
   priceMin: number | null;
   priceMax: number | null;
   hasImages: boolean;
@@ -233,6 +235,8 @@ const DEFAULT_FILTERS: FilterState = {
   yearMin: null,
   yearMax: null,
   makes: [],
+  bodyStyles: [],
+  is4x4: false,
   priceMin: null,
   priceMax: null,
   hasImages: false,
@@ -417,16 +421,24 @@ const CursorHomepage: React.FC = () => {
     yearQuickFilters: false,
     sourceFilters: true, // Source filters collapsed by default
     sourcePogs: true, // Source pogs library collapsed by default
+    makeFilters: true, // Make filters collapsed by default
+    typeFilters: true, // Body type filters collapsed by default
     priceFilters: false,
     statusFilters: false,
     locationFilters: false,
     advancedFilters: true, // Advanced filters collapsed by default
   });
 
+  // Search inputs for filtering
+  const [sourceSearchText, setSourceSearchText] = useState('');
+  const [makeSearchText, setMakeSearchText] = useState('');
+
   const hasActiveFilters = useMemo(() => {
     if (filters.yearMin || filters.yearMax) return true;
     if (filters.priceMin || filters.priceMax) return true;
     if ((filters.makes?.length || 0) > 0) return true;
+    if ((filters.bodyStyles?.length || 0) > 0) return true;
+    if (filters.is4x4) return true;
     if (filters.zipCode && filters.radiusMiles > 0) return true;
     if (filters.forSale) return true;
     if (filters.hideSold) return true;
@@ -662,6 +674,20 @@ const CursorHomepage: React.FC = () => {
         v.make?.toLowerCase().includes(m.toLowerCase())
       ));
     }
+    // Body style filter (car type)
+    if (filters.bodyStyles.length > 0) {
+      result = result.filter(v => {
+        const bodyStyle = ((v as any).body_style || '').toLowerCase();
+        return filters.bodyStyles.some(bs => bodyStyle.includes(bs.toLowerCase()));
+      });
+    }
+    // 4x4/4WD/AWD filter
+    if (filters.is4x4) {
+      result = result.filter(v => {
+        const drivetrain = ((v as any).drivetrain || '').toLowerCase();
+        return drivetrain.includes('4wd') || drivetrain.includes('4x4') || drivetrain.includes('awd');
+      });
+    }
     if (filters.priceMin) {
       result = result.filter(v => (v.display_price || 0) >= filters.priceMin!);
     }
@@ -796,6 +822,8 @@ const CursorHomepage: React.FC = () => {
     if (filters.yearMin !== DEFAULT_FILTERS.yearMin) n++;
     if (filters.yearMax !== DEFAULT_FILTERS.yearMax) n++;
     if ((filters.makes?.length || 0) > 0) n++;
+    if ((filters.bodyStyles?.length || 0) > 0) n++;
+    if (filters.is4x4 !== DEFAULT_FILTERS.is4x4) n++;
     if (filters.priceMin !== DEFAULT_FILTERS.priceMin) n++;
     if (filters.priceMax !== DEFAULT_FILTERS.priceMax) n++;
     if (filters.hasImages !== DEFAULT_FILTERS.hasImages) n++;
@@ -2084,6 +2112,22 @@ const CursorHomepage: React.FC = () => {
       });
     }
     
+    // Body styles / vehicle type
+    if (filters.bodyStyles.length > 0) {
+      badges.push({
+        label: `Type: ${filters.bodyStyles.join(', ')}`,
+        onRemove: () => setFilters({ ...filters, bodyStyles: [] })
+      });
+    }
+    
+    // 4x4 filter
+    if (filters.is4x4) {
+      badges.push({
+        label: '4x4/4WD/AWD',
+        onRemove: () => setFilters({ ...filters, is4x4: false })
+      });
+    }
+    
     // Location
     if (filters.zipCode && filters.radiusMiles > 0) {
       badges.push({
@@ -2214,8 +2258,9 @@ const CursorHomepage: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('scrape_sources')
-          .select('id, domain, source_name, url')
-          .order('source_name', { ascending: true });
+          .select('id, name, url, is_active')
+          .eq('is_active', true)
+          .order('name', { ascending: true });
 
         if (error) {
           console.error('Error loading sources:', error);
@@ -2228,7 +2273,29 @@ const CursorHomepage: React.FC = () => {
             { id: '5', domain: 'classic.com', source_name: 'Classic.com', url: 'https://classic.com' }
           ]);
         } else {
-          setActiveSources(data || []);
+          // Transform data to extract domain from URL
+          const transformedData = (data || []).map(source => {
+            // Extract domain from URL
+            let domain = source.url;
+            try {
+              const urlObj = new URL(source.url);
+              domain = urlObj.hostname.replace(/^www\./, '');
+            } catch {
+              // If URL parsing fails, try regex
+              domain = source.url
+                .replace(/^https?:\/\/(www\.)?/, '')
+                .replace(/\/.*$/, '');
+            }
+            
+            return {
+              id: source.id,
+              domain: domain,
+              source_name: source.name,
+              url: source.url
+            };
+          });
+          
+          setActiveSources(transformedData);
         }
       } catch (err) {
         console.error('Error loading sources:', err);
@@ -2824,8 +2891,10 @@ const CursorHomepage: React.FC = () => {
                     style={{
                       padding: '3px 7px',
                       fontSize: '7pt',
-                      background: isActive ? 'var(--grey-300)' : 'var(--white)',
-                      fontWeight: isActive ? 700 : 400
+                      background: isActive ? 'var(--grey-600)' : 'var(--white)',
+                      color: isActive ? 'var(--white)' : 'var(--text)',
+                      fontWeight: isActive ? 700 : 400,
+                      border: isActive ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                     }}
                     title={`Year: ${range.min}-${range.max}`}
                   >
@@ -2843,8 +2912,10 @@ const CursorHomepage: React.FC = () => {
                 style={{
                   padding: '3px 7px',
                   fontSize: '7pt',
-                  background: (filters.priceMin || filters.priceMax) ? 'var(--grey-300)' : 'var(--white)',
-                  fontWeight: (filters.priceMin || filters.priceMax) ? 700 : 400
+                  background: !collapsedSections.priceFilters ? 'var(--grey-600)' : (filters.priceMin || filters.priceMax) ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.priceFilters ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.priceFilters || filters.priceMin || filters.priceMax) ? 700 : 400,
+                  border: !collapsedSections.priceFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
                 {(filters.priceMin || filters.priceMax) 
@@ -2859,8 +2930,10 @@ const CursorHomepage: React.FC = () => {
                 style={{
                   padding: '3px 7px',
                   fontSize: '7pt',
-                  background: filters.zipCode ? 'var(--grey-300)' : 'var(--white)',
-                  fontWeight: filters.zipCode ? 700 : 400
+                  background: !collapsedSections.locationFilters ? 'var(--grey-600)' : filters.zipCode ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.locationFilters ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.locationFilters || filters.zipCode) ? 700 : 400,
+                  border: !collapsedSections.locationFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
                 {filters.zipCode ? `📍${filters.zipCode}` : 'location'}
@@ -2868,22 +2941,36 @@ const CursorHomepage: React.FC = () => {
               
               {/* Make filter button */}
               <button
-                onClick={() => {
-                  const newMake = prompt('Enter makes (comma-separated):', filters.makes.join(', '));
-                  if (newMake !== null) {
-                    const makes = newMake.split(',').map(m => m.trim()).filter(m => m.length > 0);
-                    setFilters({...filters, makes});
-                  }
-                }}
+                onClick={() => toggleCollapsedSection('makeFilters')}
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
                   fontSize: '7pt',
-                  background: filters.makes.length > 0 ? 'var(--grey-300)' : 'var(--white)',
-                  fontWeight: filters.makes.length > 0 ? 700 : 400
+                  background: !collapsedSections.makeFilters ? 'var(--grey-600)' : filters.makes.length > 0 ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.makeFilters ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.makeFilters || filters.makes.length > 0) ? 700 : 400,
+                  border: !collapsedSections.makeFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
                 {filters.makes.length > 0 ? `make: ${filters.makes.join(', ')}` : 'make'}
+              </button>
+              
+              {/* Type filter button (body style) */}
+              <button
+                onClick={() => toggleCollapsedSection('typeFilters')}
+                className="button-win95"
+                style={{
+                  padding: '3px 7px',
+                  fontSize: '7pt',
+                  background: !collapsedSections.typeFilters ? 'var(--grey-600)' : (filters.bodyStyles.length > 0 || filters.is4x4) ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.typeFilters ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.typeFilters || filters.bodyStyles.length > 0 || filters.is4x4) ? 700 : 400,
+                  border: !collapsedSections.typeFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                }}
+              >
+                {filters.bodyStyles.length > 0 || filters.is4x4 
+                  ? `type: ${[...filters.bodyStyles, filters.is4x4 ? '4x4' : ''].filter(Boolean).join(', ')}`
+                  : 'type'}
               </button>
               
               {/* Sources button */}
@@ -2893,8 +2980,10 @@ const CursorHomepage: React.FC = () => {
                 style={{
                   padding: '3px 7px',
                   fontSize: '7pt',
-                  background: sourcePogs.selected.length < sourcePogs.all.length ? 'var(--grey-300)' : 'var(--white)',
-                  fontWeight: sourcePogs.selected.length < sourcePogs.all.length ? 700 : 400
+                  background: !collapsedSections.sourcePogs ? 'var(--grey-600)' : sourcePogs.selected.length < sourcePogs.all.length ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.sourcePogs ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.sourcePogs || sourcePogs.selected.length < sourcePogs.all.length) ? 700 : 400,
+                  border: !collapsedSections.sourcePogs ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
                 sources: {sourcePogs.selected.length}/{sourcePogs.all.length}
@@ -2907,8 +2996,10 @@ const CursorHomepage: React.FC = () => {
                 style={{
                   padding: '3px 7px',
                   fontSize: '7pt',
-                  background: (filters.forSale || filters.hideSold || filters.showPending) ? 'var(--grey-300)' : 'var(--white)',
-                  fontWeight: (filters.forSale || filters.hideSold || filters.showPending) ? 700 : 400
+                  background: !collapsedSections.statusFilters ? 'var(--grey-600)' : (filters.forSale || filters.hideSold || filters.showPending) ? 'var(--grey-300)' : 'var(--white)',
+                  color: !collapsedSections.statusFilters ? 'var(--white)' : 'var(--text)',
+                  fontWeight: (!collapsedSections.statusFilters || filters.forSale || filters.hideSold || filters.showPending) ? 700 : 400,
+                  border: !collapsedSections.statusFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
                 status
@@ -2984,6 +3075,29 @@ const CursorHomepage: React.FC = () => {
                     >
                       none
                     </button>
+                    <input
+                      type="text"
+                      placeholder="search sources..."
+                      value={sourceSearchText}
+                      onChange={(e) => setSourceSearchText(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '2px 6px',
+                        fontSize: '7pt',
+                        border: '1px solid var(--border)',
+                        fontFamily: '"MS Sans Serif", sans-serif',
+                        minWidth: '80px'
+                      }}
+                    />
+                    {sourceSearchText && (
+                      <button
+                        onClick={() => setSourceSearchText('')}
+                        className="button-win95"
+                        style={{ padding: '2px 6px', fontSize: '7pt' }}
+                      >
+                        x
+                      </button>
+                    )}
                   </div>
                   <div style={{ 
                     display: 'grid',
@@ -2992,7 +3106,14 @@ const CursorHomepage: React.FC = () => {
                     maxHeight: '200px',
                     overflowY: 'auto'
                   }}>
-                    {sourcePogs.all.map((p) => (
+                    {sourcePogs.all
+                      .filter((p) => 
+                        !sourceSearchText || 
+                        p.title.toLowerCase().includes(sourceSearchText.toLowerCase()) ||
+                        p.domain.toLowerCase().includes(sourceSearchText.toLowerCase()) ||
+                        p.key.toLowerCase().includes(sourceSearchText.toLowerCase())
+                      )
+                      .map((p) => (
                       <label
                         key={p.key}
                         style={{
@@ -3031,6 +3152,215 @@ const CursorHomepage: React.FC = () => {
                           {p.count.toLocaleString()}
                         </span>
                       </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Make filter - expanded */}
+              {!collapsedSections.makeFilters && (
+                <div style={{
+                  marginBottom: '8px',
+                  padding: '6px',
+                  background: 'var(--grey-50)',
+                  border: '1px solid var(--border)',
+                  fontSize: '7pt'
+                }}>
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
+                    <input
+                      type="text"
+                      placeholder="search makes (Chevrolet, Ford...)"
+                      value={makeSearchText}
+                      onChange={(e) => setMakeSearchText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && makeSearchText.trim()) {
+                          const newMake = makeSearchText.trim();
+                          if (!filters.makes.includes(newMake)) {
+                            setFilters({...filters, makes: [...filters.makes, newMake]});
+                          }
+                          setMakeSearchText('');
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '3px 6px',
+                        fontSize: '7pt',
+                        border: '1px solid var(--border)',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (makeSearchText.trim()) {
+                          const newMake = makeSearchText.trim();
+                          if (!filters.makes.includes(newMake)) {
+                            setFilters({...filters, makes: [...filters.makes, newMake]});
+                          }
+                          setMakeSearchText('');
+                        }
+                      }}
+                      className="button-win95"
+                      style={{ padding: '2px 8px', fontSize: '7pt' }}
+                    >
+                      add
+                    </button>
+                    {filters.makes.length > 0 && (
+                      <button
+                        onClick={() => setFilters({...filters, makes: []})}
+                        className="button-win95"
+                        style={{ padding: '2px 6px', fontSize: '7pt' }}
+                      >
+                        clear
+                      </button>
+                    )}
+                  </div>
+                  {filters.makes.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      {filters.makes.map((make) => (
+                        <span
+                          key={make}
+                          style={{
+                            padding: '2px 6px',
+                            background: 'var(--grey-600)',
+                            color: 'var(--white)',
+                            fontSize: '7pt',
+                            borderRadius: '2px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          {make}
+                          <button
+                            onClick={() => setFilters({...filters, makes: filters.makes.filter(m => m !== make)})}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--white)',
+                              cursor: 'pointer',
+                              padding: 0,
+                              fontSize: '8pt',
+                              lineHeight: 1
+                            }}
+                          >
+                            x
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Quick make chips */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: filters.makes.length > 0 ? '6px' : 0 }}>
+                    {['Chevrolet', 'Ford', 'Dodge', 'GMC', 'Plymouth', 'Pontiac', 'Buick', 'Cadillac', 'Toyota', 'Porsche', 'Mercedes-Benz', 'BMW'].map((make) => (
+                      <button
+                        key={make}
+                        onClick={() => {
+                          if (filters.makes.includes(make)) {
+                            setFilters({...filters, makes: filters.makes.filter(m => m !== make)});
+                          } else {
+                            setFilters({...filters, makes: [...filters.makes, make]});
+                          }
+                        }}
+                        className="button-win95"
+                        style={{
+                          padding: '2px 6px',
+                          fontSize: '7pt',
+                          background: filters.makes.includes(make) ? 'var(--grey-600)' : 'var(--white)',
+                          color: filters.makes.includes(make) ? 'var(--white)' : 'var(--text)'
+                        }}
+                      >
+                        {make}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Type filter - expanded (body style) */}
+              {!collapsedSections.typeFilters && (
+                <div style={{
+                  marginBottom: '8px',
+                  padding: '6px',
+                  background: 'var(--grey-50)',
+                  border: '1px solid var(--border)',
+                  fontSize: '7pt'
+                }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
+                    {[
+                      { label: 'Car', values: ['Coupe', 'Sedan', 'Convertible', 'Hatchback', 'Wagon'] },
+                      { label: 'Truck', values: ['Pickup', 'Truck'] },
+                      { label: 'SUV', values: ['SUV'] },
+                      { label: 'Van', values: ['Van', 'Minivan'] },
+                    ].map(({ label, values }) => {
+                      const isSelected = values.some(v => filters.bodyStyles.includes(v));
+                      return (
+                        <button
+                          key={label}
+                          onClick={() => {
+                            if (isSelected) {
+                              setFilters({...filters, bodyStyles: filters.bodyStyles.filter(bs => !values.includes(bs))});
+                            } else {
+                              setFilters({...filters, bodyStyles: [...filters.bodyStyles, ...values]});
+                            }
+                          }}
+                          className="button-win95"
+                          style={{
+                            padding: '3px 10px',
+                            fontSize: '7pt',
+                            background: isSelected ? 'var(--grey-600)' : 'var(--white)',
+                            color: isSelected ? 'var(--white)' : 'var(--text)',
+                            fontWeight: isSelected ? 700 : 400
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setFilters({...filters, is4x4: !filters.is4x4})}
+                      className="button-win95"
+                      style={{
+                        padding: '3px 10px',
+                        fontSize: '7pt',
+                        background: filters.is4x4 ? 'var(--grey-600)' : 'var(--white)',
+                        color: filters.is4x4 ? 'var(--white)' : 'var(--text)',
+                        fontWeight: filters.is4x4 ? 700 : 400
+                      }}
+                    >
+                      4x4/4WD
+                    </button>
+                    {(filters.bodyStyles.length > 0 || filters.is4x4) && (
+                      <button
+                        onClick={() => setFilters({...filters, bodyStyles: [], is4x4: false})}
+                        className="button-win95"
+                        style={{ padding: '3px 6px', fontSize: '7pt' }}
+                      >
+                        clear
+                      </button>
+                    )}
+                  </div>
+                  {/* Specific body styles */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {['Coupe', 'Sedan', 'Convertible', 'Wagon', 'Pickup', 'SUV', 'Roadster', 'Fastback'].map((style) => (
+                      <button
+                        key={style}
+                        onClick={() => {
+                          if (filters.bodyStyles.includes(style)) {
+                            setFilters({...filters, bodyStyles: filters.bodyStyles.filter(bs => bs !== style)});
+                          } else {
+                            setFilters({...filters, bodyStyles: [...filters.bodyStyles, style]});
+                          }
+                        }}
+                        className="button-win95"
+                        style={{
+                          padding: '2px 6px',
+                          fontSize: '6pt',
+                          background: filters.bodyStyles.includes(style) ? 'var(--grey-500)' : 'var(--grey-100)',
+                          color: filters.bodyStyles.includes(style) ? 'var(--white)' : 'var(--text-muted)'
+                        }}
+                      >
+                        {style}
+                      </button>
                     ))}
                   </div>
                 </div>
