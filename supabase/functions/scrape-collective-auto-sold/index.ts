@@ -72,13 +72,14 @@ Deno.serve(async (req) => {
       console.log(`📄 Scraping page ${currentPage}: ${pageUrl}`);
 
       try {
-        // Use Firecrawl for better HTML parsing
+        // Use Firecrawl for better HTML parsing (v1 API)
         const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
         let html = '';
         
         if (firecrawlKey) {
           try {
-            const firecrawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+            console.log(`   🔥 Using Firecrawl for ${pageUrl}`);
+            const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -86,17 +87,25 @@ Deno.serve(async (req) => {
               },
               body: JSON.stringify({
                 url: pageUrl,
+                waitFor: 2000,
                 formats: ['html'],
               }),
             });
 
             if (firecrawlResponse.ok) {
               const firecrawlData = await firecrawlResponse.json();
-              html = firecrawlData.data?.html || '';
+              if (firecrawlData.success && firecrawlData.data?.html) {
+                html = firecrawlData.data.html;
+                console.log(`   ✅ Got ${html.length} chars via Firecrawl`);
+              }
+            } else {
+              console.log(`   ⚠️  Firecrawl HTTP ${firecrawlResponse.status}`);
             }
           } catch (firecrawlError: any) {
             console.log(`   ⚠️  Firecrawl failed: ${firecrawlError.message}, trying direct fetch...`);
           }
+        } else {
+          console.log(`   ⚠️  No FIRECRAWL_API_KEY found`);
         }
 
         // Fallback to direct fetch
@@ -124,45 +133,39 @@ Deno.serve(async (req) => {
           break;
         }
 
-        // Extract vehicle listings from the page
-        // Pattern from HTML: "WP0AA29901S620528 30,372 Miles 2001 Porsche 911 Carrera SOLD"
-        // Look for any element containing VIN patterns or vehicle links
-        const allLinks = doc.querySelectorAll('a[href*="/vehicles/"]');
-        const vehicleElements: Element[] = [];
+        // Extract vehicle listings - simpler approach: find all vehicle links
+        // URLs follow pattern: /vehicles/123/2014-cadillac-cts-v-wagon
+        const vehicleLinks = new Set<string>();
         
-        // Also look for text patterns that match vehicle listings
+        // Method 1: Extract from href attributes
+        const allLinks = doc.querySelectorAll('a[href*="/vehicles/"]');
         allLinks.forEach(link => {
-          const text = link.textContent || '';
-          // Check if this link contains vehicle info (VIN, year, make/model, "SOLD")
-          if (text.match(/\b([A-HJ-NPR-Z0-9]{17})\b/) || // Has VIN
-              (text.match(/\b(19|20)\d{2}\b/) && text.includes('SOLD'))) { // Has year and SOLD
-            vehicleElements.push(link);
+          const href = link.getAttribute('href');
+          if (href && href.match(/\/vehicles\/\d+\/\d{4}-/)) {
+            vehicleLinks.add(href);
           }
         });
         
-        // Also check for divs/spans with vehicle info
-        const allElements = doc.querySelectorAll('div, span, li, article');
-        allElements.forEach(el => {
-          const text = el.textContent || '';
-          const href = el.querySelector('a[href*="/vehicles/"]')?.getAttribute('href');
-          if (href && (text.match(/\b([A-HJ-NPR-Z0-9]{17})\b/) || 
-              (text.match(/\b(19|20)\d{2}\b/) && text.includes('SOLD')))) {
-            if (!vehicleElements.includes(el)) {
-              vehicleElements.push(el);
-            }
-          }
+        // Method 2: Also search the raw HTML with regex for any missed links
+        const hrefMatches = html.matchAll(/href="(\/vehicles\/\d+\/\d{4}-[^"]+)"/g);
+        for (const m of hrefMatches) {
+          vehicleLinks.add(m[1]);
+        }
+        
+        console.log(`   🔗 Found ${vehicleLinks.size} unique vehicle links`);
+        
+        // Convert to array for processing
+        const vehicleElements = Array.from(vehicleLinks).map(href => {
+          // Create a pseudo-element with the href
+          return { getAttribute: () => href } as any;
         });
         
         let foundOnPage = 0;
         const seenUrls = new Set<string>();
         
         vehicleElements.forEach((element) => {
-          // Get the link (might be the element itself or a parent)
-          const link = element.tagName === 'A' ? element : element.closest('a[href*="/vehicles/"]');
-          if (!link) return;
-
-          const href = link.getAttribute('href');
-          if (!href || !href.includes('/vehicles/')) return;
+          const href = element.getAttribute('href');
+          if (!href) return;
 
           const fullUrl = href.startsWith('http') ? href : `https://www.collectiveauto.com${href}`;
           
@@ -170,64 +173,36 @@ Deno.serve(async (req) => {
           if (seenUrls.has(fullUrl)) return;
           seenUrls.add(fullUrl);
           
-          // Get text from the element or its parent container
-          const container = element.closest('[class*="vehicle"], [class*="listing"], [class*="item"]') || element;
-          const text = container.textContent?.trim() || '';
+          // Parse year/make/model from URL slug: /vehicles/123/2014-cadillac-cts-v-wagon
+          const urlMatch = href.match(/\/vehicles\/\d+\/(\d{4})-(.+)$/);
+          if (!urlMatch) return;
           
-          // Parse VIN (usually first, alphanumeric 17 chars)
-          const vinMatch = text.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
-          const vin = vinMatch ? vinMatch[1].toUpperCase() : undefined;
+          const year = parseInt(urlMatch[1]);
+          const slugParts = urlMatch[2].split('-');
+          
+          // First part is make, rest is model
+          const make = slugParts[0].charAt(0).toUpperCase() + slugParts[0].slice(1);
+          const model = slugParts.slice(1).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+          
+          // Try to find VIN in surrounding HTML context
+          const vinContextMatch = html.match(new RegExp(`${href}[^<>]*?([A-HJ-NPR-Z0-9]{17})`, 'i'));
+          const vin = vinContextMatch ? vinContextMatch[1].toUpperCase() : undefined;
+          
+          // Try to find mileage in surrounding context
+          const mileageContextMatch = html.match(new RegExp(`${href}[^<>]*?(\\d{1,3},?\\d{3})\\s*Miles`, 'i'));
+          const mileage = mileageContextMatch ? parseInt(mileageContextMatch[1].replace(/,/g, '')) : undefined;
 
-          // Parse mileage (number followed by "Miles")
-          const mileageMatch = text.match(/([\d,]+)\s*Miles/i);
-          const mileage = mileageMatch ? parseInt(mileageMatch[1].replace(/,/g, '')) : undefined;
-
-          // Parse year (4 digits, usually 19xx or 20xx)
-          const yearMatch = text.match(/\b(19|20)\d{2}\b/);
-          const year = yearMatch ? parseInt(yearMatch[0]) : undefined;
-
-          // Parse make/model (after year, before "SOLD")
-          let make: string | undefined;
-          let model: string | undefined;
-          if (year) {
-            const yearIndex = text.indexOf(year.toString());
-            if (yearIndex >= 0) {
-              const afterYear = text.substring(yearIndex + 4).trim();
-              const beforeSold = afterYear.split('SOLD')[0].trim();
-              const parts = beforeSold.split(/\s+/).filter(p => p.length > 0);
-              if (parts.length >= 1) {
-                make = parts[0];
-                if (parts.length >= 2) {
-                  model = parts.slice(1).join(' ');
-                }
-              }
-            }
-          }
-
-          // Extract image if available (check element and parent)
-          let imageUrl: string | undefined;
-          const img = container.querySelector('img') || element.querySelector('img');
-          if (img) {
-            imageUrl = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
-            if (imageUrl && !imageUrl.startsWith('http')) {
-              imageUrl = `https://www.collectiveauto.com${imageUrl}`;
-            }
-          }
-
-          // Only add if we have at least VIN or year+make
-          if (vin || (year && make)) {
-            listings.push({
-              vin,
-              year,
-              make,
-              model,
-              mileage,
-              listing_url: fullUrl,
-              image_url: imageUrl,
-              sold_price: undefined, // Will be extracted from detail page
-            });
-            foundOnPage++;
-          }
+          listings.push({
+            vin,
+            year,
+            make,
+            model,
+            mileage,
+            listing_url: fullUrl,
+            image_url: undefined,
+            sold_price: undefined,
+          });
+          foundOnPage++;
         });
 
         console.log(`   ✅ Found ${foundOnPage} vehicles on page ${currentPage}`);
@@ -284,7 +259,7 @@ Deno.serve(async (req) => {
         const { data: existing } = await supabase
           .from('import_queue')
           .select('id')
-          .eq('source_url', listing.listing_url)
+          .eq('listing_url', listing.listing_url)
           .maybeSingle();
 
         if (existing) {
@@ -292,7 +267,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Check if vehicle already exists (by VIN)
+        // Check if vehicle already exists (by VIN or by listing URL)
         if (listing.vin) {
           const { data: existingVehicle } = await supabase
             .from('vehicles')
@@ -305,28 +280,45 @@ Deno.serve(async (req) => {
             continue;
           }
         }
+        
+        // Also check by listing URL in vehicles table
+        const { data: existingByUrl } = await supabase
+          .from('vehicles')
+          .select('id')
+          .eq('listing_url', listing.listing_url)
+          .maybeSingle();
+        
+        if (existingByUrl) {
+          duplicates++;
+          continue;
+        }
 
-        // Queue for processing
-        await supabase
+        // Queue for processing (use correct column names)
+        const { error: insertError } = await supabase
           .from('import_queue')
           .insert({
-            source_url: listing.listing_url,
-            source_type: 'dealer_website',
-            organization_id: orgId,
+            listing_url: listing.listing_url,
+            listing_title: `${listing.year} ${listing.make} ${listing.model}`,
+            listing_year: listing.year,
+            listing_make: listing.make,
+            listing_model: listing.model,
+            source_id: orgId,
             status: 'pending',
-            metadata: {
+            raw_data: {
               vin: listing.vin,
-              year: listing.year,
-              make: listing.make,
-              model: listing.model,
               mileage: listing.mileage,
               image_url: listing.image_url,
               listing_status: 'sold',
+              source: 'Collective Auto Group',
               discovered_at: new Date().toISOString(),
             },
           });
-
-        queued++;
+        
+        if (insertError) {
+          console.error(`   ❌ Insert error: ${insertError.message}`);
+        } else {
+          queued++;
+        }
       } catch (error: any) {
         console.error(`   ❌ Error queueing ${listing.listing_url}:`, error.message);
       }

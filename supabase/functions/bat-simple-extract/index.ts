@@ -43,6 +43,9 @@ interface BatExtracted {
   bid_count: number;
   comment_count: number;
   view_count: number;
+  watcher_count: number;
+  lot_number: string | null;
+  reserve_status: string | null;
   auction_end_date: string | null;
   description: string | null;
   vehicle_id?: string;
@@ -87,12 +90,28 @@ function extractVin(html: string): string | null {
   return null;
 }
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
+    .replace(/&#x([a-fA-F0-9]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&times;/g, '×')
+    .replace(/&#215;/g, '×');
+}
+
 function extractTitle(html: string): { title: string | null; year: number | null; make: string | null; model: string | null } {
   // BaT title is always in <h1 class="post-title">
   const h1Match = html.match(/<h1[^>]*class="[^"]*post-title[^"]*"[^>]*>([^<]+)</i);
   let title = h1Match?.[1]?.trim() || null;
   
   if (!title) return { title: null, year: null, make: null, model: null };
+  
+  // Decode HTML entities (like &#215; -> ×)
+  title = decodeHtmlEntities(title);
   
   // Clean BaT-specific suffixes from title
   title = title
@@ -125,51 +144,104 @@ function extractAuctionData(html: string): {
   high_bid: number | null;
   bid_count: number;
   comment_count: number;
+  view_count: number;
+  watcher_count: number;
+  lot_number: string | null;
   auction_end_date: string | null;
+  reserve_status: string | null;
 } {
-  // Look for seller in essentials or common patterns
-  const sellerMatch = html.match(/Sold by\s+<a[^>]*>([^<]+)</i) || 
+  // Seller - multiple patterns (ordered by reliability)
+  // Pattern 1: BaT History "Sold by <strong>username</strong>"
+  // Pattern 2: Essentials ">Seller</strong>: <a>username</a>"
+  // Pattern 3: From comments "(The Seller)"
+  const sellerMatch = html.match(/Sold by <strong>([^<]+)<\/strong>/i) ||
+                      html.match(/>Seller<\/strong>:\s*<a[^>]*>([^<]+)<\/a>/i) ||
                       html.match(/"authorName":"([^"]+)\s*\(The Seller\)"/);
-  const seller_username = sellerMatch?.[1] || null;
+  const seller_username = sellerMatch?.[1]?.trim() || null;
   
-  // Buyer is in the final bid comment
-  const buyerMatch = html.match(/Sold[^"]*to\s+<a[^>]*>([^<]+)</i) ||
-                     html.match(/Sold[^"]*for[^"]*to\s+([A-Za-z0-9_]+)/i);
-  const buyer_username = buyerMatch?.[1] || null;
+  // Buyer - from BaT History "to <strong>username</strong> for"
+  const buyerMatch = html.match(/to <strong>([^<]+)<\/strong> for/i) ||
+                     html.match(/<a[^>]*href="[^"]*\/member\/([^"\/]+)\/"[^>]*target="_blank">([^<]+)<\/a>\s*<\/span>\s*<\/div>\s*<div class="identifier">This Listing/i);
+  const buyer_username = buyerMatch?.[1]?.trim() || null;
   
-  // Sale price
-  const priceMatch = html.match(/Sold for[^$]*\$([0-9,]+)/i) ||
-                     html.match(/Winning Bid[^$]*\$([0-9,]+)/i);
-  const sale_price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, '')) : null;
+  // Sale price - "Sold for <strong>USD $6,954</strong>" or "for <strong>USD $6,954.00</strong>"
+  // Extract full price string first, then parse
+  const priceMatch = html.match(/Sold for\s*<strong>USD \$([0-9,]+(?:\.\d{2})?)/i) ||
+                     html.match(/for <strong>USD \$([0-9,]+(?:\.\d{2})?)<\/strong>/i) ||
+                     html.match(/Sold for[^$]*\$([0-9,]+)/i);
+  let sale_price: number | null = null;
+  if (priceMatch) {
+    // Remove commas and parse - ignore cents
+    const priceStr = priceMatch[1].replace(/,/g, '').split('.')[0];
+    sale_price = parseInt(priceStr);
+  }
   
-  // High bid (for unsold)
+  // High bid (for active/unsold auctions)
   const bidMatch = html.match(/Current Bid[^$]*\$([0-9,]+)/i) ||
                    html.match(/High Bid[^$]*\$([0-9,]+)/i);
   const high_bid = bidMatch ? parseInt(bidMatch[1].replace(/,/g, '')) : null;
   
-  // Bid count - from the JSON blob
+  // Bid count - from JSON blob (more accurate than counting)
   const bidCountMatch = html.match(/"type":"bat-bid"/g);
   const bid_count = bidCountMatch ? bidCountMatch.length : 0;
   
-  // Comment count - count non-bid comments
-  const commentCountMatch = html.match(/"type":"comment"/g);
-  const comment_count = commentCountMatch ? commentCountMatch.length : 0;
+  // Comment count - from header "<span class="info-value">26</span><span class="info-label">Comments</span>"
+  const commentHeaderMatch = html.match(/<span class="info-value">(\d+)<\/span>\s*<span class="info-label">Comments<\/span>/i);
+  const comment_count = commentHeaderMatch ? parseInt(commentHeaderMatch[1]) : 0;
   
-  // Auction end date
-  const endMatch = html.match(/data-ends="(\d+)"/);
+  // Views - "data-stats-item="views">26,541 views"
+  const viewMatch = html.match(/data-stats-item="views">([0-9,]+)/);
+  const view_count = viewMatch ? parseInt(viewMatch[1].replace(/,/g, '')) : 0;
+  
+  // Watchers - "data-stats-item="watchers">982 watchers"
+  const watcherMatch = html.match(/data-stats-item="watchers">([0-9,]+)/);
+  const watcher_count = watcherMatch ? parseInt(watcherMatch[1].replace(/,/g, '')) : 0;
+  
+  // Lot number - "<strong>Lot</strong> #225044"
+  const lotMatch = html.match(/<strong>Lot<\/strong>\s*#([0-9,]+)/i);
+  const lot_number = lotMatch ? lotMatch[1].replace(/,/g, '') : null;
+  
+  // Reserve status - look for "No Reserve" badge or reserve not met
+  let reserve_status: string | null = null;
+  if (html.includes('no-reserve') || html.includes('No Reserve')) {
+    reserve_status = 'no_reserve';
+  } else if (html.includes('Reserve Not Met') || html.includes('reserve-not-met')) {
+    reserve_status = 'reserve_not_met';
+  } else if (html.includes('Reserve Met') || sale_price) {
+    reserve_status = 'reserve_met';
+  }
+  
+  // Auction end date - from data-ends timestamp or from "on 12/27/25" text
   let auction_end_date: string | null = null;
+  const endMatch = html.match(/data-ends="(\d+)"/);
   if (endMatch) {
     const timestamp = parseInt(endMatch[1]);
     auction_end_date = new Date(timestamp * 1000).toISOString().split('T')[0];
+  } else {
+    // Try to parse from "on 12/27/25" format
+    const dateMatch = html.match(/on (\d{1,2})\/(\d{1,2})\/(\d{2})\b/);
+    if (dateMatch) {
+      const [, month, day, year] = dateMatch;
+      auction_end_date = `20${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
   }
   
-  return { seller_username, buyer_username, sale_price, high_bid, bid_count, comment_count, auction_end_date };
+  return { 
+    seller_username, 
+    buyer_username, 
+    sale_price, 
+    high_bid, 
+    bid_count, 
+    comment_count, 
+    view_count,
+    watcher_count,
+    lot_number,
+    auction_end_date,
+    reserve_status
+  };
 }
 
-function extractViewCount(html: string): number {
-  const viewMatch = html.match(/data-stats-item="views">([0-9,]+)/);
-  return viewMatch ? parseInt(viewMatch[1].replace(/,/g, '')) : 0;
-}
+// View count is now extracted in extractAuctionData for consistency
 
 function extractLocation(html: string): string | null {
   // Location is in the group-item: "Location</strong>Located in United States"
@@ -214,11 +286,29 @@ function extractSpecs(html: string): {
     }
   }
   
-  // Exterior color - "finished in X Metallic" or "X paint"
+  // Exterior color - multiple BaT patterns
+  // "finished in X Metallic", "wears X paint", "painted X"
   let exterior_color: string | null = null;
-  const colorMatch = descText.match(/finished in ([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,3}(?:\s+Metallic)?)/i);
-  if (colorMatch) {
-    exterior_color = colorMatch[1].trim();
+  const colorPatterns = [
+    /finished in ([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,3}(?:\s+Metallic)?)/i,
+    /wears ([A-Za-z]+(?:\s+[A-Za-z-]+)?)\s+(?:camouflage[- ]?style\s+)?paint/i,
+    /wears ([A-Za-z]+)\s+camouflage/i,
+    /painted (?:in )?([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,2})/i,
+    /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s+(?:over|exterior|paint)/i,
+  ];
+  for (const pattern of colorPatterns) {
+    const match = descText.match(pattern);
+    if (match && match[1].length < 30) {
+      const colorRaw = match[1].trim().toLowerCase();
+      // Skip garbage matches
+      if (colorRaw.includes('mounted') || colorRaw.includes('wheel') || colorRaw.includes('and')) continue;
+      // Capitalize first letter of each word
+      exterior_color = colorRaw
+        .split(/[\s-]+/)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+      break;
+    }
   }
   
   // Interior color - "X leather" or "X and Y leather interior"
@@ -229,26 +319,43 @@ function extractSpecs(html: string): {
     interior_color = intMatch[1].trim();
   }
   
-  // Transmission - from description
+  // Transmission - from description or title
   let transmission: string | null = null;
-  if (descText.match(/PDK|dual-clutch/i)) {
-    const speedMatch = descText.match(/(\d+)-speed\s+PDK/i);
+  
+  // Extract title from HTML for checking (often has "4-Speed" etc)
+  const titleMatch = html.match(/<h1[^>]*class="[^"]*post-title[^"]*"[^>]*>([^<]+)</i);
+  const title = titleMatch?.[1] || '';
+  const fullText = title + ' ' + descText;
+  
+  if (fullText.match(/PDK|dual-clutch/i)) {
+    const speedMatch = fullText.match(/(\d+)-speed\s+PDK/i);
     transmission = speedMatch ? `${speedMatch[1]}-Speed PDK` : 'PDK Dual-Clutch';
-  } else if (descText.match(/(\d)-speed\s+manual/i)) {
-    const speedMatch = descText.match(/(\d)-speed\s+manual/i);
+  } else if (fullText.match(/(\d+)[- ]speed\s+manual/i)) {
+    const speedMatch = fullText.match(/(\d+)[- ]speed\s+manual/i);
     transmission = speedMatch ? `${speedMatch[1]}-Speed Manual` : 'Manual';
-  } else if (descText.match(/automatic\s+transaxle|automatic\s+transmission/i)) {
-    const speedMatch = descText.match(/(\d+)-speed\s+(?:automatic|transaxle)/i);
+  } else if (fullText.match(/(\d+)[- ]speed/i) && !fullText.match(/automatic/i)) {
+    // Title often just has "4-Speed" meaning manual
+    const speedMatch = fullText.match(/(\d+)[- ]speed/i);
+    transmission = speedMatch ? `${speedMatch[1]}-Speed Manual` : 'Manual';
+  } else if (fullText.match(/automatic/i)) {
+    const speedMatch = fullText.match(/(\d+)-speed\s+automatic/i);
     transmission = speedMatch ? `${speedMatch[1]}-Speed Automatic` : 'Automatic';
+  } else if (fullText.match(/manual\s+transmission/i)) {
+    transmission = 'Manual';
   }
   
-  // Drivetrain - explicit patterns only
+  // Drivetrain - explicit patterns (check title too)
   let drivetrain: string | null = null;
-  if (descText.match(/\ball[- ]wheel[- ]drive\b/i) || descText.match(/\bAWD\b/) || descText.match(/\bfour[- ]wheel[- ]drive\b/i)) {
+  const driveText = fullText; // Already includes title + description
+  
+  // 4x4 / 4WD patterns (common in trucks/SUVs)
+  if (driveText.match(/\b4[x×]4\b/i) || driveText.match(/\b4WD\b/i) || driveText.match(/\bfour[- ]wheel[- ]drive\b/i)) {
+    drivetrain = '4WD';
+  } else if (driveText.match(/\ball[- ]wheel[- ]drive\b/i) || driveText.match(/\bAWD\b/)) {
     drivetrain = 'AWD';
-  } else if (descText.match(/\brear[- ]wheel[- ]drive\b/i) || descText.match(/\bRWD\b/)) {
+  } else if (driveText.match(/\brear[- ]wheel[- ]drive\b/i) || driveText.match(/\bRWD\b/)) {
     drivetrain = 'RWD';
-  } else if (descText.match(/\bfront[- ]wheel[- ]drive\b/i) || descText.match(/\bFWD\b/)) {
+  } else if (driveText.match(/\bfront[- ]wheel[- ]drive\b/i) || driveText.match(/\bFWD\b/)) {
     drivetrain = 'FWD';
   }
   
@@ -260,18 +367,17 @@ function extractSpecs(html: string): {
     engine = `${turbo ? turbo + ' ' : ''}${displacement}L ${config}`.trim();
   }
   
-  // Body style - from title in HTML
+  // Body style - from title (already extracted above)
   let body_style: string | null = null;
-  const titleMatch = html.match(/<h1[^>]*class="[^"]*post-title[^"]*"[^>]*>([^<]+)</i);
-  const title = titleMatch?.[1]?.toLowerCase() || descText.toLowerCase();
+  const titleLower = title.toLowerCase() || descText.toLowerCase();
   
-  if (title.includes('coupe')) body_style = 'Coupe';
-  else if (title.includes('convertible') || title.includes('cabriolet') || title.includes('roadster') || title.includes('spyder') || title.includes('targa')) body_style = 'Convertible';
-  else if (title.includes('sedan')) body_style = 'Sedan';
-  else if (title.includes('wagon') || title.includes('estate') || title.includes('avant') || title.includes('touring')) body_style = 'Wagon';
-  else if (title.includes('suv') || title.includes('crossover')) body_style = 'SUV';
-  else if (title.includes('hatchback')) body_style = 'Hatchback';
-  else if (title.includes('pickup') || title.includes('truck')) body_style = 'Truck';
+  if (titleLower.includes('coupe')) body_style = 'Coupe';
+  else if (titleLower.includes('convertible') || titleLower.includes('cabriolet') || titleLower.includes('roadster') || titleLower.includes('spyder') || titleLower.includes('targa')) body_style = 'Convertible';
+  else if (titleLower.includes('sedan')) body_style = 'Sedan';
+  else if (titleLower.includes('wagon') || titleLower.includes('estate') || titleLower.includes('avant') || titleLower.includes('touring') || titleLower.includes('suburban')) body_style = 'Wagon';
+  else if (titleLower.includes('suv') || titleLower.includes('crossover')) body_style = 'SUV';
+  else if (titleLower.includes('hatchback')) body_style = 'Hatchback';
+  else if (titleLower.includes('pickup') || titleLower.includes('truck')) body_style = 'Truck';
   
   return {
     mileage,
@@ -439,8 +545,17 @@ async function extractBatListing(url: string): Promise<BatExtracted> {
     vin: extractVin(html),
     location: extractLocation(html),
     ...specs,
-    ...auctionData,
-    view_count: extractViewCount(html),
+    seller_username: auctionData.seller_username,
+    buyer_username: auctionData.buyer_username,
+    sale_price: auctionData.sale_price,
+    high_bid: auctionData.high_bid,
+    bid_count: auctionData.bid_count,
+    comment_count: auctionData.comment_count,
+    view_count: auctionData.view_count,
+    watcher_count: auctionData.watcher_count,
+    lot_number: auctionData.lot_number,
+    reserve_status: auctionData.reserve_status,
+    auction_end_date: auctionData.auction_end_date,
     description: extractDescription(html),
     image_urls: extractImages(html),
     comments,
@@ -464,9 +579,19 @@ serve(async (req) => {
 
     console.log(`Extracting: ${url}`);
     const extracted = await extractBatListing(url);
-    console.log(`Extracted: ${extracted.title} | VIN: ${extracted.vin} | $${extracted.sale_price}`);
-    console.log(`Specs: ${extracted.mileage}mi | ${extracted.exterior_color} | ${extracted.transmission} | ${extracted.drivetrain}`);
-    console.log(`Comments: ${extracted.comments.length} (${extracted.comments.filter(c => c.type === 'bid').length} bids)`);
+    console.log(`=== EXTRACTION RESULTS ===`);
+    console.log(`Title: ${extracted.title}`);
+    console.log(`Year/Make/Model: ${extracted.year} ${extracted.make} ${extracted.model}`);
+    console.log(`VIN: ${extracted.vin || 'NOT FOUND'}`);
+    console.log(`Lot #: ${extracted.lot_number || 'NOT FOUND'}`);
+    console.log(`Sale Price: $${extracted.sale_price?.toLocaleString() || 'N/A'}`);
+    console.log(`Seller: @${extracted.seller_username || 'NOT FOUND'}`);
+    console.log(`Buyer: @${extracted.buyer_username || 'NOT FOUND'}`);
+    console.log(`Views: ${extracted.view_count} | Watchers: ${extracted.watcher_count}`);
+    console.log(`Bids: ${extracted.bid_count} | Comments: ${extracted.comment_count}`);
+    console.log(`Reserve: ${extracted.reserve_status || 'unknown'}`);
+    console.log(`Specs: ${extracted.mileage || '?'}mi | ${extracted.exterior_color || '?'} | ${extracted.transmission || '?'} | ${extracted.drivetrain || '?'}`);
+    console.log(`Images: ${extracted.image_urls.length} | Parsed comments: ${extracted.comments.length}`);
     
     // Optionally save to database
     if (save_to_db) {
@@ -492,7 +617,10 @@ serve(async (req) => {
           bat_bids: extracted.bid_count,
           bat_comments: extracted.comment_count,
           bat_views: extracted.view_count,
+          bat_watchers: extracted.watcher_count,
+          bat_lot_number: extracted.lot_number,
           bat_location: extracted.location,
+          reserve_status: extracted.reserve_status,
           // Specs extracted from listing
           mileage: extracted.mileage,
           color: extracted.exterior_color,
@@ -543,32 +671,70 @@ serve(async (req) => {
         }
       }
       
+      // Create external_listings record for platform tracking
+      const { error: listingError } = await supabase
+        .from('external_listings')
+        .insert({
+          vehicle_id: data.id,
+          platform: 'bat',
+          listing_url: extracted.url,
+          listing_id: extracted.lot_number,
+          listing_status: extracted.sale_price ? 'sold' : 'ended',
+          end_date: extracted.auction_end_date,
+          final_price: extracted.sale_price,
+          bid_count: extracted.bid_count,
+          view_count: extracted.view_count,
+          watcher_count: extracted.watcher_count,
+          sold_at: extracted.sale_price ? extracted.auction_end_date : null,
+          metadata: {
+            lot_number: extracted.lot_number,
+            seller_username: extracted.seller_username,
+            buyer_username: extracted.buyer_username,
+            reserve_status: extracted.reserve_status,
+          },
+        });
+      
+      if (listingError) {
+        console.error('External listing save error:', listingError);
+      } else {
+        console.log(`Created external_listings record`);
+      }
+      
       // Add timeline events
       const events = [];
       if (extracted.auction_end_date) {
-        // Listing event (day before end)
+        // Listing event (7 days before end - standard BaT auction)
         const endDate = new Date(extracted.auction_end_date);
         const listDate = new Date(endDate);
-        listDate.setDate(listDate.getDate() - 7); // Assume 7-day auction
+        listDate.setDate(listDate.getDate() - 7);
         
         events.push({
           vehicle_id: data.id,
           event_type: 'auction_listed',
           event_date: listDate.toISOString().split('T')[0],
-          title: 'Listed on Bring a Trailer',
-          description: `Listed by ${extracted.seller_username || 'seller'}`,
+          title: `Listed on Bring a Trailer (Lot #${extracted.lot_number || 'N/A'})`,
+          description: `Listed by @${extracted.seller_username || 'seller'}. ${extracted.reserve_status === 'no_reserve' ? 'No Reserve.' : ''}`,
           source: 'bat_import',
+          metadata: { lot_number: extracted.lot_number, seller: extracted.seller_username },
         });
         
-        // Sold event
+        // Sold/Ended event
         if (extracted.sale_price) {
           events.push({
             vehicle_id: data.id,
             event_type: 'auction_sold',
             event_date: extracted.auction_end_date,
-            title: 'Sold at Auction',
-            description: `Sold for $${extracted.sale_price.toLocaleString()} with ${extracted.bid_count} bids. Buyer: ${extracted.buyer_username || 'unknown'}`,
+            title: `Sold for $${extracted.sale_price.toLocaleString()}`,
+            description: `Won by @${extracted.buyer_username || 'unknown'} with ${extracted.bid_count} bids. ${extracted.view_count.toLocaleString()} views, ${extracted.watcher_count.toLocaleString()} watchers.`,
             source: 'bat_import',
+            metadata: { 
+              lot_number: extracted.lot_number, 
+              buyer: extracted.buyer_username,
+              sale_price: extracted.sale_price,
+              bid_count: extracted.bid_count,
+              view_count: extracted.view_count,
+              watcher_count: extracted.watcher_count,
+            },
           });
         }
       }

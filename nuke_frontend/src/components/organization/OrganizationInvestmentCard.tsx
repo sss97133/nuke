@@ -58,47 +58,33 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
         .eq('organization_id', organizationId)
         .maybeSingle();
 
-      // Load vehicle stats
-      const { data: vehicleStats } = await supabase
+      // Use business table totals (more accurate) + count from organization_vehicles as fallback
+      const { count: orgVehicleCount } = await supabase
         .from('organization_vehicles')
-        .select(`
-          relationship_type,
-          sale_price,
-          sale_date,
-          vehicles!inner(
-            current_value,
-            sale_price,
-            sale_date
-          )
-        `)
+        .select('*', { count: 'exact', head: true })
         .eq('organization_id', organizationId);
 
-      // Calculate metrics
-      const totalVehicles = vehicleStats?.length || 0;
-      const soldVehicles = vehicleStats?.filter((v: any) => 
-        v.relationship_type === 'sold' || v.sale_price || v.vehicles?.sale_price
-      ).length || 0;
+      // Use the higher of the two counts (businesses.total_vehicles vs org_vehicles count)
+      const totalVehicles = Math.max(
+        org.total_vehicles || 0,
+        orgVehicleCount || 0
+      );
       
-      const totalRevenue = vehicleStats?.reduce((sum: number, v: any) => {
-        const salePrice = v.sale_price || v.vehicles?.sale_price || 0;
-        return sum + (typeof salePrice === 'number' ? salePrice : 0);
-      }, 0) || 0;
+      // Get sold count from organization_vehicles
+      const { count: soldCount } = await supabase
+        .from('organization_vehicles')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .in('relationship_type', ['sold_by', 'sold', 'auctioned_by']);
 
-      const totalValue = vehicleStats?.reduce((sum: number, v: any) => {
-        const value = v.vehicles?.current_value || 0;
-        return sum + (typeof value === 'number' ? value : 0);
-      }, 0) || 0;
-
-      // Build metric data
+      // Build metric data using the org's denormalized fields where available
       const metricData: OrgMetricData = {
         business_type: org.business_type,
-        primary_focus: intelligence?.effective_primary_focus,
+        primary_focus: intelligence?.effective_primary_focus || org.primary_focus,
         total_vehicles: totalVehicles,
-        total_sales: soldVehicles,
-        total_revenue: totalRevenue,
-        total_inventory: vehicleStats?.filter((v: any) => 
-          v.relationship_type === 'in_stock' || v.relationship_type === 'for_sale'
-        ).length || 0,
+        total_sales: org.total_sold || soldCount || 0,
+        total_revenue: org.total_revenue || 0,
+        total_inventory: org.total_listings || 0,
         ...(intelligence || {}),
       };
 
@@ -185,24 +171,91 @@ const OrganizationInvestmentCard: React.FC<OrganizationInvestmentCardProps> = ({
               </div>
             </div>
           </Link>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px',
-              fontSize: '14px',
-              color: 'var(--text-muted)',
-              lineHeight: 1
-            }}
-            title="Close"
-          >
-            ×
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {orgData?.phone && (
+              <a
+                href={`tel:${orgData.phone.replace(/\D/g, '')}`}
+                style={{
+                  background: 'var(--accent)',
+                  color: 'var(--bg)',
+                  border: 'none',
+                  borderRadius: '3px',
+                  padding: '4px 8px',
+                  fontSize: '8pt',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  transition: '0.12s'
+                }}
+                title={`Call ${orgData.phone}`}
+              >
+                CONTACT
+              </a>
+            )}
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                fontSize: '14px',
+                color: 'var(--text-muted)',
+                lineHeight: 1
+              }}
+              title="Close"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div className="card-body">
+          {/* Contact info row */}
+          {orgData?.phone && (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              marginBottom: '12px',
+              padding: '8px 10px',
+              background: 'var(--bg-secondary)',
+              borderRadius: '4px',
+              border: '1px solid var(--border)'
+            }}>
+              <a
+                href={`tel:${orgData.phone.replace(/\D/g, '')}`}
+                style={{
+                  fontSize: '10pt',
+                  fontWeight: 600,
+                  color: 'var(--accent)',
+                  textDecoration: 'none'
+                }}
+              >
+                {orgData.phone}
+              </a>
+              {orgData?.email && (
+                <>
+                  <span style={{ color: 'var(--border)' }}>|</span>
+                  <a
+                    href={`mailto:${orgData.email}`}
+                    style={{
+                      fontSize: '9pt',
+                      color: 'var(--text-muted)',
+                      textDecoration: 'none',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {orgData.email}
+                  </a>
+                </>
+              )}
+            </div>
+          )}
+          
           {loading ? (
             <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
               Loading investment snapshot...
