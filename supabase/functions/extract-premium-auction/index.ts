@@ -182,9 +182,40 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     return upgraded;
   };
   
+  // Universal filter to exclude non-vehicle images (logos, icons, SVGs, etc.)
+  const isGarbageImage = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return true;
+    const lower = url.toLowerCase();
+    
+    // ALWAYS exclude SVGs (never vehicle photos)
+    if (lower.endsWith('.svg') || lower.includes('.svg?')) return true;
+    
+    // Exclude org branding and UI elements (these belong in org-assets bucket)
+    if (lower.includes('/countries/')) return true; // Country flags
+    if (lower.includes('/logo') || lower.includes('/logos/')) return true;
+    if (lower.includes('/icon') || lower.includes('/icons/')) return true;
+    if (lower.includes('/assets/') || lower.includes('/static/')) return true;
+    if (lower.includes('/button') || lower.includes('/badge')) return true;
+    if (lower.includes('/avatar') || lower.includes('/profile_pic')) return true;
+    if (lower.includes('/favicon')) return true;
+    if (lower.includes('/seller/')) return true;
+    if (lower.includes('placeholder')) return true;
+    
+    // Exclude social sharing images
+    if (lower.includes('linkedin.com') || lower.includes('shareArticle')) return true;
+    if (lower.includes('facebook.com/sharer')) return true;
+    if (lower.includes('twitter.com/share')) return true;
+    
+    return false;
+  };
+  
   // Filter function to exclude non-vehicle images (but KEEP documents - they're valuable!)
   const isVehicleImage = (url: string): boolean => {
     if (!url || typeof url !== 'string') return false;
+    
+    // Universal garbage filter first
+    if (isGarbageImage(url)) return false;
+    
     const lower = url.toLowerCase();
     // Must be from media.carsandbids.com
     if (!lower.includes('media.carsandbids.com')) return false;
@@ -193,11 +224,6 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     if (lower.includes('thumbnail') || (lower.includes('thumb') && !lower.match(/thumbnail/i))) {
       // Allow 'thumbnail' in path only if it's clearly a gallery image path
       if (!lower.match(/\/photos\/|\/images\/|\/gallery\//)) return false;
-    }
-    // Exclude UI elements and icons
-    if (lower.includes('/icon') || lower.includes('/icons/') || lower.includes('/logo') || lower.includes('/logos/') || 
-        lower.includes('/button') || lower.includes('/ui/') || lower.includes('/assets/') || lower.includes('/static/')) {
-      return false;
     }
     // NOTE: Documents (window stickers, spec sheets, etc.) are KEPT - they're valuable data
     // They'll just be marked as is_document=true and excluded from primary selection
@@ -1858,6 +1884,127 @@ function extractMecumStructuredSections(html: string): {
 }
 
 /**
+ * Extract structured vehicle specs from Mecum highlights/story text
+ * Parses engine codes, transmission, colors, etc. into proper DB fields
+ */
+function extractMecumStructuredSpecs(highlights: string[], story: string): {
+  engine_code?: string;
+  displacement?: string;
+  engine_size?: string;
+  horsepower?: number;
+  engine_type?: string;
+  transmission?: string;
+  transmission_type?: string;
+  transmission_model?: string;
+  color?: string;
+  color_primary?: string;
+  secondary_color?: string;
+  drivetrain?: string;
+  series?: string;
+  trim?: string;
+  trim_level?: string;
+  has_racing_stripes?: boolean;
+  previous_owners?: number;
+  purchase_location?: string;
+  is_show_car?: boolean;
+} {
+  const specs: Record<string, any> = {};
+  const allText = [...highlights, story].join(' ');
+  
+  // Engine code patterns: L72, LS6, L78, ZL1, etc.
+  const engineCodeMatch = allText.match(/\b(L\d{2}|LS\d|LT\d|ZL\d|ZZ\d|LM\d|LQ\d)\b/i);
+  if (engineCodeMatch) specs.engine_code = engineCodeMatch[1].toUpperCase();
+  
+  // COPO codes for trim
+  const copoMatch = allText.match(/COPO\s*(\d{4}(?:\/\d{4})?)/i);
+  if (copoMatch) specs.trim = `COPO ${copoMatch[1]}`;
+  
+  // Displacement: 427, 454, 350, 302, 396, etc.
+  const displacementMatch = allText.match(/\b(302|327|350|383|396|400|402|427|454|455|502)\s*(?:ci|cubic|V-?8)?/i);
+  if (displacementMatch) {
+    specs.displacement = displacementMatch[1];
+    specs.engine_size = `${displacementMatch[1]} V-8`;
+    specs.engine_type = 'V-8';
+  }
+  
+  // Horsepower: 425 HP, 450hp, 375 horsepower
+  const hpMatch = allText.match(/(\d{3,4})\s*(?:HP|hp|horsepower)/);
+  if (hpMatch) specs.horsepower = parseInt(hpMatch[1], 10);
+  
+  // Transmission: M21, M22, Muncie, TH400, 4-speed, automatic
+  const transMatch = allText.match(/\b(M2[012]|M40|TH\d{3}|Turbo\s*\d{3}|Muncie)\b/i);
+  if (transMatch) {
+    specs.transmission_model = transMatch[1].toUpperCase();
+    specs.transmission_type = /M2[012]|Muncie/i.test(transMatch[1]) ? 'Manual' : 'Automatic';
+  }
+  
+  // 4-speed, 5-speed patterns
+  const speedMatch = allText.match(/\b(\d)-speed\s*(manual|automatic)?/i);
+  if (speedMatch) {
+    const speeds = speedMatch[1];
+    const type = speedMatch[2] ? speedMatch[2].charAt(0).toUpperCase() + speedMatch[2].slice(1).toLowerCase() : 
+                 (parseInt(speeds) <= 5 ? 'Manual' : 'Automatic');
+    if (!specs.transmission) {
+      specs.transmission = `${speeds}-Speed ${type}`;
+    } else {
+      specs.transmission = `${specs.transmission_model} ${speeds}-Speed ${type}`;
+    }
+    specs.transmission_type = type;
+  }
+  
+  // Colors: Olympic Gold, Marina Blue, Hugger Orange, etc.
+  const colorPatterns = [
+    /\b(Olympic Gold|Marina Blue|Hugger Orange|Fathom Green|Cortez Silver|LeMans Blue|Daytona Yellow|Cranberry Red|Burnished Brown|Monza Red|Tuxedo Black|Ermine White|Dover White|Classic White|Butternut Yellow|Glacier Blue|Astro Blue|Dusk Blue|Verdoro Green|Forest Green|Frost Green|Rally Green|Champagne Gold|Autumn Gold|Shadow Gray|Teal Blue|Nevada Silver|Flame Orange|Inferno Orange|Bronze|Gold|Silver|White|Black|Red|Blue|Green|Yellow|Orange)\b/gi
+  ];
+  
+  for (const pattern of colorPatterns) {
+    const colorMatch = allText.match(pattern);
+    if (colorMatch) {
+      specs.color = colorMatch[1];
+      specs.color_primary = colorMatch[1];
+      break;
+    }
+  }
+  
+  // Secondary color / graphics
+  if (/white\s*(?:graphics|stripes|stripe)/i.test(allText)) {
+    specs.secondary_color = 'White';
+    specs.has_racing_stripes = true;
+  } else if (/black\s*(?:graphics|stripes|stripe)/i.test(allText)) {
+    specs.secondary_color = 'Black';
+    specs.has_racing_stripes = true;
+  }
+  
+  // Series: Yenko, Baldwin-Motion, Nickey, Dana, etc.
+  const seriesMatch = allText.match(/\b(Yenko|Baldwin[-\s]?Motion|Nickey|Dana|Berger|Gibb|Fred Gibb|Don Yenko)\b/i);
+  if (seriesMatch) specs.series = seriesMatch[1].replace(/[-\s]+/g, '-');
+  
+  // Count previous owners mentioned
+  const ownerMatches = allText.match(/from\s+(?:the\s+)?original\s+owner|acquired\s+(?:from|by)|previous\s+owner/gi);
+  if (ownerMatches && ownerMatches.length > 0) {
+    specs.previous_owners = Math.min(ownerMatches.length + 1, 5);
+  }
+  
+  // Original dealer location
+  const dealerMatch = allText.match(/sold\s+(?:new\s+)?(?:at|by)\s+([^,]+),\s*([A-Za-z]+)/i);
+  if (dealerMatch) {
+    specs.purchase_location = `${dealerMatch[1].trim()}, ${dealerMatch[2].trim()}`;
+  }
+  
+  // Show car indicators
+  if (/award\s*winner|multiple\s*awards?|concours|trophy|trophies|featured\s+(?:cover\s+)?car/i.test(allText)) {
+    specs.is_show_car = true;
+  }
+  
+  // Drivetrain (assume RWD for classic muscle cars)
+  if (specs.engine_type === 'V-8' || specs.displacement) {
+    specs.drivetrain = 'RWD';
+  }
+  
+  return specs;
+}
+
+/**
  * Extract sold price from Mecum listing HTML using DOM parsing
  * Based on user-provided DOM paths for sold listings
  * CRITICAL: Excludes lot header elements (lot number, date, location) to avoid false matches
@@ -2912,16 +3059,29 @@ async function storeVehiclesInDatabase(
           model: vehicle.model || "Unknown",
           year: Number.isFinite(vehicle.year) ? vehicle.year : null,
           trim: vehicle.trim || null,
+          trim_level: vehicle.trim_level || null,
+          series: vehicle.series || null,
           vin,
           mileage: Number.isFinite(vehicle.mileage) ? Math.trunc(vehicle.mileage) : null,
           color: vehicle.color || null,
+          color_primary: vehicle.color_primary || vehicle.color || null,
+          secondary_color: vehicle.secondary_color || null,
           interior_color: vehicle.interior_color || null,
           transmission: vehicle.transmission || null,
+          transmission_type: vehicle.transmission_type || null,
+          transmission_model: vehicle.transmission_model || null,
           engine_size: vehicle.engine_size || null,
+          engine_code: vehicle.engine_code || null,
+          engine_type: vehicle.engine_type || null,
+          horsepower: Number.isFinite(vehicle.horsepower) ? vehicle.horsepower : null,
           drivetrain: vehicle.drivetrain || null,
           fuel_type: vehicle.fuel_type || null,
           body_style: vehicle.body_style || null,
           displacement: vehicle.displacement || null,
+          previous_owners: Number.isFinite(vehicle.previous_owners) ? vehicle.previous_owners : null,
+          purchase_location: vehicle.purchase_location || null,
+          is_show_car: vehicle.is_show_car === true ? true : null,
+          has_racing_stripes: vehicle.has_racing_stripes === true ? true : null,
           asking_price: askingPrice,
           sale_price: salePrice,
           // IMPORTANT: keep `vehicles.description` as a curated summary (not a raw listing dump).
@@ -3651,19 +3811,56 @@ async function insertVehicleImages(
   const batchSize = options?.batchSize ?? 5; // Process 5 images at a time
   const delayMs = options?.delayMs ?? 1000; // 1 second delay between batches
   
-  // Clean all URLs before processing and filter out organization/dealer logos
+  // Universal garbage filter - these should NEVER be vehicle images
+  const isGarbageUrl = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return true;
+    const lower = url.toLowerCase();
+    
+    // ALWAYS exclude SVGs (never vehicle photos)
+    if (lower.endsWith('.svg') || lower.includes('.svg?') || lower.includes('.svg#')) return true;
+    
+    // Exclude tiny thumbnails (80x80, 100x100, 120x120 etc.) - not useful as vehicle images
+    if (lower.includes('width=80') && lower.includes('height=80')) return true;
+    if (lower.includes('width=100') && lower.includes('height=100')) return true;
+    if (lower.includes('width=120') && lower.includes('height=120')) return true;
+    
+    // Exclude org branding and UI elements
+    if (lower.includes('/countries/')) return true;
+    if (lower.includes('/logo') || lower.includes('/logos/') || lower.includes('logo.')) return true;
+    if (lower.includes('/icon') || lower.includes('/icons/')) return true;
+    if (lower.includes('/assets/') || lower.includes('/static/')) return true;
+    if (lower.includes('/button') || lower.includes('/badge')) return true;
+    if (lower.includes('/avatar') || lower.includes('/profile_pic')) return true;
+    if (lower.includes('/favicon')) return true;
+    if (lower.includes('/seller/')) return true;
+    if (lower.includes('placeholder')) return true;
+    
+    // Exclude social sharing images
+    if (lower.includes('linkedin.com') || lower.includes('shareArticle')) return true;
+    if (lower.includes('facebook.com/sharer')) return true;
+    if (lower.includes('twitter.com/share')) return true;
+    
+    // Organization/dealer logos
+    if (lower.includes('organization-logos/') || lower.includes('organization_logos/')) return true;
+    if (lower.includes('images.classic.com/uploads/dealer/')) return true;
+    if (lower.includes('/uploads/dealer/')) return true;
+    
+    return false;
+  };
+  
+  // Clean all URLs before processing and filter out garbage
   const urls = (Array.isArray(imageUrls) ? imageUrls : [])
     .map((u) => cleanImageUrl(String(u || "").trim(), source))
     .filter((u) => {
       if (!u || !u.startsWith("http")) return false;
+      
+      // Apply universal garbage filter
+      if (isGarbageUrl(u)) {
+        console.warn(`⚠️ Rejecting garbage image: ${u}`);
+        return false;
+      }
+      
       const urlLower = u.toLowerCase();
-      // CRITICAL: Exclude organization/dealer logos - these should NEVER be vehicle images
-      if (urlLower.includes('organization-logos/') || urlLower.includes('organization_logos/')) return false;
-      if (urlLower.includes('images.classic.com/uploads/dealer/')) return false;
-      if (urlLower.includes('/uploads/dealer/')) return false;
-      // Exclude logos in storage paths
-      if ((urlLower.includes('/logo') || urlLower.includes('logo.')) && 
-          (urlLower.includes('/storage/') || urlLower.includes('supabase.co'))) return false;
       // CRITICAL: Reject Vimeo CDN thumbnails (low-quality video thumbnails, not vehicle photos)
       if (urlLower.includes('vimeocdn.com')) {
         // Check for thumbnail size parameters (mw=80, mw=100, mw=120 = very small thumbnails)
@@ -4409,6 +4606,12 @@ async function extractMecum(url: string, maxVehicles: number) {
           console.log(`Extracted story (${structuredSections.story.length} chars)`);
         }
       }
+      
+      // Extract structured vehicle specs from highlights/story into proper DB fields
+      const extractedSpecs = extractMecumStructuredSpecs(structuredSections.highlights, structuredSections.story);
+      if (Object.keys(extractedSpecs).length > 0) {
+        console.log(`Extracted specs: ${JSON.stringify(extractedSpecs)}`);
+      }
 
       // Merge sold price: prioritize DOM extraction over Firecrawl (more reliable for sold listings)
       const finalSalePrice = domSoldPrice || vehicle?.sale_price || null;
@@ -4432,6 +4635,8 @@ async function extractMecum(url: string, maxVehicles: number) {
         description: finalDescription, // Use DOM-extracted full description if available
         highlights: structuredSections.highlights.length > 0 ? structuredSections.highlights : undefined,
         story: structuredSections.story || undefined,
+        // Structured specs extracted from highlights/story
+        ...extractedSpecs,
       };
     } catch (e: any) {
       issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);

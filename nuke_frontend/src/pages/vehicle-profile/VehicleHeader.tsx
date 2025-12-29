@@ -2249,134 +2249,42 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               </span>
             );
           })()}
-          {/* Hide external import/source badge once the profile is claimed/verified to avoid contaminating context */}
-          {!isVerifiedOwner && vehicle && (vehicle as any).profile_origin && (() => {
-            // Don't show origin badge if we're showing organization name (avoid duplication)
-            const isAutomatedImport = vehicle?.profile_origin === 'dropbox_import' && 
-                                      (vehicle?.origin_metadata?.automated_import === true || 
-                                       vehicle?.origin_metadata?.no_user_uploader === true ||
-                                       !vehicle?.uploaded_by);
-            const isOrgName = isAutomatedImport && vehicle?.origin_organization_id && responsibleName;
-            
-            // Only show badge if not showing org name
-            if (isOrgName) return null;
-
-            // Avoid duplicate platform badging (e.g. BaT favicon + "BaT" twice) when auction telemetry is present.
-            if (auctionPulse?.listing_url) {
-              const origin = String((vehicle as any).profile_origin || '');
-              const discoveryUrl = String((vehicle as any).discovery_url || '');
-              const isBatOrigin = origin === 'bat_import' || discoveryUrl.includes('bringatrailer.com/listing/');
-              const isBatPulse = String(auctionPulse.platform || '').toLowerCase() === 'bat';
-              if (isBatOrigin && isBatPulse) return null;
-            }
-            
-            // Hide origin badge if consigner badge is showing the same platform
-            const discoveryUrl = String((vehicle as any).discovery_url || '').toLowerCase();
-            const sellerLabel = sellerBadge?.label?.toLowerCase() || '';
-            const isCarsAndBidsOrigin = discoveryUrl.includes('carsandbids.com');
-            const isCarsAndBidsConsigner = sellerLabel.includes('cars & bids') || sellerLabel.includes('carsandbids');
-            // If origin is Cars & Bids and consigner badge is also Cars & Bids, hide origin badge
-            if (isCarsAndBidsOrigin && isCarsAndBidsConsigner) return null;
-            
-            // Also hide if platform badge is showing Cars & Bids
-            const isCarsAndBidsPulse = String(auctionPulse?.platform || '').toLowerCase() === 'cars_and_bids' || 
-                                       String(auctionPulse?.platform || '').toLowerCase() === 'carsandbids';
-            if (isCarsAndBidsOrigin && isCarsAndBidsPulse) return null;
-            
-            // Hide external link badge for live auction house listings - keep traffic on-site
-            // Users should use our proxy bidding service, not navigate to auction sites directly
-            const isLiveAuctionHouseListing = 
-              discoveryUrl.includes('mecum.com') ||
-              discoveryUrl.includes('barrett-jackson.com') ||
-              discoveryUrl.includes('barrettjackson.com') ||
-              discoveryUrl.includes('bonhams.com') ||
-              discoveryUrl.includes('rmsothebys.com') ||
-              discoveryUrl.includes('gooding') ||
-              discoveryUrl.includes('worldwide-auctioneers');
-            if (isLiveAuctionHouseListing) return null;
-            
-            return (
-              <span 
-                style={{ 
-                  fontSize: '7pt', 
-                  color: mutedTextColor, 
-                  padding: '1px 6px', 
-                  background: 'var(--grey-100)', 
-                  borderRadius: '3px', 
-                  whiteSpace: 'nowrap',
-                  cursor: 'pointer',
-                  transition: 'all 0.12s ease',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const origin = (vehicle as any).profile_origin;
-                  const discoveryUrl = (vehicle as any).discovery_url;
-                  if (discoveryUrl) {
-                    window.open(discoveryUrl, '_blank');
-                  } else {
-                    alert(`Imported via ${origin}\n\nClick the source badge on other vehicles to see their import stats.`);
-                  }
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--border)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--grey-100)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-                title={(vehicle as any).discovery_url ? "Click to view original listing" : "Import source"}
-              >
-                {(() => {
-                  const origin = (vehicle as any).profile_origin;
-                  const discoveryUrl = (vehicle as any).discovery_url;
-                  
-                  // Show favicon for known sources with URLs (and ALWAYS show text label)
-                  if (discoveryUrl) {
-                    try {
-                      const domain = new URL(discoveryUrl).hostname;
-                      return (
-                        <>
-                          <img 
-                            src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
-                            alt=""
-                            style={{ width: '10px', height: '10px' }}
-                            onError={(e) => {
-                              // Fallback to text if favicon fails
-                              e.currentTarget.style.display = 'none';
-                            }}
-                          />
-                          {origin === 'bat_import' ? 'BaT' : 
-                           origin === 'ksl_import' ? 'KSL' :
-                           origin === 'craigslist_scrape' ? 'CL' :
-                           domain.split('.')[0].toUpperCase()}
-                        </>
-                      );
-                    } catch {
-                      // Invalid URL, fallback to text
-                    }
-                  }
-                  
-                  // Fallback: Just show text label
-                  const originLabels: Record<string, string> = {
-                    'bat_import': 'BaT',
-                    'dropbox_import': 'Dropbox',
-                    'url_scraper': 'Scraped',
-                    'manual_entry': 'Manual',
-                    'craigslist_scrape': 'CL',
-                    'ksl_import': 'KSL',
-                    'api_import': 'API'
-                  };
-                  // Map the origin to display label, fallback to origin itself if not in map
-                  const displayLabel = originLabels[origin] || origin?.replace(/_/g, ' ') || 'Unknown';
-                  return displayLabel;
-                })()}
-              </span>
-            );
-          })()}
+          {/* CLAIM badge for unclaimed vehicles */}
+          {!isVerifiedOwner && !isPending && !hasClaim && vehicle && (
+            <a
+              href={claimHref}
+              style={{ 
+                fontSize: '7pt', 
+                color: '#0891b2',
+                padding: '1px 6px', 
+                background: '#ecfeff', 
+                border: '1px solid #06b6d4',
+                borderRadius: '3px', 
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                transition: 'all 0.12s ease',
+                textDecoration: 'none',
+                fontWeight: 600
+              }}
+              onClick={(e) => {
+                if (onClaimClick) {
+                  e.preventDefault();
+                  onClaimClick();
+                }
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#cffafe';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#ecfeff';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+              title="Claim ownership of this vehicle"
+            >
+              CLAIM
+            </a>
+          )}
           <div style={{ position: 'relative', fontSize: '7pt', color: mutedTextColor, display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
             {isVerifiedOwner ? (
             <button
