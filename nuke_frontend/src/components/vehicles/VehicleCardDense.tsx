@@ -129,18 +129,28 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const auctionEndDate = React.useMemo(() => {
     const v: any = vehicle as any;
     // Check external_listings first (most up-to-date for live auctions)
-    const externalEndDate = v?.external_listings?.[0]?.end_date;
-    return externalEndDate || v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date || null;
+    const externalListing = v?.external_listings?.[0];
+    if (externalListing?.end_date) {
+      return externalListing.end_date;
+    }
+    // Fallback to vehicle-level data
+    return v.auction_end_date || v.origin_metadata?.auction_times?.auction_end_date || null;
   }, [vehicle]);
 
+  // Update timer every second for active auctions
   React.useEffect(() => {
-    if (!auctionEndDate) return;
+    if (!isActiveAuction || !auctionEndDate) return;
     const tick = () => setAuctionNow(Date.now());
+    // Update immediately
+    tick();
+    // Then update every second
     const id = window.setInterval(() => {
-      if (document.visibilityState === 'visible') tick();
+      if (document.visibilityState === 'visible') {
+        tick();
+      }
     }, 1000);
     return () => window.clearInterval(id);
-  }, [auctionEndDate]);
+  }, [isActiveAuction, auctionEndDate]);
 
   const formatAuctionTimer = React.useMemo(() => {
     if (!auctionEndDate) return null;
@@ -530,11 +540,18 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     if (isActiveAuction) {
       const externalListing = v?.external_listings?.[0];
       if (externalListing) {
+        // Check current_bid first (most up-to-date for live auctions)
         const listingLiveBid = typeof externalListing.current_bid === 'number' 
           ? externalListing.current_bid 
           : null;
-        if (listingLiveBid && listingLiveBid > 0) {
+        if (listingLiveBid !== null && listingLiveBid > 0) {
           return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(listingLiveBid);
+        }
+        // If current_bid is 0 or null, check if there are any bids at all
+        const bidCount = typeof externalListing.bid_count === 'number' ? externalListing.bid_count : 0;
+        if (bidCount === 0) {
+          // No bids yet - return null so badge can show "BID" label
+          return null;
         }
       }
       
@@ -545,6 +562,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       if (currentBid) {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(currentBid);
       }
+      
+      // No bids yet for active auction
+      return null;
     }
     
     // For ended auctions or non-auction cases, show final results
