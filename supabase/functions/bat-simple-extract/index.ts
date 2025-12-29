@@ -3,6 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { fetchBatPage, logFetchCost, type FetchResult } from '../_shared/batFetcher.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -521,18 +522,19 @@ function extractComments(html: string, sellerUsername: string | null): BatCommen
 }
 
 
+// Store the last fetch result for cost logging
+let lastFetchResult: FetchResult | null = null;
+
 async function extractBatListing(url: string): Promise<BatExtracted> {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-    },
-  });
+  // Use the transparent hybrid fetcher (tries direct first, falls back to Firecrawl if rate limited)
+  const fetchResult = await fetchBatPage(url);
+  lastFetchResult = fetchResult;  // Store for cost logging
   
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+  if (!fetchResult.html) {
+    throw new Error(`Failed to fetch ${url}: ${fetchResult.error || 'unknown error'}`);
   }
   
-  const html = await response.text();
+  const html = fetchResult.html;
   
   const titleData = extractTitle(html);
   const auctionData = extractAuctionData(html);
@@ -577,8 +579,21 @@ serve(async (req) => {
       );
     }
 
+    // Always create supabase client for cost logging
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
     console.log(`Extracting: ${url}`);
     const extracted = await extractBatListing(url);
+    
+    // Log fetch cost if Firecrawl was used (transparent cost tracking)
+    if (lastFetchResult) {
+      await logFetchCost(supabase, 'bat-simple-extract', url, lastFetchResult);
+      console.log(`=== FETCH SOURCE: ${lastFetchResult.source.toUpperCase()} (cost: ${lastFetchResult.costCents} cents) ===`);
+    }
+    
     console.log(`=== EXTRACTION RESULTS ===`);
     console.log(`Title: ${extracted.title}`);
     console.log(`Year/Make/Model: ${extracted.year} ${extracted.make} ${extracted.model}`);
@@ -595,10 +610,6 @@ serve(async (req) => {
     
     // Optionally save to database
     if (save_to_db) {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
       
       // Insert new vehicle (not upsert - start fresh)
       const { data, error } = await supabase
@@ -776,7 +787,14 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, extracted }),
+      JSON.stringify({
+        success: true,
+        extracted,
+        _fetch: lastFetchResult ? {
+          source: lastFetchResult.source,
+          cost_cents: lastFetchResult.costCents,
+        } : null,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
     

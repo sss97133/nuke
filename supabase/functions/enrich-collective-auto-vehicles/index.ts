@@ -39,32 +39,15 @@ Deno.serve(async (req) => {
     console.log('🔧 ENRICHING COLLECTIVE AUTO VEHICLES');
     console.log('='.repeat(70));
 
-    // Get vehicles that need enrichment (no VIN or no images)
-    // First get Collective Auto vehicles, then filter for ones needing enrichment
-    const { data: allCollectiveVehicles, error: queryError } = await supabase
+    // Get vehicles that need enrichment (no VIN or missing discovery_url data)
+    // Use origin_organization_id for accurate filtering
+    const { data: vehicles, error: queryError } = await supabase
       .from('vehicles')
-      .select('id, listing_url, vin, mileage, year, make, model')
-      .or('discovery_source.eq.Collective Auto Group,listing_source.eq.Collective Auto Group,listing_url.like.%collectiveauto%')
-      .limit(500);
-    
-    // Filter to vehicles needing enrichment
-    const vehiclesNeedingEnrichment: typeof allCollectiveVehicles = [];
-    for (const v of allCollectiveVehicles || []) {
-      if (!v.vin) {
-        vehiclesNeedingEnrichment.push(v);
-      } else {
-        // Check if has images
-        const { count } = await supabase
-          .from('vehicle_images')
-          .select('*', { count: 'exact', head: true })
-          .eq('vehicle_id', v.id);
-        if (!count || count === 0) {
-          vehiclesNeedingEnrichment.push(v);
-        }
-      }
-      if (vehiclesNeedingEnrichment.length >= limit) break;
-    }
-    const vehicles = vehiclesNeedingEnrichment.slice(0, limit);
+      .select('id, listing_url, discovery_url, vin, mileage, year, make, model')
+      .eq('origin_organization_id', ORG_ID)
+      .is('vin', null)
+      .not('discovery_url', 'is', null)
+      .limit(limit);
 
     if (queryError) {
       throw new Error(`Query error: ${queryError.message}`);
@@ -78,15 +61,16 @@ Deno.serve(async (req) => {
     for (const vehicle of vehicles || []) {
       console.log(`\n🚗 [${enriched + errors + 1}/${vehicles.length}] ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
       
-      if (!vehicle.listing_url) {
-        console.log('   ⚠️  No listing URL, skipping');
+      const sourceUrl = vehicle.discovery_url || vehicle.listing_url;
+      if (!sourceUrl) {
+        console.log('   ⚠️  No source URL, skipping');
         errors++;
         continue;
       }
 
       try {
         // Scrape detail page via Firecrawl
-        console.log(`   🔥 Scraping ${vehicle.listing_url}`);
+        console.log(`   🔥 Scraping ${sourceUrl}`);
         const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
           method: 'POST',
           headers: {
@@ -94,7 +78,7 @@ Deno.serve(async (req) => {
             'Authorization': `Bearer ${firecrawlKey}`,
           },
           body: JSON.stringify({
-            url: vehicle.listing_url,
+            url: sourceUrl,
             waitFor: 3000,
             formats: ['html'],
           }),
@@ -189,7 +173,7 @@ Deno.serve(async (req) => {
               position: idx + 1,
               is_primary: idx === 0,
               source: 'organization_import',
-              source_url: vehicle.listing_url,
+              source_url: sourceUrl,
               is_external: true,
             }));
 
@@ -216,7 +200,7 @@ Deno.serve(async (req) => {
             relationship_type: 'sold_by',
             status: 'sold',
             listing_status: 'sold',
-            notes: `Vehicle sold by Collective Auto Group. Source: ${vehicle.listing_url}`,
+            notes: `Vehicle sold by Collective Auto Group. Source: ${sourceUrl}`,
           }, { onConflict: 'organization_id,vehicle_id' });
 
         enriched++;

@@ -1,13 +1,21 @@
 /**
- * CONTEXTUAL IMAGE ANALYZER
+ * DEPRECATED: analyze-image-contextual
  * 
- * Intelligent image analysis that:
- * 1. Loads vehicle context (year/make/model, specs, owner, location)
- * 2. Loads existing documentation (receipts, manuals, work history)
- * 3. Creates targeted questionnaires based on context
- * 4. Analyzes images with full context awareness
- * 5. Avoids wasting tokens on vague questions
- * 6. Can reprocess when new documentation arrives
+ * This function is DEPRECATED. Use `analyze-image` instead.
+ * 
+ * Context awareness is now built into the main analyze-image function.
+ * It automatically loads vehicle context when vehicle_id is provided.
+ * 
+ * Migration: Replace calls to this function with:
+ *   supabase.functions.invoke('analyze-image', {
+ *     body: { image_url, vehicle_id, image_id }
+ *   })
+ * 
+ * ORIGINAL PURPOSE (now in analyze-image):
+ * 1. Loads vehicle context (year/make/model, specs)
+ * 2. Loads existing documentation (receipts, manuals, work history)  
+ * 3. Creates context-aware analysis
+ * 4. Avoids wasting tokens on vague questions
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"

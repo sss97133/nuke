@@ -1,5 +1,6 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { fetchBatPage, logFetchCost, shouldUseFirecrawlForLivePolling } from '../_shared/batFetcher.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,48 +16,26 @@ function asInt(s?: string | null): number | null {
 /**
  * Sync live BaT listing data (bid count, watcher count, current bid)
  * Called periodically or manually to update active listings
+ * Note: verify_jwt is disabled for this function since it's called by cron/other functions
  */
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Require authentication (prevents public abuse of upstream scraping).
-    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization') || '';
-    if (!authHeader) {
-      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
-        status: 401,
+    const { externalListingId } = await req.json();
+    
+    if (!externalListingId) {
+      return new Response(JSON.stringify({ success: false, error: 'Missing externalListingId' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { externalListingId } = await req.json();
-
-    // Verify authentication - accept either JWT token OR service role key (for function-to-function calls)
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const token = authHeader.replace('Bearer ', '').trim();
-    const isServiceRoleKey = token === serviceRoleKey.trim();
-    
-    if (!isServiceRoleKey) {
-      // For non-service-role calls, validate JWT token
-      const supabaseAuth = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
-      const { data: authData, error: authErr } = await supabaseAuth.auth.getUser();
-      if (authErr || !authData?.user) {
-        return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    }
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Get the external listing
@@ -72,9 +51,31 @@ serve(async (req) => {
 
     console.log(`Syncing BaT listing: ${listing.listing_url}`);
 
-    // Fetch the BaT page
-    const response = await fetch(listing.listing_url);
-    const html = await response.text();
+    // COST CONTROL: For live polling, try direct fetch first without Firecrawl fallback
+    // This is called frequently, so we want to minimize costs
+    let fetchResult = await fetchBatPage(listing.listing_url, { skipFirecrawlFallback: true });
+    
+    // If direct fetch failed and auction is ending soon (< 10 min), it's worth paying for Firecrawl
+    if (!fetchResult.html && shouldUseFirecrawlForLivePolling(listing.end_date, true)) {
+      console.log(`[sync-bat-listing] Auction ending soon - trying Firecrawl fallback`);
+      fetchResult = await fetchBatPage(listing.listing_url, { forceFirecrawl: true });
+      await logFetchCost(supabase, 'sync-bat-listing', listing.listing_url, fetchResult);
+    }
+    
+    if (!fetchResult.html) {
+      // Log the failure but don't crash - we'll try again next poll
+      console.warn(`[sync-bat-listing] Failed to fetch ${listing.listing_url}: ${fetchResult.error}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: fetchResult.error || 'Failed to fetch listing',
+          listing_id: externalListingId,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const html = fetchResult.html;
 
     // Determine ended/sold state early to avoid writing bogus end_date values on completed auctions.
     const isEndedText = /Auction Ended/i.test(html);
@@ -255,6 +256,10 @@ serve(async (req) => {
           viewCount,
           status: newStatus,
           finalPrice
+        },
+        _fetch: {
+          source: fetchResult.source,
+          cost_cents: fetchResult.costCents,
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

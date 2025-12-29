@@ -1554,9 +1554,59 @@ const CursorHomepage: React.FC = () => {
         // ignore
       }
 
+      // Helper function to check if an image URL indicates poor quality or wrong image
+      const isPoorQualityImage = (url: string | null, fileSize: number | null = null): boolean => {
+        if (!url) return true;
+        const urlLower = String(url).toLowerCase();
+        
+        // Check for dealer logos and placeholder images
+        if (
+          urlLower.includes('/dealer/') ||
+          urlLower.includes('/logo') ||
+          urlLower.includes('logo-') ||
+          urlLower.includes('.svg') ||
+          urlLower.includes('placeholder') ||
+          urlLower.includes('no-image') ||
+          urlLower.includes('default') ||
+          urlLower.includes('missing')
+        ) {
+          return true;
+        }
+        
+        // Check for very small file sizes (< 10KB typically indicates low quality or placeholder)
+        if (fileSize !== null && fileSize < 10000) {
+          return true;
+        }
+        
+        // Check for known bad URL patterns (dealer logos from classic.com, etc.)
+        // These are always logos, not actual car photos
+        if (
+          urlLower.includes('images.classic.com/uploads/dealer/') ||
+          urlLower.includes('images.classic.com/uploads/dealer') ||
+          (urlLower.includes('cdn.dealeraccelerate.com') && urlLower.includes('logo'))
+        ) {
+          return true;
+        }
+        
+        // Check for PNG files with small dimensions in query params (like ?h=150&w=150)
+        // These are typically dealer logos or thumbnails, not full car photos
+        if (urlLower.includes('.png') && (urlLower.includes('?h=150') || urlLower.includes('&h=150') || urlLower.includes('?w=150') || urlLower.includes('&w=150'))) {
+          // But allow if it's from a known good source (like BaT or our own storage)
+          if (!urlLower.includes('images.classic.com') && !urlLower.includes('/dealer/')) {
+            // Might be a legitimate thumbnail, so don't filter it out
+            return false;
+          }
+          // If it's from classic.com or has /dealer/, it's definitely a logo
+          return true;
+        }
+        
+        return false;
+      };
+
       // Batch-load thumbnail/medium image variants for optimal grid performance
       const thumbnailByVehicleId = new Map<string, string | null>();
       const mediumByVehicleId = new Map<string, string | null>();
+      const vehicleImageQualityMap = new Map<string, { hasGoodImages: boolean; hasAnyImages: boolean }>();
       try {
         const vehicleIds = Array.from(new Set((vehicles || []).map((v: any) => String(v?.id || '')).filter(Boolean)));
         if (vehicleIds.length > 0) {
@@ -1566,7 +1616,7 @@ const CursorHomepage: React.FC = () => {
             const chunk = vehicleIds.slice(i, i + chunkSize);
             const { data: imgs, error: imgErr } = await supabase
               .from('vehicle_images')
-              .select('vehicle_id, thumbnail_url, medium_url, image_url, variants')
+              .select('vehicle_id, thumbnail_url, medium_url, image_url, variants, file_size')
               .in('vehicle_id', chunk)
               .order('is_primary', { ascending: false })
               .order('created_at', { ascending: true });
@@ -1579,28 +1629,49 @@ const CursorHomepage: React.FC = () => {
             
             const imageRecords = Array.isArray(imgs) ? imgs : [];
             
-            // Group by vehicle_id and take first (primary or oldest)
+            // Group by vehicle_id and track image quality
             const seenVehicleIds = new Set<string>();
             for (const img of imageRecords) {
               const vid = String(img?.vehicle_id || '');
-              if (!vid || seenVehicleIds.has(vid)) continue;
-              seenVehicleIds.add(vid);
+              if (!vid) continue;
               
-              const variants = (img?.variants && typeof img.variants === 'object') ? img.variants : {};
-              
-              // Prioritize thumbnail, then medium, then full image
-              const thumbnail = variants?.thumbnail || img?.thumbnail_url || null;
-              const medium = variants?.medium || img?.medium_url || null;
-              
-              // Normalize URLs (convert signed to public if needed)
-              const normalizedThumbnail = thumbnail ? normalizeSupabaseStorageUrl(thumbnail) : null;
-              const normalizedMedium = medium ? normalizeSupabaseStorageUrl(medium) : null;
-              
-              if (normalizedThumbnail) {
-                thumbnailByVehicleId.set(vid, normalizedThumbnail);
+              // Initialize quality tracking for this vehicle
+              if (!vehicleImageQualityMap.has(vid)) {
+                vehicleImageQualityMap.set(vid, { hasGoodImages: false, hasAnyImages: false });
               }
-              if (normalizedMedium) {
-                mediumByVehicleId.set(vid, normalizedMedium);
+              
+              const quality = vehicleImageQualityMap.get(vid)!;
+              quality.hasAnyImages = true;
+              
+              // Check if this is a good quality image
+              const imageUrl = img?.image_url || img?.medium_url || img?.thumbnail_url || null;
+              const fileSize = img?.file_size ? Number(img.file_size) : null;
+              
+              if (!isPoorQualityImage(imageUrl, fileSize)) {
+                quality.hasGoodImages = true;
+              }
+              
+              // Only process first image per vehicle for thumbnail/medium maps
+              if (!seenVehicleIds.has(vid)) {
+                seenVehicleIds.add(vid);
+                
+                const variants = (img?.variants && typeof img.variants === 'object') ? img.variants : {};
+                
+                // Prioritize thumbnail, then medium, then full image
+                const thumbnail = variants?.thumbnail || img?.thumbnail_url || null;
+                const medium = variants?.medium || img?.medium_url || null;
+                
+                // Normalize URLs (convert signed to public if needed)
+                const normalizedThumbnail = thumbnail ? normalizeSupabaseStorageUrl(thumbnail) : null;
+                const normalizedMedium = medium ? normalizeSupabaseStorageUrl(medium) : null;
+                
+                // Only use images that aren't poor quality
+                if (normalizedThumbnail && !isPoorQualityImage(normalizedThumbnail, fileSize)) {
+                  thumbnailByVehicleId.set(vid, normalizedThumbnail);
+                }
+                if (normalizedMedium && !isPoorQualityImage(normalizedMedium, fileSize)) {
+                  mediumByVehicleId.set(vid, normalizedMedium);
+                }
               }
             }
           }
@@ -1610,8 +1681,34 @@ const CursorHomepage: React.FC = () => {
         // Non-fatal: continue with fallback images
       }
 
+      // Filter out vehicles without images or with only poor quality images
+      const vehiclesWithGoodImages = (vehicles || []).filter((v: any) => {
+        const vehicleId = String(v?.id || '');
+        
+        // Check if vehicle has good quality images from vehicle_images table
+        const quality = vehicleImageQualityMap.get(vehicleId);
+        const hasGoodImagesFromTable = quality?.hasGoodImages || false;
+        const hasThumbnail = thumbnailByVehicleId.has(vehicleId);
+        const hasMedium = mediumByVehicleId.has(vehicleId);
+        
+        // Check if vehicle has primary_image_url or image_url set (and they're good quality)
+        const primaryImageUrl = v.primary_image_url ? String(v.primary_image_url).trim() : null;
+        const imageUrl = v.image_url ? String(v.image_url).trim() : null;
+        const hasGoodPrimaryImage = primaryImageUrl && primaryImageUrl.length > 0 && !isPoorQualityImage(primaryImageUrl);
+        const hasGoodImageUrl = imageUrl && imageUrl.length > 0 && !isPoorQualityImage(imageUrl);
+        
+        // Check if vehicle has images in origin_metadata (for scraped listings)
+        // Filter out poor quality origin images
+        const originImages = getOriginImages(v);
+        const goodOriginImages = originImages.filter(img => !isPoorQualityImage(img));
+        const hasGoodOriginImages = goodOriginImages.length > 0;
+        
+        // Vehicle must have at least one GOOD quality image from any source
+        return hasGoodImagesFromTable || hasThumbnail || hasMedium || hasGoodPrimaryImage || hasGoodImageUrl || hasGoodOriginImages;
+      });
+
       // Process vehicles with optimized image data (use thumbnails for grid performance)
-      const processed = (vehicles || []).map((v: any) => {
+      const processed = vehiclesWithGoodImages.map((v: any) => {
         const salePrice = v.sale_price ? Number(v.sale_price) : null;
         const askingPrice = v.asking_price ? Number(v.asking_price) : null;
         const currentValue = v.current_value ? Number(v.current_value) : null;
@@ -1649,9 +1746,16 @@ const CursorHomepage: React.FC = () => {
         const mediumUrl = mediumByVehicleId.get(vehicleId) || null;
         
         // Fallback chain: thumbnail -> medium -> primary_image_url -> image_url
-        const optimalImageUrl = thumbnailUrl || mediumUrl || 
-          normalizeSupabaseStorageUrl(v.primary_image_url) ||
-          normalizeSupabaseStorageUrl(v.image_url) ||
+        // BUT: Only use images that pass quality checks
+        const normalizedPrimary = v.primary_image_url ? normalizeSupabaseStorageUrl(v.primary_image_url) : null;
+        const normalizedImageUrl = v.image_url ? normalizeSupabaseStorageUrl(v.image_url) : null;
+        
+        // Check each candidate and only use good quality images
+        const optimalImageUrl = 
+          (thumbnailUrl && !isPoorQualityImage(thumbnailUrl)) ? thumbnailUrl :
+          (mediumUrl && !isPoorQualityImage(mediumUrl)) ? mediumUrl :
+          (normalizedPrimary && !isPoorQualityImage(normalizedPrimary)) ? normalizedPrimary :
+          (normalizedImageUrl && !isPoorQualityImage(normalizedImageUrl)) ? normalizedImageUrl :
           null;
 
         // Store both thumbnail and full-size for different use cases
@@ -1708,8 +1812,15 @@ const CursorHomepage: React.FC = () => {
         };
       });
 
-      // Keep original order (most recent first) - no hype score sorting
-      const sorted = processed;
+      // Final filter: Remove vehicles that ended up with no good quality images after processing
+      // This catches cases where a vehicle passed initial checks but all its images were poor quality
+      const sorted = processed.filter((v: any) => {
+        // Check the processed image URL (which should be optimalImageUrl)
+        const imageUrl = v.primary_image_url || v.image_url;
+        if (!imageUrl) return false; // No image at all
+        return !isPoorQualityImage(imageUrl); // Must be good quality
+      });
+      
       setHasMore((vehicles || []).length >= PAGE_SIZE);
       setPage(pageNum);
 

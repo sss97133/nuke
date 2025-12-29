@@ -7,9 +7,19 @@ const corsHeaders = {
 };
 
 /**
- * AI-powered image angle detection
- * Analyzes vehicle images and tags them with specific angles/perspectives
- * Uses OpenAI Vision API to identify: "front quarter driver", "dashboard full view", etc.
+ * DEPRECATED: ai-tag-image-angles
+ * 
+ * This function is DEPRECATED. Use `analyze-image` instead.
+ * 
+ * Angle detection is now built into the main analyze-image function
+ * and outputs proper 3D camera positions (azimuth, elevation, distance).
+ * 
+ * Migration: Replace calls to this function with:
+ *   supabase.functions.invoke('analyze-image', {
+ *     body: { imageUrl: image_url, image_id: imageId, vehicle_id: vehicleId }
+ *   })
+ * 
+ * Results are stored in `image_camera_position` table with proper coordinates.
  */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
