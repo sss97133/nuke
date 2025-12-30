@@ -247,9 +247,9 @@ export default function AuctionMarketplace() {
             primary_image_url
           )
         `)
-        // Fetch ALL listings with future end dates (not just 'active'/'live' status)
-        // Some scrapers use different status values ('pending', 'scheduled', etc.) for live auctions
-        .gt('end_date', new Date().toISOString());
+        // Do not exclude rows with missing/stale end_date; treat 'active' status as primary signal.
+        // Show rows that are explicitly active OR have a future end_date.
+        .or(`listing_status.eq.active,end_date.gt.${new Date().toISOString()}`);
 
       const { data: externalListings, error: externalError } = await externalQuery;
 
