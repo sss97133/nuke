@@ -798,6 +798,103 @@ const CursorHomepage: React.FC = () => {
     }
   }, [session]);
 
+  // Load active sources from database
+  const [activeSources, setActiveSources] = useState<Array<{
+    id: string;
+    domain: string;
+    source_name: string;
+    url: string;
+  }>>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(true);
+  const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
+
+  // Map domain to filter key for backward compatibility
+  const domainToFilterKey = useCallback((domain: string): string => {
+    const domainLower = domain.toLowerCase();
+    if (domainLower.includes('craigslist')) return 'craigslist';
+    if (domainLower.includes('ksl')) return 'ksl';
+    if (domainLower.includes('autotrader') || domainLower.includes('dealer')) return 'dealer_site';
+    if (domainLower.includes('bringatrailer') || domainLower.includes('bat')) return 'bat';
+    if (domainLower.includes('classic')) return 'classic';
+    // For new sources, use domain as key
+    return domainLower.replace(/[^a-z0-9]/g, '_');
+  }, []);
+
+  const includedSources = useMemo(() => {
+    const base: Record<string, boolean> = {};
+    const hiddenSourcesSet = new Set(filters.hiddenSources || []);
+    
+    // Initialize all known source types (not just activeSources)
+    // This ensures we handle all possible source classifications
+    const knownSourceTypes = ['craigslist', 'ksl', 'dealer_site', 'bat', 'classic', 'user', 'unknown'];
+    
+    knownSourceTypes.forEach(key => {
+      if (key === 'craigslist') {
+        base[key] = !filters.hideDealerListings && !filters.hideCraigslist;
+      } else if (key === 'ksl') {
+        base[key] = !filters.hideDealerListings && !filters.hideKsl;
+      } else if (key === 'dealer_site') {
+        base[key] = !filters.hideDealerListings && !filters.hideDealerSites;
+      } else if (key === 'bat') {
+        base[key] = !filters.hideBat;
+      } else if (key === 'classic') {
+        base[key] = !filters.hideClassic;
+      } else {
+        // user, unknown: check if they're in hiddenSources set
+        base[key] = !hiddenSourcesSet.has(key);
+      }
+    });
+    
+    // Also handle active sources that might not be in knownSourceTypes
+    activeSources.forEach(source => {
+      const key = domainToFilterKey(source.domain);
+      if (!base.hasOwnProperty(key)) {
+        // New sources: check if they're in hiddenSources set
+        base[key] = !hiddenSourcesSet.has(key);
+      }
+    });
+    
+    // Explicitly exclude any sources in hiddenSources that aren't already handled by hide* flags
+    filters.hiddenSources?.forEach(key => {
+      // Only set to false if it's not a known source type with a hide* flag
+      // Known sources are handled above, so if it's not in base yet, it's a new source
+      if (!base.hasOwnProperty(key)) {
+        base[key] = false; // Explicitly exclude new sources
+      } else if (!['craigslist', 'ksl', 'dealer_site', 'bat', 'classic'].includes(key)) {
+        // For new sources that are in activeSources, override to exclude if in hiddenSources
+        base[key] = false;
+      }
+      // Don't override known sources (craigslist, ksl, dealer_site, bat, classic) 
+      // as they're controlled by hide* flags
+    });
+
+    // #region agent log
+    console.log('[DEBUG] includedSources computed', { 
+      includedSources: base, 
+      activeSourcesCount: activeSources.length, 
+      activeSources: activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})), 
+      filters: {
+        hideBat: filters.hideBat, 
+        hideCraigslist: filters.hideCraigslist, 
+        hiddenSources: filters.hiddenSources
+      }
+    });
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2622',message:'includedSources computed',data:{includedSources:base,activeSourcesCount:activeSources.length,activeSources:activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})),filters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('Log fetch failed',e));
+    // #endregion
+
+    return base;
+  }, [
+    activeSources,
+    filters.hideDealerListings,
+    filters.hideCraigslist,
+    filters.hideDealerSites,
+    filters.hideKsl,
+    filters.hideBat,
+    filters.hideClassic,
+    filters.hiddenSources,
+    domainToFilterKey
+  ]);
+
   // Apply filters and sorting function - defined before useEffect
   const applyFiltersAndSort = useCallback(() => {
     let result = [...feedVehicles];
@@ -2555,15 +2652,6 @@ const CursorHomepage: React.FC = () => {
   }, [filters]);
 
   // Load active sources from database
-  const [activeSources, setActiveSources] = useState<Array<{
-    id: string;
-    domain: string;
-    source_name: string;
-    url: string;
-  }>>([]);
-  const [sourcesLoading, setSourcesLoading] = useState(true);
-  const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
-
   useEffect(() => {
     async function loadActiveSources() {
       try {
@@ -2618,18 +2706,6 @@ const CursorHomepage: React.FC = () => {
     loadActiveSources();
   }, []);
 
-  // Map domain to filter key for backward compatibility
-  const domainToFilterKey = useCallback((domain: string): string => {
-    const domainLower = domain.toLowerCase();
-    if (domainLower.includes('craigslist')) return 'craigslist';
-    if (domainLower.includes('ksl')) return 'ksl';
-    if (domainLower.includes('autotrader') || domainLower.includes('dealer')) return 'dealer_site';
-    if (domainLower.includes('bringatrailer') || domainLower.includes('bat')) return 'bat';
-    if (domainLower.includes('classic')) return 'classic';
-    // For new sources, use domain as key
-    return domainLower.replace(/[^a-z0-9]/g, '_');
-  }, []);
-
   // Load vehicle counts per source
   useEffect(() => {
     async function loadSourceCounts() {
@@ -2682,81 +2758,6 @@ const CursorHomepage: React.FC = () => {
       loadSourceCounts();
     }
   }, [activeSources, domainToFilterKey]);
-
-  const includedSources = useMemo(() => {
-    const base: Record<string, boolean> = {};
-    const hiddenSourcesSet = new Set(filters.hiddenSources || []);
-    
-    // Initialize all known source types (not just activeSources)
-    // This ensures we handle all possible source classifications
-    const knownSourceTypes = ['craigslist', 'ksl', 'dealer_site', 'bat', 'classic', 'user', 'unknown'];
-    
-    knownSourceTypes.forEach(key => {
-      if (key === 'craigslist') {
-        base[key] = !filters.hideDealerListings && !filters.hideCraigslist;
-      } else if (key === 'ksl') {
-        base[key] = !filters.hideDealerListings && !filters.hideKsl;
-      } else if (key === 'dealer_site') {
-        base[key] = !filters.hideDealerListings && !filters.hideDealerSites;
-      } else if (key === 'bat') {
-        base[key] = !filters.hideBat;
-      } else if (key === 'classic') {
-        base[key] = !filters.hideClassic;
-      } else {
-        // user, unknown: check if they're in hiddenSources set
-        base[key] = !hiddenSourcesSet.has(key);
-      }
-    });
-    
-    // Also handle active sources that might not be in knownSourceTypes
-    activeSources.forEach(source => {
-      const key = domainToFilterKey(source.domain);
-      if (!base.hasOwnProperty(key)) {
-        // New sources: check if they're in hiddenSources set
-        base[key] = !hiddenSourcesSet.has(key);
-      }
-    });
-    
-    // Explicitly exclude any sources in hiddenSources that aren't already handled by hide* flags
-    filters.hiddenSources?.forEach(key => {
-      // Only set to false if it's not a known source type with a hide* flag
-      // Known sources are handled above, so if it's not in base yet, it's a new source
-      if (!base.hasOwnProperty(key)) {
-        base[key] = false; // Explicitly exclude new sources
-      } else if (!['craigslist', 'ksl', 'dealer_site', 'bat', 'classic'].includes(key)) {
-        // For new sources that are in activeSources, override to exclude if in hiddenSources
-        base[key] = false;
-      }
-      // Don't override known sources (craigslist, ksl, dealer_site, bat, classic) 
-      // as they're controlled by hide* flags
-    });
-
-    // #region agent log
-    console.log('[DEBUG] includedSources computed', { 
-      includedSources: base, 
-      activeSourcesCount: activeSources.length, 
-      activeSources: activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})), 
-      filters: {
-        hideBat: filters.hideBat, 
-        hideCraigslist: filters.hideCraigslist, 
-        hiddenSources: filters.hiddenSources
-      }
-    });
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2622',message:'includedSources computed',data:{includedSources:base,activeSourcesCount:activeSources.length,activeSources:activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})),filters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('Log fetch failed',e));
-    // #endregion
-
-    return base;
-  }, [
-    activeSources,
-    filters.hideDealerListings,
-    filters.hideCraigslist,
-    filters.hideDealerSites,
-    filters.hideKsl,
-    filters.hideBat,
-    filters.hideClassic,
-    filters.hiddenSources,
-    domainToFilterKey
-  ]);
 
   const faviconUrl = useCallback((domain: string) => {
     return `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}`;

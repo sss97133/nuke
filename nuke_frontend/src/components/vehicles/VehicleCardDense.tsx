@@ -1346,20 +1346,46 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     if (imgData.large_url) urls.push(imgData.large_url);
     return urls.filter(u => u && isLikelyImageUrl(u));
   }, [isLikelyImageUrl]);
+
+  // Prefer a single URL per image record for carousel display.
+  // Otherwise we end up with the same photo repeated (thumbnail + medium + large + full).
+  const pickCarouselUrl = React.useCallback((imgData: any): string | null => {
+    if (!imgData) return null;
+
+    const candidates = [
+      imgData?.variants?.thumbnail,
+      imgData?.variants?.medium,
+      imgData?.variants?.large,
+      imgData?.thumbnail_url,
+      imgData?.medium_url,
+      imgData?.large_url,
+      imgData?.image_url,
+    ];
+
+    for (const c of candidates) {
+      const u = c ? String(c) : '';
+      if (u && isLikelyImageUrl(u)) return u;
+    }
+
+    return null;
+  }, [isLikelyImageUrl]);
   
   // Build vehicle images array reactively - recalculates when hook data changes
   const vehicleImages = React.useMemo(() => {
     const images: string[] = [];
     
-    // Prioritize image variants for grid performance (thumbnail -> medium -> full)
-    // This significantly improves load times since we load ~200px images instead of full-size
+    // Prefer exactly ONE variant from homepage-precomputed `image_variants`.
+    // This avoids showing duplicate slides for the same photo (thumbnail + medium).
     if (vehicle.image_variants) {
-      if (vehicle.image_variants.thumbnail && isLikelyImageUrl(vehicle.image_variants.thumbnail)) {
-        images.push(vehicle.image_variants.thumbnail);
-      }
-      if (vehicle.image_variants.medium && isLikelyImageUrl(vehicle.image_variants.medium)) {
-        images.push(vehicle.image_variants.medium);
-      }
+      const chosen =
+        (vehicle.image_variants.thumbnail && isLikelyImageUrl(vehicle.image_variants.thumbnail))
+          ? vehicle.image_variants.thumbnail
+          : (vehicle.image_variants.medium && isLikelyImageUrl(vehicle.image_variants.medium))
+            ? vehicle.image_variants.medium
+            : (vehicle.image_variants.large && isLikelyImageUrl(vehicle.image_variants.large))
+              ? vehicle.image_variants.large
+              : null;
+      if (chosen) images.push(chosen);
     }
     
     // Use all_images array as fallback (already contains optimized URLs from homepage)
@@ -1372,22 +1398,18 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       });
     }
     
-    // Add images from database hook (primary first, then others)
-    // This is reactive - will update when hook finishes loading
+    // Add primary database image as a single carousel entry
+    // (variants remain available as fallbacks in ResilientImage.sources)
     if (dbPrimaryImage) {
-      const dbUrls = extractImageUrls(dbPrimaryImage);
-      dbUrls.forEach(url => {
-        if (!images.includes(url)) images.push(url);
-      });
+      const chosen = pickCarouselUrl(dbPrimaryImage);
+      if (chosen && !images.includes(chosen)) images.push(chosen);
     }
     
-    // Add other database images
+    // Add other database images (one entry per image record)
     if (dbImages && dbImages.length > 0) {
       dbImages.forEach(img => {
-        const dbUrls = extractImageUrls(img);
-        dbUrls.forEach(url => {
-          if (!images.includes(url)) images.push(url);
-        });
+        const chosen = pickCarouselUrl(img);
+        if (chosen && !images.includes(chosen)) images.push(chosen);
       });
     }
     
@@ -1402,7 +1424,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     }
     
     return images;
-  }, [vehicle.image_variants, vehicle.all_images, vehicle.primary_image_url, vehicle.image_url, dbPrimaryImage, dbImages, isLikelyImageUrl, extractImageUrls]);
+  }, [vehicle.image_variants, vehicle.all_images, vehicle.primary_image_url, vehicle.image_url, dbPrimaryImage, dbImages, isLikelyImageUrl, pickCarouselUrl]);
   
   // Get current image URL (prefer thumbnail/medium for grid) - reactive to vehicleImages changes
   const currentImageUrl = React.useMemo(() => {
