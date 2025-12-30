@@ -57,6 +57,14 @@ async function firecrawlHtml(url: string): Promise<string> {
 }
 
 function parseVin(html: string): string | null {
+  // TBTFW specific: <div class="vin pad-right">VIN </div><div class="vin">SLATV4C0XPU216899</div>
+  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*\bvin\b[^"]*pad-right[^"]*"[^>]*>VIN\s*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-HJ-NPR-Z0-9]{17})\s*<\/div>/i);
+  if (tbtfwMatch?.[1]) {
+    const vin = tbtfwMatch[1].toUpperCase().trim();
+    if (vin.length === 17 && !/[IOQ]/.test(vin)) return vin;
+  }
+  
+  // Fallback: generic patterns
   const bodyText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   const m =
     bodyText.match(/\bVIN\b[\s:]*([A-HJ-NPR-Z0-9]{17})\b/i) ||
@@ -80,6 +88,13 @@ function parseVinFromUrl(url: string): string | null {
 }
 
 function parseStock(html: string): string | null {
+  // TBTFW specific: <div class="vin pad-right">Stock # </div><div class="vin">216899</div>
+  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*\bvin\b[^"]*pad-right[^"]*"[^>]*>Stock\s*#\s*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-Za-z0-9-]{2,20})\s*<\/div>/i);
+  if (tbtfwMatch?.[1]) {
+    return tbtfwMatch[1].trim();
+  }
+  
+  // Fallback: generic patterns
   const bodyText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   const m =
     html.match(/Stock\s*#\s*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-Za-z0-9-]{2,20})\s*<\/div>/i) ||
@@ -89,6 +104,14 @@ function parseStock(html: string): string | null {
 }
 
 function parseMileage(html: string): number | null {
+  // TBTFW specific: <div class="vehicle-sub-info lrg">256</div><div class="vehicle-sub-info lrg pad-left">Miles</div>
+  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*vehicle-sub-info[^"]*lrg[^"]*"[^>]*>(\d{1,3}(?:,\d{3})*|\d{1,7})<\/div>\s*<div[^>]*class="[^"]*vehicle-sub-info[^"]*lrg[^"]*pad-left[^"]*"[^>]*>Miles<\/div>/i);
+  if (tbtfwMatch?.[1]) {
+    const miles = parseInt(tbtfwMatch[1].replace(/,/g, ""), 10);
+    if (Number.isFinite(miles) && miles > 0 && miles <= 10000000) return miles;
+  }
+  
+  // Fallback: generic pattern
   const bodyText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   const m = bodyText.match(/(\d{1,3}(?:,\d{3})+|\d{2,7})\s*Miles?\b/i);
   if (!m?.[1]) return null;
@@ -98,8 +121,33 @@ function parseMileage(html: string): number | null {
 }
 
 function parsePrice(html: string): number | null {
+  // Check for "Call for Price" first - must not have w-condition-invisible (which means it's hidden)
+  const callForPriceVisible = html.match(/<div[^>]*class="[^"]*price-call[^"]*"[^>]*(?!w-condition-invisible)[^>]*>Call\s+(?:for\s+)?Price/i);
+  if (callForPriceVisible || /\bCall\s+for\s+Price\b/i.test(html.replace(/w-condition-invisible[^>]*>/g, ''))) {
+    // Only return null if "Call for Price" is actually visible (not hidden by w-condition-invisible)
+    const callForPriceHidden = html.match(/<div[^>]*class="[^"]*price-call[^"]*w-condition-invisible[^"]*"[^>]*>/i);
+    if (!callForPriceHidden) {
+      return null;
+    }
+  }
+  
+  // TBTFW specific: <div class="price lrg">379995</div> (no dollar sign in same element)
+  // Match price div that has both "price" and "lrg" classes, and doesn't have "price-call"
+  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*\bprice\b(?![^"]*\bprice-call\b)[^"]*\blrg\b[^"]*"[^>]*>\s*(\d{4,})\s*<\/div>/i);
+  if (tbtfwMatch?.[1]) {
+    const n = parseInt(tbtfwMatch[1].replace(/,/g, ""), 10);
+    if (Number.isFinite(n) && n >= 1000 && n <= 100000000) return n;
+  }
+  
+  // Alternative: just look for price class without price-call
+  const altMatch = html.match(/<div[^>]*class="[^"]*\bprice\b(?![^"]*\bprice-call\b)[^"]*"[^>]*>\s*(\d{4,})\s*<\/div>/i);
+  if (altMatch?.[1]) {
+    const n = parseInt(altMatch[1].replace(/,/g, ""), 10);
+    if (Number.isFinite(n) && n >= 1000 && n <= 100000000) return n;
+  }
+  
+  // Fallback: generic pattern with dollar sign
   const bodyText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
-  if (/\bCall\s+for\s+Price\b/i.test(bodyText)) return null;
   const m = bodyText.match(/\$\s*([\d,]{4,})/);
   if (!m?.[1]) return null;
   const n = parseInt(m[1].replace(/,/g, ""), 10);

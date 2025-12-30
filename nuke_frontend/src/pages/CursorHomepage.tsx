@@ -1386,7 +1386,7 @@ const CursorHomepage: React.FC = () => {
       // Get comprehensive vehicle data for stats (public vehicles only)
       const { data: allVehicles, error: vehiclesError } = await supabase
         .from('vehicles')
-        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, current_bid, is_for_sale, bid_count, auction_outcome')
+        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome')
         .eq('is_public', true);
       
       if (vehiclesError) {
