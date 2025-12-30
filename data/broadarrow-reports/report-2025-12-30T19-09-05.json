@@ -1,0 +1,19 @@
+{
+  "organization": {
+    "id": "515d8895-d926-4ce9-aa53-6f605c39d1a4",
+    "business_name": "Broad Arrow Private Sales",
+    "website": "https://www.broadarrowprivatesales.com",
+    "type": "dealer",
+    "description": "Broad Arrow Private Sales, a Hagerty company, is committed to advising our clients on private sales of collector cars with discretion and integrity. Led by a team with more than 100 years of combined industry knowledge and relationships, we look forward to serving you as your trusted collector car private sales advisors."
+  },
+  "generatedAt": "2025-12-30T19:09:05.806Z",
+  "inventory": {
+    "total": 0,
+    "vehicles": [],
+    "byStatus": {},
+    "byAuction": {},
+    "priceStats": {}
+  },
+  "upcomingAuctions": [],
+  "contributors": []
+}

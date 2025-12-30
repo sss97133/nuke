@@ -1,0 +1,182 @@
+{
+  "people": [
+    {
+      "id": "pgaucher@hagerty.com",
+      "name": "Paul Gaucher",
+      "emails": [
+        "pgaucher@hagerty.com"
+      ],
+      "phones": [
+        "+41 79 601 3819"
+      ],
+      "titles": [
+        "Head of Consignments, Switzerland"
+      ],
+      "organizations": [
+        "broad arrow auctions"
+      ],
+      "sources": [
+        "broadarrow"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "paul gaucher_unknown",
+      "name": "Paul Gaucher",
+      "emails": [],
+      "phones": [],
+      "titles": [
+        "Motor Cars Europe Specialist/Head of Sale Switzerland",
+        "Motor Cars Europe Specialist"
+      ],
+      "organizations": [
+        "bonhams"
+      ],
+      "sources": [
+        "luxurytribune",
+        "bonhams"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "eurocars@bonhams.com",
+      "name": null,
+      "emails": [
+        "eurocars@bonhams.com"
+      ],
+      "phones": [
+        "+33 1 42 61 10 11"
+      ],
+      "titles": [],
+      "organizations": [
+        "bonhams"
+      ],
+      "sources": [
+        "bonhams"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "david r. seyffer_unknown",
+      "name": "David R. Seyffer",
+      "emails": [],
+      "phones": [],
+      "titles": [
+        "Museum Curator"
+      ],
+      "organizations": [
+        "iwc schaffhausen"
+      ],
+      "sources": [
+        "luxurytribune"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "gregory driot_unknown",
+      "name": "Gregory Driot",
+      "emails": [],
+      "phones": [],
+      "titles": [
+        "Founder"
+      ],
+      "organizations": [
+        "automobile club de genève"
+      ],
+      "sources": [
+        "luxurytribune"
+      ],
+      "metadata": {}
+    }
+  ],
+  "organizations": [
+    {
+      "id": "broad arrow auctions",
+      "name": "Broad Arrow Auctions",
+      "sources": [
+        "broadarrow"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "bonhams",
+      "name": "Bonhams",
+      "sources": [
+        "luxurytribune",
+        "bonhams"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "iwc schaffhausen",
+      "name": "IWC Schaffhausen",
+      "sources": [
+        "luxurytribune"
+      ],
+      "metadata": {}
+    },
+    {
+      "id": "automobile club de genève",
+      "name": "Automobile Club de Genève",
+      "sources": [
+        "luxurytribune"
+      ],
+      "metadata": {}
+    }
+  ],
+  "relationships": [
+    {
+      "person": "pgaucher@hagerty.com",
+      "organization": "broad arrow auctions",
+      "role": "Head of Consignments, Switzerland",
+      "source": "broadarrow",
+      "sourceUrl": "https://www.broadarrowauctions.com/vehicles/dg25_r0028/1966-rolls-royce-silver-cloud-iii-mulliner-park-ward-drophead-coupe",
+      "discoveredAt": "2025-12-30T19:02:56.317Z"
+    },
+    {
+      "person": "paul gaucher_unknown",
+      "organization": "bonhams",
+      "role": "Motor Cars Europe Specialist/Head of Sale Switzerland",
+      "source": "luxurytribune",
+      "sourceUrl": "https://www.luxurytribune.com/les-collectionneurs-achetent-leur-reve-denfant",
+      "discoveredAt": "2025-12-30T19:02:56.318Z"
+    },
+    {
+      "person": "paul gaucher_unknown",
+      "organization": "bonhams",
+      "role": "Motor Cars Europe Specialist",
+      "source": "bonhams",
+      "sourceUrl": "https://www.bonhams.com/stories/31910/meet-the-specialist-paul-gaucher/",
+      "discoveredAt": "2025-12-30T19:02:56.318Z"
+    },
+    {
+      "person": "eurocars@bonhams.com",
+      "organization": "bonhams",
+      "role": null,
+      "source": "bonhams",
+      "sourceUrl": "https://bonhams.shorthandstories.com/sell-your-motor-car-paris-2021/",
+      "discoveredAt": "2025-12-30T19:02:56.318Z"
+    },
+    {
+      "person": "david r. seyffer_unknown",
+      "organization": "iwc schaffhausen",
+      "role": "Museum Curator",
+      "source": "luxurytribune",
+      "sourceUrl": "https://www.luxurytribune.com/les-collectionneurs-achetent-leur-reve-denfant",
+      "discoveredAt": "2025-12-30T19:02:56.318Z"
+    },
+    {
+      "person": "gregory driot_unknown",
+      "organization": "automobile club de genève",
+      "role": "Founder",
+      "source": "luxurytribune",
+      "sourceUrl": "https://www.luxurytribune.com/les-collectionneurs-achetent-leur-reve-denfant",
+      "discoveredAt": "2025-12-30T19:02:56.318Z"
+    }
+  ],
+  "stats": {
+    "totalPeople": 5,
+    "totalOrganizations": 4,
+    "totalRelationships": 6
+  }
+}

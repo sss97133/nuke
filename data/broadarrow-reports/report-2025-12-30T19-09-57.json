@@ -1,0 +1,42 @@
+{
+  "organization": {
+    "id": "bf7f8e55-4abc-45dc-aae0-1df86a9f365a",
+    "business_name": "Broad Arrow Auctions",
+    "website": "https://www.broadarrowauctions.com",
+    "type": "auction_house",
+    "description": null
+  },
+  "generatedAt": "2025-12-30T19:09:57.912Z",
+  "inventory": {
+    "total": 2,
+    "vehicles": [
+      {
+        "id": "f922a003-65fb-4e71-9c90-3beb9911ea68",
+        "year": 2010,
+        "make": "McLaren",
+        "model": "MP4-12C",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0005/2010-mclaren-mp4-12c-rolling-chassis",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "1f8df615-f182-448e-8f6a-4f4c875c4545",
+        "year": 2025,
+        "make": "Williams",
+        "model": "FW14-Junior",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0062/halfscale-cars-williams-fw14-junior",
+        "status": "active",
+        "auctionId": null
+      }
+    ],
+    "byStatus": {
+      "active": 2
+    },
+    "byAuction": {},
+    "priceStats": {}
+  },
+  "upcomingAuctions": [],
+  "contributors": []
+}

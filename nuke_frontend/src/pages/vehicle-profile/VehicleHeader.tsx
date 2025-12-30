@@ -100,16 +100,31 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const v = vehicle as any;
     const isSold = v?.sale_status === 'sold' || v?.sale_price > 0 || v?.auction_outcome === 'sold';
     
+    // Filter out obviously invalid/useless usernames
+    const isValidUsername = (username: string | null | undefined): boolean => {
+      if (!username || typeof username !== 'string') return false;
+      const u = username.trim().toLowerCase();
+      // Reject generic/placeholder usernames
+      const invalid = ['everyone', 'unknown', 'n/a', 'none', 'null', 'undefined', 'seller', 'buyer', 'owner', 'user', 'admin'];
+      return u.length > 0 && !invalid.includes(u) && u.length >= 2;
+    };
+    
     // If sold, buyer is current owner; otherwise seller owns it
     if (isSold) {
       const buyer = v?.bat_buyer?.trim();
       const seller = v?.bat_seller?.trim();
-      return buyer ? { username: buyer, from: seller, role: 'buyer' } : null;
+      if (buyer && isValidUsername(buyer)) {
+        return { username: buyer, from: seller, role: 'buyer' };
+      }
+      return null;
     }
     
     // Not sold - seller is current owner (consigning)
     const seller = v?.bat_seller?.trim();
-    return seller ? { username: seller, from: null, role: 'seller' } : null;
+    if (seller && isValidUsername(seller)) {
+      return { username: seller, from: null, role: 'seller' };
+    }
+    return null;
   }, [(vehicle as any)?.bat_buyer, (vehicle as any)?.bat_seller, (vehicle as any)?.sale_status, (vehicle as any)?.sale_price, (vehicle as any)?.auction_outcome]);
 
   // Derive location display - prefer city codes (ATL, LAX, NYC) or state abbrev
@@ -2216,37 +2231,58 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     />
                   ) : null;
                 })()}
-                {/* Seller bubble (internal): if we have a BaT seller handle, show a second circle next to platform */}
-                {batIdentityHref?.seller?.handle ? (
-                <Link
-                  to={batIdentityHref.seller.href}
-                  onClick={(e) => e.stopPropagation()}
-                  title="Seller (internal profile)"
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
-                >
-                  <span
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: 999,
-                      border: '1px solid var(--border)',
-                      background: 'var(--surface)',
-                      color: 'var(--text)',
-                      fontSize: '9px',
-                      fontWeight: 800,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      lineHeight: 1,
-                      paddingTop: 1,
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    {String(batIdentityHref.seller.handle || '').slice(0, 1).toUpperCase()}
-                  </span>
-                </Link>
-              ) : null}
-              {auctionPulse.updated_at ? (
+                {/* Seller bubble: if we have a BaT seller handle, show a circle that opens seller info on click */}
+                {batIdentityHref?.seller?.handle ? (() => {
+                  // Check if seller is an organization (matches any visible org)
+                  const sellerHandle = batIdentityHref.seller.handle.toLowerCase();
+                  const sellerOrg = visibleOrganizations.find((o: any) => {
+                    const orgName = String(o?.business_name || '').toLowerCase();
+                    return orgName.includes(sellerHandle) || sellerHandle.includes(orgName.split(' ')[0]);
+                  });
+                  
+                  return (
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (sellerOrg) {
+                            // If seller is an org, show org card
+                            setOrgCardAnchor(e.currentTarget);
+                            setShowOrgInvestmentCard(sellerOrg.organization_id);
+                          } else {
+                            // Otherwise show seller identity claim page
+                            navigate(batIdentityHref.seller.href);
+                          }
+                        }}
+                        title={sellerOrg ? `${sellerOrg.business_name} (${formatRelationship(sellerOrg.relationship_type)}) - Click to view details` : `Seller: @${batIdentityHref.seller.handle} - Click to claim identity`}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 999,
+                          border: '1px solid var(--border)',
+                          background: 'var(--surface)',
+                          color: 'var(--text)',
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          lineHeight: 1,
+                          padding: 0,
+                          margin: 0,
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        {String(batIdentityHref.seller.handle || '').slice(0, 1).toUpperCase()}
+                      </button>
+                    </div>
+                  );
+                })() : null}
+              {/* Hide "updated X ago" for sold/ended auctions - redundant with SOLD badge */}
+              {auctionPulse.updated_at && !isSold && !isEnded ? (
                 <span
                   className="badge badge-secondary"
                   style={{
@@ -2566,11 +2602,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 // Don't show link for sold auctions (user requested removal of SOLD link button)
                 if (auctionPulse?.listing_url) {
                   const status = String(auctionPulse.listing_status || '').toLowerCase();
-                  const isLiveStatus = status === 'active' || status === 'live';
-                  const isSoldStatus = status === 'sold';
+                  const endDate = auctionPulse.end_date ? new Date(auctionPulse.end_date).getTime() : null;
+                  const isPastEnd = endDate !== null && endDate < Date.now();
+                  const vehicleIsSold = (vehicle as any)?.sale_status === 'sold' || 
+                                       (vehicle as any)?.sale_price > 0 || 
+                                       (vehicle as any)?.auction_outcome === 'sold';
+                  const isLiveStatus = (status === 'active' || status === 'live') && !isPastEnd && !vehicleIsSold;
+                  const isSoldStatus = status === 'sold' || status === 'ended' || vehicleIsSold;
                   
-                  // Only show link for live auctions, not sold ones
-                  if (isLiveStatus) {
+                  // Only show link for live auctions, not sold/ended ones
+                  if (isLiveStatus && !isSoldStatus) {
                     const label = typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0
                       ? `Bid: ${formatCurrency(auctionPulse.current_bid)}`
                       : 'BID';
@@ -2869,17 +2910,16 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     }
                     
                     return (
-                      <Link
+                      <button
                         key={org.id}
-                        to={`/org/${org.organization_id}`}
-                        data-discover="true"
+                        type="button"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                           setOrgCardAnchor(e.currentTarget);
                           setShowOrgInvestmentCard(org.organization_id);
                         }}
-                        title={`${org.business_name} (${formatRelationship(org.relationship_type)})`}
+                        title={`${org.business_name} (${formatRelationship(org.relationship_type)}) - Click to view details`}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -2890,9 +2930,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           borderRadius: '50%',
                           background: 'var(--surface)',
                           color: baseTextColor,
-                          textDecoration: 'none',
-                          fontSize: '10px',
-                          overflow: 'hidden',
+                          padding: 0,
+                          margin: 0,
                           cursor: 'pointer',
                           transition: 'transform 0.1s ease'
                         }}
@@ -2914,7 +2953,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         ) : (
                           org.business_name.charAt(0).toUpperCase()
                         )}
-                      </Link>
+                      </button>
                     );
                   })}
                 {extraOrgCount > 0 && (

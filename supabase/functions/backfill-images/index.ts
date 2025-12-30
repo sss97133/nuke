@@ -210,12 +210,16 @@ serve(async (req: Request) => {
 
     console.log(`Backfilling ${image_urls.length} images for vehicle ${vehicle_id} (start_index=${start_index}, max_images=${max_images}, continue=${shouldContinue}, chain_depth=${chain_depth})`);
 
-    // Get vehicle info for context
+    // Get vehicle info for context and validation
     const { data: vehicle } = await supabase
       .from('vehicles')
-      .select('origin_metadata')
+      .select('id, year, make, model, origin_metadata, bat_auction_url, discovery_url')
       .eq('id', vehicle_id)
       .single();
+
+    if (!vehicle) {
+      throw new Error(`Vehicle ${vehicle_id} not found`);
+    }
 
     // NOTE: vehicle_images has an attribution CHECK constraint + FK to auth.users.
     // Edge Functions frequently have no auth user context; rather than hardcoding a user_id that might not exist,
@@ -543,6 +547,44 @@ serve(async (req: Request) => {
           }
         }
 
+        // CRITICAL: Validate image doesn't belong to another vehicle (prevents contamination)
+        // Check if this image URL already exists for a different vehicle
+        const { data: existingImage } = await supabase
+          .from('vehicle_images')
+          .select('vehicle_id, vehicles!inner(id, year, make, model)')
+          .eq('image_url', publicUrl)
+          .neq('vehicle_id', vehicle_id)
+          .not('is_duplicate', 'is', true)
+          .maybeSingle();
+
+        if (existingImage) {
+          const otherVehicle = existingImage.vehicles;
+          console.warn(`⚠️  SKIPPING: Image ${publicUrl.substring(0, 80)}... already belongs to ${otherVehicle.year} ${otherVehicle.make} ${otherVehicle.model} (${otherVehicle.id}), not ${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle_id})`);
+          results.errors.push(`image_belongs_to_other_vehicle: ${rawUrl} :: belongs to ${otherVehicle.id}`);
+          results.failed++;
+          continue;
+        }
+
+        // For BAT images: verify they match the vehicle's BAT listing
+        if (effectiveSource === 'bat_import' && rawUrl.includes('bringatrailer.com')) {
+          const batUrl = vehicle.bat_auction_url || vehicle.discovery_url;
+          const canonicalUrls = vehicle.origin_metadata?.image_urls || [];
+          
+          if (canonicalUrls.length > 0) {
+            // Normalize URLs for comparison
+            const normalizedRaw = rawUrl.split('#')[0].split('?')[0].replace(/-scaled\./g, '.').toLowerCase();
+            const isCanonical = canonicalUrls.some((canonical: string) => {
+              const normalizedCanonical = canonical.split('#')[0].split('?')[0].replace(/-scaled\./g, '.').toLowerCase();
+              return normalizedCanonical.includes(normalizedRaw) || normalizedRaw.includes(normalizedCanonical);
+            });
+            
+            if (!isCanonical && batUrl && batUrl.includes('bringatrailer.com/listing/')) {
+              console.warn(`⚠️  WARNING: BAT image ${rawUrl.substring(0, 80)}... not in canonical list for vehicle ${vehicle_id}. Proceeding but may be contamination.`);
+              // Don't block, but log warning
+            }
+          }
+        }
+
         // Create database record (even if storage object already existed).
         // If a previous run uploaded to storage but DB insert failed, this is the recovery path.
         const { data: imageRecord, error: dbError } = await supabase
@@ -576,7 +618,11 @@ serve(async (req: Request) => {
               import_source: source,
               effective_source: effectiveSource,
               import_index: i,
-              imported_at: new Date().toISOString()
+              imported_at: new Date().toISOString(),
+              // Store vehicle info for validation tracking
+              vehicle_year: vehicle.year,
+              vehicle_make: vehicle.make,
+              vehicle_model: vehicle.model
             }
           })
           .select('id')

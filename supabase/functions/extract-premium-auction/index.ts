@@ -2293,6 +2293,9 @@ serve(async (req) => {
       case 'russoandsteele':
         result = await extractRussoAndSteele(url, max_vehicles);
         break;
+      case 'broadarrow':
+        result = await extractBroadArrow(url, max_vehicles);
+        break;
       default:
         result = await extractGeneric(url, max_vehicles, detectedSite);
     }
@@ -2328,6 +2331,7 @@ function detectAuctionSite(url: string): string {
     if (domain.includes('barrett-jackson.com')) return 'barrettjackson';
     if (domain.includes('russoandsteele.com')) return 'russoandsteele';
     if (domain.includes('bringatrailer.com')) return 'bringatrailer';
+    if (domain.includes('broadarrowauctions.com')) return 'broadarrow';
     
     return 'unknown';
   } catch {
@@ -3136,7 +3140,14 @@ async function storeVehiclesInDatabase(
             comments: Array.isArray(vehicle.comments) ? vehicle.comments : [],
             bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : [],
             auction_id: vehicle.auction_id || null,
+            auction_name: vehicle.auction_name || null,
+            auction_location: vehicle.auction_location || null,
             listing_status: vehicle.listing_status || 'active',
+            // Store contributor/contact information (flexible format for multiple sources)
+            // Structure: { name, title, phone, email, context, source_type, discovered_at }
+            // Context types: 'auction_specialist', 'dealer_contact', 'service_provider', 'contact'
+            // Source types: 'curated_contact', 'schema_extracted', 'generic_listing', 'user_submitted'
+            contributor: vehicle.contributor || null,
           },
           // This is effectively a URL-based scraper import; using url_scraper makes downstream org-link triggers
           // attach the vehicle as a 'consigner' (allowed by organization_vehicles_relationship_type_check).
@@ -3183,6 +3194,8 @@ async function storeVehiclesInDatabase(
             bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : (existingOriginMetadata.bidders || []),
             auction_id: vehicle.auction_id || existingOriginMetadata.auction_id || null,
             listing_status: vehicle.listing_status || existingOriginMetadata.listing_status || 'active',
+            // Store contributor/consignment consultant information (Broad Arrow) - prefer new data
+            contributor: vehicle.contributor || existingOriginMetadata.contributor || null,
             last_updated: nowIso(),
           };
           
@@ -3296,6 +3309,8 @@ async function storeVehiclesInDatabase(
             bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : (existingOriginMetadata.bidders || []),
             auction_id: vehicle.auction_id || existingOriginMetadata.auction_id || null,
             listing_status: vehicle.listing_status || existingOriginMetadata.listing_status || 'active',
+            // Store contributor/consignment consultant information (Broad Arrow) - prefer new data
+            contributor: vehicle.contributor || existingOriginMetadata.contributor || null,
             last_updated: nowIso(),
           };
           
@@ -3359,6 +3374,7 @@ async function storeVehiclesInDatabase(
           else if (urlLower.includes('mecum.com')) platform = 'mecum';
           else if (urlLower.includes('barrett-jackson.com') || urlLower.includes('barrettjackson.com')) platform = 'barrettjackson';
           else if (urlLower.includes('russoandsteele.com')) platform = 'russoandsteele';
+          else if (urlLower.includes('broadarrowauctions.com')) platform = 'broadarrow';
         }
         
         // Fallback to source name if URL detection failed
@@ -3369,6 +3385,7 @@ async function storeVehiclesInDatabase(
           else if (sourceLower.includes('mecum')) platform = 'mecum';
           else if (sourceLower.includes('barrett')) platform = 'barrettjackson';
           else if (sourceLower.includes('russo')) platform = 'russoandsteele';
+          else if (sourceLower.includes('broad arrow') || sourceLower.includes('broadarrow')) platform = 'broadarrow';
         }
         
         if (platform && listingUrl) {
@@ -3386,6 +3403,11 @@ async function storeVehiclesInDatabase(
             } else if (platform === 'barrettjackson') {
               const itemMatch = String(listingUrl).match(/\/Item\/([^\/]+)/);
               listingId = vehicle.lot_number || (itemMatch ? itemMatch[1] : null) || listingUrl.split('/').filter(Boolean).pop() || null;
+            } else if (platform === 'broadarrow') {
+              // Broad Arrow URL pattern: /vehicles/{auction_id}/{slug}
+              // Use the last part of the URL path as listing ID
+              const pathParts = listingUrl.split('/').filter(Boolean);
+              listingId = vehicle.lot_number || pathParts[pathParts.length - 1] || null;
             } else {
               listingId = listingUrl.split('/').filter(Boolean).pop() || null;
             }
@@ -3733,6 +3755,57 @@ async function storeVehiclesInDatabase(
         } else {
           console.log(`No images to insert for vehicle ${data.id} (images: ${vehicle.images ? 'exists but empty/invalid' : 'missing'})`);
         }
+        
+        // Insert videos as images with video metadata
+        if (vehicle.videos && Array.isArray(vehicle.videos) && vehicle.videos.length > 0) {
+          console.log(`Inserting ${vehicle.videos.length} videos for vehicle ${data.id}`);
+          const videoErrors: string[] = [];
+          let videoInserted = 0;
+          
+          for (const video of vehicle.videos) {
+            try {
+              // Use thumbnail as image_url, store video URL in metadata
+              const thumbnailUrl = video.thumbnail || `https://img.youtube.com/vi/${video.url.match(/[?&]v=([a-zA-Z0-9_-]{11})/)?.[1] || ''}/maxresdefault.jpg`;
+              
+              const { error: videoError } = await supabase
+                .from("vehicle_images")
+                .insert({
+                  vehicle_id: data.id,
+                  image_url: thumbnailUrl,
+                  source: source.toLowerCase(),
+                  source_url: listingUrl,
+                  is_external: true,
+                  ai_processing_status: "pending",
+                  position: 9999 + videoInserted, // Put videos after images
+                  display_order: 9999 + videoInserted,
+                  is_primary: false,
+                  is_approved: true,
+                  approval_status: "auto_approved",
+                  redaction_level: "none",
+                  exif_data: {
+                    is_video: true,
+                    video_url: video.url,
+                    video_type: video.type,
+                    video_thumbnail: video.thumbnail,
+                    source_url: listingUrl,
+                    discovery_url: listingUrl,
+                    imported_from: source,
+                  },
+                });
+              
+              if (videoError) {
+                videoErrors.push(`video insert failed (${data.id}): ${videoError.message}`);
+              } else {
+                videoInserted++;
+              }
+            } catch (e: any) {
+              videoErrors.push(`video insert exception (${data.id}): ${e?.message || String(e)}`);
+            }
+          }
+          
+          console.log(`Inserted ${videoInserted} videos, ${videoErrors.length} errors`);
+          errors.push(...videoErrors);
+        }
       }
     } catch (e: any) {
       const msg = `vehicles insert exception (${vehicle?.listing_url || "no-url"}): ${e?.message || String(e)}`;
@@ -3999,6 +4072,8 @@ async function insertVehicleImages(
         imageSource = "external_import"; // Mecum: use generic external_import
       } else if (listingUrlLower.includes("barrett-jackson.com") || listingUrlLower.includes("barrettjackson.com") || sourceLower.includes("barrett")) {
         imageSource = "external_import"; // Barrett-Jackson: use generic external_import
+      } else if (listingUrlLower.includes("broadarrowauctions.com") || sourceLower.includes("broad arrow") || sourceLower.includes("broadarrow")) {
+        imageSource = "external_import"; // Broad Arrow: use generic external_import
       } else {
         // Default to external_import for unknown platforms
         imageSource = "external_import";
@@ -5452,6 +5527,524 @@ async function extractRussoAndSteele(url: string, maxVehicles: number) {
     extraction_method: 'needs_dom_mapping',
     note: 'Russo & Steele DOM mapping needs to be implemented',
     timestamp: new Date().toISOString()
+  };
+}
+
+async function extractBroadArrow(url: string, maxVehicles: number) {
+  console.log("Broad Arrow: discovering listing URLs then extracting per-listing");
+  console.log("Note: Broad Arrow operates via auctions - extracting from available lots (upcoming) and results (past)");
+
+  const normalizedUrl = String(url || "").trim();
+  const isDirectListing = normalizedUrl.includes("broadarrowauctions.com/vehicles/") && 
+                          !normalizedUrl.includes("/vehicles/results") &&
+                          !normalizedUrl.includes("/vehicles/available");
+
+  // Determine extraction source:
+  // - "available" or "upcoming" = upcoming auction lots (treat as inventory)
+  // - "results" or "past-auctions" = past auction results (sold/unsold)
+  // - default = results page
+  const isAvailableLots = normalizedUrl.includes("/available") || 
+                          normalizedUrl.includes("/upcoming") ||
+                          normalizedUrl.toLowerCase().includes("available");
+  
+  const indexUrl = isDirectListing
+    ? normalizedUrl.split("?")[0]
+    : isAvailableLots
+    ? "https://www.broadarrowauctions.com/vehicles/available"
+    : (normalizedUrl.includes("broadarrowauctions.com/vehicles") 
+        ? normalizedUrl 
+        : "https://www.broadarrowauctions.com/vehicles/results");
+
+  const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  const sourceWebsite = "https://www.broadarrowauctions.com";
+
+  let listingUrls: string[] = [];
+  let mapRaw: any = null;
+
+  if (isDirectListing) {
+    listingUrls = [indexUrl];
+  }
+
+  // Step 1: Discover listing URLs via Firecrawl map (for results pages)
+  if (listingUrls.length === 0) {
+    try {
+      const mapped = await fetchJsonWithTimeout(
+        FIRECRAWL_MAP_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${firecrawlKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url: indexUrl,
+            includeSubdomains: false,
+            limit: 1000,
+          }),
+        },
+        20000,
+        "Firecrawl map",
+      );
+      mapRaw = mapped;
+
+      const urls: string[] =
+        mapped?.data?.urls ||
+        mapped?.urls ||
+        mapped?.data ||
+        mapped?.links ||
+        [];
+
+      if (Array.isArray(urls) && urls.length > 0) {
+        listingUrls = urls
+          .map((u: any) => String(u || "").trim())
+          .filter((u: string) => u.startsWith("http"))
+          .map((u: string) => u.split("?")[0])
+          .filter((u: string) =>
+            u.includes("broadarrowauctions.com/vehicles/") &&
+            !u.includes("/vehicles/results") &&
+            !u.includes("/vehicles/available") &&
+            !u.includes("/past-auctions") &&
+            u.match(/\/vehicles\/[^\/]+\/[^\/]+$/) // Pattern: /vehicles/{auction_id}/{slug}
+          )
+          .slice(0, 500);
+      }
+    } catch (e: any) {
+      console.warn("Broad Arrow map discovery failed:", e?.message || String(e));
+    }
+  }
+
+  // Fallback: scrape markdown and regex out listing URLs
+  if (listingUrls.length === 0) {
+    try {
+      const fc = await fetchJsonWithTimeout(
+        FIRECRAWL_SCRAPE_URL,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${firecrawlKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            url: indexUrl,
+            formats: ["markdown"],
+            onlyMainContent: false,
+            waitFor: 2500,
+          }),
+        },
+        20000,
+        "Firecrawl index scrape",
+      );
+      const markdown: string = fc?.data?.markdown || fc?.markdown || "";
+      if (markdown) {
+        // Extract URLs from markdown - pattern: /vehicles/{id}/{slug}
+        const urlMatches = markdown.match(/\/vehicles\/[a-zA-Z0-9_-]+\/[^\/\s\)]+/g) || [];
+        listingUrls = Array.from(new Set(urlMatches))
+          .map((path: string) => `https://www.broadarrowauctions.com${path}`)
+          .filter((u: string) => !u.includes("/results") && !u.includes("/available") && !u.includes("/past-auctions"))
+          .slice(0, 500);
+      }
+    } catch (e: any) {
+      console.warn("Broad Arrow markdown discovery failed:", e?.message || String(e));
+    }
+  }
+
+  // Step 2: Per-listing extraction
+  const listingSchema = {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "Listing title (e.g., '1956 Jaguar D-Type')" },
+      lot_number: { type: "string", description: "Lot number if available" },
+      year: { type: "number", description: "Vehicle year" },
+      make: { type: "string", description: "Vehicle make" },
+      model: { type: "string", description: "Vehicle model" },
+      trim: { type: "string", description: "Trim level" },
+      vin: { type: "string", description: "VIN if available" },
+      mileage: { type: "number", description: "Mileage / odometer" },
+      location: { type: "string", description: "Location" },
+      description: { type: "string", description: "Description" },
+      sale_price: { type: "number", description: "Sold price / hammer price if sold (extract from 'Sold Price:' text). IMPORTANT: Check currency selector - convert CHF/EUR/GBP to USD using approximate rates (CHF: 1.15, EUR: 1.10, GBP: 1.27)" },
+      sale_date: { type: "string", description: "Sale date if available" },
+      auction_end_date: { type: "string", description: "Auction end date" },
+      auction_name: { type: "string", description: "Auction event name (e.g., 'The Zurich Auction 2025', 'The Amelia Auction 2025')" },
+      auction_location: { type: "string", description: "Auction location/venue" },
+      images: { 
+        type: "array", 
+        items: { type: "string" }, 
+        description: "ALL vehicle image URLs from the page - gallery images, main photos, detail shots. Include full URLs. Exclude placeholder images, logos, and icons." 
+      },
+      videos: {
+        type: "array",
+        items: { 
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Full video URL (YouTube, Vimeo, etc.)" },
+            type: { type: "string", description: "Video platform (youtube, vimeo, etc.)" },
+            thumbnail: { type: "string", description: "Video thumbnail URL" }
+          }
+        },
+        description: "All video URLs from the page (YouTube embeds, Vimeo links, etc.)"
+      },
+      contributor_name: { type: "string", description: "Consignment Consultant name from vdp-sales-row" },
+      contributor_title: { type: "string", description: "Consignment Consultant title (e.g., 'Consignment Consultant')" },
+      contributor_phone: { type: "string", description: "Consignment Consultant phone number" },
+      contributor_email: { type: "string", description: "Consignment Consultant email address" },
+    },
+  };
+
+  const extracted: any[] = [];
+  const issues: string[] = [];
+
+  // Prefer unseen URLs to avoid repeatedly re-importing the same top listings
+  let urlsToScrape = listingUrls;
+  try {
+    const supabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+    const sample = listingUrls.slice(0, 50);
+    if (sample.length > 0) {
+      const { data: existing } = await supabase
+        .from("vehicles")
+        .select("platform_url")
+        .in("platform_url", sample);
+      const existingSet = new Set((existing || []).map((r: any) => String(r?.platform_url || "")));
+      const unseen = sample.filter((u) => !existingSet.has(u));
+      urlsToScrape = (unseen.length > 0 ? unseen : sample).slice(0, Math.max(1, maxVehicles));
+    }
+  } catch {
+    // ignore
+  }
+
+  // PARALLEL scraping for speed - process multiple listings concurrently (increased to 12 for faster extraction)
+  const urlsToProcess = urlsToScrape.slice(0, Math.max(1, maxVehicles));
+  const CONCURRENCY = 12;
+  const batches: string[][] = [];
+  for (let i = 0; i < urlsToProcess.length; i += CONCURRENCY) {
+    batches.push(urlsToProcess.slice(i, i + CONCURRENCY));
+  }
+
+  for (const batch of batches) {
+    const scrapePromises = batch.map(async (listingUrl: string) => {
+      try {
+        const firecrawlData = await fetchJsonWithTimeout(
+          FIRECRAWL_SCRAPE_URL,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${firecrawlKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              url: listingUrl,
+              formats: ["extract", "html"],
+              onlyMainContent: false,
+              waitFor: 5000, // Reduced from 8000ms for faster extraction
+              actions: [
+                {
+                  type: "wait",
+                  milliseconds: 1500, // Reduced from 2000ms
+                },
+                {
+                  type: "scroll",
+                  direction: "down",
+                  pixels: 1000,
+                },
+                {
+                  type: "wait",
+                  milliseconds: 1500, // Reduced from 2000ms
+                },
+              ],
+              extract: { schema: listingSchema },
+            }),
+          },
+          FIRECRAWL_LISTING_TIMEOUT_MS,
+          "Firecrawl listing scrape",
+        );
+
+        const vehicle = firecrawlData?.data?.extract || {};
+        const html = String(firecrawlData?.data?.html || "");
+        
+        // Extract images and videos from HTML
+        let images = Array.isArray(vehicle?.images) && vehicle.images.length > 0
+          ? vehicle.images.filter((img: string) => 
+              !img.toLowerCase().includes('no-car-image') && 
+              !img.toLowerCase().includes('placeholder') &&
+              !img.toLowerCase().includes('logo')
+            )
+          : [];
+        
+        // Extract videos (YouTube, Vimeo, etc.)
+        const videos: Array<{url: string; type: string; thumbnail?: string}> = [];
+        
+        // YouTube video extraction
+        const youtubePatterns = [
+          /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/gi,
+          /<iframe[^>]*src=["']([^"']*youtube[^"']*)["']/gi,
+        ];
+        
+        for (const pattern of youtubePatterns) {
+          const matches = html.match(pattern) || [];
+          for (const match of matches) {
+            const videoIdMatch = match.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/i);
+            if (videoIdMatch?.[1]) {
+              const videoId = videoIdMatch[1];
+              const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+              const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+              
+              if (!videos.find(v => v.url === videoUrl)) {
+                videos.push({
+                  url: videoUrl,
+                  type: 'youtube',
+                  thumbnail,
+                });
+              }
+            }
+          }
+        }
+        
+        // Vimeo video extraction
+        const vimeoPattern = /(?:vimeo\.com\/)(\d+)/gi;
+        const vimeoMatches = html.match(vimeoPattern) || [];
+        for (const match of vimeoMatches) {
+          const videoIdMatch = match.match(/vimeo\.com\/(\d+)/i);
+          if (videoIdMatch?.[1]) {
+            const videoId = videoIdMatch[1];
+            const videoUrl = `https://vimeo.com/${videoId}`;
+            
+            if (!videos.find(v => v.url === videoUrl)) {
+              videos.push({
+                url: videoUrl,
+                type: 'vimeo',
+              });
+            }
+          }
+        }
+        
+        // Simple image extraction from HTML (look for img src in gallery sections)
+        if (images.length === 0 && html) {
+          const imgMatches = html.match(/<img[^>]+src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi) || [];
+          for (const match of imgMatches) {
+            const srcMatch = match.match(/src=["']([^"']+)["']/i);
+            if (srcMatch?.[1]) {
+              const imgUrl = srcMatch[1];
+              if (imgUrl.includes('broadarrow') && 
+                  !imgUrl.includes('logo') && 
+                  !imgUrl.includes('icon') &&
+                  !imgUrl.includes('placeholder')) {
+                images.push(imgUrl);
+              }
+            }
+          }
+          images = Array.from(new Set(images)).slice(0, 100); // Limit to 100 images
+        }
+        
+        // Add video thumbnails to images array (videos are stored as images with is_video flag)
+        for (const video of videos) {
+          if (video.thumbnail) {
+            images.push(video.thumbnail);
+          }
+        }
+
+        // Detect currency from currency selector
+        let detectedCurrency = 'USD'; // Default
+        const currencyMatch = html.match(/<select[^>]*class=["'][^"']*currency-selector[^"']*["'][^>]*>[\s\S]*?<option[^>]*selected=["']selected["'][^>]*value=["']([^"']+)["']/i);
+        if (currencyMatch && currencyMatch[1]) {
+          detectedCurrency = currencyMatch[1].toUpperCase();
+        }
+        
+        // Currency conversion rates (approximate, should use real-time API in production)
+        const currencyRates: Record<string, number> = {
+          'USD': 1.0,
+          'EUR': 1.10, // 1 EUR = 1.10 USD (approximate)
+          'GBP': 1.27, // 1 GBP = 1.27 USD (approximate)
+          'CHF': 1.15, // 1 CHF = 1.15 USD (approximate)
+        };
+        const conversionRate = currencyRates[detectedCurrency] || 1.0;
+        
+        // Extract sale price from HTML with currency conversion
+        if (!vehicle.sale_price && html) {
+          // Try multiple patterns for price extraction
+          const pricePatterns = [
+            /Sold\s+Price:\s*[€£$]?\s*([\d,]+)/i,
+            /Price[:\s]+[€£$]?\s*([\d,]+)/i,
+            /Estimate[:\s]+[€£$]?\s*([\d,]+)/i,
+          ];
+          
+          for (const pattern of pricePatterns) {
+            const priceMatch = html.match(pattern);
+            if (priceMatch?.[1]) {
+              const rawPrice = parseInt(priceMatch[1].replace(/,/g, ''), 10);
+              if (rawPrice > 0) {
+                // Convert to USD (prices are stored in cents, so multiply by 100)
+                vehicle.sale_price = Math.round(rawPrice * conversionRate * 100);
+                vehicle.price_currency = detectedCurrency;
+                break;
+              }
+            }
+          }
+        }
+        
+        // Also convert any existing price if it was extracted in wrong currency
+        if (vehicle.sale_price && vehicle.sale_price < 1000000 && detectedCurrency !== 'USD') {
+          // If price seems too low, it might be in wrong currency
+          // Re-extract and convert
+          const pricePatterns = [
+            /Sold\s+Price:\s*[€£$]?\s*([\d,]+)/i,
+            /Price[:\s]+[€£$]?\s*([\d,]+)/i,
+          ];
+          for (const pattern of pricePatterns) {
+            const priceMatch = html.match(pattern);
+            if (priceMatch?.[1]) {
+              const rawPrice = parseInt(priceMatch[1].replace(/,/g, ''), 10);
+              if (rawPrice > 0) {
+                vehicle.sale_price = Math.round(rawPrice * conversionRate * 100);
+                vehicle.price_currency = detectedCurrency;
+                break;
+              }
+            }
+          }
+        }
+
+        // Extract contributor/contact information from HTML
+        // This handles multiple formats - Broad Arrow's curated format, generic listings, etc.
+        let contributor: any = null;
+        if (html) {
+          // Broad Arrow specific format: vdp-sales-row div (curated, high-end contact)
+          const nameMatch = html.match(/<div[^>]*class=["'][^"']*line[^"']*name[^"']*["'][^>]*>\s*([^<]+?)\s*<\/div>/i);
+          const titleMatch = html.match(/<div[^>]*class=["'][^"']*line[^"']*sales_title[^"']*["'][^>]*>\s*([^<]+?)\s*<\/div>/i);
+          
+          // Generic contact extraction patterns (for other site formats)
+          const genericNamePatterns = [
+            /<div[^>]*class=["'][^"']*contact[^"']*name[^"']*["'][^>]*>\s*([^<]+?)\s*<\/div>/i,
+            /<span[^>]*class=["'][^"']*contact[^"']*name[^"']*["'][^>]*>\s*([^<]+?)\s*<\/span>/i,
+            /Contact:\s*([^<]+?)(?:<|$)/i,
+          ];
+          
+          const genericTitlePatterns = [
+            /<div[^>]*class=["'][^"']*contact[^"']*title[^"']*["'][^>]*>\s*([^<]+?)\s*<\/div>/i,
+            /<span[^>]*class=["'][^"']*contact[^"']*title[^"']*["'][^>]*>\s*([^<]+?)\s*<\/span>/i,
+            /Title:\s*([^<]+?)(?:<|$)/i,
+          ];
+          
+          let name = nameMatch ? nameMatch[1].trim() : null;
+          let title = titleMatch ? titleMatch[1].trim() : null;
+          
+          // Try generic patterns if Broad Arrow specific didn't match
+          if (!name) {
+            for (const pattern of genericNamePatterns) {
+              const match = html.match(pattern);
+              if (match?.[1]) {
+                name = match[1].trim();
+                break;
+              }
+            }
+          }
+          
+          if (!title) {
+            for (const pattern of genericTitlePatterns) {
+              const match = html.match(pattern);
+              if (match?.[1]) {
+                title = match[1].trim();
+                break;
+              }
+            }
+          }
+          
+          // Extract contact info (phone, email) - works across formats
+          const phoneMatch = html.match(/href=["']tel:([^"']+)["']/i) || html.match(/phone[:\s]+([+\d\s\-\(\)]+)/i);
+          const phone = phoneMatch ? phoneMatch[1].trim() : null;
+          
+          const emailMatch = html.match(/href=["']mailto:([^"']+)["']/i) || html.match(/email[:\s]+([a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+          const email = emailMatch ? emailMatch[1].trim() : null;
+          
+          // Determine contact context/type based on source and role
+          // High-end auction houses (Broad Arrow, Bonhams, etc.) = 'auction_specialist'
+          // Generic dealers = 'dealer_contact'
+          // Service providers (detailers, mechanics) = 'service_provider'
+          // Default = 'contact'
+          const contactContext = source.toLowerCase().includes('broadarrow') || 
+                                 source.toLowerCase().includes('bonhams') ||
+                                 source.toLowerCase().includes('auction')
+            ? 'auction_specialist'
+            : title && (title.toLowerCase().includes('detail') || title.toLowerCase().includes('mechanic') || title.toLowerCase().includes('service'))
+            ? 'service_provider'
+            : 'contact';
+          
+          // Only create contributor object if we found at least one field
+          if (name || title || phone || email) {
+            contributor = {
+              name: name || vehicle.contributor_name || null,
+              title: title || vehicle.contributor_title || null,
+              phone: phone || vehicle.contributor_phone || null,
+              email: email || vehicle.contributor_email || null,
+              context: contactContext, // Classification for profile building
+              source_type: 'curated_contact', // vs 'generic_listing', 'user_submitted', etc.
+              discovered_at: new Date().toISOString(),
+            };
+          }
+        }
+        
+        // Use schema-extracted contributor data if HTML extraction didn't find it
+        if (!contributor && (vehicle.contributor_name || vehicle.contributor_title || vehicle.contributor_phone || vehicle.contributor_email)) {
+          // Determine context from schema-extracted data
+          const contactContext = title && (title.toLowerCase().includes('detail') || title.toLowerCase().includes('mechanic'))
+            ? 'service_provider'
+            : 'contact';
+          
+          contributor = {
+            name: vehicle.contributor_name || null,
+            title: vehicle.contributor_title || null,
+            phone: vehicle.contributor_phone || null,
+            email: vehicle.contributor_email || null,
+            context: contactContext,
+            source_type: 'schema_extracted',
+            discovered_at: new Date().toISOString(),
+          };
+        }
+
+        return {
+          ...vehicle,
+          listing_url: listingUrl,
+          images,
+          videos, // Separate videos array
+          contributor,
+          price_currency: vehicle.price_currency || detectedCurrency,
+        };
+      } catch (e: any) {
+        issues.push(`listing scrape failed: ${listingUrl} (${e?.message || String(e)})`);
+        return null;
+      }
+    });
+
+    const results = await Promise.all(scrapePromises);
+    extracted.push(...results.filter((r) => r !== null));
+  }
+
+  const created = await storeVehiclesInDatabase(extracted, "Broad Arrow Auctions", sourceWebsite);
+
+  // Determine extraction context for reporting
+  const extractionContext = isAvailableLots 
+    ? "upcoming_auction_lots" 
+    : "past_auction_results";
+
+  return {
+    success: true,
+    source: "Broad Arrow Auctions",
+    site_type: "broadarrow",
+    listing_index_url: indexUrl,
+    extraction_context: extractionContext, // "upcoming_auction_lots" or "past_auction_results"
+    listings_discovered: listingUrls.length,
+    vehicles_extracted: extracted.length,
+    vehicles_created: created.created_ids.length,
+    vehicles_updated: created.updated_ids.length,
+    vehicles_saved: created.created_ids.length + created.updated_ids.length,
+    created_vehicle_ids: created.created_ids,
+    updated_vehicle_ids: created.updated_ids,
+    issues: [...issues, ...created.errors],
+    extraction_method: "index_link_discovery + firecrawl_per_listing_extract_parallel",
+    timestamp: new Date().toISOString(),
+    debug: {
+      map_response_keys: mapRaw && typeof mapRaw === "object" ? Object.keys(mapRaw) : null,
+      discovered_listing_urls: listingUrls.slice(0, 5),
+      extraction_source: isAvailableLots ? "available_lots" : "results",
+    },
   };
 }
 
