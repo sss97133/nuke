@@ -63,7 +63,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
   const [rows, setRows] = useState<AuctionRow[]>([]);
   const [vehiclesById, setVehiclesById] = useState<Record<string, VehicleMini>>({});
   const [bestImageByVehicleId, setBestImageByVehicleId] = useState<Record<string, string>>({});
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('live');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [reserveFilter, setReserveFilter] = useState<ReserveFilter>('all');
 
   useEffect(() => {
