@@ -20,6 +20,90 @@ function toInt(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+async function fetchHtml(url: string): Promise<string> {
+  // Try direct fetch first (cheap). Some Cloudflare setups may hang/deny Edge IPs.
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (resp.ok) return await resp.text();
+  } catch {
+    // fall through to Firecrawl
+  }
+
+  // Firecrawl fallback (more reliable for JS/anti-bot pages)
+  const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") || "";
+  if (!firecrawlKey) throw new Error("Direct fetch failed and FIRECRAWL_API_KEY is not set");
+
+  const fcResp = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${firecrawlKey}`,
+    },
+    body: JSON.stringify({
+      url,
+      formats: ["html"],
+      onlyMainContent: false,
+      // Give Webflow time to hydrate listing links if needed.
+      waitFor: 6500,
+    }),
+    signal: AbortSignal.timeout(60000),
+  });
+  const txt = await fcResp.text();
+  if (!fcResp.ok) throw new Error(`Firecrawl HTTP ${fcResp.status}: ${txt.slice(0, 200)}`);
+  let data: any = null;
+  try {
+    data = JSON.parse(txt);
+  } catch {
+    throw new Error(`Firecrawl response was not JSON: ${txt.slice(0, 200)}`);
+  }
+  const html = data?.data?.html || null;
+  if (!html || typeof html !== "string") throw new Error("Firecrawl returned no html");
+  return html;
+}
+
+function titleFromSlug(slug: string): string {
+  const s = String(slug || "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s;
+}
+
+function parseFromAmInventoryUrl(u: string): { year: number | null; vin: string | null; title: string | null; make: string | null; model: string | null } {
+  try {
+    const url = new URL(u);
+    const m = url.pathname.match(/\/am-inventory\/([^/]+)/i);
+    const slug = (m?.[1] || "").trim();
+    if (!slug) return { year: null, vin: null, title: null, make: null, model: null };
+
+    const vinMatch = slug.match(/\b([A-HJ-NPR-Z0-9]{17})\b/i);
+    const vin = vinMatch?.[1]?.toUpperCase() || null;
+
+    const yearMatch = slug.match(/\b(19|20)\d{2}\b/);
+    const year = yearMatch ? parseInt(yearMatch[0], 10) : null;
+
+    // Rough make/model inference from slug (best-effort).
+    // Slugs are typically: Make-Model-...-YEAR-VIN
+    const parts = slug.split("-").filter(Boolean);
+    const yearIdx = year ? parts.findIndex((p) => p === String(year)) : -1;
+    const usable = yearIdx > 0 ? parts.slice(0, yearIdx) : parts;
+    const make = usable[0] ? usable[0].replace(/\s+/g, " ").trim() : null;
+    const model = usable.length > 1 ? usable.slice(1).join(" ").trim() : null;
+
+    const title = titleFromSlug(usable.join(" "));
+    return { year, vin, title: title || null, make, model };
+  } catch {
+    return { year: null, vin: null, title: null, make: null, model: null };
+  }
+}
+
 async function postJson(url: string, bearer: string, body: any): Promise<{ ok: boolean; status: number; text: string; json: any }> {
   const resp = await fetch(url, {
     method: "POST",
@@ -118,7 +202,8 @@ serve(async (req) => {
       max_results: maxResults,
       import_batches: importBatches,
       import_batch_size: importBatchSize,
-      scrape: null,
+      scrape_source_id: null,
+      discovery: null,
       import_runs: [] as any[],
     };
 
@@ -126,38 +211,96 @@ serve(async (req) => {
       return new Response(JSON.stringify(out), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 2) Run scrape-multi-source to queue /am-inventory/* listings
-    const scrapeUrl = `${supabaseUrl.replace(/\\/$/, "")}/functions/v1/scrape-multi-source`;
-    const scrapeResp = await postJson(scrapeUrl, invokeJwt, {
-      source_url: inventoryUrl,
-      source_type: "dealer_website",
-      organization_id: orgId,
-      max_results: maxResults,
-      extract_listings: true,
-      extract_dealer_info: true,
-      use_llm_extraction: true,
-      include_sold: false,
-      force_listing_status: "in_stock",
-      cheap_mode: false,
-    });
-    out.scrape = {
-      ok: scrapeResp.ok,
-      status: scrapeResp.status,
-      json: scrapeResp.json,
-      text_preview: scrapeResp.ok ? null : scrapeResp.text.slice(0, 400),
-    };
-    if (!scrapeResp.ok) {
-      return new Response(JSON.stringify(out), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    // 2) Deterministic discovery for TBTFW: inventory HTML contains /am-inventory/* links.
+    const html = await fetchHtml(inventoryUrl);
+    const base = new URL(inventoryUrl);
+    const linkMatches = Array.from(html.matchAll(/href="(\/am-inventory\/[^"]+)"/gi)).map((m) => (m[1] || "").trim());
+    const absLinks = linkMatches
+      .map((p) => new URL(p, base.origin).toString())
+      .filter((u) => u.includes("/am-inventory/"));
+    const dedupedLinks = Array.from(new Set(absLinks)).slice(0, maxResults);
 
-    const scrapeSourceId = scrapeResp.json?.source_id || null;
+    // Grab one hero image per listing (best-effort). TBTFW embeds AutoManager blob URLs.
+    const imgMatches = Array.from(html.matchAll(/https:\/\/automanager\.blob\.core\.windows\.net\/wmphotos\/043135\/[^"'\\s<>]+?_1280\.(?:jpg|jpeg|png|webp)/gi))
+      .map((m) => (m[0] || "").trim())
+      .filter(Boolean);
+    const dedupedImgs = Array.from(new Set(imgMatches));
+
+    // Ensure scrape_source exists (so we can filter import processing by source_id)
+    const { data: existingSource, error: ssErr } = await supabase
+      .from("scrape_sources")
+      .select("id")
+      .eq("url", inventoryUrl)
+      .maybeSingle();
+    if (ssErr) throw new Error(`scrape_sources select failed: ${ssErr.message}`);
+
+    let scrapeSourceId: string | null = existingSource?.id || null;
     if (!scrapeSourceId) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: "scrape-multi-source did not return source_id",
-        scrape: out.scrape,
-      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const { data: createdSource, error: ssInsErr } = await supabase
+        .from("scrape_sources")
+        .insert({
+          name: "TBTFW Inventory",
+          url: inventoryUrl,
+          source_type: "dealer",
+          inventory_url: inventoryUrl,
+          last_scraped_at: new Date().toISOString(),
+          last_successful_scrape: new Date().toISOString(),
+          total_listings_found: dedupedLinks.length,
+        } as any)
+        .select("id")
+        .single();
+      if (ssInsErr) throw new Error(`scrape_sources insert failed: ${ssInsErr.message}`);
+      scrapeSourceId = createdSource?.id || null;
     }
+    if (!scrapeSourceId) throw new Error("Failed to resolve scrape_source_id");
+
+    out.scrape_source_id = scrapeSourceId;
+    out.discovery = {
+      links_found: absLinks.length,
+      links_deduped: dedupedLinks.length,
+      images_found: imgMatches.length,
+      images_deduped: dedupedImgs.length,
+      sample_links: dedupedLinks.slice(0, 5),
+    };
+
+    // Upsert import_queue rows (idempotent by listing_url)
+    // Filter out junk /am-inventory/<VIN> URLs (no year => process-import-queue will reject).
+    const pairs = dedupedLinks.map((u, idx) => ({ u, idx, parsed: parseFromAmInventoryUrl(u) }));
+    const validPairs = pairs.filter((p) => typeof p.parsed.year === 'number' && Number.isFinite(p.parsed.year));
+    const rows = validPairs.map((p) => {
+      const thumb = dedupedImgs[p.idx] || null;
+      return {
+        source_id: scrapeSourceId,
+        listing_url: p.u,
+        listing_title: p.parsed.title,
+        listing_year: p.parsed.year,
+        listing_make: p.parsed.make,
+        listing_model: p.parsed.model,
+        thumbnail_url: thumb,
+        raw_data: {
+          organization_id: orgId,
+          inventory_extraction: true,
+          listing_status: "in_stock",
+          vin: p.parsed.vin,
+          image_urls: thumb ? [thumb] : [],
+          extracted_via: "tbtfw-ingest-now",
+          source_url: inventoryUrl,
+        },
+        priority: 0,
+      };
+    });
+
+    let queued = 0;
+    const chunkSize = 100;
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const chunk = rows.slice(i, i + chunkSize);
+      const { error: upErr } = await supabase
+        .from("import_queue")
+        .upsert(chunk, { onConflict: "listing_url" } as any);
+      if (upErr) throw new Error(`import_queue upsert failed: ${upErr.message}`);
+      queued += chunk.length;
+    }
+    out.discovery.queued = queued;
 
     // 3) Drain import queue for this scrape source
     const importUrl = `${supabaseUrl.replace(/\\/$/, "")}/functions/v1/process-import-queue`;

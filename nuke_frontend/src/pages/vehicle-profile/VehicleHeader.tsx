@@ -627,9 +627,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       const v: any = vehicle as any;
       const externalListing = v?.external_listings?.[0];
       if (externalListing) {
-        // Check if listing is truly live by looking at end_date (more reliable than status field)
+        // Treat listing as live if either:
+        // - end_date is in the future, OR
+        // - end_date is missing but status indicates 'active' or 'live'
         const listingEndDate = externalListing.end_date ? new Date(externalListing.end_date).getTime() : 0;
-        const isLive = Number.isFinite(listingEndDate) && listingEndDate > Date.now();
+        const statusStr = String(externalListing.listing_status || '').toLowerCase();
+        const hasLiveStatus = statusStr === 'active' || statusStr === 'live';
+        const isLive = (Number.isFinite(listingEndDate) && listingEndDate > Date.now()) || (!externalListing.end_date && hasLiveStatus);
         const listingBid = parseMoneyNumber(externalListing.current_bid);
         if (isLive && listingBid) {
           return { amount: listingBid, label: 'Current Bid' };
@@ -2899,8 +2903,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           e.currentTarget.style.transform = 'scale(1)';
                         }}
                       >
-                        {isBatOrg ? (
-                          <FaviconIcon url={batUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+                      {isBatOrg ? (
+                          <img src="/vendor/bat/favicon.ico" alt="Bring a Trailer" style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
                         ) : isCarsAndBidsOrg ? (
                           <FaviconIcon url={carsAndBidsUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
                         ) : org.logo_url ? (
