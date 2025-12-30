@@ -3817,6 +3817,17 @@ async function storeVehiclesInDatabase(
   return { created_ids: createdIds, updated_ids: updatedIds, errors, source_org_id: sourceOrgId };
 }
 
+// Normalize website URL for consistent matching
+function normalizeWebsiteForMatching(url: string | null): string | null {
+  if (!url) return null;
+  return url
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/$/, '')
+    .trim();
+}
+
 async function ensureSourceBusiness(
   supabase: any,
   sourceName: string,
@@ -3824,14 +3835,43 @@ async function ensureSourceBusiness(
 ): Promise<string | null> {
   const w = website ? String(website).trim() : "";
   if (!w) return null;
+  
+  // Normalize website for matching
+  const normalizedWebsite = normalizeWebsiteForMatching(w);
+  
   try {
-    const { data: existing } = await supabase
+    // First try exact match
+    const { data: existingExact } = await supabase
       .from("businesses")
-      .select("id")
+      .select("id, website")
       .eq("website", w)
       .limit(1)
       .maybeSingle();
-    if (existing?.id) return existing.id;
+    if (existingExact?.id) return existingExact.id;
+    
+    // Then try normalized match (to catch www vs non-www, http vs https, trailing slash variations)
+    if (normalizedWebsite) {
+      const { data: allOrgs } = await supabase
+        .from("businesses")
+        .select("id, website")
+        .not("website", "is", null)
+        .limit(1000); // Get a reasonable batch to check
+      
+      if (allOrgs) {
+        const match = allOrgs.find(org => {
+          const orgNormalized = normalizeWebsiteForMatching(org.website);
+          return orgNormalized === normalizedWebsite;
+        });
+        if (match?.id) {
+          // Update the existing org to use the canonical website format
+          await supabase
+            .from("businesses")
+            .update({ website: w }) // Use the provided format as canonical
+            .eq("id", match.id);
+          return match.id;
+        }
+      }
+    }
 
     const { data: inserted, error } = await supabase
       .from("businesses")
