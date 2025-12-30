@@ -784,6 +784,86 @@ serve(async (req) => {
             location: null,
           }
         };
+
+        // TBTFW / AutoManager (Webflow) listings: /am-inventory/<slug>
+        // These pages include VIN/Stock/Mileage and a full AutoManager image gallery.
+        // Our generic parsers often miss this because the labels are in separate divs.
+        const isTbtfwAmInventory = (() => {
+          try {
+            const u = new URL(item.listing_url);
+            const host = u.hostname.replace(/^www\./, '').toLowerCase();
+            return host === 'tbtfw.com' && u.pathname.toLowerCase().startsWith('/am-inventory/');
+          } catch {
+            return false;
+          }
+        })();
+
+        const bodyText = doc?.body?.textContent || '';
+
+        if (isTbtfwAmInventory) {
+          scrapeData.data.source = 'TBTFW';
+          scrapeData.data.platform = 'tbtfw';
+          try {
+            scrapeData.data.platform_url = new URL(item.listing_url).origin;
+          } catch {
+            // ignore
+          }
+
+          // VIN + Stock # appear as:
+          // <div class="vin pad-right">VIN </div><div class="vin">VF9...</div>
+          // <div class="vin pad-right">Stock # </div><div class="vin">795038</div>
+          const vinFromText = bodyText.match(/\bVIN\b[\s:]*([A-HJ-NPR-Z0-9]{17})\b/i)?.[1] || null;
+          const vinFromHtml =
+            html.match(/VIN\s*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-HJ-NPR-Z0-9]{17})\s*<\/div>/i)?.[1] ||
+            null;
+          const vin = (vinFromText || vinFromHtml || '').toUpperCase().trim();
+          if (vin && vin.length === 17 && !/[IOQ]/.test(vin)) {
+            scrapeData.data.vin = vin;
+          }
+
+          const stock =
+            html.match(/Stock\s*#\s*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-Za-z0-9-]{2,20})\s*<\/div>/i)?.[1] ||
+            bodyText.match(/\bStock\s*#\b[\s:]*([A-Za-z0-9-]{2,20})/i)?.[1] ||
+            null;
+          if (stock) {
+            scrapeData.data.stock_number = String(stock).trim();
+          }
+
+          // Price: prefer numeric, but keep null when the page shows "Call for Price".
+          if (!scrapeData.data.asking_price) {
+            const callForPrice = /\bCall\s+for\s+Price\b/i.test(bodyText) || /\bCall\s+for\s+Price\b/i.test(html);
+            if (!callForPrice) {
+              const extractedPrice = extractVehiclePrice(bodyText);
+              if (extractedPrice) scrapeData.data.asking_price = extractedPrice;
+            }
+          }
+
+          // Mileage: common format is "5,715 Miles" and it is visible in textContent.
+          if (!scrapeData.data.mileage) {
+            const m1 = bodyText.match(/(\d{1,3}(?:,\d{3})+|\d{2,7})\s*Miles?\b/i);
+            if (m1?.[1]) {
+              const miles = parseInt(m1[1].replace(/,/g, ''), 10);
+              if (Number.isFinite(miles) && miles > 0 && miles < 10000000) {
+                scrapeData.data.mileage = miles;
+              }
+            }
+          }
+
+          // Images: AutoManager gallery uses Azure blob URLs.
+          // Capture all wmphotos assets and prefer the *_1280 size (stable and high-res).
+          try {
+            const imgs = Array.from(html.matchAll(/https:\/\/automanager\.blob\.core\.windows\.net\/wmphotos\/043135\/[^"'\s<>]+?\.(?:jpg|jpeg|png|webp)/gi))
+              .map((m) => (m[0] || '').trim())
+              .filter(Boolean)
+              .map((u) => u.replace(/_(?:320|640|800|1024)\.(jpg|jpeg|png|webp)$/i, '_1280.$1'));
+            const deduped = Array.from(new Set(imgs));
+            if (deduped.length > 0) {
+              scrapeData.data.images = deduped;
+            }
+          } catch {
+            // ignore
+          }
+        }
         }
 
         // L'Art de L'Automobile: use the dedicated `scrape-vehicle` extractor for /fiche/ pages.
@@ -2018,6 +2098,7 @@ serve(async (req) => {
               scrapeData.data.color ?? scrapeData.data.colors ?? scrapeData.data.origin_metadata?.lart?.colors ?? null
             );
             const listingFields: Array<{ key: string; value: any }> = [
+              { key: 'vin', value: scrapeData.data.vin ?? null },
               { key: 'asking_price', value: scrapeData.data.asking_price ?? scrapeData.data.price ?? null },
               { key: 'mileage', value: scrapeData.data.mileage ?? null },
               { key: 'transmission', value: scrapeData.data.transmission ?? null },
@@ -2360,12 +2441,41 @@ serve(async (req) => {
             ? (scrapeData as any).data.bhcc_stockno
             : null;
 
+        const listingVin = (scrapeData?.data?.vin || '').toString().trim();
+        const safeVin =
+          listingVin && listingVin.length === 17 && !/[IOQ]/.test(listingVin) ? listingVin.toUpperCase() : null;
+
+        const listingHost = (() => {
+          try { return new URL(item.listing_url).hostname.replace(/^www\./, ''); } catch { return null; }
+        })();
+
+        const bestTitle =
+          (scrapeData?.data?.title || rawData?.title || item.listing_title || '').toString().trim() || null;
+        const bestPrimaryImage =
+          (Array.isArray(scrapeData?.data?.images) && scrapeData.data.images.length > 0)
+            ? String(scrapeData.data.images[0] || '').trim()
+            : (typeof (item as any)?.thumbnail_url === 'string' ? String((item as any).thumbnail_url).trim() : null);
+
         const { data: newVehicle, error: vehicleError} = await supabase
           .from('vehicles')
           .insert({
             year: year,
             make: make,
             model: model,
+            vin: safeVin,
+            vin_source: safeVin ? `scraped_listing:${listingHost || 'unknown'}` : null,
+            vin_confidence: safeVin ? 80 : null,
+            mileage: (typeof scrapeData?.data?.mileage === 'number' && Number.isFinite(scrapeData.data.mileage)) ? scrapeData.data.mileage : null,
+            mileage_source: (typeof scrapeData?.data?.mileage === 'number' && Number.isFinite(scrapeData.data.mileage)) ? `scraped_listing:${listingHost || 'unknown'}` : null,
+            asking_price: (typeof scrapeData?.data?.asking_price === 'number' && Number.isFinite(scrapeData.data.asking_price)) ? scrapeData.data.asking_price : null,
+            listing_url: item.listing_url,
+            listing_source: listingHost,
+            listing_title: bestTitle,
+            title: bestTitle,
+            primary_image_url: bestPrimaryImage && bestPrimaryImage.startsWith('http') ? bestPrimaryImage : null,
+            image_url: bestPrimaryImage && bestPrimaryImage.startsWith('http') ? bestPrimaryImage : null,
+            platform_source: scrapeData?.data?.source || null,
+            platform_url: scrapeData?.data?.platform_url || (listingHost ? `https://${listingHost}` : null),
             status: 'pending', // Start pending - will be activated after validation
             is_public: false, // Start private - will be made public after validation
             discovery_url: item.listing_url,
@@ -2376,6 +2486,7 @@ serve(async (req) => {
               image_urls: scrapeData.data.images || [], // Store for reference
               image_count: scrapeData.data.images?.length || 0,
               ...(bhccStockNo ? { bhcc: { stockno: bhccStockNo } } : {}),
+              ...(scrapeData?.data?.stock_number ? { stock_number: scrapeData.data.stock_number } : {}),
               ...(isLartFiche ? {
                 lart: {
                   description_fr: scrapeData.data.description_fr || null,

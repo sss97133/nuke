@@ -302,6 +302,23 @@ const ImageGallery = ({
     })();
   }, [vehicleId]);
 
+  // Default BaT-only view for BaT-origin vehicles, with a user-toggle to show all sources
+  const isBatVehicle = useMemo(() => {
+    const origin = String(vehicleMeta?.profile_origin || '').toLowerCase();
+    const discovery = String(vehicleMeta?.discovery_url || '').toLowerCase();
+    return origin === 'bat_import' || discovery.includes('bringatrailer.com/listing/');
+  }, [vehicleMeta]);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'bat' | 'user' | 'org' | 'external' | 'queue'>('all');
+  useEffect(() => {
+    // When we navigate to a BaT vehicle, default to BaT images only to avoid UI pollution.
+    setSourceFilter(isBatVehicle ? 'bat' : 'all');
+  }, [isBatVehicle]);
+  const applySourceFilter = useCallback((rows: any[]) => {
+    if (!Array.isArray(rows) || rows.length === 0) return rows;
+    if (sourceFilter === 'all') return rows;
+    return rows.filter((img: any) => getImageSource(img).type === sourceFilter);
+  }, [sourceFilter]);
+
   // Load auction start date for BaT vehicles (for date calculations)
   useEffect(() => {
     (async () => {
@@ -539,9 +556,9 @@ const ImageGallery = ({
     const nextAll = filterBatNoiseRows(allImages);
     if (nextAll.length === allImages.length) return;
     setAllImages(nextAll);
-    setDisplayedImages(sortRows(nextAll, sortBy)); // NO LIMIT - show ALL images
+    setDisplayedImages(sortRows(applySourceFilter(nextAll), sortBy)); // NO LIMIT - show filtered images
     // Do not toggle usingFallback here; we only filter the current view.
-  }, [vehicleMeta]); // intentionally not depending on allImages to avoid loops
+  }, [vehicleMeta, applySourceFilter]); // intentionally not depending on allImages to avoid loops
 
   const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
   const normalizeFallbackUrls = (urls: string[]) => {
@@ -629,7 +646,7 @@ const ImageGallery = ({
       const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
       setUsingFallback(false);
       setAllImages(images);
-      setDisplayedImages(sortRows(images, sortBy)); // NO LIMIT - show ALL images
+      setDisplayedImages(sortRows(applySourceFilter(images), sortBy)); // NO LIMIT - show filtered images
       setShowImages(true);
       onImagesUpdated?.();
     } catch (err) {
@@ -1970,6 +1987,16 @@ const ImageGallery = ({
 
           {/* Toggle Buttons for Sorting */}
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            {/* Only BaT toggle (defaulted for BaT vehicles) */}
+            <label className="text-small" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', userSelect: 'none' }} title="Show only Bring a Trailer images for BaT listings">
+              <input
+                type="checkbox"
+                checked={sourceFilter === 'bat'}
+                onChange={(e) => setSourceFilter(e.target.checked ? 'bat' : 'all')}
+              />
+              <span>Only BaT</span>
+            </label>
+
             {/* Group by Source Toggle */}
             <button
               onClick={() => {
