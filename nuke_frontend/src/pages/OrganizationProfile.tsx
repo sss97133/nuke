@@ -26,7 +26,6 @@ import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationServiceTab } from '../components/organization/OrganizationServiceTab';
 import { OrganizationAuctionsTab } from '../components/organization/OrganizationAuctionsTab';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
-import { LiveAuctionBadge } from '../components/auction/AuctionBadges';
 import VehicleThumbnail from '../components/VehicleThumbnail';
 import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
 import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
@@ -225,7 +224,7 @@ export default function OrganizationProfile() {
   const formatBusinessTypeLabel = (t?: string | null) => {
     const v = String(t || '').toLowerCase().trim();
     if (!v) return null;
-    if (v === 'auction_house') return 'Online Auction House';
+    if (v === 'auction_house') return 'Online Auction Platform';
     if (v === 'dealership') return 'Dealership';
     if (v === 'body_shop') return 'Body Shop';
     if (v === 'restoration_shop') return 'Restoration Shop';
@@ -1454,9 +1453,15 @@ export default function OrganizationProfile() {
   }
 
   const displayName = organization.business_name || organization.legal_name || 'Unnamed Organization';
-  const headerLogoUrl =
-    (organization as any)?.logo_url ||
-    (primaryImage?.large_url ?? primaryImage?.image_url ?? null);
+  
+  // Detect BaT organization for proper logo
+  const orgName = String(displayName).toLowerCase();
+  const isBatOrg = orgName.includes('bring a trailer') || orgName === 'bat' || orgName.includes('ba t');
+  
+  // Use proper vendor logos when available, otherwise fall back to organization logo
+  const headerLogoUrl = isBatOrg 
+    ? '/vendor/bat/favicon.ico'
+    : ((organization as any)?.logo_url || null);
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
@@ -1512,14 +1517,13 @@ export default function OrganizationProfile() {
             }}>
               {displayName}
             </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
             {organization.business_type && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
                 <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>
-                {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
+                  {formatBusinessTypeLabel(organization.business_type) || organization.business_type}
+                </div>
               </div>
             )}
-              <LiveAuctionBadge organization={organization} />
-            </div>
           </div>
 
           {/* Stock price (if tradable) - Secondary */}

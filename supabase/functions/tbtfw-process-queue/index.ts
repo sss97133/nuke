@@ -58,19 +58,21 @@ async function firecrawlHtml(url: string): Promise<string> {
 
 function parseVin(html: string): string | null {
   // TBTFW specific: <div class="vin pad-right">VIN </div><div class="vin">SLATV4C0XPU216899</div>
-  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*\bvin\b[^"]*pad-right[^"]*"[^>]*>VIN\s*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-HJ-NPR-Z0-9]{17})\s*<\/div>/i);
+  // Also handles &nbsp; entity: <div class="vin pad-right">VIN&nbsp;</div>
+  // Accepts 8-17 characters (modern 17-char VINs and pre-1981 shorter VINs)
+  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*\bvin\b[^"]*pad-right[^"]*"[^>]*>VIN(?:\s|&nbsp;)*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-HJ-NPR-Z0-9]{8,17})\s*<\/div>/i);
   if (tbtfwMatch?.[1]) {
     const vin = tbtfwMatch[1].toUpperCase().trim();
-    if (vin.length === 17 && !/[IOQ]/.test(vin)) return vin;
+    if (vin.length >= 8 && vin.length <= 17 && !/[IOQ]/.test(vin)) return vin;
   }
   
-  // Fallback: generic patterns
+  // Fallback: generic patterns (8-17 characters for pre-1981 and modern VINs)
   const bodyText = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   const m =
-    bodyText.match(/\bVIN\b[\s:]*([A-HJ-NPR-Z0-9]{17})\b/i) ||
-    html.match(/VIN\s*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-HJ-NPR-Z0-9]{17})\s*<\/div>/i);
+    bodyText.match(/\bVIN\b[\s:]*([A-HJ-NPR-Z0-9]{8,17})\b/i) ||
+    html.match(/VIN\s*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-HJ-NPR-Z0-9]{8,17})\s*<\/div>/i);
   const vin = (m?.[1] || "").toUpperCase().trim();
-  if (!vin || vin.length !== 17 || /[IOQ]/.test(vin)) return null;
+  if (!vin || vin.length < 8 || vin.length > 17 || /[IOQ]/.test(vin)) return null;
   return vin;
 }
 
@@ -78,9 +80,10 @@ function parseVinFromUrl(url: string): string | null {
   try {
     const u = new URL(url);
     const slug = u.pathname.split('/').filter(Boolean).pop() || '';
-    const m = slug.match(/\b([A-HJ-NPR-Z0-9]{17})\b/i);
+    // Accept 8-17 characters (modern 17-char VINs and pre-1981 shorter VINs like 8F01T116890, U15GLM86038)
+    const m = slug.match(/\b([A-HJ-NPR-Z0-9]{8,17})\b/i);
     const vin = (m?.[1] || '').toUpperCase().trim();
-    if (!vin || vin.length !== 17 || /[IOQ]/.test(vin)) return null;
+    if (!vin || vin.length < 8 || vin.length > 17 || /[IOQ]/.test(vin)) return null;
     return vin;
   } catch {
     return null;
@@ -89,7 +92,8 @@ function parseVinFromUrl(url: string): string | null {
 
 function parseStock(html: string): string | null {
   // TBTFW specific: <div class="vin pad-right">Stock # </div><div class="vin">216899</div>
-  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*\bvin\b[^"]*pad-right[^"]*"[^>]*>Stock\s*#\s*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-Za-z0-9-]{2,20})\s*<\/div>/i);
+  // Also handles &nbsp; entity: <div class="vin pad-right">Stock #&nbsp;</div>
+  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*\bvin\b[^"]*pad-right[^"]*"[^>]*>Stock(?:\s|&nbsp;)*#(?:\s|&nbsp;)*<\/div>\s*<div[^>]*class="[^"]*\bvin\b[^"]*"[^>]*>\s*([A-Za-z0-9-]{2,20})\s*<\/div>/i);
   if (tbtfwMatch?.[1]) {
     return tbtfwMatch[1].trim();
   }
@@ -131,16 +135,16 @@ function parsePrice(html: string): number | null {
     }
   }
   
-  // TBTFW specific: <div class="price lrg">379995</div> (no dollar sign in same element)
+  // TBTFW specific: <div class="price lrg">159,995</div> (may include commas, no dollar sign in same element)
   // Match price div that has both "price" and "lrg" classes, and doesn't have "price-call"
-  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*\bprice\b(?![^"]*\bprice-call\b)[^"]*\blrg\b[^"]*"[^>]*>\s*(\d{4,})\s*<\/div>/i);
+  const tbtfwMatch = html.match(/<div[^>]*class="[^"]*\bprice\b(?![^"]*\bprice-call\b)[^"]*\blrg\b[^"]*"[^>]*>\s*([\d,]{4,})\s*<\/div>/i);
   if (tbtfwMatch?.[1]) {
     const n = parseInt(tbtfwMatch[1].replace(/,/g, ""), 10);
     if (Number.isFinite(n) && n >= 1000 && n <= 100000000) return n;
   }
   
   // Alternative: just look for price class without price-call
-  const altMatch = html.match(/<div[^>]*class="[^"]*\bprice\b(?![^"]*\bprice-call\b)[^"]*"[^>]*>\s*(\d{4,})\s*<\/div>/i);
+  const altMatch = html.match(/<div[^>]*class="[^"]*\bprice\b(?![^"]*\bprice-call\b)[^"]*"[^>]*>\s*([\d,]{4,})\s*<\/div>/i);
   if (altMatch?.[1]) {
     const n = parseInt(altMatch[1].replace(/,/g, ""), 10);
     if (Number.isFinite(n) && n >= 1000 && n <= 100000000) return n;
