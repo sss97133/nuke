@@ -33,6 +33,7 @@ import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
 import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
 import { getOrganizationProfileData } from '../services/profileStatsService';
 import { AdminNotificationService } from '../services/adminNotificationService';
+import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
 import '../design-system.css';
 
 interface Organization {
@@ -1457,6 +1458,7 @@ export default function OrganizationProfile() {
   // Detect BaT organization for proper logo
   const orgName = String(displayName).toLowerCase();
   const isBatOrg = orgName.includes('bring a trailer') || orgName === 'bat' || orgName.includes('ba t');
+  const isBroadArrow = orgName.includes('broad arrow') || orgName.includes('broadarrow');
   
   // Use proper vendor logos when available, otherwise fall back to organization logo
   const headerLogoUrl = isBatOrg 
@@ -2229,13 +2231,15 @@ export default function OrganizationProfile() {
                                   </div>
                                 )}
 
-                                {/* Current Bid and Comment Count Row */}
+                                {/* Price / Bid and Comment Count Row */}
                                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '2px' }}>
-                                  {vehicle.auction_current_bid && (
+                                  {(vehicle.sale_price || vehicle.auction_current_bid) && (
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                                      <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Bid:</span>
+                                      <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                                        {vehicle.sale_price ? 'Sold:' : 'Bid:'}
+                                      </span>
                                       <span style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--text)', fontFamily: 'monospace' }}>
-                                        {formatUsd(vehicle.auction_current_bid / 100)}
+                                        {formatUsd((vehicle.sale_price || vehicle.auction_current_bid / 100) || 0)}
                                       </span>
                                     </div>
                                   )}
@@ -2291,6 +2295,45 @@ export default function OrganizationProfile() {
                                       {listingLabel}
                                     </span>
                                   )}
+                                  {/* Sold/Unsold Badge */}
+                                  {(() => {
+                                    const status = String(vehicle.listing_status || '').toLowerCase();
+                                    if (status === 'sold' || vehicle.sale_price) {
+                                      return (
+                                        <span
+                                          style={{
+                                            fontSize: '7pt',
+                                            padding: '3px 6px',
+                                            border: '1px solid #166534',
+                                            background: '#dcfce7',
+                                            color: '#166534',
+                                            fontWeight: 700,
+                                            borderRadius: '0px'
+                                          }}
+                                        >
+                                          SOLD
+                                        </span>
+                                      );
+                                    }
+                                    if (status === 'unsold' || status === 'ended') {
+                                      return (
+                                        <span
+                                          style={{
+                                            fontSize: '7pt',
+                                            padding: '3px 6px',
+                                            border: '1px solid #991b1b',
+                                            background: '#fee2e2',
+                                            color: '#991b1b',
+                                            fontWeight: 700,
+                                            borderRadius: '0px'
+                                          }}
+                                        >
+                                          UNSOLD
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -2484,6 +2527,13 @@ export default function OrganizationProfile() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Broad Arrow Metrics Display */}
+            {isBroadArrow && vehicles.length > 0 && (
+              <div style={{ marginBottom: '16px' }}>
+                <BroadArrowMetricsDisplay vehicles={vehicles} showDetailed={true} />
               </div>
             )}
 

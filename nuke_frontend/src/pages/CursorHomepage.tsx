@@ -465,24 +465,43 @@ const CursorHomepage: React.FC = () => {
   const [availableBodyStyles, setAvailableBodyStyles] = useState<string[]>([]);
 
   const hasActiveFilters = useMemo(() => {
-    if (filters.yearMin || filters.yearMax) return true;
-    if (filters.priceMin || filters.priceMax) return true;
-    if ((filters.makes?.length || 0) > 0) return true;
-    if ((filters.bodyStyles?.length || 0) > 0) return true;
-    if (filters.is4x4) return true;
-    if ((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.radiusMiles > 0)) return true;
-    if (filters.forSale) return true;
-    if (filters.hideSold) return true;
-    if (filters.showPending) return true;
-    if (filters.privateParty) return true;
-    if (filters.dealer) return true;
-    if (filters.hideDealerListings) return true;
-    if (filters.hideCraigslist) return true;
-    if (filters.hideDealerSites) return true;
-    if (filters.hideKsl) return true;
-    if (filters.hideBat) return true;
-    if (filters.hideClassic) return true;
-    return false;
+    const result = 
+      (filters.yearMin || filters.yearMax) ||
+      (filters.priceMin || filters.priceMax) ||
+      ((filters.makes?.length || 0) > 0) ||
+      ((filters.bodyStyles?.length || 0) > 0) ||
+      filters.is4x4 ||
+      ((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.radiusMiles > 0)) ||
+      filters.forSale ||
+      filters.hideSold ||
+      filters.showPending ||
+      filters.privateParty ||
+      filters.dealer ||
+      filters.hideDealerListings ||
+      filters.hideCraigslist ||
+      filters.hideDealerSites ||
+      filters.hideKsl ||
+      filters.hideBat ||
+      filters.hideClassic ||
+      ((filters.hiddenSources?.length || 0) > 0);
+    
+    // #region agent log
+    console.log('[DEBUG] hasActiveFilters computed', {
+      result,
+      filterFlags: {
+        hideBat: filters.hideBat,
+        hideCraigslist: filters.hideCraigslist,
+        hideKsl: filters.hideKsl,
+        hideDealerSites: filters.hideDealerSites,
+        hideClassic: filters.hideClassic,
+        hideDealerListings: filters.hideDealerListings,
+        hiddenSources: filters.hiddenSources
+      }
+    });
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:467',message:'hasActiveFilters computed',data:{result,filterFlags:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hideKsl:filters.hideKsl,hideDealerSites:filters.hideDealerSites,hideClassic:filters.hideClassic,hideDealerListings:filters.hideDealerListings,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    return result;
   }, [filters]);
 
 
@@ -876,40 +895,68 @@ const CursorHomepage: React.FC = () => {
       });
     }
 
-    // Source / dealer-ish filtering
-    if (
+    // Source / dealer-ish filtering - use inclusion-based logic
+    // Check if any sources are explicitly excluded (indicating user has made selections)
+    const hasSourceSelections = 
       filters.hideDealerListings ||
       filters.hideCraigslist ||
       filters.hideDealerSites ||
       filters.hideKsl ||
       filters.hideBat ||
       filters.hideClassic ||
-      (filters.hiddenSources && filters.hiddenSources.length > 0)
-    ) {
+      (filters.hiddenSources && filters.hiddenSources.length > 0);
+
+    if (hasSourceSelections) {
+      // #region agent log
+      const beforeCount = result.length;
+      const sourceBreakdown: Record<string, number> = {};
+      result.forEach((v: any) => {
+        const src = classifySource(v);
+        sourceBreakdown[src] = (sourceBreakdown[src] || 0) + 1;
+      });
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:889',message:'Before source filter',data:{vehicleCount:beforeCount,sourceBreakdown,includedSources,filterFlags:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hideKsl:filters.hideKsl,hideDealerSites:filters.hideDealerSites,hideClassic:filters.hideClassic,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+
+      // Use inclusion-based filtering: only show vehicles from included sources
       result = result.filter((v: any) => {
         const src = classifySource(v);
-        const hiddenSourcesSet = new Set(filters.hiddenSources || []);
-
-        if (filters.hideDealerListings) {
-          if (src === 'craigslist' || src === 'dealer_site' || src === 'ksl') return false;
-        }
-
-        if (filters.hideCraigslist && src === 'craigslist') return false;
-        if (filters.hideDealerSites && src === 'dealer_site') return false;
-        if (filters.hideKsl && src === 'ksl') return false;
-        if (filters.hideBat && src === 'bat') return false;
-        if (filters.hideClassic && src === 'classic') return false;
+        // Check if this source is included based on includedSources
+        // If hasSourceSelections is true, only include sources that are explicitly set to true
+        // If a source isn't in includedSources, exclude it (don't default to included)
+        const isIncluded = includedSources[src] === true;
         
-        // Check dynamic sources
-        if (hiddenSourcesSet.has(src)) return false;
-
-        // If ALL main sources are hidden, also hide unknown sources
-        const allMainSourcesHidden = filters.hideCraigslist && filters.hideDealerSites && 
-          filters.hideKsl && filters.hideBat && filters.hideClassic;
-        if (allMainSourcesHidden && (src === 'unknown' || src === 'user')) return false;
-
-        return true;
+        // #region agent log
+        if (src === 'bat') {
+          console.log('[DEBUG] BaT vehicle filter check', { 
+            src, 
+            isIncluded, 
+            includedSourcesValue: includedSources[src], 
+            includedSourcesKeys: Object.keys(includedSources), 
+            hideBat: filters.hideBat,
+            vehicleId: v.id,
+            discoveryUrl: v.discovery_url,
+            profileOrigin: v.profile_origin
+          });
+          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:900',message:'BaT vehicle filter check',data:{src,isIncluded,includedSourcesValue:includedSources[src],includedSourcesKeys:Object.keys(includedSources),hideBat:filters.hideBat,vehicleId:v.id,discoveryUrl:v.discovery_url,profileOrigin:v.profile_origin},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch((e)=>console.error('Log fetch failed',e));
+        }
+        // #endregion
+        
+        return isIncluded;
       });
+
+      // #region agent log
+      const afterCount = result.length;
+      const afterSourceBreakdown: Record<string, number> = {};
+      result.forEach((v: any) => {
+        const src = classifySource(v);
+        afterSourceBreakdown[src] = (afterSourceBreakdown[src] || 0) + 1;
+      });
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:912',message:'After source filter',data:{vehicleCountBefore:beforeCount,vehicleCountAfter:afterCount,sourceBreakdownAfter:afterSourceBreakdown,filteredOut:beforeCount-afterCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+    } else {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:913',message:'Source filter skipped - no hide flags',data:{vehicleCount:result.length,includedSources},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
     }
     
     // Location filtering - support multiple locations
@@ -984,7 +1031,7 @@ const CursorHomepage: React.FC = () => {
     }
     
     setFilteredVehicles(result);
-  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText]);
+  }, [feedVehicles, filters, sortBy, sortDirection, debouncedSearchText, includedSources, activeSources, domainToFilterKey]);
 
   // Apply filters and sorting whenever vehicles or settings change
   useEffect(() => {
@@ -1044,7 +1091,7 @@ const CursorHomepage: React.FC = () => {
       // Build query with filters applied
       let query = supabase
         .from('vehicles')
-        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, sale_date, discovery_url, discovery_source, profile_origin, year, make, model, title, vin, image_count', { count: 'exact' })
+        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, sale_date, discovery_url, discovery_source, profile_origin, year, make, model, title, vin', { count: 'exact' })
         .eq('is_public', true)
         .neq('status', 'pending');
 
@@ -1373,24 +1420,32 @@ const CursorHomepage: React.FC = () => {
     try {
       setDbStatsLoading(true);
       
-      // Get total vehicle count (public vehicles only, matching the displayed count)
+      // Get total vehicle count (public vehicles only, excluding pending - matching the displayed count)
       const { count: totalCount, error: countError } = await supabase
         .from('vehicles')
         .select('*', { count: 'exact', head: true })
-        .eq('is_public', true);
+        .eq('is_public', true)
+        .neq('status', 'pending');
       
       if (countError) {
         console.error('Error loading vehicle count:', countError);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1429',message:'Error loading vehicle count',data:{error:countError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
       }
       
-      // Get comprehensive vehicle data for stats (public vehicles only)
+      // Get comprehensive vehicle data for stats (public vehicles only, excluding pending)
       const { data: allVehicles, error: vehiclesError } = await supabase
         .from('vehicles')
         .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome')
-        .eq('is_public', true);
+        .eq('is_public', true)
+        .neq('status', 'pending');
       
       if (vehiclesError) {
         console.error('Error loading vehicles for stats:', vehiclesError);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1440',message:'Error loading vehicles for stats',data:{error:vehiclesError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
         return;
       }
       
@@ -1462,6 +1517,7 @@ const CursorHomepage: React.FC = () => {
         .from('vehicles')
         .select('sale_price, sale_date')
         .eq('is_public', true)
+        .neq('status', 'pending')
         .not('sale_price', 'is', null)
         .gte('sale_date', todayISO);
       
@@ -1484,12 +1540,20 @@ const CursorHomepage: React.FC = () => {
         totalVehicles: stats.totalVehicles,
         totalValue: stats.totalValue,
         vehiclesWithValue,
-        vehiclesProcessed: (allVehicles || []).length
+        vehiclesProcessed: (allVehicles || []).length,
+        totalCountFromQuery: totalCount
       });
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1518',message:'Setting dbStats',data:{totalVehicles:stats.totalVehicles,totalValue:stats.totalValue,forSaleCount:stats.forSaleCount,activeAuctions:stats.activeAuctions,totalCountFromQuery:totalCount,vehiclesProcessed:(allVehicles || []).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       
       setDbStats(stats);
     } catch (error) {
       console.error('Error loading database stats:', error);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1524',message:'Error in loadDatabaseStats catch',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
     } finally {
       setDbStatsLoading(false);
     }
@@ -1548,13 +1612,33 @@ const CursorHomepage: React.FC = () => {
 
   // Update filteredStats to show DB stats when no filters, filtered stats when filters active
   const displayStats = useMemo(() => {
-    if (!hasActiveFilters && !debouncedSearchText) {
-      // Show database-wide stats when no filters
+    // #region agent log
+    console.log('[DEBUG] displayStats computed', {
+      hasActiveFilters,
+      debouncedSearchText,
+      dbStatsTotalVehicles: dbStats.totalVehicles,
+      dbStatsTotalValue: dbStats.totalValue,
+      filteredStatsTotalVehicles: filteredStats.totalVehicles,
+      filteredStatsTotalValue: filteredStats.totalValue,
+      willUseDbStats: !hasActiveFilters && !debouncedSearchText,
+      dbStatsHasData: dbStats.totalVehicles > 0
+    });
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1578',message:'displayStats computed',data:{hasActiveFilters,debouncedSearchText,dbStatsTotalVehicles:dbStats.totalVehicles,dbStatsTotalValue:dbStats.totalValue,filteredStatsTotalVehicles:filteredStats.totalVehicles,filteredStatsTotalValue:filteredStats.totalValue,willUseDbStats:!hasActiveFilters && !debouncedSearchText,dbStatsHasData:dbStats.totalVehicles > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    // Priority 1: If no filters and dbStats has loaded (has data), always use dbStats
+    // This ensures we show correct stats even if hasActiveFilters check has issues
+    if (!hasActiveFilters && !debouncedSearchText && dbStats.totalVehicles > 0) {
       return dbStats;
-    } else {
-      // Show filtered stats when filters are active
+    }
+    
+    // Priority 2: If filters are active, use filteredStats
+    if (hasActiveFilters || debouncedSearchText) {
       return filteredStats;
     }
+    
+    // Priority 3: No filters but dbStats hasn't loaded yet - still use dbStats (will update when loaded)
+    return dbStats;
   }, [hasActiveFilters, debouncedSearchText, dbStats, filteredStats]);
 
   const loadSession = async () => {
@@ -2435,6 +2519,10 @@ const CursorHomepage: React.FC = () => {
   // We keep legacy `hide*` flags for now, but treat them as derived from "included chips".
   // For new dynamic sources, we use a hiddenSources set in filters.
   const setSourceIncluded = useCallback((kind: string, included: boolean) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2437',message:'setSourceIncluded called',data:{kind,included,currentFilters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
+
     setFilters((prev) => {
       // This legacy flag conflicts with per-source toggles (it hides CL + dealer sites + KSL).
       // For the new "pogs" interaction model, we treat sources as independent, so we clear it
@@ -2464,7 +2552,7 @@ const CursorHomepage: React.FC = () => {
           return { ...base, hiddenSources: Array.from(hiddenSources) };
       }
     });
-  }, []);
+  }, [filters]);
 
   // Load active sources from database
   const [activeSources, setActiveSources] = useState<Array<{
@@ -2599,10 +2687,11 @@ const CursorHomepage: React.FC = () => {
     const base: Record<string, boolean> = {};
     const hiddenSourcesSet = new Set(filters.hiddenSources || []);
     
-    // Initialize all active sources as included by default
-    activeSources.forEach(source => {
-      const key = domainToFilterKey(source.domain);
-      // Check if there's a specific filter for this source
+    // Initialize all known source types (not just activeSources)
+    // This ensures we handle all possible source classifications
+    const knownSourceTypes = ['craigslist', 'ksl', 'dealer_site', 'bat', 'classic', 'user', 'unknown'];
+    
+    knownSourceTypes.forEach(key => {
       if (key === 'craigslist') {
         base[key] = !filters.hideDealerListings && !filters.hideCraigslist;
       } else if (key === 'ksl') {
@@ -2614,10 +2703,47 @@ const CursorHomepage: React.FC = () => {
       } else if (key === 'classic') {
         base[key] = !filters.hideClassic;
       } else {
+        // user, unknown: check if they're in hiddenSources set
+        base[key] = !hiddenSourcesSet.has(key);
+      }
+    });
+    
+    // Also handle active sources that might not be in knownSourceTypes
+    activeSources.forEach(source => {
+      const key = domainToFilterKey(source.domain);
+      if (!base.hasOwnProperty(key)) {
         // New sources: check if they're in hiddenSources set
         base[key] = !hiddenSourcesSet.has(key);
       }
     });
+    
+    // Explicitly exclude any sources in hiddenSources that aren't already handled by hide* flags
+    filters.hiddenSources?.forEach(key => {
+      // Only set to false if it's not a known source type with a hide* flag
+      // Known sources are handled above, so if it's not in base yet, it's a new source
+      if (!base.hasOwnProperty(key)) {
+        base[key] = false; // Explicitly exclude new sources
+      } else if (!['craigslist', 'ksl', 'dealer_site', 'bat', 'classic'].includes(key)) {
+        // For new sources that are in activeSources, override to exclude if in hiddenSources
+        base[key] = false;
+      }
+      // Don't override known sources (craigslist, ksl, dealer_site, bat, classic) 
+      // as they're controlled by hide* flags
+    });
+
+    // #region agent log
+    console.log('[DEBUG] includedSources computed', { 
+      includedSources: base, 
+      activeSourcesCount: activeSources.length, 
+      activeSources: activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})), 
+      filters: {
+        hideBat: filters.hideBat, 
+        hideCraigslist: filters.hideCraigslist, 
+        hiddenSources: filters.hiddenSources
+      }
+    });
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2622',message:'includedSources computed',data:{includedSources:base,activeSourcesCount:activeSources.length,activeSources:activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})),filters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('Log fetch failed',e));
+    // #endregion
 
     return base;
   }, [
@@ -2637,23 +2763,49 @@ const CursorHomepage: React.FC = () => {
   }, []);
 
   const sourcePogs = useMemo(() => {
-    const all = activeSources.map(source => {
+    // Deduplicate sources by their filter key - keep the first one for each key
+    const seenKeys = new Set<string>();
+    const deduplicated: Array<{
+      key: string;
+      domain: string;
+      title: string;
+      included: boolean;
+      id: string;
+      url: string;
+      count: number;
+    }> = [];
+
+    activeSources.forEach(source => {
       const key = domainToFilterKey(source.domain);
-      return {
-        key: key as any,
-        domain: source.domain,
-        title: source.source_name || source.domain,
-        included: includedSources[key] !== false, // Default to true if not explicitly set
-        id: source.id,
-        url: source.url,
-        count: sourceCounts[key] || 0
-      };
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        deduplicated.push({
+          key: key as any,
+          domain: source.domain,
+          title: source.source_name || source.domain,
+          included: includedSources[key] !== false, // Default to true if not explicitly set
+          id: source.id,
+          url: source.url,
+          count: sourceCounts[key] || 0
+        });
+      } else {
+        // Merge counts for duplicate keys
+        const existing = deduplicated.find(s => s.key === key);
+        if (existing) {
+          existing.count += (sourceCounts[key] || 0);
+        }
+      }
     });
 
+    // #region agent log
+    const batSources = deduplicated.filter(s => s.key === 'bat' || s.domain.toLowerCase().includes('bringatrailer') || s.domain.toLowerCase().includes('bat'));
+    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2651',message:'sourcePogs computed',data:{totalSourcesBefore:activeSources.length,totalSourcesAfter:deduplicated.length,batSourcesCount:batSources.length,batSources:batSources.map(s=>({domain:s.domain,title:s.title,key:s.key,included:s.included,count:s.count})),allSources:deduplicated.map(s=>({domain:s.domain,title:s.title,key:s.key})),selectedCount:deduplicated.filter((x) => x.included).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+
     return {
-      all,
-      selected: all.filter((x) => x.included),
-      hiddenCount: all.filter((x) => !x.included).length
+      all: deduplicated,
+      selected: deduplicated.filter((x) => x.included),
+      hiddenCount: deduplicated.filter((x) => !x.included).length
     };
   }, [activeSources, includedSources, domainToFilterKey, sourceCounts]);
 
@@ -3452,7 +3604,100 @@ const CursorHomepage: React.FC = () => {
                       type="text"
                       placeholder="search sources..."
                       value={sourceSearchText}
-                      onChange={(e) => setSourceSearchText(e.target.value)}
+                      onChange={(e) => {
+                        const text = e.target.value;
+                        setSourceSearchText(text);
+                        
+                        // #region agent log
+                        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:3505',message:'Source search onChange',data:{text,sourcePogsCount:sourcePogs.all.length,currentFilters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch(()=>{});
+                        // #endregion
+                        
+                        // Auto-apply filters when searching for specific sources
+                        const searchLower = text.toLowerCase().trim();
+                        if (searchLower.includes('bring') || searchLower.includes('bat')) {
+                          // Filter to only BaT sources
+                          const allOtherKeys = sourcePogs.all
+                            .filter(p => p.key !== 'bat')
+                            .map(p => p.key);
+                          
+                          // #region agent log
+                          console.log('[DEBUG] Setting BaT filter', { allOtherKeys, sourcePogsKeys: sourcePogs.all.map(p=>p.key), text });
+                          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:3511',message:'Setting BaT filter',data:{allOtherKeys,sourcePogsKeys:sourcePogs.all.map(p=>p.key),text},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch((e)=>console.error('Log fetch failed',e));
+                          // #endregion
+                          
+                          setFilters((prev) => {
+                            const newFilters = {
+                              ...prev,
+                              hideDealerListings: true,
+                              hideCraigslist: true,
+                              hideDealerSites: true,
+                              hideKsl: true,
+                              hideBat: false, // Keep BaT visible
+                              hideClassic: true,
+                              hiddenSources: allOtherKeys
+                            };
+                            console.log('[DEBUG] Setting filters', { prev, newFilters });
+                            return newFilters;
+                          });
+                        } else if (searchLower.includes('craigslist') || searchLower.includes('cl')) {
+                          // Filter to only Craigslist
+                          const allOtherKeys = sourcePogs.all
+                            .filter(p => p.key !== 'craigslist')
+                            .map(p => p.key);
+                          setFilters((prev) => ({
+                            ...prev,
+                            hideDealerListings: true,
+                            hideCraigslist: false,
+                            hideDealerSites: true,
+                            hideKsl: true,
+                            hideBat: true,
+                            hideClassic: true,
+                            hiddenSources: allOtherKeys
+                          }));
+                        } else if (searchLower.includes('ksl')) {
+                          // Filter to only KSL
+                          const allOtherKeys = sourcePogs.all
+                            .filter(p => p.key !== 'ksl')
+                            .map(p => p.key);
+                          setFilters((prev) => ({
+                            ...prev,
+                            hideDealerListings: true,
+                            hideCraigslist: true,
+                            hideDealerSites: true,
+                            hideKsl: false,
+                            hideBat: true,
+                            hideClassic: true,
+                            hiddenSources: allOtherKeys
+                          }));
+                        } else if (searchLower.includes('classic')) {
+                          // Filter to only Classic.com
+                          const allOtherKeys = sourcePogs.all
+                            .filter(p => p.key !== 'classic')
+                            .map(p => p.key);
+                          setFilters((prev) => ({
+                            ...prev,
+                            hideDealerListings: true,
+                            hideCraigslist: true,
+                            hideDealerSites: true,
+                            hideKsl: true,
+                            hideBat: true,
+                            hideClassic: false,
+                            hiddenSources: allOtherKeys
+                          }));
+                        } else if (!text.trim()) {
+                          // Clear search - show all sources
+                          setFilters((prev) => ({
+                            ...prev,
+                            hideDealerListings: false,
+                            hideCraigslist: false,
+                            hideDealerSites: false,
+                            hideKsl: false,
+                            hideBat: false,
+                            hideClassic: false,
+                            hiddenSources: []
+                          }));
+                        }
+                      }}
                       style={{
                         flex: 1,
                         padding: '2px 6px',
@@ -3480,12 +3725,20 @@ const CursorHomepage: React.FC = () => {
                     overflowY: 'auto'
                   }}>
                     {sourcePogs.all
-                      .filter((p) => 
-                        !sourceSearchText || 
-                        p.title.toLowerCase().includes(sourceSearchText.toLowerCase()) ||
-                        p.domain.toLowerCase().includes(sourceSearchText.toLowerCase()) ||
-                        p.key.toLowerCase().includes(sourceSearchText.toLowerCase())
-                      )
+                      .filter((p) => {
+                        const matches = !sourceSearchText || 
+                          p.title.toLowerCase().includes(sourceSearchText.toLowerCase()) ||
+                          p.domain.toLowerCase().includes(sourceSearchText.toLowerCase()) ||
+                          p.key.toLowerCase().includes(sourceSearchText.toLowerCase());
+                        
+                        // #region agent log
+                        if (sourceSearchText && sourceSearchText.toLowerCase().includes('bring')) {
+                          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:3483',message:'Source search filter',data:{sourceSearchText,sourceDomain:p.domain,sourceTitle:p.title,sourceKey:p.key,matches},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+                        }
+                        // #endregion
+                        
+                        return matches;
+                      })
                       .map((p, idx) => (
                       <label
                         key={p.id ? `source-${p.id}` : `source-${p.domain}-${idx}`}

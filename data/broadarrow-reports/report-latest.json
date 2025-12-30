@@ -1,0 +1,522 @@
+{
+  "organization": {
+    "id": "bf7f8e55-4abc-45dc-aae0-1df86a9f365a",
+    "business_name": "Broad Arrow Auctions",
+    "website": "https://www.broadarrowauctions.com",
+    "type": "auction_house",
+    "description": null
+  },
+  "generatedAt": "2025-12-30T21:11:40.169Z",
+  "inventory": {
+    "total": 50,
+    "vehicles": [
+      {
+        "id": "6ef4de88-7095-407d-a82a-bbe0dee874a6",
+        "year": 2024,
+        "make": "Broad Arrow Auctions LLC",
+        "model": "Unknown",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/available",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "4c5bce99-9a7b-4d66-96ec-65611a23b6de",
+        "year": 1966,
+        "make": "Rolls-Royce",
+        "model": "Silver Cloud III Mulliner Park Ward Drophead Coupe",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0028/1966-rolls-royce-silver-cloud-iii-mulliner-park-ward-drophead-coupe",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "e7954e5f-9a78-4e32-8ea8-2d251aaea4aa",
+        "year": 1964,
+        "make": "Bentley",
+        "model": "S3 Continental Mulliner Park Ward Drophead Coupe",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0029/1964-bentley-s3-continental-mulliner-park-ward-drophead-coupe",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "c0ee68af-8607-41a7-90d4-baec7ef3ee39",
+        "year": 1988,
+        "make": "Rolls-Royce",
+        "model": "Corniche II",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0052/1988-rolls-royce-corniche-ii",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "d942298d-9713-4586-bae4-8c9cc5e1b36e",
+        "year": 2020,
+        "make": "Bugatti",
+        "model": "Chiron Sport",
+        "vin": "VF9SP3V32KM795231",
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0008/2020-bugatti-chiron-sport",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "d799c035-d938-4255-8171-42715d992366",
+        "year": 2009,
+        "make": "Abarth",
+        "model": "500 Ferrari Dealer Edition",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0032/2009-abarth-500-ferrari-dealer-edition",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "347a7da4-0978-4cf3-a376-cf3debd9fdd0",
+        "year": 2014,
+        "make": "McLaren",
+        "model": "P1",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0030/2014-mclaren-p1",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "fd7d32c9-ca4a-473a-bfd5-3bf8087f82c1",
+        "year": 1990,
+        "make": "Porsche",
+        "model": "911 Coupe",
+        "vin": "WP0AB2964LS451541",
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0011/1990-porsche-911-coupe-reimagined-by-singer-goldfinger-commission",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "e9653cab-9bdf-4e99-bb76-9e74eae71582",
+        "year": 1993,
+        "make": "Lamborghini",
+        "model": "Diablo Evolution GTR",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0026/1993-lamborghini-diablo-evolution-gtr",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "8fe6c4e3-f5f9-4663-912c-5344be392c66",
+        "year": 2019,
+        "make": "Porsche",
+        "model": "935",
+        "vin": "WP0ZZZ99ZKS199175",
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0001/2019-porsche-935",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "d9352583-a11b-4bdd-a78f-3daaf6d55904",
+        "year": 1994,
+        "make": "Audi",
+        "model": "RS2 Avant",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0015/1994-audi-rs2-avant",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "0c1571db-dfc1-4487-84ec-60db55527dea",
+        "year": 2009,
+        "make": "Rolls-Royce",
+        "model": "Phantom Coupé",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0050/2009-rolls-royce-phantom-coupe",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "1a76c84e-2be9-411c-a6fa-8907133e8819",
+        "year": 1956,
+        "make": "Alfa Romeo",
+        "model": "Giulietta Spider",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0013/1956-alfa-romeo-giulietta-spider",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "a8cd4db6-2c5c-4eb4-988c-280659e96c01",
+        "year": 1966,
+        "make": "Ferrari",
+        "model": "275 GTB Alloy",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0031/1966-ferrari-275-gtb-alloy",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "3c7a3eb3-d727-47f4-9de1-af4c015fc19f",
+        "year": 1970,
+        "make": "Alfa Romeo",
+        "model": "1300 Junior Zagato",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0012/1970-alfa-romeo-1300-junior-zagato",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "e3f4031e-46f6-4af5-ae18-e178431e0912",
+        "year": 1952,
+        "make": "Ferrari",
+        "model": "212 Europa Pinin Farina Coupe",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0004/1952-ferrari-212-europa-pinin-farina-coupe",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "28f61665-7dd1-4201-9189-30a24e31b02d",
+        "year": 1975,
+        "make": "Rolls-Royce",
+        "model": "Silver Shadow",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0022/1975-rolls-royce-silver-shadow-long-wheelbase-saloon-ex-princess-margaret",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "c1193919-428f-4ee9-b33e-292177c8c11c",
+        "year": 2010,
+        "make": "Porsche",
+        "model": "911 Turbo Cabriolet",
+        "vin": "WP0ZZZ99ZAS770460",
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0010/2010-porsche-911-turbo-cabriolet",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "cf3776ee-8314-4482-b87e-fbac37cdfb7c",
+        "year": 2016,
+        "make": "Porsche",
+        "model": "911 R",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0009/2016-porsche-911-r",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "727ce9f8-0882-4657-bc05-d7bf257aee4c",
+        "year": 2004,
+        "make": "Ferrari",
+        "model": "575 GTC",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0064/2004-ferrari-575-gtc-stradale",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "7a75449e-dad3-4a1f-8876-b94b9fde1840",
+        "year": 2015,
+        "make": "Porsche",
+        "model": "918 Spyder",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0061/2015-porsche-918-spyder",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "9267abf7-a421-49f6-a103-5da1b4342f5a",
+        "year": 2005,
+        "make": "Ferrari",
+        "model": "Superamerica",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0068/2005-ferrari-superamerica",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "f9419b0b-868e-4fc7-858a-26e55c390b15",
+        "year": 1981,
+        "make": "Citroën",
+        "model": "CX Limousine",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0016/1981-citroen-cx-limousine",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "840c8ec3-0774-4a40-9441-39c2ded5490a",
+        "year": 1937,
+        "make": "SS Jaguar",
+        "model": "100 3 ½-Litre",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0027/1937-ss-jaguar-100-3-litre",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "1179109d-8d64-4785-8bdf-c953a98833e2",
+        "year": 2008,
+        "make": "Bugatti",
+        "model": "Veyron EB 16.4 Coupe",
+        "vin": "VF9SA15C38M795169",
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0067/2008-bugatti-veyron-eb-16-4-coupe",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "36361ce2-a70f-42ad-abc8-04889ed49ded",
+        "year": 2009,
+        "make": "Ferrari",
+        "model": "Scuderia Spider 16M",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0046/2009-ferrari-scuderia-spider-16m",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "1fe02ffd-e64a-411b-8033-e38dad743e3e",
+        "year": 1991,
+        "make": "Isdera",
+        "model": "Sbarro Espera Turbo S20E",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0060/1991-isdera-sbarro-espera-turbo-s20e",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "984dd2b9-6531-4528-a89d-331336a2d2b4",
+        "year": 1956,
+        "make": "Jaguar",
+        "model": "D-Type",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0003/1956-jaguar-d-type",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "0e47f438-151c-490f-832d-9dcb3c2ecd75",
+        "year": 1962,
+        "make": "Lotus",
+        "model": "22 Formula Junior",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0045/1962-lotus-22-formula-junior-ex-jo-siffert-scuderia-filipinetti",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "a49cb017-60c0-4801-beee-7863170d5a1d",
+        "year": 2023,
+        "make": "Ferrari",
+        "model": "812 Competizione A",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0018/2023-ferrari-812-competizione-a",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "5c8a3d39-7f40-4961-b9b2-bcd764e54c7e",
+        "year": 1987,
+        "make": "Ferrari",
+        "model": "412",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0048/1987-ferrari-412",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "b7dcc2d1-4bb1-40ab-8ab3-271dee5aa2db",
+        "year": 2007,
+        "make": "Porsche",
+        "model": "911 Turbo Gemballa Avalanche GTR 750 EVO-R",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0006/2007-porsche-911-turbo-gemballa-avalanche-gtr-750-evo-r",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "391a2d5e-685b-42b2-afe4-7b222af4a341",
+        "year": 1983,
+        "make": "Maserati",
+        "model": "Khamsin",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0037/1983-maserati-khamsin",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "ae2a6c01-adee-4aa0-a1e5-7e1921ac0ef5",
+        "year": 1967,
+        "make": "Lamborghini",
+        "model": "Miura P400",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0043/1967-lamborghini-miura-p400",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "67270f6b-4dbd-4a3e-9c5d-e20b54f8c7f8",
+        "year": 1969,
+        "make": "Lamborghini",
+        "model": "Islero",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0017/1969-lamborghini-islero",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "03650895-7523-4479-9717-9867ffc3dd69",
+        "year": 2008,
+        "make": "Porsche",
+        "model": "911 GT2 Clubsport",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0025/2008-porsche-911-gt2-clubsport",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "4573faf0-2180-476c-90e8-d4967e8900d6",
+        "year": 2010,
+        "make": "Porsche",
+        "model": "911 GT3 RS Clubsport",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0057/2010-porsche-911-gt3-rs-clubsport",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "f44daf5e-3dad-472c-9a65-44fbcc637d15",
+        "year": 1990,
+        "make": "Ferrari",
+        "model": "348 ts",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0042/1990-ferrari-348-ts",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "0eff5c56-e660-4a77-8e3b-37a44a6ff750",
+        "year": 2012,
+        "make": "Mercedes-Benz",
+        "model": "SLS AMG Roadster",
+        "vin": "WMX1974771A007072",
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0056/2012-mercedes-benz-sls-amg-roadster",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "a9ce2bfd-e8cb-4c61-8c73-870313df803b",
+        "year": 1954,
+        "make": "Swallow",
+        "model": "Doretti",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0034/1954-swallow-doretti",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "0464d933-e9c6-4631-9053-0e2205d3077d",
+        "year": 1971,
+        "make": "Fiat",
+        "model": "500 L",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0014/1971-fiat-500-l",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "15294aa0-121b-40cb-801f-bf2cab6b6d27",
+        "year": 2024,
+        "make": "Aston Martin",
+        "model": "Valkyrie Spider",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0063/2024-aston-martin-valkyrie-spider",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "05013ada-af8f-4321-8986-fbd9ffc50d07",
+        "year": 1995,
+        "make": "Aston Martin",
+        "model": "Vantage V550",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0047/1995-aston-martin-vantage-v550",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "27cc6c5f-dff8-4b12-81f6-6c0dfe50f48a",
+        "year": 1983,
+        "make": "Ferrari",
+        "model": "400 i Automatic",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0049/1983-ferrari-400-i-automatic",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "7e8a14fb-2f43-461f-9c1d-5c5c58296bce",
+        "year": 1959,
+        "make": "BMW",
+        "model": "Isetta 300",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0036/1959-bmw-isetta-300",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "d3c4846b-22c4-4abf-a4dc-6a735934d115",
+        "year": 2012,
+        "make": "McLaren",
+        "model": "Gemballa 12C Spyder",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0007/2012-mclaren-gemballa-12c-spyder",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "3074c2f5-2332-4b4e-af34-4bcb15dba6fc",
+        "year": 1981,
+        "make": "Porsche",
+        "model": "924 Carrera GT",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0035/1981-porsche-924-carrera-gt",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "b970bf61-624d-41e6-8cae-b66bc97c8ea4",
+        "year": 2025,
+        "make": "Micro",
+        "model": "Microlino",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0024/2025-micro-microlino",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "f922a003-65fb-4e71-9c90-3beb9911ea68",
+        "year": 2010,
+        "make": "McLaren",
+        "model": "MP4-12C",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0005/2010-mclaren-mp4-12c-rolling-chassis",
+        "status": "active",
+        "auctionId": null
+      },
+      {
+        "id": "1f8df615-f182-448e-8f6a-4f4c875c4545",
+        "year": 2025,
+        "make": "Williams",
+        "model": "FW14-Junior",
+        "vin": null,
+        "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0062/halfscale-cars-williams-fw14-junior",
+        "status": "active",
+        "auctionId": null
+      }
+    ],
+    "byStatus": {
+      "active": 50
+    },
+    "byAuction": {},
+    "priceStats": {}
+  },
+  "upcomingAuctions": [],
+  "contributors": []
+}

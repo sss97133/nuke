@@ -18,6 +18,7 @@ interface VehicleData {
   asking_price?: number | null;
   current_value?: number | null;
   is_for_sale?: boolean | null;
+  listing_status?: string | null; // 'sold', 'unsold', 'active', etc.
   uploaded_by?: string;
   profiles?: any;
 }
@@ -81,11 +82,42 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
           <h3 className="heading-3" style={{ margin: '0 0 4px 0', fontSize: '10pt', lineHeight: 1.3 }}>
             {title}
           </h3>
-          {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
-            <div className="text" style={{ fontSize: '8pt', color: '#3b82f6', fontWeight: 'bold' }}>
-              {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
-            </div>
-          )}
+          {/* Price and Status */}
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {(vehicle.sale_price || vehicle.asking_price || vehicle.current_value) && (
+              <div className="text" style={{ fontSize: '8pt', color: '#3b82f6', fontWeight: 'bold' }}>
+                {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
+              </div>
+            )}
+            {vehicle.listing_status && (
+              <span
+                style={{
+                  fontSize: '7pt',
+                  padding: '2px 6px',
+                  borderRadius: '2px',
+                  fontWeight: 600,
+                  background:
+                    vehicle.listing_status === 'sold'
+                      ? '#dcfce7'
+                      : vehicle.listing_status === 'unsold'
+                      ? '#fee2e2'
+                      : '#e0e7ff',
+                  color:
+                    vehicle.listing_status === 'sold'
+                      ? '#166534'
+                      : vehicle.listing_status === 'unsold'
+                      ? '#991b1b'
+                      : '#3730a3',
+                }}
+              >
+                {vehicle.listing_status === 'sold'
+                  ? 'SOLD'
+                  : vehicle.listing_status === 'unsold'
+                  ? 'UNSOLD'
+                  : vehicle.listing_status.toUpperCase()}
+              </span>
+            )}
+          </div>
         </div>
       </Link>
     );
@@ -131,7 +163,33 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
                 {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
               </span>
             )}
-            {vehicle.is_for_sale && (
+            {vehicle.listing_status && (
+              <span
+                style={{
+                  ...smallChipStyle,
+                  background:
+                    vehicle.listing_status === 'sold'
+                      ? '#dcfce7'
+                      : vehicle.listing_status === 'unsold'
+                      ? '#fee2e2'
+                      : '#e0e7ff',
+                  color:
+                    vehicle.listing_status === 'sold'
+                      ? '#166534'
+                      : vehicle.listing_status === 'unsold'
+                      ? '#991b1b'
+                      : '#3730a3',
+                  fontWeight: 600,
+                }}
+              >
+                {vehicle.listing_status === 'sold'
+                  ? 'SOLD'
+                  : vehicle.listing_status === 'unsold'
+                  ? 'UNSOLD'
+                  : vehicle.listing_status.toUpperCase()}
+              </span>
+            )}
+            {vehicle.is_for_sale && !vehicle.listing_status && (
               <span className="badge" style={{ ...smallChipStyle, background: '#dcfce7', color: '#166534' }}>
                 For Sale
               </span>
@@ -192,7 +250,33 @@ const ShopVehicleCard: React.FC<ShopVehicleCardProps> = ({ vehicle, viewMode, de
                 {formatPrice(vehicle.sale_price || vehicle.asking_price || vehicle.current_value)}
               </span>
             )}
-            {vehicle.is_for_sale && (
+            {vehicle.listing_status && (
+              <span
+                style={{
+                  ...smallChipStyle,
+                  background:
+                    vehicle.listing_status === 'sold'
+                      ? '#dcfce7'
+                      : vehicle.listing_status === 'unsold'
+                      ? '#fee2e2'
+                      : '#e0e7ff',
+                  color:
+                    vehicle.listing_status === 'sold'
+                      ? '#166534'
+                      : vehicle.listing_status === 'unsold'
+                      ? '#991b1b'
+                      : '#3730a3',
+                  fontWeight: 600,
+                }}
+              >
+                {vehicle.listing_status === 'sold'
+                  ? 'SOLD'
+                  : vehicle.listing_status === 'unsold'
+                  ? 'UNSOLD'
+                  : vehicle.listing_status.toUpperCase()}
+              </span>
+            )}
+            {vehicle.is_for_sale && !vehicle.listing_status && (
               <span className="badge" style={{ ...smallChipStyle, background: '#dcfce7', color: '#166534' }}>
                 For Sale
               </span>

@@ -6,6 +6,7 @@ type AuctionSource = 'bat' | 'external';
 
 type ReserveFilter = 'all' | 'reserve' | 'no_reserve';
 type StatusFilter = 'live' | 'ended' | 'all';
+type SoldFilter = 'all' | 'sold' | 'unsold'; // For auction houses: separate sold (results) from unsold
 
 interface AuctionRow {
   id: string;
@@ -65,6 +66,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
   const [bestImageByVehicleId, setBestImageByVehicleId] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [reserveFilter, setReserveFilter] = useState<ReserveFilter>('all');
+  const [soldFilter, setSoldFilter] = useState<SoldFilter>('all');
 
   useEffect(() => {
     let mounted = true;
@@ -228,17 +230,43 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
       if (statusFilter === 'live' && !isLive) return false;
       if (statusFilter === 'ended' && !isEnded) return false;
 
+      // Determine if sold: has final_price, listing_status is 'sold', or has sold_at metadata
+      const isSold = Boolean(r.final_price_cents) || 
+                     r.listing_status === 'sold' ||
+                     (r.listing_status === 'ended' && r.final_price_cents);
+      const isUnsold = isEnded && !isSold && r.listing_status !== 'sold';
+      
+      if (soldFilter === 'sold' && !isSold) return false;
+      if (soldFilter === 'unsold' && !isUnsold) return false;
+
       const hasReserve = typeof r.reserve_price_cents === 'number' && r.reserve_price_cents > 0;
       const noReserve = !hasReserve;
       if (reserveFilter === 'reserve' && !hasReserve) return false;
       if (reserveFilter === 'no_reserve' && !noReserve) return false;
       return true;
     });
-  }, [rows, statusFilter, reserveFilter]);
+  }, [rows, statusFilter, reserveFilter, soldFilter]);
 
   const liveCount = useMemo(() => {
     const now = Date.now();
     return rows.filter((r) => r.listing_status === 'active' && (r.end_time ? new Date(r.end_time).getTime() : 0) > now).length;
+  }, [rows]);
+
+  const soldCount = useMemo(() => {
+    return rows.filter((r) => {
+      const isSold = Boolean(r.final_price_cents) || r.listing_status === 'sold';
+      return isSold;
+    }).length;
+  }, [rows]);
+
+  const unsoldCount = useMemo(() => {
+    const now = Date.now();
+    return rows.filter((r) => {
+      const end = r.end_time ? new Date(r.end_time).getTime() : 0;
+      const isEnded = !(r.listing_status === 'active' && end > now);
+      const isSold = Boolean(r.final_price_cents) || r.listing_status === 'sold';
+      return isEnded && !isSold;
+    }).length;
   }, [rows]);
 
   if (loading) {
@@ -255,10 +283,29 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontWeight: 700 }}>Auctions</span>
           <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-            Live {liveCount} · Total {rows.length}
+            Live {liveCount} · Sold {soldCount} · Unsold {unsoldCount} · Total {rows.length}
           </span>
         </div>
         <div className="card-body" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Results</span>
+            {(['all', 'sold', 'unsold'] as const).map((k) => (
+              <button
+                key={k}
+                className="button button-secondary button-small"
+                onClick={() => setSoldFilter(k)}
+                style={{
+                  fontSize: '8pt',
+                  borderRadius: 0,
+                  border: soldFilter === k ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  color: soldFilter === k ? 'var(--accent)' : 'var(--text)',
+                }}
+              >
+                {k === 'all' ? 'All' : k === 'sold' ? 'Results (Sold)' : 'Unsold'}
+              </button>
+            ))}
+          </div>
+
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Status</span>
             {(['live', 'ended', 'all'] as const).map((k) => (
@@ -320,10 +367,13 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
             const endStr = endTs && !Number.isNaN(endTs.getTime()) ? endTs.toLocaleString() : null;
             const hasReserve = typeof r.reserve_price_cents === 'number' && r.reserve_price_cents > 0;
 
-            const price =
-              r.listing_status === 'active'
-                ? (r.current_bid_cents ?? null)
-                : (r.final_price_cents ?? r.current_bid_cents ?? null);
+            // Determine if sold for display
+            const isSold = Boolean(r.final_price_cents) || r.listing_status === 'sold';
+            const price = isSold
+              ? (r.final_price_cents ?? null)
+              : (r.listing_status === 'active'
+                  ? (r.current_bid_cents ?? null)
+                  : (r.current_bid_cents ?? null));
 
             return (
               <div

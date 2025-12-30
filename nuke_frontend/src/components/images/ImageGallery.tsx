@@ -1987,16 +1987,6 @@ const ImageGallery = ({
 
           {/* Toggle Buttons for Sorting */}
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-            {/* Only BaT toggle (defaulted for BaT vehicles) */}
-            <label className="text-small" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', userSelect: 'none' }} title="Show only Bring a Trailer images for BaT listings">
-              <input
-                type="checkbox"
-                checked={sourceFilter === 'bat'}
-                onChange={(e) => setSourceFilter(e.target.checked ? 'bat' : 'all')}
-              />
-              <span>Only BaT</span>
-            </label>
-
             {/* Group by Source Toggle */}
             <button
               onClick={() => {

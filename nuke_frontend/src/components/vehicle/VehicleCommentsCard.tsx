@@ -102,7 +102,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             is_seller,
             auction_event_id,
             external_identity_id,
-            auction_events!inner(vehicle_id)
+            vehicle_id
           `)
           .eq('vehicle_id', vehicleId)
           .order('posted_at', { ascending: false })

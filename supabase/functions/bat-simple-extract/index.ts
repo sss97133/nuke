@@ -539,7 +539,8 @@ async function extractBatListing(url: string): Promise<BatExtracted> {
   const titleData = extractTitle(html);
   const auctionData = extractAuctionData(html);
   const specs = extractSpecs(html);
-  const comments = extractComments(html, auctionData.seller_username);
+  // Comments extraction removed - use extract-auction-comments function instead
+  // const comments = extractComments(html, auctionData.seller_username);
   
   return {
     url,
@@ -560,7 +561,7 @@ async function extractBatListing(url: string): Promise<BatExtracted> {
     auction_end_date: auctionData.auction_end_date,
     description: extractDescription(html),
     image_urls: extractImages(html),
-    comments,
+    comments: [], // Empty - comments extracted separately via extract-auction-comments
   };
 }
 
@@ -570,7 +571,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url, save_to_db } = await req.json();
+    const { url, save_to_db, vehicle_id } = await req.json();
     
     if (!url || !url.includes('bringatrailer.com/listing/')) {
       return new Response(
@@ -609,62 +610,106 @@ serve(async (req) => {
     console.log(`Images: ${extracted.image_urls.length} | Parsed comments: ${extracted.comments.length}`);
     
     // Optionally save to database
-    if (save_to_db) {
+    if (save_to_db || vehicle_id) {
+      let targetVehicleId = vehicle_id;
       
-      // Insert new vehicle (not upsert - start fresh)
-      const { data, error } = await supabase
-        .from('vehicles')
-        .insert({
-          bat_auction_url: extracted.url,
-          year: extracted.year,
-          make: extracted.make,
-          model: extracted.model,
-          vin: extracted.vin,
-          bat_listing_title: extracted.title,
-          bat_seller: extracted.seller_username,
-          bat_buyer: extracted.buyer_username,
-          sale_price: extracted.sale_price,
-          high_bid: extracted.high_bid,
-          bat_bids: extracted.bid_count,
-          bat_comments: extracted.comment_count,
-          bat_views: extracted.view_count,
-          bat_watchers: extracted.watcher_count,
-          bat_lot_number: extracted.lot_number,
-          bat_location: extracted.location,
-          reserve_status: extracted.reserve_status,
-          // Specs extracted from listing
-          mileage: extracted.mileage,
-          color: extracted.exterior_color,
-          interior_color: extracted.interior_color,
-          transmission: extracted.transmission,
-          drivetrain: extracted.drivetrain,
-          engine_type: extracted.engine,
-          body_style: extracted.body_style,
-          // Standard fields
-          description: extracted.description,
-          auction_end_date: extracted.auction_end_date,
-          listing_source: 'bat_simple_extract',
-          profile_origin: 'bat_import',
-          discovery_url: extracted.url,
-          discovery_source: 'bat',
-          is_public: true,
-          sale_status: extracted.sale_price ? 'sold' : 'available',
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('DB error:', error);
-        throw new Error(`Failed to save vehicle: ${error.message}`);
+      // If vehicle_id provided, update existing vehicle; otherwise create new
+      if (vehicle_id) {
+        // Update existing vehicle
+        const { error: updateError } = await supabase
+          .from('vehicles')
+          .update({
+            bat_auction_url: extracted.url,
+            bat_listing_title: extracted.title,
+            bat_seller: extracted.seller_username,
+            bat_buyer: extracted.buyer_username,
+            sale_price: extracted.sale_price,
+            high_bid: extracted.high_bid,
+            bat_bids: extracted.bid_count,
+            bat_comments: extracted.comment_count,
+            bat_views: extracted.view_count,
+            bat_watchers: extracted.watcher_count,
+            bat_lot_number: extracted.lot_number,
+            bat_location: extracted.location,
+            reserve_status: extracted.reserve_status,
+            mileage: extracted.mileage,
+            color: extracted.exterior_color,
+            interior_color: extracted.interior_color,
+            transmission: extracted.transmission,
+            drivetrain: extracted.drivetrain,
+            engine_type: extracted.engine,
+            body_style: extracted.body_style,
+            description: extracted.description,
+            auction_end_date: extracted.auction_end_date,
+            sale_status: extracted.sale_price ? 'sold' : 'available',
+            // Only update VIN if vehicle doesn't have one
+            vin: extracted.vin || undefined,
+          })
+          .eq('id', vehicle_id);
+        
+        if (updateError) {
+          console.error('Vehicle update error:', updateError);
+          throw new Error(`Failed to update vehicle: ${updateError.message}`);
+        }
+        
+        console.log(`Updated vehicle: ${vehicle_id}`);
+        extracted.vehicle_id = vehicle_id;
+      } else {
+        // Insert new vehicle (not upsert - start fresh)
+        const { data, error } = await supabase
+          .from('vehicles')
+          .insert({
+            bat_auction_url: extracted.url,
+            year: extracted.year,
+            make: extracted.make,
+            model: extracted.model,
+            vin: extracted.vin,
+            bat_listing_title: extracted.title,
+            bat_seller: extracted.seller_username,
+            bat_buyer: extracted.buyer_username,
+            sale_price: extracted.sale_price,
+            high_bid: extracted.high_bid,
+            bat_bids: extracted.bid_count,
+            bat_comments: extracted.comment_count,
+            bat_views: extracted.view_count,
+            bat_watchers: extracted.watcher_count,
+            bat_lot_number: extracted.lot_number,
+            bat_location: extracted.location,
+            reserve_status: extracted.reserve_status,
+            // Specs extracted from listing
+            mileage: extracted.mileage,
+            color: extracted.exterior_color,
+            interior_color: extracted.interior_color,
+            transmission: extracted.transmission,
+            drivetrain: extracted.drivetrain,
+            engine_type: extracted.engine,
+            body_style: extracted.body_style,
+            // Standard fields
+            description: extracted.description,
+            auction_end_date: extracted.auction_end_date,
+            listing_source: 'bat_simple_extract',
+            profile_origin: 'bat_import',
+            discovery_url: extracted.url,
+            discovery_source: 'bat',
+            is_public: true,
+            sale_status: extracted.sale_price ? 'sold' : 'available',
+          })
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('DB error:', error);
+          throw new Error(`Failed to save vehicle: ${error.message}`);
+        }
+        
+        console.log(`Saved vehicle: ${data.id}`);
+        extracted.vehicle_id = data.id;
       }
       
-      console.log(`Saved vehicle: ${data.id}`);
-      extracted.vehicle_id = data.id;
-      
       // Save ALL images (BaT has great galleries - use them)
-      if (extracted.image_urls.length > 0) {
+      if (extracted.image_urls.length > 0 && extracted.vehicle_id) {
         const imageRecords = extracted.image_urls.map((img_url, i) => ({
-          vehicle_id: data.id,
+          vehicle_id: extracted.vehicle_id,
           image_url: img_url,
           position: i,
           source: 'bat_import',
@@ -673,7 +718,10 @@ serve(async (req) => {
         
         const { error: imgError } = await supabase
           .from('vehicle_images')
-          .insert(imageRecords);
+          .upsert(imageRecords, {
+            onConflict: 'vehicle_id,image_url',
+            ignoreDuplicates: false
+          });
         
         if (imgError) {
           console.error('Image save error:', imgError);
@@ -682,33 +730,37 @@ serve(async (req) => {
         }
       }
       
-      // Create external_listings record for platform tracking
-      const { error: listingError } = await supabase
-        .from('external_listings')
-        .insert({
-          vehicle_id: data.id,
-          platform: 'bat',
-          listing_url: extracted.url,
-          listing_id: extracted.lot_number,
-          listing_status: extracted.sale_price ? 'sold' : 'ended',
-          end_date: extracted.auction_end_date,
-          final_price: extracted.sale_price,
-          bid_count: extracted.bid_count,
-          view_count: extracted.view_count,
-          watcher_count: extracted.watcher_count,
-          sold_at: extracted.sale_price ? extracted.auction_end_date : null,
-          metadata: {
-            lot_number: extracted.lot_number,
-            seller_username: extracted.seller_username,
-            buyer_username: extracted.buyer_username,
-            reserve_status: extracted.reserve_status,
-          },
-        });
+      // Create/update external_listings record for platform tracking
+      if (extracted.vehicle_id) {
+        const { error: listingError } = await supabase
+          .from('external_listings')
+          .upsert({
+            vehicle_id: extracted.vehicle_id,
+            platform: 'bat',
+            listing_url: extracted.url,
+            listing_id: extracted.lot_number,
+            listing_status: extracted.sale_price ? 'sold' : 'ended',
+            end_date: extracted.auction_end_date,
+            final_price: extracted.sale_price,
+            bid_count: extracted.bid_count,
+            view_count: extracted.view_count,
+            watcher_count: extracted.watcher_count,
+            sold_at: extracted.sale_price ? extracted.auction_end_date : null,
+            metadata: {
+              lot_number: extracted.lot_number,
+              seller_username: extracted.seller_username,
+              buyer_username: extracted.buyer_username,
+              reserve_status: extracted.reserve_status,
+            },
+          }, {
+            onConflict: 'vehicle_id,platform'
+          });
       
-      if (listingError) {
-        console.error('External listing save error:', listingError);
-      } else {
-        console.log(`Created external_listings record`);
+        if (listingError) {
+          console.error('External listing save error:', listingError);
+        } else {
+          console.log(`Created/updated external_listings record`);
+        }
       }
       
       // Add timeline events
@@ -720,7 +772,7 @@ serve(async (req) => {
         listDate.setDate(listDate.getDate() - 7);
         
         events.push({
-          vehicle_id: data.id,
+          vehicle_id: extracted.vehicle_id,
           event_type: 'auction_listed',
           event_date: listDate.toISOString().split('T')[0],
           title: `Listed on Bring a Trailer (Lot #${extracted.lot_number || 'N/A'})`,
@@ -732,7 +784,7 @@ serve(async (req) => {
         // Sold/Ended event
         if (extracted.sale_price) {
           events.push({
-            vehicle_id: data.id,
+            vehicle_id: extracted.vehicle_id,
             event_type: 'auction_sold',
             event_date: extracted.auction_end_date,
             title: `Sold for $${extracted.sale_price.toLocaleString()}`,
@@ -755,35 +807,10 @@ serve(async (req) => {
         console.log(`Created ${events.length} timeline events`);
       }
       
-      // Save comments and bids
-      if (extracted.comments.length > 0) {
-        const commentRecords = extracted.comments.map((c, i) => ({
-          vehicle_id: data.id,
-          platform: 'bat',
-          source_url: extracted.url,
-          comment_type: c.type,
-          sequence_number: i + 1,
-          author_username: c.author_username,
-          is_seller: c.is_seller,
-          posted_at: c.posted_at,
-          comment_text: c.text,
-          bid_amount: c.bid_amount,
-          comment_likes: c.likes,
-        }));
-        
-        // Insert in batches of 100
-        for (let i = 0; i < commentRecords.length; i += 100) {
-          const batch = commentRecords.slice(i, i + 100);
-          const { error: commentError } = await supabase
-            .from('auction_comments')
-            .insert(batch);
-          
-          if (commentError) {
-            console.error('Comment save error:', commentError);
-          }
-        }
-        console.log(`Saved ${commentRecords.length} comments/bids`);
-      }
+      // NOTE: Comment extraction removed from bat-simple-extract
+      // Comments should be extracted using extract-auction-comments function
+      // which properly parses DOM, uses content_hash for deduplication, and links to auction_events
+      // This function only extracts vehicle data, images, and metadata - NOT comments
     }
 
     return new Response(
