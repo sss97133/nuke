@@ -1465,8 +1465,24 @@ export default function OrganizationProfile() {
     ? '/vendor/bat/favicon.ico'
     : ((organization as any)?.logo_url || null);
 
+  // Ensure light theme is applied (prevent dark mode issues)
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      // Force light theme if not explicitly set
+      if (!root.getAttribute('data-theme')) {
+        root.setAttribute('data-theme', 'light');
+      }
+    }
+  }, []);
+
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
+    <div style={{ 
+      background: 'var(--bg, #f5f5f5)', 
+      color: 'var(--text, #2a2a2a)',
+      minHeight: '100vh',
+      width: '100%'
+    }}>
       {/* HEADER: Organization Name - Top Focus */}
       <div style={{
         position: 'sticky',
@@ -1682,7 +1698,12 @@ export default function OrganizationProfile() {
       )}
 
       {/* Content */}
-      <div style={{ padding: '16px' }}>
+      <div style={{ 
+        padding: '16px',
+        background: 'var(--bg, #f5f5f5)',
+        color: 'var(--text, #2a2a2a)',
+        minHeight: 'calc(100vh - 200px)'
+      }}>
         {activeTab === 'overview' && (
           <>
 
