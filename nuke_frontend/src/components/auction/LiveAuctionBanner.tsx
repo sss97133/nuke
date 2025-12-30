@@ -69,13 +69,15 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
   const loadActiveListing = async () => {
     try {
       setLoading(true);
+      const nowIso = new Date().toISOString();
       const { data, error } = await supabase
         .from('vehicle_listings')
         .select('*')
         .eq('vehicle_id', vehicleId)
         .eq('status', 'active')
         .in('sale_type', ['auction', 'live_auction'])
-        .gt('auction_end_time', new Date().toISOString())
+        // Treat as active if end time is in the future OR end time is missing (status governs liveness)
+        .or(`auction_end_time.is.null,auction_end_time.gt.${nowIso}`)
         .maybeSingle();
 
       if (error) {

@@ -191,9 +191,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // Live bid from external_listings (already in vehicle data from homepage query)
     const externalListing = (v as any)?.external_listings?.[0];
     const listingLiveBid = parseMoneyNumber(externalListing?.current_bid);
-    // Check if listing is truly live by looking at end_date (more reliable than status field)
+    // Treat listing as live if end_date is in the future OR status indicates active/live when end_date is missing
     const listingEndDate = externalListing?.end_date ? new Date(externalListing.end_date).getTime() : 0;
-    const isLive = Number.isFinite(listingEndDate) && listingEndDate > Date.now();
+    const statusStr = String(externalListing?.listing_status || '').toLowerCase();
+    const hasLiveStatus = statusStr === 'active' || statusStr === 'live';
+    const isLive = (Number.isFinite(listingEndDate) && listingEndDate > Date.now()) || (!externalListing?.end_date && hasLiveStatus);
     const liveBid = isLive ? listingLiveBid : null;
     
     // Current bid from vehicle (fallback if no external listing)

@@ -2825,9 +2825,9 @@ const CursorHomepage: React.FC = () => {
                 <>
                   <div style={{ width: '1px', height: '14px', background: 'var(--border)', flex: '0 0 auto' }} aria-hidden="true" />
                   <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', flex: '0 0 auto' }}>
-                    {sourcePogs.selected.map((p) => (
+                    {sourcePogs.selected.map((p, idx) => (
                       <button
-                        key={p.key}
+                        key={p.id ? `source-${p.id}` : `source-${p.domain}-${idx}`}
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -3486,9 +3486,9 @@ const CursorHomepage: React.FC = () => {
                         p.domain.toLowerCase().includes(sourceSearchText.toLowerCase()) ||
                         p.key.toLowerCase().includes(sourceSearchText.toLowerCase())
                       )
-                      .map((p) => (
+                      .map((p, idx) => (
                       <label
-                        key={p.key}
+                        key={p.id ? `source-${p.id}` : `source-${p.domain}-${idx}`}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
