@@ -301,7 +301,16 @@ const ImageGallery = ({
           .order('created_at', { ascending: true });
 
         if (error) throw error;
-        setAllImages(images || []);
+        const filtered = (images || []).filter((img: any) => {
+          const u = String(img?.image_url || '').toLowerCase();
+          const p = String(img?.storage_path || '').toLowerCase();
+          if (u.includes('organization_import') || p.includes('organization_import')) return false;
+          if (u.includes('import_queue') || p.includes('import_queue')) return false;
+          if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
+          if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
+          return true;
+        });
+        setAllImages(filtered);
         setVehicleMeta(vehicleMeta || null);
       } catch {
         setVehicleMeta(null);
@@ -1227,7 +1236,16 @@ const ImageGallery = ({
 
         if (error) throw error;
         const deduped = dedupeFetchedImages(rawImages || []);
-        const images = filterBatNoiseRows(deduped, meta);
+        const cleaned = deduped.filter((img: any) => {
+          const u = String(img?.image_url || '').toLowerCase();
+          const p = String(img?.storage_path || '').toLowerCase();
+          if (u.includes('organization_import') || p.includes('organization_import')) return false;
+          if (u.includes('import_queue') || p.includes('import_queue')) return false;
+          if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
+          if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
+          return true;
+        });
+        const images = filterBatNoiseRows(cleaned, meta);
 
         // If DB is empty, show fallback URLs (scraped listing images) to avoid empty profiles.
         const fallback = normalizeFallbackUrls(fallbackImageUrls);
@@ -1302,7 +1320,16 @@ const ImageGallery = ({
             
             if (!error && refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
-              const refreshedFiltered = filterBatNoiseRows(refreshedDeduped);
+              const refreshedCleaned = refreshedDeduped.filter((img: any) => {
+                const u = String(img?.image_url || '').toLowerCase();
+                const p = String((img as any)?.storage_path || '').toLowerCase();
+                if (u.includes('organization_import') || p.includes('organization_import')) return false;
+                if (u.includes('import_queue') || p.includes('import_queue')) return false;
+                if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
+                if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
+                return true;
+              });
+              const refreshedFiltered = filterBatNoiseRows(refreshedCleaned);
               // Check if the specific image was updated
               const updatedImage = refreshedFiltered.find(img => img.id === imageId) || (refreshedImages || []).find((img: any) => img.id === imageId);
               if (updatedImage) {
@@ -1511,7 +1538,16 @@ const ImageGallery = ({
         .order('created_at', { ascending: true });
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
-      const refreshedFiltered = filterBatNoiseRows(refreshedDeduped);
+      const refreshedCleaned = refreshedDeduped.filter((img: any) => {
+        const u = String(img?.image_url || '').toLowerCase();
+        const p = String((img as any)?.storage_path || '').toLowerCase();
+        if (u.includes('organization_import') || p.includes('organization_import')) return false;
+        if (u.includes('import_queue') || p.includes('import_queue')) return false;
+        if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
+        if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
+        return true;
+      });
+      const refreshedFiltered = filterBatNoiseRows(refreshedCleaned);
       setAllImages(refreshedFiltered);
       
       // Always show images after upload and refresh the display
