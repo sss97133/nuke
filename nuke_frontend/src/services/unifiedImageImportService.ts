@@ -496,7 +496,22 @@ export class UnifiedImageImportService {
 
       // Keep `vehicles.primary_image_url` + denormalized variants in sync for fast feeds/cards.
       // Best-effort: failures here shouldn't block the upload/import.
-      if (vehicleId && (isPrimary === true)) {
+      const looksLikeNonVehicleLead = (() => {
+        const u = String(urlData?.publicUrl || '').toLowerCase();
+        const p = String(storagePath || '').toLowerCase();
+        return (
+          u.includes('organization_import') ||
+          p.includes('organization_import') ||
+          u.includes('import_queue') ||
+          p.includes('import_queue') ||
+          u.includes('organization-logos/') ||
+          p.includes('organization-logos/') ||
+          u.includes('organization_logos/') ||
+          p.includes('organization_logos/')
+        );
+      })();
+
+      if (vehicleId && (isPrimary === true) && !looksLikeNonVehicleLead) {
         try {
           const v = (variants && typeof variants === 'object') ? variants : {};
           const bestLarge = String((v as any)?.large || (v as any)?.full || urlData.publicUrl);
