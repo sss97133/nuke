@@ -440,21 +440,90 @@ function extractVehiclePrice(text: string): number | null {
     return null; // Don't extract if only monthly payment found
   }
   
-  // Extract all prices and prefer the largest (vehicle prices are typically $5,000+)
+  // Unstructured fallback:
+  // Some dealer pages contain many $ amounts that are NOT the vehicle price (discounts, shipping thresholds,
+  // deposits, financing promos, etc.). The old "take the max $ amount" behavior can incorrectly stamp
+  // the same promo value onto many vehicles during batch imports.
+  //
+  // Strategy:
+  // - extract $-amount candidates WITH a nearby context window
+  // - accept only those that look like an actual listing price (keywords present)
+  // - reject common non-price contexts (discounts, payments, shipping, deposits, etc.)
+  const isLikelyRealListingPrice = (context: string): boolean => {
+    const c = String(context || '').toLowerCase();
+    if (!c) return false;
+
+    const positive = [
+      'asking',
+      'price',
+      'sale price',
+      'our price',
+      'list price',
+      'final price',
+      'msrp',
+      'buy it now',
+      'buy now',
+      'starting at', // cautious, but usually price context on listing pages
+    ];
+
+    const negative = [
+      'per month',
+      '/mo',
+      'monthly',
+      'payment',
+      'oac',
+      'down',
+      'deposit',
+      'shipping',
+      'orders over',
+      'order over',
+      'free shipping',
+      'save',
+      'off',
+      'discount',
+      'rebate',
+      'finance',
+      'financing',
+      'apr',
+      'lease',
+      'term',
+      'cash back',
+      'cashback',
+      'coupon',
+      'gift card',
+      'accessories',
+      'service',
+      'warranty',
+      'tax',
+      'fees',
+    ];
+
+    if (negative.some((w) => c.includes(w))) return false;
+    return positive.some((w) => c.includes(w));
+  };
+
   // Match both $14.500 (European) and $14,500 (US) formats
-  const priceMatches = text.match(/\$\s*([\d,.]+)/g);
-  if (priceMatches) {
-    const prices = priceMatches
-      .map(m => {
-        const numMatch = m.match(/\$\s*([\d,.]+)/);
-        return numMatch ? normalizePriceString(numMatch[1]) : null;
-      })
-      .filter((p): p is number => p !== null && p >= 1000 && p < 10000000);
-    
-    if (prices.length > 0) {
-      // Return the largest valid price (likely the vehicle price)
-      return Math.max(...prices);
-    }
+  const dollarRe = /\$\s*([\d,.]+)/g;
+  const candidates: number[] = [];
+
+  let m: RegExpExecArray | null;
+  while ((m = dollarRe.exec(text)) !== null) {
+    const raw = m[1];
+    if (!raw) continue;
+    const price = normalizePriceString(raw);
+    if (!price || price < 1000 || price >= 10000000) continue;
+
+    const start = Math.max(0, m.index - 40);
+    const end = Math.min(text.length, m.index + m[0].length + 40);
+    const context = text.slice(start, end);
+
+    if (!isLikelyRealListingPrice(context)) continue;
+    candidates.push(price);
+  }
+
+  if (candidates.length > 0) {
+    // Prefer the largest in a "price context" window (covers "Was $X, now $Y" etc).
+    return Math.max(...candidates);
   }
   
   return null;
