@@ -56,6 +56,8 @@ function cleanMakeName(raw: any): string | null {
 // Handles European-style formatting where period is thousands separator (e.g., $14.500 = $14,500)
 function extractVehiclePrice(text: string): number | null {
   if (!text) return null;
+
+  const MAX_PRICE = 2_000_000;
   
   // Helper to normalize price string (handles both comma and period as thousands separators)
   const normalizePriceString = (priceStr: string): number | null => {
@@ -113,7 +115,7 @@ function extractVehiclePrice(text: string): number | null {
     const match = text.match(pattern);
     if (match && match[1]) {
       const price = normalizePriceString(match[1]);
-      if (price && price >= 1000 && price < 10000000) {
+      if (price && price >= 1000 && price < MAX_PRICE) {
         return price;
       }
     }
@@ -125,7 +127,7 @@ function extractVehiclePrice(text: string): number | null {
     const vehiclePriceMatch = text.match(/(?:Price|Asking|Sale)[:\s]*\$?\s*([\d,.]+)/i);
     if (vehiclePriceMatch && vehiclePriceMatch[1]) {
       const price = normalizePriceString(vehiclePriceMatch[1]);
-      if (price && price >= 1000 && price < 10000000) {
+      if (price && price >= 1000 && price < MAX_PRICE) {
         return price;
       }
     }
@@ -141,7 +143,7 @@ function extractVehiclePrice(text: string): number | null {
         const numMatch = m.match(/\$\s*([\d,.]+)/);
         return numMatch ? normalizePriceString(numMatch[1]) : null;
       })
-      .filter((p): p is number => p !== null && p >= 1000 && p < 10000000);
+      .filter((p): p is number => p !== null && p >= 1000 && p < MAX_PRICE);
     
     if (prices.length > 0) {
       // Return the largest valid price (likely the vehicle price)
