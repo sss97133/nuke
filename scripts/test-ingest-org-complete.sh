@@ -14,15 +14,17 @@ if [ -f "nuke_frontend/.env.local" ]; then
   export $(grep -E "^VITE_SUPABASE_(URL|ANON_KEY)=" nuke_frontend/.env.local | sed 's/^VITE_/SUPABASE_/' | xargs)
 fi
 
-# Use SUPABASE_ANON_KEY or VITE_SUPABASE_ANON_KEY
+# Try to get key from multiple sources (anon key or service role key both work)
 SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-${VITE_SUPABASE_ANON_KEY}}"
+SUPABASE_KEY="${SUPABASE_ANON_KEY:-${SUPABASE_SERVICE_ROLE_KEY}}"
 
-if [ -z "$SUPABASE_ANON_KEY" ]; then
-  echo "❌ Error: SUPABASE_ANON_KEY or VITE_SUPABASE_ANON_KEY must be set"
+if [ -z "$SUPABASE_KEY" ]; then
+  echo "❌ Error: API key required. Set one of:"
+  echo "  - SUPABASE_ANON_KEY"
+  echo "  - VITE_SUPABASE_ANON_KEY (in nuke_frontend/.env.local)"
+  echo "  - SUPABASE_SERVICE_ROLE_KEY"
   echo ""
-  echo "Set it in one of these ways:"
-  echo "  1. Export in your shell: export SUPABASE_ANON_KEY=your-key"
-  echo "  2. Set in nuke_frontend/.env.local: VITE_SUPABASE_ANON_KEY=your-key"
+  echo "Edge Functions accept both anon key and service role key for authentication."
   exit 1
 fi
 
@@ -39,7 +41,7 @@ echo ""
 start_time=$(date +%s)
 
 response=$(curl -s -w "\n%{http_code}" -X POST "$FUNCTION_URL" \
-  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $SUPABASE_KEY" \
   -H "Content-Type: application/json" \
   -d "{\"url\": \"$TEST_URL\"}")
 

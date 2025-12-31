@@ -10,6 +10,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const STORAGE_BUCKET = 'vehicle-data'
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders, status: 200 })
@@ -711,10 +713,10 @@ serve(async (req) => {
                   
                   const ext = imageUrl.match(/\.(jpg|jpeg|png|webp)$/i)?.[1] || 'jpg'
                   const fileName = `${Date.now()}_${i}.${ext}`
-                  const storagePath = `${vehicleId}/${fileName}`
+                  const storagePath = `vehicles/${vehicleId}/images/craigslist_scrape/${fileName}`
                   
                   const { error: uploadError } = await supabase.storage
-                    .from('vehicle-images')
+                    .from(STORAGE_BUCKET)
                     .upload(storagePath, uint8Array, {
                       contentType: `image/${ext}`,
                       cacheControl: '3600',
@@ -724,7 +726,7 @@ serve(async (req) => {
                   if (uploadError) continue
                   
                   const { data: { publicUrl } } = supabase.storage
-                    .from('vehicle-images')
+                    .from(STORAGE_BUCKET)
                     .getPublicUrl(storagePath)
                   
                   // Create ghost user for photographer

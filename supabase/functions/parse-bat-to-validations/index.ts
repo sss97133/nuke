@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const STORAGE_BUCKET = 'vehicle-data';
+
 /**
  * Parse BaT listing and create GRANULAR data validations for each field
  * Fill in the blanks - BaT is one validation source competing with others
@@ -357,11 +359,11 @@ serve(async (req) => {
         
         // Generate filename
         const filename = `bat_${lotNumber}_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-        const storagePath = `${vehicleId}/${filename}`;
+        const storagePath = `vehicles/${vehicleId}/images/bat_listing/${filename}`;
 
         // Upload to Supabase storage
         const { error: uploadError } = await supabase.storage
-          .from('vehicle-images')
+          .from(STORAGE_BUCKET)
           .upload(storagePath, imgBlob, {
             contentType: 'image/jpeg',
             cacheControl: '3600'
@@ -374,7 +376,7 @@ serve(async (req) => {
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
-          .from('vehicle-images')
+          .from(STORAGE_BUCKET)
           .getPublicUrl(storagePath);
 
         // Create vehicle_images entry with ghost user as photographer
@@ -448,7 +450,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error parsing BaT listing:', error);
     return new Response(
       JSON.stringify({ error: error.message }),

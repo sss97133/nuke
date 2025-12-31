@@ -14,7 +14,8 @@ interface Comment {
   comment_type?: string; // 'bid', 'question', 'observation', etc.
   bid_amount?: number;
   is_seller?: boolean;
-  source?: 'nzero' | 'bat'; // Distinguish N-Zero comments from BaT comments
+  source?: 'nzero' | 'auction' | 'bat'; // Distinguish N-Zero comments from auction_comments and BaT
+  auction_platform?: string | null;
   external_identity_id?: string; // For linking to profiles
 }
 
@@ -100,6 +101,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             comment_type,
             bid_amount,
             is_seller,
+            platform,
+            source_url,
             auction_event_id,
             external_identity_id,
             vehicle_id
@@ -130,6 +133,25 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
       const allComments: Comment[] = [];
 
+      // Resolve auction platform per auction_event_id (auction_comments is multi-platform)
+      const auctionEventIds = [...new Set((auctionCommentsResult.data || []).map((c: any) => c.auction_event_id).filter(Boolean))];
+      const auctionEventPlatformMap = new Map<string, string>();
+      if (auctionEventIds.length > 0) {
+        try {
+          const { data: evRows } = await supabase
+            .from('auction_events')
+            .select('id, source')
+            .in('id', auctionEventIds);
+          (evRows || []).forEach((r: any) => {
+            const src = r?.source ? String(r.source) : null;
+            const mapped = src === 'carsandbids' ? 'cars_and_bids' : src;
+            if (r?.id && mapped) auctionEventPlatformMap.set(String(r.id), mapped);
+          });
+        } catch {
+          // ignore
+        }
+      }
+
       // Process N-Zero comments
       if (nzeroCommentsResult.data && nzeroCommentsResult.data.length > 0) {
         const userIds = [...new Set(nzeroCommentsResult.data.map(c => c.user_id).filter(Boolean))];
@@ -156,18 +178,58 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
       // Process auction comments (from auction_comments table)
       if (auctionCommentsResult.data && auctionCommentsResult.data.length > 0) {
-        // Get external_identity_id for usernames to link to profiles
-        const usernames = [...new Set(auctionCommentsResult.data.map(c => c.author_username).filter(Boolean))];
-        const { data: externalIds } = await supabase
-          .from('external_identities')
-          .select('id, handle, claimed_by_user_id, profile_url')
-          .eq('platform', 'bat')
-          .in('handle', usernames);
+        const isGarbageCarsAndBidsComment = (text: string): boolean => {
+          const t = String(text || '').trim();
+          if (!t) return true;
+          const lower = t.toLowerCase();
+          if (lower.includes('comments & bids')) return true;
+          if (lower.includes('most upvoted')) return true;
+          if (lower.includes('newest')) return true;
+          if (lower.includes('add a comment')) return true;
+          if (lower.includes('bid history')) return true;
+          if (lower.includes('you just commented')) return true;
+          if (lower.startsWith('comments ')) return true;
+          return false;
+        };
 
-        const identityMap = new Map((externalIds || []).map(e => [e.handle, e]));
+        // Get external identities for usernames by platform (bat, cars_and_bids, etc.)
+        const platformHandles = new Map<string, Set<string>>();
+        for (const c of auctionCommentsResult.data as any[]) {
+          const handle = c.author_username;
+          if (!handle) continue;
+          const eventPlatform = (c.platform ? String(c.platform) : null) || auctionEventPlatformMap.get(String(c.auction_event_id)) || null;
+          const p = (eventPlatform || 'bat').toString();
+          const set = platformHandles.get(p) || new Set<string>();
+          set.add(handle);
+          platformHandles.set(p, set);
+        }
+
+        const externalIdentityByPlatformHandle = new Map<string, any>();
+        for (const [platform, handlesSet] of platformHandles.entries()) {
+          const handles = Array.from(handlesSet);
+          if (handles.length === 0) continue;
+          const { data: externalIds } = await supabase
+            .from('external_identities')
+            .select('id, handle, claimed_by_user_id, profile_url')
+            .eq('platform', platform)
+            .in('handle', handles);
+          (externalIds || []).forEach((e: any) => {
+            if (e?.handle) externalIdentityByPlatformHandle.set(`${platform}:${e.handle}`, e);
+          });
+        }
 
         for (const c of auctionCommentsResult.data) {
-          const identity = identityMap.get(c.author_username) || (c.external_identity_id ? externalIds?.find(e => e.id === c.external_identity_id) : null);
+          const auctionPlatform = ((c as any).platform ? String((c as any).platform) : null) || auctionEventPlatformMap.get(String((c as any).auction_event_id)) || null;
+
+          if (auctionPlatform === 'cars_and_bids' && isGarbageCarsAndBidsComment(String(c.comment_text || ''))) {
+            continue;
+          }
+
+          const identity =
+            (auctionPlatform && c.author_username ? externalIdentityByPlatformHandle.get(`${auctionPlatform}:${c.author_username}`) : null) ||
+            (!auctionPlatform && c.author_username ? externalIdentityByPlatformHandle.get(`bat:${c.author_username}`) : null) ||
+            null;
+
           allComments.push({
             id: `auction-${c.id}`,
             user_id: identity?.claimed_by_user_id || null,
@@ -179,7 +241,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             comment_type: c.comment_type,
             bid_amount: c.bid_amount ? Number(c.bid_amount) : undefined,
             is_seller: c.is_seller,
-            source: 'bat',
+            source: 'auction',
+            auction_platform: auctionPlatform,
             external_identity_id: identity?.id || c.external_identity_id,
             user_avatar: identity?.profile_url || undefined
           });
@@ -288,15 +351,15 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       return;
     }
     
-    // If it's a BaT user, check if they have a claimed external identity
-    if (comment.source === 'bat' && (comment.author_username || comment.external_identity_id)) {
+    // For external auction identities, route through external_identities.
+    if ((comment.source === 'auction' || comment.source === 'bat') && (comment.author_username || comment.external_identity_id)) {
       let identity = null;
       
       // Try to get identity by external_identity_id first (faster)
       if (comment.external_identity_id) {
         const { data } = await supabase
           .from('external_identities')
-          .select('claimed_by_user_id, profile_url, handle')
+          .select('id, claimed_by_user_id, profile_url, handle')
           .eq('id', comment.external_identity_id)
           .maybeSingle();
         identity = data;
@@ -304,10 +367,13 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       
       // Fallback: get by username
       if (!identity && comment.author_username) {
+        const platform =
+          (comment.source === 'auction' ? (comment.auction_platform || null) : 'bat') ||
+          'bat';
         const { data } = await supabase
           .from('external_identities')
-          .select('claimed_by_user_id, profile_url, handle')
-          .eq('platform', 'bat')
+          .select('id, claimed_by_user_id, profile_url, handle')
+          .eq('platform', platform)
           .eq('handle', comment.author_username)
           .maybeSingle();
         identity = data;
@@ -324,10 +390,13 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         navigate(`/profile/external/${comment.external_identity_id}`);
       } else if (comment.author_username) {
         // Try to find external identity to show public profile
+        const platform =
+          (comment.source === 'auction' ? (comment.auction_platform || null) : 'bat') ||
+          'bat';
         const { data: extIdentity } = await supabase
           .from('external_identities')
           .select('id, handle, profile_url')
-          .eq('platform', 'bat')
+          .eq('platform', platform)
           .eq('handle', comment.author_username)
           .maybeSingle();
         
@@ -339,7 +408,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           window.open(extIdentity.profile_url, '_blank');
         } else {
           // Last resort: open claim identity page
-          navigate(`/claim-identity?platform=bat&handle=${encodeURIComponent(comment.author_username)}`);
+          navigate(`/claim-identity?platform=${encodeURIComponent(platform)}&handle=${encodeURIComponent(comment.author_username)}`);
         }
       }
     }
@@ -379,6 +448,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
               const displayDate = comment.posted_at || comment.created_at;
               const isBid = comment.comment_type === 'bid' || comment.bid_amount !== undefined;
               const isBaT = comment.source === 'bat';
+              const isAuction = comment.source === 'auction';
+              const auctionPlatform = (comment as any).auction_platform ? String((comment as any).auction_platform) : null;
               
               return (
                 <div key={comment.id} style={{ 
@@ -436,6 +507,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         {isBaT && (
                           <span style={{ fontSize: '7pt', color: '#2563eb', fontWeight: 600 }}>
                             BaT
+                          </span>
+                        )}
+                        {isAuction && auctionPlatform && auctionPlatform !== 'bat' && (
+                          <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                            {auctionPlatform === 'cars_and_bids' ? 'Cars & Bids' : auctionPlatform}
                           </span>
                         )}
                         {isBid && comment.bid_amount && (

@@ -18,6 +18,8 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import exifr from 'npm:exifr@7.1.3'
 
+const STORAGE_BUCKET = 'vehicle-data'
+
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -212,7 +214,7 @@ Deno.serve(async (req: Request) => {
         const filePath = `vehicles/${vehicleId}/events/${eventRec.id}/${fileName}`
         
         const { error: upErr } = await supabase.storage
-          .from('vehicle-images')
+          .from(STORAGE_BUCKET)
           .upload(filePath, item.file)
         
         if (upErr) {
@@ -221,7 +223,7 @@ Deno.serve(async (req: Request) => {
         }
 
         const { data: pub } = supabase.storage
-          .from('vehicle-images')
+          .from(STORAGE_BUCKET)
           .getPublicUrl(filePath)
         
         if (pub?.publicUrl) {
@@ -311,12 +313,12 @@ Deno.serve(async (req: Request) => {
         const filePath = `vehicles/${vehicleId}/loose/${fileName}`
         
         const { error: upErr } = await supabase.storage
-          .from('vehicle-images')
+          .from(STORAGE_BUCKET)
           .upload(filePath, item.file)
         
         if (!upErr) {
           const { data: pub } = supabase.storage
-            .from('vehicle-images')
+            .from(STORAGE_BUCKET)
             .getPublicUrl(filePath)
           
           if (pub?.publicUrl) {

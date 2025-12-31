@@ -1,11 +1,11 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from 'playwright/test';
 
 /**
  * Playwright Configuration for Nuke Platform Testing
  * Tests production deployment of mobile upload FAB and UI improvements
  */
 export default defineConfig({
-  testDir: './tests',
+  testDir: '../tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

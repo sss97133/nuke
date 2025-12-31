@@ -100,20 +100,135 @@ function extractOrgData(html: string, url: string): ExtractedOrg {
     metadata: {},
   };
   
-  // Extract business name from title, h1, or meta tags
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  if (titleMatch) {
-    org.business_name = titleMatch[1]
-      .replace(/\s+/g, ' ')
-      .trim()
-      .split('|')[0]
-      .split('-')[0]
-      .trim();
+  // Common slogan words/phrases that shouldn't be company names
+  const sloganPatterns = [
+    /^(built for|driven by|powered by|experience|discover|explore|welcome to|your|the future of|the leader in)/i,
+    /(ahead|journey|adventure|excellence|quality|craftsmanship|heritage|legacy|innovation|performance)$/i,
+  ];
+  
+  const isSlogan = (text: string): boolean => {
+    const lowerText = text.toLowerCase();
+    // Check against common slogan patterns
+    if (sloganPatterns.some(pattern => pattern.test(text))) {
+      return true;
+    }
+    // Check if it's a generic marketing phrase
+    const genericPhrases = [
+      'built for the road ahead',
+      'driven by excellence',
+      'your journey starts here',
+      'experience the difference',
+      'craftsmanship redefined',
+      'heritage meets innovation',
+    ];
+    return genericPhrases.some(phrase => lowerText.includes(phrase) || phrase.includes(lowerText));
+  };
+  
+  // Priority 1: Extract from JSON-LD structured data (most reliable)
+  const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  for (const match of Array.from(jsonLdMatches)) {
+    try {
+      const jsonLd = JSON.parse(match[1]);
+      // Handle both single objects and arrays
+      const items = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
+      for (const item of items) {
+        if (item['@type'] === 'Organization' || item['@type'] === 'LocalBusiness') {
+          if (item.name && typeof item.name === 'string' && !isSlogan(item.name)) {
+            org.business_name = item.name.trim();
+            break;
+          }
+        }
+      }
+      if (org.business_name) break;
+    } catch (e) {
+      // Invalid JSON, skip
+    }
   }
   
-  const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-  if (h1Match && !org.business_name) {
-    org.business_name = h1Match[1].trim();
+  // Priority 2: Extract from logo alt text or link text (very reliable)
+  if (!org.business_name) {
+    const logoAltMatch = html.match(/<img[^>]*(?:logo|brand)[^>]*alt=["']([^"']+)["']/i);
+    if (logoAltMatch && logoAltMatch[1]) {
+      const altText = logoAltMatch[1].trim();
+      // Skip generic alt text like "logo", "brand", "home"
+      if (!['logo', 'brand', 'home', 'image'].includes(altText.toLowerCase()) && !isSlogan(altText)) {
+        org.business_name = altText;
+      }
+    }
+  }
+  
+  // Priority 3: Extract from header/nav link text (common pattern)
+  if (!org.business_name) {
+    // Look for link in header/nav that appears to be a company name
+    const headerMatch = html.match(/<header[^>]*>([\s\S]{0,2000})<\/header>/i) || 
+                        html.match(/<nav[^>]*>([\s\S]{0,2000})<\/nav>/i);
+    const headerSection = headerMatch ? headerMatch[1] : html.substring(0, 5000); // First 5000 chars as fallback
+    
+    const linkMatches = headerSection.matchAll(/<a[^>]*href=["']\/["'][^>]*>([^<]+(?:<[^>]+>[^<]+<\/[^>]+>)*[^<]*)<\/a>/gi);
+    for (const match of Array.from(linkMatches)) {
+      const linkContent = match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      // Check if it looks like a company name (2-4 words, starts with capital, reasonable length)
+      if (linkContent.match(/^[A-Z][a-zA-Z\s]{3,50}$/) && 
+          linkContent.split(/\s+/).length >= 2 && 
+          linkContent.split(/\s+/).length <= 4 &&
+          !linkContent.match(/^(logo|brand|home|menu|inventory|about|contact|shop|build)/i) &&
+          !isSlogan(linkContent)) {
+        org.business_name = linkContent;
+        break;
+      }
+    }
+  }
+  
+  // Priority 4: Extract from title tag (but filter out slogans and take the company name part)
+  if (!org.business_name) {
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch) {
+      let title = titleMatch[1].replace(/\s+/g, ' ').trim();
+      
+      // Filter out video/platform indicators
+      if (!title.match(/\b(vimeo|youtube|video|watch|play|stream|embed)\b/i)) {
+        // Split by | or - and try each part
+        const parts = title.split(/[|\-–—]/).map(p => p.trim()).filter(p => p.length > 2);
+        for (const part of parts) {
+          if (!isSlogan(part) && part.length < 100) {
+            // Check if it looks like a company name (not just a slogan)
+            if (part.split(/\s+/).length >= 2 && part.split(/\s+/).length <= 5) {
+              org.business_name = part;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Priority 5: Extract domain name and convert to readable name (fallback)
+  if (!org.business_name) {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.replace(/^www\./, ''); // Remove www.
+      const domainParts = hostname.split('.')[0].split(/-|_/); // Split on hyphens/underscores
+      // Capitalize each word
+      const domainName = domainParts
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+        .join(' ');
+      if (domainName.length > 2 && domainName.length < 100) {
+        org.business_name = domainName;
+      }
+    } catch (e) {
+      // Invalid URL, skip
+    }
+  }
+  
+  // Priority 6: Extract from h1 (last resort, but filter slogans)
+  if (!org.business_name) {
+    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+    if (h1Match) {
+      const h1Text = h1Match[1].trim();
+      if (h1Text.length > 2 && h1Text.length < 100 && !isSlogan(h1Text)) {
+        org.business_name = h1Text;
+      }
+    }
   }
   
   // Extract description from meta description or first paragraph
@@ -173,81 +288,206 @@ function extractOrgData(html: string, url: string): ExtractedOrg {
   return org;
 }
 
-function extractVehicles(html: string, baseUrl: string): ExtractedVehicle[] {
-  const vehicles: ExtractedVehicle[] = [];
-  const seenVehicles = new Set<string>();
+/**
+ * Find all /for-sale/ URLs from a page (both listing pages and individual vehicle pages)
+ */
+function findForSaleUrls(html: string, baseUrl: string): string[] {
+  const urls = new Set<string>();
+  const baseUrlObj = new URL(baseUrl);
   
-  // Remove scripts and styles for cleaner parsing
+  // Find all links to /for-sale/ pages
+  const linkPattern = /<a[^>]+href=["']([^"']*\/for-sale\/[^"']*)["'][^>]*>/gi;
+  let match;
+  while ((match = linkPattern.exec(html)) !== null) {
+    const href = match[1];
+    try {
+      const url = new URL(href, baseUrl);
+      // Only include URLs from the same domain
+      if (url.hostname === baseUrlObj.hostname && url.pathname.includes('/for-sale/')) {
+        urls.add(url.href);
+      }
+    } catch (e) {
+      // Invalid URL, skip
+    }
+  }
+  
+  return Array.from(urls);
+}
+
+/**
+ * Extract vehicle data from an individual vehicle listing page
+ */
+function extractVehicleFromPage(html: string, pageUrl: string): ExtractedVehicle | null {
   const cleanHtml = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
                        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
   
-  // Pattern 1: Look for year + make + model patterns
-  const vehiclePattern = /\b((?:19|20)\d{2})\s+([A-Za-z]+)\s+([A-Za-z0-9\s\-/]+?)(?:\s|$|,|\.|<\/|&nbsp;)/gi;
+  const vehicle: ExtractedVehicle = {
+    source_url: pageUrl,
+    metadata: {},
+  };
   
-  let match;
-  while ((match = vehiclePattern.exec(cleanHtml)) !== null) {
-    const year = parseInt(match[1]);
-    const make = match[2].trim();
-    let model = match[3].trim().replace(/\s+/g, ' ');
+  // Known vehicle makes (with aliases mapped to canonical names)
+  const makeAliases: Record<string, string> = {
+    'chevy': 'Chevrolet',
+    'vw': 'Volkswagen',
+    'mercedes': 'Mercedes-Benz',
+    'land rover': 'Land Rover',
+    'range rover': 'Range Rover',
+    'alfa romeo': 'Alfa Romeo',
+    'rolls-royce': 'Rolls-Royce',
+    'aston martin': 'Aston Martin',
+    'mercedes-benz': 'Mercedes-Benz',
+  };
+  
+  const knownMakes = new Set([
+    'ford', 'chevrolet', 'chevy', 'dodge', 'chrysler', 'jeep', 'ram', 'gmc',
+    'toyota', 'honda', 'nissan', 'mazda', 'subaru', 'mitsubishi', 'acura', 'lexus', 'infiniti',
+    'bmw', 'mercedes', 'mercedes-benz', 'audi', 'volkswagen', 'vw', 'porsche', 'volvo',
+    'jaguar', 'land rover', 'range rover', 'bentley', 'rolls-royce', 'aston martin',
+    'ferrari', 'lamborghini', 'mclaren', 'maserati', 'alfa romeo', 'fiat',
+    'cadillac', 'lincoln', 'buick', 'pontiac', 'oldsmobile', 'plymouth', 'amc',
+    'studebaker', 'packard', 'willys', 'international', 'datsun', 'saab', 'triumph', 'mg'
+  ]);
+  
+  // Generic words that shouldn't be treated as makes
+  const genericWords = new Set(['classic', 'custom', 'vintage', 'restored', 'rebuilt', 'modified', 'project', 'for', 'sale']);
+  
+  // Extract year, make, model from title or h1
+  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+  const headingText = (h1Match?.[1] || titleMatch?.[1] || '').trim();
+  
+  // Try to extract year + make + model from heading
+  const vehiclePattern = /\b((?:19|20)\d{2})\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)\s+([A-Za-z0-9\s\-/]+?)(?:\s|$|,|\.|<\/|&nbsp;)/i;
+  const vehicleMatch = headingText.match(vehiclePattern) || cleanHtml.match(vehiclePattern);
+  
+  if (vehicleMatch) {
+    vehicle.year = parseInt(vehicleMatch[1]);
+    const makeCandidate = vehicleMatch[2].trim().toLowerCase();
+    let model = vehicleMatch[3].trim().replace(/\s+/g, ' ');
     
-    // Filter out false positives
-    if (model.length < 1 || model.length > 50) continue;
-    if (['ad', 'classic', 'projects', 'inventory'].includes(model.toLowerCase())) continue;
-    
-    // Get context around match
-    const contextStart = match.index;
-    const context = cleanHtml.substring(contextStart, Math.min(contextStart + 800, cleanHtml.length));
-    
-    // Extract price
-    const priceMatch = context.match(/\$([\d,]+(?:\.\d{2})?)/);
-    const price = priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : undefined;
-    
-    // Determine status
-    const isSold = /SOLD|SALE\s+COMPLETE|SOLD\s+OUT/i.test(context);
-    const status = isSold ? 'sold' : 'for_sale';
-    
-    // Extract images
-    const imageUrls: string[] = [];
-    const imgPattern = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-    let imgMatch;
-    while ((imgMatch = imgPattern.exec(context)) !== null) {
-      const rawUrl = imgMatch[1];
-      const imageUrl = rawUrl.startsWith('http') 
-        ? rawUrl 
-        : new URL(rawUrl, baseUrl).href;
-      
-      if (!imageUrl.match(/(topbar|header|logo|button|icon)/i)) {
-        imageUrls.push(imageUrl);
+    // Check if make candidate is valid (skip generic words)
+    if (!genericWords.has(makeCandidate) && knownMakes.has(makeCandidate)) {
+      // Normalize make name using alias map if available
+      vehicle.make = makeAliases[makeCandidate] || vehicleMatch[2].trim();
+      vehicle.model = model;
+    } else {
+      // Try first word of model as make
+      const modelParts = model.split(/\s+/);
+      if (modelParts.length > 0) {
+        const firstModelWord = modelParts[0].toLowerCase();
+        if (knownMakes.has(firstModelWord)) {
+          // Normalize make name using alias map
+          vehicle.make = makeAliases[firstModelWord] || modelParts[0];
+          vehicle.model = modelParts.slice(1).join(' ');
+        } else {
+          // Can't determine make/model reliably
+          return null;
+        }
+      } else {
+        return null;
+      }
+    }
+  } else {
+    // Try to extract from URL path
+    const urlPath = new URL(pageUrl).pathname;
+    const urlParts = urlPath.split('/').filter(p => p);
+    const forSaleIndex = urlParts.indexOf('for-sale');
+    if (forSaleIndex >= 0 && urlParts.length > forSaleIndex + 1) {
+      const vehicleSlug = urlParts[forSaleIndex + 1];
+      // Try to parse year from slug (e.g., "1969-classic-k5-blazer-2465")
+      const yearMatch = vehicleSlug.match(/\b(19|20)\d{2}\b/);
+      if (yearMatch) {
+        vehicle.year = parseInt(yearMatch[0]);
+        // Extract make/model from slug (very rough)
+        const slugParts = vehicleSlug.replace(/\d+/g, '').split('-').filter(p => p && p !== 'classic' && p !== 'for' && p !== 'sale');
+        if (slugParts.length >= 2) {
+          const firstPart = slugParts[0].toLowerCase();
+          if (knownMakes.has(firstPart)) {
+            vehicle.make = slugParts[0];
+            vehicle.model = slugParts.slice(1).join(' ');
+          } else if (slugParts.length >= 3 && knownMakes.has(slugParts[0] + ' ' + slugParts[1])) {
+            vehicle.make = slugParts[0] + ' ' + slugParts[1];
+            vehicle.model = slugParts.slice(2).join(' ');
+          }
+        }
       }
     }
     
-    const vehicleKey = `${year}-${make}-${model}-${price || '0'}`;
-    if (seenVehicles.has(vehicleKey)) continue;
-    seenVehicles.add(vehicleKey);
-    
-    const descText = context.replace(/<[^>]+>/g, ' ')
-                           .replace(/&nbsp;/g, ' ')
-                           .replace(/\s+/g, ' ')
-                           .trim();
-    const description = descText.length > 30 && descText.length < 500 ? descText.substring(0, 500) : undefined;
-    
-    vehicles.push({
-      year,
-      make,
-      model,
-      description,
-      price,
-      status,
-      image_urls: imageUrls.length > 0 ? imageUrls : undefined,
-      source_url: baseUrl,
-      metadata: {
-        extracted_at: new Date().toISOString(),
-        context_length: context.length,
-      },
-    });
+    if (!vehicle.make || !vehicle.model) {
+      return null; // Can't extract vehicle info
+    }
   }
   
-  return vehicles;
+  // Extract description - look for meta description, then main content
+  const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+  if (metaDescMatch) {
+    vehicle.description = metaDescMatch[1].trim();
+  } else {
+    // Try to find main content area
+    const mainContentMatch = html.match(/<main[^>]*>([\s\S]{200,2000})<\/main>/i) ||
+                            html.match(/<article[^>]*>([\s\S]{200,2000})<\/article>/i) ||
+                            html.match(/<div[^>]*class=["'][^"']*content["'][^>]*>([\s\S]{200,2000})<\/div>/i);
+    if (mainContentMatch) {
+      const content = mainContentMatch[1].replace(/<[^>]+>/g, ' ')
+                                          .replace(/&nbsp;/g, ' ')
+                                          .replace(/\s+/g, ' ')
+                                          .trim();
+      if (content.length > 100) {
+        vehicle.description = content.substring(0, 1000);
+      }
+    }
+  }
+  
+  // Extract price
+  const pricePatterns = [
+    /\$\s*([\d,]+(?:\.\d{2})?)/g,
+    /Price[:\s]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+    /Asking[:\s]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
+  ];
+  
+  for (const pattern of pricePatterns) {
+    const matches = cleanHtml.matchAll(pattern);
+    for (const match of matches) {
+      const price = parseFloat(match[1].replace(/,/g, ''));
+      if (price > 1000 && price < 10000000) { // Reasonable price range
+        vehicle.price = price;
+        break;
+      }
+    }
+    if (vehicle.price) break;
+  }
+  
+  // Determine status
+  vehicle.status = /SOLD|SALE\s+COMPLETE|SOLD\s+OUT|NOT\s+AVAILABLE/i.test(cleanHtml) ? 'sold' : 'for_sale';
+  
+  // Extract images - prioritize main vehicle images
+  const imageUrls: string[] = [];
+  const imgPattern = /<img[^>]+src=["']([^"']+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>/gi;
+  let imgMatch;
+  while ((imgMatch = imgPattern.exec(cleanHtml)) !== null) {
+    const imgUrl = imgMatch[1];
+    const alt = imgMatch[2] || '';
+    
+    // Skip navigation/header/logo images
+    if (imgUrl.match(/(topbar|header|logo|button|icon|avatar|profile)/i) ||
+        alt.match(/(logo|navigation|menu|button)/i)) {
+      continue;
+    }
+    
+    const fullUrl = imgUrl.startsWith('http') ? imgUrl : new URL(imgUrl, pageUrl).href;
+    if (!imageUrls.includes(fullUrl)) {
+      imageUrls.push(fullUrl);
+    }
+  }
+  
+  vehicle.image_urls = imageUrls.length > 0 ? imageUrls : undefined;
+  vehicle.metadata = {
+    extracted_at: new Date().toISOString(),
+    page_title: titleMatch?.[1] || '',
+  };
+  
+  return vehicle;
 }
 
 async function insertOrganization(supabase: any, org: ExtractedOrg): Promise<string | null> {
@@ -261,7 +501,7 @@ async function insertOrganization(supabase: any, org: ExtractedOrg): Promise<str
     .from('businesses')
     .select('id, metadata')
     .eq('website', org.website)
-    .single();
+    .maybeSingle();
 
   const orgData: any = {
     website: org.website,
@@ -350,7 +590,7 @@ async function insertVehicle(supabase: any, vehicle: ExtractedVehicle, organizat
       .from('vehicles')
       .select('id')
       .eq('vin', vehicle.vin)
-      .single();
+      .maybeSingle();
     existingVehicle = data;
   } else if (vehicle.source_url && vehicle.model) {
     const { data } = await supabase
@@ -358,7 +598,7 @@ async function insertVehicle(supabase: any, vehicle: ExtractedVehicle, organizat
       .select('id')
       .eq('discovery_url', vehicle.source_url)
       .eq('model', vehicle.model)
-      .single();
+      .maybeSingle();
     existingVehicle = data;
   }
 
@@ -395,13 +635,13 @@ async function insertVehicle(supabase: any, vehicle: ExtractedVehicle, organizat
 
   // Link vehicle to organization
   // Check if link already exists
-  const { data: existingLink } = await supabase
+  const { data: existingLink, error: linkCheckError } = await supabase
     .from('organization_vehicles')
     .select('id')
     .eq('organization_id', organizationId)
     .eq('vehicle_id', vehicleId)
     .eq('relationship_type', vehicle.status === 'sold' ? 'seller' : 'owner')
-    .single();
+    .maybeSingle(); // Use maybeSingle() instead of single() to handle no record gracefully
 
   const linkData = {
     organization_id: organizationId,
@@ -445,7 +685,7 @@ async function insertVehicle(supabase: any, vehicle: ExtractedVehicle, organizat
         .select('id')
         .eq('vehicle_id', vehicleId)
         .eq('image_url', imageUrl)
-        .single();
+        .maybeSingle();
 
       if (!existingImage) {
         // Insert new image
@@ -497,16 +737,94 @@ Deno.serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    // Step 1: Scrape organization and vehicles
-    console.log('📡 Step 1: Scraping data...');
-    const html = await fetchHtml(url);
-    const org = extractOrgData(html, url);
-    const vehicles = extractVehicles(html, url);
+    // Step 1: Scrape organization from homepage
+    console.log('📡 Step 1: Scraping organization data...');
+    const homepageHtml = await fetchHtml(url);
+    const org = extractOrgData(homepageHtml, url);
     
-    console.log(`✅ Scraped: ${org.business_name || 'Unknown'} (${vehicles.length} vehicles)`);
+    console.log(`✅ Organization: ${org.business_name || 'Unknown'}`);
+    
+    // Step 2: Discover all /for-sale/ URLs (listing pages and individual vehicle pages)
+    console.log('🔍 Step 2: Discovering vehicle listing pages...');
+    let allVehicleUrls = new Set<string>();
+    const initialForSaleUrls = findForSaleUrls(homepageHtml, url);
+    console.log(`✅ Found ${initialForSaleUrls.length} /for-sale/ URLs from homepage`);
+    
+    // Step 2a: Also check the main inventory page (/for-sale/)
+    const inventoryUrl = new URL('/for-sale/', url).href;
+    try {
+      console.log(`🔍 Checking inventory page: ${inventoryUrl}`);
+      const inventoryHtml = await fetchHtml(inventoryUrl);
+      const inventoryUrls = findForSaleUrls(inventoryHtml, url);
+      console.log(`✅ Found ${inventoryUrls.length} /for-sale/ URLs from inventory page`);
+      inventoryUrls.forEach(u => allVehicleUrls.add(u));
+    } catch (error: any) {
+      console.warn(`⚠️  Failed to scrape inventory page: ${error.message}`);
+    }
+    
+    // Add initial URLs
+    initialForSaleUrls.forEach(u => allVehicleUrls.add(u));
+    
+    // Step 2b: For each listing page (not individual vehicle), discover more URLs
+    const listingPages = Array.from(allVehicleUrls).filter(u => {
+      // Listing pages typically don't have a numeric ID at the end
+      // Individual pages: /for-sale/1969-classic-k5-blazer-2465/
+      // Listing pages: /for-sale/chevrolet-k5-blazer/
+      const path = new URL(u).pathname;
+      return path.match(/\/for-sale\/[^/]+\/$/) && !path.match(/\/for-sale\/[^/]+-\d+\/$/);
+    });
+    
+    console.log(`🔍 Discovering vehicles from ${listingPages.length} listing pages...`);
+    for (const listingUrl of listingPages.slice(0, 20)) { // Limit to 20 listing pages
+      try {
+        const listingHtml = await fetchHtml(listingUrl);
+        const discoveredUrls = findForSaleUrls(listingHtml, url);
+        discoveredUrls.forEach(u => allVehicleUrls.add(u));
+        console.log(`  ✅ Found ${discoveredUrls.length} URLs from ${listingUrl}`);
+      } catch (error: any) {
+        console.warn(`  ⚠️  Failed to scrape listing page ${listingUrl}: ${error.message}`);
+      }
+    }
+    
+    // Filter to only individual vehicle pages (those with numeric IDs or specific patterns)
+    const individualVehicleUrls = Array.from(allVehicleUrls).filter(u => {
+      const path = new URL(u).pathname;
+      // Individual vehicle pages have patterns like:
+      // /for-sale/1969-classic-k5-blazer-2465/
+      // /for-sale/1977-classic-chevy-k10-3837/
+      return path.match(/\/for-sale\/[^/]+-\d+\/$/) || 
+             path.match(/\/for-sale\/\d{4}-[^/]+\/$/); // year prefix
+    });
+    
+    console.log(`✅ Total individual vehicle pages found: ${individualVehicleUrls.length}`);
+    
+    // Step 3: Scrape each individual vehicle page to extract vehicle data
+    console.log(`📡 Step 3: Scraping ${individualVehicleUrls.length} vehicle pages...`);
+    const vehicles: ExtractedVehicle[] = [];
+    
+    // Limit to first 100 URLs to avoid timeouts
+    const urlsToProcess = individualVehicleUrls.slice(0, 100);
+    
+    for (let i = 0; i < urlsToProcess.length; i++) {
+      const vehicleUrl = urlsToProcess[i];
+      
+      try {
+        console.log(`  [${i + 1}/${urlsToProcess.length}] Scraping: ${vehicleUrl}`);
+        const vehicleHtml = await fetchHtml(vehicleUrl);
+        const vehicle = extractVehicleFromPage(vehicleHtml, vehicleUrl);
+        
+        if (vehicle && vehicle.make && vehicle.model) {
+          vehicles.push(vehicle);
+        }
+      } catch (error: any) {
+        console.warn(`  ⚠️  Failed to scrape ${vehicleUrl}: ${error.message}`);
+      }
+    }
+    
+    console.log(`✅ Extracted ${vehicles.length} vehicles`);
 
-    // Step 2: Insert organization
-    console.log('💾 Step 2: Inserting organization...');
+    // Step 4: Insert organization
+    console.log('💾 Step 4: Inserting organization...');
     const organizationId = await insertOrganization(supabase, org);
     
     if (!organizationId) {
@@ -515,8 +833,8 @@ Deno.serve(async (req) => {
     
     console.log(`✅ Organization inserted: ${organizationId}`);
 
-    // Step 3: Insert vehicles and link to organization
-    console.log(`💾 Step 3: Inserting ${vehicles.length} vehicles...`);
+    // Step 5: Insert vehicles and link to organization
+    console.log(`💾 Step 5: Inserting ${vehicles.length} vehicles...`);
     const vehicleResults = {
       inserted: 0,
       skipped: 0,

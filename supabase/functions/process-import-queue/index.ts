@@ -3541,7 +3541,7 @@ serve(async (req) => {
         results.succeeded++;
         results.vehicles_created.push(newVehicle.id);
         console.log(`✅ Created vehicle ${newVehicle.id} from ${item.listing_url}`);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Failed to process ${item.listing_url}:`, error);
         debugLog({
           sessionId,
@@ -3588,7 +3588,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Process queue error:', error);
     debugLog({
       sessionId,
