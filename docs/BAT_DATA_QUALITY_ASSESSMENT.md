@@ -270,3 +270,4 @@ The BaT data extraction system has a solid foundation with good coverage for ima
 
 With these fixes, we should achieve 80%+ comment coverage for BaT vehicles, matching the high quality of image and auction event data.
 
+
