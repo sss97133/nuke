@@ -33,7 +33,7 @@ async function backfillMissingBatImages(batchSize = 25) {
 
   const candidates = [];
   for (const v of vehicles || []) {
-    const hasImages = await supabase
+    const existing = await supabase
       .from('vehicle_images')
       .select('id', { count: 'exact', head: true })
       .eq('vehicle_id', v.id)
@@ -42,14 +42,18 @@ async function backfillMissingBatImages(batchSize = 25) {
       .is('is_duplicate', false)
       .is('is_document', false);
 
-    if (hasImages.count === 0) {
-      const om = v.origin_metadata || {};
-      const urls = Array.isArray(om.image_urls) ? om.image_urls : [];
-      const batUrl = v.bat_auction_url || v.listing_url || v.discovery_url;
-      
-      if (urls.length > 0 || batUrl) {
-        candidates.push({ id: v.id, urls, batUrl });
-      }
+    const existingCount = typeof existing?.count === 'number' ? existing.count : 0;
+    const om = v.origin_metadata || {};
+    const urls = Array.isArray(om.image_urls) ? om.image_urls : [];
+    const expectedCount = urls.length;
+    const batUrl = v.bat_auction_url || v.listing_url || v.discovery_url;
+
+    const needsBackfill = expectedCount > 0
+      ? existingCount < expectedCount
+      : existingCount === 0;
+
+    if (needsBackfill && (expectedCount > 0 || (batUrl && batUrl.includes('bringatrailer.com/listing/')))) {
+      candidates.push({ id: v.id, urls, batUrl, existingCount, expectedCount });
     }
   }
 

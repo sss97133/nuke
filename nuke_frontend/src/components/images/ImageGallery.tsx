@@ -301,16 +301,7 @@ const ImageGallery = ({
           .order('created_at', { ascending: true });
 
         if (error) throw error;
-        const filtered = (images || []).filter((img: any) => {
-          const u = String(img?.image_url || '').toLowerCase();
-          const p = String(img?.storage_path || '').toLowerCase();
-          if (u.includes('organization_import') || p.includes('organization_import')) return false;
-          if (u.includes('import_queue') || p.includes('import_queue')) return false;
-          if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
-          if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
-          return true;
-        });
-        setAllImages(filtered);
+        setAllImages(applyQuarantinePolicy(images || []));
         setVehicleMeta(vehicleMeta || null);
       } catch {
         setVehicleMeta(null);
@@ -454,6 +445,50 @@ const ImageGallery = ({
       }
     }
     return false;
+  };
+
+  // Quarantine policy:
+  // - Always hide organization logo assets (not vehicle photos)
+  // - Treat import_queue + organization_import as "soft quarantined":
+  //   hide them when we have better images, but show them if they are all we have.
+  const applyQuarantinePolicy = (rows: any[]): any[] => {
+    if (!Array.isArray(rows) || rows.length === 0) return rows;
+
+    const isOrgLogoPath = (img: any) => {
+      const u = String(img?.image_url || '').toLowerCase();
+      const p = String(img?.storage_path || '').toLowerCase();
+      return (
+        u.includes('organization-logos/') ||
+        p.includes('organization-logos/') ||
+        u.includes('organization_logos/') ||
+        p.includes('organization_logos/')
+      );
+    };
+
+    const isSoftQuarantined = (img: any) => {
+      const u = String(img?.image_url || '').toLowerCase();
+      const p = String(img?.storage_path || '').toLowerCase();
+      const src = String((img as any)?.source || '').toLowerCase();
+      const isExternalFlag = (img as any)?.is_external === true;
+      return (
+        u.includes('import_queue') ||
+        p.includes('import_queue') ||
+        u.includes('organization_import') ||
+        p.includes('organization_import') ||
+        u.includes('external_import') ||
+        p.includes('external_import') ||
+        src === 'external_import' ||
+        isExternalFlag
+      );
+    };
+
+    const noLogos = rows.filter((img: any) => !isOrgLogoPath(img));
+    if (noLogos.length === 0) return [];
+
+    const hasBetter = noLogos.some((img: any) => !isSoftQuarantined(img));
+    if (!hasBetter) return noLogos;
+
+    return noLogos.filter((img: any) => !isSoftQuarantined(img));
   };
 
   const filterBatNoiseRows = (rows: any[], meta: any = vehicleMeta): any[] => {
@@ -1236,15 +1271,7 @@ const ImageGallery = ({
 
         if (error) throw error;
         const deduped = dedupeFetchedImages(rawImages || []);
-        const cleaned = deduped.filter((img: any) => {
-          const u = String(img?.image_url || '').toLowerCase();
-          const p = String(img?.storage_path || '').toLowerCase();
-          if (u.includes('organization_import') || p.includes('organization_import')) return false;
-          if (u.includes('import_queue') || p.includes('import_queue')) return false;
-          if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
-          if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
-          return true;
-        });
+        const cleaned = applyQuarantinePolicy(deduped);
         const images = filterBatNoiseRows(cleaned, meta);
 
         // If DB is empty, show fallback URLs (scraped listing images) to avoid empty profiles.
@@ -1272,6 +1299,13 @@ const ImageGallery = ({
           const sorted = sortRows(images, sortBy);
           setDisplayedImages(sorted.slice(0, Math.min(50, sorted.length)));
           setShowImages(true);
+        }
+
+        // If this vehicle is BaT-origin but we don't actually have any BaT-tagged images,
+        // don't force the BaT-only filter (it yields an empty gallery).
+        if (isBatVehicle && sourceFilter === 'bat') {
+          const hasBat = Array.isArray(images) && images.some((img: any) => getImageSource(img).type === 'bat');
+          if (!hasBat) setSourceFilter('all');
         }
         
         // Check for pending uploads in queue
@@ -1320,15 +1354,7 @@ const ImageGallery = ({
             
             if (!error && refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
-              const refreshedCleaned = refreshedDeduped.filter((img: any) => {
-                const u = String(img?.image_url || '').toLowerCase();
-                const p = String((img as any)?.storage_path || '').toLowerCase();
-                if (u.includes('organization_import') || p.includes('organization_import')) return false;
-                if (u.includes('import_queue') || p.includes('import_queue')) return false;
-                if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
-                if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
-                return true;
-              });
+              const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);
               const refreshedFiltered = filterBatNoiseRows(refreshedCleaned);
               // Check if the specific image was updated
               const updatedImage = refreshedFiltered.find(img => img.id === imageId) || (refreshedImages || []).find((img: any) => img.id === imageId);
@@ -1538,15 +1564,7 @@ const ImageGallery = ({
         .order('created_at', { ascending: true });
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
-      const refreshedCleaned = refreshedDeduped.filter((img: any) => {
-        const u = String(img?.image_url || '').toLowerCase();
-        const p = String((img as any)?.storage_path || '').toLowerCase();
-        if (u.includes('organization_import') || p.includes('organization_import')) return false;
-        if (u.includes('import_queue') || p.includes('import_queue')) return false;
-        if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
-        if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
-        return true;
-      });
+      const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);
       const refreshedFiltered = filterBatNoiseRows(refreshedCleaned);
       setAllImages(refreshedFiltered);
       

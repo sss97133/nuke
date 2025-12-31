@@ -203,3 +203,4 @@ HAVING COUNT(ac.id) != COALESCE(v.bat_comments, 0)
 ORDER BY ABS(COUNT(ac.id) - COALESCE(v.bat_comments, 0)) DESC
 LIMIT 20;
 
+
