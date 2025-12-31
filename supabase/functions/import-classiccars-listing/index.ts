@@ -6,12 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const STORAGE_BUCKET = 'vehicle-data'
+
 interface ImageAnalysisResult {
   make?: string
   model?: string
   year?: number
   color?: string
+  angle?: string
   condition_score?: number
+  rust_severity?: number
+  paint_quality?: number
+  environment?: string
+  photo_quality?: string
   confidence?: number
   analysis?: any
 }
@@ -265,10 +272,10 @@ serve(async (req) => {
           const timestamp = Date.now()
           const ext = imageUrl.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i)?.[1] || 'jpg'
           const filename = `classiccars_${timestamp}_${i + batch.indexOf(imageUrl)}.${ext}`
-          const storagePath = `${vehicleId}/${filename}`
+          const storagePath = `vehicles/${vehicleId}/images/classiccars_com/${filename}`
 
           const { error: uploadError } = await supabase.storage
-            .from('vehicle-images')
+            .from(STORAGE_BUCKET)
             .upload(storagePath, imageBytes, {
               contentType: `image/${ext}`,
               cacheControl: '3600',
@@ -282,7 +289,7 @@ serve(async (req) => {
 
           // Get public URL
           const { data: { publicUrl } } = supabase.storage
-            .from('vehicle-images')
+            .from(STORAGE_BUCKET)
             .getPublicUrl(storagePath)
 
           // Format analysis for frontend (ai_scan_metadata structure)

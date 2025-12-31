@@ -1,11 +1,9 @@
 // The following lines import the Playwright test automation library functions
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from 'playwright/test';
 
 // The next constant tries to set VEHICLE_URL from environment variable
 // If the env var is not set, it uses a default development vehicle URL
 const VEHICLE_URL =
-  process.env.PLAYWRIGHT_TIMELINE_VEHICLE_URL ||
-  'https://n-zero.dev/vehicle/05b2cc98-cd4f-4fb6-a17e-038d6664905e';
   process.env.PLAYWRIGHT_TIMELINE_VEHICLE_URL ||
   'https://n-zero.dev/vehicle/05b2cc98-cd4f-4fb6-a17e-038d6664905e';
 

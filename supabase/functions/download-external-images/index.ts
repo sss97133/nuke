@@ -7,6 +7,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const STORAGE_BUCKET = "vehicle-data";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -105,11 +107,11 @@ serve(async (req) => {
 
             // Generate storage path
             const fileName = `${Date.now()}_${img.id}.${ext}`;
-            const storagePath = `${img.vehicle_id}/${fileName}`;
+            const storagePath = `vehicles/${img.vehicle_id}/images/external_import/${fileName}`;
 
             // Upload to Supabase Storage
             const { error: uploadError } = await supabase.storage
-              .from("vehicle-images")
+              .from(STORAGE_BUCKET)
               .upload(storagePath, uint8Array, {
                 contentType: contentType,
                 cacheControl: "3600",
@@ -122,7 +124,7 @@ serve(async (req) => {
 
             // Get public URL
             const { data: { publicUrl } } = supabase.storage
-              .from("vehicle-images")
+              .from(STORAGE_BUCKET)
               .getPublicUrl(storagePath);
 
             // Update vehicle_images record with storage path and remove is_external flag

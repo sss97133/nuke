@@ -7,6 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+const STORAGE_BUCKET = 'vehicle-data'
+
 // All major Craigslist regions
 const CRAIGSLIST_REGIONS = [
   'sfbay', 'newyork', 'losangeles', 'chicago', 'atlanta', 'dallas', 'denver', 
@@ -766,11 +768,11 @@ serve(async (req) => {
                           // Generate filename
                           const ext = imageUrl.match(/\.(jpg|jpeg|png|webp)$/i)?.[1] || 'jpg'
                           const fileName = `${Date.now()}_${i}.${ext}`
-                          const storagePath = `${vehicleId}/${fileName}`
+                          const storagePath = `vehicles/${vehicleId}/images/craigslist_scrape/${fileName}`
                           
                           // Upload to Supabase Storage
                           const { data: uploadData, error: uploadError } = await supabase.storage
-                            .from('vehicle-images')
+                            .from(STORAGE_BUCKET)
                             .upload(storagePath, uint8Array, {
                               contentType: `image/${ext}`,
                               cacheControl: '3600',
@@ -784,7 +786,7 @@ serve(async (req) => {
                           
                           // Get public URL
                           const { data: { publicUrl } } = supabase.storage
-                            .from('vehicle-images')
+                            .from(STORAGE_BUCKET)
                             .getPublicUrl(storagePath)
                           
                           // Create ghost user for Craigslist photographer (unknown)

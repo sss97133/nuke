@@ -20,6 +20,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const STORAGE_BUCKET = 'vehicle-data';
+
 const FIRECRAWL_SCRAPE_URL = "https://api.firecrawl.dev/v1/scrape";
 const FIRECRAWL_MAP_URL = "https://api.firecrawl.dev/v1/map";
 const FIRECRAWL_LISTING_TIMEOUT_MS = 60000; // Increased to 60s for Cars & Bids (large galleries take time)
@@ -38,6 +40,15 @@ function withTimeout<T>(p: Promise<T>, timeoutMs: number, label: string): Promis
     if (id?.unref) id.unref();
   });
   return Promise.race([p, timeout]);
+}
+
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(String(input || ''));
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  const bytes = new Uint8Array(buf);
+  let out = '';
+  for (const b of bytes) out += b.toString(16).padStart(2, '0');
+  return out;
 }
 
 async function fetchJsonWithTimeout(
@@ -1423,54 +1434,137 @@ function extractCarsAndBidsBidders(html: string): Array<{ username: string; prof
 function extractCarsAndBidsComments(html: string): Array<{ author: string; text: string; timestamp?: string; is_seller?: boolean; is_bid?: boolean; bid_amount?: number; profile_url?: string }> {
   const h = String(html || "");
   const comments: Array<{ author: string; text: string; timestamp?: string; is_seller?: boolean; is_bid?: boolean; bid_amount?: number; profile_url?: string }> = [];
+
+  const isGarbageCommentText = (text: string): boolean => {
+    const t = String(text || '').trim();
+    if (!t) return true;
+    const lower = t.toLowerCase();
+    // Common C&B UI chrome that we must never store as a comment
+    if (lower.includes('comments & bids')) return true;
+    if (lower.includes('most upvoted')) return true;
+    if (lower.includes('newest')) return true;
+    if (lower.includes('add a comment')) return true;
+    if (lower.includes('bid history')) return true;
+    if (lower.includes('you just commented')) return true;
+    if (lower.startsWith('comments ')) return true;
+    // Very short nav-like strings
+    if (t.length < 8) return true;
+    return false;
+  };
+
+  const sanitizeCommentText = (text: string): string => {
+    let t = String(text || '');
+
+    // Normalize whitespace first so tokens like "Ico\nn" become "Ico n" and match patterns.
+    t = t.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // Strip common UI chrome strings that sometimes get embedded in the comment body.
+    // We keep the actual message content (often after "Re:").
+    t = t
+      .replace(/^follow\s+[A-Za-z0-9_\-]+\s+/i, '')
+      .replace(/\breputation\s+icon\b\s*[0-9]+(?:\.[0-9]+)?k?\b/gi, ' ')
+      .replace(/\breputation\s+icon\b/gi, ' ')
+      .replace(/\bseller\b\s*[0-9]+(?:\.[0-9]+)?k?\s*(?:m|h|d|w|mo|y)\b/gi, ' ')
+      .replace(/\breply\b\s*flag\s+as\s+inappropriate\b/gi, ' ')
+      .replace(/\bflag\s+as\s+inappropriate\b/gi, ' ')
+      .replace(/\breply\b\s*$/i, ' ')
+      .replace(/\s+\|\s+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return t;
+  };
+
+  const findCommentsArray = (root: any): any[] | null => {
+    const seen = new Set<any>();
+    const stack: Array<{ v: any; depth: number }> = [{ v: root, depth: 0 }];
+    while (stack.length) {
+      const { v, depth } = stack.pop()!;
+      if (!v || typeof v !== 'object') continue;
+      if (seen.has(v)) continue;
+      seen.add(v);
+      if (depth > 8) continue;
+
+      // Common shapes
+      const candidateArrays = [
+        (v as any)?.comments,
+        (v as any)?.commentThreads,
+        (v as any)?.comment_threads,
+      ];
+      for (const arr of candidateArrays) {
+        if (Array.isArray(arr) && arr.length > 0) return arr;
+      }
+
+      // Sometimes comments are in GraphQL relay structure
+      const edges = (v as any)?.comments?.edges;
+      if (Array.isArray(edges) && edges.length > 0) return edges;
+
+      // Traverse
+      if (Array.isArray(v)) {
+        for (let i = 0; i < v.length; i++) {
+          stack.push({ v: v[i], depth: depth + 1 });
+        }
+      } else {
+        for (const k of Object.keys(v)) {
+          stack.push({ v: (v as any)[k], depth: depth + 1 });
+        }
+      }
+    }
+    return null;
+  };
   
   // PRIORITY: Extract from __NEXT_DATA__ (Next.js embeds all data here)
   try {
-    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
-    const nextDataMatch = h.match(nextDataPattern);
+    const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i;
+    const nextDataMatch = nextDataPattern.exec(h);
     if (nextDataMatch && nextDataMatch[1]) {
       try {
         const nextData = JSON.parse(nextDataMatch[1]);
-        // Navigate through Next.js structure
-        const auction = nextData?.props?.pageProps?.auction || 
-                       nextData?.props?.pageProps?.data?.auction ||
-                       nextData?.props?.auction ||
-                       nextData?.auction;
-        
-        if (auction) {
-          // Extract comments from Next.js data
-          if (Array.isArray(auction.comments)) {
-            for (const comment of auction.comments) {
-              if (comment.text || comment.body || comment.content) {
-                const text = comment.text || comment.body || comment.content || '';
-                const author = comment.author || comment.username || comment.user?.username || 'Unknown';
-                const profileUrl = comment.profile_url || comment.user?.profile_url || 
-                                 (author !== 'Unknown' ? `https://carsandbids.com/user/${author}` : undefined);
-                
-                // Check if it's a bid comment
-                const isBid = comment.is_bid || comment.type === 'bid' || 
-                             /bid\s+placed\s+by|bid\s+of/i.test(text);
-                const bidAmount = isBid ? (comment.bid_amount || comment.amount || 
-                                          (text.match(/\$([0-9,]+)/)?.[1] ? 
-                                           parseInt(text.match(/\$([0-9,]+)/)?.[1].replace(/,/g, ''), 10) : undefined)) : undefined;
-                
-                // Check if it's a seller comment
-                const isSeller = comment.is_seller || comment.type === 'seller' || 
-                               comment.author_type === 'seller' ||
-                               /seller|owner|listed\s+by/i.test(text);
-                
-                if (text.length >= 10) {
-                  comments.push({
-                    author,
-                    text,
-                    timestamp: comment.timestamp || comment.created_at || comment.date || comment.posted_at,
-                    is_seller: isSeller,
-                    is_bid: isBid,
-                    bid_amount: bidAmount,
-                    profile_url: profileUrl,
-                  });
-                }
-              }
+        // Try common locations first
+        const auction = nextData?.props?.pageProps?.auction ||
+          nextData?.props?.pageProps?.data?.auction ||
+          nextData?.props?.auction ||
+          nextData?.auction ||
+          null;
+
+        const rawArr = findCommentsArray(auction || nextData);
+        if (rawArr && rawArr.length > 0) {
+          for (const raw of rawArr) {
+            const comment = raw?.node ? raw.node : raw;
+            const rawText = comment?.text || comment?.body || comment?.content || comment?.message || '';
+            const text = sanitizeCommentText(rawText);
+            if (isGarbageCommentText(text)) continue;
+
+            const author = comment?.author || comment?.username || comment?.user?.username || comment?.user?.handle || 'Unknown';
+            const profileUrl = comment?.profile_url || comment?.user?.profile_url ||
+              (author !== 'Unknown' ? `https://carsandbids.com/user/${author}` : undefined);
+
+            // Drop "system status" lines that sometimes get mixed into the comment array
+            // (We represent auction status via auction_events/outcome, not as a fake comment.)
+            if (author === 'Unknown') {
+              const lower = text.toLowerCase();
+              if (lower.startsWith('reserve not met, bid to $')) continue;
+              if (lower.startsWith('sold to ') || lower.startsWith('sold after for $')) continue;
+            }
+
+            const isBid = Boolean(comment?.is_bid) || comment?.type === 'bid' || /bid\s+placed\s+by|bid\s+of/i.test(text);
+            const bidMatch = text.match(/\$([0-9,]+)/);
+            const bidAmount = isBid ? (comment?.bid_amount || comment?.amount ||
+              (bidMatch?.[1] ? parseInt(String(bidMatch[1]).replace(/,/g, ''), 10) : undefined)) : undefined;
+
+            const isSeller = Boolean(comment?.is_seller) || comment?.type === 'seller' || comment?.author_type === 'seller' ||
+              Boolean(comment?.user?.is_seller) || Boolean(comment?.user?.seller) || false;
+
+            if (text.length >= 10) {
+              comments.push({
+                author,
+                text,
+                timestamp: comment?.timestamp || comment?.created_at || comment?.date || comment?.posted_at,
+                is_seller: isSeller,
+                is_bid: isBid,
+                bid_amount: bidAmount,
+                profile_url: profileUrl,
+              });
             }
           }
         }
@@ -1559,6 +1653,9 @@ function extractCarsAndBidsComments(html: string): Array<{ author: string; text:
         .replace(/&quot;/g, '"')
         .replace(/\s+/g, ' ')
         .trim();
+
+      text = sanitizeCommentText(text);
+      if (isGarbageCommentText(text)) continue;
       
       // Extract timestamp
       const timestamp = parseTimestamp(commentHtml);
@@ -2574,7 +2671,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
             },
             body: JSON.stringify({
               url: listingUrl,
-              formats: ["html"], // Just get HTML, no schema extraction (more reliable)
+              formats: ["html", "extract"],
               onlyMainContent: false,
               waitFor: 10000, // Reduced wait time
               // Simplified actions - just scroll, no clicks
@@ -2585,6 +2682,7 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
                 { type: "scroll", direction: "down", pixels: 3000 },
                 { type: "wait", milliseconds: 3000 },
               ],
+              extract: { schema: listingSchema },
             }),
           },
           FIRECRAWL_LISTING_TIMEOUT_MS,
@@ -3370,7 +3468,7 @@ async function storeVehiclesInDatabase(
         if (listingUrl) {
           const urlLower = String(listingUrl).toLowerCase();
           if (urlLower.includes('bringatrailer.com')) platform = 'bat';
-          else if (urlLower.includes('carsandbids.com')) platform = 'carsandbids';
+          else if (urlLower.includes('carsandbids.com')) platform = 'cars_and_bids';
           else if (urlLower.includes('mecum.com')) platform = 'mecum';
           else if (urlLower.includes('barrett-jackson.com') || urlLower.includes('barrettjackson.com')) platform = 'barrettjackson';
           else if (urlLower.includes('russoandsteele.com')) platform = 'russoandsteele';
@@ -3381,7 +3479,7 @@ async function storeVehiclesInDatabase(
         if (!platform) {
           const sourceLower = String(source).toLowerCase();
           if (sourceLower.includes('bring a trailer') || sourceLower.includes('bat')) platform = 'bat';
-          else if (sourceLower.includes('cars & bids') || sourceLower.includes('carsandbids')) platform = 'carsandbids';
+          else if (sourceLower.includes('cars & bids') || sourceLower.includes('carsandbids')) platform = 'cars_and_bids';
           else if (sourceLower.includes('mecum')) platform = 'mecum';
           else if (sourceLower.includes('barrett')) platform = 'barrettjackson';
           else if (sourceLower.includes('russo')) platform = 'russoandsteele';
@@ -3395,7 +3493,7 @@ async function storeVehiclesInDatabase(
             if (platform === 'bat') {
               const lotMatch = String(listingUrl).match(/-(\d+)\/?$/);
               listingId = vehicle.lot_number || (lotMatch ? lotMatch[1] : null);
-            } else if (platform === 'carsandbids') {
+            } else if (platform === 'cars_and_bids') {
               listingId = listingUrl.split('/').filter(Boolean).pop() || null;
             } else if (platform === 'mecum') {
               const lotMatch = String(listingUrl).match(/\/lots\/(?:detail\/)?([^\/]+)/);
@@ -3520,129 +3618,196 @@ async function storeVehiclesInDatabase(
         }
         
         // Store comments and bid history in auction_comments table
-        // Hoist auctionEventId to outer scope so it can be used in bidders block
+        // NOTE: Production schema uses auction_events(source, source_url) and auction_comments dedupe key (vehicle_id, content_hash).
+        // Hoist auctionEventId to outer scope so it can be used in bidders block.
         let auctionEventId: string | null = null;
-        
+
         if (data?.id && listingUrl && (Array.isArray(vehicle.comments) || Array.isArray(vehicle.bid_history))) {
           try {
-            // Create or get auction_event (using unique constraint on platform, listing_url)
-            const eventPlatform = platform || 'carsandbids';
+            // Determine auction_events.source for this listing
+            const eventSource = platform === 'cars_and_bids' ? 'carsandbids' : (platform || 'unknown');
+
+            // Create or get auction_event (unique key in prod: (vehicle_id, source_url))
             const { data: existingEvent } = await supabase
               .from('auction_events')
               .select('id')
-              .eq('platform', eventPlatform)
-              .eq('listing_url', listingUrl)
+              .eq('vehicle_id', data.id)
+              .eq('source_url', listingUrl)
               .maybeSingle();
-            
+
             if (existingEvent?.id) {
               auctionEventId = existingEvent.id;
             } else {
-              // Create new auction_event
               const endDate = vehicle.auction_end_date ? new Date(vehicle.auction_end_date) : null;
+              // auction_events.outcome CHECK constraint:
+              // sold, reserve_not_met, no_sale, bid_to, cancelled, relisted, pending
+              const outcome: string =
+                Number.isFinite(vehicle.sale_price) || Number.isFinite(vehicle.final_bid) ? 'sold' :
+                (vehicle.reserve_met === false ? 'reserve_not_met' :
+                  (endDate && Number.isFinite(endDate.getTime()) && endDate > new Date() ? 'pending' : 'no_sale'));
               const { data: newEvent, error: eventError } = await supabase
                 .from('auction_events')
                 .upsert({
-                  platform: eventPlatform,
-                  listing_url: listingUrl,
                   vehicle_id: data.id,
-                  outcome: vehicle.sale_price ? 'sold' : (endDate && new Date(endDate) > new Date() ? 'active' : 'ended'),
+                  source: eventSource,
+                  source_url: listingUrl,
+                  source_listing_id: vehicle.auction_id || vehicle.listing_id || (listingUrl ? listingUrl.split('/').filter(Boolean)[1] || null : null),
+                  outcome,
                   high_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
-                  reserve_price: Number.isFinite(vehicle.reserve_price) ? vehicle.reserve_price : null,
-                  reserve_met: vehicle.reserve_met ?? null,
-                  auction_start_at: vehicle.auction_start_date ? new Date(vehicle.auction_start_date).toISOString() : null,
-                  auction_end_at: endDate && Number.isFinite(endDate.getTime()) ? endDate.toISOString() : null,
-                  metadata: {
-                    listing_id: vehicle.auction_id || vehicle.listing_id || (listingUrl ? listingUrl.split('/').pop() || null : null),
-                    current_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
-                    final_price: Number.isFinite(vehicle.sale_price) ? vehicle.sale_price : 
-                                (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid : null),
-                    bid_count: Array.isArray(vehicle.bid_history) ? vehicle.bid_history.length : 
-                              (Number.isFinite(vehicle.bid_count) ? vehicle.bid_count : null),
-                    comment_count: Array.isArray(vehicle.comments) ? vehicle.comments.length :
-                                  (Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null),
+                  winning_bid: Number.isFinite(vehicle.sale_price) ? vehicle.sale_price : (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid : null),
+                  winning_bidder: vehicle.buyer_username || vehicle.buyer || null,
+                  seller_name: vehicle.seller_username || vehicle.seller || null,
+                  comments_count: Array.isArray(vehicle.comments) ? vehicle.comments.length : (Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null),
+                  bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : null,
+                  raw_data: {
+                    extracted_at: nowIso(),
+                    platform,
+                    listing_url: listingUrl,
+                    listing_id: vehicle.auction_id || vehicle.listing_id || null,
+                    bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : null,
                   },
+                  updated_at: nowIso(),
                 }, {
-                  onConflict: 'platform,listing_url',
+                  onConflict: 'vehicle_id,source_url',
                 })
                 .select('id')
                 .single();
-              
+
               if (!eventError && newEvent?.id) {
                 auctionEventId = newEvent.id;
               } else if (eventError) {
                 console.warn(`Failed to create/update auction_event: ${eventError.message}`);
               }
             }
-            
-            // Store comments
-            if (auctionEventId && Array.isArray(vehicle.comments) && vehicle.comments.length > 0) {
-              const commentsToInsert = vehicle.comments.map((c: any, idx: number) => ({
-                auction_event_id: auctionEventId,
-                vehicle_id: data.id,
-                platform: platform || 'carsandbids',
-                source_url: listingUrl,
-                sequence_number: idx + 1,
-                posted_at: c.timestamp ? new Date(c.timestamp).toISOString() : new Date().toISOString(),
-                author_username: c.author || 'Unknown',
-                is_seller: c.is_seller || false,
-                comment_type: c.is_bid ? 'bid' : (c.is_seller ? 'seller_response' : 'observation'),
-                comment_text: c.text || '',
-                word_count: (c.text || '').split(/\s+/).length,
-                bid_amount: c.bid_amount || (c.is_bid && c.text ? parseFloat(c.text.match(/\$([0-9,]+)/)?.[1]?.replace(/,/g, '') || '0') : null),
-                has_question: (c.text || '').includes('?'),
-              }));
-              
-              // Insert in batches
-              const batchSize = 20;
-              for (let i = 0; i < commentsToInsert.length; i += batchSize) {
-                const batch = commentsToInsert.slice(i, i + batchSize);
+
+            // Store comments (dedupe key: vehicle_id + content_hash)
+            if (Array.isArray(vehicle.comments) && vehicle.comments.length > 0) {
+              const platformForComments = platform || null;
+              const rows = [] as any[];
+              for (let idx = 0; idx < vehicle.comments.length; idx++) {
+                const c = vehicle.comments[idx];
+                const postedAt = c.timestamp ? new Date(c.timestamp).toISOString() : new Date().toISOString();
+                const author = c.author || 'Unknown';
+                let text = c.text || '';
+
+                // Cars & Bids: aggressively strip UI chrome from comments before storing.
+                // We do this here (persistence time) because upstream extraction can still
+                // return comment objects with UI fragments in `text`.
+                if (platform === 'cars_and_bids') {
+                  text = String(text || '')
+                    .replace(/[\r\n\t]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                  text = text
+                    .replace(/^follow\s+[A-Za-z0-9_\-]+\s+/i, '')
+                    .replace(/\breputation\s+icon\b\s*[0-9]+(?:\.[0-9]+)?k?\b/gi, ' ')
+                    .replace(/\breputation\s+icon\b/gi, ' ')
+                    .replace(/\bseller\b\s*[0-9]+(?:\.[0-9]+)?k?\s*(?:m|h|d|w|mo|y)\b/gi, ' ')
+                    .replace(/\breply\b\s*flag\s+as\s+inappropriate\b/gi, ' ')
+                    .replace(/\bflag\s+as\s+inappropriate\b/gi, ' ')
+                    .replace(/\s+\|\s+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                  const lower = text.toLowerCase();
+                  if (!text) continue;
+                  if (lower.includes('comments & bids')) continue;
+                  if (lower.includes('most upvoted')) continue;
+                  if (lower.includes('newest')) continue;
+                  if (lower.includes('add a comment')) continue;
+                  if (lower.includes('bid history')) continue;
+                  if (lower.includes('you just commented')) continue;
+                  if (lower.startsWith('comments ')) continue;
+
+                  // Drop status-line pseudo-comments
+                  if (author === 'Unknown') {
+                    if (lower.startsWith('reserve not met, bid to $')) continue;
+                    if (lower.startsWith('sold to ') || lower.startsWith('sold after for $')) continue;
+                  }
+
+                  if (text.length < 10) continue;
+                }
+
+                const bidAmount = c.bid_amount || (c.is_bid && text ? parseFloat(text.match(/\$([0-9,]+)/)?.[1]?.replace(/,/g, '') || '0') : null);
+                const contentHash = await sha256Hex(`${data.id}|${listingUrl}|comment|${idx + 1}|${postedAt}|${author}|${text}|${bidAmount || ''}`);
+
+                rows.push({
+                  auction_event_id: auctionEventId,
+                  vehicle_id: data.id,
+                  platform: platformForComments,
+                  source_url: listingUrl,
+                  content_hash: contentHash,
+                  sequence_number: idx + 1,
+                  posted_at: postedAt,
+                  author_username: author,
+                  is_seller: c.is_seller || false,
+                  comment_type: c.is_bid ? 'bid' : (c.is_seller ? 'seller_response' : 'observation'),
+                  comment_text: text,
+                  word_count: text.split(/\s+/).filter(Boolean).length,
+                  bid_amount: bidAmount,
+                  has_question: text.includes('?'),
+                });
+              }
+
+              const batchSize = 25;
+              for (let i = 0; i < rows.length; i += batchSize) {
+                const batch = rows.slice(i, i + batchSize);
                 const { error: commentError } = await supabase
                   .from('auction_comments')
                   .upsert(batch, {
-                    onConflict: 'auction_event_id,sequence_number',
+                    onConflict: 'vehicle_id,content_hash',
                     ignoreDuplicates: false,
                   });
-                
                 if (commentError) {
-                  console.warn(`Failed to insert comment batch ${i / batchSize + 1}: ${commentError.message}`);
+                  console.warn(`Failed to upsert auction_comments batch ${i / batchSize + 1}: ${commentError.message}`);
                 }
               }
-              
-              console.log(`✅ Stored ${commentsToInsert.length} comments for vehicle ${data.id}`);
+
+              console.log(`✅ Stored ${rows.length} comments for vehicle ${data.id}`);
             }
-            
-            // Store bid history as comments (if not already stored)
-            if (auctionEventId && Array.isArray(vehicle.bid_history) && vehicle.bid_history.length > 0) {
-              const bidComments = vehicle.bid_history
-                .filter((bid: any) => bid.amount && bid.bidder)
-                .map((bid: any, idx: number) => ({
+
+            // Store bid history as comments (optional; same dedupe key)
+            if (Array.isArray(vehicle.bid_history) && vehicle.bid_history.length > 0) {
+              const platformForComments = platform || null;
+              const rows = [] as any[];
+              for (let idx = 0; idx < vehicle.bid_history.length; idx++) {
+                const bid = vehicle.bid_history[idx];
+                if (!bid?.amount || !bid?.bidder) continue;
+                const postedAt = bid.timestamp ? new Date(bid.timestamp).toISOString() : new Date().toISOString();
+                const author = bid.bidder || 'Unknown';
+                const text = `Bid of $${Number(bid.amount).toLocaleString()} placed by ${author}`;
+                const contentHash = await sha256Hex(`${data.id}|${listingUrl}|bid|${idx + 1}|${postedAt}|${author}|${bid.amount}`);
+
+                rows.push({
                   auction_event_id: auctionEventId,
                   vehicle_id: data.id,
-                  platform: platform || 'carsandbids',
+                  platform: platformForComments,
                   source_url: listingUrl,
-                  sequence_number: 10000 + idx, // High sequence number to avoid conflicts
-                  posted_at: bid.timestamp ? new Date(bid.timestamp).toISOString() : new Date().toISOString(),
-                  author_username: bid.bidder || 'Unknown',
+                  content_hash: contentHash,
+                  sequence_number: 10000 + idx,
+                  posted_at: postedAt,
+                  author_username: author,
                   is_seller: false,
                   comment_type: 'bid',
-                  comment_text: `Bid of $${bid.amount.toLocaleString()} placed by ${bid.bidder || 'Unknown'}`,
-                  word_count: 8,
+                  comment_text: text,
+                  word_count: text.split(/\s+/).filter(Boolean).length,
                   bid_amount: bid.amount,
                   has_question: false,
-                }));
-              
-              if (bidComments.length > 0) {
+                });
+              }
+
+              if (rows.length > 0) {
                 const { error: bidError } = await supabase
                   .from('auction_comments')
-                  .upsert(bidComments, {
-                    onConflict: 'auction_event_id,sequence_number',
+                  .upsert(rows, {
+                    onConflict: 'vehicle_id,content_hash',
                     ignoreDuplicates: false,
                   });
-                
                 if (bidError) {
-                  console.warn(`Failed to insert bid history: ${bidError.message}`);
+                  console.warn(`Failed to upsert bid history: ${bidError.message}`);
                 } else {
-                  console.log(`✅ Stored ${bidComments.length} bid history entries for vehicle ${data.id}`);
+                  console.log(`✅ Stored ${rows.length} bid history entries for vehicle ${data.id}`);
                 }
               }
             }
@@ -3656,7 +3821,7 @@ async function storeVehiclesInDatabase(
           try {
             const nowIso = new Date().toISOString();
             const identityRows = vehicle.bidders.map((bidder: any) => ({
-              platform: 'carsandbids',
+              platform: 'cars_and_bids',
               handle: bidder.username || 'Unknown',
               profile_url: bidder.profile_url || `https://carsandbids.com/user/${bidder.username}`,
               display_name: bidder.username,
@@ -4232,11 +4397,11 @@ async function insertVehicleImages(
               
               // Generate storage path
               const fileName = `${Date.now()}_${img.id}.${ext}`;
-              const storagePath = `${vehicleId}/${fileName}`;
+              const storagePath = `vehicles/${vehicleId}/images/premium_auction/${fileName}`;
 
               // Upload to Supabase Storage
               const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('vehicle-images')
+                .from(STORAGE_BUCKET)
                 .upload(storagePath, uint8Array, {
                   contentType: contentType,
                   cacheControl: '3600',
@@ -4249,7 +4414,7 @@ async function insertVehicleImages(
 
               // Get public URL
               const { data: { publicUrl } } = supabase.storage
-                .from('vehicle-images')
+                .from(STORAGE_BUCKET)
                 .getPublicUrl(storagePath);
 
               // Update vehicle_images record with storage path and remove is_external flag

@@ -149,11 +149,13 @@ const VehicleProfile: React.FC = () => {
           String((vehicle as any)?.listing_url || '').trim();
 
         const isBat = origin === 'bat_import' || listingUrl.includes('bringatrailer.com/listing/');
-        if (!isBat) return;
-        if (!listingUrl || !listingUrl.includes('bringatrailer.com/listing/')) return;
+        const isCarsAndBids = listingUrl.includes('carsandbids.com/auctions/');
+        if (!isBat && !isCarsAndBids) return;
         if (fallbackListingImageUrls.length > 0) return;
 
-        const cacheKey = `bat_fallback_images_${vehicle.id}`;
+        const cacheKey = isCarsAndBids
+          ? `carsandbids_fallback_images_${vehicle.id}`
+          : `bat_fallback_images_${vehicle.id}`;
         const filterNonPhotoListingUrls = (arr: string[]): string[] => {
           const urls = Array.isArray(arr) ? arr : [];
           const keep = urls.filter((rawUrl) => {
@@ -210,6 +212,44 @@ const VehicleProfile: React.FC = () => {
         } catch {
           // ignore cache parse errors
         }
+
+        // Cars & Bids: do NOT scrape (bot-protected). Use images already stored in external_listings metadata.
+        if (isCarsAndBids) {
+          try {
+            const { data: listings } = await supabase
+              .from('external_listings')
+              .select('metadata')
+              .eq('vehicle_id', vehicle.id)
+              .eq('listing_url', listingUrl)
+              .order('updated_at', { ascending: false })
+              .limit(5);
+
+            const meta = Array.isArray(listings) && listings.length > 0 ? (listings[0] as any)?.metadata : null;
+            const images: string[] =
+              (Array.isArray(meta?.image_urls) ? meta.image_urls : null) ||
+              (Array.isArray(meta?.images) ? meta.images : null) ||
+              [];
+
+            const filtered = filterNonPhotoListingUrls(images);
+            if (filtered.length > 0) {
+              setFallbackListingImageUrls(filtered);
+              try {
+                window.localStorage.setItem(cacheKey, JSON.stringify(filtered.slice(0, 250)));
+              } catch {
+                // ignore
+              }
+              if (!leadImageUrl && filtered[0]) setLeadImageUrl(filtered[0]);
+            }
+          } catch (e) {
+            console.debug('[VehicleProfile] carsandbids fallback listing images skipped:', e);
+          }
+
+          return;
+        }
+
+        // BaT-only fallback: fetch gallery URLs via simple-scraper
+        if (!isBat) return;
+        if (!listingUrl || !listingUrl.includes('bringatrailer.com/listing/')) return;
 
         const { data, error } = await supabase.functions.invoke('simple-scraper', {
           body: { url: listingUrl },

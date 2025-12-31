@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const STORAGE_BUCKET = 'vehicle-data';
+
 interface InstagramPost {
   id: string;
   media_type: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
@@ -261,11 +263,17 @@ serve(async (req) => {
             
             // Store it for future use
             if (externalIdentityId) {
+              const { data: currentIdentity } = await supabase
+                .from('external_identities')
+                .select('metadata')
+                .eq('id', externalIdentityId)
+                .maybeSingle();
+
               await supabase
                 .from('external_identities')
                 .update({
                   metadata: {
-                    ...identity?.metadata,
+                    ...(currentIdentity?.metadata || {}),
                     instagram_account_id: igAccountId
                   }
                 })
@@ -473,7 +481,7 @@ async function downloadImageToStorage(
 
     // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('vehicle-images')
+      .from(STORAGE_BUCKET)
       .upload(filePath, imageUint8Array, {
         contentType: contentType,
         upsert: true
@@ -486,7 +494,7 @@ async function downloadImageToStorage(
 
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from('vehicle-images')
+      .from(STORAGE_BUCKET)
       .getPublicUrl(filePath);
 
     return urlData.publicUrl;

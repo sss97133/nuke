@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { FeedItem } from '../feed/types';
 import ContentCard from '../feed/ContentCard';
+import VehicleCardDense from '../vehicles/VehicleCardDense';
 import { highlightSearchTerm } from '../../utils/searchHighlight';
 import type { SearchResult } from '../../types/search';
 import '../../design-system.css';
@@ -424,40 +425,67 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
               gap: '16px'
             }}>
               {filteredAndSortedResults.map(result => (
-                <div 
-                  key={result.id} 
-                  style={{ 
-                    position: 'relative',
-                    transition: 'transform 0.12s ease, box-shadow 0.12s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  {/* Relevance Score Badge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    background: 'rgba(59, 130, 246, 0.95)',
-                    color: 'white',
-                    padding: '4px 10px',
-                    borderRadius: '12px',
-                    fontSize: '7pt',
-                    fontWeight: 700,
-                    zIndex: 10,
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                  }}>
-                    {Math.round(result.relevance_score * 100)}% match
+                result.type === 'vehicle' ? (
+                  <div key={result.id} style={{ position: 'relative' }}>
+                    <VehicleCardDense
+                      vehicle={{
+                        id: result.id,
+                        year: result.metadata?.year,
+                        make: result.metadata?.make,
+                        model: result.metadata?.model,
+                        is_for_sale: result.metadata?.for_sale ?? result.metadata?.is_for_sale,
+                        location:
+                          (result.metadata?.city || result.metadata?.state)
+                            ? `${result.metadata?.city || ''}${result.metadata?.city && result.metadata?.state ? ', ' : ''}${result.metadata?.state || ''}`.trim()
+                            : undefined,
+                        primary_image_url: result.image_url,
+                        created_at: result.created_at,
+                        updated_at: result.created_at,
+                      }}
+                      viewMode="gallery"
+                      showSocial={false}
+                      showPriceChange={false}
+                      showPriceOverlay={true}
+                      showDetailOverlay={true}
+                      infoDense={true}
+                      thumbnailFit="cover"
+                    />
                   </div>
+                ) : (
+                  <div 
+                    key={result.id} 
+                    style={{ 
+                      position: 'relative',
+                      transition: 'transform 0.12s ease, box-shadow 0.12s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      background: 'rgba(59, 130, 246, 0.95)',
+                      color: 'white',
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      fontSize: '7pt',
+                      fontWeight: 700,
+                      zIndex: 10,
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}>
+                      {Math.round(result.relevance_score * 100)}% match
+                    </div>
 
-                  <ContentCard item={convertToFeedItem(result)} />
-                </div>
+                    <ContentCard item={convertToFeedItem(result)} />
+                  </div>
+                )
               ))}
             </div>
           )}
