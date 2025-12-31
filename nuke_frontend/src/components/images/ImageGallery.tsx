@@ -491,6 +491,75 @@ const ImageGallery = ({
     return noLogos.filter((img: any) => !isSoftQuarantined(img));
   };
 
+  const normalizeUrlForMatch = (u: string): string => {
+    const s = String(u || '').trim();
+    if (!s) return '';
+    return s
+      .split('#')[0]
+      .split('?')[0]
+      .replace(/&#038;/g, '&')
+      .replace(/&amp;/g, '&')
+      .replace(/-scaled\./g, '.')
+      .trim();
+  };
+
+  const applyBatCanonicalOverlay = (rows: any[], meta: any): any[] => {
+    const m = meta || vehicleMeta;
+    if (!m) return rows;
+
+    const po = String(m?.profile_origin || '').toLowerCase();
+    const du = String(m?.discovery_url || '').toLowerCase();
+    const bu = String((m as any)?.bat_auction_url || '').toLowerCase();
+    const isBat = po === 'bat_import' || du.includes('bringatrailer.com/listing/') || bu.includes('bringatrailer.com/listing/');
+    if (!isBat) return rows;
+
+    const om = (m?.origin_metadata && typeof m.origin_metadata === 'object') ? m.origin_metadata : null;
+    const canonicalRaw = Array.isArray(om?.image_urls) ? (om!.image_urls as any[]) : [];
+    const canonicalBatUrls = canonicalRaw
+      .map((u: any) => normalizeUrlForMatch(String(u || '')))
+      .filter((u: string) => !!u)
+      .filter((u: string) => u.includes('bringatrailer.com/wp-content/uploads/'))
+      .filter((u: string) => !isIconOrLogo(u));
+
+    if (canonicalBatUrls.length === 0) return rows;
+
+    const bestByCanonical = new Map<string, any>();
+    const userUploads: any[] = [];
+
+    for (const r of (rows || [])) {
+      const srcType = getImageSource(r).type;
+      if (srcType === 'user') {
+        userUploads.push(r);
+        continue;
+      }
+
+      const candidate = normalizeUrlForMatch(String((r as any)?.source_url || (r as any)?.exif_data?.original_url || ''));
+      if (candidate && !bestByCanonical.has(candidate)) {
+        bestByCanonical.set(candidate, r);
+      }
+    }
+
+    const merged = canonicalBatUrls.map((url: string, idx: number) => {
+      const existing = bestByCanonical.get(url);
+      if (existing) return existing;
+      return {
+        id: `bat_url_${idx}`,
+        image_url: url,
+        source_url: url,
+        source: 'bat_import',
+        created_at: new Date().toISOString(),
+        taken_at: null,
+        is_primary: idx === 0,
+        position: idx,
+        caption: 'BaT',
+        category: 'general',
+        __external: true,
+      };
+    });
+
+    return merged.concat(userUploads);
+  };
+
   const filterBatNoiseRows = (rows: any[], meta: any = vehicleMeta): any[] => {
     if (!rows || rows.length === 0) return rows;
     
@@ -605,7 +674,7 @@ const ImageGallery = ({
   useEffect(() => {
     if (!vehicleMeta) return;
     if (!allImages || allImages.length === 0) return;
-    const nextAll = filterBatNoiseRows(allImages);
+    const nextAll = applyBatCanonicalOverlay(filterBatNoiseRows(allImages), vehicleMeta);
     if (nextAll.length === allImages.length) return;
     setAllImages(nextAll);
     setDisplayedImages(sortRows(applySourceFilter(nextAll), sortBy)); // NO LIMIT - show filtered images
@@ -1246,7 +1315,7 @@ const ImageGallery = ({
         if (!meta) {
           const { data: vm, error: vmErr } = await supabase
             .from('vehicles')
-            .select('id, year, make, model, profile_origin, discovery_url')
+            .select('id, year, make, model, profile_origin, discovery_url, bat_auction_url, origin_metadata')
             .eq('id', vehicleId)
             .maybeSingle();
           if (!vmErr) {
@@ -1257,7 +1326,7 @@ const ImageGallery = ({
 
         const { data: rawImages, error } = await supabase
           .from('vehicle_images')
-          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
+          .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
           .eq('vehicle_id', vehicleId)
           // Filter out documents (treat NULL as false for legacy rows)
           .not('is_document', 'is', true)
@@ -1272,7 +1341,7 @@ const ImageGallery = ({
         if (error) throw error;
         const deduped = dedupeFetchedImages(rawImages || []);
         const cleaned = applyQuarantinePolicy(deduped);
-        const images = filterBatNoiseRows(cleaned, meta);
+        const images = applyBatCanonicalOverlay(filterBatNoiseRows(cleaned, meta), meta);
 
         // If DB is empty, show fallback URLs (scraped listing images) to avoid empty profiles.
         const fallback = normalizeFallbackUrls(fallbackImageUrls);
@@ -1344,7 +1413,7 @@ const ImageGallery = ({
             console.log(`Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
             const { data: refreshedImages, error } = await supabase
               .from('vehicle_images')
-              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category')
+              .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
               .eq('vehicle_id', vehicleId)
               .not('is_document', 'is', true)
               .not('is_duplicate', 'is', true)
@@ -1355,7 +1424,7 @@ const ImageGallery = ({
             if (!error && refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
               const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);
-              const refreshedFiltered = filterBatNoiseRows(refreshedCleaned);
+              const refreshedFiltered = applyBatCanonicalOverlay(filterBatNoiseRows(refreshedCleaned), vehicleMeta);
               // Check if the specific image was updated
               const updatedImage = refreshedFiltered.find(img => img.id === imageId) || (refreshedImages || []).find((img: any) => img.id === imageId);
               if (updatedImage) {
@@ -1565,7 +1634,7 @@ const ImageGallery = ({
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
       const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);
-      const refreshedFiltered = filterBatNoiseRows(refreshedCleaned);
+      const refreshedFiltered = applyBatCanonicalOverlay(filterBatNoiseRows(refreshedCleaned), vehicleMeta);
       setAllImages(refreshedFiltered);
       
       // Always show images after upload and refresh the display
