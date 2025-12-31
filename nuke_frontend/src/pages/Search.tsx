@@ -4,23 +4,8 @@ import IntelligentSearch from '../components/search/IntelligentSearch';
 import SearchResults from '../components/search/SearchResults';
 import { aiGateway } from '../lib/aiGateway';
 import { supabase } from '../lib/supabase';
+import type { SearchResult } from '../types/search';
 import '../design-system.css';
-
-interface SearchResult {
-  id: string;
-  type: 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference' | 'status';
-  title: string;
-  description: string;
-  metadata: any;
-  relevance_score: number;
-  location?: {
-    lat: number;
-    lng: number;
-    address?: string;
-  };
-  image_url?: string;
-  created_at: string;
-}
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -240,14 +225,22 @@ export default function Search() {
     switch (r.type) {
       case 'vehicle':
         return `/vehicle/${r.id}`;
+      case 'organization':
+        return `/org/${r.id}`;
       case 'user':
         return `/profile/${r.id}`;
       case 'shop':
-        return `/organizations/${r.id}`;
+        return `/org/${r.id}`;
       case 'part':
         return `/parts/${r.id}`;
       case 'timeline_event':
         return r.metadata?.vehicle_id ? `/vehicle/${r.metadata.vehicle_id}` : undefined;
+      case 'image':
+        return r.metadata?.vehicle_id ? `/vehicle/${r.metadata.vehicle_id}` : `/images/${r.id}`;
+      case 'auction':
+        return r.metadata?.listing_url ? String(r.metadata.listing_url) : undefined;
+      case 'source':
+        return r.metadata?.url ? String(r.metadata.url) : (r.metadata?.domain ? `https://${String(r.metadata.domain)}` : undefined);
       default:
         return undefined;
     }
