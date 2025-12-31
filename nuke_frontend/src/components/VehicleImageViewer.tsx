@@ -84,7 +84,9 @@ const VehicleImageViewer: React.FC<VehicleImageViewerProps> = ({
       let query = supabase
         .from('vehicle_images')
         .select('id, image_url, thumbnail_url, created_at, is_primary, position, is_sensitive, sensitive_type, storage_path')
-        .eq('vehicle_id', vehicleId);
+        .eq('vehicle_id', vehicleId)
+        // Quarantine/duplicate rows should never appear in standard galleries
+        .or('is_duplicate.is.null,is_duplicate.eq.false');
 
     // Apply filters
     if (stageFilter) query = query.eq('process_stage', stageFilter);

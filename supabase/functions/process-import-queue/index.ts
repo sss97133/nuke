@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 import { normalizeListingLocation } from "../_shared/normalizeListingLocation.ts";
+import { extractGalleryImagesFromHtml } from "../_shared/batDomMap.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -634,6 +635,7 @@ serve(async (req) => {
         let scrapeSuccess = false;
         const firecrawlApiKey = Deno.env.get('FIRECRAWL_API_KEY');
         let scrapeData: any = null;
+        let doc: any = null;
 
         if (isFacebookMarketplace) {
           const { data: fbResp, error: fbErr } = await supabase.functions.invoke('scrape-vehicle', {
@@ -764,7 +766,7 @@ serve(async (req) => {
         html = html.replace(/<div[^>]*style="[^"]*font-size:\s*9pt[^"]*"[^>]*>[\s\S]*?QR\s+Code[\s\S]*?<\/div>/gi, '');
         html = html.replace(/QR\s+Code[\s\S]{0,200}/gi, '');
         
-        const doc = new DOMParser().parseFromString(html, 'text/html');
+        doc = new DOMParser().parseFromString(html, 'text/html');
 
         // Basic data extraction
         scrapeData = {
@@ -775,7 +777,7 @@ serve(async (req) => {
             discovery_url: item.listing_url,
             title: doc.querySelector('title')?.textContent || '',
             description: '',
-            images: extractImageURLs(html),
+            images: item.listing_url.includes('bringatrailer.com') ? [] : extractImageURLs(html),
             timestamp: new Date().toISOString(),
             year: null,
             make: null,
@@ -864,7 +866,6 @@ serve(async (req) => {
             // ignore
           }
         }
-        }
 
         // L'Art de L'Automobile: use the dedicated `scrape-vehicle` extractor for /fiche/ pages.
         // This is critical for: hi-res image set, structured options/service history, mileage/price.
@@ -939,6 +940,20 @@ serve(async (req) => {
         if (item.listing_url.includes('bringatrailer.com')) {
           console.log('🔍 Parsing BaT URL...');
           scrapeData.data.source = 'Bring a Trailer';
+
+          // CRITICAL: BaT image extraction must come from the listing's gallery JSON ONLY.
+          // Do NOT rely on any page-wide <img> scanning (it will pull UI assets and other listing promos).
+          try {
+            const gallery = extractGalleryImagesFromHtml(html);
+            if (Array.isArray(gallery?.urls) && gallery.urls.length > 0) {
+              scrapeData.data.images = gallery.urls;
+            } else {
+              // If we can't find the canonical gallery, leave images as-is.
+              // (It may have been populated by a non-contaminating source, e.g. Firecrawl structured output.)
+            }
+          } catch {
+            // ignore
+          }
           
           // CRITICAL: Parse from URL first - most reliable format: /listing/YEAR-MAKE-MODEL-ID/
           // Pattern: /listing/1992-chevrolet-454-ss-14/ or /listing/2003-harley-davidson-electra-glide-classic/
@@ -1070,11 +1085,9 @@ serve(async (req) => {
             }
           }
           
-          // Extract price - use helper function to avoid monthly payments
-          const extractedPrice = extractVehiclePrice(bodyText);
-          if (extractedPrice) {
-            scrapeData.data.asking_price = extractedPrice;
-          }
+          // NOTE: Do not set `asking_price` for BaT listings.
+          // BaT is an auction platform, and price must come from auction-specific fields
+          // (live bid / final sale) rather than generic page text scanning.
           
           // Extract color - "finished in Golf Blue", "Golf Blue over black"
           const colorPatterns = [
@@ -2467,7 +2480,7 @@ serve(async (req) => {
             vin_confidence: safeVin ? 80 : null,
             mileage: (typeof scrapeData?.data?.mileage === 'number' && Number.isFinite(scrapeData.data.mileage)) ? scrapeData.data.mileage : null,
             mileage_source: (typeof scrapeData?.data?.mileage === 'number' && Number.isFinite(scrapeData.data.mileage)) ? `scraped_listing:${listingHost || 'unknown'}` : null,
-            asking_price: (typeof scrapeData?.data?.asking_price === 'number' && Number.isFinite(scrapeData.data.asking_price)) ? scrapeData.data.asking_price : null,
+            asking_price: item.listing_url.includes('bringatrailer.com') ? null : ((typeof scrapeData?.data?.asking_price === 'number' && Number.isFinite(scrapeData.data.asking_price)) ? scrapeData.data.asking_price : null),
             listing_url: item.listing_url,
             listing_source: listingHost,
             listing_title: bestTitle,
@@ -2554,6 +2567,8 @@ serve(async (req) => {
         // Fallback logic:
         // - Some dealer sites block per-listing scraping, causing scrape-vehicle to return no images.
         // - In those cases, use image URLs discovered on the inventory grid (import_queue raw_data).
+        const isBatListing = item.listing_url.includes('bringatrailer.com');
+
         const rawFallbackImages: string[] = (() => {
           try {
             const raw = rawData || {};
@@ -2573,257 +2588,285 @@ serve(async (req) => {
         const imageUrls = (() => {
           const primary = Array.isArray(scrapeData.data.images) ? scrapeData.data.images : [];
           if (primary.length > 0) return primary;
-          if (rawFallbackImages.length > 0) return rawFallbackImages;
+          if (!isBatListing && rawFallbackImages.length > 0) return rawFallbackImages;
           return [];
         })();
         if (imageUrls.length > 0) {
           // IMPORTANT: do not cap total gallery size. We batch uploads to stay within Edge runtime.
           const isLartFiche = item.listing_url.includes('lartdelautomobile.com/fiche/');
 
-          // Keep import-queue processing within Edge runtime limits:
-          // upload a limited number immediately; defer the rest to background backfill.
-          const isBatListing = item.listing_url.includes('bringatrailer.com');
-          const defaultMaxImmediate = isLartFiche ? 24 : (isBatListing ? 50 : 12); // BaT listings often have 50+ images
-          let MAX_IMAGES_IMMEDIATE = defaultMaxImmediate;
-          if (skip_image_upload) {
-            MAX_IMAGES_IMMEDIATE = 0;
-          } else if (typeof max_images_immediate === 'number' && Number.isFinite(max_images_immediate)) {
-            MAX_IMAGES_IMMEDIATE = Math.max(0, Math.min(Math.floor(max_images_immediate), defaultMaxImmediate));
-          } else if (fast_mode) {
-            // Keep very small by default for non-lart to avoid 504s.
-            MAX_IMAGES_IMMEDIATE = isLartFiche ? 6 : 2;
-          }
-          const immediateImageUrls = imageUrls.slice(0, MAX_IMAGES_IMMEDIATE);
-          const deferredImageUrlsBase = imageUrls.slice(MAX_IMAGES_IMMEDIATE);
-
-          console.log(`  📸 Processing ${immediateImageUrls.length}/${imageUrls.length} images immediately...`);
-          let imagesUploaded = 0;
-          const uploadedPublicUrls: string[] = [];
-          
-          // Get import user ID (best-effort). Canonical org table is `businesses`.
-          let importUserId = null;
-          if (organizationId) {
-            try {
-              const { data: biz, error: bizErr } = await supabase
-                .from('businesses')
-                .select('uploaded_by, discovered_by')
-                .eq('id', organizationId)
-                .maybeSingle();
-              if (!bizErr && biz) {
-                importUserId = (biz.discovered_by || biz.uploaded_by || null);
-              }
-            } catch {
-              // swallow (not all schemas have these columns)
+          // Intentionally do nothing for BaT listings: images must not be ingested into storage/vehicle_images.
+          // The canonical gallery URLs are kept in vehicles.origin_metadata.image_urls.
+          if (!isBatListing) {
+            // Keep import-queue processing within Edge runtime limits:
+            // upload a limited number immediately; defer the rest to background backfill.
+            const defaultMaxImmediate = isLartFiche ? 24 : 12;
+            let MAX_IMAGES_IMMEDIATE = defaultMaxImmediate;
+            if (skip_image_upload) {
+              MAX_IMAGES_IMMEDIATE = 0;
+            } else if (typeof max_images_immediate === 'number' && Number.isFinite(max_images_immediate)) {
+              MAX_IMAGES_IMMEDIATE = Math.max(0, Math.min(Math.floor(max_images_immediate), defaultMaxImmediate));
+            } else if (fast_mode) {
+              // Keep very small by default for non-lart to avoid 504s.
+              MAX_IMAGES_IMMEDIATE = isLartFiche ? 6 : 2;
             }
-          }
-          
-          // If no org owner, try to get from auth context or use system user
-          if (!importUserId) {
-            const { data: { user } } = await supabase.auth.getUser();
-            importUserId = user?.id || null;
-          }
+            const immediateImageUrls = imageUrls.slice(0, MAX_IMAGES_IMMEDIATE);
+            const deferredImageUrlsBase = imageUrls.slice(MAX_IMAGES_IMMEDIATE);
 
-          // Delegate image ingestion to backfill-images so storage paths + DB inserts are deterministic and deduped.
-          // This reduces drift (multiple ingestion paths) and prevents partial failures from leaving orphaned storage objects.
-          if (immediateImageUrls.length > 0 && !skip_image_upload) {
-            try {
-              await supabase.functions.invoke('backfill-images', {
-                body: {
-                  vehicle_id: newVehicle.id,
-                  image_urls: immediateImageUrls,
-                  source: organizationId ? 'organization_import' : 'external_import',
-                  run_analysis: false,
-                  max_images: immediateImageUrls.length,
-                  continue: false,
-                  sleep_ms: isLartFiche ? 150 : 200,
-                  max_runtime_ms: 25000,
+            console.log(`  📸 Processing ${immediateImageUrls.length}/${imageUrls.length} images immediately...`);
+            let imagesUploaded = 0;
+            const uploadedPublicUrls: string[] = [];
+            
+            // Get import user ID (best-effort). Canonical org table is `businesses`.
+            let importUserId = null;
+            if (organizationId) {
+              try {
+                const { data: biz, error: bizErr } = await supabase
+                  .from('businesses')
+                  .select('uploaded_by, discovered_by')
+                  .eq('id', organizationId)
+                  .maybeSingle();
+                if (!bizErr && biz) {
+                  importUserId = (biz.discovered_by || biz.uploaded_by || null);
                 }
-              });
-            } catch (bfErr: any) {
-              console.warn(`⚠️ Immediate backfill-images failed (non-blocking): ${bfErr.message}`);
-            }
-          }
-
-          // Pull a small ordered sample of uploaded images for VIN OCR (best-effort).
-          // Rely on position ordering so repeated runs are stable.
-          if (!skip_image_upload && immediateImageUrls.length > 0) {
-            try {
-              const { data: imgRows, error: imgErr } = await supabase
-                .from('vehicle_images')
-                .select('image_url')
-                .eq('vehicle_id', newVehicle.id)
-                .order('position', { ascending: true })
-                .limit(immediateImageUrls.length);
-              if (!imgErr && Array.isArray(imgRows)) {
-                for (const r of imgRows as any[]) {
-                  const u = String(r?.image_url || '').trim();
-                  if (u) uploadedPublicUrls.push(u);
-                }
-                imagesUploaded = uploadedPublicUrls.length;
+              } catch {
+                // swallow (not all schemas have these columns)
               }
-            } catch (e: any) {
-              console.warn(`⚠️ Failed to read uploaded images for VIN OCR (non-blocking): ${e.message}`);
             }
-          }
+            
+            // If no org owner, try to get from auth context or use system user
+            if (!importUserId) {
+              const { data: { user } } = await supabase.auth.getUser();
+              importUserId = user?.id || null;
+            }
 
-          console.log(`  ✅ Successfully uploaded ${imagesUploaded}/${immediateImageUrls.length} images`);
-
-          // VIN OCR from images (critical for dealer sites that omit VIN in text)
-          // Use a small capped set to control cost/time; prefer high-res images (we now scrape hi-res on lartdelautomobile).
-          try {
-            const { data: vRow } = await supabase
-              .from('vehicles')
-              .select('vin')
-              .eq('id', newVehicle.id)
-              .maybeSingle();
-
-            const currentVin = (vRow?.vin || '').toString().trim();
-            const shouldTryVinOcr = !currentVin;
-
-            // Try VIN OCR for both in-stock and sold listings.
-            const shouldTryVinOcrNow = shouldTryVinOcr;
-
-            if (shouldTryVinOcrNow && uploadedPublicUrls.length > 0) {
-              // VIN plate/sticker is rarely in the first couple images; sample across the set.
-              const maxVinOcrImages = 12;
-              const candidateSet: string[] = [];
-              const n = uploadedPublicUrls.length;
-              const pick = (idx: number) => {
-                if (idx < 0 || idx >= n) return;
-                const u = uploadedPublicUrls[idx];
-                if (!u) return;
-                if (!candidateSet.includes(u)) candidateSet.push(u);
-              };
-              pick(0);
-              pick(1);
-              pick(Math.floor(n * 0.33));
-              pick(Math.floor(n * 0.5));
-              pick(Math.floor(n * 0.66));
-              pick(n - 1);
-              pick(n - 2);
-              pick(n - 3);
-              for (let i = 0; i < n && candidateSet.length < maxVinOcrImages; i++) pick(i);
-
-              for (const candidateUrl of candidateSet.slice(0, maxVinOcrImages)) {
-                const { data: aiData, error: aiErr } = await supabase.functions.invoke('analyze-image', {
+            // Delegate image ingestion to backfill-images so storage paths + DB inserts are deterministic and deduped.
+            // This reduces drift (multiple ingestion paths) and prevents partial failures from leaving orphaned storage objects.
+            if (immediateImageUrls.length > 0 && !skip_image_upload) {
+              try {
+                await supabase.functions.invoke('backfill-images', {
                   body: {
-                    image_url: candidateUrl,
                     vehicle_id: newVehicle.id,
-                    user_id: importUserId
+                    image_urls: immediateImageUrls,
+                    source: organizationId ? 'organization_import' : 'external_import',
+                    run_analysis: false,
+                    max_images: immediateImageUrls.length,
+                    continue: false,
+                    sleep_ms: isLartFiche ? 150 : 200,
+                    max_runtime_ms: 25000,
                   }
                 });
-
-                if (aiErr) {
-                  console.warn(`⚠️ VIN OCR analyze-image failed: ${aiErr.message}`);
-                } else if (aiData?.vinTagResponse?.extracted_data?.vin || aiData?.vinTagData?.vin) {
-                  // Best-effort: stop early if VIN has been written.
-                }
-
-                const { data: vinCheck } = await supabase
-                  .from('vehicles')
-                  .select('vin')
-                  .eq('id', newVehicle.id)
-                  .maybeSingle();
-
-                const newVin = (vinCheck?.vin || '').toString().trim();
-                if (newVin && newVin.length === 17) {
-                  console.log(`✅ VIN extracted from images: ${newVin}`);
-                  break;
-                }
+              } catch (bfErr: any) {
+                console.warn(`⚠️ Immediate backfill-images failed (non-blocking): ${bfErr.message}`);
               }
             }
-          } catch (vinOcrErr: any) {
-            console.warn(`⚠️ VIN OCR step failed (non-blocking): ${vinOcrErr.message}`);
-          }
 
-          const deferredImageUrls = [...deferredImageUrlsBase].filter(Boolean);
-
-          // CRITICAL: When skip_image_upload is true, create vehicle_images records with external URLs
-          // This allows frontend to show images immediately while we download them gradually
-          if (imageUrls.length > 0 && skip_image_upload) {
-            try {
-              // Create vehicle_images records with external URLs
-              const imageRecords = imageUrls.slice(0, 50).map((url: string, idx: number) => ({
-                vehicle_id: newVehicle.id,
-                user_id: importUserId || null,
-                image_url: url.trim(),
-                thumbnail_url: url.trim(),
-                medium_url: url.trim(),
-                large_url: url.trim(),
-                is_external: true, // Mark as external URL
-                source: organizationId ? 'organization_import' : 'external_import',
-                source_url: item.listing_url || null,
-                is_primary: idx === 0,
-                position: idx,
-                display_order: idx,
-                approval_status: 'auto_approved',
-                is_approved: true,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              }));
-
-              const { error: insertError } = await supabase
-                .from('vehicle_images')
-                .insert(imageRecords);
-
-              if (insertError) {
-                console.warn(`⚠️ Failed to create external image records (non-blocking): ${insertError.message}`);
-              } else {
-                console.log(`  💾 Created ${imageRecords.length} vehicle_images records with external URLs (will download later)`);
-              }
-
-              // Also store in origin_metadata for backup
+            // Pull a small ordered sample of uploaded images for VIN OCR (best-effort).
+            // Rely on position ordering so repeated runs are stable.
+            if (!skip_image_upload && immediateImageUrls.length > 0) {
               try {
-                const { data: vrow } = await supabase
-                  .from('vehicles')
-                  .select('origin_metadata')
-                  .eq('id', newVehicle.id)
-                  .maybeSingle();
-                
-                const om = (vrow?.origin_metadata && typeof vrow.origin_metadata === 'object') 
-                  ? vrow.origin_metadata 
-                  : {};
-                
-                const nextOm = {
-                  ...om,
-                  image_urls: imageUrls,
-                  image_count: imageUrls.length,
-                  images_stored_at: new Date().toISOString(),
-                  images_backfilled: false,
-                };
-                
-                await supabase
-                  .from('vehicles')
-                  .update({ origin_metadata: nextOm, updated_at: new Date().toISOString() } as any)
-                  .eq('id', newVehicle.id);
-              } catch (metadataErr: any) {
-                // Non-blocking
-              }
-            } catch (extErr: any) {
-              console.warn(`⚠️ Failed to create external image records (non-blocking): ${extErr.message}`);
-            }
-          }
-
-          // Defer remaining images to background backfill (best-effort).
-          if (!skip_image_upload && (deferredImageUrls.length > 0 || immediateImageUrls.length > 0)) {
-            try {
-              // Re-submit the full list to backfill-images; it is dedupe-safe via source_url,
-              // so it will skip what we already inserted and retry any failures.
-              await supabase.functions.invoke('backfill-images', {
-                body: {
-                  vehicle_id: newVehicle.id,
-                  image_urls: imageUrls,
-                  source: organizationId ? 'organization_import' : 'external_import',
-                  run_analysis: false,
-                  max_images: 0,
-                  continue: true,
-                  sleep_ms: isLartFiche ? 150 : 200,
-                  max_runtime_ms: 25000,
+                const { data: imgRows, error: imgErr } = await supabase
+                  .from('vehicle_images')
+                  .select('image_url')
+                  .eq('vehicle_id', newVehicle.id)
+                  .order('position', { ascending: true })
+                  .limit(immediateImageUrls.length);
+                if (!imgErr && Array.isArray(imgRows)) {
+                  for (const r of imgRows as any[]) {
+                    const u = String(r?.image_url || '').trim();
+                    if (u) uploadedPublicUrls.push(u);
+                  }
+                  imagesUploaded = uploadedPublicUrls.length;
                 }
-              });
-              console.log(`  🧩 Deferred ${deferredImageUrls.length} images to backfill`);
-            } catch (bfErr: any) {
-              console.warn(`⚠️ Failed to defer images to backfill (non-blocking): ${bfErr.message}`);
+              } catch (e: any) {
+                console.warn(`⚠️ Failed to read uploaded images for VIN OCR (non-blocking): ${e.message}`);
+              }
+            }
+
+            console.log(`  ✅ Successfully uploaded ${imagesUploaded}/${immediateImageUrls.length} images`);
+
+            // VIN OCR from images (critical for dealer sites that omit VIN in text)
+            // Use a small capped set to control cost/time; prefer high-res images (we now scrape hi-res on lartdelautomobile).
+            try {
+              const { data: vRow } = await supabase
+                .from('vehicles')
+                .select('vin')
+                .eq('id', newVehicle.id)
+                .maybeSingle();
+
+              const currentVin = (vRow?.vin || '').toString().trim();
+              const shouldTryVinOcr = !currentVin;
+
+              // Try VIN OCR for both in-stock and sold listings.
+              const shouldTryVinOcrNow = shouldTryVinOcr;
+
+              if (shouldTryVinOcrNow && uploadedPublicUrls.length > 0) {
+                // VIN plate/sticker is rarely in the first couple images; sample across the set.
+                const maxVinOcrImages = 12;
+                const candidateSet: string[] = [];
+                const n = uploadedPublicUrls.length;
+                const pick = (idx: number) => {
+                  if (idx < 0 || idx >= n) return;
+                  const u = uploadedPublicUrls[idx];
+                  if (!u) return;
+                  if (!candidateSet.includes(u)) candidateSet.push(u);
+                };
+                pick(0);
+                pick(1);
+                pick(Math.floor(n * 0.33));
+                pick(Math.floor(n * 0.5));
+                pick(Math.floor(n * 0.66));
+                pick(n - 1);
+                pick(n - 2);
+                pick(n - 3);
+                for (let i = 0; i < n && candidateSet.length < maxVinOcrImages; i++) pick(i);
+
+                for (const candidateUrl of candidateSet.slice(0, maxVinOcrImages)) {
+                  const { data: aiData, error: aiErr } = await supabase.functions.invoke('analyze-image', {
+                    body: {
+                      image_url: candidateUrl,
+                      vehicle_id: newVehicle.id,
+                      user_id: importUserId
+                    }
+                  });
+
+                  if (aiErr) {
+                    console.warn(`⚠️ VIN OCR analyze-image failed: ${aiErr.message}`);
+                  } else if (aiData?.vinTagResponse?.extracted_data?.vin || aiData?.vinTagData?.vin) {
+                    // Best-effort: stop early if VIN has been written.
+                  }
+
+                  const { data: vinCheck } = await supabase
+                    .from('vehicles')
+                    .select('vin')
+                    .eq('id', newVehicle.id)
+                    .maybeSingle();
+
+                  const newVin = (vinCheck?.vin || '').toString().trim();
+                  if (newVin && newVin.length === 17) {
+                    console.log(`✅ VIN extracted from images: ${newVin}`);
+                    break;
+                  }
+                }
+              }
+            } catch (vinOcrErr: any) {
+              console.warn(`⚠️ VIN OCR step failed (non-blocking): ${vinOcrErr.message}`);
+            }
+
+            const deferredImageUrls = [...deferredImageUrlsBase].filter(Boolean);
+
+            // CRITICAL: When skip_image_upload is true, create vehicle_images records with external URLs
+            // This allows frontend to show images immediately while we download them gradually
+            if (imageUrls.length > 0 && skip_image_upload) {
+              try {
+                // Dedupe guard: if we already created external URL rows for this vehicle, don't keep inserting more
+                // on re-runs / retries.
+                const { data: existingExternalRows } = await supabase
+                  .from('vehicle_images')
+                  .select('id, image_url')
+                  .eq('vehicle_id', newVehicle.id)
+                  .limit(200);
+                const existingExternalUrls = new Set(
+                  (existingExternalRows || [])
+                    .map((r: any) => String(r?.image_url || '').trim())
+                    .filter(Boolean)
+                );
+
+                // Create vehicle_images records with external URLs
+                const imageRecords = imageUrls
+                  .map((u: any) => (typeof u === 'string' ? u.trim() : String(u || '').trim()))
+                  .filter(Boolean)
+                  .filter((u: string) => u.startsWith('http'))
+                  .filter((u: string) => !existingExternalUrls.has(u))
+                  .slice(0, 50)
+                  .map((url: string, idx: number) => ({
+                  vehicle_id: newVehicle.id,
+                  user_id: importUserId || null,
+                  image_url: url.trim(),
+                  variants: {
+                    thumbnail: url.trim(),
+                    medium: url.trim(),
+                    large: url.trim(),
+                    full: url.trim(),
+                  },
+                  is_external: true, // Mark as external URL
+                  source: organizationId ? 'organization_import' : 'external_import',
+                  // IMPORTANT: source_url must be the actual image URL for dedupe safety.
+                  source_url: url.trim(),
+                  is_primary: idx === 0,
+                  position: idx,
+                  display_order: idx,
+                  approval_status: 'auto_approved',
+                  is_approved: true,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                }));
+
+                if (imageRecords.length > 0) {
+                  const { error: insertError } = await supabase
+                    .from('vehicle_images')
+                    .insert(imageRecords);
+
+                  if (insertError) {
+                    console.warn(`⚠️ Failed to create external image records (non-blocking): ${insertError.message}`);
+                  } else {
+                    console.log(`  💾 Created ${imageRecords.length} vehicle_images records with external URLs (will download later)`);
+                  }
+                }
+
+                // Also store in origin_metadata for backup
+                try {
+                  const { data: vrow } = await supabase
+                    .from('vehicles')
+                    .select('origin_metadata')
+                    .eq('id', newVehicle.id)
+                    .maybeSingle();
+                  
+                  const om = (vrow?.origin_metadata && typeof vrow.origin_metadata === 'object') 
+                    ? vrow.origin_metadata 
+                    : {};
+                  
+                  const nextOm = {
+                    ...om,
+                    image_urls: imageUrls,
+                    image_count: imageUrls.length,
+                    images_stored_at: new Date().toISOString(),
+                    images_backfilled: false,
+                  };
+                  
+                  await supabase
+                    .from('vehicles')
+                    .update({ origin_metadata: nextOm, updated_at: new Date().toISOString() } as any)
+                    .eq('id', newVehicle.id);
+                } catch (metadataErr: any) {
+                  // Non-blocking
+                }
+              } catch (extErr: any) {
+                console.warn(`⚠️ Failed to create external image records (non-blocking): ${extErr.message}`);
+              }
+            }
+
+            // Defer remaining images to background backfill (best-effort).
+            if (!skip_image_upload && (deferredImageUrls.length > 0 || immediateImageUrls.length > 0)) {
+              try {
+                // Re-submit the full list to backfill-images; it is dedupe-safe via source_url,
+                // so it will skip what we already inserted and retry any failures.
+                await supabase.functions.invoke('backfill-images', {
+                  body: {
+                    vehicle_id: newVehicle.id,
+                    image_urls: imageUrls,
+                    source: organizationId ? 'organization_import' : 'external_import',
+                    run_analysis: false,
+                    max_images: 0,
+                    continue: true,
+                    sleep_ms: isLartFiche ? 150 : 200,
+                    max_runtime_ms: 25000,
+                  }
+                });
+                console.log(`  🧩 Deferred ${deferredImageUrls.length} images to backfill`);
+              } catch (bfErr: any) {
+                console.warn(`⚠️ Failed to defer images to backfill (non-blocking): ${bfErr.message}`);
+              }
             }
           }
         }
@@ -3414,8 +3457,14 @@ serve(async (req) => {
             const lotMatch = item.listing_url.match(/-(\d+)\/?$/);
             const lotNumber = lotMatch ? lotMatch[1] : null;
             
-            // Extract current bid from asking_price
-            const currentBid = scrapeData.data.asking_price || null;
+            // BaT is an auction platform: no asking price.
+            // Prefer auction telemetry fields if present; otherwise leave null and let sync-bat-listing fill it.
+            const currentBid =
+              (typeof scrapeData.data.current_bid === 'number' && Number.isFinite(scrapeData.data.current_bid))
+                ? scrapeData.data.current_bid
+                : (typeof scrapeData.data.high_bid === 'number' && Number.isFinite(scrapeData.data.high_bid))
+                  ? scrapeData.data.high_bid
+                  : null;
             
             // Calculate start_date: Use auction_start_date if available, otherwise calculate from end_date (end - 7 days)
             let startDate = scrapeData.data.auction_start_date;
@@ -3482,7 +3531,7 @@ serve(async (req) => {
               source: source,
               metadata: {
                 source_url: item.listing_url,
-                price: scrapeData.data.price || scrapeData.data.asking_price,
+                price: scrapeData.data.sale_price || scrapeData.data.high_bid || scrapeData.data.current_bid || scrapeData.data.price || scrapeData.data.asking_price,
                 location: scrapeData.data.location,
                 discovery: true
               }
@@ -3542,7 +3591,6 @@ serve(async (req) => {
         results.succeeded++;
         results.vehicles_created.push(newVehicle.id);
         console.log(`✅ Created vehicle ${newVehicle.id} from ${item.listing_url}`);
-
       } catch (error) {
         console.error(`Failed to process ${item.listing_url}:`, error);
         debugLog({

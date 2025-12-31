@@ -640,7 +640,9 @@ const VehicleProfile: React.FC = () => {
       const { data: imgs } = await supabase
         .from('vehicle_images')
         .select('image_url, is_primary')
-        .eq('vehicle_id', vehicle.id);
+        .eq('vehicle_id', vehicle.id)
+        // Quarantine/duplicate rows should never appear in standard galleries
+        .or('is_duplicate.is.null,is_duplicate.eq.false');
         // NO LIMIT - show ALL images from all sources
       const images = (imgs || []) as any[];
       // Services removed during cleanup - simplified composition
@@ -1552,7 +1554,13 @@ const VehicleProfile: React.FC = () => {
       
       // Initialize leadImageUrl from primary_image_url if available
       const primaryImg = (vehicleData as any)?.primary_image_url || (vehicleData as any)?.primaryImageUrl || (vehicleData as any)?.image_url;
-      if (primaryImg && !leadImageUrl) {
+      const primaryImgLower = typeof primaryImg === 'string' ? primaryImg.toLowerCase() : '';
+      const primaryImgLooksWrong =
+        primaryImgLower.includes('organization_import') ||
+        primaryImgLower.includes('import_queue') ||
+        primaryImgLower.includes('organization-logos/') ||
+        primaryImgLower.includes('organization_logos/');
+      if (primaryImg && !leadImageUrl && !primaryImgLooksWrong) {
         setLeadImageUrl(primaryImg);
       }
 
@@ -1891,7 +1899,9 @@ const VehicleProfile: React.FC = () => {
       const { data: imgs } = await supabase
         .from('vehicle_images')
         .select('area, labels, sensitive_type')
-        .eq('vehicle_id', vehicle.id);
+        .eq('vehicle_id', vehicle.id)
+        // Quarantine/duplicate rows should never appear in standard galleries
+        .or('is_duplicate.is.null,is_duplicate.eq.false');
 
       const sources: FieldSource[] = (data || []).map((e: any) => ({
         field_name: fieldName,
@@ -2510,6 +2520,8 @@ const VehicleProfile: React.FC = () => {
         .eq('vehicle_id', vehicle.id)
         // Legacy rows may have is_document = NULL; treat that as "not a document"
         .not('is_document', 'is', true) // Filter out documents - they belong in a separate section
+        // Quarantine/duplicate rows should never appear in standard galleries
+        .or('is_duplicate.is.null,is_duplicate.eq.false')
         .order('is_primary', { ascending: false })
           // IMPORTANT: NULL positions should sort LAST (older backfills didn't set position).
           .order('position', { ascending: true, nullsFirst: false })

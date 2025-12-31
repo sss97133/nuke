@@ -464,6 +464,16 @@ const CursorHomepage: React.FC = () => {
   const [availableMakes, setAvailableMakes] = useState<string[]>([]);
   const [availableBodyStyles, setAvailableBodyStyles] = useState<string[]>([]);
 
+  const homepageDebugEnabled =
+    typeof window !== 'undefined' &&
+    (() => {
+      try {
+        return window.localStorage.getItem('nuke_debug_homepage') === '1';
+      } catch {
+        return false;
+      }
+    })();
+
   const hasActiveFilters = useMemo(() => {
     const result = 
       (filters.yearMin || filters.yearMax) ||
@@ -486,19 +496,21 @@ const CursorHomepage: React.FC = () => {
       ((filters.hiddenSources?.length || 0) > 0);
     
     // #region agent log
-    console.log('[DEBUG] hasActiveFilters computed', {
-      result,
-      filterFlags: {
-        hideBat: filters.hideBat,
-        hideCraigslist: filters.hideCraigslist,
-        hideKsl: filters.hideKsl,
-        hideDealerSites: filters.hideDealerSites,
-        hideClassic: filters.hideClassic,
-        hideDealerListings: filters.hideDealerListings,
-        hiddenSources: filters.hiddenSources
-      }
-    });
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:467',message:'hasActiveFilters computed',data:{result,filterFlags:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hideKsl:filters.hideKsl,hideDealerSites:filters.hideDealerSites,hideClassic:filters.hideClassic,hideDealerListings:filters.hideDealerListings,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    if (homepageDebugEnabled) {
+      console.log('[DEBUG] hasActiveFilters computed', {
+        result,
+        filterFlags: {
+          hideBat: filters.hideBat,
+          hideCraigslist: filters.hideCraigslist,
+          hideKsl: filters.hideKsl,
+          hideDealerSites: filters.hideDealerSites,
+          hideClassic: filters.hideClassic,
+          hideDealerListings: filters.hideDealerListings,
+          hiddenSources: filters.hiddenSources
+        }
+      });
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:467',message:'hasActiveFilters computed',data:{result,filterFlags:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hideKsl:filters.hideKsl,hideDealerSites:filters.hideDealerSites,hideClassic:filters.hideClassic,hideDealerListings:filters.hideDealerListings,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    }
     // #endregion
     
     return result;
@@ -821,6 +833,11 @@ const CursorHomepage: React.FC = () => {
   }, []);
 
   const includedSources = useMemo(() => {
+    // Ensure filters is available before accessing its properties
+    if (!filters) {
+      return {};
+    }
+    
     const base: Record<string, boolean> = {};
     const hiddenSourcesSet = new Set(filters.hiddenSources || []);
     
@@ -869,29 +886,25 @@ const CursorHomepage: React.FC = () => {
     });
 
     // #region agent log
-    console.log('[DEBUG] includedSources computed', { 
-      includedSources: base, 
-      activeSourcesCount: activeSources.length, 
-      activeSources: activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})), 
-      filters: {
-        hideBat: filters.hideBat, 
-        hideCraigslist: filters.hideCraigslist, 
-        hiddenSources: filters.hiddenSources
-      }
-    });
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2622',message:'includedSources computed',data:{includedSources:base,activeSourcesCount:activeSources.length,activeSources:activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})),filters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('Log fetch failed',e));
+    if (homepageDebugEnabled) {
+      console.log('[DEBUG] includedSources computed', { 
+        includedSources: base, 
+        activeSourcesCount: activeSources.length, 
+        activeSources: activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})), 
+        filters: {
+          hideBat: filters.hideBat, 
+          hideCraigslist: filters.hideCraigslist, 
+          hiddenSources: filters.hiddenSources
+        }
+      });
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2622',message:'includedSources computed',data:{includedSources:base,activeSourcesCount:activeSources.length,activeSources:activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})),filters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('Log fetch failed',e));
+    }
     // #endregion
 
     return base;
   }, [
     activeSources,
-    filters.hideDealerListings,
-    filters.hideCraigslist,
-    filters.hideDealerSites,
-    filters.hideKsl,
-    filters.hideBat,
-    filters.hideClassic,
-    filters.hiddenSources,
+    filters,
     domainToFilterKey
   ]);
 
@@ -1710,17 +1723,19 @@ const CursorHomepage: React.FC = () => {
   // Update filteredStats to show DB stats when no filters, filtered stats when filters active
   const displayStats = useMemo(() => {
     // #region agent log
-    console.log('[DEBUG] displayStats computed', {
-      hasActiveFilters,
-      debouncedSearchText,
-      dbStatsTotalVehicles: dbStats.totalVehicles,
-      dbStatsTotalValue: dbStats.totalValue,
-      filteredStatsTotalVehicles: filteredStats.totalVehicles,
-      filteredStatsTotalValue: filteredStats.totalValue,
-      willUseDbStats: !hasActiveFilters && !debouncedSearchText,
-      dbStatsHasData: dbStats.totalVehicles > 0
-    });
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1578',message:'displayStats computed',data:{hasActiveFilters,debouncedSearchText,dbStatsTotalVehicles:dbStats.totalVehicles,dbStatsTotalValue:dbStats.totalValue,filteredStatsTotalVehicles:filteredStats.totalVehicles,filteredStatsTotalValue:filteredStats.totalValue,willUseDbStats:!hasActiveFilters && !debouncedSearchText,dbStatsHasData:dbStats.totalVehicles > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    if (homepageDebugEnabled) {
+      console.log('[DEBUG] displayStats computed', {
+        hasActiveFilters,
+        debouncedSearchText,
+        dbStatsTotalVehicles: dbStats.totalVehicles,
+        dbStatsTotalValue: dbStats.totalValue,
+        filteredStatsTotalVehicles: filteredStats.totalVehicles,
+        filteredStatsTotalValue: filteredStats.totalValue,
+        willUseDbStats: !hasActiveFilters && !debouncedSearchText,
+        dbStatsHasData: dbStats.totalVehicles > 0
+      });
+      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1578',message:'displayStats computed',data:{hasActiveFilters,debouncedSearchText,dbStatsTotalVehicles:dbStats.totalVehicles,dbStatsTotalValue:dbStats.totalValue,filteredStatsTotalVehicles:filteredStats.totalVehicles,filteredStatsTotalValue:filteredStats.totalValue,willUseDbStats:!hasActiveFilters && !debouncedSearchText,dbStatsHasData:dbStats.totalVehicles > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    }
     // #endregion
     
     // Priority 1: If no filters and dbStats has loaded (has data), always use dbStats
