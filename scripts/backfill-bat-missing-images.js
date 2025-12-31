@@ -69,8 +69,26 @@ async function backfillMissingBatImages(batchSize = 25) {
     const batUrl = v.batUrl;
 
     try {
-      if (urls && urls.length > 0) {
-        // Use existing URLs from origin_metadata
+      // If we have a BaT listing URL, prefer authoritative extraction from the BaT gallery DOM.
+      // origin_metadata.image_urls can be contaminated (hundreds of URLs is a strong signal).
+      const hasBatUrl = batUrl && batUrl.includes('bringatrailer.com/listing/');
+      const urlsLookContaminated = urls && urls.length > 250;
+
+      if (hasBatUrl && (urlsLookContaminated || !urls || urls.length === 0)) {
+        // Fetch from BaT URL (authoritative)
+        console.log(`  [${i + 1}/${Math.min(batchSize, candidates.length)}] Importing ${v.id} from ${batUrl}...`);
+        const { error: importErr } = await supabase.functions.invoke('import-bat-listing', {
+          body: {
+            url: batUrl,
+            allowFuzzyMatch: false,
+            imageBatchSize: 50,
+          },
+        });
+
+        if (importErr) throw importErr;
+        success++;
+      } else if (urls && urls.length > 0) {
+        // Use existing URLs from origin_metadata (fallback when list is reasonable)
         console.log(`  [${i + 1}/${Math.min(batchSize, candidates.length)}] Backfilling ${v.id} with ${urls.length} URLs...`);
         const { error: backfillErr } = await supabase.functions.invoke('backfill-images', {
           body: {
@@ -87,19 +105,6 @@ async function backfillMissingBatImages(batchSize = 25) {
 
         if (backfillErr) throw backfillErr;
         success++;
-      } else if (batUrl && batUrl.includes('bringatrailer.com/listing/')) {
-        // Fetch from BaT URL
-        console.log(`  [${i + 1}/${Math.min(batchSize, candidates.length)}] Importing ${v.id} from ${batUrl}...`);
-        const { error: importErr } = await supabase.functions.invoke('import-bat-listing', {
-          body: {
-            url: batUrl,
-            allowFuzzyMatch: false,
-            imageBatchSize: 50,
-          },
-        });
-
-        if (importErr) throw importErr;
-        success++;
       } else {
         console.log(`  [${i + 1}/${Math.min(batchSize, candidates.length)}] Skipping ${v.id} (no URLs or BaT URL)`);
       }
@@ -115,5 +120,6 @@ async function backfillMissingBatImages(batchSize = 25) {
   console.log(`\n✅ Complete: ${success} succeeded, ${failed} failed`);
 }
 
-backfillMissingBatImages(50).catch(console.error);
+const batchSize = parseInt(process.argv[2], 10) || 50;
+backfillMissingBatImages(batchSize).catch(console.error);
 
