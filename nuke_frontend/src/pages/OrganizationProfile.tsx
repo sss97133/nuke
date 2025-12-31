@@ -80,12 +80,14 @@ interface OrgImage {
   id: string;
   image_url: string;
   thumbnail_url?: string;
+  medium_url?: string;
   large_url?: string;
   caption?: string;
   category?: string;
   taken_at?: string;
   uploaded_at: string;
   user_id: string;
+  is_primary?: boolean;
   location_name?: string;
   latitude?: number;
   longitude?: number;
@@ -416,6 +418,17 @@ export default function OrganizationProfile() {
   useEffect(() => {
     setPrimaryHeroSrcIndex(0);
   }, [heroKey]);
+
+  // Ensure light theme is applied (prevent dark mode issues)
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      // Force light theme if not explicitly set
+      if (!root.getAttribute('data-theme')) {
+        root.setAttribute('data-theme', 'light');
+      }
+    }
+  }, []);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -885,7 +898,7 @@ export default function OrganizationProfile() {
                   // Check for active BaT listing
                   // Use auction_end_date > NOW() as primary check (more reliable than status)
                   supabase.from('bat_listings')
-                    .select('id, organization_id, seller_username, listing_status, auction_end_date, high_bid, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url')
+                    .select('id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url')
                     .eq('vehicle_id', ov.vehicle_id)
                     .gt('auction_end_date', now.split('T')[0])
                     .maybeSingle()
@@ -941,7 +954,7 @@ export default function OrganizationProfile() {
                   endDate.setHours(23, 59, 59, 999);
                   // Use high_bid for live auctions, final_bid only for sold auctions
                   const isLive = endDate.getTime() > Date.now();
-                  const currentBid = isLive ? (batAuction.data.high_bid || null) : (batAuction.data.final_bid || null);
+                  const currentBid = (batAuction.data.final_bid || null);
                   auctionData = {
                     auction_end_time: endDate.toISOString(),
                     auction_current_bid: currentBid ? Math.round(Number(currentBid) * 100) : null,
@@ -1465,17 +1478,6 @@ export default function OrganizationProfile() {
     ? '/vendor/bat/favicon.ico'
     : ((organization as any)?.logo_url || null);
 
-  // Ensure light theme is applied (prevent dark mode issues)
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      const root = document.documentElement;
-      // Force light theme if not explicitly set
-      if (!root.getAttribute('data-theme')) {
-        root.setAttribute('data-theme', 'light');
-      }
-    }
-  }, []);
-
   return (
     <div style={{ 
       background: 'var(--bg, #f5f5f5)', 
@@ -1893,7 +1895,7 @@ export default function OrganizationProfile() {
                                 Time Left
                               </div>
                               <div style={{ fontSize: '9pt', fontWeight: 700, color: '#dc2626', whiteSpace: 'nowrap' }}>
-                                {formatTimeRemaining(vehicle.auction_end_time)}
+                                {formatTimeRemaining(vehicle.auction_end_time ?? null)}
                               </div>
                             </div>
                           </div>
@@ -2260,7 +2262,7 @@ export default function OrganizationProfile() {
                                         {vehicle.sale_price ? 'Sold:' : 'Bid:'}
                                       </span>
                                       <span style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--text)', fontFamily: 'monospace' }}>
-                                        {formatUsd((vehicle.sale_price || vehicle.auction_current_bid / 100) || 0)}
+                                        {formatUsd((vehicle.sale_price || (vehicle.auction_current_bid ?? 0) / 100) || 0)}
                                       </span>
                                     </div>
                                   )}
@@ -3236,14 +3238,14 @@ export default function OrganizationProfile() {
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <a
-                      href={`/dealer/${id}/ai-assistant`}
+                      href={`/dealer/${organization.id}/ai-assistant`}
                       className="button button-primary"
                       style={{ fontSize: '9pt', textDecoration: 'none', display: 'inline-block' }}
                     >
                       AI Assistant
                     </a>
                     <a
-                      href={`/dealer/${id}/bulk-editor`}
+                      href={`/dealer/${organization.id}/bulk-editor`}
                       className="button button-secondary"
                       style={{ fontSize: '9pt', textDecoration: 'none', display: 'inline-block' }}
                     >
@@ -3257,7 +3259,7 @@ export default function OrganizationProfile() {
                       Import BaT Sales
                     </button>
                     <a
-                      href={`/dealer/${id}/dropbox-import`}
+                      href={`/dealer/${organization.id}/dropbox-import`}
                       className="button button-secondary"
                       style={{ fontSize: '9pt', textDecoration: 'none', display: 'inline-block' }}
                     >
@@ -3328,14 +3330,16 @@ export default function OrganizationProfile() {
       )}
 
       {/* Contribute Data Modal */}
-      {showContributeModal && <AddOrganizationData
-        organizationId={id!}
-        onClose={() => setShowContributeModal(false)}
-        onSaved={() => {
-          setShowContributeModal(false);
-          loadOrganization();
-        }}
-      />}
+      {showContributeModal && organization && (
+        <AddOrganizationData
+          organizationId={organization.id}
+          onClose={() => setShowContributeModal(false)}
+          onSaved={() => {
+            setShowContributeModal(false);
+            loadOrganization();
+          }}
+        />
+      )}
 
       {/* Claim Ownership Modal */}
       {showOwnershipModal && session && ReactDOM.createPortal(

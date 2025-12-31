@@ -69,6 +69,8 @@ export const useVehicleImages = (vehicleId?: string) => {
         .eq('vehicle_id', vehicleId)
         // Legacy rows may have is_document = NULL; treat that as "not a document"
         .not('is_document', 'is', true)
+        // Quarantine/duplicate rows should never appear in standard galleries
+        .or('is_duplicate.is.null,is_duplicate.eq.false')
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: false });
         // NO LIMIT - show ALL images from all sources

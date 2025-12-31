@@ -181,7 +181,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
   // Get the external identity
   const { data: externalIdentity, error: identityError } = await supabase
     .from('external_identities')
-    .select('id, platform, handle, profile_url, display_name, claimed_by_user_id')
+    .select('id, platform, handle, profile_url, display_name, claimed_by_user_id, first_seen_at, created_at')
     .eq('id', externalIdentityId)
     .single();
 
@@ -317,16 +317,46 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .eq('status', 'active');
   
   const vehicleIds = orgVehicles?.map(ov => ov.vehicle_id).filter(Boolean) || [];
-  
-  const { data: auctionListings } = vehicleIds.length > 0 ? await supabase
-    .from('auction_events')
-    .select(`
-      *,
-      vehicle:vehicles(*)
-    `)
-    .in('vehicle_id', vehicleIds)
-    .order('auction_end_at', { ascending: false })
-    .limit(100) : { data: [] };
+
+  const chunk = <T,>(arr: T[], size: number): T[][] => {
+    if (size <= 0) return [arr];
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  };
+
+  // PostgREST encodes `.in()` as a URL query like `vehicle_id=in.(...)`.
+  // Large org inventories can exceed URL limits and return 400. Chunk to keep requests small.
+  const auctionListings: any[] = [];
+  if (vehicleIds.length > 0) {
+    const chunks = chunk(vehicleIds, 50);
+    const results = await Promise.allSettled(
+      chunks.map((ids) =>
+        supabase
+          .from('auction_events')
+          .select(`
+            *,
+            vehicle:vehicles(*)
+          `)
+          .in('vehicle_id', ids)
+          .order('auction_end_at', { ascending: false })
+          .limit(100)
+      )
+    );
+
+    for (const r of results) {
+      if (r.status !== 'fulfilled') continue;
+      if (r.value.error) continue;
+      for (const row of r.value.data || []) auctionListings.push(row);
+    }
+
+    auctionListings.sort((a: any, b: any) => {
+      const at = a?.auction_end_at ? new Date(a.auction_end_at).getTime() : 0;
+      const bt = b?.auction_end_at ? new Date(b.auction_end_at).getTime() : 0;
+      return bt - at;
+    });
+    auctionListings.splice(100);
+  }
 
   // Get bids (from organization members)
   const { data: orgContributors } = await supabase
@@ -425,7 +455,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
   return {
     organization,
     stats,
-    listings: [...(batListings || []), ...(auctionListings || [])],
+    listings: [...(batListings || []), ...auctionListings],
     bids: bids || [],
     comments: comments || [],
     auction_wins: auctionWins || [],

@@ -299,6 +299,160 @@ serve(async (req) => {
       external_identity_id: handleToExternalIdentityId.get(String(c.author_username)) || null,
     }))
 
+    let batListingId: string | null = null
+    try {
+      const nowIso = new Date().toISOString()
+      const { data: extListing } = await supabase
+        .from('external_listings')
+        .select('final_price, current_bid, listing_status, end_date, sold_at, listing_id')
+        .eq('vehicle_id', vehicleId)
+        .eq('platform', 'bat')
+        .maybeSingle()
+
+      const inferredHighBid = commentsWithIdentities
+        .map((c: any) => (typeof c?.bid_amount === 'number' && Number.isFinite(c.bid_amount) ? c.bid_amount : null))
+        .filter((n: any) => typeof n === 'number')
+        .reduce((acc: number, n: number) => (n > acc ? n : acc), 0)
+
+      const inferredFinalPrice =
+        (typeof extListing?.final_price === 'number' && Number.isFinite(extListing.final_price) && extListing.final_price > 0)
+          ? Math.floor(extListing.final_price)
+          : null
+
+      const inferredSaleDate = (() => {
+        const t = extListing?.sold_at || extListing?.end_date || null
+        if (!t) return null
+        const d = new Date(t)
+        if (!Number.isFinite(d.getTime())) return null
+        return d.toISOString().split('T')[0]
+      })()
+
+      const inferredStatus = (() => {
+        const s = String(extListing?.listing_status || '').toLowerCase()
+        if (s === 'sold') return 'sold'
+        if (s === 'active' || s === 'live') return 'active'
+        if (s === 'ended' || s === 'complete' || s === 'completed') return 'ended'
+        return null
+      })()
+
+      const listingPayload: any = {
+        vehicle_id: vehicleId,
+        bat_listing_url: String(auction_url),
+        bat_lot_number: extListing?.listing_id ? String(extListing.listing_id) : null,
+        listing_status: inferredStatus || undefined,
+        comment_count: commentsWithIdentities.length,
+        bid_count: commentsWithIdentities.filter((c: any) => typeof c?.bid_amount === 'number' && Number.isFinite(c.bid_amount) && c.bid_amount > 0).length,
+        sale_price: inferredFinalPrice,
+        final_bid: inferredFinalPrice || (inferredHighBid > 0 ? Math.floor(inferredHighBid) : null),
+        sale_date: inferredFinalPrice ? inferredSaleDate : null,
+        auction_end_date: inferredSaleDate || undefined,
+        last_updated_at: nowIso,
+        updated_at: nowIso,
+        raw_data: {
+          source: 'extract-auction-comments',
+          auction_event_id: eventId,
+          last_extracted_at: nowIso,
+        }
+      }
+
+      const { data: upsertedListing, error: upsertListingErr } = await supabase
+        .from('bat_listings')
+        .upsert(listingPayload, { onConflict: 'bat_listing_url' })
+        .select('id')
+        .single()
+      if (!upsertListingErr && upsertedListing?.id) {
+        batListingId = String(upsertedListing.id)
+      }
+
+      if (batListingId) {
+        const batCommentRows = commentsWithIdentities.map((c: any) => ({
+          bat_listing_id: batListingId,
+          vehicle_id: vehicleId,
+          bat_username: String(c.author_username || 'Unknown'),
+          comment_text: String(c.comment_text || ''),
+          comment_html: null,
+          comment_timestamp: c.posted_at,
+          scraped_at: nowIso,
+          bat_comment_id: null,
+          comment_url: null,
+          is_seller_comment: !!c.is_seller,
+          likes_count: typeof c.comment_likes === 'number' && Number.isFinite(c.comment_likes) ? Math.max(0, Math.floor(c.comment_likes)) : 0,
+          replies_count: 0,
+          parent_comment_id: null,
+          contains_question: !!c.has_question,
+          contains_bid: typeof c.bid_amount === 'number' && Number.isFinite(c.bid_amount) && c.bid_amount > 0,
+          contains_technical_info: false,
+          metadata: {
+            auction_event_id: eventId,
+            source_url: String(auction_url),
+            sequence_number: c.sequence_number,
+            comment_type: c.comment_type,
+            hours_until_close: c.hours_until_close,
+            bid_amount: c.bid_amount,
+          },
+          updated_at: nowIso,
+          external_identity_id: c.external_identity_id,
+          content_hash: c.content_hash,
+        }))
+
+        await supabase
+          .from('bat_comments')
+          .upsert(batCommentRows, { onConflict: 'bat_listing_id,content_hash' })
+
+        const bidRows = commentsWithIdentities
+          .filter((c: any) => typeof c?.bid_amount === 'number' && Number.isFinite(c.bid_amount) && c.bid_amount > 0)
+          .map((c: any) => ({
+            bat_listing_id: batListingId,
+            vehicle_id: vehicleId,
+            bat_user_id: null,
+            bat_username: String(c.author_username || 'Unknown'),
+            external_identity_id: c.external_identity_id,
+            bid_amount: c.bid_amount,
+            bid_timestamp: c.posted_at,
+            is_winning_bid: false,
+            is_final_bid: false,
+            source: 'comment',
+            bat_comment_id: null,
+            auction_event_id: eventId,
+            metadata: {
+              source_url: String(auction_url),
+              comment_content_hash: c.content_hash,
+              sequence_number: c.sequence_number,
+            },
+            updated_at: nowIso,
+          }))
+
+        if (bidRows.length > 0) {
+          await supabase
+            .from('bat_bids')
+            .upsert(bidRows, { onConflict: 'bat_listing_id,bat_username,bid_amount,bid_timestamp' })
+        }
+
+        if (inferredStatus || inferredFinalPrice || inferredHighBid > 0) {
+          const maxBid = bidRows
+            .map((b: any) => (typeof b?.bid_amount === 'number' && Number.isFinite(b.bid_amount) ? b.bid_amount : null))
+            .filter((n: any) => typeof n === 'number')
+            .reduce((acc: number, n: number) => (n > acc ? n : acc), 0)
+
+          await supabase
+            .from('bat_listings')
+            .update({
+              comment_count: batCommentRows.length,
+              bid_count: bidRows.length,
+              final_bid: inferredFinalPrice || (maxBid > 0 ? Math.floor(maxBid) : null),
+              sale_price: inferredFinalPrice,
+              sale_date: inferredFinalPrice ? inferredSaleDate : null,
+              listing_status: inferredStatus || undefined,
+              last_updated_at: nowIso,
+              updated_at: nowIso,
+            })
+            .eq('id', batListingId)
+        }
+      }
+    } catch (e: any) {
+      console.warn('BaT table upserts failed (non-fatal):', e?.message || String(e))
+    }
+
     // Store comments
     if (comments.length > 0) {
       console.log(`Attempting to upsert ${comments.length} comments...`)

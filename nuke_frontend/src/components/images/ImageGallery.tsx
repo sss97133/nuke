@@ -287,19 +287,27 @@ const ImageGallery = ({
   // Vehicle meta (used to suppress "BaT homepage noise" images that were mistakenly attached to some vehicles)
   const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
   useEffect(() => {
-    (async () => {
+    const loadImages = async () => {
+      setLoading(true);
       try {
-        if (!vehicleId) { setVehicleMeta(null); return; }
-        const { data, error } = await supabase
-          .from('vehicles')
-          .select('id, year, make, model, profile_origin, discovery_url')
-          .eq('id', vehicleId)
-          .maybeSingle();
-        if (!error) setVehicleMeta(data || null);
+        // Load images from database
+        const { data: images, error } = await supabase
+          .from('vehicle_images')
+          .select('*')
+          .eq('vehicle_id', vehicleId)
+          // Quarantine/duplicate rows should never appear in standard galleries
+          .or('is_duplicate.is.null,is_duplicate.eq.false')
+          .order('position', { ascending: true })
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        setAllImages(images || []);
+        setVehicleMeta(vehicleMeta || null);
       } catch {
         setVehicleMeta(null);
       }
-    })();
+    };
+    loadImages();
   }, [vehicleId]);
 
   // Default BaT-only view for BaT-origin vehicles, with a user-toggle to show all sources
