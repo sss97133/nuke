@@ -598,7 +598,7 @@ serve(async (req) => {
     };
 
     for (const item of queueItems) {
-      try {
+      await (async () => {
         debugLog({
           sessionId,
           runId,
@@ -1432,6 +1432,8 @@ serve(async (req) => {
               scrapeData.data.body_style = 'Pickup';
             }
           }
+        }
+
         }
 
         // Extract dealer/organization info from listing
@@ -3591,7 +3593,7 @@ serve(async (req) => {
         results.succeeded++;
         results.vehicles_created.push(newVehicle.id);
         console.log(`✅ Created vehicle ${newVehicle.id} from ${item.listing_url}`);
-      } catch (error) {
+      })().catch(async (error) => {
         console.error(`Failed to process ${item.listing_url}:`, error);
         debugLog({
           sessionId,
@@ -3626,7 +3628,7 @@ serve(async (req) => {
 
         results.failed++;
         await sleep(150);
-      }
+      });
 
       results.processed++;
     }
