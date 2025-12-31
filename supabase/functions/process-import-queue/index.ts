@@ -1434,7 +1434,6 @@ serve(async (req) => {
           }
         }
 
-        }
 
         // Extract dealer/organization info from listing
         const rawData = item.raw_data || {};
@@ -2262,112 +2261,57 @@ serve(async (req) => {
                   if (toUpload.length > 0) {
                     console.log(`🧪 L'Art hi-res repair: uploading ${toUpload.length} hi-res images for ${existingByUrlId}`);
 
-                    // Best-effort attribution user
-                    let importUserId: string | null = null;
-                    if (organizationId) {
-                      try {
-                        const { data: biz, error: bizErr } = await supabase
-                          .from('businesses')
-                          .select('uploaded_by, discovered_by')
-                          .eq('id', organizationId)
-                          .maybeSingle();
-                        if (!bizErr && biz) {
-                          importUserId = (biz.discovered_by || biz.uploaded_by || null);
+                    // IMPORTANT: Delegate to backfill-images to ensure deterministic storage paths + dedupe
+                    // (prevents Date.now() re-upload storms on retries).
+                    const maxRepairImages = 25;
+                    const repairUrls = toUpload.slice(0, maxRepairImages);
+                    try {
+                      await supabase.functions.invoke('backfill-images', {
+                        body: {
+                          vehicle_id: existingByUrlId,
+                          image_urls: repairUrls,
+                          source: organizationId ? 'organization_import' : 'external_import',
+                          run_analysis: false,
+                          max_images: maxRepairImages,
+                          continue: false,
+                          sleep_ms: 150,
+                          max_runtime_ms: 25000,
                         }
-                      } catch {
-                        // ignore
-                      }
-                    }
-                    if (!importUserId) {
-                      const { data: { user } } = await supabase.auth.getUser();
-                      importUserId = user?.id || null;
-                    }
-
-                    for (let i = 0; i < toUpload.length; i++) {
-                      let sourceUrl = toUpload[i];
-                      if (sourceUrl.startsWith('http://res.cloudinary.com/')) {
-                        sourceUrl = 'https://' + sourceUrl.slice('http://'.length);
-                      }
-
-                      try {
-                        const imageResponse = await fetch(sourceUrl, { signal: AbortSignal.timeout(20000) });
-                        if (!imageResponse.ok) {
-                          console.warn(`    ⚠️ Hi-res download failed ${i + 1}/${toUpload.length}: HTTP ${imageResponse.status}`);
-                          continue;
-                        }
-                        const imageBlob = await imageResponse.blob();
-                        const arrayBuffer = await imageBlob.arrayBuffer();
-                        const uint8Array = new Uint8Array(arrayBuffer);
-
-                        const ext = sourceUrl.match(/\.(jpg|jpeg|png|webp)$/i)?.[1] || 'jpg';
-                        const fileName = `repair_hires_${Date.now()}_${i}.${ext}`;
-                        const storagePath = `${existingByUrlId}/${fileName}`;
-
-                        const { error: uploadError } = await supabase.storage
-                          .from('vehicle-images')
-                          .upload(storagePath, uint8Array, {
-                            contentType: `image/${ext}`,
-                            cacheControl: '3600',
-                            upsert: false
-                          });
-                        if (uploadError) {
-                          console.warn(`    ⚠️ Hi-res upload error ${i + 1}: ${uploadError.message}`);
-                          continue;
-                        }
-
-                        const { data: { publicUrl } } = supabase.storage
-                          .from('vehicle-images')
-                          .getPublicUrl(storagePath);
-
-                        const { error: imgInsertErr } = await supabase
-                          .from('vehicle_images')
-                          .insert({
-                            vehicle_id: existingByUrlId,
-                            image_url: publicUrl,
-                            user_id: importUserId,
-                            is_primary: i === 0,
-                            source: organizationId ? 'organization_import' : 'external_import',
-                            source_url: sourceUrl,
-                            storage_path: storagePath,
-                            taken_at: new Date().toISOString(),
-                            exif_data: {
-                              source_url: sourceUrl,
-                              discovery_url: item.listing_url,
-                              imported_by_user_id: importUserId,
-                              imported_at: new Date().toISOString(),
-                              queue_id: item.id,
-                              repair_pass: true,
-                              listing_status: isSoldListing ? 'sold' : 'in_stock',
-                              dealer_inventory_status: isSoldListing ? 'sold' : 'in_stock',
-                              organization_id: organizationId || null
-                            }
-                          } as any);
-
-                        if (imgInsertErr) {
-                          console.warn(`    ⚠️ Hi-res image record insert failed ${i + 1}: ${imgInsertErr.message}`);
-                          continue;
-                        }
-                      } catch (e: any) {
-                        console.warn(`    ⚠️ Hi-res repair image error ${i + 1}: ${e?.message || String(e)}`);
-                      }
+                      });
+                    } catch (bfErr: any) {
+                      console.warn(`    ⚠️ Hi-res repair backfill-images failed: ${bfErr?.message || String(bfErr)}`);
                     }
 
-                    // Ensure only the newest hi-res primary remains primary (avoid multiple primaries)
-                    const { data: newestPrimary } = await supabase
-                      .from('vehicle_images')
-                      .select('id')
-                      .eq('vehicle_id', existingByUrlId)
-                      .eq('is_primary', true)
-                      .order('created_at', { ascending: false })
-                      .limit(1)
-                      .maybeSingle();
-                    if (newestPrimary?.id) {
-                      await supabase
+                    // Promote the newest repaired image to primary (best-effort).
+                    try {
+                      const { data: newestRepair } = await supabase
                         .from('vehicle_images')
-                        .update({ is_primary: false })
+                        .select('id, image_url')
                         .eq('vehicle_id', existingByUrlId)
-                        .neq('id', newestPrimary.id)
-                        .eq('is_primary', true);
+                        .in('source_url', repairUrls)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .maybeSingle();
+                      if (newestRepair?.id) {
+                        await supabase
+                          .from('vehicle_images')
+                          .update({ is_primary: false })
+                          .eq('vehicle_id', existingByUrlId)
+                          .neq('id', newestRepair.id)
+                          .eq('is_primary', true);
+                        await supabase
+                          .from('vehicle_images')
+                          .update({ is_primary: true })
+                          .eq('id', newestRepair.id);
+                        if (newestRepair?.image_url) {
+                          await supabase
+                            .from('vehicles')
+                            .update({ primary_image_url: newestRepair.image_url, updated_at: new Date().toISOString() } as any)
+                            .eq('id', existingByUrlId);
+                        }
+                      }
+                    } catch {
+                      // ignore
                     }
                   }
                 }
@@ -2765,7 +2709,7 @@ serve(async (req) => {
                 // on re-runs / retries.
                 const { data: existingExternalRows } = await supabase
                   .from('vehicle_images')
-                  .select('id, image_url')
+                  .select('id, image_url, is_primary')
                   .eq('vehicle_id', newVehicle.id)
                   .limit(200);
                 const existingExternalUrls = new Set(
@@ -2773,6 +2717,7 @@ serve(async (req) => {
                     .map((r: any) => String(r?.image_url || '').trim())
                     .filter(Boolean)
                 );
+                const hasPrimaryAlready = (existingExternalRows || []).some((r: any) => r?.is_primary === true);
 
                 // Create vehicle_images records with external URLs
                 const imageRecords = imageUrls
@@ -2795,7 +2740,7 @@ serve(async (req) => {
                   source: organizationId ? 'organization_import' : 'external_import',
                   // IMPORTANT: source_url must be the actual image URL for dedupe safety.
                   source_url: url.trim(),
-                  is_primary: idx === 0,
+                  is_primary: !hasPrimaryAlready && idx === 0,
                   position: idx,
                   display_order: idx,
                   approval_status: 'auto_approved',

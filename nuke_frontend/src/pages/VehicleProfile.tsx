@@ -2748,7 +2748,19 @@ const VehicleProfile: React.FC = () => {
         }
 
         // Load all images using public URLs (fast) and de-dupe (storage/variants can create repeats)
-        const raw = Array.from(new Set((imageRecords || []).map((r: any) => normalizeUrl(r?.image_url)).filter(Boolean)));
+        const displayableImageRecords = (imageRecords || []).filter((r: any) => {
+          const u = String(r?.image_url || '').toLowerCase();
+          const p = String(r?.storage_path || '').toLowerCase();
+          // Never show quarantined/foreign import images in a vehicle's gallery.
+          // These are not guaranteed to belong to the subject vehicle and have caused cross-contamination.
+          if (u.includes('organization_import') || p.includes('organization_import')) return false;
+          if (u.includes('import_queue') || p.includes('import_queue')) return false;
+          if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
+          if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
+          return true;
+        });
+
+        const raw = Array.from(new Set(displayableImageRecords.map((r: any) => normalizeUrl(r?.image_url)).filter(Boolean)));
         
         // Identify noisy patterns from origin_metadata (logos, icons, small UI elements)
         // Note: originImages already declared above at line 2186
