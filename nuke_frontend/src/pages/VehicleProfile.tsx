@@ -1556,7 +1556,6 @@ const VehicleProfile: React.FC = () => {
       const primaryImg = (vehicleData as any)?.primary_image_url || (vehicleData as any)?.primaryImageUrl || (vehicleData as any)?.image_url;
       const primaryImgLower = typeof primaryImg === 'string' ? primaryImg.toLowerCase() : '';
       const primaryImgLooksWrong =
-        primaryImgLower.includes('organization_import') ||
         primaryImgLower.includes('import_queue') ||
         primaryImgLower.includes('organization-logos/') ||
         primaryImgLower.includes('organization_logos/');
@@ -2753,7 +2752,6 @@ const VehicleProfile: React.FC = () => {
           const p = String(r?.storage_path || '').toLowerCase();
           // Never show quarantined/foreign import images in a vehicle's gallery.
           // These are not guaranteed to belong to the subject vehicle and have caused cross-contamination.
-          if (u.includes('organization_import') || p.includes('organization_import')) return false;
           if (u.includes('import_queue') || p.includes('import_queue')) return false;
           if (u.includes('organization-logos/') || p.includes('organization-logos/')) return false;
           if (u.includes('organization_logos/') || p.includes('organization_logos/')) return false;
@@ -3135,7 +3133,12 @@ const VehicleProfile: React.FC = () => {
       (vehicle as any)?.primaryImageUrl ||
       (vehicle as any)?.image_url ||
       null;
-    const primaryOk = primaryUrl && typeof primaryUrl === 'string' && filterProfileImages([primaryUrl], vehicle).length > 0;
+    const primaryUrlLower = typeof primaryUrl === 'string' ? primaryUrl.toLowerCase() : '';
+    const primaryLooksWrong =
+      primaryUrlLower.includes('import_queue') ||
+      primaryUrlLower.includes('organization-logos/') ||
+      primaryUrlLower.includes('organization_logos/');
+    const primaryOk = primaryUrl && typeof primaryUrl === 'string' && !primaryLooksWrong && filterProfileImages([primaryUrl], vehicle).length > 0;
     if (primaryOk && typeof primaryUrl === 'string' && !images.includes(primaryUrl)) {
       images = [primaryUrl, ...images];
       // Fallback for lead image - ensure it's set from primary

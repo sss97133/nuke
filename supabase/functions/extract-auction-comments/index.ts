@@ -19,6 +19,18 @@ async function sha256Hex(text: string): Promise<string> {
   return bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+function normalizeUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    u.hash = '';
+    u.search = '';
+    if (!u.pathname.endsWith('/')) u.pathname = `${u.pathname}/`;
+    return u.toString();
+  } catch {
+    return String(raw).split('#')[0].split('?')[0];
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -31,26 +43,33 @@ serve(async (req) => {
     const { auction_url, auction_event_id, vehicle_id } = await req.json()
     if (!auction_url) throw new Error('Missing auction_url')
 
-    console.log(`Extracting comments from: ${auction_url}`)
+    const auctionUrlRaw = String(auction_url)
+    const auctionUrlNorm = normalizeUrl(auctionUrlRaw)
+    const auctionUrlAlt = auctionUrlNorm.endsWith('/') ? auctionUrlNorm.slice(0, -1) : `${auctionUrlNorm}/`
+    const urlCandidates = Array.from(new Set([auctionUrlRaw, auctionUrlNorm, auctionUrlAlt].filter(Boolean)))
+
+    console.log(`Extracting comments from: ${auctionUrlNorm}`)
 
     // Resolve auction_event_id if caller didn't provide it (best-effort convenience).
-    const platformGuess = String(auction_url).includes('bringatrailer.com') ? 'bat' : null
+    const platformGuess = auctionUrlNorm.includes('bringatrailer.com') ? 'bat' : null
     let eventId: string | null = auction_event_id ? String(auction_event_id) : null
     if (!eventId && platformGuess) {
       const { data: ev } = await supabase
         .from('auction_events')
         .select('id')
         .eq('source', platformGuess)
-        .eq('source_url', String(auction_url))
+        .in('source_url', urlCandidates)
         .limit(1)
         .maybeSingle()
       if (ev?.id) eventId = String(ev.id)
     }
-    if (!eventId) throw new Error('Missing auction_event_id (and could not resolve by listing_url)')
+    if (!eventId) {
+      console.warn('Missing auction_event_id (and could not resolve by listing_url) - proceeding without auction_event_id')
+    }
 
     // Resolve vehicle_id for UI filters + auction pulse; prefer explicit input, else read from auction_events.
     let vehicleId: string | null = vehicle_id ? String(vehicle_id) : null
-    if (!vehicleId) {
+    if (!vehicleId && eventId) {
       const { data: ev2 } = await supabase
         .from('auction_events')
         .select('vehicle_id')
@@ -58,7 +77,35 @@ serve(async (req) => {
         .maybeSingle()
       if (ev2?.vehicle_id) vehicleId = String(ev2.vehicle_id)
     }
-    if (!vehicleId) throw new Error('auction_event_id resolved but vehicle_id is missing on auction_events row')
+    if (!vehicleId && platformGuess === 'bat') {
+      const { data: ext } = await supabase
+        .from('external_listings')
+        .select('vehicle_id')
+        .eq('platform', 'bat')
+        .in('listing_url', urlCandidates)
+        .limit(1)
+        .maybeSingle()
+      if (ext?.vehicle_id) vehicleId = String(ext.vehicle_id)
+    }
+    if (!vehicleId && platformGuess === 'bat') {
+      const { data: v1 } = await supabase
+        .from('vehicles')
+        .select('id')
+        .in('bat_auction_url', urlCandidates)
+        .limit(1)
+        .maybeSingle()
+      if (v1?.id) vehicleId = String(v1.id)
+    }
+    if (!vehicleId && platformGuess === 'bat') {
+      const { data: v2 } = await supabase
+        .from('vehicles')
+        .select('id')
+        .in('discovery_url', urlCandidates)
+        .limit(1)
+        .maybeSingle()
+      if (v2?.id) vehicleId = String(v2.id)
+    }
+    if (!vehicleId) throw new Error('Missing vehicle_id (and could not resolve by auction_event_id, external_listings, or vehicles URLs)')
 
     // Use Firecrawl to get JavaScript-rendered page
     const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
@@ -72,7 +119,7 @@ serve(async (req) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          url: auction_url,
+          url: auctionUrlNorm,
           waitFor: 3000,
           formats: ['html']
         })
@@ -86,7 +133,7 @@ serve(async (req) => {
     
     // Fallback to direct fetch if Firecrawl fails
     if (!html) {
-      const response = await fetch(auction_url)
+      const response = await fetch(auctionUrlNorm)
       html = await response.text()
     }
     
@@ -219,7 +266,7 @@ serve(async (req) => {
       const content_hash = await sha256Hex(
         [
           'bat',
-          String(auction_url),
+          String(auctionUrlNorm),
           String(i + 1),
           String(posted_at.toISOString()),
           String(author),
@@ -231,7 +278,7 @@ serve(async (req) => {
         auction_event_id: eventId,
         vehicle_id: vehicleId,
         platform: platformGuess,
-        source_url: String(auction_url),
+        source_url: String(auctionUrlNorm),
         content_hash,
         sequence_number: i + 1,
         posted_at: posted_at.toISOString(),
@@ -337,7 +384,7 @@ serve(async (req) => {
 
       const listingPayload: any = {
         vehicle_id: vehicleId,
-        bat_listing_url: String(auction_url),
+        bat_listing_url: String(auctionUrlNorm),
         bat_lot_number: extListing?.listing_id ? String(extListing.listing_id) : null,
         listing_status: inferredStatus || undefined,
         comment_count: commentsWithIdentities.length,
@@ -369,6 +416,8 @@ serve(async (req) => {
           bat_listing_id: batListingId,
           vehicle_id: vehicleId,
           bat_username: String(c.author_username || 'Unknown'),
+          external_identity_id: c.external_identity_id,
+          content_hash: c.content_hash,
           comment_text: String(c.comment_text || ''),
           comment_html: null,
           comment_timestamp: c.posted_at,
@@ -379,20 +428,7 @@ serve(async (req) => {
           likes_count: typeof c.comment_likes === 'number' && Number.isFinite(c.comment_likes) ? Math.max(0, Math.floor(c.comment_likes)) : 0,
           replies_count: 0,
           parent_comment_id: null,
-          contains_question: !!c.has_question,
-          contains_bid: typeof c.bid_amount === 'number' && Number.isFinite(c.bid_amount) && c.bid_amount > 0,
-          contains_technical_info: false,
-          metadata: {
-            auction_event_id: eventId,
-            source_url: String(auction_url),
-            sequence_number: c.sequence_number,
-            comment_type: c.comment_type,
-            hours_until_close: c.hours_until_close,
-            bid_amount: c.bid_amount,
-          },
           updated_at: nowIso,
-          external_identity_id: c.external_identity_id,
-          content_hash: c.content_hash,
         }))
 
         await supabase
@@ -415,7 +451,7 @@ serve(async (req) => {
             bat_comment_id: null,
             auction_event_id: eventId,
             metadata: {
-              source_url: String(auction_url),
+              source_url: String(auctionUrlNorm),
               comment_content_hash: c.content_hash,
               sequence_number: c.sequence_number,
             },
@@ -482,7 +518,7 @@ serve(async (req) => {
           // analyze-auction-comments is deployed with verify_jwt enabled.
           ...(authToUse ? { 'Authorization': authToUse } : {})
         },
-        body: JSON.stringify({ auction_event_id })
+        body: JSON.stringify({ auction_event_id: eventId })
       }).catch(e => console.error('Failed to trigger analysis:', e))
     }
 
@@ -496,8 +532,9 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    console.error('Error:', error)
-    return new Response(JSON.stringify({ error: error.message }), {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('Error:', message)
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

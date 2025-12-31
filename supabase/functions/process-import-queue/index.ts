@@ -364,7 +364,7 @@ function coerceDateOnly(input: any): string | null {
 // Handles European-style formatting where period is thousands separator (e.g., $14.500 = $14,500)
 function extractVehiclePrice(text: string): number | null {
   if (!text) return null;
-  
+
   // Helper to normalize price string (handles both comma and period as thousands separators)
   const normalizePriceString = (priceStr: string): number | null => {
     // Remove $ and spaces
@@ -421,7 +421,7 @@ function extractVehiclePrice(text: string): number | null {
     const match = text.match(pattern);
     if (match && match[1]) {
       const price = normalizePriceString(match[1]);
-      if (price && price >= 1000 && price < 10000000) {
+      if (price && price >= 1000) {
         return price;
       }
     }
@@ -433,7 +433,7 @@ function extractVehiclePrice(text: string): number | null {
     const vehiclePriceMatch = text.match(/(?:Price|Asking|Sale)[:\s]*\$?\s*([\d,.]+)/i);
     if (vehiclePriceMatch && vehiclePriceMatch[1]) {
       const price = normalizePriceString(vehiclePriceMatch[1]);
-      if (price && price >= 1000 && price < 10000000) {
+      if (price && price >= 1000) {
         return price;
       }
     }
@@ -449,11 +449,12 @@ function extractVehiclePrice(text: string): number | null {
         const numMatch = m.match(/\$\s*([\d,.]+)/);
         return numMatch ? normalizePriceString(numMatch[1]) : null;
       })
-      .filter((p): p is number => p !== null && p >= 1000 && p < 10000000);
+      .filter((p): p is number => p !== null && p >= 1000);
     
-    if (prices.length > 0) {
-      // Return the largest valid price (likely the vehicle price)
-      return Math.max(...prices);
+    // If we found multiple $ amounts in free text, do not guess.
+    // Only accept an unstructured price if it is unambiguous.
+    if (prices.length === 1) {
+      return prices[0];
     }
   }
   
@@ -598,7 +599,7 @@ serve(async (req) => {
     };
 
     for (const item of queueItems) {
-      await (async () => {
+      try {
         debugLog({
           sessionId,
           runId,
@@ -1434,6 +1435,8 @@ serve(async (req) => {
           }
         }
 
+        }
+        }
 
         // Extract dealer/organization info from listing
         const rawData = item.raw_data || {};
@@ -3538,7 +3541,7 @@ serve(async (req) => {
         results.succeeded++;
         results.vehicles_created.push(newVehicle.id);
         console.log(`✅ Created vehicle ${newVehicle.id} from ${item.listing_url}`);
-      })().catch(async (error) => {
+      } catch (error) {
         console.error(`Failed to process ${item.listing_url}:`, error);
         debugLog({
           sessionId,
@@ -3573,7 +3576,7 @@ serve(async (req) => {
 
         results.failed++;
         await sleep(150);
-      });
+      }
 
       results.processed++;
     }

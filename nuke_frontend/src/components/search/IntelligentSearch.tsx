@@ -7,28 +7,8 @@ import { UnifiedImageImportService } from '../../services/unifiedImageImportServ
 import { FaviconIcon } from '../common/FaviconIcon';
 import { extractAndCacheFavicon, detectSourceType } from '../../services/sourceFaviconService';
 import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
+import type { SearchResult } from '../../types/search';
 import '../../design-system.css';
-
-interface SearchResult {
-  id: string;
-  type: 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference' | 'status';
-  title: string;
-  description: string;
-  metadata: any;
-  relevance_score: number;
-  location?: {
-    lat: number;
-    lng: number;
-    address?: string;
-  };
-  image_url?: string;
-  created_at: string;
-  related_entities?: {
-    vehicles?: any[];
-    organizations?: any[];
-    users?: any[];
-  };
-}
 
 interface SearchResponse {
   results: SearchResult[];
@@ -538,7 +518,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
             metadata: { source: sourceName, scrape_date: new Date().toISOString() }
           }).then(() => {
             console.log(`✅ Field source created: ${field.field_name}`);
-          }).catch(err => {
+          }, (err: any) => {
             console.warn(`Failed to create field source for ${field.field_name}:`, err);
           });
         }
@@ -555,7 +535,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           } else {
             console.log('✅ AI analysis queued (ID:', queueId, ') - will process automatically');
           }
-        }).catch(err => {
+        }, (err: any) => {
           console.warn('⚠️ Analysis queue error (non-critical, will retry):', err);
         });
 
@@ -665,6 +645,26 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
 
     setIsSearching(true);
     try {
+      // Prefer the unified search edge function when available (single request).
+      // Fall back to the existing multi-query client search if invoke fails.
+      try {
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('search', {
+          body: {
+            query: searchQuery.trim(),
+            limit: 50
+          }
+        });
+
+        if (!edgeError && edgeData && Array.isArray((edgeData as any).results)) {
+          const edgeResults = (edgeData as any).results as SearchResult[];
+          const edgeSummary = String((edgeData as any).search_summary || '') || `Found ${edgeResults.length} results for "${searchQuery.trim()}".`;
+          onSearchResults(edgeResults, edgeSummary);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+
       const analysis = parseSearchQuery(searchQuery);
       console.log('Search analysis:', analysis);
 
@@ -1255,6 +1255,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
   const searchAuctions = async (query: string, analysis: any): Promise<SearchResult[]> => {
     try {
       const searchTerm = query.trim();
+      const searchTermSafe = escapeILike(searchTerm);
       if (!searchTerm) {
         return [];
       }
@@ -1519,7 +1520,9 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         supabase.from('search_analytics').insert({
           query: searchTerm,
           timestamp: new Date().toISOString()
-        }).catch(() => {
+        }).then(() => {
+          // Ignore analytics success
+        }, () => {
           // Ignore analytics errors
         });
       } catch {

@@ -24,7 +24,10 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
       case 'timeline_event': return '#10b981';
       case 'image': return '#f59e0b';
       case 'shop': return '#8b5cf6';
+      case 'organization': return '#8b5cf6';
       case 'auction': return '#ef4444';
+      case 'user': return '#6b7280';
+      case 'source': return '#6b7280';
       case 'user_activity': return '#6b7280';
       default: return '#6b7280';
     }
@@ -60,11 +63,11 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
 
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (item.type === 'vehicle') {
-      goToVehicle();
-    } else {
-      setLightboxOpen(true);
+    if (item.type === 'vehicle' || item.type === 'organization' || item.type === 'shop' || item.type === 'user' || item.type === 'source') {
+      handleCardClick();
+      return;
     }
+    setLightboxOpen(true);
   };
 
   const goToVehicle = () => {
@@ -111,8 +114,14 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
       case 'shop':
       case 'timeline_event':
         return t;
+      case 'organization':
+        return 'shop';
+      case 'user':
+        return 'user';
       case 'user_activity':
         return 'user';
+      case 'source':
+        return 'page';
       case 'auction':
       default:
         return 'page';
@@ -149,11 +158,37 @@ const ContentCard = ({ item, viewMode = 'gallery', denseMode = false }: ContentC
         window.location.href = `${baseUrl}vehicle/${item.id}`;
         break;
       case 'image':
-        window.location.href = `${baseUrl}images/${item.id}`;
+        window.location.href = (item as any)?.metadata?.vehicle_id
+          ? `${baseUrl}vehicle/${(item as any).metadata.vehicle_id}`
+          : `${baseUrl}images/${item.id}`;
+        break;
+      case 'organization':
+        window.location.href = `${baseUrl}org/${item.id}`;
+        break;
+      case 'user':
+        window.location.href = `${baseUrl}profile/${item.id}`;
         break;
       case 'shop':
-        window.location.href = `${baseUrl}shops/${item.id}`;
+        window.location.href = `${baseUrl}org/${item.id}`;
         break;
+      case 'source': {
+        const url = (item as any)?.metadata?.url || ((item as any)?.metadata?.domain ? `https://${String((item as any).metadata.domain)}` : null);
+        if (url) {
+          window.open(String(url), '_blank', 'noopener,noreferrer');
+          break;
+        }
+        console.log('View item:', item);
+        break;
+      }
+      case 'auction': {
+        const url = (item as any)?.metadata?.listing_url;
+        if (url) {
+          window.open(String(url), '_blank', 'noopener,noreferrer');
+          break;
+        }
+        console.log('View item:', item);
+        break;
+      }
       case 'timeline_event': {
         const vid = (item as any)?.metadata?.vehicle_id;
         if (vid) {

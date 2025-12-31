@@ -6,6 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const STORAGE_BUCKET = 'vehicle-data';
+
 interface BackfillRequest {
   vehicle_id: string;
   image_urls: string[];
@@ -491,13 +493,13 @@ serve(async (req: Request) => {
         // Deterministic storage path prevents re-upload storms during re-runs.
         const urlHash = await sha1Hex(`${rawUrl}|${extension}`);
         const filename = `${effectiveSource}_${urlHash}.${extension}`;
-        const storagePath = `${vehicle_id}/${effectiveSource}/${filename}`;
+        const storagePath = `vehicles/${vehicle_id}/images/${effectiveSource}/${filename}`;
         
         console.log(`Uploading to storage: ${storagePath}`);
         
         // Upload to storage using Uint8Array (same as backfill-craigslist-images)
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('vehicle-images')
+          .from(STORAGE_BUCKET)
           .upload(storagePath, imageBytes, {
             contentType: `image/${extension}`,
             cacheControl: '3600',
@@ -526,7 +528,7 @@ serve(async (req: Request) => {
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
-          .from('vehicle-images')
+          .from(STORAGE_BUCKET)
           .getPublicUrl(storagePath);
 
         // Validate that the uploaded image is actually accessible to prevent blank squares
@@ -548,21 +550,26 @@ serve(async (req: Request) => {
         }
 
         // CRITICAL: Validate image doesn't belong to another vehicle (prevents contamination)
-        // Check if this image URL already exists for a different vehicle
-        const { data: existingImage } = await supabase
-          .from('vehicle_images')
-          .select('vehicle_id, vehicles!inner(id, year, make, model)')
-          .eq('image_url', publicUrl)
-          .neq('vehicle_id', vehicle_id)
-          .not('is_duplicate', 'is', true)
-          .maybeSingle();
+        // Comparing publicUrl across vehicles is ineffective because our storage paths include vehicle_id.
+        // Use content identity (file_hash) to detect cross-vehicle contamination.
+        if (fileHash) {
+          const { data: existingByHash } = await supabase
+            .from('vehicle_images')
+            .select('vehicle_id, vehicles!inner(id, year, make, model)')
+            .eq('file_hash', fileHash)
+            .neq('vehicle_id', vehicle_id)
+            .not('is_duplicate', 'is', true)
+            .maybeSingle();
 
-        if (existingImage) {
-          const otherVehicle = existingImage.vehicles;
-          console.warn(`⚠️  SKIPPING: Image ${publicUrl.substring(0, 80)}... already belongs to ${otherVehicle.year} ${otherVehicle.make} ${otherVehicle.model} (${otherVehicle.id}), not ${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle_id})`);
-          results.errors.push(`image_belongs_to_other_vehicle: ${rawUrl} :: belongs to ${otherVehicle.id}`);
-          results.failed++;
-          continue;
+          if (existingByHash) {
+            const otherVehicle = (existingByHash as any).vehicles;
+            console.warn(
+              `⚠️  SKIPPING: Image hash already belongs to ${otherVehicle?.year} ${otherVehicle?.make} ${otherVehicle?.model} (${otherVehicle?.id}), not ${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle_id})`
+            );
+            results.errors.push(`image_belongs_to_other_vehicle_by_hash: ${rawUrl} :: belongs to ${otherVehicle?.id || 'unknown'}`);
+            results.failed++;
+            continue;
+          }
         }
 
         // For BAT images: verify they match the vehicle's BAT listing

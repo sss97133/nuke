@@ -247,7 +247,7 @@ export function extractGalleryImagesFromHtml(html: string): { urls: string[]; me
     // Fallback 1: Search for ANY element with data-gallery-items (in case structure changed)
     // But only if we're on a BaT listing page (check for bringatrailer.com in URL or HTML)
     if (h.includes('bringatrailer.com')) {
-      const allGalleryElements = doc?.querySelectorAll?.('[data-gallery-items]') || [];
+      const allGalleryElements = doc?.querySelectorAll?.('#bat_listing_page_photo_gallery [data-gallery-items]') || [];
       for (let i = 0; i < allGalleryElements.length; i++) {
         const el = allGalleryElements[i];
         const attr = el?.getAttribute?.('data-gallery-items');
@@ -293,7 +293,7 @@ export function extractGalleryImagesFromHtml(html: string): { urls: string[]; me
     
     // Fallback 3: Search entire HTML for data-gallery-items (last resort, but still safer than old regex)
     // Only if we haven't found anything yet and we're confident this is a BaT listing page
-    if (h.includes('bringatrailer.com') && h.includes('data-gallery-items')) {
+    if (false && h.includes('bringatrailer.com') && h.includes('data-gallery-items')) {
       // Try to find data-gallery-items anywhere in the HTML
       // Use a more flexible pattern that handles HTML entities
       const globalPatterns = [
@@ -303,10 +303,10 @@ export function extractGalleryImagesFromHtml(html: string): { urls: string[]; me
       
       for (const pattern of globalPatterns) {
         const globalMatch = h.match(pattern);
-        if (globalMatch?.[1]) {
+        const encoded = globalMatch?.[1] || null;
+        if (encoded) {
           console.warn('[batDomMap] Using global regex fallback (all other methods failed)');
-          const encoded = String(globalMatch[1]);
-          const jsonText = safeDecodeHtmlAttr(encoded);
+          const jsonText = safeDecodeHtmlAttr(String(encoded));
           const urls = parseGalleryItems(jsonText);
           if (urls.length > 0) {
             return { urls, method: 'attr:data-gallery-items:regex-fallback:global' };

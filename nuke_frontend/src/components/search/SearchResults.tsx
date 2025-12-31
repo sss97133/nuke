@@ -3,28 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import type { FeedItem } from '../feed/types';
 import ContentCard from '../feed/ContentCard';
 import { highlightSearchTerm } from '../../utils/searchHighlight';
+import type { SearchResult } from '../../types/search';
 import '../../design-system.css';
-
-interface SearchResult {
-  id: string;
-  type: 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference' | 'status';
-  title: string;
-  description: string;
-  metadata: any;
-  relevance_score: number;
-  location?: {
-    lat: number;
-    lng: number;
-    address?: string;
-  };
-  image_url?: string;
-  created_at: string;
-  related_entities?: {
-    vehicles?: any[];
-    organizations?: any[];
-    users?: any[];
-  };
-}
 
 interface SearchResultsProps {
   results: SearchResult[];
@@ -37,7 +17,29 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
   const searchQuery = searchParams.get('q') || '';
   const [viewMode, setViewMode] = useState<'cards' | 'list' | 'map'>('cards');
   const [sortBy, setSortBy] = useState<'relevance' | 'date' | 'location'>('relevance');
-  const [filterBy, setFilterBy] = useState<'all' | 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference'>('all');
+  const [filterBy, setFilterBy] = useState<'all' | 'vehicle' | 'organization' | 'shop' | 'part' | 'user' | 'timeline_event' | 'image' | 'document' | 'auction' | 'reference' | 'source'>('all');
+
+  const getResultHref = (result: SearchResult): string | undefined => {
+    switch (result.type) {
+      case 'vehicle':
+        return `/vehicle/${result.id}`;
+      case 'organization':
+      case 'shop':
+        return `/org/${result.id}`;
+      case 'user':
+        return `/profile/${result.id}`;
+      case 'timeline_event':
+        return result.metadata?.vehicle_id ? `/vehicle/${result.metadata.vehicle_id}?t=timeline&event=${result.id}` : undefined;
+      case 'image':
+        return result.metadata?.vehicle_id ? `/vehicle/${result.metadata.vehicle_id}` : `/images/${result.id}`;
+      case 'auction':
+        return result.metadata?.listing_url ? String(result.metadata.listing_url) : undefined;
+      case 'source':
+        return result.metadata?.url ? String(result.metadata.url) : (result.metadata?.domain ? `https://${String(result.metadata.domain)}` : undefined);
+      default:
+        return undefined;
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -61,6 +63,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
       case 'document': return 'DOC';
       case 'auction': return 'A';
       case 'reference': return 'REF';
+      case 'source': return 'SRC';
       default: return '';
     }
   };
@@ -293,6 +296,7 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
               <option value="document">Documents</option>
               <option value="auction">Auctions</option>
               <option value="reference">References</option>
+              <option value="source">Sources</option>
             </select>
           </div>
 
@@ -469,8 +473,12 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
                 <div
                   key={result.id}
                   onClick={() => {
-                    if (result.type === 'vehicle') {
-                      window.location.href = `/vehicle/${result.id}`;
+                    const href = getResultHref(result);
+                    if (!href) return;
+                    if (href.startsWith('http://') || href.startsWith('https://')) {
+                      window.open(href, '_blank', 'noopener,noreferrer');
+                    } else {
+                      window.location.href = href;
                     }
                   }}
                   style={{

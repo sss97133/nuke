@@ -1,6 +1,6 @@
 export interface FeedItem {
   id: string;
-  type: 'vehicle' | 'timeline_event' | 'shop' | 'auction' | 'image' | 'user_activity';
+  type: 'vehicle' | 'timeline_event' | 'shop' | 'auction' | 'image' | 'user_activity' | 'organization' | 'user' | 'source';
   title: string;
   description: string;
   image_url?: string;

@@ -303,10 +303,21 @@ FROM inserted_vehicle;
 4. **Maintainable:** No technical debt from "300 shitty functions"
 5. **Flexible:** MCP tools allow direct SQL control
 
+## Remote Execution
+
+For details on how this workflow runs remotely, what tools are used, and execution methods, see:
+- **[Remote Execution Architecture](./REMOTE_EXECUTION_ARCHITECTURE.md)** - Complete guide to remote execution
+
+**Quick Summary:**
+- **Edge Function** runs on Supabase Cloud (remote)
+- **MCP Tools** execute SQL remotely via MCP server
+- **AI Assistant** can orchestrate the entire workflow
+- **Scripts** can run from any machine with Deno
+
 ## Next Steps
 
 1. Deploy the `scrape-org` function
 2. Test with sample URLs
-3. Use MCP tools to insert data
+3. Use MCP tools to insert data (see [Remote Execution Architecture](./REMOTE_EXECUTION_ARCHITECTURE.md))
 4. Monitor and refine extraction patterns
 
