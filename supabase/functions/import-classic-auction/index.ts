@@ -251,7 +251,7 @@ serve(async (req) => {
         .from('vehicles')
         .insert({
           year: ymm.year || 0,
-          make: ymm.make || 'Unknown',
+          make: ymm.make || '',
           model: ymm.model || 'Vehicle',
           trim: null,
           description: '',
@@ -275,8 +275,8 @@ serve(async (req) => {
         .from('vehicles')
         .update({
           year: ymm.year || undefined,
-          make: ymm.make || undefined,
-          model: ymm.model || undefined,
+          make: ymm.make ? ymm.make : undefined,
+          model: ymm.model ? ymm.model : undefined,
           listing_url: url,
           discovery_url: url,
           origin_metadata: {

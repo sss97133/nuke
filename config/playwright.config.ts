@@ -13,7 +13,7 @@ export default defineConfig({
   reporter: 'html',
   
   use: {
-    baseURL: 'https://nukefrontend-5dzr395le-nzero.vercel.app',
+    baseURL: 'https://n-zero.dev',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
