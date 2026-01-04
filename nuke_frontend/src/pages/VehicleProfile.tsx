@@ -3416,14 +3416,7 @@ const VehicleProfile: React.FC = () => {
 
         {/* Two Column Layout: Left (vehicle info, investment, ref docs, description, comments & bids, privacy) | Right (image gallery) */}
         <section className="section">
-          <div 
-            className="vehicle-profile-two-column"
-            style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '320px 1fr', 
-              gap: 'var(--space-4)'
-            }}
-          >
+          <div className="vehicle-profile-two-column">
             {/* Left Column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               {/* Vehicle Info */}

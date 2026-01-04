@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { AdminNotificationService } from '../../services/adminNotificationService';
+import { useToast } from '../../hooks/useToast';
+import { StreamActionsService, type StreamAction } from '../../services/streamActionsService';
 
 type StreamActionPackRow = {
   id: string;
@@ -23,11 +25,14 @@ function slugify(s: string) {
 
 export default function MemeLibraryAdmin() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [packs, setPacks] = useState<StreamActionPackRow[]>([]);
   const [selectedPackId, setSelectedPackId] = useState<string>('');
+  const [actions, setActions] = useState<StreamAction[]>([]);
+  const [editingActionId, setEditingActionId] = useState<string | null>(null);
 
   const [packSlug, setPackSlug] = useState('');
   const [packName, setPackName] = useState('');
@@ -60,12 +65,30 @@ export default function MemeLibraryAdmin() {
   };
 
   const refresh = async () => {
-    const { data, error } = await supabase
-      .from('stream_action_packs')
-      .select('id, slug, name, description, price_cents, is_active')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    setPacks((data || []) as StreamActionPackRow[]);
+    try {
+      const { data, error } = await supabase
+        .from('stream_action_packs')
+        .select('id, slug, name, description, price_cents, is_active')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setPacks((data || []) as StreamActionPackRow[]);
+      
+      if (selectedPackId) {
+        await refreshActions();
+      }
+    } catch (e: any) {
+      showToast(e?.message || 'Failed to refresh packs', 'error');
+    }
+  };
+
+  const refreshActions = async () => {
+    if (!selectedPackId) return;
+    try {
+      const acts = await StreamActionsService.listActionsForPacks([selectedPackId], true);
+      setActions(acts);
+    } catch (e: any) {
+      showToast(e?.message || 'Failed to load actions', 'error');
+    }
   };
 
   useEffect(() => {
@@ -94,6 +117,14 @@ export default function MemeLibraryAdmin() {
     if (!packs.length) return;
     setSelectedPackId((prev) => (prev && packs.some((p) => p.id === prev) ? prev : packs[0].id));
   }, [packs]);
+
+  useEffect(() => {
+    if (selectedPackId) {
+      void refreshActions();
+    } else {
+      setActions([]);
+    }
+  }, [selectedPackId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!packName) return;
@@ -129,33 +160,94 @@ export default function MemeLibraryAdmin() {
       setPackDescription('');
       setPackPriceCents(0);
       setPackActive(true);
+      showToast('Pack saved successfully', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Failed to save pack', 'error');
     } finally {
       setLoading(false);
     }
   };
 
+  const deletePack = async (packId: string) => {
+    if (!confirm('Delete this pack? All actions in the pack will also be deleted.')) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.rpc('admin_delete_stream_action_pack', { p_pack_id: packId });
+      if (error) throw error;
+      await refresh();
+      showToast('Pack deleted successfully', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Failed to delete pack', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearActionForm = () => {
+    setActionTitle('');
+    setActionSlug('');
+    setActionDurationMs(1800);
+    setActionCooldownMs(2500);
+    setActionActive(true);
+    setActionFile(null);
+    setActionSourceUrl('');
+    setActionAttribution('');
+    setActionLicense('');
+    setActionTags('');
+    setActionImportUrl('');
+    setEditingActionId(null);
+  };
+
+  const loadActionForEdit = (action: StreamAction) => {
+    setEditingActionId(action.id);
+    setActionTitle(action.title);
+    setActionSlug(action.slug);
+    setActionDurationMs(action.duration_ms);
+    setActionCooldownMs(action.cooldown_ms);
+    setActionActive(action.is_active);
+    setActionSourceUrl(action.source_url || '');
+    setActionAttribution(action.attribution || '');
+    setActionLicense(action.license || '');
+    setActionTags(action.tags?.join(', ') || '');
+    setActionFile(null);
+    setActionImportUrl('');
+  };
+
   const uploadAndCreateAction = async () => {
-    if (!selectedPack) throw new Error('Select a pack first');
-    if (!actionFile) throw new Error('Choose an image/gif file');
+    if (!selectedPack) {
+      showToast('Select a pack first', 'warning');
+      return;
+    }
+    if (!editingActionId && !actionFile && !actionImportUrl) {
+      showToast('Choose an image/gif file or provide an import URL', 'warning');
+      return;
+    }
 
     const title = String(actionTitle || '').trim();
     const slug = slugify(actionSlug || actionTitle);
-    if (!title || !slug) throw new Error('Missing action title/slug');
-
-    const ext = (actionFile.name.split('.').pop() || 'png').toLowerCase();
-    const safeExt = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext) ? ext : 'png';
-    const objectPath = `packs/${selectedPack.slug}/${slug}.${safeExt}`;
+    if (!title || !slug) {
+      showToast('Missing action title/slug', 'warning');
+      return;
+    }
 
     try {
       setLoading(true);
 
-      const { error: uploadErr, data: uploadData } = await supabase.storage
-        .from('meme-assets')
-        .upload(objectPath, actionFile, { upsert: true, cacheControl: '3600' });
-      if (uploadErr) throw uploadErr;
+      let publicUrl = editingActionId ? actions.find((a) => a.id === editingActionId)?.image_url || null : null;
 
-      const publicUrl = supabase.storage.from('meme-assets').getPublicUrl(uploadData.path).data.publicUrl;
-      if (!publicUrl) throw new Error('Failed to create public URL');
+      if (actionFile) {
+        const ext = (actionFile.name.split('.').pop() || 'png').toLowerCase();
+        const safeExt = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext) ? ext : 'png';
+        const objectPath = `packs/${selectedPack.slug}/${slug}.${safeExt}`;
+
+        const { error: uploadErr, data: uploadData } = await supabase.storage
+          .from('meme-assets')
+          .upload(objectPath, actionFile, { upsert: true, cacheControl: '3600' });
+        if (uploadErr) throw uploadErr;
+
+        publicUrl = supabase.storage.from('meme-assets').getPublicUrl(uploadData.path).data.publicUrl;
+        if (!publicUrl) throw new Error('Failed to create public URL');
+      }
 
       const { data: actionId, error } = await supabase.rpc('admin_upsert_stream_action', {
         p_pack_id: selectedPack.id,
@@ -181,33 +273,52 @@ export default function MemeLibraryAdmin() {
       });
       if (error) throw error;
 
-      setActionTitle('');
-      setActionSlug('');
-      setActionDurationMs(1800);
-      setActionCooldownMs(2500);
-      setActionActive(true);
-      setActionFile(null);
-      setActionSourceUrl('');
-      setActionAttribution('');
-      setActionLicense('');
-      setActionTags('');
-      setActionImportUrl('');
+      clearActionForm();
+      await refreshActions();
+      showToast(editingActionId ? 'Action updated successfully' : 'Action created successfully', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Failed to save action', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      return actionId;
+  const deleteAction = async (actionId: string) => {
+    if (!confirm('Delete this action?')) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.rpc('admin_delete_stream_action', { p_action_id: actionId });
+      if (error) throw error;
+      await refreshActions();
+      showToast('Action deleted successfully', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Failed to delete action', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const importFromUrl = async () => {
-    if (!selectedPack) throw new Error('Select a pack first');
+    if (!selectedPack) {
+      showToast('Select a pack first', 'warning');
+      return;
+    }
     const title = String(actionTitle || '').trim();
     const slug = slugify(actionSlug || actionTitle);
     const url = String(actionImportUrl || '').trim();
     const license = String(actionLicense || '').trim();
-    if (!title || !slug) throw new Error('Missing action title/slug');
-    if (!url) throw new Error('Missing URL');
-    if (!license) throw new Error('License is required for URL imports');
+    if (!title || !slug) {
+      showToast('Missing action title/slug', 'warning');
+      return;
+    }
+    if (!url) {
+      showToast('Missing URL', 'warning');
+      return;
+    }
+    if (!license) {
+      showToast('License is required for URL imports', 'warning');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -243,17 +354,11 @@ export default function MemeLibraryAdmin() {
         throw new Error(json?.error || `Import failed (${resp.status})`);
       }
 
-      setActionTitle('');
-      setActionSlug('');
-      setActionDurationMs(1800);
-      setActionCooldownMs(2500);
-      setActionActive(true);
-      setActionFile(null);
-      setActionSourceUrl('');
-      setActionAttribution('');
-      setActionLicense('');
-      setActionTags('');
-      setActionImportUrl('');
+      clearActionForm();
+      await refreshActions();
+      showToast('Action imported successfully', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Failed to import action', 'error');
     } finally {
       setLoading(false);
     }
@@ -321,7 +426,19 @@ export default function MemeLibraryAdmin() {
                 <input value={packDescription} onChange={(e) => setPackDescription(e.target.value)} disabled={loading} />
               </label>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, alignItems: 'center' }}>
+              <div style={{ fontSize: '8pt', color: '#6b7280' }}>
+                {selectedPackId && selectedPack ? (
+                  <button
+                    className="button button-secondary"
+                    onClick={() => void deletePack(selectedPack.id)}
+                    disabled={loading}
+                    style={{ fontSize: '8pt', padding: '6px 10px' }}
+                  >
+                    DELETE PACK
+                  </button>
+                ) : null}
+              </div>
               <button className="button button-primary" onClick={() => void createOrUpdatePack()} disabled={loading}>
                 {loading ? 'WORKING...' : 'SAVE PACK'}
               </button>
@@ -428,18 +545,89 @@ export default function MemeLibraryAdmin() {
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
             <div style={{ fontSize: '8pt', color: '#6b7280' }}>
               Target pack: <b>{selectedPack ? `${selectedPack.name} (${selectedPack.slug})` : 'none'}</b>
+              {editingActionId ? <span style={{ marginLeft: 8, color: '#f59e0b' }}>(EDITING)</span> : null}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="button button-secondary" onClick={() => void importFromUrl()} disabled={loading || !selectedPackId}>
+              {editingActionId ? (
+                <button className="button button-secondary" onClick={() => clearActionForm()} disabled={loading}>
+                  CANCEL
+                </button>
+              ) : null}
+              <button className="button button-secondary" onClick={() => void importFromUrl()} disabled={loading || !selectedPackId || !!editingActionId}>
                 {loading ? 'WORKING...' : 'IMPORT URL'}
               </button>
               <button className="button button-primary" onClick={() => void uploadAndCreateAction()} disabled={loading || !selectedPackId}>
-                {loading ? 'WORKING...' : 'UPLOAD + CREATE'}
+                {loading ? 'WORKING...' : editingActionId ? 'UPDATE ACTION' : 'UPLOAD + CREATE'}
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {selectedPackId && actions.length > 0 ? (
+        <div className="card">
+          <div className="card-header">Existing Actions ({actions.length})</div>
+          <div className="card-body">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+              {actions.map((action) => (
+                <div
+                  key={action.id}
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: '4px',
+                    padding: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}
+                >
+                  {action.image_url ? (
+                    <img
+                      src={action.image_url}
+                      alt={action.title}
+                      style={{
+                        width: '100%',
+                        height: 120,
+                        objectFit: 'cover',
+                        border: '1px solid rgba(0,0,0,0.1)',
+                        borderRadius: '4px',
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : null}
+                  <div style={{ fontSize: '9pt', fontWeight: 700 }}>{action.title}</div>
+                  <div style={{ fontSize: '7pt', color: '#6b7280' }}>
+                    {action.tags?.length ? `Tags: ${action.tags.join(', ')}` : 'No tags'}
+                  </div>
+                  <div style={{ fontSize: '7pt', color: '#6b7280' }}>
+                    {action.is_active ? 'Active' : 'Inactive'} · {action.duration_ms}ms
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <button
+                      className="button button-secondary"
+                      onClick={() => loadActionForEdit(action)}
+                      disabled={loading}
+                      style={{ fontSize: '8pt', padding: '6px 10px', flex: 1 }}
+                    >
+                      EDIT
+                    </button>
+                    <button
+                      className="button button-secondary"
+                      onClick={() => void deleteAction(action.id)}
+                      disabled={loading}
+                      style={{ fontSize: '8pt', padding: '6px 10px', flex: 1, color: '#dc2626' }}
+                    >
+                      DELETE
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

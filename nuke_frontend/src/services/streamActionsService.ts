@@ -21,6 +21,11 @@ export type StreamAction = {
   duration_ms: number;
   cooldown_ms: number;
   is_active: boolean;
+  source_url: string | null;
+  attribution: string | null;
+  license: string | null;
+  tags: string[];
+  metadata: Record<string, any>;
 };
 
 export type StreamActionPurchase = {
@@ -88,14 +93,28 @@ export const StreamActionsService = {
     return (data || []) as StreamActionPurchase[];
   },
 
-  async listActionsForPacks(packIds: string[]): Promise<StreamAction[]> {
+  async listActionsForPacks(packIds: string[], includeInactive = false): Promise<StreamAction[]> {
     if (!packIds.length) return [];
-    const { data, error } = await supabase
+    let query = supabase
       .from('stream_actions')
-      .select('id, pack_id, slug, title, kind, render_text, image_url, sound_key, duration_ms, cooldown_ms, is_active')
-      .in('pack_id', packIds)
-      .eq('is_active', true)
-      .order('title', { ascending: true });
+      .select('id, pack_id, slug, title, kind, render_text, image_url, sound_key, duration_ms, cooldown_ms, is_active, source_url, attribution, license, tags, metadata')
+      .in('pack_id', packIds);
+    if (!includeInactive) {
+      query = query.eq('is_active', true);
+    }
+    const { data, error } = await query.order('title', { ascending: true });
+    if (error) throw error;
+    return (data || []) as StreamAction[];
+  },
+
+  async listAllActions(includeInactive = false): Promise<StreamAction[]> {
+    let query = supabase
+      .from('stream_actions')
+      .select('id, pack_id, slug, title, kind, render_text, image_url, sound_key, duration_ms, cooldown_ms, is_active, source_url, attribution, license, tags, metadata');
+    if (!includeInactive) {
+      query = query.eq('is_active', true);
+    }
+    const { data, error } = await query.order('title', { ascending: true });
     if (error) throw error;
     return (data || []) as StreamAction[];
   },
@@ -133,6 +152,16 @@ export const StreamActionsService = {
       .limit(limit);
     if (error) throw error;
     return (data || []) as ContentActionEvent[];
+  },
+
+  async deleteAction(actionId: string) {
+    const { error } = await supabase.rpc('admin_delete_stream_action', { p_action_id: actionId });
+    if (error) throw error;
+  },
+
+  async deletePack(packId: string) {
+    const { error } = await supabase.rpc('admin_delete_stream_action_pack', { p_pack_id: packId });
+    if (error) throw error;
   },
 };
 

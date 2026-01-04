@@ -23,7 +23,8 @@
     "ingest:classic-auctions": "tsx scripts/classic-import-auctions.ts",
     "extract-all-orgs": "tsx scripts/extract-all-orgs.ts",
     "extract-inventory": "node scripts/invoke-extract-inventory.js",
-    "trickle-backfill-images": "tsx scripts/trickle-backfill-images.ts"
+    "trickle-backfill-images": "tsx scripts/trickle-backfill-images.ts",
+    "import:memes": "tsx scripts/import-popular-memes.ts"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^4.8.2",

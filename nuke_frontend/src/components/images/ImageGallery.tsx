@@ -2085,7 +2085,7 @@ const ImageGallery = ({
 
       {/* Gallery Controls */}
       <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', flexWrap: 'wrap', minWidth: 0 }}>
           {/* View Mode */}
           <div style={{ display: 'flex', border: '2px solid var(--border)', backgroundColor: 'var(--white)' }}>
             <button
