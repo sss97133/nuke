@@ -1,18 +1,1913 @@
 # Page snapshot
 
 ```yaml
-- main [ref=e3]:
-  - paragraph [ref=e4]:
-    - generic [ref=e5]:
-      - strong [ref=e6]: "404"
-      - text: ": NOT_FOUND"
-    - generic [ref=e7]:
-      - text: "Code:"
-      - code [ref=e8]: "`DEPLOYMENT_NOT_FOUND`"
-    - generic [ref=e9]:
-      - text: "ID:"
-      - code [ref=e10]: "`iad1::prsh6-1767218386815-7afc75fc7bb0`"
-  - link "This deployment cannot be found. For more information and troubleshooting, see our documentation." [ref=e11] [cursor=pointer]:
-    - /url: https://vercel.com/docs/errors/DEPLOYMENT_NOT_FOUND
-    - generic [ref=e12]: This deployment cannot be found. For more information and troubleshooting, see our documentation.
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - button "n-zero ▶" [ref=e9] [cursor=pointer]:
+      - generic [ref=e10]: n-zero
+      - generic [ref=e11]: ▶
+    - generic [ref=e14]:
+      - textbox "AI input" [ref=e15]:
+        - /placeholder: VIN, URL, search query, or image...
+      - button "..." [ref=e16] [cursor=pointer]
+    - link "Login" [ref=e19] [cursor=pointer]:
+      - /url: /login
+  - main [ref=e20]:
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]: 6,436 veh
+          - generic [ref=e27]: "|"
+          - generic [ref=e28]: $72,995,245 val
+          - generic [ref=e29]: "|"
+          - generic [ref=e30]: $5,586,290 24h
+          - generic [ref=e31]: "|"
+          - generic [ref=e32]: 11 auct
+          - generic [ref=e33]: "|"
+          - generic [ref=e34]: $99,313 avg
+          - generic "6 per row" [ref=e36]:
+            - generic [ref=e37]: 6/row
+            - slider [ref=e38]: "6"
+          - button "hide" [ref=e39] [cursor=pointer]
+        - generic [ref=e40]:
+          - button "year" [ref=e41] [cursor=pointer]
+          - button "make" [ref=e42] [cursor=pointer]
+          - button "price" [ref=e43] [cursor=pointer]
+          - button "price range" [ref=e44] [cursor=pointer]
+          - button "location" [ref=e45] [cursor=pointer]
+          - button "type" [ref=e46] [cursor=pointer]
+          - 'button "sources: 111/111" [ref=e47] [cursor=pointer]'
+          - button "status" [ref=e48] [cursor=pointer]
+        - generic [ref=e49]:
+          - generic [ref=e50]:
+            - generic [ref=e51]:
+              - spinbutton [ref=e52]
+              - generic [ref=e53]: to
+              - spinbutton [ref=e54]
+            - generic [ref=e55]:
+              - button "64-91" [ref=e56] [cursor=pointer]
+              - button "73-87" [ref=e57] [cursor=pointer]
+              - button "67-72" [ref=e58] [cursor=pointer]
+              - button "87-00" [ref=e59] [cursor=pointer]
+              - button "60s" [ref=e60] [cursor=pointer]
+              - button "70s" [ref=e61] [cursor=pointer]
+              - button "80s" [ref=e62] [cursor=pointer]
+              - button "90s" [ref=e63] [cursor=pointer]
+          - generic [ref=e64]:
+            - textbox "min" [ref=e65]
+            - generic [ref=e66]: –
+            - textbox "max" [ref=e67]
+          - generic [ref=e69]:
+            - textbox "ZIP" [ref=e70]
+            - generic [ref=e71]: within
+            - combobox [ref=e72] [cursor=pointer]:
+              - option "10mi"
+              - option "25mi"
+              - option "50mi" [selected]
+              - option "100mi"
+              - option "250mi"
+              - option "500mi"
+            - button "add" [disabled] [ref=e73] [cursor=pointer]
+            - button "save" [disabled] [ref=e74] [cursor=pointer]
+          - generic [ref=e75]:
+            - generic [ref=e76] [cursor=pointer]:
+              - checkbox "for sale only" [ref=e77]
+              - generic [ref=e78]: for sale only
+            - generic [ref=e79] [cursor=pointer]:
+              - checkbox "hide sold" [ref=e80]
+              - generic [ref=e81]: hide sold
+            - generic [ref=e82] [cursor=pointer]:
+              - checkbox "show pending" [ref=e83]
+              - generic [ref=e84]: show pending
+            - generic [ref=e85] [cursor=pointer]:
+              - checkbox "private party" [ref=e86]
+              - generic [ref=e87]: private party
+            - generic [ref=e88] [cursor=pointer]:
+              - checkbox "dealer" [ref=e89]
+              - generic [ref=e90]: dealer
+      - generic [ref=e91]:
+        - link "1980 International Scout II 1980 International Scout II C tier" [ref=e92] [cursor=pointer]:
+          - /url: /vehicle/b2132b1e-66ee-434c-a154-1f44bc67aedf
+          - img "1980 International Scout II" [ref=e95]
+          - generic [ref=e97]:
+            - generic "1980 International Scout II" [ref=e98]
+            - generic [ref=e100]: C tier
+        - link "1968 Ford Mustang 1968 Ford Mustang C tier" [ref=e101] [cursor=pointer]:
+          - /url: /vehicle/bc87e4af-618a-49cd-9a7b-c9f9715aaa7d
+          - img "1968 Ford Mustang" [ref=e104]
+          - generic [ref=e106]:
+            - generic "1968 Ford Mustang" [ref=e107]
+            - generic [ref=e109]: C tier
+        - link "1972 Chevrolet K5 Blazer 1972 Chevrolet K5 Blazer C tier" [ref=e110] [cursor=pointer]:
+          - /url: /vehicle/a7fbd3c6-7e35-455b-a501-9ba30ccbbc11
+          - img "1972 Chevrolet K5 Blazer" [ref=e113]
+          - generic [ref=e115]:
+            - generic "1972 Chevrolet K5 Blazer" [ref=e116]
+            - generic [ref=e118]: C tier
+        - link "1970 Ford Mustang Lot 1154889 // January 13th, 2026 ▼ 1970 Ford Mustang • Mach 1 C tier" [ref=e119] [cursor=pointer]:
+          - /url: /vehicle/d8adc3dc-c817-4aa0-874b-d2e84cc34b2e
+          - generic [ref=e120]:
+            - img "1970 Ford Mustang" [ref=e122]
+            - button "Lot 1154889 // January 13th, 2026 ▼" [ref=e125]:
+              - generic [ref=e126]: Lot 1154889
+              - generic [ref=e127]: //
+              - time [ref=e128]: January 13th, 2026
+              - generic [ref=e129]: ▼
+          - generic [ref=e131]:
+            - generic "1970 Ford Mustang Mach 1" [ref=e132]:
+              - text: 1970 Ford Mustang
+              - generic [ref=e133]: • Mach 1
+            - generic [ref=e135]: C tier
+        - link "1969 Chevrolet Chevelle Lot 1153055 // January 14th, 2026 ▼ 1969 Chevrolet Chevelle • SS C tier" [ref=e136] [cursor=pointer]:
+          - /url: /vehicle/5061914b-3247-40b1-89e2-48ae87ebf908
+          - generic [ref=e137]:
+            - img "1969 Chevrolet Chevelle" [ref=e139]
+            - button "Lot 1153055 // January 14th, 2026 ▼" [ref=e142]:
+              - generic [ref=e143]: Lot 1153055
+              - generic [ref=e144]: //
+              - time [ref=e145]: January 14th, 2026
+              - generic [ref=e146]: ▼
+          - generic [ref=e148]:
+            - generic "1969 Chevrolet Chevelle SS" [ref=e149]:
+              - text: 1969 Chevrolet Chevelle
+              - generic [ref=e150]: • SS
+            - generic [ref=e152]: C tier
+        - link "1965 Plymouth Satellite Lot 1154872 // January 13th, 2026 ▼ 1965 Plymouth Satellite • Convertible C tier" [ref=e153] [cursor=pointer]:
+          - /url: /vehicle/b2d9a7d5-0c28-4de1-b634-9bd28d0ce84a
+          - generic [ref=e154]:
+            - img "1965 Plymouth Satellite" [ref=e156]
+            - button "Lot 1154872 // January 13th, 2026 ▼" [ref=e159]:
+              - generic [ref=e160]: Lot 1154872
+              - generic [ref=e161]: //
+              - time [ref=e162]: January 13th, 2026
+              - generic [ref=e163]: ▼
+          - generic [ref=e165]:
+            - generic "1965 Plymouth Satellite Convertible" [ref=e166]:
+              - text: 1965 Plymouth Satellite
+              - generic [ref=e167]: • Convertible
+            - generic [ref=e169]: C tier
+        - link "1970 AMC AMX Lot 1154883 // January 13th, 2026 ▼ 1970 AMC AMX C tier" [ref=e170] [cursor=pointer]:
+          - /url: /vehicle/ddd199e5-c009-4bcf-9dcd-a80563a74e88
+          - generic [ref=e171]:
+            - img "1970 AMC AMX" [ref=e173]
+            - button "Lot 1154883 // January 13th, 2026 ▼" [ref=e176]:
+              - generic [ref=e177]: Lot 1154883
+              - generic [ref=e178]: //
+              - time [ref=e179]: January 13th, 2026
+              - generic [ref=e180]: ▼
+          - generic [ref=e182]:
+            - generic "1970 AMC AMX" [ref=e183]
+            - generic [ref=e185]: C tier
+        - link "1966 Shelby GT350 Lot 1154874 // January 13th, 2026 ▼ 1966 Shelby GT350 C tier" [ref=e186] [cursor=pointer]:
+          - /url: /vehicle/2ca90a07-ead4-404f-bb9d-f496a42dd368
+          - generic [ref=e187]:
+            - img "1966 Shelby GT350" [ref=e189]
+            - button "Lot 1154874 // January 13th, 2026 ▼" [ref=e192]:
+              - generic [ref=e193]: Lot 1154874
+              - generic [ref=e194]: //
+              - time [ref=e195]: January 13th, 2026
+              - generic [ref=e196]: ▼
+          - generic [ref=e198]:
+            - generic "1966 Shelby GT350" [ref=e199]
+            - generic [ref=e201]: C tier
+        - link "1965 Pontiac GTO Lot 1155209 // January 14th, 2026 ▼ 1965 Pontiac GTO C tier" [ref=e202] [cursor=pointer]:
+          - /url: /vehicle/501cef9c-39cc-4294-baab-684158f895d0
+          - generic [ref=e203]:
+            - img "1965 Pontiac GTO" [ref=e205]
+            - button "Lot 1155209 // January 14th, 2026 ▼" [ref=e208]:
+              - generic [ref=e209]: Lot 1155209
+              - generic [ref=e210]: //
+              - time [ref=e211]: January 14th, 2026
+              - generic [ref=e212]: ▼
+          - generic [ref=e214]:
+            - generic "1965 Pontiac GTO" [ref=e215]
+            - generic [ref=e217]: C tier
+        - link "1969 Chevrolet Nova Lot 1154880 // January 13th, 2026 ▼ 1969 Chevrolet Nova • SS C tier" [ref=e218] [cursor=pointer]:
+          - /url: /vehicle/404788c2-e467-40b0-b6c2-0b7e4b85307b
+          - generic [ref=e219]:
+            - img "1969 Chevrolet Nova" [ref=e221]
+            - button "Lot 1154880 // January 13th, 2026 ▼" [ref=e224]:
+              - generic [ref=e225]: Lot 1154880
+              - generic [ref=e226]: //
+              - time [ref=e227]: January 13th, 2026
+              - generic [ref=e228]: ▼
+          - generic [ref=e230]:
+            - generic "1969 Chevrolet Nova SS" [ref=e231]:
+              - text: 1969 Chevrolet Nova
+              - generic [ref=e232]: • SS
+            - generic [ref=e234]: C tier
+        - link "1932 Ford Custom Lot 1154824 // January 13th, 2026 ▼ 1932 Ford Custom C tier" [ref=e235] [cursor=pointer]:
+          - /url: /vehicle/91847741-5769-4705-95c2-a080e7d27bf9
+          - generic [ref=e236]:
+            - img "1932 Ford Custom" [ref=e238]
+            - button "Lot 1154824 // January 13th, 2026 ▼" [ref=e241]:
+              - generic [ref=e242]: Lot 1154824
+              - generic [ref=e243]: //
+              - time [ref=e244]: January 13th, 2026
+              - generic [ref=e245]: ▼
+          - generic [ref=e247]:
+            - generic "1932 Ford Custom" [ref=e248]
+            - generic [ref=e250]: C tier
+        - link "1968 Shelby GT500 Lot 1152861 // January 16th, 2026 ▼ 1968 Shelby GT500 C tier" [ref=e251] [cursor=pointer]:
+          - /url: /vehicle/370c65c2-0b6a-468e-9dcf-21d82796c1d2
+          - generic [ref=e252]:
+            - img "1968 Shelby GT500" [ref=e254]
+            - button "Lot 1152861 // January 16th, 2026 ▼" [ref=e257]:
+              - generic [ref=e258]: Lot 1152861
+              - generic [ref=e259]: //
+              - time [ref=e260]: January 16th, 2026
+              - generic [ref=e261]: ▼
+          - generic [ref=e263]:
+            - generic "1968 Shelby GT500" [ref=e264]
+            - generic [ref=e266]: C tier
+        - link "1957 Chevrolet Bel Air Lot 1154840 // January 13th, 2026 ▼ 1957 Chevrolet Bel Air • Convertible C tier" [ref=e267] [cursor=pointer]:
+          - /url: /vehicle/f4055927-4ebc-4e6d-8139-17655468d428
+          - generic [ref=e268]:
+            - img "1957 Chevrolet Bel Air" [ref=e270]
+            - button "Lot 1154840 // January 13th, 2026 ▼" [ref=e273]:
+              - generic [ref=e274]: Lot 1154840
+              - generic [ref=e275]: //
+              - time [ref=e276]: January 13th, 2026
+              - generic [ref=e277]: ▼
+          - generic [ref=e279]:
+            - generic "1957 Chevrolet Bel Air Convertible" [ref=e280]:
+              - text: 1957 Chevrolet Bel Air
+              - generic [ref=e281]: • Convertible
+            - generic [ref=e283]: C tier
+        - link "1942 Packard 120 Lot 1154830 // January 13th, 2026 ▼ 1942 Packard 120 C tier" [ref=e284] [cursor=pointer]:
+          - /url: /vehicle/a763e3fc-12b5-44e4-81a8-c5fdfb20a884
+          - generic [ref=e285]:
+            - img "1942 Packard 120" [ref=e287]
+            - button "Lot 1154830 // January 13th, 2026 ▼" [ref=e290]:
+              - generic [ref=e291]: Lot 1154830
+              - generic [ref=e292]: //
+              - time [ref=e293]: January 13th, 2026
+              - generic [ref=e294]: ▼
+          - generic [ref=e296]:
+            - generic "1942 Packard 120" [ref=e297]
+            - generic [ref=e299]: C tier
+        - link "1974 Porsche 911S Lot 179660 // April 11th, 2014 ▼ 1974 Porsche 911S • Race Car • 4-speed manual C tier" [ref=e300] [cursor=pointer]:
+          - /url: /vehicle/0c6adc05-f675-4e44-9896-725f997eb7f1
+          - generic [ref=e301]:
+            - img "1974 Porsche 911S" [ref=e303]
+            - button "Lot 179660 // April 11th, 2014 ▼" [ref=e306]:
+              - generic [ref=e307]: Lot 179660
+              - generic [ref=e308]: //
+              - time [ref=e309]: April 11th, 2014
+              - generic [ref=e310]: ▼
+          - generic [ref=e312]:
+            - generic "1974 Porsche 911S Race Car 4-speed manual" [ref=e313]:
+              - text: 1974 Porsche 911S
+              - generic [ref=e314]: • Race Car • 4-speed manual
+            - generic [ref=e316]: C tier
+        - link "1977 Pontiac Trans Am Lot 1154488 // January 9th, 2026 ▼ 1977 Pontiac Trans Am C tier" [ref=e317] [cursor=pointer]:
+          - /url: /vehicle/658b04f2-8326-4892-a0aa-3b2a1e6d1233
+          - generic [ref=e318]:
+            - img "1977 Pontiac Trans Am" [ref=e320]
+            - button "Lot 1154488 // January 9th, 2026 ▼" [ref=e323]:
+              - generic [ref=e324]: Lot 1154488
+              - generic [ref=e325]: //
+              - time [ref=e326]: January 9th, 2026
+              - generic [ref=e327]: ▼
+          - generic [ref=e329]:
+            - generic "1977 Pontiac Trans Am" [ref=e330]
+            - generic [ref=e332]: C tier
+        - link "2014 Chevrolet Corvette Stingray Coupe $16,900 2014 Chevrolet Corvette C tier" [ref=e333] [cursor=pointer]:
+          - /url: /vehicle/34d95c26-ac15-41e0-85f3-c228a617b152
+          - generic [ref=e334]:
+            - img "2014 Chevrolet Corvette Stingray Coupe" [ref=e336]
+            - generic [ref=e338]: $16,900
+          - generic [ref=e340]:
+            - generic "2014 Chevrolet Corvette" [ref=e341]
+            - generic [ref=e343]: C tier
+        - link "2007 Chevrolet Corvette Z06 $27,250 2007 Chevrolet Corvette C tier" [ref=e344] [cursor=pointer]:
+          - /url: /vehicle/17eee0e4-c462-42df-8874-1b59860c1fb3
+          - generic [ref=e345]:
+            - img "2007 Chevrolet Corvette Z06" [ref=e347]
+            - generic [ref=e349]: $27,250
+          - generic [ref=e351]:
+            - generic "2007 Chevrolet Corvette" [ref=e352]
+            - generic [ref=e354]: C tier
+        - link "1966 Rolls-royce Silver Cloud III Mulliner Park Ward Drophead Coupe $83,375 1966 Rolls-royce Silver Cloud III Mulliner Park Ward Drophead Coupe C tier" [ref=e355] [cursor=pointer]:
+          - /url: /vehicle/4c5bce99-9a7b-4d66-96ec-65611a23b6de
+          - generic [ref=e356]:
+            - img "1966 Rolls-royce Silver Cloud III Mulliner Park Ward Drophead Coupe" [ref=e358]
+            - generic [ref=e360]: $83,375
+          - generic [ref=e362]:
+            - generic "1966 Rolls-royce Silver Cloud III Mulliner Park Ward Drophead Coupe" [ref=e363]
+            - generic [ref=e365]: C tier
+        - link "2002 Chevrolet Corvette Convertible $10,500 2002 Chevrolet Corvette C tier" [ref=e366] [cursor=pointer]:
+          - /url: /vehicle/f5e7a154-3d19-4f3a-9cea-2dea8134c709
+          - generic [ref=e367]:
+            - img "2002 Chevrolet Corvette Convertible" [ref=e369]
+            - generic [ref=e371]: $10,500
+          - generic [ref=e373]:
+            - generic "2002 Chevrolet Corvette" [ref=e374]
+            - generic [ref=e376]: C tier
+        - link "2019 Chevrolet Corvette Grand Sport Coupe $43,500 2019 Chevrolet Corvette C tier" [ref=e377] [cursor=pointer]:
+          - /url: /vehicle/b3de4394-28cc-4c36-b66b-0eb875bebff3
+          - generic [ref=e378]:
+            - img "2019 Chevrolet Corvette Grand Sport Coupe" [ref=e380]
+            - generic [ref=e382]: $43,500
+          - generic [ref=e384]:
+            - generic "2019 Chevrolet Corvette" [ref=e385]
+            - generic [ref=e387]: C tier
+        - link "1964 Bentley S3 Continental Mulliner Park Ward Drophead Coupe $57,500 1964 Bentley S3 Continental Mulliner Park Ward Drophead Coupe C tier" [ref=e388] [cursor=pointer]:
+          - /url: /vehicle/e7954e5f-9a78-4e32-8ea8-2d251aaea4aa
+          - generic [ref=e389]:
+            - img "1964 Bentley S3 Continental Mulliner Park Ward Drophead Coupe" [ref=e391]
+            - generic [ref=e393]: $57,500
+          - generic [ref=e395]:
+            - generic "1964 Bentley S3 Continental Mulliner Park Ward Drophead Coupe" [ref=e396]
+            - generic [ref=e398]: C tier
+        - link "1988 Rolls-royce Corniche II $52,900 1988 Rolls-royce Corniche II C tier" [ref=e399] [cursor=pointer]:
+          - /url: /vehicle/c0ee68af-8607-41a7-90d4-baec7ef3ee39
+          - generic [ref=e400]:
+            - img "1988 Rolls-royce Corniche II" [ref=e402]
+            - generic [ref=e404]: $52,900
+          - generic [ref=e406]:
+            - generic "1988 Rolls-royce Corniche II" [ref=e407]
+            - generic [ref=e409]: C tier
+        - link "2020 Bugatti Chiron Sport 2020 Bugatti Chiron Sport C tier" [ref=e410] [cursor=pointer]:
+          - /url: /vehicle/d942298d-9713-4586-bae4-8c9cc5e1b36e
+          - img "2020 Bugatti Chiron Sport" [ref=e413]
+          - generic [ref=e415]:
+            - generic "2020 Bugatti Chiron Sport" [ref=e416]
+            - generic [ref=e418]: C tier
+        - link "2009 Abarth 500 Ferrari Dealer Edition $34,500 2009 Abarth 500 Ferrari Dealer Edition • Ferrari Dealer Edition C tier" [ref=e419] [cursor=pointer]:
+          - /url: /vehicle/d799c035-d938-4255-8171-42715d992366
+          - generic [ref=e420]:
+            - img "2009 Abarth 500 Ferrari Dealer Edition" [ref=e422]
+            - generic [ref=e424]: $34,500
+          - generic [ref=e426]:
+            - generic "2009 Abarth 500 Ferrari Dealer Edition Ferrari Dealer Edition" [ref=e427]:
+              - text: 2009 Abarth 500 Ferrari Dealer Edition
+              - generic [ref=e428]: • Ferrari Dealer Edition
+            - generic [ref=e430]: C tier
+        - link "2014 Mclaren P1 $1,108,750 2014 Mclaren P1 C tier" [ref=e431] [cursor=pointer]:
+          - /url: /vehicle/347a7da4-0978-4cf3-a376-cf3debd9fdd0
+          - generic [ref=e432]:
+            - img "2014 Mclaren P1" [ref=e434]
+            - generic [ref=e436]: $1,108,750
+          - generic [ref=e438]:
+            - generic "2014 Mclaren P1" [ref=e439]
+            - generic [ref=e441]: C tier
+        - link "1990 Porsche 911 Coupe 1990 Porsche 911 Coupe • Goldfinger Commission C tier" [ref=e442] [cursor=pointer]:
+          - /url: /vehicle/fd7d32c9-ca4a-473a-bfd5-3bf8087f82c1
+          - img "1990 Porsche 911 Coupe" [ref=e445]
+          - generic [ref=e447]:
+            - generic "1990 Porsche 911 Coupe Goldfinger Commission" [ref=e448]:
+              - text: 1990 Porsche 911 Coupe
+              - generic [ref=e449]: • Goldfinger Commission
+            - generic [ref=e451]: C tier
+        - link "1993 Lamborghini Diablo Evolution GTR $343,750 1993 Lamborghini Diablo Evolution GTR • Evolution GTR C tier" [ref=e452] [cursor=pointer]:
+          - /url: /vehicle/e9653cab-9bdf-4e99-bb76-9e74eae71582
+          - generic [ref=e453]:
+            - img "1993 Lamborghini Diablo Evolution GTR" [ref=e455]
+            - generic [ref=e457]: $343,750
+          - generic [ref=e459]:
+            - generic "1993 Lamborghini Diablo Evolution GTR Evolution GTR" [ref=e460]:
+              - text: 1993 Lamborghini Diablo Evolution GTR
+              - generic [ref=e461]: • Evolution GTR
+            - generic [ref=e463]: C tier
+        - link "2019 Porsche 935 2019 Porsche 935 C tier" [ref=e464] [cursor=pointer]:
+          - /url: /vehicle/8fe6c4e3-f5f9-4663-912c-5344be392c66
+          - img "2019 Porsche 935" [ref=e467]
+          - generic [ref=e469]:
+            - generic "2019 Porsche 935" [ref=e470]
+            - generic [ref=e472]: C tier
+        - link "1994 Audi RS2 Avant $43,125 1994 Audi RS2 Avant C tier" [ref=e473] [cursor=pointer]:
+          - /url: /vehicle/d9352583-a11b-4bdd-a78f-3daaf6d55904
+          - generic [ref=e474]:
+            - img "1994 Audi RS2 Avant" [ref=e476]
+            - generic [ref=e478]: $43,125
+          - generic [ref=e480]:
+            - generic "1994 Audi RS2 Avant" [ref=e481]
+            - generic [ref=e483]: C tier
+        - link "2009 Rolls-royce Phantom Coupé $230,000 2009 Rolls-royce Phantom Coupé C tier" [ref=e484] [cursor=pointer]:
+          - /url: /vehicle/0c1571db-dfc1-4487-84ec-60db55527dea
+          - generic [ref=e485]:
+            - img "2009 Rolls-royce Phantom Coupé" [ref=e487]
+            - generic [ref=e489]: $230,000
+          - generic [ref=e491]:
+            - generic "2009 Rolls-royce Phantom Coupé" [ref=e492]
+            - generic [ref=e494]: C tier
+        - link "2007 Chevrolet Corvette Coupe $20,000 2007 Chevrolet Corvette C tier" [ref=e495] [cursor=pointer]:
+          - /url: /vehicle/de5f72f6-ffb3-4a68-a335-ba7ed947175b
+          - generic [ref=e496]:
+            - img "2007 Chevrolet Corvette Coupe" [ref=e498]
+            - generic [ref=e500]: $20,000
+          - generic [ref=e502]:
+            - generic "2007 Chevrolet Corvette" [ref=e503]
+            - generic [ref=e505]: C tier
+        - link "1956 Alfa Romeo Giulietta Spider $40,250 1956 Alfa Romeo Giulietta Spider C tier" [ref=e506] [cursor=pointer]:
+          - /url: /vehicle/1a76c84e-2be9-411c-a6fa-8907133e8819
+          - generic [ref=e507]:
+            - img "1956 Alfa Romeo Giulietta Spider" [ref=e509]
+            - generic [ref=e511]: $40,250
+          - generic [ref=e513]:
+            - generic "1956 Alfa Romeo Giulietta Spider" [ref=e514]
+            - generic [ref=e516]: C tier
+        - link "1966 Ferrari 275 GTB Alloy $2,312,500 1966 Ferrari 275 GTB Alloy C tier" [ref=e517] [cursor=pointer]:
+          - /url: /vehicle/a8cd4db6-2c5c-4eb4-988c-280659e96c01
+          - generic [ref=e518]:
+            - img "1966 Ferrari 275 GTB Alloy" [ref=e520]
+            - generic [ref=e522]: $2,312,500
+          - generic [ref=e524]:
+            - generic "1966 Ferrari 275 GTB Alloy" [ref=e525]
+            - generic [ref=e527]: C tier
+        - link "1970 Alfa Romeo 1300 Junior Zagato $54,625 1970 Alfa Romeo 1300 Junior Zagato C tier" [ref=e528] [cursor=pointer]:
+          - /url: /vehicle/3c7a3eb3-d727-47f4-9de1-af4c015fc19f
+          - generic [ref=e529]:
+            - img "1970 Alfa Romeo 1300 Junior Zagato" [ref=e531]
+            - generic [ref=e533]: $54,625
+          - generic [ref=e535]:
+            - generic "1970 Alfa Romeo 1300 Junior Zagato" [ref=e536]
+            - generic [ref=e538]: C tier
+        - link "1952 Ferrari 212 Europa Pinin Farina Coupe $816,250 1952 Ferrari 212 Europa Pinin Farina Coupe C tier" [ref=e539] [cursor=pointer]:
+          - /url: /vehicle/e3f4031e-46f6-4af5-ae18-e178431e0912
+          - generic [ref=e540]:
+            - img "1952 Ferrari 212 Europa Pinin Farina Coupe" [ref=e542]
+            - generic [ref=e544]: $816,250
+          - generic [ref=e546]:
+            - generic "1952 Ferrari 212 Europa Pinin Farina Coupe" [ref=e547]
+            - generic [ref=e549]: C tier
+        - link "1975 Rolls-royce Silver Shadow $46,000 1975 Rolls-royce Silver Shadow • Long Wheelbase Saloon Ex-Princess Margaret C tier" [ref=e550] [cursor=pointer]:
+          - /url: /vehicle/28f61665-7dd1-4201-9189-30a24e31b02d
+          - generic [ref=e551]:
+            - img "1975 Rolls-royce Silver Shadow" [ref=e553]
+            - generic [ref=e555]: $46,000
+          - generic [ref=e557]:
+            - generic "1975 Rolls-royce Silver Shadow Long Wheelbase Saloon Ex-Princess Margaret" [ref=e558]:
+              - text: 1975 Rolls-royce Silver Shadow
+              - generic [ref=e559]: • Long Wheelbase Saloon Ex-Princess Margaret
+            - generic [ref=e561]: C tier
+        - link "2010 Porsche 911 Turbo Cabriolet 2010 Porsche 911 Turbo Cabriolet • Turbo C tier" [ref=e562] [cursor=pointer]:
+          - /url: /vehicle/c1193919-428f-4ee9-b33e-292177c8c11c
+          - img "2010 Porsche 911 Turbo Cabriolet" [ref=e565]
+          - generic [ref=e567]:
+            - generic "2010 Porsche 911 Turbo Cabriolet Turbo" [ref=e568]:
+              - text: 2010 Porsche 911 Turbo Cabriolet
+              - generic [ref=e569]: • Turbo
+            - generic [ref=e571]: C tier
+        - link "2016 Porsche 911 R $298,750 2016 Porsche 911 R C tier" [ref=e572] [cursor=pointer]:
+          - /url: /vehicle/cf3776ee-8314-4482-b87e-fbac37cdfb7c
+          - generic [ref=e573]:
+            - img "2016 Porsche 911 R" [ref=e575]
+            - generic [ref=e577]: $298,750
+          - generic [ref=e579]:
+            - generic "2016 Porsche 911 R" [ref=e580]
+            - generic [ref=e582]: C tier
+        - link "2004 Ferrari 575 GTC $230,000 2004 Ferrari 575 GTC • Stradale C tier" [ref=e583] [cursor=pointer]:
+          - /url: /vehicle/727ce9f8-0882-4657-bc05-d7bf257aee4c
+          - generic [ref=e584]:
+            - img "2004 Ferrari 575 GTC" [ref=e586]
+            - generic [ref=e588]: $230,000
+          - generic [ref=e590]:
+            - generic "2004 Ferrari 575 GTC Stradale" [ref=e591]:
+              - text: 2004 Ferrari 575 GTC
+              - generic [ref=e592]: • Stradale
+            - generic [ref=e594]: C tier
+        - link "2015 Porsche 918 Spyder $1,418,125 2015 Porsche 918 Spyder • Liquid Metal Chrome Blue C tier" [ref=e595] [cursor=pointer]:
+          - /url: /vehicle/7a75449e-dad3-4a1f-8876-b94b9fde1840
+          - generic [ref=e596]:
+            - img "2015 Porsche 918 Spyder" [ref=e598]
+            - generic [ref=e600]: $1,418,125
+          - generic [ref=e602]:
+            - generic "2015 Porsche 918 Spyder Liquid Metal Chrome Blue" [ref=e603]:
+              - text: 2015 Porsche 918 Spyder
+              - generic [ref=e604]: • Liquid Metal Chrome Blue
+            - generic [ref=e606]: C tier
+        - link "2005 Ferrari Superamerica $241,500 2005 Ferrari Superamerica C tier" [ref=e607] [cursor=pointer]:
+          - /url: /vehicle/9267abf7-a421-49f6-a103-5da1b4342f5a
+          - generic [ref=e608]:
+            - img "2005 Ferrari Superamerica" [ref=e610]
+            - generic [ref=e612]: $241,500
+          - generic [ref=e614]:
+            - generic "2005 Ferrari Superamerica" [ref=e615]
+            - generic [ref=e617]: C tier
+        - link "1981 Citroën CX Limousine $23,000 1981 Citroën CX Limousine C tier" [ref=e618] [cursor=pointer]:
+          - /url: /vehicle/f9419b0b-868e-4fc7-858a-26e55c390b15
+          - generic [ref=e619]:
+            - img "1981 Citroën CX Limousine" [ref=e621]
+            - generic [ref=e623]: $23,000
+          - generic [ref=e625]:
+            - generic "1981 Citroën CX Limousine" [ref=e626]
+            - generic [ref=e628]: C tier
+        - link "1937 SS Jaguar 100 3 ½-Litre $321,250 1937 SS Jaguar 100 3 ½-Litre C tier" [ref=e629] [cursor=pointer]:
+          - /url: /vehicle/840c8ec3-0774-4a40-9441-39c2ded5490a
+          - generic [ref=e630]:
+            - img "1937 SS Jaguar 100 3 ½-Litre" [ref=e632]
+            - generic [ref=e634]: $321,250
+          - generic [ref=e636]:
+            - generic "1937 SS Jaguar 100 3 ½-Litre" [ref=e637]
+            - generic [ref=e639]: C tier
+        - link "2008 Bugatti Veyron EB 16.4 Coupe 2008 Bugatti Veyron EB 16.4 Coupe C tier" [ref=e640] [cursor=pointer]:
+          - /url: /vehicle/1179109d-8d64-4785-8bdf-c953a98833e2
+          - img "2008 Bugatti Veyron EB 16.4 Coupe" [ref=e643]
+          - generic [ref=e645]:
+            - generic "2008 Bugatti Veyron EB 16.4 Coupe" [ref=e646]
+            - generic [ref=e648]: C tier
+        - link "2009 Ferrari Scuderia Spider 16M $501,250 2009 Ferrari Scuderia Spider 16M C tier" [ref=e649] [cursor=pointer]:
+          - /url: /vehicle/36361ce2-a70f-42ad-abc8-04889ed49ded
+          - generic [ref=e650]:
+            - img "2009 Ferrari Scuderia Spider 16M" [ref=e652]
+            - generic [ref=e654]: $501,250
+          - generic [ref=e656]:
+            - generic "2009 Ferrari Scuderia Spider 16M" [ref=e657]
+            - generic [ref=e659]: C tier
+        - link "1991 Isdera Sbarro Espera Turbo S20E $103,500 1991 Isdera Sbarro Espera Turbo S20E C tier" [ref=e660] [cursor=pointer]:
+          - /url: /vehicle/1fe02ffd-e64a-411b-8033-e38dad743e3e
+          - generic [ref=e661]:
+            - img "1991 Isdera Sbarro Espera Turbo S20E" [ref=e663]
+            - generic [ref=e665]: $103,500
+          - generic [ref=e667]:
+            - generic "1991 Isdera Sbarro Espera Turbo S20E" [ref=e668]
+            - generic [ref=e670]: C tier
+        - link "1956 Jaguar D-Type $5,181,250 1956 Jaguar D-Type C tier" [ref=e671] [cursor=pointer]:
+          - /url: /vehicle/984dd2b9-6531-4528-a89d-331336a2d2b4
+          - generic [ref=e672]:
+            - img "1956 Jaguar D-Type" [ref=e674]
+            - generic [ref=e676]: $5,181,250
+          - generic [ref=e678]:
+            - generic "1956 Jaguar D-Type" [ref=e679]
+            - generic [ref=e681]: C tier
+        - link "1962 Lotus 22 Formula Junior $86,250 1962 Lotus 22 Formula Junior C tier" [ref=e682] [cursor=pointer]:
+          - /url: /vehicle/0e47f438-151c-490f-832d-9dcb3c2ecd75
+          - generic [ref=e683]:
+            - img "1962 Lotus 22 Formula Junior" [ref=e685]
+            - generic [ref=e687]: $86,250
+          - generic [ref=e689]:
+            - generic "1962 Lotus 22 Formula Junior" [ref=e690]
+            - generic [ref=e692]: C tier
+        - link "2023 Ferrari 812 Competizione A $1,525,000 2023 Ferrari 812 Competizione A • Competizione A C tier" [ref=e693] [cursor=pointer]:
+          - /url: /vehicle/a49cb017-60c0-4801-beee-7863170d5a1d
+          - generic [ref=e694]:
+            - img "2023 Ferrari 812 Competizione A" [ref=e696]
+            - generic [ref=e698]: $1,525,000
+          - generic [ref=e700]:
+            - generic "2023 Ferrari 812 Competizione A Competizione A" [ref=e701]:
+              - text: 2023 Ferrari 812 Competizione A
+              - generic [ref=e702]: • Competizione A
+            - generic [ref=e704]: C tier
+        - link "1987 Ferrari 412 $97,750 1987 Ferrari 412 C tier" [ref=e705] [cursor=pointer]:
+          - /url: /vehicle/5c8a3d39-7f40-4961-b9b2-bcd764e54c7e
+          - generic [ref=e706]:
+            - img "1987 Ferrari 412" [ref=e708]
+            - generic [ref=e710]: $97,750
+          - generic [ref=e712]:
+            - generic "1987 Ferrari 412" [ref=e713]
+            - generic [ref=e715]: C tier
+        - link "2007 Porsche 911 Turbo Gemballa Avalanche GTR 750 EVO-R $150,000 2007 Porsche 911 Turbo Gemballa Avalanche GTR 750 EVO-R C tier" [ref=e716] [cursor=pointer]:
+          - /url: /vehicle/b7dcc2d1-4bb1-40ab-8ab3-271dee5aa2db
+          - generic [ref=e717]:
+            - img "2007 Porsche 911 Turbo Gemballa Avalanche GTR 750 EVO-R" [ref=e719]
+            - generic [ref=e721]: $150,000
+          - generic [ref=e723]:
+            - generic "2007 Porsche 911 Turbo Gemballa Avalanche GTR 750 EVO-R" [ref=e724]
+            - generic [ref=e726]: C tier
+        - link "1983 Maserati Khamsin $106,375 1983 Maserati Khamsin C tier" [ref=e727] [cursor=pointer]:
+          - /url: /vehicle/391a2d5e-685b-42b2-afe4-7b222af4a341
+          - generic [ref=e728]:
+            - img "1983 Maserati Khamsin" [ref=e730]
+            - generic [ref=e732]: $106,375
+          - generic [ref=e734]:
+            - generic "1983 Maserati Khamsin" [ref=e735]
+            - generic [ref=e737]: C tier
+        - link "1967 Lamborghini Miura P400 1967 Lamborghini Miura P400 C tier" [ref=e738] [cursor=pointer]:
+          - /url: /vehicle/ae2a6c01-adee-4aa0-a1e5-7e1921ac0ef5
+          - img "1967 Lamborghini Miura P400" [ref=e741]
+          - generic [ref=e743]:
+            - generic "1967 Lamborghini Miura P400" [ref=e744]
+            - generic [ref=e746]: C tier
+        - link "1969 Lamborghini Islero $270,250 1969 Lamborghini Islero C tier" [ref=e747] [cursor=pointer]:
+          - /url: /vehicle/67270f6b-4dbd-4a3e-9c5d-e20b54f8c7f8
+          - generic [ref=e748]:
+            - img "1969 Lamborghini Islero" [ref=e750]
+            - generic [ref=e752]: $270,250
+          - generic [ref=e754]:
+            - generic "1969 Lamborghini Islero" [ref=e755]
+            - generic [ref=e757]: C tier
+        - link "2008 Porsche 911 GT2 Clubsport $310,000 2008 Porsche 911 GT2 Clubsport • Clubsport C tier" [ref=e758] [cursor=pointer]:
+          - /url: /vehicle/03650895-7523-4479-9717-9867ffc3dd69
+          - generic [ref=e759]:
+            - img "2008 Porsche 911 GT2 Clubsport" [ref=e761]
+            - generic [ref=e763]: $310,000
+          - generic [ref=e765]:
+            - generic "2008 Porsche 911 GT2 Clubsport Clubsport" [ref=e766]:
+              - text: 2008 Porsche 911 GT2 Clubsport
+              - generic [ref=e767]: • Clubsport
+            - generic [ref=e769]: C tier
+        - link "2010 Porsche 911 GT3 RS Clubsport $195,500 2010 Porsche 911 GT3 RS Clubsport • Clubsport C tier" [ref=e770] [cursor=pointer]:
+          - /url: /vehicle/4573faf0-2180-476c-90e8-d4967e8900d6
+          - generic [ref=e771]:
+            - img "2010 Porsche 911 GT3 RS Clubsport" [ref=e773]
+            - generic [ref=e775]: $195,500
+          - generic [ref=e777]:
+            - generic "2010 Porsche 911 GT3 RS Clubsport Clubsport" [ref=e778]:
+              - text: 2010 Porsche 911 GT3 RS Clubsport
+              - generic [ref=e779]: • Clubsport
+            - generic [ref=e781]: C tier
+        - link "1990 Ferrari 348 ts $75,000 1990 Ferrari 348 ts C tier" [ref=e782] [cursor=pointer]:
+          - /url: /vehicle/f44daf5e-3dad-472c-9a65-44fbcc637d15
+          - generic [ref=e783]:
+            - img "1990 Ferrari 348 ts" [ref=e785]
+            - generic [ref=e787]: $75,000
+          - generic [ref=e789]:
+            - generic "1990 Ferrari 348 ts" [ref=e790]
+            - generic [ref=e792]: C tier
+        - link "2012 Mercedes-benz SLS AMG Roadster 2012 Mercedes-benz SLS AMG Roadster C tier" [ref=e793] [cursor=pointer]:
+          - /url: /vehicle/0eff5c56-e660-4a77-8e3b-37a44a6ff750
+          - img "2012 Mercedes-benz SLS AMG Roadster" [ref=e796]
+          - generic [ref=e798]:
+            - generic "2012 Mercedes-benz SLS AMG Roadster" [ref=e799]
+            - generic [ref=e801]: C tier
+        - link "1954 Swallow Doretti $103,500 1954 Swallow Doretti C tier" [ref=e802] [cursor=pointer]:
+          - /url: /vehicle/a9ce2bfd-e8cb-4c61-8c73-870313df803b
+          - generic [ref=e803]:
+            - img "1954 Swallow Doretti" [ref=e805]
+            - generic [ref=e807]: $103,500
+          - generic [ref=e809]:
+            - generic "1954 Swallow Doretti" [ref=e810]
+            - generic [ref=e812]: C tier
+        - link "1971 Fiat 500 L $11,500 1971 Fiat 500 L • Lusso C tier" [ref=e813] [cursor=pointer]:
+          - /url: /vehicle/0464d933-e9c6-4631-9053-0e2205d3077d
+          - generic [ref=e814]:
+            - img "1971 Fiat 500 L" [ref=e816]
+            - generic [ref=e818]: $11,500
+          - generic [ref=e820]:
+            - generic "1971 Fiat 500 L Lusso" [ref=e821]:
+              - text: 1971 Fiat 500 L
+              - generic [ref=e822]: • Lusso
+            - generic [ref=e824]: C tier
+        - link "2024 Aston Martin Valkyrie Spider $2,706,250 2024 Aston Martin Valkyrie Spider C tier" [ref=e825] [cursor=pointer]:
+          - /url: /vehicle/15294aa0-121b-40cb-801f-bf2cab6b6d27
+          - generic [ref=e826]:
+            - img "2024 Aston Martin Valkyrie Spider" [ref=e828]
+            - generic [ref=e830]: $2,706,250
+          - generic [ref=e832]:
+            - generic "2024 Aston Martin Valkyrie Spider" [ref=e833]
+            - generic [ref=e835]: C tier
+        - link "1995 Aston Martin Vantage V550 $132,250 1995 Aston Martin Vantage V550 C tier" [ref=e836] [cursor=pointer]:
+          - /url: /vehicle/05013ada-af8f-4321-8986-fbd9ffc50d07
+          - generic [ref=e837]:
+            - img "1995 Aston Martin Vantage V550" [ref=e839]
+            - generic [ref=e841]: $132,250
+          - generic [ref=e843]:
+            - generic "1995 Aston Martin Vantage V550" [ref=e844]
+            - generic [ref=e846]: C tier
+        - link "1983 Ferrari 400 i Automatic $80,500 1983 Ferrari 400 i Automatic C tier" [ref=e847] [cursor=pointer]:
+          - /url: /vehicle/27cc6c5f-dff8-4b12-81f6-6c0dfe50f48a
+          - generic [ref=e848]:
+            - img "1983 Ferrari 400 i Automatic" [ref=e850]
+            - generic [ref=e852]: $80,500
+          - generic [ref=e854]:
+            - generic "1983 Ferrari 400 i Automatic" [ref=e855]
+            - generic [ref=e857]: C tier
+        - link "1959 BMW Isetta 300 $13,800 1959 BMW Isetta 300 C tier" [ref=e858] [cursor=pointer]:
+          - /url: /vehicle/7e8a14fb-2f43-461f-9c1d-5c5c58296bce
+          - generic [ref=e859]:
+            - img "1959 BMW Isetta 300" [ref=e861]
+            - generic [ref=e863]: $13,800
+          - generic [ref=e865]:
+            - generic "1959 BMW Isetta 300" [ref=e866]
+            - generic [ref=e868]: C tier
+        - link "2012 Mclaren Gemballa 12C Spyder $92,000 2012 Mclaren Gemballa 12C Spyder C tier" [ref=e869] [cursor=pointer]:
+          - /url: /vehicle/d3c4846b-22c4-4abf-a4dc-6a735934d115
+          - generic [ref=e870]:
+            - img "2012 Mclaren Gemballa 12C Spyder" [ref=e872]
+            - generic [ref=e874]: $92,000
+          - generic [ref=e876]:
+            - generic "2012 Mclaren Gemballa 12C Spyder" [ref=e877]
+            - generic [ref=e879]: C tier
+        - link "1981 Porsche 924 Carrera GT $97,750 1981 Porsche 924 Carrera GT C tier" [ref=e880] [cursor=pointer]:
+          - /url: /vehicle/3074c2f5-2332-4b4e-af34-4bcb15dba6fc
+          - generic [ref=e881]:
+            - img "1981 Porsche 924 Carrera GT" [ref=e883]
+            - generic [ref=e885]: $97,750
+          - generic [ref=e887]:
+            - generic "1981 Porsche 924 Carrera GT" [ref=e888]
+            - generic [ref=e890]: C tier
+        - link "2025 Micro Microlino $14,950 2025 Micro Microlino • One-off C tier" [ref=e891] [cursor=pointer]:
+          - /url: /vehicle/b970bf61-624d-41e6-8cae-b66bc97c8ea4
+          - generic [ref=e892]:
+            - img "2025 Micro Microlino" [ref=e894]
+            - generic [ref=e896]: $14,950
+          - generic [ref=e898]:
+            - generic "2025 Micro Microlino One-off" [ref=e899]:
+              - text: 2025 Micro Microlino
+              - generic [ref=e900]: • One-off
+            - generic [ref=e902]: C tier
+        - link "1984 Chevrolet Corvette Coupe $5,500 1984 Chevrolet Corvette C tier" [ref=e903] [cursor=pointer]:
+          - /url: /vehicle/70361eab-1d5e-4f2a-82b1-42fa9959b87d
+          - generic [ref=e904]:
+            - img "1984 Chevrolet Corvette Coupe" [ref=e906]
+            - generic [ref=e908]: $5,500
+          - generic [ref=e910]:
+            - generic "1984 Chevrolet Corvette" [ref=e911]
+            - generic [ref=e913]: C tier
+        - link "2010 Mclaren MP4-12C $21,250 2010 Mclaren MP4-12C • Rolling Chassis C tier" [ref=e914] [cursor=pointer]:
+          - /url: /vehicle/f922a003-65fb-4e71-9c90-3beb9911ea68
+          - generic [ref=e915]:
+            - img "2010 Mclaren MP4-12C" [ref=e917]
+            - generic [ref=e919]: $21,250
+          - generic [ref=e921]:
+            - generic "2010 Mclaren MP4-12C Rolling Chassis" [ref=e922]:
+              - text: 2010 Mclaren MP4-12C
+              - generic [ref=e923]: • Rolling Chassis
+            - generic [ref=e925]: C tier
+        - link "2025 Williams FW14-Junior $43,750 2025 Williams FW14-Junior • Halfscale C tier" [ref=e926] [cursor=pointer]:
+          - /url: /vehicle/1f8df615-f182-448e-8f6a-4f4c875c4545
+          - generic [ref=e927]:
+            - img "2025 Williams FW14-Junior" [ref=e929]
+            - generic [ref=e931]: $43,750
+          - generic [ref=e933]:
+            - generic "2025 Williams FW14-Junior Halfscale" [ref=e934]:
+              - text: 2025 Williams FW14-Junior
+              - generic [ref=e935]: • Halfscale
+            - generic [ref=e937]: C tier
+        - link "1971 Dodge Challenger Lot 1154350 // January 13th, 2026 ▼ 1971 Dodge Challenger • Convertible C tier" [ref=e938] [cursor=pointer]:
+          - /url: /vehicle/17863221-9851-49d6-94ae-650cda02abba
+          - generic [ref=e939]:
+            - img "1971 Dodge Challenger" [ref=e941]
+            - button "Lot 1154350 // January 13th, 2026 ▼" [ref=e944]:
+              - generic [ref=e945]: Lot 1154350
+              - generic [ref=e946]: //
+              - time [ref=e947]: January 13th, 2026
+              - generic [ref=e948]: ▼
+          - generic [ref=e950]:
+            - generic "1971 Dodge Challenger Convertible" [ref=e951]:
+              - text: 1971 Dodge Challenger
+              - generic [ref=e952]: • Convertible
+            - generic [ref=e954]: C tier
+        - link "1988 Chevrolet c3500 pickup gmt400 1988 Chevrolet C3500 C tier" [ref=e955] [cursor=pointer]:
+          - /url: /vehicle/94ffb710-d963-440e-b818-3d3022c61993
+          - img "1988 Chevrolet c3500 pickup gmt400" [ref=e958]
+          - generic [ref=e960]:
+            - generic "1988 Chevrolet C3500" [ref=e961]
+            - generic [ref=e963]: C tier
+        - link "2016 Dodge challenger srt hellcat 2016 Dodge challenger srt hellcat C tier" [ref=e964] [cursor=pointer]:
+          - /url: /vehicle/9e8af1aa-ac67-449a-9658-5471f37f1f50
+          - img "2016 Dodge challenger srt hellcat" [ref=e967]
+          - generic [ref=e969]:
+            - generic "2016 Dodge challenger srt hellcat" [ref=e970]
+            - generic [ref=e972]: C tier
+        - link "1964 Chevrolet corvette 1964 Chevrolet Corvette C tier" [ref=e973] [cursor=pointer]:
+          - /url: /vehicle/ba4a96af-5540-4a3d-9549-d1bf475c18fd
+          - img "1964 Chevrolet corvette" [ref=e976]
+          - generic [ref=e978]:
+            - generic "1964 Chevrolet Corvette" [ref=e979]
+            - generic [ref=e981]: C tier
+        - link "1979 Lincoln continental town car 1979 Lincoln continental town car C tier" [ref=e982] [cursor=pointer]:
+          - /url: /vehicle/07c91a0b-2a8e-4648-8b83-3793e81eb56b
+          - img "1979 Lincoln continental town car" [ref=e985]
+          - generic [ref=e987]:
+            - generic "1979 Lincoln continental town car" [ref=e988]
+            - generic [ref=e990]: C tier
+        - link "2013 Bmw m3 coupe 2013 Bmw m3 coupe • Manual C tier" [ref=e991] [cursor=pointer]:
+          - /url: /vehicle/9df686f7-ce60-4a61-a5e5-0351f091254d
+          - img "2013 Bmw m3 coupe" [ref=e994]
+          - generic [ref=e996]:
+            - generic "2013 Bmw m3 coupe Manual" [ref=e997]:
+              - text: 2013 Bmw m3 coupe
+              - generic [ref=e998]: • Manual
+            - generic [ref=e1000]: C tier
+        - 'link "2015 Land rover lr4 SOLD $6,750 2015 Land rover lr4 • No Reserve: 2015 Land Rover LR4 HSE C tier" [ref=e1001] [cursor=pointer]':
+          - /url: /vehicle/0065e066-937d-46dc-8fa4-be7e7cc3f02e
+          - generic [ref=e1002]:
+            - img "2015 Land rover lr4" [ref=e1004]
+            - generic [ref=e1006]: SOLD $6,750
+          - generic [ref=e1008]:
+            - 'generic "2015 Land rover lr4 No Reserve: 2015 Land Rover LR4 HSE" [ref=e1009]':
+              - text: 2015 Land rover lr4
+              - generic [ref=e1010]: "• No Reserve: 2015 Land Rover LR4 HSE"
+            - generic [ref=e1012]: C tier
+        - link "2015 Porsche 918 spyder 2015 Porsche 918 spyder C tier" [ref=e1013] [cursor=pointer]:
+          - /url: /vehicle/a57ba849-61b4-40a9-a8d4-25c12fa05e1d
+          - img "2015 Porsche 918 spyder" [ref=e1016]
+          - generic [ref=e1018]:
+            - generic "2015 Porsche 918 spyder" [ref=e1019]
+            - generic [ref=e1021]: C tier
+        - link "2007 Bentley continental gtc 2007 Bentley continental gtc C tier" [ref=e1022] [cursor=pointer]:
+          - /url: /vehicle/cde8da51-2b3b-4d82-8ca4-11e6f95d7928
+          - img "2007 Bentley continental gtc" [ref=e1025]
+          - generic [ref=e1027]:
+            - generic "2007 Bentley continental gtc" [ref=e1028]
+            - generic [ref=e1030]: C tier
+        - link "2012 Mercedes benz sls amg 2012 Mercedes benz sls amg C tier" [ref=e1031] [cursor=pointer]:
+          - /url: /vehicle/6b3ab24f-b713-4f15-a4de-53e7485119a5
+          - img "2012 Mercedes benz sls amg" [ref=e1034]
+          - generic [ref=e1036]:
+            - generic "2012 Mercedes benz sls amg" [ref=e1037]
+            - generic [ref=e1039]: C tier
+        - link "2017 Land rover range rover 2017 Land rover range rover C tier" [ref=e1040] [cursor=pointer]:
+          - /url: /vehicle/0758ed98-918d-4f74-8249-0142262a51cc
+          - img "2017 Land rover range rover" [ref=e1043]
+          - generic [ref=e1045]:
+            - generic "2017 Land rover range rover" [ref=e1046]
+            - generic [ref=e1048]: C tier
+        - link "1935 Rolls royce 20 25 1935 Rolls royce 20 25 C tier" [ref=e1049] [cursor=pointer]:
+          - /url: /vehicle/f826224b-a5a0-4939-a56a-e00565b2754c
+          - img "1935 Rolls royce 20 25" [ref=e1052]
+          - generic [ref=e1054]:
+            - generic "1935 Rolls royce 20 25" [ref=e1055]
+            - generic [ref=e1057]: C tier
+        - link "2007 Land rover range rover 2007 Land rover range rover C tier" [ref=e1058] [cursor=pointer]:
+          - /url: /vehicle/a9de8db5-1622-4b12-8fdc-eb7d93e6aa08
+          - img "2007 Land rover range rover" [ref=e1061]
+          - generic [ref=e1063]:
+            - generic "2007 Land rover range rover" [ref=e1064]
+            - generic [ref=e1066]: C tier
+        - link "1966 Chevrolet corvair monza sport coupe 1966 Chevrolet corvair monza sport coupe C tier" [ref=e1067] [cursor=pointer]:
+          - /url: /vehicle/5cb1e088-3c11-41eb-ac97-66a3046c4ca5
+          - img "1966 Chevrolet corvair monza sport coupe" [ref=e1070]
+          - generic [ref=e1072]:
+            - generic "1966 Chevrolet corvair monza sport coupe" [ref=e1073]
+            - generic [ref=e1075]: C tier
+        - link "1972 Bsa rocket 1972 Bsa rocket C tier" [ref=e1076] [cursor=pointer]:
+          - /url: /vehicle/1c4d4b8e-6d96-4b2a-b860-59c37faeea00
+          - img "1972 Bsa rocket" [ref=e1079]
+          - generic [ref=e1081]:
+            - generic "1972 Bsa rocket" [ref=e1082]
+            - generic [ref=e1084]: C tier
+        - link "2011 Porsche cayenne 2011 Porsche cayenne • 6-speed manual C tier" [ref=e1085] [cursor=pointer]:
+          - /url: /vehicle/8fdf7b62-99c7-425a-9977-637054788de2
+          - img "2011 Porsche cayenne" [ref=e1088]
+          - generic [ref=e1090]:
+            - generic "2011 Porsche cayenne 6-speed manual" [ref=e1091]:
+              - text: 2011 Porsche cayenne
+              - generic [ref=e1092]: • 6-speed manual
+            - generic [ref=e1094]: C tier
+        - link "2018 Mercedes amg e63 s sedan 2018 Mercedes amg e63 s sedan C tier" [ref=e1095] [cursor=pointer]:
+          - /url: /vehicle/c6c4b656-d3e2-4233-8490-c8d255ccfc3b
+          - img "2018 Mercedes amg e63 s sedan" [ref=e1098]
+          - generic [ref=e1100]:
+            - generic "2018 Mercedes amg e63 s sedan" [ref=e1101]
+            - generic [ref=e1103]: C tier
+        - link "2024 Chevrolet corvette z06 2024 Chevrolet Corvette C tier" [ref=e1104] [cursor=pointer]:
+          - /url: /vehicle/8aa9706f-0675-4555-acdb-a86e80f37ec3
+          - img "2024 Chevrolet corvette z06" [ref=e1107]
+          - generic [ref=e1109]:
+            - generic "2024 Chevrolet Corvette" [ref=e1110]
+            - generic [ref=e1112]: C tier
+        - link "1985 Bmw m635csi 1985 Bmw m635csi C tier" [ref=e1113] [cursor=pointer]:
+          - /url: /vehicle/64ad7688-68a7-46bc-97bc-cc0e8ebf2517
+          - img "1985 Bmw m635csi" [ref=e1116]
+          - generic [ref=e1118]:
+            - generic "1985 Bmw m635csi" [ref=e1119]
+            - generic [ref=e1121]: C tier
+        - link "1977 Toyota land cruiser fj40 1977 Toyota land cruiser fj40 C tier" [ref=e1122] [cursor=pointer]:
+          - /url: /vehicle/b0741472-1762-4b17-b19f-61f80bc71b6f
+          - img "1977 Toyota land cruiser fj40" [ref=e1125]
+          - generic [ref=e1127]:
+            - generic "1977 Toyota land cruiser fj40" [ref=e1128]
+            - generic [ref=e1130]: C tier
+        - link "1988 Mercedes benz 560sl 1988 Mercedes benz 560sl C tier" [ref=e1131] [cursor=pointer]:
+          - /url: /vehicle/5e0fbf4c-0015-436c-9b55-e8ee16fbf824
+          - img "1988 Mercedes benz 560sl" [ref=e1134]
+          - generic [ref=e1136]:
+            - generic "1988 Mercedes benz 560sl" [ref=e1137]
+            - generic [ref=e1139]: C tier
+        - link "2023 Lamborghini Huracan EVO Spyder 2023 Lamborghini Huracan EVO Spyder C tier" [ref=e1140] [cursor=pointer]:
+          - /url: /vehicle/be58c8cb-5c10-4a6d-a183-24c9ae30e7da
+          - img "2023 Lamborghini Huracan EVO Spyder" [ref=e1143]
+          - generic [ref=e1145]:
+            - generic "2023 Lamborghini Huracan EVO Spyder" [ref=e1146]
+            - generic [ref=e1148]: C tier
+        - link "1991 Mitsubishi 3000gt 1991 Mitsubishi 3000gt C tier" [ref=e1149] [cursor=pointer]:
+          - /url: /vehicle/1317c11e-5f23-4c52-a46a-d6d445a61aca
+          - img "1991 Mitsubishi 3000gt" [ref=e1152]
+          - generic [ref=e1154]:
+            - generic "1991 Mitsubishi 3000gt" [ref=e1155]
+            - generic [ref=e1157]: C tier
+        - link "1961 Jaguar mk ix 1961 Jaguar mk ix C tier" [ref=e1158] [cursor=pointer]:
+          - /url: /vehicle/9f075ce3-c054-4e79-82d6-fd5f26e8efd8
+          - img "1961 Jaguar mk ix" [ref=e1161]
+          - generic [ref=e1163]:
+            - generic "1961 Jaguar mk ix" [ref=e1164]
+            - generic [ref=e1166]: C tier
+        - link "2026 Rolls Royce Cullinan 2026 Rolls Royce Cullinan C tier" [ref=e1167] [cursor=pointer]:
+          - /url: /vehicle/05343f08-5c4a-467a-a9e8-68c8070217ba
+          - img "2026 Rolls Royce Cullinan" [ref=e1170]
+          - generic [ref=e1172]:
+            - generic "2026 Rolls Royce Cullinan" [ref=e1173]
+            - generic [ref=e1175]: C tier
+        - link "1972 Honda sl70 1972 Honda sl70 C tier" [ref=e1176] [cursor=pointer]:
+          - /url: /vehicle/1b51e45f-f91b-4d34-89d7-8ea24b397237
+          - img "1972 Honda sl70" [ref=e1179]
+          - generic [ref=e1181]:
+            - generic "1972 Honda sl70" [ref=e1182]
+            - generic [ref=e1184]: C tier
+        - link "1966 Amc marlin 1966 Amc marlin C tier" [ref=e1185] [cursor=pointer]:
+          - /url: /vehicle/28432810-9fc3-44c3-8fad-97c5385948c5
+          - img "1966 Amc marlin" [ref=e1188]
+          - generic [ref=e1190]:
+            - generic "1966 Amc marlin" [ref=e1191]
+            - generic [ref=e1193]: C tier
+        - link "2011 Land rover range rover 2011 Land rover range rover C tier" [ref=e1194] [cursor=pointer]:
+          - /url: /vehicle/aefd77b8-764b-4b98-a7f5-7317feff27fb
+          - img "2011 Land rover range rover" [ref=e1197]
+          - generic [ref=e1199]:
+            - generic "2011 Land rover range rover" [ref=e1200]
+            - generic [ref=e1202]: C tier
+        - link "2025 Rolls Royce Phantom 2025 Rolls Royce Phantom C tier" [ref=e1203] [cursor=pointer]:
+          - /url: /vehicle/eed2ce8b-57f2-4dc0-8aef-5785dcf6a037
+          - img "2025 Rolls Royce Phantom" [ref=e1206]
+          - generic [ref=e1208]:
+            - generic "2025 Rolls Royce Phantom" [ref=e1209]
+            - generic [ref=e1211]: C tier
+        - link "2026 Mercedes Benz G Class AMG G 63 2026 Mercedes Benz G Class AMG G 63 C tier" [ref=e1212] [cursor=pointer]:
+          - /url: /vehicle/a6392524-d588-4c5d-a67f-73e5eb16073a
+          - img "2026 Mercedes Benz G Class AMG G 63" [ref=e1215]
+          - generic [ref=e1217]:
+            - generic "2026 Mercedes Benz G Class AMG G 63" [ref=e1218]
+            - generic [ref=e1220]: C tier
+        - link "1989 Nissan 300ZX 5-Speed for 1989 Nissan 300ZX 5-Speed for C tier" [ref=e1221] [cursor=pointer]:
+          - /url: /vehicle/9aa8b5aa-7fa2-405c-9029-ce6652afa653
+          - img "1989 Nissan 300ZX 5-Speed for" [ref=e1224]
+          - generic [ref=e1226]:
+            - generic "1989 Nissan 300ZX 5-Speed for" [ref=e1227]
+            - generic [ref=e1229]: C tier
+        - link "2019 Volkswagen tiguan 2019 Volkswagen tiguan C tier" [ref=e1230] [cursor=pointer]:
+          - /url: /vehicle/0b1179bd-5d10-4d1f-adc9-81651e4217c9
+          - img "2019 Volkswagen tiguan" [ref=e1233]
+          - generic [ref=e1235]:
+            - generic "2019 Volkswagen tiguan" [ref=e1236]
+            - generic [ref=e1238]: C tier
+        - link "2000 Mitsubishi Toppo BJ for 2000 Mitsubishi Toppo BJ for C tier" [ref=e1239] [cursor=pointer]:
+          - /url: /vehicle/724c2289-9de2-403b-a438-3769e71b9dd6
+          - img "2000 Mitsubishi Toppo BJ for" [ref=e1242]
+          - generic [ref=e1244]:
+            - generic "2000 Mitsubishi Toppo BJ for" [ref=e1245]
+            - generic [ref=e1247]: C tier
+        - link "2025 Mercedes Benz G Class AMG G 800 Brabus 2025 Mercedes Benz G Class AMG G 800 Brabus C tier" [ref=e1248] [cursor=pointer]:
+          - /url: /vehicle/03e04c86-743b-4229-a417-0fccb40ead57
+          - img "2025 Mercedes Benz G Class AMG G 800 Brabus" [ref=e1251]
+          - generic [ref=e1253]:
+            - generic "2025 Mercedes Benz G Class AMG G 800 Brabus" [ref=e1254]
+            - generic [ref=e1256]: C tier
+        - link "1962 Unknown eldorado biarritz 1962 Unknown eldorado biarritz C tier" [ref=e1257] [cursor=pointer]:
+          - /url: /vehicle/b0b319be-b274-4876-8529-3f8c460f2164
+          - img "1962 Unknown eldorado biarritz" [ref=e1260]
+          - generic [ref=e1262]:
+            - generic "1962 Unknown eldorado biarritz" [ref=e1263]
+            - generic [ref=e1265]: C tier
+        - link "2004 BMW 745i 2004 BMW 745i C tier" [ref=e1266] [cursor=pointer]:
+          - /url: /vehicle/93b566a1-8a61-493e-acec-c322e051ada3
+          - img "2004 BMW 745i" [ref=e1269]
+          - generic [ref=e1271]:
+            - generic "2004 BMW 745i" [ref=e1272]
+            - generic [ref=e1274]: C tier
+        - link "2024 Unknown 911 gt3 rs 2024 Unknown 911 gt3 rs C tier" [ref=e1275] [cursor=pointer]:
+          - /url: /vehicle/45689ba9-ff1c-4a23-a42e-4bb53a4a1d63
+          - img "2024 Unknown 911 gt3 rs" [ref=e1278]
+          - generic [ref=e1280]:
+            - generic "2024 Unknown 911 gt3 rs" [ref=e1281]
+            - generic [ref=e1283]: C tier
+        - link "2002 Unknown 4runner 2002 Unknown 4runner C tier" [ref=e1284] [cursor=pointer]:
+          - /url: /vehicle/5f2d90bb-55ee-44a0-92be-5cef0755bf4a
+          - img "2002 Unknown 4runner" [ref=e1287]
+          - generic [ref=e1289]:
+            - generic "2002 Unknown 4runner" [ref=e1290]
+            - generic [ref=e1292]: C tier
+        - 'link "2004 BMW 645ci convertible SOLD $13,000 2004 BMW 645ci convertible • No Reserve: 2004 BMW 645Ci Convertible C tier" [ref=e1293] [cursor=pointer]':
+          - /url: /vehicle/bfaf7f3c-9a6a-4164-bffb-1e9fae075883
+          - generic [ref=e1294]:
+            - img "2004 BMW 645ci convertible" [ref=e1296]
+            - generic [ref=e1298]: SOLD $13,000
+          - generic [ref=e1300]:
+            - 'generic "2004 BMW 645ci convertible No Reserve: 2004 BMW 645Ci Convertible" [ref=e1301]':
+              - text: 2004 BMW 645ci convertible
+              - generic [ref=e1302]: "• No Reserve: 2004 BMW 645Ci Convertible"
+            - generic [ref=e1304]: C tier
+        - link "2007 Unknown xb12r firebolt 2007 Unknown xb12r firebolt C tier" [ref=e1305] [cursor=pointer]:
+          - /url: /vehicle/32c46bef-4534-49d1-8997-830d1228bb3f
+          - img "2007 Unknown xb12r firebolt" [ref=e1308]
+          - generic [ref=e1310]:
+            - generic "2007 Unknown xb12r firebolt" [ref=e1311]
+            - generic [ref=e1313]: C tier
+        - link "2014 Unknown fj cruiser 2014 Unknown fj cruiser C tier" [ref=e1314] [cursor=pointer]:
+          - /url: /vehicle/410578c6-0010-4d83-925c-0b0e11678679
+          - img "2014 Unknown fj cruiser" [ref=e1317]
+          - generic [ref=e1319]:
+            - generic "2014 Unknown fj cruiser" [ref=e1320]
+            - generic [ref=e1322]: C tier
+        - link "1996 Unknown nsx t 1996 Unknown nsx t C tier" [ref=e1323] [cursor=pointer]:
+          - /url: /vehicle/5bceab2b-a4b2-4390-8581-67e83a78270b
+          - img "1996 Unknown nsx t" [ref=e1326]
+          - generic [ref=e1328]:
+            - generic "1996 Unknown nsx t" [ref=e1329]
+            - generic [ref=e1331]: C tier
+        - link "1980 Unknown martin v8 volante 1980 Unknown martin v8 volante C tier" [ref=e1332] [cursor=pointer]:
+          - /url: /vehicle/e0b03826-7ddb-4944-b369-9d8c6ef74c6f
+          - img "1980 Unknown martin v8 volante" [ref=e1335]
+          - generic [ref=e1337]:
+            - generic "1980 Unknown martin v8 volante" [ref=e1338]
+            - generic [ref=e1340]: C tier
+        - link "1964 Unknown bus 1964 Unknown bus C tier" [ref=e1341] [cursor=pointer]:
+          - /url: /vehicle/687c00df-0b5a-402d-94b6-6c1d68704b3d
+          - img "1964 Unknown bus" [ref=e1344]
+          - generic [ref=e1346]:
+            - generic "1964 Unknown bus" [ref=e1347]
+            - generic [ref=e1349]: C tier
+        - link "1967 Unknown bronco 1967 Unknown bronco C tier" [ref=e1350] [cursor=pointer]:
+          - /url: /vehicle/df6cb4a3-a717-4b2f-b5fd-65d23b10c303
+          - img "1967 Unknown bronco" [ref=e1353]
+          - generic [ref=e1355]:
+            - generic "1967 Unknown bronco" [ref=e1356]
+            - generic [ref=e1358]: C tier
+        - link "2022 GMC sierra 3 2022 GMC Sierra C tier" [ref=e1359] [cursor=pointer]:
+          - /url: /vehicle/2cca7f82-841b-493c-8f14-50d363a9f22d
+          - img "2022 GMC sierra 3" [ref=e1362]
+          - generic [ref=e1364]:
+            - generic "2022 GMC Sierra" [ref=e1365]
+            - generic [ref=e1367]: C tier
+        - link "1982 Unknown corvette 1982 Unknown Corvette C tier" [ref=e1368] [cursor=pointer]:
+          - /url: /vehicle/928cbd79-c259-40e7-b690-f2f5c601c54e
+          - img "1982 Unknown corvette" [ref=e1371]
+          - generic [ref=e1373]:
+            - generic "1982 Unknown Corvette" [ref=e1374]
+            - generic [ref=e1376]: C tier
+        - link "2023 Unknown escalade v esv 2023 Unknown escalade v esv C tier" [ref=e1377] [cursor=pointer]:
+          - /url: /vehicle/9ae60259-fd47-49e6-aea9-10b7ad528d00
+          - img "2023 Unknown escalade v esv" [ref=e1380]
+          - generic [ref=e1382]:
+            - generic "2023 Unknown escalade v esv" [ref=e1383]
+            - generic [ref=e1385]: C tier
+        - link "2026 Unknown corvette zr1 2026 Unknown corvette zr1 C tier" [ref=e1386] [cursor=pointer]:
+          - /url: /vehicle/f1123dfb-e917-4126-87b0-052f76ae3517
+          - img "2026 Unknown corvette zr1" [ref=e1389]
+          - generic [ref=e1391]:
+            - generic "2026 Unknown corvette zr1" [ref=e1392]
+            - generic [ref=e1394]: C tier
+        - link "1985 Unknown benz 380sl 1985 Unknown benz 380sl C tier" [ref=e1395] [cursor=pointer]:
+          - /url: /vehicle/4364a580-5a4d-471d-8b7f-30057deeeed0
+          - img "1985 Unknown benz 380sl" [ref=e1398]
+          - generic [ref=e1400]:
+            - generic "1985 Unknown benz 380sl" [ref=e1401]
+            - generic [ref=e1403]: C tier
+        - link "1954 Unknown crown imperial convertible 1954 Unknown crown imperial convertible C tier" [ref=e1404] [cursor=pointer]:
+          - /url: /vehicle/256ae721-0b04-4587-98b9-213ed98e3c77
+          - img "1954 Unknown crown imperial convertible" [ref=e1407]
+          - generic [ref=e1409]:
+            - generic "1954 Unknown crown imperial convertible" [ref=e1410]
+            - generic [ref=e1412]: C tier
+        - link "1967 Unknown harvester scout 800 1967 Unknown harvester scout 800 C tier" [ref=e1413] [cursor=pointer]:
+          - /url: /vehicle/87ccc22a-d476-4965-9d6a-ebb21423d1e6
+          - img "1967 Unknown harvester scout 800" [ref=e1416]
+          - generic [ref=e1418]:
+            - generic "1967 Unknown harvester scout 800" [ref=e1419]
+            - generic [ref=e1421]: C tier
+        - link "2018 Unknown panamera 4 e hybrid 2018 Unknown panamera 4 e hybrid C tier" [ref=e1422] [cursor=pointer]:
+          - /url: /vehicle/6d56d600-0c0d-4363-8dea-9aef46ab5f8a
+          - img "2018 Unknown panamera 4 e hybrid" [ref=e1425]
+          - generic [ref=e1427]:
+            - generic "2018 Unknown panamera 4 e hybrid" [ref=e1428]
+            - generic [ref=e1430]: C tier
+        - link "2000 Unknown lx470 2000 Unknown lx470 C tier" [ref=e1431] [cursor=pointer]:
+          - /url: /vehicle/e32c2206-7318-48ea-9c5b-2750809d6af5
+          - img "2000 Unknown lx470" [ref=e1434]
+          - generic [ref=e1436]:
+            - generic "2000 Unknown lx470" [ref=e1437]
+            - generic [ref=e1439]: C tier
+        - link "2004 Unknown st4s 2004 Unknown st4s C tier" [ref=e1440] [cursor=pointer]:
+          - /url: /vehicle/4f8465c1-911f-4880-95eb-13c6a1728698
+          - img "2004 Unknown st4s" [ref=e1443]
+          - generic [ref=e1445]:
+            - generic "2004 Unknown st4s" [ref=e1446]
+            - generic [ref=e1448]: C tier
+        - link "2023 Unknown cooper s 2023 Unknown cooper s C tier" [ref=e1449] [cursor=pointer]:
+          - /url: /vehicle/85367c6c-7d8c-4b96-aba6-7c0189520242
+          - img "2023 Unknown cooper s" [ref=e1452]
+          - generic [ref=e1454]:
+            - generic "2023 Unknown cooper s" [ref=e1455]
+            - generic [ref=e1457]: C tier
+        - link "2003 BMW k1200rs 2003 BMW k1200rs C tier" [ref=e1458] [cursor=pointer]:
+          - /url: /vehicle/fb7cacf2-124d-4d29-a813-f2234fb4506b
+          - img "2003 BMW k1200rs" [ref=e1461]
+          - generic [ref=e1463]:
+            - generic "2003 BMW k1200rs" [ref=e1464]
+            - generic [ref=e1466]: C tier
+        - link "2001 Unknown LS 430 $7,500 2001 Unknown LS 430 C tier" [ref=e1467] [cursor=pointer]:
+          - /url: /vehicle/86212ad7-6e10-46c1-8eff-3e71d4c20649
+          - generic [ref=e1468]:
+            - img "2001 Unknown LS 430" [ref=e1470]
+            - generic [ref=e1472]: $7,500
+          - generic [ref=e1474]:
+            - generic "2001 Unknown LS 430" [ref=e1475]
+            - generic [ref=e1477]: C tier
+        - link "2020 Unknown Continental Gtc V8 $145,000 2020 Unknown Continental Gtc V8 C tier" [ref=e1478] [cursor=pointer]:
+          - /url: /vehicle/640f4f19-02ae-4bf9-80a9-160e378b132a
+          - generic [ref=e1479]:
+            - img "2020 Unknown Continental Gtc V8" [ref=e1481]
+            - generic [ref=e1483]: $145,000
+          - generic [ref=e1485]:
+            - generic "2020 Unknown Continental Gtc V8" [ref=e1486]
+            - generic [ref=e1488]: C tier
+        - link "1992 Unknown MX 5 Miata $6,901 1992 Unknown MX 5 Miata C tier" [ref=e1489] [cursor=pointer]:
+          - /url: /vehicle/55ea9845-6a32-4e3e-a26f-dac4f50cdaf9
+          - generic [ref=e1490]:
+            - img "1992 Unknown MX 5 Miata" [ref=e1492]
+            - generic [ref=e1494]: $6,901
+          - generic [ref=e1496]:
+            - generic "1992 Unknown MX 5 Miata" [ref=e1497]
+            - generic [ref=e1499]: C tier
+        - link "2017 Unknown Tacoma Trd Sport Double Cab 4x4 $8,100 2017 Unknown Tacoma Trd Sport Double Cab 4x4 C tier" [ref=e1500] [cursor=pointer]:
+          - /url: /vehicle/1ccfee55-c494-4f27-9dee-f022666bdc75
+          - generic [ref=e1501]:
+            - img "2017 Unknown Tacoma Trd Sport Double Cab 4x4" [ref=e1503]
+            - generic [ref=e1505]: $8,100
+          - generic [ref=e1507]:
+            - generic "2017 Unknown Tacoma Trd Sport Double Cab 4x4" [ref=e1508]
+            - generic [ref=e1510]: C tier
+        - link "2023 Unknown Camaro $84,427 2023 Unknown Camaro • COPO C tier" [ref=e1511] [cursor=pointer]:
+          - /url: /vehicle/6807eb3a-4714-4aaf-8062-5602321beba7
+          - generic [ref=e1512]:
+            - img "2023 Unknown Camaro" [ref=e1514]
+            - generic [ref=e1516]: $84,427
+          - generic [ref=e1518]:
+            - generic "2023 Unknown Camaro COPO" [ref=e1519]:
+              - text: 2023 Unknown Camaro
+              - generic [ref=e1520]: • COPO
+            - generic [ref=e1522]: C tier
+        - link "1969 Unknown Mustang $37,750 1969 Unknown Mustang • Hardtop 302 C tier" [ref=e1523] [cursor=pointer]:
+          - /url: /vehicle/a6cdaf95-8c17-488f-aa5d-6032d6a7d9d9
+          - generic [ref=e1524]:
+            - img "1969 Unknown Mustang" [ref=e1526]
+            - generic [ref=e1528]: $37,750
+          - generic [ref=e1530]:
+            - generic "1969 Unknown Mustang Hardtop 302" [ref=e1531]:
+              - text: 1969 Unknown Mustang
+              - generic [ref=e1532]: • Hardtop 302
+            - generic [ref=e1534]: C tier
+        - link "1964 Ford Galaxie 500 SOLD $19,100 1964 Ford Galaxie 500 • 2-Door Hardtop Fastback C tier" [ref=e1535] [cursor=pointer]:
+          - /url: /vehicle/cfd91ba3-3892-4c5a-92b0-7ec378b07fbd
+          - generic [ref=e1536]:
+            - img "1964 Ford Galaxie 500" [ref=e1538]
+            - generic [ref=e1540]: SOLD $19,100
+          - generic [ref=e1542]:
+            - generic "1964 Ford Galaxie 500 2-Door Hardtop Fastback" [ref=e1543]:
+              - text: 1964 Ford Galaxie 500
+              - generic [ref=e1544]: • 2-Door Hardtop Fastback
+            - generic [ref=e1546]: C tier
+        - link "1968 Unknown dart 1968 Unknown dart C tier" [ref=e1547] [cursor=pointer]:
+          - /url: /vehicle/41f20740-539b-4d2f-b2a0-f045f2123d06
+          - img "1968 Unknown dart" [ref=e1550]
+          - generic [ref=e1552]:
+            - generic "1968 Unknown dart" [ref=e1553]
+            - generic [ref=e1555]: C tier
+        - link "2007 Unknown Mustang $30,000 2007 Unknown Mustang • Shelby GT/SC C tier" [ref=e1556] [cursor=pointer]:
+          - /url: /vehicle/36072024-d50c-471d-ab94-509ab9b9c49a
+          - generic [ref=e1557]:
+            - img "2007 Unknown Mustang" [ref=e1559]
+            - generic [ref=e1561]: $30,000
+          - generic [ref=e1563]:
+            - generic "2007 Unknown Mustang Shelby GT/SC" [ref=e1564]:
+              - text: 2007 Unknown Mustang
+              - generic [ref=e1565]: • Shelby GT/SC
+            - generic [ref=e1567]: C tier
+        - link "1995 BMW 540i 1995 BMW 540i C tier" [ref=e1568] [cursor=pointer]:
+          - /url: /vehicle/34d8892e-8e54-4d6e-98be-b962c56be802
+          - img "1995 BMW 540i" [ref=e1571]
+          - generic [ref=e1573]:
+            - generic "1995 BMW 540i" [ref=e1574]
+            - generic [ref=e1576]: C tier
+        - link "1990 Unknown corvette zr 1 1990 Unknown Corvette C tier" [ref=e1577] [cursor=pointer]:
+          - /url: /vehicle/58262350-44e3-4efa-8d06-654a631aa090
+          - img "1990 Unknown corvette zr 1" [ref=e1580]
+          - generic [ref=e1582]:
+            - generic "1990 Unknown Corvette" [ref=e1583]
+            - generic [ref=e1585]: C tier
+        - link "1971 Unknown Chevelle $36,500 1971 Unknown Chevelle • Malibu Sport Coupe C tier" [ref=e1586] [cursor=pointer]:
+          - /url: /vehicle/b39c63f4-728a-49b5-97e2-517dac1262fd
+          - generic [ref=e1587]:
+            - img "1971 Unknown Chevelle" [ref=e1589]
+            - generic [ref=e1591]: $36,500
+          - generic [ref=e1593]:
+            - generic "1971 Unknown Chevelle Malibu Sport Coupe" [ref=e1594]:
+              - text: 1971 Unknown Chevelle
+              - generic [ref=e1595]: • Malibu Sport Coupe
+            - generic [ref=e1597]: C tier
+        - link "1998 Unknown cherokee 1998 Unknown cherokee C tier" [ref=e1598] [cursor=pointer]:
+          - /url: /vehicle/187a3e68-3662-4fb9-b585-0b82b137a166
+          - img "1998 Unknown cherokee" [ref=e1601]
+          - generic [ref=e1603]:
+            - generic "1998 Unknown cherokee" [ref=e1604]
+            - generic [ref=e1606]: C tier
+        - link "1963 Unknown continental 1963 Unknown continental C tier" [ref=e1607] [cursor=pointer]:
+          - /url: /vehicle/8a6d1cd8-bbee-45fd-8e24-09ec2fc3bdd3
+          - img "1963 Unknown continental" [ref=e1610]
+          - generic [ref=e1612]:
+            - generic "1963 Unknown continental" [ref=e1613]
+            - generic [ref=e1615]: C tier
+        - link "2007 Unknown Explorer $7,000 2007 Unknown Explorer • Eddie Bauer C tier" [ref=e1616] [cursor=pointer]:
+          - /url: /vehicle/4c383d9e-4a8c-4ae5-889c-f1d246da047d
+          - generic [ref=e1617]:
+            - img "2007 Unknown Explorer" [ref=e1619]
+            - generic [ref=e1621]: $7,000
+          - generic [ref=e1623]:
+            - generic "2007 Unknown Explorer Eddie Bauer" [ref=e1624]:
+              - text: 2007 Unknown Explorer
+              - generic [ref=e1625]: • Eddie Bauer
+            - generic [ref=e1627]: C tier
+        - link "2000 Unknown 911 Carrera $29,600 2000 Unknown 911 Carrera • Coupe C tier" [ref=e1628] [cursor=pointer]:
+          - /url: /vehicle/ca534dcf-67a0-49eb-a524-b716375d2f0a
+          - generic [ref=e1629]:
+            - img "2000 Unknown 911 Carrera" [ref=e1631]
+            - generic [ref=e1633]: $29,600
+          - generic [ref=e1635]:
+            - generic "2000 Unknown 911 Carrera Coupe" [ref=e1636]:
+              - text: 2000 Unknown 911 Carrera
+              - generic [ref=e1637]: • Coupe
+            - generic [ref=e1639]: C tier
+        - link "2000 Unknown F-350 Super Duty $26,000 2000 Unknown F-350 Super Duty • XLT Crew Cab C tier" [ref=e1640] [cursor=pointer]:
+          - /url: /vehicle/b5de6d77-d52d-4b3b-8da6-d97cb0636db5
+          - generic [ref=e1641]:
+            - img "2000 Unknown F-350 Super Duty" [ref=e1643]
+            - generic [ref=e1645]: $26,000
+          - generic [ref=e1647]:
+            - generic "2000 Unknown F-350 Super Duty XLT Crew Cab" [ref=e1648]:
+              - text: 2000 Unknown F-350 Super Duty
+              - generic [ref=e1649]: • XLT Crew Cab
+            - generic [ref=e1651]: C tier
+        - link "1988 BMW E30 M3 1988 BMW E30 M3 • Manual C tier" [ref=e1652] [cursor=pointer]:
+          - /url: /vehicle/cc9cf473-b942-4cf9-bc6c-ad17fbc0df14
+          - img "1988 BMW E30 M3" [ref=e1655]
+          - generic [ref=e1657]:
+            - generic "1988 BMW E30 M3 Manual" [ref=e1658]:
+              - text: 1988 BMW E30 M3
+              - generic [ref=e1659]: • Manual
+            - generic [ref=e1661]: C tier
+        - link "2010 Unknown Boxster S $32,000 2010 Unknown Boxster S • 987 C tier" [ref=e1662] [cursor=pointer]:
+          - /url: /vehicle/3f21b53b-065a-4b0a-883c-3017d578359f
+          - generic [ref=e1663]:
+            - img "2010 Unknown Boxster S" [ref=e1665]
+            - generic [ref=e1667]: $32,000
+          - generic [ref=e1669]:
+            - generic "2010 Unknown Boxster S 987" [ref=e1670]:
+              - text: 2010 Unknown Boxster S
+              - generic [ref=e1671]: • 987
+            - generic [ref=e1673]: C tier
+        - link "1978 Unknown Sedan DeVille 1978 Unknown Sedan DeVille • d’Elegance C tier" [ref=e1674] [cursor=pointer]:
+          - /url: /vehicle/1d840c66-2a6e-4eef-b60b-ebbbbe607be5
+          - img "1978 Unknown Sedan DeVille" [ref=e1677]
+          - generic [ref=e1679]:
+            - generic "1978 Unknown Sedan DeVille d’Elegance" [ref=e1680]:
+              - text: 1978 Unknown Sedan DeVille
+              - generic [ref=e1681]: • d’Elegance
+            - generic [ref=e1683]: C tier
+        - link "1996 Unknown impala ss 1996 Unknown Impala C tier" [ref=e1684] [cursor=pointer]:
+          - /url: /vehicle/17b83b0b-89f6-401c-9b5a-646f3736dbc1
+          - img "1996 Unknown impala ss" [ref=e1687]
+          - generic [ref=e1689]:
+            - generic "1996 Unknown Impala" [ref=e1690]
+            - generic [ref=e1692]: C tier
+        - link "1998 Unknown Suburban K1500 $13,750 1998 Unknown Suburban • LT C tier" [ref=e1693] [cursor=pointer]:
+          - /url: /vehicle/9c3d2d96-e863-41fc-bf7d-79df65806055
+          - generic [ref=e1694]:
+            - img "1998 Unknown Suburban K1500" [ref=e1696]
+            - generic [ref=e1698]: $13,750
+          - generic [ref=e1700]:
+            - generic "1998 Unknown Suburban LT" [ref=e1701]:
+              - text: 1998 Unknown Suburban
+              - generic [ref=e1702]: • LT
+            - generic [ref=e1704]: C tier
+        - link "1970 Unknown Mustang $37,000 1970 Unknown Mustang • Mach 1 C tier" [ref=e1705] [cursor=pointer]:
+          - /url: /vehicle/741b6371-52ee-41ff-a362-ebdb094ce94d
+          - generic [ref=e1706]:
+            - img "1970 Unknown Mustang" [ref=e1708]
+            - generic [ref=e1710]: $37,000
+          - generic [ref=e1712]:
+            - generic "1970 Unknown Mustang Mach 1" [ref=e1713]:
+              - text: 1970 Unknown Mustang
+              - generic [ref=e1714]: • Mach 1
+            - generic [ref=e1716]: C tier
+        - link "1994 Unknown Viewt $5,100 1994 Unknown Viewt C tier" [ref=e1717] [cursor=pointer]:
+          - /url: /vehicle/2142b0d4-c3a8-4e1a-9636-6daa6c6f3a6f
+          - generic [ref=e1718]:
+            - img "1994 Unknown Viewt" [ref=e1720]
+            - generic [ref=e1722]: $5,100
+          - generic [ref=e1724]:
+            - generic "1994 Unknown Viewt" [ref=e1725]
+            - generic [ref=e1727]: C tier
+        - link "2003 BMW 540i $3,300 2003 BMW 540i • M Sport C tier" [ref=e1728] [cursor=pointer]:
+          - /url: /vehicle/e9195b9a-0d7e-4425-9139-616955c28d72
+          - generic [ref=e1729]:
+            - img "2003 BMW 540i" [ref=e1731]
+            - generic [ref=e1733]: $3,300
+          - generic [ref=e1735]:
+            - generic "2003 BMW 540i M Sport" [ref=e1736]:
+              - text: 2003 BMW 540i
+              - generic [ref=e1737]: • M Sport
+            - generic [ref=e1739]: C tier
+        - link "2016 Unknown Cayenne Diesel $24,750 2016 Unknown Cayenne Diesel C tier" [ref=e1740] [cursor=pointer]:
+          - /url: /vehicle/fa0142b9-b365-4bce-a4ea-fdd5967601d9
+          - generic [ref=e1741]:
+            - img "2016 Unknown Cayenne Diesel" [ref=e1743]
+            - generic [ref=e1745]: $24,750
+          - generic [ref=e1747]:
+            - generic "2016 Unknown Cayenne Diesel" [ref=e1748]
+            - generic [ref=e1750]: C tier
+        - link "1995 Unknown F-150 $11,800 1995 Unknown F-150 • XLT C tier" [ref=e1751] [cursor=pointer]:
+          - /url: /vehicle/83726ea1-5b39-4dc5-979f-98f6ba8205fc
+          - generic [ref=e1752]:
+            - img "1995 Unknown F-150" [ref=e1754]
+            - generic [ref=e1756]: $11,800
+          - generic [ref=e1758]:
+            - generic "1995 Unknown F-150 XLT" [ref=e1759]:
+              - text: 1995 Unknown F-150
+              - generic [ref=e1760]: • XLT
+            - generic [ref=e1762]: C tier
+        - link "1999 Unknown 911 Carrera $17,250 1999 Unknown 911 Carrera • Coupe C tier" [ref=e1763] [cursor=pointer]:
+          - /url: /vehicle/44e90729-f7c3-4087-aec3-d01272ef58b7
+          - generic [ref=e1764]:
+            - img "1999 Unknown 911 Carrera" [ref=e1766]
+            - generic [ref=e1768]: $17,250
+          - generic [ref=e1770]:
+            - generic "1999 Unknown 911 Carrera Coupe" [ref=e1771]:
+              - text: 1999 Unknown 911 Carrera
+              - generic [ref=e1772]: • Coupe
+            - generic [ref=e1774]: C tier
+        - link "2000 Unknown GSX-R750 $3,800 2000 Unknown GSX-R750 C tier" [ref=e1775] [cursor=pointer]:
+          - /url: /vehicle/c943c277-7de4-4918-8df0-6d5ce5a1eb0b
+          - generic [ref=e1776]:
+            - img "2000 Unknown GSX-R750" [ref=e1778]
+            - generic [ref=e1780]: $3,800
+          - generic [ref=e1782]:
+            - generic "2000 Unknown GSX-R750" [ref=e1783]
+            - generic [ref=e1785]: C tier
+        - link "2021 Unknown AMG GT $600,000 2021 Unknown AMG GT • Black Series P One Edition C tier" [ref=e1786] [cursor=pointer]:
+          - /url: /vehicle/fa526492-bc66-49cc-b95b-2e8b140c2c99
+          - generic [ref=e1787]:
+            - img "2021 Unknown AMG GT" [ref=e1789]
+            - generic [ref=e1791]: $600,000
+          - generic [ref=e1793]:
+            - generic "2021 Unknown AMG GT Black Series P One Edition" [ref=e1794]:
+              - text: 2021 Unknown AMG GT
+              - generic [ref=e1795]: • Black Series P One Edition
+            - generic [ref=e1797]: C tier
+        - link "1963 Unknown 88 1963 Unknown 88 C tier" [ref=e1798] [cursor=pointer]:
+          - /url: /vehicle/5575f2c3-af00-4431-9dd3-cbd119d168a1
+          - img "1963 Unknown 88" [ref=e1801]
+          - generic [ref=e1803]:
+            - generic "1963 Unknown 88" [ref=e1804]
+            - generic [ref=e1806]: C tier
+        - link "1965 Unknown Continental Lot 1155661 // January 16th, 2026 ▼ 1965 Unknown Continental • Convertible C tier" [ref=e1807] [cursor=pointer]:
+          - /url: /vehicle/8a298611-c8d3-4563-85e4-2f9cce4de65d
+          - generic [ref=e1808]:
+            - img "1965 Unknown Continental" [ref=e1810]
+            - button "Lot 1155661 // January 16th, 2026 ▼" [ref=e1813]:
+              - generic [ref=e1814]: Lot 1155661
+              - generic [ref=e1815]: //
+              - time [ref=e1816]: January 16th, 2026
+              - generic [ref=e1817]: ▼
+          - generic [ref=e1819]:
+            - generic "1965 Unknown Continental Convertible" [ref=e1820]:
+              - text: 1965 Unknown Continental
+              - generic [ref=e1821]: • Convertible
+            - generic [ref=e1823]: C tier
+        - link "1972 Unknown Bronco Lot 1152862 // January 14th, 2026 ▼ 1972 Unknown Bronco • Dana • Gateway C tier" [ref=e1824] [cursor=pointer]:
+          - /url: /vehicle/4c938225-bfc7-4264-9658-889ed9b66ead
+          - generic [ref=e1825]:
+            - img "1972 Unknown Bronco" [ref=e1827]
+            - button "Lot 1152862 // January 14th, 2026 ▼" [ref=e1830]:
+              - generic [ref=e1831]: Lot 1152862
+              - generic [ref=e1832]: //
+              - time [ref=e1833]: January 14th, 2026
+              - generic [ref=e1834]: ▼
+          - generic [ref=e1836]:
+            - generic "1972 Unknown Bronco Dana Gateway" [ref=e1837]:
+              - text: 1972 Unknown Bronco
+              - generic [ref=e1838]: • Dana • Gateway
+            - generic [ref=e1840]: C tier
+        - link "1970 Unknown Superbird Lot 1152863 // January 16th, 2026 ▼ 1970 Unknown Superbird C tier" [ref=e1841] [cursor=pointer]:
+          - /url: /vehicle/2cdbab4e-99bb-4ea3-959b-5865f08f0c36
+          - generic [ref=e1842]:
+            - img "1970 Unknown Superbird" [ref=e1844]
+            - button "Lot 1152863 // January 16th, 2026 ▼" [ref=e1847]:
+              - generic [ref=e1848]: Lot 1152863
+              - generic [ref=e1849]: //
+              - time [ref=e1850]: January 16th, 2026
+              - generic [ref=e1851]: ▼
+          - generic [ref=e1853]:
+            - generic "1970 Unknown Superbird" [ref=e1854]
+            - generic [ref=e1856]: C tier
+        - link "1972 Unknown Bronco Lot 1152862 // January 14th, 2026 ▼ 1972 Unknown Bronco • Dana • Gateway C tier" [ref=e1857] [cursor=pointer]:
+          - /url: /vehicle/ea3b0ad5-de5c-42a2-a01e-330b4fb5034d
+          - generic [ref=e1858]:
+            - img "1972 Unknown Bronco" [ref=e1860]
+            - button "Lot 1152862 // January 14th, 2026 ▼" [ref=e1863]:
+              - generic [ref=e1864]: Lot 1152862
+              - generic [ref=e1865]: //
+              - time [ref=e1866]: January 14th, 2026
+              - generic [ref=e1867]: ▼
+          - generic [ref=e1869]:
+            - generic "1972 Unknown Bronco Dana Gateway" [ref=e1870]:
+              - text: 1972 Unknown Bronco
+              - generic [ref=e1871]: • Dana • Gateway
+            - generic [ref=e1873]: C tier
+        - link "1977 Unknown 900 Lot 1164630 // January 30th, 2026 ▼ 1977 Unknown 900 • SS C tier" [ref=e1874] [cursor=pointer]:
+          - /url: /vehicle/7c4089e5-cd72-4d69-9c5f-6be8d3f2623d
+          - generic [ref=e1875]:
+            - img "1977 Unknown 900" [ref=e1877]
+            - button "Lot 1164630 // January 30th, 2026 ▼" [ref=e1880]:
+              - generic [ref=e1881]: Lot 1164630
+              - generic [ref=e1882]: //
+              - time [ref=e1883]: January 30th, 2026
+              - generic [ref=e1884]: ▼
+          - generic [ref=e1886]:
+            - generic "1977 Unknown 900 SS" [ref=e1887]:
+              - text: 1977 Unknown 900
+              - generic [ref=e1888]: • SS
+            - generic [ref=e1890]: C tier
+        - link "1950 Unknown Convertible Lot 1154834 // January 13th, 2026 ▼ 1950 Unknown Convertible C tier" [ref=e1891] [cursor=pointer]:
+          - /url: /vehicle/7da45d59-601a-4a6d-b8b7-ade2d502bd37
+          - generic [ref=e1892]:
+            - img "1950 Unknown Convertible" [ref=e1894]
+            - button "Lot 1154834 // January 13th, 2026 ▼" [ref=e1897]:
+              - generic [ref=e1898]: Lot 1154834
+              - generic [ref=e1899]: //
+              - time [ref=e1900]: January 13th, 2026
+              - generic [ref=e1901]: ▼
+          - generic [ref=e1903]:
+            - generic "1950 Unknown Convertible" [ref=e1904]
+            - generic [ref=e1906]: C tier
+        - link "1955 Unknown 210 Lot 1153060 // January 14th, 2026 ▼ 1955 Unknown 210 • Hardtop C tier" [ref=e1907] [cursor=pointer]:
+          - /url: /vehicle/7e476e90-6e11-4f71-aa5d-76b7f6b0c7a3
+          - generic [ref=e1908]:
+            - img "1955 Unknown 210" [ref=e1910]
+            - button "Lot 1153060 // January 14th, 2026 ▼" [ref=e1913]:
+              - generic [ref=e1914]: Lot 1153060
+              - generic [ref=e1915]: //
+              - time [ref=e1916]: January 14th, 2026
+              - generic [ref=e1917]: ▼
+          - generic [ref=e1919]:
+            - generic "1955 Unknown 210 Hardtop" [ref=e1920]:
+              - text: 1955 Unknown 210
+              - generic [ref=e1921]: • Hardtop
+            - generic [ref=e1923]: C tier
+        - link "1968 Unknown Camaro Lot 1153057 // January 14th, 2026 ▼ 1968 Unknown Camaro • RS/SS C tier" [ref=e1924] [cursor=pointer]:
+          - /url: /vehicle/9fcffdda-2b50-4ef4-894d-8062746bf6c5
+          - generic [ref=e1925]:
+            - img "1968 Unknown Camaro" [ref=e1927]
+            - button "Lot 1153057 // January 14th, 2026 ▼" [ref=e1930]:
+              - generic [ref=e1931]: Lot 1153057
+              - generic [ref=e1932]: //
+              - time [ref=e1933]: January 14th, 2026
+              - generic [ref=e1934]: ▼
+          - generic [ref=e1936]:
+            - generic "1968 Unknown Camaro RS/SS" [ref=e1937]:
+              - text: 1968 Unknown Camaro
+              - generic [ref=e1938]: • RS/SS
+            - generic [ref=e1940]: C tier
+        - link "1969 Unknown Charger Lot 1153058 // January 14th, 2026 ▼ 1969 Unknown Charger • R/T C tier" [ref=e1941] [cursor=pointer]:
+          - /url: /vehicle/74b71b18-9cfd-4899-b262-8830ef1728a1
+          - generic [ref=e1942]:
+            - img "1969 Unknown Charger" [ref=e1944]
+            - button "Lot 1153058 // January 14th, 2026 ▼" [ref=e1947]:
+              - generic [ref=e1948]: Lot 1153058
+              - generic [ref=e1949]: //
+              - time [ref=e1950]: January 14th, 2026
+              - generic [ref=e1951]: ▼
+          - generic [ref=e1953]:
+            - generic "1969 Unknown Charger R/T" [ref=e1954]:
+              - text: 1969 Unknown Charger
+              - generic [ref=e1955]: • R/T
+            - generic [ref=e1957]: C tier
+        - link "1947 Unknown Streamliner Lot 1154832 // January 13th, 2026 ▼ 1947 Unknown Streamliner C tier" [ref=e1958] [cursor=pointer]:
+          - /url: /vehicle/a3b6eba7-5cbe-4d64-bf99-f350c4b034ab
+          - generic [ref=e1959]:
+            - img "1947 Unknown Streamliner" [ref=e1961]
+            - button "Lot 1154832 // January 13th, 2026 ▼" [ref=e1964]:
+              - generic [ref=e1965]: Lot 1154832
+              - generic [ref=e1966]: //
+              - time [ref=e1967]: January 13th, 2026
+              - generic [ref=e1968]: ▼
+          - generic [ref=e1970]:
+            - generic "1947 Unknown Streamliner" [ref=e1971]
+            - generic [ref=e1973]: C tier
+        - link "1957 Unknown 150 Lot 1154839 // January 13th, 2026 ▼ 1957 Unknown 150 C tier" [ref=e1974] [cursor=pointer]:
+          - /url: /vehicle/31299173-394f-493f-8fd1-531857688639
+          - generic [ref=e1975]:
+            - img "1957 Unknown 150" [ref=e1977]
+            - button "Lot 1154839 // January 13th, 2026 ▼" [ref=e1980]:
+              - generic [ref=e1981]: Lot 1154839
+              - generic [ref=e1982]: //
+              - time [ref=e1983]: January 13th, 2026
+              - generic [ref=e1984]: ▼
+          - generic [ref=e1986]:
+            - generic "1957 Unknown 150" [ref=e1987]
+            - generic [ref=e1989]: C tier
+        - link "1970 Unknown Camaro Lot 1154887 // January 13th, 2026 ▼ 1970 Unknown Camaro • Z28 C tier" [ref=e1990] [cursor=pointer]:
+          - /url: /vehicle/bb2e5c7e-d7d4-4a47-9b7e-28ec19617bf6
+          - generic [ref=e1991]:
+            - img "1970 Unknown Camaro" [ref=e1993]
+            - button "Lot 1154887 // January 13th, 2026 ▼" [ref=e1996]:
+              - generic [ref=e1997]: Lot 1154887
+              - generic [ref=e1998]: //
+              - time [ref=e1999]: January 13th, 2026
+              - generic [ref=e2000]: ▼
+          - generic [ref=e2002]:
+            - generic "1970 Unknown Camaro Z28" [ref=e2003]:
+              - text: 1970 Unknown Camaro
+              - generic [ref=e2004]: • Z28
+            - generic [ref=e2006]: C tier
+        - link "1977 Unknown 900 Lot 1164630 // January 30th, 2026 ▼ 1977 Unknown 900 • SS C tier" [ref=e2007] [cursor=pointer]:
+          - /url: /vehicle/fa002ce4-0e42-42d6-9046-d9662ea65316
+          - generic [ref=e2008]:
+            - img "1977 Unknown 900" [ref=e2010]
+            - button "Lot 1164630 // January 30th, 2026 ▼" [ref=e2013]:
+              - generic [ref=e2014]: Lot 1164630
+              - generic [ref=e2015]: //
+              - time [ref=e2016]: January 30th, 2026
+              - generic [ref=e2017]: ▼
+          - generic [ref=e2019]:
+            - generic "1977 Unknown 900 SS" [ref=e2020]:
+              - text: 1977 Unknown 900
+              - generic [ref=e2021]: • SS
+            - generic [ref=e2023]: C tier
+        - link "1934 Unknown CAC Lot 1164169 // January 30th, 2026 ▼ 1934 Unknown CAC C tier" [ref=e2024] [cursor=pointer]:
+          - /url: /vehicle/8e7cb8ac-8c5d-4ca9-b994-324d0ac4a5f9
+          - generic [ref=e2025]:
+            - img "1934 Unknown CAC" [ref=e2027]
+            - button "Lot 1164169 // January 30th, 2026 ▼" [ref=e2030]:
+              - generic [ref=e2031]: Lot 1164169
+              - generic [ref=e2032]: //
+              - time [ref=e2033]: January 30th, 2026
+              - generic [ref=e2034]: ▼
+          - generic [ref=e2036]:
+            - generic "1934 Unknown CAC" [ref=e2037]
+            - generic [ref=e2039]: C tier
+        - link "1960 Unknown Lark VIII Lot 1154864 // January 13th, 2026 ▼ 1960 Unknown Lark VIII • Regal C tier" [ref=e2040] [cursor=pointer]:
+          - /url: /vehicle/2b7d14ce-ca2b-4bdc-aace-2fa84e16f452
+          - generic [ref=e2041]:
+            - img "1960 Unknown Lark VIII" [ref=e2043]
+            - button "Lot 1154864 // January 13th, 2026 ▼" [ref=e2046]:
+              - generic [ref=e2047]: Lot 1154864
+              - generic [ref=e2048]: //
+              - time [ref=e2049]: January 13th, 2026
+              - generic [ref=e2050]: ▼
+          - generic [ref=e2052]:
+            - generic "1960 Unknown Lark VIII Regal" [ref=e2053]:
+              - text: 1960 Unknown Lark VIII
+              - generic [ref=e2054]: • Regal
+            - generic [ref=e2056]: C tier
+        - link "1969 Unknown Nova Lot 1155415 // January 16th, 2026 ▼ 1969 Unknown Nova • Yenko • Yenko C tier" [ref=e2057] [cursor=pointer]:
+          - /url: /vehicle/632c6790-3185-4616-88d7-9420c6ae25d6
+          - generic [ref=e2058]:
+            - img "1969 Unknown Nova" [ref=e2060]
+            - button "Lot 1155415 // January 16th, 2026 ▼" [ref=e2063]:
+              - generic [ref=e2064]: Lot 1155415
+              - generic [ref=e2065]: //
+              - time [ref=e2066]: January 16th, 2026
+              - generic [ref=e2067]: ▼
+          - generic [ref=e2069]:
+            - generic "1969 Unknown Nova Yenko Yenko" [ref=e2070]:
+              - text: 1969 Unknown Nova
+              - generic [ref=e2071]: • Yenko • Yenko
+            - generic [ref=e2073]: C tier
+        - link "1965 Unknown Impala Lot 1153062 // January 14th, 2026 ▼ 1965 Unknown Impala • SS C tier" [ref=e2074] [cursor=pointer]:
+          - /url: /vehicle/3c34cfb8-db39-4d70-84de-388f90a117af
+          - generic [ref=e2075]:
+            - img "1965 Unknown Impala" [ref=e2077]
+            - button "Lot 1153062 // January 14th, 2026 ▼" [ref=e2080]:
+              - generic [ref=e2081]: Lot 1153062
+              - generic [ref=e2082]: //
+              - time [ref=e2083]: January 14th, 2026
+              - generic [ref=e2084]: ▼
+          - generic [ref=e2086]:
+            - generic "1965 Unknown Impala SS" [ref=e2087]:
+              - text: 1965 Unknown Impala
+              - generic [ref=e2088]: • SS
+            - generic [ref=e2090]: C tier
+        - link "1969 Unknown Camaro Lot 1153056 // January 14th, 2026 ▼ 1969 Unknown Camaro • Z28 C tier" [ref=e2091] [cursor=pointer]:
+          - /url: /vehicle/4171ae1f-2958-489f-abd6-51e2279c0d74
+          - generic [ref=e2092]:
+            - img "1969 Unknown Camaro" [ref=e2094]
+            - button "Lot 1153056 // January 14th, 2026 ▼" [ref=e2097]:
+              - generic [ref=e2098]: Lot 1153056
+              - generic [ref=e2099]: //
+              - time [ref=e2100]: January 14th, 2026
+              - generic [ref=e2101]: ▼
+          - generic [ref=e2103]:
+            - generic "1969 Unknown Camaro Z28" [ref=e2104]:
+              - text: 1969 Unknown Camaro
+              - generic [ref=e2105]: • Z28
+            - generic [ref=e2107]: C tier
+        - link "1969 Unknown GTX Lot 1153059 // January 14th, 2026 ▼ 1969 Unknown GTX C tier" [ref=e2108] [cursor=pointer]:
+          - /url: /vehicle/5a2411e0-1f3b-48f2-8914-8cd521517c60
+          - generic [ref=e2109]:
+            - img "1969 Unknown GTX" [ref=e2111]
+            - button "Lot 1153059 // January 14th, 2026 ▼" [ref=e2114]:
+              - generic [ref=e2115]: Lot 1153059
+              - generic [ref=e2116]: //
+              - time [ref=e2117]: January 14th, 2026
+              - generic [ref=e2118]: ▼
+          - generic [ref=e2120]:
+            - generic "1969 Unknown GTX" [ref=e2121]
+            - generic [ref=e2123]: C tier
+        - link "1971 Unknown Chevelle Lot 1153054 // January 14th, 2026 ▼ 1971 Unknown Chevelle • Fuel-Injected 502 CI V-8, Automatic C tier" [ref=e2124] [cursor=pointer]:
+          - /url: /vehicle/b1da1f33-9353-4b22-8731-2fbde76fb01a
+          - generic [ref=e2125]:
+            - img "1971 Unknown Chevelle" [ref=e2127]
+            - button "Lot 1153054 // January 14th, 2026 ▼" [ref=e2130]:
+              - generic [ref=e2131]: Lot 1153054
+              - generic [ref=e2132]: //
+              - time [ref=e2133]: January 14th, 2026
+              - generic [ref=e2134]: ▼
+          - generic [ref=e2136]:
+            - generic "1971 Unknown Chevelle Fuel-Injected 502 CI V-8, Automatic" [ref=e2137]:
+              - text: 1971 Unknown Chevelle
+              - generic [ref=e2138]: • Fuel-Injected 502 CI V-8, Automatic
+            - generic [ref=e2140]: C tier
+        - link "1952 Honda Cub Lot 1163082 // ▼ 1952 Honda Cub • F-Type C tier" [ref=e2141] [cursor=pointer]:
+          - /url: /vehicle/cb351a18-a7f7-4ba4-b106-88aaa7d0bcb6
+          - generic [ref=e2142]:
+            - img "1952 Honda Cub" [ref=e2144]
+            - button "Lot 1163082 // ▼" [ref=e2147]:
+              - generic [ref=e2148]: Lot 1163082
+              - generic [ref=e2149]: //
+              - generic [ref=e2150]: ▼
+          - generic [ref=e2152]:
+            - generic "1952 Honda Cub F-Type" [ref=e2153]:
+              - text: 1952 Honda Cub
+              - generic [ref=e2154]: • F-Type
+            - generic [ref=e2156]: C tier
+        - link "1954 Unknown 100-4 Lot 1154838 // January 13th, 2026 ▼ 1954 Unknown 100-4 C tier" [ref=e2157] [cursor=pointer]:
+          - /url: /vehicle/1f225db4-cda7-4dbf-8fad-64105cb4811d
+          - generic [ref=e2158]:
+            - img "1954 Unknown 100-4" [ref=e2160]
+            - button "Lot 1154838 // January 13th, 2026 ▼" [ref=e2163]:
+              - generic [ref=e2164]: Lot 1154838
+              - generic [ref=e2165]: //
+              - time [ref=e2166]: January 13th, 2026
+              - generic [ref=e2167]: ▼
+          - generic [ref=e2169]:
+            - generic "1954 Unknown 100-4" [ref=e2170]
+            - generic [ref=e2172]: C tier
+        - link "1975 Unknown 750 Lot 1164629 // January 30th, 2026 ▼ 1975 Unknown 750 • Sport C tier" [ref=e2173] [cursor=pointer]:
+          - /url: /vehicle/65829ed2-5c37-41bd-b95f-7c6b23073f23
+          - generic [ref=e2174]:
+            - img "1975 Unknown 750" [ref=e2176]
+            - button "Lot 1164629 // January 30th, 2026 ▼" [ref=e2179]:
+              - generic [ref=e2180]: Lot 1164629
+              - generic [ref=e2181]: //
+              - time [ref=e2182]: January 30th, 2026
+              - generic [ref=e2183]: ▼
+          - generic [ref=e2185]:
+            - generic "1975 Unknown 750 Sport" [ref=e2186]:
+              - text: 1975 Unknown 750
+              - generic [ref=e2187]: • Sport
+            - generic [ref=e2189]: C tier
+        - link "1969 Unknown Captain America Replica Lot 1163946 // January 30th, 2026 ▼ 1969 Unknown Captain America Replica C tier" [ref=e2190] [cursor=pointer]:
+          - /url: /vehicle/8cd18412-d2ab-427e-93f7-ff65ad337e87
+          - generic [ref=e2191]:
+            - img "1969 Unknown Captain America Replica" [ref=e2193]
+            - button "Lot 1163946 // January 30th, 2026 ▼" [ref=e2196]:
+              - generic [ref=e2197]: Lot 1163946
+              - generic [ref=e2198]: //
+              - time [ref=e2199]: January 30th, 2026
+              - generic [ref=e2200]: ▼
+          - generic [ref=e2202]:
+            - generic "1969 Unknown Captain America Replica" [ref=e2203]
+            - generic [ref=e2205]: C tier
+        - link "1934 Unknown Speedway Lot 1164598 // January 30th, 2026 ▼ 1934 Unknown Speedway C tier" [ref=e2206] [cursor=pointer]:
+          - /url: /vehicle/ea37b311-3f6a-411c-9254-8b27a0ca89dc
+          - generic [ref=e2207]:
+            - img "1934 Unknown Speedway" [ref=e2209]
+            - button "Lot 1164598 // January 30th, 2026 ▼" [ref=e2212]:
+              - generic [ref=e2213]: Lot 1164598
+              - generic [ref=e2214]: //
+              - time [ref=e2215]: January 30th, 2026
+              - generic [ref=e2216]: ▼
+          - generic [ref=e2218]:
+            - generic "1934 Unknown Speedway" [ref=e2219]
+            - generic [ref=e2221]: C tier
+        - link "1972 Unknown RS125 Lot 1163079 // January 30th, 2026 ▼ 1972 Unknown RS125 • Racer C tier" [ref=e2222] [cursor=pointer]:
+          - /url: /vehicle/2604a22a-87df-49f8-97e6-e4e3d8ba0f42
+          - generic [ref=e2223]:
+            - img "1972 Unknown RS125" [ref=e2225]
+            - button "Lot 1163079 // January 30th, 2026 ▼" [ref=e2228]:
+              - generic [ref=e2229]: Lot 1163079
+              - generic [ref=e2230]: //
+              - time [ref=e2231]: January 30th, 2026
+              - generic [ref=e2232]: ▼
+          - generic [ref=e2234]:
+            - generic "1972 Unknown RS125 Racer" [ref=e2235]:
+              - text: 1972 Unknown RS125
+              - generic [ref=e2236]: • Racer
+            - generic [ref=e2238]: C tier
+        - link "1944 Unknown E Lot 1162961 // January 30th, 2026 ▼ 1944 Unknown E • Knucklehead C tier" [ref=e2239] [cursor=pointer]:
+          - /url: /vehicle/3e1d3c74-8270-455a-bb42-f2464df6f8e6
+          - generic [ref=e2240]:
+            - img "1944 Unknown E" [ref=e2242]
+            - button "Lot 1162961 // January 30th, 2026 ▼" [ref=e2245]:
+              - generic [ref=e2246]: Lot 1162961
+              - generic [ref=e2247]: //
+              - time [ref=e2248]: January 30th, 2026
+              - generic [ref=e2249]: ▼
+          - generic [ref=e2251]:
+            - generic "1944 Unknown E Knucklehead" [ref=e2252]:
+              - text: 1944 Unknown E
+              - generic [ref=e2253]: • Knucklehead
+            - generic [ref=e2255]: C tier
+        - link "1975 Unknown 750 Lot 1164629 // January 30th, 2026 ▼ 1975 Unknown 750 • Sport C tier" [ref=e2256] [cursor=pointer]:
+          - /url: /vehicle/52bc2561-9c76-4e49-be53-fc2238a8fd74
+          - generic [ref=e2257]:
+            - img "1975 Unknown 750" [ref=e2259]
+            - button "Lot 1164629 // January 30th, 2026 ▼" [ref=e2262]:
+              - generic [ref=e2263]: Lot 1164629
+              - generic [ref=e2264]: //
+              - time [ref=e2265]: January 30th, 2026
+              - generic [ref=e2266]: ▼
+          - generic [ref=e2268]:
+            - generic "1975 Unknown 750 Sport" [ref=e2269]:
+              - text: 1975 Unknown 750
+              - generic [ref=e2270]: • Sport
+            - generic [ref=e2272]: C tier
+        - link "1969 Unknown Captain America Replica Lot 1163946 // January 30th, 2026 ▼ 1969 Unknown Captain America Replica C tier" [ref=e2273] [cursor=pointer]:
+          - /url: /vehicle/785bd32c-b09f-4cf1-a46a-27cbaaf2a66b
+          - generic [ref=e2274]:
+            - img "1969 Unknown Captain America Replica" [ref=e2276]
+            - button "Lot 1163946 // January 30th, 2026 ▼" [ref=e2279]:
+              - generic [ref=e2280]: Lot 1163946
+              - generic [ref=e2281]: //
+              - time [ref=e2282]: January 30th, 2026
+              - generic [ref=e2283]: ▼
+          - generic [ref=e2285]:
+            - generic "1969 Unknown Captain America Replica" [ref=e2286]
+            - generic [ref=e2288]: C tier
+        - link "1970 Unknown K10 Lot 1153061 // January 14th, 2026 ▼ 1970 Unknown K10 C tier" [ref=e2289] [cursor=pointer]:
+          - /url: /vehicle/6bf3a39c-0faa-4183-b274-8a1d8baa9332
+          - generic [ref=e2290]:
+            - img "1970 Unknown K10" [ref=e2292]
+            - button "Lot 1153061 // January 14th, 2026 ▼" [ref=e2295]:
+              - generic [ref=e2296]: Lot 1153061
+              - generic [ref=e2297]: //
+              - time [ref=e2298]: January 14th, 2026
+              - generic [ref=e2299]: ▼
+          - generic [ref=e2301]:
+            - generic "1970 Unknown K10" [ref=e2302]
+            - generic [ref=e2304]: C tier
+        - link "1975 Unknown Trans Am Lot 1155957 // January 13th, 2026 ▼ 1975 Unknown Trans Am C tier" [ref=e2305] [cursor=pointer]:
+          - /url: /vehicle/98edfa75-f466-413f-822b-941081357d6a
+          - generic [ref=e2306]:
+            - img "1975 Unknown Trans Am" [ref=e2308]
+            - button "Lot 1155957 // January 13th, 2026 ▼" [ref=e2311]:
+              - generic [ref=e2312]: Lot 1155957
+              - generic [ref=e2313]: //
+              - time [ref=e2314]: January 13th, 2026
+              - generic [ref=e2315]: ▼
+          - generic [ref=e2317]:
+            - generic "1975 Unknown Trans Am" [ref=e2318]
+            - generic [ref=e2320]: C tier
+        - link "1966 Unknown Panhead Lot 1164665 // January 30th, 2026 ▼ 1966 Unknown Panhead • Captain America Replica C tier" [ref=e2321] [cursor=pointer]:
+          - /url: /vehicle/85e94ea8-d028-4b72-8443-ae3d91775b7a
+          - generic [ref=e2322]:
+            - img "1966 Unknown Panhead" [ref=e2324]
+            - button "Lot 1164665 // January 30th, 2026 ▼" [ref=e2327]:
+              - generic [ref=e2328]: Lot 1164665
+              - generic [ref=e2329]: //
+              - time [ref=e2330]: January 30th, 2026
+              - generic [ref=e2331]: ▼
+          - generic [ref=e2333]:
+            - generic "1966 Unknown Panhead Captain America Replica" [ref=e2334]:
+              - text: 1966 Unknown Panhead
+              - generic [ref=e2335]: • Captain America Replica
+            - generic [ref=e2337]: C tier
+        - link "1937 Unknown EL Lot 1163945 // January 30th, 2026 ▼ 1937 Unknown EL • Knucklehead C tier" [ref=e2338] [cursor=pointer]:
+          - /url: /vehicle/b746a074-b9a3-46e3-b10e-1ef4f0757558
+          - generic [ref=e2339]:
+            - img "1937 Unknown EL" [ref=e2341]
+            - button "Lot 1163945 // January 30th, 2026 ▼" [ref=e2344]:
+              - generic [ref=e2345]: Lot 1163945
+              - generic [ref=e2346]: //
+              - time [ref=e2347]: January 30th, 2026
+              - generic [ref=e2348]: ▼
+          - generic [ref=e2350]:
+            - generic "1937 Unknown EL Knucklehead" [ref=e2351]:
+              - text: 1937 Unknown EL
+              - generic [ref=e2352]: • Knucklehead
+            - generic [ref=e2354]: C tier
+        - link "1966 Unknown Panhead Lot 1164665 // January 30th, 2026 ▼ 1966 Unknown Panhead • Captain America Replica C tier" [ref=e2355] [cursor=pointer]:
+          - /url: /vehicle/e905d4d9-c275-4fec-aa15-57c1a32ab80c
+          - generic [ref=e2356]:
+            - img "1966 Unknown Panhead" [ref=e2358]
+            - button "Lot 1164665 // January 30th, 2026 ▼" [ref=e2361]:
+              - generic [ref=e2362]: Lot 1164665
+              - generic [ref=e2363]: //
+              - time [ref=e2364]: January 30th, 2026
+              - generic [ref=e2365]: ▼
+          - generic [ref=e2367]:
+            - generic "1966 Unknown Panhead Captain America Replica" [ref=e2368]:
+              - text: 1966 Unknown Panhead
+              - generic [ref=e2369]: • Captain America Replica
+            - generic [ref=e2371]: C tier
+        - link "1949 Unknown EL Lot 1162958 // January 30th, 2026 ▼ 1949 Unknown EL • Panhead C tier" [ref=e2372] [cursor=pointer]:
+          - /url: /vehicle/be61c0f0-81e2-4087-a892-33e70c45c95e
+          - generic [ref=e2373]:
+            - img "1949 Unknown EL" [ref=e2375]
+            - button "Lot 1162958 // January 30th, 2026 ▼" [ref=e2378]:
+              - generic [ref=e2379]: Lot 1162958
+              - generic [ref=e2380]: //
+              - time [ref=e2381]: January 30th, 2026
+              - generic [ref=e2382]: ▼
+          - generic [ref=e2384]:
+            - generic "1949 Unknown EL Panhead" [ref=e2385]:
+              - text: 1949 Unknown EL
+              - generic [ref=e2386]: • Panhead
+            - generic [ref=e2388]: C tier
+        - link "1978 Unknown Trans Am Lot 1119619 // July 11th, 2024 ▼ 1978 Unknown Trans Am • Coupe C tier" [ref=e2389] [cursor=pointer]:
+          - /url: /vehicle/17780168-dd1c-4d96-8d5d-cb526272c034
+          - generic [ref=e2390]:
+            - img "1978 Unknown Trans Am" [ref=e2392]
+            - button "Lot 1119619 // July 11th, 2024 ▼" [ref=e2395]:
+              - generic [ref=e2396]: Lot 1119619
+              - generic [ref=e2397]: //
+              - time [ref=e2398]: July 11th, 2024
+              - generic [ref=e2399]: ▼
+          - generic [ref=e2401]:
+            - generic "1978 Unknown Trans Am Coupe" [ref=e2402]:
+              - text: 1978 Unknown Trans Am
+              - generic [ref=e2403]: • Coupe
+            - generic [ref=e2405]: C tier
+        - link "1968 Unknown FJ-40 Land Cruiser Lot 1112908 // July 11th, 2024 ▼ 1968 Unknown FJ-40 Land Cruiser • SUV C tier" [ref=e2406] [cursor=pointer]:
+          - /url: /vehicle/bca70ada-c1e0-4f25-97b9-4ec886727577
+          - generic [ref=e2407]:
+            - img "1968 Unknown FJ-40 Land Cruiser" [ref=e2409]
+            - button "Lot 1112908 // July 11th, 2024 ▼" [ref=e2412]:
+              - generic [ref=e2413]: Lot 1112908
+              - generic [ref=e2414]: //
+              - time [ref=e2415]: July 11th, 2024
+              - generic [ref=e2416]: ▼
+          - generic [ref=e2418]:
+            - generic "1968 Unknown FJ-40 Land Cruiser SUV" [ref=e2419]:
+              - text: 1968 Unknown FJ-40 Land Cruiser
+              - generic [ref=e2420]: • SUV
+            - generic [ref=e2422]: C tier
+        - link "1960 Unknown Impala Lot 1121950 // July 11th, 2024 ▼ 1960 Unknown Impala • Hardtop C tier" [ref=e2423] [cursor=pointer]:
+          - /url: /vehicle/d11e0d71-d4da-4bdb-8aa1-ac0f2edf3221
+          - generic [ref=e2424]:
+            - img "1960 Unknown Impala" [ref=e2426]
+            - button "Lot 1121950 // July 11th, 2024 ▼" [ref=e2429]:
+              - generic [ref=e2430]: Lot 1121950
+              - generic [ref=e2431]: //
+              - time [ref=e2432]: July 11th, 2024
+              - generic [ref=e2433]: ▼
+          - generic [ref=e2435]:
+            - generic "1960 Unknown Impala Hardtop" [ref=e2436]:
+              - text: 1960 Unknown Impala
+              - generic [ref=e2437]: • Hardtop
+            - generic [ref=e2439]: C tier
+        - link "1965 Unknown GT40 Lot 1156664 // January 15th, 2026 ▼ 1965 Unknown GT40 • MkI C tier" [ref=e2440] [cursor=pointer]:
+          - /url: /vehicle/9e87e0cf-97bb-4a14-88f3-5824b80bc231
+          - generic [ref=e2441]:
+            - img "1965 Unknown GT40" [ref=e2443]
+            - button "Lot 1156664 // January 15th, 2026 ▼" [ref=e2446]:
+              - generic [ref=e2447]: Lot 1156664
+              - generic [ref=e2448]: //
+              - time [ref=e2449]: January 15th, 2026
+              - generic [ref=e2450]: ▼
+          - generic [ref=e2452]:
+            - generic "1965 Unknown GT40 MkI" [ref=e2453]:
+              - text: 1965 Unknown GT40
+              - generic [ref=e2454]: • MkI
+            - generic [ref=e2456]: C tier
+        - link "1978 Unknown Trans Am Lot 1119619 // July 11th, 2024 ▼ 1978 Unknown Trans Am C tier" [ref=e2457] [cursor=pointer]:
+          - /url: /vehicle/ea010560-e152-4d0f-90a4-670ea1171153
+          - generic [ref=e2458]:
+            - img "1978 Unknown Trans Am" [ref=e2460]
+            - button "Lot 1119619 // July 11th, 2024 ▼" [ref=e2463]:
+              - generic [ref=e2464]: Lot 1119619
+              - generic [ref=e2465]: //
+              - time [ref=e2466]: July 11th, 2024
+              - generic [ref=e2467]: ▼
+          - generic [ref=e2469]:
+            - generic "1978 Unknown Trans Am" [ref=e2470]
+            - generic [ref=e2472]: C tier
+        - link "1952 Unknown Hornet Lot 1154837 // January 13th, 2026 ▼ 1952 Unknown Hornet • Sedan C tier" [ref=e2473] [cursor=pointer]:
+          - /url: /vehicle/12617184-036c-4281-9f11-27a7e458b2a0
+          - generic [ref=e2474]:
+            - img "1952 Unknown Hornet" [ref=e2476]
+            - button "Lot 1154837 // January 13th, 2026 ▼" [ref=e2479]:
+              - generic [ref=e2480]: Lot 1154837
+              - generic [ref=e2481]: //
+              - time [ref=e2482]: January 13th, 2026
+              - generic [ref=e2483]: ▼
+          - generic [ref=e2485]:
+            - generic "1952 Unknown Hornet Sedan" [ref=e2486]:
+              - text: 1952 Unknown Hornet
+              - generic [ref=e2487]: • Sedan
+            - generic [ref=e2489]: C tier
+  - contentinfo [ref=e2492]:
+    - generic [ref=e2493]:
+      - generic [ref=e2494]: NUKE © 2025
+      - link "About" [ref=e2495] [cursor=pointer]:
+        - /url: /about
+      - link "Privacy Policy" [ref=e2496] [cursor=pointer]:
+        - /url: /privacy
+      - link "Terms of Service" [ref=e2497] [cursor=pointer]:
+        - /url: /terms
+      - link "Data Deletion" [ref=e2498] [cursor=pointer]:
+        - /url: /data-deletion
 ```

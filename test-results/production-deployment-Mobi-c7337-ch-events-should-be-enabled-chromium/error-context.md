@@ -1,15 +1,104 @@
 # Page snapshot
 
 ```yaml
-- main [ref=e3]:
-  - paragraph [ref=e4]:
-    - generic [ref=e5]:
-      - strong [ref=e6]: "404"
-      - text: ": NOT_FOUND"
-    - generic [ref=e7]:
-      - text: "Code:"
-      - code [ref=e8]: "`DEPLOYMENT_NOT_FOUND`"
-    - generic [ref=e9]:
-      - text: "ID:"
-      - code [ref=e10]: "`iad1::s4r69-1767218388785-591d76cee9d5`"
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - button "n-zero ▶" [ref=e9] [cursor=pointer]:
+      - generic [ref=e10]: n-zero
+      - generic [ref=e11]: ▶
+    - generic [ref=e14]:
+      - textbox "AI input" [ref=e15]:
+        - /placeholder: VIN, URL, search query, or image...
+      - button "..." [ref=e16] [cursor=pointer]
+    - link "Login" [ref=e19] [cursor=pointer]:
+      - /url: /login
+  - main [ref=e20]:
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]: 0 veh
+          - generic [ref=e27]: "|"
+          - generic [ref=e28]: $0 val
+          - generic "6 per row" [ref=e30]:
+            - generic [ref=e31]: 6/row
+            - slider [ref=e32]: "6"
+          - button "hide" [ref=e33] [cursor=pointer]
+        - generic [ref=e34]:
+          - button "year" [ref=e35] [cursor=pointer]
+          - button "make" [ref=e36] [cursor=pointer]
+          - button "price" [ref=e37] [cursor=pointer]
+          - button "price range" [ref=e38] [cursor=pointer]
+          - button "location" [ref=e39] [cursor=pointer]
+          - button "type" [ref=e40] [cursor=pointer]
+          - 'button "sources: 0/0" [ref=e41] [cursor=pointer]'
+          - button "status" [ref=e42] [cursor=pointer]
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic [ref=e45]:
+              - spinbutton [ref=e46]
+              - generic [ref=e47]: to
+              - spinbutton [ref=e48]
+            - generic [ref=e49]:
+              - button "64-91" [ref=e50] [cursor=pointer]
+              - button "73-87" [ref=e51] [cursor=pointer]
+              - button "67-72" [ref=e52] [cursor=pointer]
+              - button "87-00" [ref=e53] [cursor=pointer]
+              - button "60s" [ref=e54] [cursor=pointer]
+              - button "70s" [ref=e55] [cursor=pointer]
+              - button "80s" [ref=e56] [cursor=pointer]
+              - button "90s" [ref=e57] [cursor=pointer]
+          - generic [ref=e58]:
+            - textbox "min" [ref=e59]
+            - generic [ref=e60]: –
+            - textbox "max" [ref=e61]
+          - generic [ref=e63]:
+            - textbox "ZIP" [ref=e64]
+            - generic [ref=e65]: within
+            - combobox [ref=e66] [cursor=pointer]:
+              - option "10mi"
+              - option "25mi"
+              - option "50mi" [selected]
+              - option "100mi"
+              - option "250mi"
+              - option "500mi"
+            - button "add" [disabled] [ref=e67] [cursor=pointer]
+            - button "save" [disabled] [ref=e68] [cursor=pointer]
+          - generic [ref=e69]:
+            - generic [ref=e70] [cursor=pointer]:
+              - checkbox "for sale only" [ref=e71]
+              - generic [ref=e72]: for sale only
+            - generic [ref=e73] [cursor=pointer]:
+              - checkbox "hide sold" [ref=e74]
+              - generic [ref=e75]: hide sold
+            - generic [ref=e76] [cursor=pointer]:
+              - checkbox "show pending" [ref=e77]
+              - generic [ref=e78]: show pending
+            - generic [ref=e79] [cursor=pointer]:
+              - checkbox "private party" [ref=e80]
+              - generic [ref=e81]: private party
+            - generic [ref=e82] [cursor=pointer]:
+              - checkbox "dealer" [ref=e83]
+              - generic [ref=e84]: dealer
+      - generic [ref=e85]:
+        - generic [ref=e86]: No vehicles found
+        - generic [ref=e87]: Be the first to add a build and start the hype train!
+        - button "Add Your First Vehicle" [ref=e88] [cursor=pointer]
+  - navigation "Primary" [ref=e89]:
+    - link "Home" [ref=e90] [cursor=pointer]:
+      - /url: /
+    - link "+" [ref=e91] [cursor=pointer]:
+      - /url: /capture
+    - link "Profile" [ref=e92] [cursor=pointer]:
+      - /url: /profile
+  - contentinfo [ref=e93]:
+    - generic [ref=e94]:
+      - generic [ref=e95]: NUKE © 2025
+      - link "About" [ref=e96] [cursor=pointer]:
+        - /url: /about
+      - link "Privacy Policy" [ref=e97] [cursor=pointer]:
+        - /url: /privacy
+      - link "Terms of Service" [ref=e98] [cursor=pointer]:
+        - /url: /terms
+      - link "Data Deletion" [ref=e99] [cursor=pointer]:
+        - /url: /data-deletion
 ```

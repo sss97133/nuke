@@ -289,25 +289,44 @@ function extractOrgData(html: string, url: string): ExtractedOrg {
 }
 
 /**
- * Find all /for-sale/ URLs from a page (both listing pages and individual vehicle pages)
+ * Find all vehicle listing URLs from a page (supports multiple URL patterns)
  */
 function findForSaleUrls(html: string, baseUrl: string): string[] {
   const urls = new Set<string>();
   const baseUrlObj = new URL(baseUrl);
   
-  // Find all links to /for-sale/ pages
-  const linkPattern = /<a[^>]+href=["']([^"']*\/for-sale\/[^"']*)["'][^>]*>/gi;
-  let match;
-  while ((match = linkPattern.exec(html)) !== null) {
-    const href = match[1];
-    try {
-      const url = new URL(href, baseUrl);
-      // Only include URLs from the same domain
-      if (url.hostname === baseUrlObj.hostname && url.pathname.includes('/for-sale/')) {
-        urls.add(url.href);
+  // Multiple URL patterns to support different site structures
+  const patterns = [
+    /<a[^>]+href=["']([^"']*\/for-sale\/[^"']*)["'][^>]*>/gi,
+    /<a[^>]+href=["']([^"']*\/inventory\/[^"']*)["'][^>]*>/gi,
+    /<a[^>]+href=["']([^"']*\/vehicles\/[^"']*)["'][^>]*>/gi,
+    /<a[^>]+href=["']([^"']*\/vehicle\/[^"']*)["'][^>]*>/gi,
+    /<a[^>]+href=["']([^"']*\/cars\/[^"']*)["'][^>]*>/gi,
+    /<a[^>]+href=["']([^"']*\/listings\/[^"']*)["'][^>]*>/gi,
+  ];
+  
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      const href = match[1];
+      try {
+        const url = new URL(href, baseUrl);
+        // Only include URLs from the same domain
+        if (url.hostname === baseUrlObj.hostname) {
+          // Filter out common non-vehicle pages
+          const path = url.pathname.toLowerCase();
+          if (!path.includes('/contact') && 
+              !path.includes('/about') && 
+              !path.includes('/blog') &&
+              !path.includes('/news') &&
+              !path.includes('/gallery') &&
+              path !== '/') {
+            urls.add(url.href);
+          }
+        }
+      } catch (e) {
+        // Invalid URL, skip
       }
-    } catch (e) {
-      // Invalid URL, skip
     }
   }
   
@@ -744,38 +763,46 @@ Deno.serve(async (req) => {
     
     console.log(`✅ Organization: ${org.business_name || 'Unknown'}`);
     
-    // Step 2: Discover all /for-sale/ URLs (listing pages and individual vehicle pages)
+    // Step 2: Discover vehicle URLs (limited for timeout protection)
     console.log('🔍 Step 2: Discovering vehicle listing pages...');
     let allVehicleUrls = new Set<string>();
-    const initialForSaleUrls = findForSaleUrls(homepageHtml, url);
-    console.log(`✅ Found ${initialForSaleUrls.length} /for-sale/ URLs from homepage`);
+    const initialVehicleUrls = findForSaleUrls(homepageHtml, url);
+    console.log(`✅ Found ${initialVehicleUrls.length} vehicle URLs from homepage`);
+    if (initialVehicleUrls.length > 0) {
+      console.log(`   Sample URLs: ${initialVehicleUrls.slice(0, 3).join(', ')}`);
+    }
+    initialVehicleUrls.forEach(u => allVehicleUrls.add(u));
     
-    // Step 2a: Also check the main inventory page (/for-sale/)
-    const inventoryUrl = new URL('/for-sale/', url).href;
+    // Step 2a: Try main inventory page only (skip others to save time)
+    const mainInventoryPath = '/for-sale/'; // Most common path
     try {
-      console.log(`🔍 Checking inventory page: ${inventoryUrl}`);
+      const inventoryUrl = new URL(mainInventoryPath, url).href;
+      console.log(`🔍 Checking main inventory page: ${inventoryUrl}`);
       const inventoryHtml = await fetchHtml(inventoryUrl);
       const inventoryUrls = findForSaleUrls(inventoryHtml, url);
-      console.log(`✅ Found ${inventoryUrls.length} /for-sale/ URLs from inventory page`);
+      console.log(`✅ Found ${inventoryUrls.length} vehicle URLs from ${mainInventoryPath}`);
+      if (inventoryUrls.length > 0) {
+        console.log(`   Sample URLs: ${inventoryUrls.slice(0, 3).join(', ')}`);
+      }
       inventoryUrls.forEach(u => allVehicleUrls.add(u));
     } catch (error: any) {
-      console.warn(`⚠️  Failed to scrape inventory page: ${error.message}`);
+      console.warn(`⚠️  Main inventory page not found or failed: ${error.message}`);
     }
     
-    // Add initial URLs
-    initialForSaleUrls.forEach(u => allVehicleUrls.add(u));
-    
     // Step 2b: For each listing page (not individual vehicle), discover more URLs
+    // Limit discovery to avoid timeout - we'll get enough URLs from homepage + main inventory page
     const listingPages = Array.from(allVehicleUrls).filter(u => {
-      // Listing pages typically don't have a numeric ID at the end
-      // Individual pages: /for-sale/1969-classic-k5-blazer-2465/
-      // Listing pages: /for-sale/chevrolet-k5-blazer/
-      const path = new URL(u).pathname;
-      return path.match(/\/for-sale\/[^/]+\/$/) && !path.match(/\/for-sale\/[^/]+-\d+\/$/);
+      const path = new URL(u).pathname.toLowerCase();
+      const isListingPage = path.match(/\/(for-sale|inventory|vehicles|cars|listings)\/?$/) ||
+                           (path.match(/\/(for-sale|inventory|vehicles|cars|listings)\/[^/]+\/?$/) && 
+                            !path.match(/\/\d{4}-/) &&
+                            !path.match(/-\d+$/));
+      return isListingPage;
     });
     
-    console.log(`🔍 Discovering vehicles from ${listingPages.length} listing pages...`);
-    for (const listingUrl of listingPages.slice(0, 20)) { // Limit to 20 listing pages
+    // Limit to 5 listing pages max to stay under timeout
+    console.log(`🔍 Discovering vehicles from ${Math.min(listingPages.length, 5)} listing pages (limited for timeout protection)...`);
+    for (const listingUrl of listingPages.slice(0, 5)) {
       try {
         const listingHtml = await fetchHtml(listingUrl);
         const discoveredUrls = findForSaleUrls(listingHtml, url);
@@ -788,28 +815,48 @@ Deno.serve(async (req) => {
     
     // Filter to only individual vehicle pages (those with numeric IDs or specific patterns)
     const individualVehicleUrls = Array.from(allVehicleUrls).filter(u => {
-      const path = new URL(u).pathname;
+      const path = new URL(u).pathname.toLowerCase();
       // Individual vehicle pages have patterns like:
       // /for-sale/1969-classic-k5-blazer-2465/
-      // /for-sale/1977-classic-chevy-k10-3837/
-      return path.match(/\/for-sale\/[^/]+-\d+\/$/) || 
-             path.match(/\/for-sale\/\d{4}-[^/]+\/$/); // year prefix
+      // /vehicles/1970-bronco/
+      // /inventory/1967-camaro/
+      const isVehiclePage = 
+        path.match(/\/(for-sale|inventory|vehicles|vehicle|cars|listings)\/[^/]+-\d+\/?$/) || // Year + numeric ID
+        path.match(/\/(for-sale|inventory|vehicles|vehicle|cars|listings)\/\d{4}-[^/]+\/?$/) || // year prefix
+        (path.match(/\/(for-sale|inventory|vehicles|vehicle|cars|listings)\/[^/]+\/?$/) && 
+         !path.match(/\/(for-sale|inventory|vehicles|vehicle|cars|listings)\/?$/)); // Not just the category page
+      return isVehiclePage;
     });
     
     console.log(`✅ Total individual vehicle pages found: ${individualVehicleUrls.length}`);
     
     // Step 3: Scrape each individual vehicle page to extract vehicle data
     console.log(`📡 Step 3: Scraping ${individualVehicleUrls.length} vehicle pages...`);
+    
+    // Track execution time to avoid timeout (Edge Functions have 60s limit)
+    const startTime = Date.now();
+    const maxExecutionTime = 50000; // 50 seconds - leave 10s buffer for response
+    
     const vehicles: ExtractedVehicle[] = [];
     
-    // Limit to first 100 URLs to avoid timeouts
-    const urlsToProcess = individualVehicleUrls.slice(0, 100);
+    // Limit to first 10 URLs to stay well under timeout
+    // Each vehicle page scrape takes ~2-5 seconds, so 10 vehicles = ~20-50 seconds max
+    const urlsToProcess = individualVehicleUrls.slice(0, 10);
+    
+    console.log(`⏱️  Processing ${urlsToProcess.length} vehicles (timeout protection: ${maxExecutionTime}ms)`);
     
     for (let i = 0; i < urlsToProcess.length; i++) {
+      // Check timeout before processing each vehicle
+      const elapsed = Date.now() - startTime;
+      if (elapsed > maxExecutionTime) {
+        console.log(`⏰ Timeout protection: stopping after ${i} vehicles (${elapsed}ms elapsed)`);
+        break;
+      }
+      
       const vehicleUrl = urlsToProcess[i];
       
       try {
-        console.log(`  [${i + 1}/${urlsToProcess.length}] Scraping: ${vehicleUrl}`);
+        console.log(`  [${i + 1}/${urlsToProcess.length}] Scraping: ${vehicleUrl} (${elapsed}ms elapsed)`);
         const vehicleHtml = await fetchHtml(vehicleUrl);
         const vehicle = extractVehicleFromPage(vehicleHtml, vehicleUrl);
         
@@ -821,7 +868,7 @@ Deno.serve(async (req) => {
       }
     }
     
-    console.log(`✅ Extracted ${vehicles.length} vehicles`);
+    console.log(`✅ Extracted ${vehicles.length} vehicles (${Date.now() - startTime}ms total)`);
 
     // Step 4: Insert organization
     console.log('💾 Step 4: Inserting organization...');

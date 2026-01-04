@@ -1458,6 +1458,11 @@ function extractCarsAndBidsComments(html: string): Array<{ author: string; text:
     // Normalize whitespace first so tokens like "Ico\nn" become "Ico n" and match patterns.
     t = t.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
 
+    // Strip leading relative time prefixes that sometimes get merged into the text (e.g. "3d ...", "1h ...").
+    t = t
+      .replace(/^[^A-Za-z0-9$]*?/g, '')
+      .replace(/^\d+\s*(?:m|h|d|w|mo|y)\s+/i, '');
+
     // Strip common UI chrome strings that sometimes get embedded in the comment body.
     // We keep the actual message content (often after "Re:").
     t = t
@@ -2613,6 +2618,8 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
       sale_price: { type: "number", description: "Final sale price if auction ended (look for 'Sold for $X' or 'Final Price')" },
       sale_date: { type: "string", description: "Sale date if auction ended" },
       location: { type: "string", description: "Location" },
+      seller: { type: "string", description: "Seller username/handle (listing owner) if shown" },
+      buyer: { type: "string", description: "Buyer / winning bidder username/handle if auction ended and shown" },
       description: { type: "string", description: "FULL listing description - all text content describing the vehicle, its condition, history, modifications, etc. Extract from description section, article content, or main content area. Include ALL paragraphs and details. Minimum 100 characters." },
       images: { 
         type: "array", 
@@ -2906,6 +2913,8 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
         fuel_type: llmExtracted.fuel_type ?? vehicle?.fuel_type ?? null,
         body_style: llmExtracted.body_style ?? vehicle?.body_style ?? null,
         location: llmExtracted.location ?? vehicle?.location ?? null,
+        seller: llmExtracted.seller ?? vehicle?.seller ?? vehicle?.seller_username ?? null,
+        buyer: llmExtracted.buyer ?? vehicle?.buyer ?? vehicle?.buyer_username ?? null,
         description: llmExtracted.description ?? descriptionFromHtml ?? vehicle?.description ?? null,
         images, // Cleaned high-res images
         // Auction data - prioritize LLM > HTML extraction > Firecrawl
@@ -3070,6 +3079,26 @@ async function storeVehiclesInDatabase(
   const sourceOrgId = await ensureSourceBusiness(supabase, source, sourceWebsite);
 
   const nowIso = () => new Date().toISOString();
+
+  const preferNonEmptyArray = (candidate: any, fallback: any): any[] => {
+    if (Array.isArray(candidate) && candidate.length > 0) return candidate;
+    if (Array.isArray(fallback) && fallback.length > 0) return fallback;
+    return Array.isArray(candidate) ? candidate : (Array.isArray(fallback) ? fallback : []);
+  };
+
+  const deriveSellerBuyer = (vehicle: any): { seller: string | null; buyer: string | null } => {
+    const explicitSeller = (vehicle?.seller || vehicle?.seller_username || null) as string | null;
+    const explicitBuyer = (vehicle?.buyer || vehicle?.buyer_username || null) as string | null;
+    const bidders = Array.isArray(vehicle?.bidders) ? vehicle.bidders : [];
+    const comments = Array.isArray(vehicle?.comments) ? vehicle.comments : [];
+    const sellerFromBidders = bidders.find((b: any) => b?.is_seller)?.username || null;
+    const buyerFromBidders = bidders.find((b: any) => b?.is_buyer)?.username || null;
+    const sellerFromComments = comments.find((c: any) => c?.is_seller && c?.author)?.author || null;
+    return {
+      seller: explicitSeller || sellerFromBidders || sellerFromComments || null,
+      buyer: explicitBuyer || buyerFromBidders || null,
+    };
+  };
 
   const normalizeDescriptionSummary = (raw: any): string | null => {
     const s = typeof raw === "string" ? raw.trim() : "";
@@ -3237,6 +3266,8 @@ async function storeVehiclesInDatabase(
             bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : [],
             comments: Array.isArray(vehicle.comments) ? vehicle.comments : [],
             bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : [],
+            seller: deriveSellerBuyer(vehicle).seller,
+            buyer: deriveSellerBuyer(vehicle).buyer,
             auction_id: vehicle.auction_id || null,
             auction_name: vehicle.auction_name || null,
             auction_location: vehicle.auction_location || null,
@@ -3281,15 +3312,17 @@ async function storeVehiclesInDatabase(
             import_date: nowIso().split('T')[0],
             discovery_url: listingUrl,
             source_url: listingUrl,
-            images: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.images || []),
-            image_urls: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.image_urls || []),
+            images: preferNonEmptyArray(vehicle.images, existingOriginMetadata.images),
+            image_urls: preferNonEmptyArray(vehicle.images, existingOriginMetadata.image_urls),
             structured_sections: vehicle.structured_sections || existingOriginMetadata.structured_sections || {},
             // Store highlights and story from Mecum extraction
             highlights: Array.isArray(vehicle.highlights) ? vehicle.highlights : (existingOriginMetadata.highlights || []),
             story: typeof vehicle.story === 'string' ? vehicle.story : (existingOriginMetadata.story || null),
-            bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : (existingOriginMetadata.bid_history || []),
-            comments: Array.isArray(vehicle.comments) ? vehicle.comments : (existingOriginMetadata.comments || []),
-            bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : (existingOriginMetadata.bidders || []),
+            bid_history: preferNonEmptyArray(vehicle.bid_history, existingOriginMetadata.bid_history),
+            comments: preferNonEmptyArray(vehicle.comments, existingOriginMetadata.comments),
+            bidders: preferNonEmptyArray(vehicle.bidders, existingOriginMetadata.bidders),
+            seller: deriveSellerBuyer(vehicle).seller || existingOriginMetadata.seller || null,
+            buyer: deriveSellerBuyer(vehicle).buyer || existingOriginMetadata.buyer || null,
             auction_id: vehicle.auction_id || existingOriginMetadata.auction_id || null,
             listing_status: vehicle.listing_status || existingOriginMetadata.listing_status || 'active',
             // Store contributor/consignment consultant information (Broad Arrow) - prefer new data
@@ -3396,15 +3429,17 @@ async function storeVehiclesInDatabase(
             import_date: nowIso().split('T')[0],
             discovery_url: listingUrl,
             source_url: listingUrl,
-            images: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.images || []),
-            image_urls: Array.isArray(vehicle.images) ? vehicle.images : (existingOriginMetadata.image_urls || []),
+            images: preferNonEmptyArray(vehicle.images, existingOriginMetadata.images),
+            image_urls: preferNonEmptyArray(vehicle.images, existingOriginMetadata.image_urls),
             structured_sections: vehicle.structured_sections || existingOriginMetadata.structured_sections || {},
             // Store highlights and story from Mecum extraction
             highlights: Array.isArray(vehicle.highlights) ? vehicle.highlights : (existingOriginMetadata.highlights || []),
             story: typeof vehicle.story === 'string' ? vehicle.story : (existingOriginMetadata.story || null),
-            bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : (existingOriginMetadata.bid_history || []),
-            comments: Array.isArray(vehicle.comments) ? vehicle.comments : (existingOriginMetadata.comments || []),
-            bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : (existingOriginMetadata.bidders || []),
+            bid_history: preferNonEmptyArray(vehicle.bid_history, existingOriginMetadata.bid_history),
+            comments: preferNonEmptyArray(vehicle.comments, existingOriginMetadata.comments),
+            bidders: preferNonEmptyArray(vehicle.bidders, existingOriginMetadata.bidders),
+            seller: deriveSellerBuyer(vehicle).seller || existingOriginMetadata.seller || null,
+            buyer: deriveSellerBuyer(vehicle).buyer || existingOriginMetadata.buyer || null,
             auction_id: vehicle.auction_id || existingOriginMetadata.auction_id || null,
             listing_status: vehicle.listing_status || existingOriginMetadata.listing_status || 'active',
             // Store contributor/consignment consultant information (Broad Arrow) - prefer new data
@@ -3494,7 +3529,8 @@ async function storeVehiclesInDatabase(
               const lotMatch = String(listingUrl).match(/-(\d+)\/?$/);
               listingId = vehicle.lot_number || (lotMatch ? lotMatch[1] : null);
             } else if (platform === 'cars_and_bids') {
-              listingId = listingUrl.split('/').filter(Boolean).pop() || null;
+              const match = String(listingUrl).match(/\/auctions\/([^\/\?#]+)/i);
+              listingId = match?.[1] || null;
             } else if (platform === 'mecum') {
               const lotMatch = String(listingUrl).match(/\/lots\/(?:detail\/)?([^\/]+)/);
               listingId = vehicle.lot_number || (lotMatch ? lotMatch[1] : null);
@@ -3569,6 +3605,26 @@ async function storeVehiclesInDatabase(
             
             // Store ALL extracted images in metadata for fallback display
             const extractedImages = Array.isArray(vehicle.images) ? vehicle.images : [];
+
+            const { data: existingListing } = await supabase
+              .from('external_listings')
+              .select('id,current_bid,final_price,bid_count,watcher_count,view_count,start_date,end_date,sold_at,metadata')
+              .eq('vehicle_id', data.id)
+              .eq('platform', platform)
+              .eq('listing_id', listingId)
+              .maybeSingle();
+
+            const existingMeta = (existingListing?.metadata as any) || {};
+            const existingImages = Array.isArray(existingMeta?.images) ? existingMeta.images : [];
+            const mergedImages = extractedImages.length > 0 ? extractedImages : existingImages;
+            const mergedBidCount = (Number.isFinite(vehicle.bid_count) && Math.trunc(vehicle.bid_count) > 0) ? Math.trunc(vehicle.bid_count) : (existingListing?.bid_count ?? null);
+            const mergedViewCount = (Number.isFinite(vehicle.view_count) && Math.trunc(vehicle.view_count) > 0) ? Math.trunc(vehicle.view_count) : (existingListing?.view_count ?? null);
+            const mergedWatcherCount = (Number.isFinite(vehicle.watcher_count) && Math.trunc(vehicle.watcher_count) > 0) ? Math.trunc(vehicle.watcher_count) : (existingListing?.watcher_count ?? null);
+            const mergedCurrentBid = (Number.isFinite(currentBid) && Number(currentBid) > 0) ? currentBid : (existingListing?.current_bid ?? null);
+            const mergedFinalPrice = (Number.isFinite(finalPrice) && Number(finalPrice) > 0) ? finalPrice : (existingListing?.final_price ?? null);
+            const mergedStartDate = startDateIso || (existingListing?.start_date ?? null);
+            const mergedEndDate = endDateIso || (existingListing?.end_date ?? null);
+            const mergedSoldAt = soldAtIso || (existingListing?.sold_at ?? null);
             
             await supabase
               .from('external_listings')
@@ -3579,32 +3635,32 @@ async function storeVehiclesInDatabase(
                 listing_url: listingUrl,
                 listing_status: listingStatus,
                 listing_id: listingId,
-                start_date: startDateIso,
-                end_date: endDateIso,
-                sold_at: soldAtIso,
-                current_bid: currentBid,
-                final_price: finalPrice,
+                start_date: mergedStartDate,
+                end_date: mergedEndDate,
+                sold_at: mergedSoldAt,
+                current_bid: mergedCurrentBid,
+                final_price: mergedFinalPrice,
                 reserve_price: Number.isFinite(vehicle.reserve_price) ? vehicle.reserve_price : null,
-                bid_count: Number.isFinite(vehicle.bid_count) ? Math.trunc(vehicle.bid_count) : null,
-                view_count: Number.isFinite(vehicle.view_count) ? Math.trunc(vehicle.view_count) : null,
-                watcher_count: Number.isFinite(vehicle.watcher_count) ? Math.trunc(vehicle.watcher_count) : null,
+                bid_count: mergedBidCount,
+                view_count: mergedViewCount,
+                watcher_count: mergedWatcherCount,
                 metadata: {
                   source: 'extract-premium-auction',
                   lot_number: vehicle.lot_number || listingId,
                   auction_start_date: vehicle.auction_start_date,
                   auction_end_date: vehicle.auction_end_date,
                   sale_date: vehicle.sale_date,
-                  seller: vehicle.seller || vehicle.seller_username || null,
+                  seller: deriveSellerBuyer(vehicle).seller,
                   seller_username: vehicle.seller_username || null,
-                  buyer: vehicle.buyer || vehicle.buyer_username || null,
+                  buyer: deriveSellerBuyer(vehicle).buyer,
                   buyer_username: vehicle.buyer_username || null,
                   location: vehicle.location || null,
                   comment_count: Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null,
                   reserve_met: vehicle.reserve_met,
                   features: Array.isArray(vehicle.features) ? vehicle.features : null,
                   // CRITICAL: Store ALL extracted images for fallback display
-                  images: extractedImages,
-                  image_urls: extractedImages, // Alias for compatibility
+                  images: mergedImages,
+                  image_urls: mergedImages, // Alias for compatibility
                   // Store bid history
                   bid_history: Array.isArray(vehicle.bid_history) && vehicle.bid_history.length > 0 ? vehicle.bid_history : null,
                 },
@@ -3625,7 +3681,7 @@ async function storeVehiclesInDatabase(
         if (data?.id && listingUrl && (Array.isArray(vehicle.comments) || Array.isArray(vehicle.bid_history))) {
           try {
             // Determine auction_events.source for this listing
-            const eventSource = platform === 'cars_and_bids' ? 'carsandbids' : (platform || 'unknown');
+            const eventSource = platform === 'cars_and_bids' ? 'cars_and_bids' : (platform || 'unknown');
 
             // Create or get auction_event (unique key in prod: (vehicle_id, source_url))
             const { data: existingEvent } = await supabase
@@ -3637,6 +3693,21 @@ async function storeVehiclesInDatabase(
 
             if (existingEvent?.id) {
               auctionEventId = existingEvent.id;
+
+              const sourceListingIdFromUrl = String(listingUrl).match(/\/auctions\/([^\/\?#]+)/i)?.[1] || null;
+
+              await supabase
+                .from('auction_events')
+                .update({
+                  source: eventSource,
+                  source_listing_id: vehicle.auction_id || vehicle.listing_id || sourceListingIdFromUrl,
+                  seller_name: deriveSellerBuyer(vehicle).seller,
+                  winning_bidder: vehicle.buyer_username || vehicle.buyer || null,
+                  comments_count: Array.isArray(vehicle.comments) ? vehicle.comments.length : (Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null),
+                  bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : null,
+                  updated_at: nowIso(),
+                })
+                .eq('id', existingEvent.id);
             } else {
               const endDate = vehicle.auction_end_date ? new Date(vehicle.auction_end_date) : null;
               // auction_events.outcome CHECK constraint:
@@ -3651,12 +3722,12 @@ async function storeVehiclesInDatabase(
                   vehicle_id: data.id,
                   source: eventSource,
                   source_url: listingUrl,
-                  source_listing_id: vehicle.auction_id || vehicle.listing_id || (listingUrl ? listingUrl.split('/').filter(Boolean)[1] || null : null),
+                  source_listing_id: vehicle.auction_id || vehicle.listing_id || null,
                   outcome,
                   high_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
                   winning_bid: Number.isFinite(vehicle.sale_price) ? vehicle.sale_price : (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid : null),
                   winning_bidder: vehicle.buyer_username || vehicle.buyer || null,
-                  seller_name: vehicle.seller_username || vehicle.seller || null,
+                  seller_name: deriveSellerBuyer(vehicle).seller,
                   comments_count: Array.isArray(vehicle.comments) ? vehicle.comments.length : (Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null),
                   bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : null,
                   raw_data: {
@@ -3698,6 +3769,10 @@ async function storeVehiclesInDatabase(
                     .replace(/[\r\n\t]+/g, ' ')
                     .replace(/\s+/g, ' ')
                     .trim();
+
+                  text = text
+                    .replace(/^[^A-Za-z0-9$]*?/g, '')
+                    .replace(/^\d+\s*(?:m|h|d|w|mo|y)\s+/i, '');
 
                   text = text
                     .replace(/^follow\s+[A-Za-z0-9_\-]+\s+/i, '')

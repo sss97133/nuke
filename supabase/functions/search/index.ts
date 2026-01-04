@@ -57,6 +57,14 @@ function normalizeQuery(q: string): string {
   return (q || "").trim();
 }
 
+function sanitizeForFts(q: string): string {
+  // Keep this conservative to avoid tsquery syntax issues caused by punctuation.
+  return String(q || "")
+    .replace(/[^a-zA-Z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function tokenize(q: string): string[] {
   return (q || "")
     .toLowerCase()
@@ -164,6 +172,7 @@ serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get("Authorization") || null;
+    const isAnonRequest = !authHeader;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -194,6 +203,10 @@ serve(async (req: Request) => {
     const terms = expandTerms(tokenize(queryRaw));
     const safe = escapeILike(queryRaw);
 
+    const isSingleTokenQuery = tokenize(queryRaw).length === 1;
+    const isMakeOnlyQuery = isSingleTokenQuery && !looksLikeImageQuery(queryRaw);
+    const vehicleFetchLimit = isMakeOnlyQuery ? 60 : Math.min(60, limit);
+
     const wantsImages = looksLikeImageQuery(queryRaw);
     const wantsOldest = sortOldestFirst(queryRaw);
     const wantsNewest = sortNewestFirst(queryRaw);
@@ -219,6 +232,7 @@ serve(async (req: Request) => {
       ? supabase
           .from("vehicle_images")
           .select("id, vehicle_id, image_url, caption, category, taken_at, created_at")
+          .not("vehicle_id", "is", null)
           .or(`caption.ilike.%${safe}%`)
           .limit(Math.min(80, limit))
       : Promise.resolve({ data: [] as any[], error: null as any });
@@ -234,7 +248,7 @@ serve(async (req: Request) => {
     let usedFuzzyProfiles = false;
     try {
       const { data: tsq, error: tsqError } = await supabase.rpc("convert_to_tsquery", {
-        input_text: queryRaw,
+        input_text: sanitizeForFts(queryRaw),
       });
 
       const tsquery = String(tsq || "").trim();
@@ -242,16 +256,18 @@ serve(async (req: Request) => {
         const [vFts, bFts, pFts] = await Promise.all([
           supabase.rpc("search_vehicles_fulltext", {
             query_text: tsquery,
-            limit_count: Math.min(60, limit),
+            limit_count: vehicleFetchLimit,
           }),
           supabase.rpc("search_businesses_fulltext", {
             query_text: tsquery,
             limit_count: Math.min(40, limit),
           }),
-          supabase.rpc("search_profiles_fulltext", {
-            query_text: tsquery,
-            limit_count: Math.min(30, limit),
-          }),
+          isAnonRequest
+            ? Promise.resolve({ data: [] as any[], error: null as any })
+            : supabase.rpc("search_profiles_fulltext", {
+                query_text: tsquery,
+                limit_count: Math.min(30, limit),
+              }),
         ]);
 
         if (!vFts.error && !bFts.error && !pFts.error) {
@@ -272,7 +288,7 @@ serve(async (req: Request) => {
         .select("id, year, make, model, color, description, created_at, updated_at, is_for_sale, city, state")
         .eq("is_public", true)
         .or(vehicleOr || `make.ilike.%${safe}%,model.ilike.%${safe}%,description.ilike.%${safe}%`)
-        .limit(Math.min(60, limit));
+        .limit(vehicleFetchLimit);
 
       const orgsPromise = supabase
         .from("businesses")
@@ -281,11 +297,13 @@ serve(async (req: Request) => {
         .or(`business_name.ilike.%${safe}%,legal_name.ilike.%${safe}%,description.ilike.%${safe}%`)
         .limit(Math.min(40, limit));
 
-      const usersPromise = supabase
-        .from("profiles")
-        .select("id, username, full_name, bio, avatar_url, created_at")
-        .or(`username.ilike.%${safe}%,full_name.ilike.%${safe}%,bio.ilike.%${safe}%`)
-        .limit(Math.min(30, limit));
+      const usersPromise = isAnonRequest
+        ? Promise.resolve({ data: [] as any[], error: null as any })
+        : supabase
+            .from("profiles")
+            .select("id, username, full_name, bio, avatar_url, created_at")
+            .or(`username.ilike.%${safe}%,full_name.ilike.%${safe}%,bio.ilike.%${safe}%`)
+            .limit(Math.min(30, limit));
 
       const [vehiclesRes, orgsRes, usersRes] = await Promise.all([
         vehiclesPromise,
@@ -307,14 +325,14 @@ serve(async (req: Request) => {
 
       const needsVehicles = vehiclesData.length < minVehicles;
       const needsBusinesses = orgsData.length < minBusinesses;
-      const needsProfiles = usersData.length < minProfiles;
+      const needsProfiles = !isAnonRequest && usersData.length < minProfiles;
 
       if (needsVehicles || needsBusinesses || needsProfiles) {
         const [vFuzzy, bFuzzy, pFuzzy] = await Promise.all([
           needsVehicles
             ? supabase.rpc("search_vehicles_fuzzy", {
                 query_text: queryRaw,
-                limit_count: Math.min(60, limit),
+                limit_count: vehicleFetchLimit,
               })
             : Promise.resolve({ data: [] as any[], error: null as any }),
           needsBusinesses
@@ -356,6 +374,47 @@ serve(async (req: Request) => {
     const imagesData = (imagesRes.data || []) as any[];
     const sourcesData = (sourcesRes.data || []) as any[];
 
+    const vehicleIds = Array.from(
+      new Set((vehiclesData || []).map((v: any) => (v?.id ? String(v.id) : "")).filter(Boolean)),
+    ).slice(0, 120);
+
+    const vehicleMetaById: Record<string, any> = {};
+    if (vehicleIds.length > 0) {
+      const { data: vMeta } = await supabase
+        .from("vehicles")
+        .select("id, city, state, is_for_sale")
+        .in("id", vehicleIds);
+      (vMeta || []).forEach((v: any) => {
+        vehicleMetaById[String(v.id)] = v;
+      });
+    }
+
+    const vehicleImageById: Record<string, string> = {};
+    if (vehicleIds.length > 0) {
+      const { data: vImgs } = await supabase
+        .from("vehicle_images")
+        .select("vehicle_id, image_url, variants, thumbnail_url, medium_url, is_primary, position, created_at")
+        .in("vehicle_id", vehicleIds)
+        .order("is_primary", { ascending: false })
+        .order("position", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      for (const img of vImgs || []) {
+        const vid = img?.vehicle_id ? String(img.vehicle_id) : "";
+        if (!vid || vehicleImageById[vid]) continue;
+
+        const variants = (img as any)?.variants as any;
+        const candidate =
+          (variants?.thumbnail as string | undefined) ||
+          ((img as any)?.thumbnail_url as string | undefined) ||
+          (variants?.medium as string | undefined) ||
+          ((img as any)?.medium_url as string | undefined) ||
+          ((img as any)?.image_url as string | undefined);
+
+        if (candidate) vehicleImageById[vid] = candidate;
+      }
+    }
+
     const vehicleIdsForImages = new Set<string>();
     for (const img of imagesData) {
       if (img?.vehicle_id) vehicleIdsForImages.add(String(img.vehicle_id));
@@ -375,6 +434,7 @@ serve(async (req: Request) => {
 
     const vehiclesMaxRel = normalizeRelevance(vehiclesData);
     const vehicleResults: SearchResult[] = vehiclesData.map((v: any) => {
+      const vMeta = vehicleMetaById[String(v.id)] || null;
       const title = `${v.year ?? ""} ${v.make ?? ""} ${v.model ?? ""}`.trim() || "Vehicle";
       const description = v.description || `${v.color ?? ""} ${v.make ?? ""} ${v.model ?? ""}`.trim() || "";
       const baseText = scoreText(terms, `${title} ${description}`);
@@ -391,10 +451,13 @@ serve(async (req: Request) => {
           make: v.make,
           model: v.model,
           color: v.color,
-          for_sale: v.is_for_sale,
+          for_sale: vMeta?.is_for_sale ?? v.is_for_sale,
+          city: vMeta?.city ?? undefined,
+          state: vMeta?.state ?? undefined,
           fts_relevance: usedFts ? v.relevance : undefined,
         },
         relevance_score: clamp01((usedFts ? baseFts : baseText) + (usedFts ? 0.15 * baseText : 0) + makeBoost + modelBoost),
+        image_url: vehicleImageById[String(v.id)] || undefined,
         created_at: v.updated_at || v.created_at,
       };
     });
@@ -506,7 +569,7 @@ serve(async (req: Request) => {
     }
 
     const sections = {
-      vehicles: vehicleResults.slice(0, Math.min(25, limit)),
+      vehicles: vehicleResults.slice(0, isMakeOnlyQuery ? 60 : Math.min(25, limit)),
       organizations: orgResults.slice(0, Math.min(15, limit)),
       users: userResults.slice(0, Math.min(12, limit)),
       images: imageResults.slice(0, Math.min(30, limit)),
