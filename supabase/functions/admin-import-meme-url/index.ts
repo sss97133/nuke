@@ -52,6 +52,13 @@ function hostAllowed(host: string): boolean {
     "commons.wikimedia.org",
     "openclipart.org",
     "static.openclipart.org",
+    // Allow direct image URLs from known CDN/hosting services for meme images
+    // These are typically user-uploaded content, so verify licenses
+    "i.imgur.com",
+    "imgur.com",
+    // GIPHY direct image URLs
+    "i.giphy.com",
+    "media.giphy.com",
   ]);
   return allow.has(h);
 }

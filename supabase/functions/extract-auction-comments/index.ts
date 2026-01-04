@@ -107,35 +107,59 @@ serve(async (req) => {
     }
     if (!vehicleId) throw new Error('Missing vehicle_id (and could not resolve by auction_event_id, external_listings, or vehicles URLs)')
 
-    // Use Firecrawl to get JavaScript-rendered page
+    // Use Firecrawl to get JavaScript-rendered page (REQUIRED for BaT comments)
     const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
-    let html = ''
-    
-    if (firecrawlKey) {
-      const fcResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${firecrawlKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          url: auctionUrlNorm,
-          waitFor: 3000,
-          formats: ['html']
-        })
-      })
-      
-      if (fcResp.ok) {
-        const fcData = await fcResp.json()
-        html = fcData.data?.html || ''
-      }
+    if (!firecrawlKey) {
+      throw new Error('FIRECRAWL_API_KEY is required for comment extraction. BaT pages require JavaScript rendering.')
     }
     
-    // Fallback to direct fetch if Firecrawl fails
+    console.log('🔥 Using Firecrawl to fetch BaT page with JS rendering...')
+    const fcResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${firecrawlKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        url: auctionUrlNorm,
+        formats: ['html'],
+        onlyMainContent: false,
+        waitFor: 8000, // Give JS time to render BaT's dynamic comments
+        actions: [
+          {
+            type: 'wait',
+            milliseconds: 2000 // Initial page load
+          },
+          {
+            type: 'scroll',
+            direction: 'down',
+            pixels: 3000 // Scroll to trigger lazy loading of comments
+          },
+          {
+            type: 'wait',
+            milliseconds: 3000 // Wait for comments to load after scroll
+          }
+        ]
+      }),
+      signal: AbortSignal.timeout(60000) // 60 second timeout
+    })
+    
+    if (!fcResp.ok) {
+      const errorText = await fcResp.text().catch(() => '')
+      throw new Error(`Firecrawl API error ${fcResp.status}: ${errorText.slice(0, 200)}`)
+    }
+    
+    const fcData = await fcResp.json()
+    if (!fcData.success) {
+      throw new Error(`Firecrawl failed: ${fcData.error || JSON.stringify(fcData).slice(0, 200)}`)
+    }
+    
+    const html = fcData.data?.html || ''
     if (!html) {
-      const response = await fetch(auctionUrlNorm)
-      html = await response.text()
+      throw new Error('Firecrawl returned no HTML content')
     }
+    
+    console.log(`✅ Firecrawl returned ${html.length} characters of HTML`)
     
     const doc = new DOMParser().parseFromString(html, 'text/html')
     if (!doc) throw new Error('Failed to parse HTML (DOMParser returned null)')

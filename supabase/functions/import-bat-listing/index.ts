@@ -7,6 +7,33 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function getBearer(req: Request): string | null {
+  const h = req.headers.get('authorization') || req.headers.get('Authorization');
+  if (!h) return null;
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  return m?.[1]?.trim() || null;
+}
+
+function isAuthorized(req: Request): { ok: boolean; status: number; error?: string } {
+  // NOTE: This function may be deployed with verify_jwt disabled to support sb_secret_* keys.
+  // We enforce internal auth here by requiring the caller to provide the service key either as
+  // Authorization: Bearer <service_key> or apikey: <service_key>.
+  const serviceKey =
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+    Deno.env.get('SERVICE_ROLE_KEY') ??
+    Deno.env.get('SUPABASE_SERVICE_KEY') ??
+    '';
+  if (!serviceKey) return { ok: false, status: 500, error: 'Server not configured' };
+
+  const bearer = getBearer(req);
+  const apikey = req.headers.get('apikey') || req.headers.get('x-supabase-api-key') || '';
+
+  if (bearer === serviceKey) return { ok: true, status: 200 };
+  if (apikey === serviceKey) return { ok: true, status: 200 };
+
+  return { ok: false, status: 401, error: 'Unauthorized' };
+}
+
 interface BaTListing {
   url: string;
   title: string;
@@ -333,6 +360,14 @@ serve(async (req) => {
   }
 
   try {
+    const auth = isAuthorized(req);
+    if (!auth.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: auth.error || 'Unauthorized' }),
+        { status: auth.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const payload = await req.json();
     // Backwards/compat: accept {listingUrl}, {batUrl}, {bat_url}, {url}
     const batUrlRaw = coalesceString(payload?.listingUrl, payload?.batUrl, payload?.bat_url, payload?.url);
@@ -1030,31 +1065,32 @@ serve(async (req) => {
       batch_size: imageBatchSize
     };
     try {
-      const { data: simpleData, error: simpleError } = await supabase.functions.invoke('simple-scraper', {
-        body: { url: batUrl }
-      });
-      const images: string[] = (simpleData?.success && Array.isArray(simpleData?.data?.images)) ? simpleData.data.images : [];
-      const MAX_TOTAL_IMAGES = 120;
+      // CRITICAL: Avoid "pollution images".
+      // Only accept images from the BaT listing's canonical gallery (`data-gallery-items`).
+      const gallery = extractGalleryImagesFromHtml(html || '');
+      const images: string[] = Array.isArray(gallery?.urls) ? gallery.urls : [];
+      const MAX_TOTAL_IMAGES = 160;
       const capped = images.slice(0, MAX_TOTAL_IMAGES);
+
       imageImport.original_found = images.length;
       imageImport.found = capped.length;
 
-      if (simpleError) {
-        console.log('simple-scraper failed (non-fatal):', simpleError.message);
-      } else if (capped.length > 0) {
+      if (capped.length > 0) {
         for (let start = 0; start < capped.length; start += imageBatchSize) {
           const slice = capped.slice(start, start + imageBatchSize);
           imageImport.batches++;
+
           const { data: backfillData, error: backfillError } = await supabase.functions.invoke('backfill-images', {
             body: {
               vehicle_id: vehicleId,
               image_urls: slice,
-              source: 'BAT_IMPORT',
+              source: 'bat_import',
               run_analysis: false,
               listed_date: saleDate,
               max_images: slice.length
             }
           });
+
           if (backfillError) {
             console.log(`backfill-images batch failed (non-fatal):`, backfillError.message);
             imageImport.failed += slice.length;
@@ -1065,7 +1101,7 @@ serve(async (req) => {
           imageImport.failed += Number(backfillData?.failed || 0);
         }
       } else {
-        console.log('No images found by simple-scraper');
+        console.log(`[import-bat-listing] No gallery images found (method: ${gallery?.method || 'unknown'}, htmlSource: ${htmlSource}, htmlLen: ${html?.length || 0})`);
       }
     } catch (e: any) {
       console.log('Image import failed (non-fatal):', e?.message || String(e));

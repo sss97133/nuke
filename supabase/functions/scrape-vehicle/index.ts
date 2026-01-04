@@ -878,7 +878,22 @@ async function tryFirecrawl(url: string): Promise<any | null> {
         formats: ['extract', 'html'],
         extract: { schema: extractionSchema },
         onlyMainContent: false,
-        waitFor: 4000,
+        waitFor: 8000, // Longer wait for KSL JS to load
+        actions: [
+          {
+            type: 'wait',
+            milliseconds: 3000,
+          },
+          {
+            type: 'scroll',
+            direction: 'down',
+            pixels: 2000,
+          },
+          {
+            type: 'wait',
+            milliseconds: 3000,
+          },
+        ],
       }),
     })
 
@@ -895,8 +910,23 @@ async function tryFirecrawl(url: string): Promise<any | null> {
     }
 
     const extract = firecrawlData?.data?.extract || null
+    const html = firecrawlData?.data?.html || null
+    
+    // Check if KSL blocked the request (block page detection)
+    if (html && (
+      html.includes('Blocked Request Notification') || 
+      html.includes('forbiddenconnection@deseretdigital.com') ||
+      html.includes('Access to this page has been denied')
+    )) {
+      console.warn('Firecrawl returned KSL block page - KSL is blocking even Firecrawl requests')
+      return null
+    }
+    
+    // Return both extract and HTML so we can extract images from HTML if extract doesn't have them
     if (!extract || typeof extract !== 'object') return null
-    return extract
+    
+    // Attach HTML to extract object so caller can use it
+    return { ...extract, _firecrawl_html: html }
   } catch (e: any) {
     console.warn(`Firecrawl exception: ${e?.message || String(e)}`)
     return null
@@ -933,16 +963,24 @@ serve(async (req) => {
     }
 
     // Robust path: Firecrawl structured extraction first (works better on JS-heavy dealer sites).
-    const firecrawlExtract = await tryFirecrawl(url)
+    const firecrawlResult = await tryFirecrawl(url)
+    const firecrawlExtract = firecrawlResult ? { ...firecrawlResult } : null
+    const firecrawlHtml = firecrawlResult?._firecrawl_html || null
+    // Remove internal field from extract
+    if (firecrawlExtract && '_firecrawl_html' in firecrawlExtract) {
+      delete firecrawlExtract._firecrawl_html
+    }
 
-    let html = ''
+    let html = firecrawlHtml || ''
     let doc: any = null
 
     // Fallback path: fetch and parse HTML
     // NOTE: Some sites (like lartdelautomobile.com) require HTML parsing even when Firecrawl returns extract,
     // because the page contains hi-res image URLs in data attributes.
     const needsHtmlParse = url.includes('lartdelautomobile.com') || url.includes('beverlyhillscarclub.com')
-    if (!firecrawlExtract || needsHtmlParse) {
+    // For KSL, always use HTML from Firecrawl for image extraction (even if extract exists)
+    const needsKslHtmlParse = url.includes('ksl.com') && firecrawlHtml
+    if (!html && (!firecrawlExtract || needsHtmlParse)) {
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -1096,11 +1134,21 @@ serve(async (req) => {
 
     // If Firecrawl didn't yield images (or it wasn't used), use HTML extraction.
     // NOTE: For BaT listings, this is intentionally bypassed in favor of canonical gallery extraction above.
-    if ((!data.images || data.images.length === 0) && html) {
+    // For KSL, always try HTML extraction even if Firecrawl extract had images (extract may miss them)
+    const shouldExtractFromHtml = (!data.images || data.images.length === 0) || (url.includes('ksl.com') && html && html.length > 1000)
+    if (shouldExtractFromHtml && html) {
       try {
-        const extractedImages = extractImageURLs(html)
+        // Pass the original URL for KSL so we can resolve relative paths
+        const extractedImages = extractImageURLs(html, url)
         if (extractedImages && extractedImages.length > 0) {
-          data.images = normalizeImageUrls(extractedImages)
+          const normalized = normalizeImageUrls(extractedImages)
+          // For KSL, merge with existing images (Firecrawl may have found some)
+          if (url.includes('ksl.com') && data.images && data.images.length > 0) {
+            const combined = [...new Set([...data.images, ...normalized])]
+            data.images = combined
+          } else {
+            data.images = normalized
+          }
         }
       } catch (e: any) {
         console.warn('Error extracting images from HTML:', e?.message);
@@ -1605,27 +1653,66 @@ serve(async (req) => {
 })
 
 // Helper function to extract image URLs
-function extractImageURLs(html: string): string[] {
+function extractImageURLs(html: string, baseUrl?: string): string[] {
   const images: string[] = []
   const seen = new Set<string>()
   
-  // Pattern 1: Standard img tags
-  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi
+  // Extract base domain from URL for relative path resolution
+  let baseDomain = ''
+  if (baseUrl) {
+    try {
+      const urlObj = new URL(baseUrl)
+      baseDomain = `${urlObj.protocol}//${urlObj.hostname}`
+    } catch (e) {
+      // Invalid URL, skip base domain
+    }
+  }
+  
+  // Pattern 1: Standard img tags (including data-src, data-lazy-src for KSL)
+  const imgRegex = /<img[^>]+(?:src|data-src|data-lazy-src|data-original)=["']([^"']+)["'][^>]*>/gi
   let match
 
   while ((match = imgRegex.exec(html)) !== null) {
     const src = match[1]
-    if (src && !src.startsWith('data:') && !src.includes('icon') && !src.includes('logo')) {
+    if (src && !src.startsWith('data:') && !src.includes('icon') && !src.includes('logo') && !src.includes('avatar')) {
       // Convert relative URLs to absolute
       let fullUrl = src
       if (src.startsWith('//')) {
         fullUrl = 'https:' + src
       } else if (src.startsWith('/')) {
-        continue // Skip relative URLs without base
+        // For KSL, resolve relative URLs
+        if (baseDomain && (baseUrl?.includes('ksl.com'))) {
+          fullUrl = baseDomain + src
+        } else {
+          continue // Skip relative URLs without base
+        }
       } else if (src.startsWith('http')) {
         fullUrl = src
       } else {
         continue
+      }
+      
+      // Extract from Next.js image proxy URLs (KSL uses these)
+      if (fullUrl.includes('_next/image?url=')) {
+        try {
+          const urlObj = new URL(fullUrl)
+          const urlParam = urlObj.searchParams.get('url')
+          if (urlParam) {
+            fullUrl = decodeURIComponent(urlParam)
+          }
+        } catch (e) {
+          // Keep original if parsing fails
+        }
+      }
+      
+      // Filter KSL-specific images
+      if (baseUrl?.includes('ksl.com')) {
+        if (!fullUrl.includes('ksl.com') && !fullUrl.includes('ksldigital.com') && !fullUrl.includes('image.ksldigital.com')) {
+          continue // Only include KSL domain images
+        }
+        if (fullUrl.includes('logo') || fullUrl.includes('icon') || fullUrl.includes('flag') || fullUrl.includes('svg')) {
+          continue
+        }
       }
       
       if (!seen.has(fullUrl)) {

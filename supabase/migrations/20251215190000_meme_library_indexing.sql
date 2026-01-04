@@ -256,6 +256,65 @@ $$ language plpgsql security definer;
 
 grant execute on function public.admin_upsert_stream_action(uuid, text, text, text, text, text, text, integer, integer, boolean, text, text, text, text[], jsonb) to authenticated;
 
+create or replace function public.admin_delete_stream_action(
+  p_action_id uuid
+)
+returns void as $$
+declare
+  v_user_id uuid;
+begin
+  v_user_id := auth.uid();
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if not exists (
+    select 1 from public.admin_users au
+    where au.user_id = v_user_id and au.is_active = true
+  ) then
+    raise exception 'Admin access required';
+  end if;
+
+  if p_action_id is null then
+    raise exception 'Missing action_id';
+  end if;
+
+  delete from public.stream_actions where id = p_action_id;
+end;
+$$ language plpgsql security definer;
+
+grant execute on function public.admin_delete_stream_action(uuid) to authenticated;
+
+create or replace function public.admin_delete_stream_action_pack(
+  p_pack_id uuid
+)
+returns void as $$
+declare
+  v_user_id uuid;
+begin
+  v_user_id := auth.uid();
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if not exists (
+    select 1 from public.admin_users au
+    where au.user_id = v_user_id and au.is_active = true
+  ) then
+    raise exception 'Admin access required';
+  end if;
+
+  if p_pack_id is null then
+    raise exception 'Missing pack_id';
+  end if;
+
+  -- Delete pack (actions will cascade due to ON DELETE CASCADE)
+  delete from public.stream_action_packs where id = p_pack_id;
+end;
+$$ language plpgsql security definer;
+
+grant execute on function public.admin_delete_stream_action_pack(uuid) to authenticated;
+
 commit;
 
 

@@ -74,9 +74,15 @@ export default function VehicleMemePanel({
         if (!mounted) return;
         setPacks(p);
 
+        // Free packs (price_cents = 0) are automatically "owned" by everyone
+        const freePackIds = new Set(p.filter((pack) => pack.price_cents === 0).map((pack) => pack.id));
+
         if (!user?.id) {
-          setMyPackIds(new Set());
-          setActions([]);
+          setMyPackIds(freePackIds);
+          // Still load actions for free packs even if not logged in
+          const act = await StreamActionsService.listActionsForPacks(Array.from(freePackIds));
+          if (!mounted) return;
+          setActions(act);
           setCashCents(null);
           return;
         }
@@ -92,8 +98,10 @@ export default function VehicleMemePanel({
 
         const purchases = await StreamActionsService.listMyPurchases(user.id);
         if (!mounted) return;
-        const ids = new Set(purchases.map((x) => x.pack_id));
-        setMyPackIds(ids);
+        const purchasedIds = new Set(purchases.map((x) => x.pack_id));
+        // Combine free packs with purchased packs
+        const allOwnedIds = new Set([...freePackIds, ...purchasedIds]);
+        setMyPackIds(allOwnedIds);
 
         const act = await StreamActionsService.listActionsForPacks(p.map((x) => x.id));
         if (!mounted) return;
@@ -101,6 +109,10 @@ export default function VehicleMemePanel({
       } catch (e: any) {
         if (!mounted) return;
         console.error('Vehicle meme load error:', e);
+        // Show error to user
+        if (e?.message) {
+          console.error('Error details:', e.message);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -237,7 +249,7 @@ export default function VehicleMemePanel({
 
           {!loading && !hasAnyPacks ? (
             <div style={{ color: '#757575' }}>
-              No packs available. Browse all memes below or check back later.
+              No packs available. If you're an admin, you can add packs at <a href="/admin/meme-library" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>/admin/meme-library</a>.
             </div>
           ) : null}
 

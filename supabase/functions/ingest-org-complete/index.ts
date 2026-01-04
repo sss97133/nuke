@@ -2,16 +2,18 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 /**
- * FULLY AUTOMATED ORGANIZATION INGESTION
+ * INTELLIGENT ORGANIZATION INGESTION AGENT
  * 
- * Complete end-to-end workflow:
- * 1. Scrape organization and vehicle data
- * 2. Insert organization into database
- * 3. Insert vehicles into database
- * 4. Link organization to vehicles
- * 5. Insert vehicle images
+ * Fully automated agent that:
+ * 1. Takes a URL (that's it - no questions)
+ * 2. Inspects site structure using LLM + Firecrawl
+ * 3. Maps DOM structure and extraction points intelligently
+ * 4. Learns and stores patterns for reuse
+ * 5. Extracts all data accurately
+ * 6. Fills database automatically
  * 
- * No manual steps required - fully automated.
+ * Uses API keys from Edge Function secrets (OPENAI_API_KEY, FIRECRAWL_API_KEY)
+ * Runs on Supabase compute cloud
  */
 
 const corsHeaders = {
@@ -19,713 +21,48 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface ScrapeRequest {
+interface IngestRequest {
   url: string;
+  force_rediscover?: boolean;
 }
 
-interface ExtractedOrg {
-  business_name?: string;
-  website?: string;
-  description?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zip_code?: string;
-  logo_url?: string;
-  metadata?: Record<string, any>;
+interface SiteStructure {
+  domain: string;
+  site_type: string;
+  platform?: string;
+  cms?: string;
+  page_types: PageType[];
+  listing_patterns: ListingPattern[];
+  pagination_pattern?: string;
 }
 
-interface ExtractedVehicle {
-  year?: number;
-  make?: string;
-  model?: string;
-  description?: string;
-  image_urls?: string[];
-  source_url?: string;
-  price?: number;
-  status?: string;
-  vin?: string;
-  metadata?: Record<string, any>;
+interface PageType {
+  type: string;
+  url_pattern: string;
+  sample_urls: string[];
+  structure_hints: string[];
 }
 
-async function fetchHtml(url: string): Promise<string> {
-  const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
-  
-  if (firecrawlKey) {
-    try {
-      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${firecrawlKey}`,
-        },
-        body: JSON.stringify({
-          url,
-          formats: ['html'],
-          onlyMainContent: false,
-        }),
-        signal: AbortSignal.timeout(30000),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        return data.data?.html || '';
-      }
-    } catch (e) {
-      console.warn('Firecrawl failed, trying direct fetch:', e);
-    }
-  }
-  
-  // Fallback to direct fetch
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0)',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    },
-    signal: AbortSignal.timeout(20000),
-  });
-  
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-  
-  return await response.text();
+interface ListingPattern {
+  pattern_type: 'url' | 'dom' | 'api';
+  pattern: string;
+  confidence: number;
+  sample_matches: string[];
 }
 
-function extractOrgData(html: string, url: string): ExtractedOrg {
-  const org: ExtractedOrg = {
-    website: url,
-    metadata: {},
-  };
-  
-  // Common slogan words/phrases that shouldn't be company names
-  const sloganPatterns = [
-    /^(built for|driven by|powered by|experience|discover|explore|welcome to|your|the future of|the leader in)/i,
-    /(ahead|journey|adventure|excellence|quality|craftsmanship|heritage|legacy|innovation|performance)$/i,
-  ];
-  
-  const isSlogan = (text: string): boolean => {
-    const lowerText = text.toLowerCase();
-    // Check against common slogan patterns
-    if (sloganPatterns.some(pattern => pattern.test(text))) {
-      return true;
-    }
-    // Check if it's a generic marketing phrase
-    const genericPhrases = [
-      'built for the road ahead',
-      'driven by excellence',
-      'your journey starts here',
-      'experience the difference',
-      'craftsmanship redefined',
-      'heritage meets innovation',
-    ];
-    return genericPhrases.some(phrase => lowerText.includes(phrase) || phrase.includes(lowerText));
-  };
-  
-  // Priority 1: Extract from JSON-LD structured data (most reliable)
-  const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-  for (const match of Array.from(jsonLdMatches)) {
-    try {
-      const jsonLd = JSON.parse(match[1]);
-      // Handle both single objects and arrays
-      const items = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
-      for (const item of items) {
-        if (item['@type'] === 'Organization' || item['@type'] === 'LocalBusiness') {
-          if (item.name && typeof item.name === 'string' && !isSlogan(item.name)) {
-            org.business_name = item.name.trim();
-            break;
-          }
-        }
-      }
-      if (org.business_name) break;
-    } catch (e) {
-      // Invalid JSON, skip
-    }
-  }
-  
-  // Priority 2: Extract from logo alt text or link text (very reliable)
-  if (!org.business_name) {
-    const logoAltMatch = html.match(/<img[^>]*(?:logo|brand)[^>]*alt=["']([^"']+)["']/i);
-    if (logoAltMatch && logoAltMatch[1]) {
-      const altText = logoAltMatch[1].trim();
-      // Skip generic alt text like "logo", "brand", "home"
-      if (!['logo', 'brand', 'home', 'image'].includes(altText.toLowerCase()) && !isSlogan(altText)) {
-        org.business_name = altText;
-      }
-    }
-  }
-  
-  // Priority 3: Extract from header/nav link text (common pattern)
-  if (!org.business_name) {
-    // Look for link in header/nav that appears to be a company name
-    const headerMatch = html.match(/<header[^>]*>([\s\S]{0,2000})<\/header>/i) || 
-                        html.match(/<nav[^>]*>([\s\S]{0,2000})<\/nav>/i);
-    const headerSection = headerMatch ? headerMatch[1] : html.substring(0, 5000); // First 5000 chars as fallback
-    
-    const linkMatches = headerSection.matchAll(/<a[^>]*href=["']\/["'][^>]*>([^<]+(?:<[^>]+>[^<]+<\/[^>]+>)*[^<]*)<\/a>/gi);
-    for (const match of Array.from(linkMatches)) {
-      const linkContent = match[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      // Check if it looks like a company name (2-4 words, starts with capital, reasonable length)
-      if (linkContent.match(/^[A-Z][a-zA-Z\s]{3,50}$/) && 
-          linkContent.split(/\s+/).length >= 2 && 
-          linkContent.split(/\s+/).length <= 4 &&
-          !linkContent.match(/^(logo|brand|home|menu|inventory|about|contact|shop|build)/i) &&
-          !isSlogan(linkContent)) {
-        org.business_name = linkContent;
-        break;
-      }
-    }
-  }
-  
-  // Priority 4: Extract from title tag (but filter out slogans and take the company name part)
-  if (!org.business_name) {
-    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (titleMatch) {
-      let title = titleMatch[1].replace(/\s+/g, ' ').trim();
-      
-      // Filter out video/platform indicators
-      if (!title.match(/\b(vimeo|youtube|video|watch|play|stream|embed)\b/i)) {
-        // Split by | or - and try each part
-        const parts = title.split(/[|\-–—]/).map(p => p.trim()).filter(p => p.length > 2);
-        for (const part of parts) {
-          if (!isSlogan(part) && part.length < 100) {
-            // Check if it looks like a company name (not just a slogan)
-            if (part.split(/\s+/).length >= 2 && part.split(/\s+/).length <= 5) {
-              org.business_name = part;
-              break;
-            }
-          }
-        }
-      }
-    }
-  }
-  
-  // Priority 5: Extract domain name and convert to readable name (fallback)
-  if (!org.business_name) {
-    try {
-      const urlObj = new URL(url);
-      const hostname = urlObj.hostname.replace(/^www\./, ''); // Remove www.
-      const domainParts = hostname.split('.')[0].split(/-|_/); // Split on hyphens/underscores
-      // Capitalize each word
-      const domainName = domainParts
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-        .join(' ');
-      if (domainName.length > 2 && domainName.length < 100) {
-        org.business_name = domainName;
-      }
-    } catch (e) {
-      // Invalid URL, skip
-    }
-  }
-  
-  // Priority 6: Extract from h1 (last resort, but filter slogans)
-  if (!org.business_name) {
-    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-    if (h1Match) {
-      const h1Text = h1Match[1].trim();
-      if (h1Text.length > 2 && h1Text.length < 100 && !isSlogan(h1Text)) {
-        org.business_name = h1Text;
-      }
-    }
-  }
-  
-  // Extract description from meta description or first paragraph
-  const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
-  if (metaDescMatch) {
-    org.description = metaDescMatch[1].trim();
-  }
-  
-  // Extract contact info
-  const emailMatch = html.match(/mailto:([^\s"']+@[^\s"']+)/i) || html.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/);
-  if (emailMatch) {
-    org.email = emailMatch[1];
-  }
-  
-  const phoneMatch = html.match(/(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/);
-  if (phoneMatch) {
-    org.phone = phoneMatch[0].replace(/[^\d+]/g, '');
-  }
-  
-  // Extract address
-  const addressPatterns = [
-    /(\d+\s+[A-Za-z0-9\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Circle|Cir)[^<]*?)(?:,|<\/)/i,
-    /<address[^>]*>([^<]+)<\/address>/i,
-  ];
-  
-  for (const pattern of addressPatterns) {
-    const match = html.match(pattern);
-    if (match) {
-      const addr = match[1].trim();
-      const parts = addr.split(',').map(s => s.trim());
-      if (parts.length >= 2) {
-        org.address = parts[0];
-        const cityState = parts[1].match(/([^0-9]+?)\s+([A-Z]{2})\s+(\d{5})?/);
-        if (cityState) {
-          org.city = cityState[1].trim();
-          org.state = cityState[2];
-          org.zip_code = cityState[3];
-        }
-      }
-      break;
-    }
-  }
-  
-  // Extract logo
-  const logoMatch = html.match(/<img[^>]*(?:logo|brand)[^>]*src=["']([^"']+)["']/i);
-  if (logoMatch) {
-    const logoUrl = logoMatch[1];
-    org.logo_url = logoUrl.startsWith('http') ? logoUrl : new URL(logoUrl, url).href;
-  }
-  
-  org.metadata = {
-    html_length: html.length,
-    extracted_at: new Date().toISOString(),
-    source: 'automated_ingestion',
-  };
-  
-  return org;
+interface ExtractionPattern {
+  field_name: string;
+  selectors: string[];
+  regex_patterns?: string[];
+  extraction_method: 'dom' | 'llm' | 'api' | 'hybrid';
+  confidence: number;
+  sample_values: any[];
 }
 
-/**
- * Find all vehicle listing URLs from a page (supports multiple URL patterns)
- */
-function findForSaleUrls(html: string, baseUrl: string): string[] {
-  const urls = new Set<string>();
-  const baseUrlObj = new URL(baseUrl);
-  
-  // Multiple URL patterns to support different site structures
-  const patterns = [
-    /<a[^>]+href=["']([^"']*\/for-sale\/[^"']*)["'][^>]*>/gi,
-    /<a[^>]+href=["']([^"']*\/inventory\/[^"']*)["'][^>]*>/gi,
-    /<a[^>]+href=["']([^"']*\/vehicles\/[^"']*)["'][^>]*>/gi,
-    /<a[^>]+href=["']([^"']*\/vehicle\/[^"']*)["'][^>]*>/gi,
-    /<a[^>]+href=["']([^"']*\/cars\/[^"']*)["'][^>]*>/gi,
-    /<a[^>]+href=["']([^"']*\/listings\/[^"']*)["'][^>]*>/gi,
-  ];
-  
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(html)) !== null) {
-      const href = match[1];
-      try {
-        const url = new URL(href, baseUrl);
-        // Only include URLs from the same domain
-        if (url.hostname === baseUrlObj.hostname) {
-          // Filter out common non-vehicle pages
-          const path = url.pathname.toLowerCase();
-          if (!path.includes('/contact') && 
-              !path.includes('/about') && 
-              !path.includes('/blog') &&
-              !path.includes('/news') &&
-              !path.includes('/gallery') &&
-              path !== '/') {
-            urls.add(url.href);
-          }
-        }
-      } catch (e) {
-        // Invalid URL, skip
-      }
-    }
-  }
-  
-  return Array.from(urls);
-}
-
-/**
- * Extract vehicle data from an individual vehicle listing page
- */
-function extractVehicleFromPage(html: string, pageUrl: string): ExtractedVehicle | null {
-  const cleanHtml = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-                       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-  
-  const vehicle: ExtractedVehicle = {
-    source_url: pageUrl,
-    metadata: {},
-  };
-  
-  // Known vehicle makes (with aliases mapped to canonical names)
-  const makeAliases: Record<string, string> = {
-    'chevy': 'Chevrolet',
-    'vw': 'Volkswagen',
-    'mercedes': 'Mercedes-Benz',
-    'land rover': 'Land Rover',
-    'range rover': 'Range Rover',
-    'alfa romeo': 'Alfa Romeo',
-    'rolls-royce': 'Rolls-Royce',
-    'aston martin': 'Aston Martin',
-    'mercedes-benz': 'Mercedes-Benz',
-  };
-  
-  const knownMakes = new Set([
-    'ford', 'chevrolet', 'chevy', 'dodge', 'chrysler', 'jeep', 'ram', 'gmc',
-    'toyota', 'honda', 'nissan', 'mazda', 'subaru', 'mitsubishi', 'acura', 'lexus', 'infiniti',
-    'bmw', 'mercedes', 'mercedes-benz', 'audi', 'volkswagen', 'vw', 'porsche', 'volvo',
-    'jaguar', 'land rover', 'range rover', 'bentley', 'rolls-royce', 'aston martin',
-    'ferrari', 'lamborghini', 'mclaren', 'maserati', 'alfa romeo', 'fiat',
-    'cadillac', 'lincoln', 'buick', 'pontiac', 'oldsmobile', 'plymouth', 'amc',
-    'studebaker', 'packard', 'willys', 'international', 'datsun', 'saab', 'triumph', 'mg'
-  ]);
-  
-  // Generic words that shouldn't be treated as makes
-  const genericWords = new Set(['classic', 'custom', 'vintage', 'restored', 'rebuilt', 'modified', 'project', 'for', 'sale']);
-  
-  // Extract year, make, model from title or h1
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-  const headingText = (h1Match?.[1] || titleMatch?.[1] || '').trim();
-  
-  // Try to extract year + make + model from heading
-  const vehiclePattern = /\b((?:19|20)\d{2})\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)\s+([A-Za-z0-9\s\-/]+?)(?:\s|$|,|\.|<\/|&nbsp;)/i;
-  const vehicleMatch = headingText.match(vehiclePattern) || cleanHtml.match(vehiclePattern);
-  
-  if (vehicleMatch) {
-    vehicle.year = parseInt(vehicleMatch[1]);
-    const makeCandidate = vehicleMatch[2].trim().toLowerCase();
-    let model = vehicleMatch[3].trim().replace(/\s+/g, ' ');
-    
-    // Check if make candidate is valid (skip generic words)
-    if (!genericWords.has(makeCandidate) && knownMakes.has(makeCandidate)) {
-      // Normalize make name using alias map if available
-      vehicle.make = makeAliases[makeCandidate] || vehicleMatch[2].trim();
-      vehicle.model = model;
-    } else {
-      // Try first word of model as make
-      const modelParts = model.split(/\s+/);
-      if (modelParts.length > 0) {
-        const firstModelWord = modelParts[0].toLowerCase();
-        if (knownMakes.has(firstModelWord)) {
-          // Normalize make name using alias map
-          vehicle.make = makeAliases[firstModelWord] || modelParts[0];
-          vehicle.model = modelParts.slice(1).join(' ');
-        } else {
-          // Can't determine make/model reliably
-          return null;
-        }
-      } else {
-        return null;
-      }
-    }
-  } else {
-    // Try to extract from URL path
-    const urlPath = new URL(pageUrl).pathname;
-    const urlParts = urlPath.split('/').filter(p => p);
-    const forSaleIndex = urlParts.indexOf('for-sale');
-    if (forSaleIndex >= 0 && urlParts.length > forSaleIndex + 1) {
-      const vehicleSlug = urlParts[forSaleIndex + 1];
-      // Try to parse year from slug (e.g., "1969-classic-k5-blazer-2465")
-      const yearMatch = vehicleSlug.match(/\b(19|20)\d{2}\b/);
-      if (yearMatch) {
-        vehicle.year = parseInt(yearMatch[0]);
-        // Extract make/model from slug (very rough)
-        const slugParts = vehicleSlug.replace(/\d+/g, '').split('-').filter(p => p && p !== 'classic' && p !== 'for' && p !== 'sale');
-        if (slugParts.length >= 2) {
-          const firstPart = slugParts[0].toLowerCase();
-          if (knownMakes.has(firstPart)) {
-            vehicle.make = slugParts[0];
-            vehicle.model = slugParts.slice(1).join(' ');
-          } else if (slugParts.length >= 3 && knownMakes.has(slugParts[0] + ' ' + slugParts[1])) {
-            vehicle.make = slugParts[0] + ' ' + slugParts[1];
-            vehicle.model = slugParts.slice(2).join(' ');
-          }
-        }
-      }
-    }
-    
-    if (!vehicle.make || !vehicle.model) {
-      return null; // Can't extract vehicle info
-    }
-  }
-  
-  // Extract description - look for meta description, then main content
-  const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
-  if (metaDescMatch) {
-    vehicle.description = metaDescMatch[1].trim();
-  } else {
-    // Try to find main content area
-    const mainContentMatch = html.match(/<main[^>]*>([\s\S]{200,2000})<\/main>/i) ||
-                            html.match(/<article[^>]*>([\s\S]{200,2000})<\/article>/i) ||
-                            html.match(/<div[^>]*class=["'][^"']*content["'][^>]*>([\s\S]{200,2000})<\/div>/i);
-    if (mainContentMatch) {
-      const content = mainContentMatch[1].replace(/<[^>]+>/g, ' ')
-                                          .replace(/&nbsp;/g, ' ')
-                                          .replace(/\s+/g, ' ')
-                                          .trim();
-      if (content.length > 100) {
-        vehicle.description = content.substring(0, 1000);
-      }
-    }
-  }
-  
-  // Extract price
-  const pricePatterns = [
-    /\$\s*([\d,]+(?:\.\d{2})?)/g,
-    /Price[:\s]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-    /Asking[:\s]+\$?\s*([\d,]+(?:\.\d{2})?)/gi,
-  ];
-  
-  for (const pattern of pricePatterns) {
-    const matches = cleanHtml.matchAll(pattern);
-    for (const match of matches) {
-      const price = parseFloat(match[1].replace(/,/g, ''));
-      if (price > 1000 && price < 10000000) { // Reasonable price range
-        vehicle.price = price;
-        break;
-      }
-    }
-    if (vehicle.price) break;
-  }
-  
-  // Determine status
-  vehicle.status = /SOLD|SALE\s+COMPLETE|SOLD\s+OUT|NOT\s+AVAILABLE/i.test(cleanHtml) ? 'sold' : 'for_sale';
-  
-  // Extract images - prioritize main vehicle images
-  const imageUrls: string[] = [];
-  const imgPattern = /<img[^>]+src=["']([^"']+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>/gi;
-  let imgMatch;
-  while ((imgMatch = imgPattern.exec(cleanHtml)) !== null) {
-    const imgUrl = imgMatch[1];
-    const alt = imgMatch[2] || '';
-    
-    // Skip navigation/header/logo images
-    if (imgUrl.match(/(topbar|header|logo|button|icon|avatar|profile)/i) ||
-        alt.match(/(logo|navigation|menu|button)/i)) {
-      continue;
-    }
-    
-    const fullUrl = imgUrl.startsWith('http') ? imgUrl : new URL(imgUrl, pageUrl).href;
-    if (!imageUrls.includes(fullUrl)) {
-      imageUrls.push(fullUrl);
-    }
-  }
-  
-  vehicle.image_urls = imageUrls.length > 0 ? imageUrls : undefined;
-  vehicle.metadata = {
-    extracted_at: new Date().toISOString(),
-    page_title: titleMatch?.[1] || '',
-  };
-  
-  return vehicle;
-}
-
-async function insertOrganization(supabase: any, org: ExtractedOrg): Promise<string | null> {
-  if (!org.website) {
-    console.error('Organization website is required');
-    return null;
-  }
-
-  // First, check if organization exists
-  const { data: existing } = await supabase
-    .from('businesses')
-    .select('id, metadata')
-    .eq('website', org.website)
-    .maybeSingle();
-
-  const orgData: any = {
-    website: org.website,
-  };
-
-  if (org.business_name) orgData.business_name = org.business_name;
-  if (org.description) orgData.description = org.description;
-  if (org.email) orgData.email = org.email;
-  if (org.phone) orgData.phone = org.phone;
-  if (org.address) orgData.address = org.address;
-  if (org.city) orgData.city = org.city;
-  if (org.state) orgData.state = org.state;
-  if (org.zip_code) orgData.zip_code = org.zip_code;
-  if (org.logo_url) orgData.logo_url = org.logo_url;
-
-  // Merge metadata
-  const existingMetadata = existing?.metadata || {};
-  orgData.metadata = {
-    ...existingMetadata,
-    ...(org.metadata || {}),
-    extracted_at: new Date().toISOString(),
-    source: 'automated_ingestion',
-  };
-
-  let organizationId: string | null = null;
-
-  if (existing?.id) {
-    // Update existing organization
-    const { data, error } = await supabase
-      .from('businesses')
-      .update(orgData)
-      .eq('id', existing.id)
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error updating organization:', error);
-      return null;
-    }
-    organizationId = data?.id || null;
-  } else {
-    // Insert new organization
-    const { data, error } = await supabase
-      .from('businesses')
-      .insert(orgData)
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error inserting organization:', error);
-      return null;
-    }
-    organizationId = data?.id || null;
-  }
-
-  return organizationId;
-}
-
-async function insertVehicle(supabase: any, vehicle: ExtractedVehicle, organizationId: string): Promise<string | null> {
-  if (!vehicle.make || !vehicle.model) {
-    console.warn('Vehicle missing make or model, skipping');
-    return null;
-  }
-
-  const vehicleData: any = {
-    make: vehicle.make,
-    model: vehicle.model,
-    discovery_url: vehicle.source_url || null,
-    platform_url: vehicle.source_url || null,
-    notes: vehicle.description || null,
-    asking_price: vehicle.price || null,
-    origin_metadata: vehicle.metadata || {},
-  };
-
-  if (vehicle.year) vehicleData.year = vehicle.year;
-  if (vehicle.vin) vehicleData.vin = vehicle.vin;
-
-  // Insert or update vehicle
-  let vehicleId: string | null = null;
-
-  // Check if vehicle exists by VIN or discovery_url + model
-  let existingVehicle = null;
-  
-  if (vehicle.vin) {
-    const { data } = await supabase
-      .from('vehicles')
-      .select('id')
-      .eq('vin', vehicle.vin)
-      .maybeSingle();
-    existingVehicle = data;
-  } else if (vehicle.source_url && vehicle.model) {
-    const { data } = await supabase
-      .from('vehicles')
-      .select('id')
-      .eq('discovery_url', vehicle.source_url)
-      .eq('model', vehicle.model)
-      .maybeSingle();
-    existingVehicle = data;
-  }
-
-  if (existingVehicle?.id) {
-    // Update existing vehicle
-    const { data, error } = await supabase
-      .from('vehicles')
-      .update(vehicleData)
-      .eq('id', existingVehicle.id)
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error updating vehicle:', error);
-      return null;
-    }
-    vehicleId = data?.id || null;
-  } else {
-    // Insert new vehicle
-    const { data, error } = await supabase
-      .from('vehicles')
-      .insert(vehicleData)
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error inserting vehicle:', error);
-      return null;
-    }
-    vehicleId = data?.id || null;
-  }
-
-  if (!vehicleId) return null;
-
-  // Link vehicle to organization
-  // Check if link already exists
-  const { data: existingLink, error: linkCheckError } = await supabase
-    .from('organization_vehicles')
-    .select('id')
-    .eq('organization_id', organizationId)
-    .eq('vehicle_id', vehicleId)
-    .eq('relationship_type', vehicle.status === 'sold' ? 'seller' : 'owner')
-    .maybeSingle(); // Use maybeSingle() instead of single() to handle no record gracefully
-
-  const linkData = {
-    organization_id: organizationId,
-    vehicle_id: vehicleId,
-    relationship_type: vehicle.status === 'sold' ? 'seller' : 'owner',
-    status: vehicle.status === 'sold' ? 'past' : 'active',
-    auto_tagged: false,
-    metadata: {
-      source_url: vehicle.source_url,
-      extracted_at: new Date().toISOString(),
-      price: vehicle.price,
-    },
-  };
-
-  let linkError;
-  if (existingLink?.id) {
-    // Update existing link
-    const { error } = await supabase
-      .from('organization_vehicles')
-      .update(linkData)
-      .eq('id', existingLink.id);
-    linkError = error;
-  } else {
-    // Insert new link
-    const { error } = await supabase
-      .from('organization_vehicles')
-      .insert(linkData);
-    linkError = error;
-  }
-
-  if (linkError) {
-    console.warn('Error linking vehicle to organization:', linkError);
-  }
-
-  // Insert vehicle images
-  if (vehicle.image_urls && vehicle.image_urls.length > 0) {
-    for (const imageUrl of vehicle.image_urls) {
-      // Check if image already exists
-      const { data: existingImage } = await supabase
-        .from('vehicle_images')
-        .select('id')
-        .eq('vehicle_id', vehicleId)
-        .eq('image_url', imageUrl)
-        .maybeSingle();
-
-      if (!existingImage) {
-        // Insert new image
-        const { error: imgError } = await supabase
-          .from('vehicle_images')
-          .insert({
-            vehicle_id: vehicleId,
-            image_url: imageUrl,
-            category: 'exterior',
-            uploaded_at: new Date().toISOString(),
-          });
-
-        if (imgError) {
-          console.warn('Error inserting vehicle image:', imgError);
-        }
-      }
-    }
-  }
-
-  return vehicleId;
-}
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -733,202 +70,692 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { url }: ScrapeRequest = await req.json();
+    const { url, force_rediscover = false }: IngestRequest = await req.json();
 
     if (!url) {
       return new Response(
-        JSON.stringify({ success: false, error: 'URL is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        JSON.stringify({ error: 'url required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`🚀 Starting automated ingestion for: ${url}`);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase credentials not configured');
-    }
+    console.log(`\n🤖 INTELLIGENT INGESTION AGENT`);
+    console.log('='.repeat(70));
+    console.log(`URL: ${url}\n`);
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      auth: { persistSession: false },
-    });
+    // Step 1: Create/find organization
+    console.log('📋 Step 1: Creating/finding organization...');
+    const organizationId = await createOrFindOrganization(supabase, url);
+    console.log(`✅ Organization ID: ${organizationId}\n`);
 
-    // Step 1: Scrape organization from homepage
-    console.log('📡 Step 1: Scraping organization data...');
-    const homepageHtml = await fetchHtml(url);
-    const org = extractOrgData(homepageHtml, url);
-    
-    console.log(`✅ Organization: ${org.business_name || 'Unknown'}`);
-    
-    // Step 2: Discover vehicle URLs (limited for timeout protection)
-    console.log('🔍 Step 2: Discovering vehicle listing pages...');
-    let allVehicleUrls = new Set<string>();
-    const initialVehicleUrls = findForSaleUrls(homepageHtml, url);
-    console.log(`✅ Found ${initialVehicleUrls.length} vehicle URLs from homepage`);
-    if (initialVehicleUrls.length > 0) {
-      console.log(`   Sample URLs: ${initialVehicleUrls.slice(0, 3).join(', ')}`);
-    }
-    initialVehicleUrls.forEach(u => allVehicleUrls.add(u));
-    
-    // Step 2a: Try main inventory page only (skip others to save time)
-    const mainInventoryPath = '/for-sale/'; // Most common path
-    try {
-      const inventoryUrl = new URL(mainInventoryPath, url).href;
-      console.log(`🔍 Checking main inventory page: ${inventoryUrl}`);
-      const inventoryHtml = await fetchHtml(inventoryUrl);
-      const inventoryUrls = findForSaleUrls(inventoryHtml, url);
-      console.log(`✅ Found ${inventoryUrls.length} vehicle URLs from ${mainInventoryPath}`);
-      if (inventoryUrls.length > 0) {
-        console.log(`   Sample URLs: ${inventoryUrls.slice(0, 3).join(', ')}`);
-      }
-      inventoryUrls.forEach(u => allVehicleUrls.add(u));
-    } catch (error: any) {
-      console.warn(`⚠️  Main inventory page not found or failed: ${error.message}`);
-    }
-    
-    // Step 2b: For each listing page (not individual vehicle), discover more URLs
-    // Limit discovery to avoid timeout - we'll get enough URLs from homepage + main inventory page
-    const listingPages = Array.from(allVehicleUrls).filter(u => {
-      const path = new URL(u).pathname.toLowerCase();
-      const isListingPage = path.match(/\/(for-sale|inventory|vehicles|cars|listings)\/?$/) ||
-                           (path.match(/\/(for-sale|inventory|vehicles|cars|listings)\/[^/]+\/?$/) && 
-                            !path.match(/\/\d{4}-/) &&
-                            !path.match(/-\d+$/));
-      return isListingPage;
-    });
-    
-    // Limit to 5 listing pages max to stay under timeout
-    console.log(`🔍 Discovering vehicles from ${Math.min(listingPages.length, 5)} listing pages (limited for timeout protection)...`);
-    for (const listingUrl of listingPages.slice(0, 5)) {
-      try {
-        const listingHtml = await fetchHtml(listingUrl);
-        const discoveredUrls = findForSaleUrls(listingHtml, url);
-        discoveredUrls.forEach(u => allVehicleUrls.add(u));
-        console.log(`  ✅ Found ${discoveredUrls.length} URLs from ${listingUrl}`);
-      } catch (error: any) {
-        console.warn(`  ⚠️  Failed to scrape listing page ${listingUrl}: ${error.message}`);
-      }
-    }
-    
-    // Filter to only individual vehicle pages (those with numeric IDs or specific patterns)
-    const individualVehicleUrls = Array.from(allVehicleUrls).filter(u => {
-      const path = new URL(u).pathname.toLowerCase();
-      // Individual vehicle pages have patterns like:
-      // /for-sale/1969-classic-k5-blazer-2465/
-      // /vehicles/1970-bronco/
-      // /inventory/1967-camaro/
-      const isVehiclePage = 
-        path.match(/\/(for-sale|inventory|vehicles|vehicle|cars|listings)\/[^/]+-\d+\/?$/) || // Year + numeric ID
-        path.match(/\/(for-sale|inventory|vehicles|vehicle|cars|listings)\/\d{4}-[^/]+\/?$/) || // year prefix
-        (path.match(/\/(for-sale|inventory|vehicles|vehicle|cars|listings)\/[^/]+\/?$/) && 
-         !path.match(/\/(for-sale|inventory|vehicles|vehicle|cars|listings)\/?$/)); // Not just the category page
-      return isVehiclePage;
-    });
-    
-    console.log(`✅ Total individual vehicle pages found: ${individualVehicleUrls.length}`);
-    
-    // Step 3: Scrape each individual vehicle page to extract vehicle data
-    console.log(`📡 Step 3: Scraping ${individualVehicleUrls.length} vehicle pages...`);
-    
-    // Track execution time to avoid timeout (Edge Functions have 60s limit)
-    const startTime = Date.now();
-    const maxExecutionTime = 50000; // 50 seconds - leave 10s buffer for response
-    
-    const vehicles: ExtractedVehicle[] = [];
-    
-    // Limit to first 10 URLs to stay well under timeout
-    // Each vehicle page scrape takes ~2-5 seconds, so 10 vehicles = ~20-50 seconds max
-    const urlsToProcess = individualVehicleUrls.slice(0, 10);
-    
-    console.log(`⏱️  Processing ${urlsToProcess.length} vehicles (timeout protection: ${maxExecutionTime}ms)`);
-    
-    for (let i = 0; i < urlsToProcess.length; i++) {
-      // Check timeout before processing each vehicle
-      const elapsed = Date.now() - startTime;
-      if (elapsed > maxExecutionTime) {
-        console.log(`⏰ Timeout protection: stopping after ${i} vehicles (${elapsed}ms elapsed)`);
-        break;
-      }
+    // Step 2: Check for existing patterns
+    let existingPatterns: any = null;
+    if (!force_rediscover) {
+      const domain = new URL(url).hostname;
+      const { data: patterns } = await supabase
+        .from('dealer_site_schemas')
+        .select('*')
+        .eq('domain', domain)
+        .maybeSingle();
       
-      const vehicleUrl = urlsToProcess[i];
-      
-      try {
-        console.log(`  [${i + 1}/${urlsToProcess.length}] Scraping: ${vehicleUrl} (${elapsed}ms elapsed)`);
-        const vehicleHtml = await fetchHtml(vehicleUrl);
-        const vehicle = extractVehicleFromPage(vehicleHtml, vehicleUrl);
-        
-        if (vehicle && vehicle.make && vehicle.model) {
-          vehicles.push(vehicle);
-        }
-      } catch (error: any) {
-        console.warn(`  ⚠️  Failed to scrape ${vehicleUrl}: ${error.message}`);
-      }
-    }
-    
-    console.log(`✅ Extracted ${vehicles.length} vehicles (${Date.now() - startTime}ms total)`);
-
-    // Step 4: Insert organization
-    console.log('💾 Step 4: Inserting organization...');
-    const organizationId = await insertOrganization(supabase, org);
-    
-    if (!organizationId) {
-      throw new Error('Failed to insert organization');
-    }
-    
-    console.log(`✅ Organization inserted: ${organizationId}`);
-
-    // Step 5: Insert vehicles and link to organization
-    console.log(`💾 Step 5: Inserting ${vehicles.length} vehicles...`);
-    const vehicleResults = {
-      inserted: 0,
-      skipped: 0,
-      errors: 0,
-    };
-
-    for (const vehicle of vehicles) {
-      const vehicleId = await insertVehicle(supabase, vehicle, organizationId);
-      if (vehicleId) {
-        vehicleResults.inserted++;
-      } else {
-        vehicleResults.errors++;
+      if (patterns) {
+        existingPatterns = patterns;
+        console.log(`✅ Found existing patterns for ${domain}\n`);
       }
     }
 
-    console.log(`✅ Vehicles processed: ${vehicleResults.inserted} inserted, ${vehicleResults.errors} errors`);
+    // Step 3: Inspect site structure (LLM + Firecrawl)
+    console.log('🔍 Step 2: Inspecting site structure...');
+    const siteStructure = await discoverSiteStructure(url, existingPatterns, supabase);
+    console.log(`✅ Discovered ${siteStructure.page_types.length} page types`);
+    console.log(`   Site type: ${siteStructure.site_type}`);
+    if (siteStructure.platform) console.log(`   Platform: ${siteStructure.platform}\n`);
 
-    // Return success response
+    // Step 4: Learn extraction patterns (LLM-powered DOM mapping)
+    console.log('🧠 Step 3: Learning extraction patterns (DOM mapping)...');
+    const extractionPatterns = await learnExtractionPatterns(
+      url,
+      siteStructure,
+      existingPatterns,
+      supabase
+    );
+    console.log(`✅ Learned ${extractionPatterns.length} extraction patterns\n`);
+
+    // Step 5: Store patterns for reuse
+    console.log('💾 Step 4: Storing learned patterns...');
+    await storeLearnedPatterns(url, siteStructure, extractionPatterns, supabase);
+    console.log(`✅ Patterns stored\n`);
+
+    // Step 6: Extract all data using learned patterns
+    console.log('📦 Step 5: Extracting data using learned patterns...');
+    const extractionResult = await extractAllData(
+      organizationId,
+      url,
+      siteStructure,
+      extractionPatterns,
+      supabase
+    );
+    console.log(`✅ Extraction complete:`);
+    console.log(`   - Vehicles found: ${extractionResult.vehicles_found}`);
+    console.log(`   - Vehicles extracted: ${extractionResult.vehicles_extracted}`);
+    console.log(`   - Vehicles created: ${extractionResult.vehicles_created}`);
+    console.log(`   - Images found: ${extractionResult.images_found}\n`);
+
     return new Response(
       JSON.stringify({
         success: true,
         organization_id: organizationId,
-        organization_name: org.business_name,
-        vehicles: {
-          found: vehicles.length,
-          inserted: vehicleResults.inserted,
-          errors: vehicleResults.errors,
-        },
-        stats: {
-          org_fields_extracted: Object.keys(org).filter(k => org[k as keyof ExtractedOrg] !== undefined).length,
-          vehicles_found: vehicles.length,
-          vehicles_with_images: vehicles.filter(v => v.image_urls && v.image_urls.length > 0).length,
-        },
+        website: url,
+        site_structure: siteStructure,
+        extraction_patterns: extractionPatterns.length,
+        vehicles_found: extractionResult.vehicles_found,
+        vehicles_created: extractionResult.vehicles_created,
+        images_found: extractionResult.images_found,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
-    console.error('❌ Error in automated ingestion:', error);
+    console.error('Error:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message,
-        stack: error.stack,
-      }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
 
+/**
+ * Create or find organization by website URL
+ */
+async function createOrFindOrganization(supabase: any, url: string): Promise<string> {
+  const domain = new URL(url).hostname;
+  
+  // Check if organization exists
+  const { data: existing } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('website', url)
+    .maybeSingle();
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Extract basic org info from homepage
+  try {
+    const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+      },
+      body: JSON.stringify({
+        url,
+        formats: ['html', 'markdown'],
+        onlyMainContent: false,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (firecrawlResponse.ok) {
+      const firecrawlData = await firecrawlResponse.json();
+      const html = firecrawlData.data?.html || '';
+      const markdown = firecrawlData.data?.markdown || '';
+
+      // Use LLM to extract organization name and basic info
+      if (OPENAI_API_KEY) {
+        const orgPrompt = `Extract organization information from this website:
+
+URL: ${url}
+Markdown (first 2000 chars): ${markdown.substring(0, 2000)}
+
+Extract:
+1. Organization/business name (prioritize logo alt text, header text, title tag)
+2. Brief description (1-2 sentences, exclude footer boilerplate)
+
+Return JSON:
+{
+  "business_name": "Company Name",
+  "description": "Brief description"
+}`;
+
+        const llmResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an expert at extracting business information from websites. Return only valid JSON.',
+              },
+              {
+                role: 'user',
+                content: orgPrompt,
+              },
+            ],
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+          }),
+          signal: AbortSignal.timeout(30000),
+        });
+
+        if (llmResponse.ok) {
+          const llmData = await llmResponse.json();
+          const orgInfo = JSON.parse(llmData.choices[0].message.content);
+          
+          const { data: newOrg, error: insertError } = await supabase
+            .from('businesses')
+            .insert({
+              website: url,
+              business_name: orgInfo.business_name || domain,
+              description: orgInfo.description,
+              metadata: {
+                source: 'automated_ingestion',
+                extracted_at: new Date().toISOString(),
+              },
+            })
+            .select('id')
+            .single();
+
+          if (!insertError && newOrg) {
+            return newOrg.id;
+          }
+        }
+      }
+    }
+  } catch (error: any) {
+    console.warn('Org extraction failed, using domain as name:', error.message);
+  }
+
+  // Fallback: Create org with domain as name
+  const { data: newOrg, error: insertError } = await supabase
+    .from('businesses')
+    .insert({
+      website: url,
+      business_name: domain,
+      metadata: {
+        source: 'automated_ingestion',
+        extracted_at: new Date().toISOString(),
+      },
+    })
+    .select('id')
+    .single();
+
+  if (insertError || !newOrg) {
+    throw new Error(`Failed to create organization: ${insertError?.message}`);
+  }
+
+  return newOrg.id;
+}
+
+/**
+ * Discover site structure using LLM + Firecrawl
+ */
+async function discoverSiteStructure(
+  siteUrl: string,
+  existingPatterns: any,
+  supabase: any
+): Promise<SiteStructure> {
+  const domain = new URL(siteUrl).hostname;
+
+  if (existingPatterns?.schema_data) {
+    return {
+      domain,
+      site_type: existingPatterns.site_type || 'unknown',
+      platform: existingPatterns.schema_data?.platform,
+      cms: existingPatterns.schema_data?.cms,
+      page_types: existingPatterns.schema_data?.page_types || [],
+      listing_patterns: existingPatterns.schema_data?.listing_patterns || [],
+      pagination_pattern: existingPatterns.schema_data?.pagination_pattern,
+    };
+  }
+
+  try {
+    const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+      },
+      body: JSON.stringify({
+        url: siteUrl,
+        formats: ['html', 'markdown'],
+        onlyMainContent: false,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!firecrawlResponse.ok) {
+      throw new Error(`Firecrawl failed: ${firecrawlResponse.status}`);
+    }
+
+    const firecrawlData = await firecrawlResponse.json();
+    const html = firecrawlData.data?.html || '';
+    const markdown = firecrawlData.data?.markdown || '';
+
+    if (OPENAI_API_KEY) {
+      const structurePrompt = `Analyze this website and identify its structure:
+
+URL: ${siteUrl}
+Markdown preview (first 3000 chars): ${markdown.substring(0, 3000)}
+
+Extract:
+1. Site type (dealer_website, auction_house, marketplace, etc.)
+2. Platform/CMS if detectable
+3. Page types (inventory, vehicle_detail, about, contact, etc.)
+4. URL patterns for vehicle listings (e.g., /for-sale/, /inventory/, /vehicles/)
+5. Pagination pattern if any
+
+Return JSON:
+{
+  "site_type": "dealer_website",
+  "platform": "DealerFire",
+  "cms": "WordPress",
+  "page_types": [
+    {
+      "type": "inventory",
+      "url_pattern": "/inventory",
+      "sample_urls": ["..."],
+      "structure_hints": ["..."]
+    }
+  ],
+  "listing_patterns": [
+    {
+      "pattern_type": "url",
+      "pattern": "/for-sale/.*",
+      "confidence": 0.9,
+      "sample_matches": ["..."]
+    }
+  ],
+  "pagination_pattern": "?page={n}"
+}`;
+
+      const llmResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert web scraping analyst. Analyze websites and extract structural patterns. Return only valid JSON.',
+            },
+            {
+              role: 'user',
+              content: structurePrompt,
+            },
+          ],
+          temperature: 0.3,
+          response_format: { type: 'json_object' },
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (llmResponse.ok) {
+        const llmData = await llmResponse.json();
+        const structure = JSON.parse(llmData.choices[0].message.content);
+        return {
+          domain,
+          ...structure,
+        };
+      }
+    }
+
+    return {
+      domain,
+      site_type: 'unknown',
+      page_types: [{
+        type: 'inventory',
+        url_pattern: '/inventory',
+        sample_urls: [],
+        structure_hints: [],
+      }],
+      listing_patterns: [],
+    };
+  } catch (error: any) {
+    console.warn('Structure discovery failed, using fallback:', error.message);
+    return {
+      domain,
+      site_type: 'unknown',
+      page_types: [],
+      listing_patterns: [],
+    };
+  }
+}
+
+/**
+ * Learn extraction patterns using LLM (DOM mapping)
+ */
+async function learnExtractionPatterns(
+  siteUrl: string,
+  siteStructure: SiteStructure,
+  existingPatterns: any,
+  supabase: any
+): Promise<ExtractionPattern[]> {
+  if (existingPatterns?.schema_data?.extraction_patterns) {
+    return existingPatterns.schema_data.extraction_patterns;
+  }
+
+  if (!OPENAI_API_KEY || siteStructure.page_types.length === 0) {
+    return [];
+  }
+
+  try {
+    const samplePage = siteStructure.page_types.find((pt) => 
+      pt.type === 'vehicle_detail' || pt.type === 'inventory'
+    );
+    
+    if (!samplePage || samplePage.sample_urls.length === 0) {
+      // Try to find a vehicle listing URL from the homepage
+      const inventoryUrl = `${siteUrl}/inventory` || `${siteUrl}/for-sale`;
+      
+      const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        },
+        body: JSON.stringify({
+          url: inventoryUrl,
+          formats: ['html', 'markdown'],
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (firecrawlResponse.ok) {
+        const firecrawlData = await firecrawlResponse.json();
+        const markdown = firecrawlData.data?.markdown || '';
+        const html = firecrawlData.data?.html || '';
+
+        const patternPrompt = `Analyze this vehicle listing page and identify extraction patterns:
+
+URL: ${inventoryUrl}
+Markdown (first 4000 chars): ${markdown.substring(0, 4000)}
+
+For each field (year, make, model, price, mileage, VIN, description, images), identify:
+1. CSS selectors that work (provide multiple fallbacks)
+2. Regex patterns if needed
+3. Extraction method (dom, llm, hybrid)
+4. Confidence level (0.0-1.0)
+
+Return JSON:
+{
+  "patterns": [
+    {
+      "field_name": "price",
+      "selectors": [".price", ".amount", "[data-price]"],
+      "regex_patterns": ["/\\$([\\d,]+)/"],
+      "extraction_method": "dom",
+      "confidence": 0.9,
+      "sample_values": ["$45,000"]
+    }
+  ]
+}`;
+
+        const llmResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an expert web scraping pattern analyst. Identify extraction patterns from HTML. Return JSON with a "patterns" array.',
+              },
+              {
+                role: 'user',
+                content: patternPrompt,
+              },
+            ],
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+          }),
+          signal: AbortSignal.timeout(30000),
+        });
+
+        if (llmResponse.ok) {
+          const llmData = await llmResponse.json();
+          const response = JSON.parse(llmData.choices[0].message.content);
+          return Array.isArray(response.patterns) ? response.patterns : (response.patterns || []);
+        }
+      }
+    } else {
+      const sampleUrl = samplePage.sample_urls[0];
+      
+      const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        },
+        body: JSON.stringify({
+          url: sampleUrl,
+          formats: ['html', 'markdown'],
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (firecrawlResponse.ok) {
+        const firecrawlData = await firecrawlResponse.json();
+        const markdown = firecrawlData.data?.markdown || '';
+
+        const patternPrompt = `Analyze this vehicle listing page and identify extraction patterns:
+
+URL: ${sampleUrl}
+Markdown (first 4000 chars): ${markdown.substring(0, 4000)}
+
+For each field (year, make, model, price, mileage, VIN, description, images), identify:
+1. CSS selectors that work (provide multiple fallbacks)
+2. Regex patterns if needed
+3. Extraction method (dom, llm, hybrid)
+4. Confidence level (0.0-1.0)
+
+Return JSON:
+{
+  "patterns": [
+    {
+      "field_name": "price",
+      "selectors": [".price", ".amount", "[data-price]"],
+      "regex_patterns": ["/\\$([\\d,]+)/"],
+      "extraction_method": "dom",
+      "confidence": 0.9,
+      "sample_values": ["$45,000"]
+    }
+  ]
+}`;
+
+        const llmResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an expert web scraping pattern analyst. Identify extraction patterns from HTML. Return JSON with a "patterns" array.',
+              },
+              {
+                role: 'user',
+                content: patternPrompt,
+              },
+            ],
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+          }),
+          signal: AbortSignal.timeout(30000),
+        });
+
+        if (llmResponse.ok) {
+          const llmData = await llmResponse.json();
+          const response = JSON.parse(llmData.choices[0].message.content);
+          return Array.isArray(response.patterns) ? response.patterns : (response.patterns || []);
+        }
+      }
+    }
+  } catch (error: any) {
+    console.warn('Pattern learning failed:', error.message);
+  }
+
+  return [];
+}
+
+/**
+ * Store learned patterns for reuse
+ */
+async function storeLearnedPatterns(
+  siteUrl: string,
+  siteStructure: SiteStructure,
+  extractionPatterns: ExtractionPattern[],
+  supabase: any
+): Promise<void> {
+  try {
+    const domain = new URL(siteUrl).hostname;
+
+    const schemaData = {
+      site_type: siteStructure.site_type,
+      platform: siteStructure.platform,
+      cms: siteStructure.cms,
+      page_types: siteStructure.page_types,
+      listing_patterns: siteStructure.listing_patterns,
+      pagination_pattern: siteStructure.pagination_pattern,
+      extraction_patterns: extractionPatterns,
+      discovered_at: new Date().toISOString(),
+    };
+
+    await supabase
+      .from('dealer_site_schemas')
+      .upsert({
+        domain,
+        site_name: domain,
+        site_type: siteStructure.site_type || 'dealer_website',
+        schema_data: schemaData,
+        cataloged_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'domain',
+      });
+  } catch (error: any) {
+    console.warn('Failed to store patterns:', error.message);
+  }
+}
+
+/**
+ * Extract all data using learned patterns
+ */
+async function extractAllData(
+  organizationId: string,
+  siteUrl: string,
+  siteStructure: SiteStructure,
+  extractionPatterns: ExtractionPattern[],
+  supabase: any
+): Promise<{
+  vehicles_found: number;
+  vehicles_extracted: number;
+  vehicles_created: number;
+  images_found: number;
+}> {
+  // Find inventory URL
+  const inventoryPage = siteStructure.page_types.find((pt) => pt.type === 'inventory');
+  let inventoryUrl = inventoryPage?.sample_urls[0] || `${siteUrl}/inventory`;
+  
+  const isMotoriousUrl = inventoryUrl.toLowerCase().includes('motorious.com') || 
+                         inventoryUrl.toLowerCase().includes('buy.motorious.com');
+  const sourceType = isMotoriousUrl ? 'marketplace' : 'dealer_website';
+
+  let vehiclesQueued = 0;
+  let vehiclesFound = 0;
+
+  // Scrape and queue listings using scrape-multi-source
+  try {
+    console.log(`   Scraping inventory from: ${inventoryUrl}`);
+    const scrapeResponse = await fetch(`${SUPABASE_URL}/functions/v1/scrape-multi-source`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({
+        source_url: inventoryUrl,
+        source_type: sourceType,
+        organization_id: organizationId,
+        max_results: 500,
+        use_llm_extraction: true,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (scrapeResponse.ok) {
+      const scrapeData = await scrapeResponse.json();
+      vehiclesFound = scrapeData.listings_found || 0;
+      vehiclesQueued = scrapeData.listings_queued || 0;
+      console.log(`   ✅ Queued ${vehiclesQueued} listings for processing`);
+    } else {
+      const errorText = await scrapeResponse.text();
+      console.warn(`   ⚠️  Scraping failed: ${scrapeResponse.status} - ${errorText.substring(0, 200)}`);
+    }
+  } catch (error: any) {
+    console.warn(`   ⚠️  Scraping error: ${error.message}`);
+  }
+
+  // Process import queue to create vehicle profiles
+  let vehiclesCreated = 0;
+  if (vehiclesQueued > 0) {
+    try {
+      console.log(`   Processing import queue...`);
+      const processResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-import-queue`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          batch_size: 50,
+          organization_id: organizationId,
+        }),
+        signal: AbortSignal.timeout(120000),
+      });
+
+      if (processResponse.ok) {
+        const processData = await processResponse.json();
+        vehiclesCreated = processData.vehicles_created || 0;
+        console.log(`   ✅ Created ${vehiclesCreated} vehicle profiles`);
+      }
+    } catch (error: any) {
+      console.warn(`   ⚠️  Queue processing error: ${error.message}`);
+    }
+  }
+
+  // Count images
+  const { count: imageCount } = await supabase
+    .from('vehicle_images')
+    .select('*', { count: 'exact', head: true })
+    .in('vehicle_id', 
+      (await supabase
+        .from('organization_vehicles')
+        .select('vehicle_id')
+        .eq('organization_id', organizationId)
+      ).data?.map((v: any) => v.vehicle_id) || []
+    );
+
+  return {
+    vehicles_found: vehiclesFound,
+    vehicles_extracted: vehiclesQueued,
+    vehicles_created: vehiclesCreated,
+    images_found: imageCount || 0,
+  };
+}
