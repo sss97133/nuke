@@ -44,7 +44,7 @@ jobs:
       - name: Scrape search pages for URLs
         id: scrape_search
         env:
-          MAX_PAGES: ${{ github.event.inputs.max_pages || '3' }}
+          MAX_PAGES: ${{ github.event.inputs.max_pages || '25' }}
         run: |
           node << 'EOF'
           import { chromium } from 'playwright';
