@@ -1283,8 +1283,42 @@ serve(async (req) => {
     const needsKslFallback = isKsl && !firecrawlHtml && !firecrawlExtract // KSL and Firecrawl completely failed
     
     if (!html && (!firecrawlExtract || needsHtmlParse || needsKslFallback)) {
-      // Strategy 1: Try Firecrawl STEALTH MODE for KSL (uses residential proxies)
+      // Strategy 1: Try Playwright service for KSL (proven to bypass PerimeterX)
       if (needsKslFallback) {
+        const playwrightUrl = Deno.env.get('PLAYWRIGHT_SERVICE_URL')
+        if (playwrightUrl) {
+          try {
+            console.log(`🥷 Calling Playwright service for KSL...`)
+            const playwrightResponse = await fetch(`${playwrightUrl}/scrape-listing`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url }),
+              signal: AbortSignal.timeout(120000), // 2 min timeout
+            })
+            
+            if (playwrightResponse.ok) {
+              const playwrightData = await playwrightResponse.json()
+              if (playwrightData?.success && playwrightData?.data) {
+                html = playwrightData.data.html
+                data.images = playwrightData.data.images || []
+                data.title = playwrightData.data.title
+                data.year = playwrightData.data.year
+                data.make = playwrightData.data.make
+                data.model = playwrightData.data.model
+                data.vin = playwrightData.data.vin
+                data.mileage = playwrightData.data.mileage
+                data.asking_price = playwrightData.data.asking_price
+                console.log(`✅ Playwright service: ${data.images.length} images, ${html.length} chars HTML`)
+              }
+            }
+          } catch (e: any) {
+            console.warn(`⚠️  Playwright service failed: ${e?.message}`)
+          }
+        }
+      }
+      
+      // Strategy 2: Try Firecrawl stealth as fallback
+      if (!html && needsKslFallback) {
         const stealthHtml = await tryFirecrawlStealth(url)
         if (stealthHtml && stealthHtml.length > 100) {
           html = stealthHtml
@@ -1292,7 +1326,7 @@ serve(async (req) => {
         }
       }
       
-      // Strategy 2: Direct fetch (fallback for non-KSL or if stealth failed)
+      // Strategy 3: Direct fetch (last resort)
       if (!html) {
         const response = await fetch(url, {
           headers: {
