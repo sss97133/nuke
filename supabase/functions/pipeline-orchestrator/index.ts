@@ -198,9 +198,11 @@ serve(async (req) => {
             'Authorization': `Bearer ${SERVICE_KEY}`,
           },
           body: JSON.stringify({
-            batch_size: 20,
+            batch_size: 3,
             max_attempts: 3,
             priority_only: false,
+            skip_image_upload: true, // Images backfilled separately
+            fast_mode: true,
           }),
         }).then(async (resp) => {
           if (!resp.ok) {
@@ -214,7 +216,7 @@ serve(async (req) => {
         });
         
         result.import_queue_processed = -1; // -1 indicates async (result not known yet)
-        console.log(`   ✅ import_queue triggered (async, batch_size=20)`);
+        console.log(`   ✅ import_queue triggered (async, batch_size=3, fast_mode)`);
 
       } catch (e: any) {
         result.errors.push(`import_queue trigger error: ${e.message}`);
@@ -235,7 +237,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${SERVICE_KEY}`,
           },
           body: JSON.stringify({
-            batchSize: 10,
+            batchSize: 3,
             maxAttempts: 3,
           }),
         }).then(async (resp) => {
@@ -250,7 +252,7 @@ serve(async (req) => {
         });
         
         result.bat_queue_processed = -1; // -1 indicates async (result not known yet)
-        console.log(`   ✅ bat_extraction_queue triggered (async, batch_size=10)`);
+        console.log(`   ✅ bat_extraction_queue triggered (async, batch_size=3)`);
 
       } catch (e: any) {
         result.errors.push(`bat_extraction_queue trigger error: ${e.message}`);
