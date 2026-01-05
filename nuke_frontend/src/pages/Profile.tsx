@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 // Simple auth hook to work with existing session-based auth
@@ -54,12 +54,14 @@ import ShopFinancials from './ShopFinancials';
 import { ComprehensiveProfileStats } from '../components/profile/ComprehensiveProfileStats';
 import { ProfileListingsTab } from '../components/profile/ProfileListingsTab';
 import { ProfileBidsTab } from '../components/profile/ProfileBidsTab';
+import { ProfileCommentsTab } from '../components/profile/ProfileCommentsTab';
 import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessStoriesTab';
 import { getUserProfileData } from '../services/profileStatsService';
 
 const Profile: React.FC = () => {
   const { userId, externalIdentityId } = useParams<{ userId?: string; externalIdentityId?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,7 @@ const Profile: React.FC = () => {
     'auctions' |
     'listings' |
     'bids' |
+    'comments' |
     'stories' |
     'photos' |
     'financials' |
@@ -219,6 +222,16 @@ const Profile: React.FC = () => {
       loadProfileData();
     }
   }, [currentUserId, userId, externalIdentityId]);
+
+  // Handle URL query parameters for tab navigation
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    const validTabs = ['overview', 'collection', 'gallery', 'professional', 'organizations', 'auctions', 'listings', 'bids', 'comments', 'stories', 'photos', 'financials', 'duplicates', 'settings'];
+    if (tabParam && validTabs.includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
+  }, [location.search]);
 
   // Check admin status
   useEffect(() => {
@@ -590,9 +603,10 @@ const Profile: React.FC = () => {
             { key: 'auctions', label: 'My Auctions' },
             { key: 'listings', label: 'Listings', public: true },
             { key: 'bids', label: 'Bids', public: true },
+            { key: 'comments', label: 'Comments', public: true },
             { key: 'stories', label: 'Success Stories', public: true },
             { key: 'settings', label: 'Settings' }
-          ].filter(tab => tab.key === 'settings' ? isOwnProfile : (tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations' || tab.key === 'auctions' || tab.key === 'listings' || tab.key === 'bids' || tab.key === 'stories')).map((tab) => (
+          ].filter(tab => tab.key === 'settings' ? isOwnProfile : (tab.public || isOwnProfile || tab.key === 'overview' || tab.key === 'professional' || tab.key === 'organizations' || tab.key === 'auctions' || tab.key === 'listings' || tab.key === 'bids' || tab.key === 'comments' || tab.key === 'stories')).map((tab) => (
             <button
               key={tab.key}
               className="text-small"
@@ -708,6 +722,15 @@ const Profile: React.FC = () => {
               <div>
                 <ProfileBidsTab
                   bids={comprehensiveData.bids || []}
+                  profileType="user"
+                />
+              </div>
+            )}
+
+            {activeTab === 'comments' && comprehensiveData && (
+              <div>
+                <ProfileCommentsTab
+                  comments={comprehensiveData.comments || []}
                   profileType="user"
                 />
               </div>

@@ -104,8 +104,96 @@ async function backfillVehicleImages(vehicleId) {
   try {
     let images = [];
     
-    // Use Firecrawl directly if API key is available
-    if (firecrawlKey && vehicle.discovery_url.includes('ksl.com')) {
+    // For KSL, use Playwright (bypasses PerimeterX reliably)
+    if (vehicle.discovery_url.includes('ksl.com')) {
+      console.log(`🥷 Using Playwright with stealth to bypass PerimeterX...`);
+      try {
+        const { chromium } = await import('playwright');
+        const browser = await chromium.launch({
+          headless: true,
+          args: [
+            '--disable-blink-features=AutomationControlled',
+            '--disable-features=IsolateOrigins,site-per-process',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--window-size=1920,1080',
+          ],
+        });
+        
+        const context = await browser.newContext({
+          userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          viewport: { width: 1920, height: 1080 },
+          locale: 'en-US',
+          timezoneId: 'America/Denver',
+          geolocation: { latitude: 40.7608, longitude: -111.8910 },
+          permissions: ['geolocation'],
+        });
+        
+        const page = await context.newPage();
+        
+        // Anti-detection
+        await page.addInitScript(() => {
+          Object.defineProperty(navigator, 'webdriver', { get: () => false });
+          window.chrome = { runtime: {} };
+          Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+          Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+        });
+        
+        await page.goto(vehicle.discovery_url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.waitForTimeout(8000); // PerimeterX wait
+        
+        // Human-like scrolling
+        await page.evaluate(async () => {
+          await new Promise((resolve) => {
+            let totalHeight = 0;
+            const distance = 100;
+            const timer = setInterval(() => {
+              window.scrollBy(0, distance);
+              totalHeight += distance;
+              if (totalHeight >= document.body.scrollHeight / 2) {
+                clearInterval(timer);
+                resolve();
+              }
+            }, 100);
+          });
+        });
+        
+        await page.waitForTimeout(2000);
+        
+        // Extract images
+        images = await page.evaluate(() => {
+          const result = [];
+          const seen = new Set();
+          
+          document.querySelectorAll('img').forEach(img => {
+            const src = img.src || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
+            if (src && 
+                (src.includes('ksldigital.com') || src.includes('image.ksl.com')) &&
+                !src.includes('logo') && 
+                !src.includes('icon') &&
+                !src.includes('svg') &&
+                !src.includes('weather') &&
+                !seen.has(src)) {
+              seen.add(src);
+              result.push(src);
+            }
+          });
+          
+          return result;
+        });
+        
+        await browser.close();
+        
+        if (images.length > 0) {
+          console.log(`✅ Playwright extracted ${images.length} images`);
+        }
+      } catch (playwrightErr) {
+        console.log(`⚠️  Playwright failed: ${playwrightErr.message}`);
+      }
+    }
+    
+    // Fallback: Use Firecrawl directly if API key is available and Playwright didn't work
+    if (images.length === 0 && firecrawlKey && vehicle.discovery_url.includes('ksl.com')) {
       console.log(`🔥 Using Firecrawl API directly...`);
       try {
         const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
@@ -388,11 +476,6 @@ async function backfillVehicleImages(vehicleId) {
       return;
     }
 
-    if (images.length === 0) {
-      console.log(`\n❌ No images found after all attempts`);
-      return;
-    }
-
     console.log(`✅ Found ${images.length} image(s)`);
 
     // Filter valid KSL image URLs
@@ -410,7 +493,7 @@ async function backfillVehicleImages(vehicleId) {
     console.log(`📸 Processing ${validImages.length} valid image(s)...\n`);
 
     // Call backfill-images Edge Function
-    const listedDate = listingData?.listed_date || vehicle.origin_metadata?.listed_date || null;
+    const listedDate = vehicle.origin_metadata?.listed_date || null;
     
     console.log(`📤 Calling backfill-images function...`);
     

@@ -14,6 +14,7 @@ import { useVINProofs } from '../../hooks/useVINProofs';
 import { FaviconIcon } from '../../components/common/FaviconIcon';
 import { AuctionPlatformBadge } from '../../components/auction/AuctionBadges';
 import { OdometerBadge } from '../../components/vehicle/OdometerBadge';
+import MemeDropBadge from '../../components/vehicle/MemeDropBadge';
 import vinDecoderService from '../../services/vinDecoder';
 import UpdateSalePriceModal from '../../components/vehicle/UpdateSalePriceModal';
 import { FollowAuctionCard } from '../../components/auction/FollowAuctionCard';
@@ -1832,6 +1833,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
             <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
           ) : null}
+
+          {/* Meme Drop Count Badge */}
+          {vehicle?.id && <MemeDropBadge vehicleId={vehicle.id} compact />}
 
           {/* Location Badge with Dropdown */}
           {locationDisplay && (

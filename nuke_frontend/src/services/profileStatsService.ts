@@ -95,7 +95,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
     .order('auction_end_date', { ascending: false })
     .limit(100) : { data: [] };
 
-  // Get comments (BaT comments + auction comments)
+  // Get comments (BaT comments + auction comments) - EXCLUDE bids
   const { data: batComments } = identityIds.length > 0 ? await supabase
     .from('bat_comments')
     .select(`
@@ -103,6 +103,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
       listing:bat_listings(*, vehicle:vehicles(*))
     `)
     .in('external_identity_id', identityIds)
+    .or('contains_bid.is.null,contains_bid.eq.false')
     .order('comment_timestamp', { ascending: false })
     .limit(100) : { data: [] };
 
@@ -113,6 +114,7 @@ export async function getUserProfileData(userId: string): Promise<UserProfileDat
       auction:auction_events(*, vehicle:vehicles(*))
     `)
     .in('external_identity_id', identityIds)
+    .is('bid_amount', null)
     .order('posted_at', { ascending: false })
     .limit(100) : { data: [] };
 
@@ -229,7 +231,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .order('auction_end_date', { ascending: false })
     .limit(100);
 
-  // Get comments
+  // Get comments - EXCLUDE bids
   const { data: batComments } = await supabase
     .from('bat_comments')
     .select(`
@@ -237,6 +239,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
       listing:bat_listings(*, vehicle:vehicles(*))
     `)
     .eq('external_identity_id', externalIdentity.id)
+    .or('contains_bid.is.null,contains_bid.eq.false')
     .order('comment_timestamp', { ascending: false })
     .limit(100);
 
@@ -247,6 +250,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
       auction:auction_events(*, vehicle:vehicles(*))
     `)
     .eq('external_identity_id', externalIdentity.id)
+    .is('bid_amount', null)
     .order('posted_at', { ascending: false })
     .limit(100);
 

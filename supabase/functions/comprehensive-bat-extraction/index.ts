@@ -15,31 +15,6 @@ function json(status: number, body: unknown) {
   });
 }
 
-function getBearer(req: Request): string | null {
-  const h = req.headers.get("authorization") || req.headers.get("Authorization");
-  if (!h) return null;
-  const m = h.match(/^Bearer\s+(.+)$/i);
-  return m?.[1]?.trim() || null;
-}
-
-function isAuthorized(req: Request): { ok: boolean; status: number; error?: string } {
-  // NOTE: This function should be deployed with verify_jwt disabled.
-  // We enforce internal auth by requiring the service key via Authorization bearer or apikey header.
-  const serviceKey =
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
-    Deno.env.get("SERVICE_ROLE_KEY") ??
-    Deno.env.get("SUPABASE_SERVICE_KEY") ??
-    "";
-  if (!serviceKey) return { ok: false, status: 500, error: "Server not configured" };
-
-  const bearer = getBearer(req);
-  const apikey = req.headers.get("apikey") || req.headers.get("x-supabase-api-key") || "";
-  if (bearer === serviceKey) return { ok: true, status: 200 };
-  if (apikey === serviceKey) return { ok: true, status: 200 };
-
-  return { ok: false, status: 401, error: "Unauthorized" };
-}
-
 function normalizeUrl(raw: string): string {
   try {
     const u = new URL(raw);
@@ -118,9 +93,6 @@ function extractBatGalleryUrlsFromHtml(html: string): { urls: string[]; method: 
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  const auth = isAuthorized(req);
-  if (!auth.ok) return json(auth.status, { success: false, error: auth.error || "Unauthorized" });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
   const SERVICE_KEY =

@@ -840,6 +840,147 @@ function parseLartFiche(html: string, url: string): any {
   }
 }
 
+// ScraperAPI fallback for sites with PerimeterX (like KSL)
+async function tryScraperAPI(url: string): Promise<string | null> {
+  const SCRAPERAPI_KEY = Deno.env.get('SCRAPERAPI_KEY')
+  if (!SCRAPERAPI_KEY) {
+    console.log('⚠️  SCRAPERAPI_KEY not set, skipping ScraperAPI fallback')
+    return null
+  }
+
+  try {
+    console.log('🔧 Trying ScraperAPI to bypass PerimeterX...')
+    // ScraperAPI automatically rotates proxies and handles JavaScript rendering
+    const scraperUrl = `http://api.scraperapi.com?api_key=${SCRAPERAPI_KEY}&url=${encodeURIComponent(url)}&render=true&premium=true`
+    
+    const response = await fetch(scraperUrl, {
+      headers: {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    })
+
+    if (!response.ok) {
+      console.warn(`⚠️  ScraperAPI HTTP error ${response.status}`)
+      return null
+    }
+
+    const html = await response.text()
+    
+    // Check if we got a block page
+    if (html && (
+      html.includes('PerimeterX') ||
+      html.includes('Access to this page has been denied') ||
+      html.includes('_pxCustomLogo')
+    )) {
+      console.warn('⚠️  ScraperAPI also got blocked by PerimeterX')
+      return null
+    }
+
+    if (html && html.length > 1000) {
+      console.log(`✅ ScraperAPI returned HTML (${html.length} chars)`)
+      return html
+    }
+
+    return null
+  } catch (e: any) {
+    console.warn(`⚠️  ScraperAPI exception: ${e?.message || String(e)}`)
+    return null
+  }
+}
+
+// Try Firecrawl Stealth Mode for PerimeterX bypass (5 credits per request)
+async function tryFirecrawlStealth(url: string): Promise<string | null> {
+  const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY')
+  if (!FIRECRAWL_API_KEY) return null
+
+  try {
+    console.log('🥷 Trying Firecrawl STEALTH MODE for PerimeterX bypass...')
+    
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+      },
+      body: JSON.stringify({
+        url,
+        formats: ['html'], // Only need HTML for image extraction
+        
+        // CRITICAL: Stealth proxy mode for PerimeterX bypass
+        proxy: 'stealth', // Uses residential proxies + advanced fingerprinting
+        
+        onlyMainContent: false,
+        timeout: 90000, // Longer timeout for stealth mode
+        waitFor: 15000, // Wait for page to fully load
+        removeBase64Images: false,
+        
+        // Actions to load lazy-loaded gallery images
+        actions: [
+          {
+            type: 'wait',
+            milliseconds: 8000,
+          },
+          {
+            type: 'scroll',
+            direction: 'down',
+            pixels: 1000,
+          },
+          {
+            type: 'wait',
+            milliseconds: 3000,
+          },
+          {
+            type: 'scroll',
+            direction: 'down',
+            pixels: 2000,
+          },
+          {
+            type: 'wait',
+            milliseconds: 5000,
+          },
+        ],
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '')
+      console.warn(`⚠️  Firecrawl stealth HTTP error ${response.status}: ${errorText?.slice(0, 200)}`)
+      return null
+    }
+
+    const data = await response.json()
+    const html = data?.data?.html
+
+    if (!data?.success) {
+      console.warn(`⚠️  Firecrawl stealth failed: ${JSON.stringify(data)?.slice(0, 300)}`)
+      // Check if we still got HTML despite failure
+      if (html && html.length > 1000) {
+        console.log(`📄 Firecrawl stealth reported failure but we have HTML (${html.length} chars)`)
+      } else {
+        return null
+      }
+    }
+
+    if (!html || html.length < 100) {
+      console.warn('⚠️  Firecrawl stealth returned no HTML')
+      return null
+    }
+
+    // Check if still blocked
+    if (html.includes('PerimeterX') || html.includes('_pxCustomLogo') || html.includes('Access to this page has been denied')) {
+      console.warn('⚠️  Firecrawl stealth still got blocked by PerimeterX')
+      // But still return the HTML - we can extract the one image from block page
+      return html
+    }
+
+    console.log(`✅ Firecrawl STEALTH MODE returned HTML (${html.length} chars)`)
+    return html
+  } catch (e: any) {
+    console.warn(`⚠️  Firecrawl stealth exception: ${e?.message || String(e)}`)
+    return null
+  }
+}
+
 async function tryFirecrawl(url: string): Promise<any | null> {
   const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY')
   if (!FIRECRAWL_API_KEY) return null
@@ -866,67 +1007,211 @@ async function tryFirecrawl(url: string): Promise<any | null> {
     },
   }
 
+  // For KSL, try multiple strategies to bypass PerimeterX
+  const isKsl = url.includes('ksl.com')
+  
   try {
+    // Strategy 1: Enhanced scrape with mobile mode and longer waits for KSL
+    const scrapeConfig: any = {
+      url,
+      formats: ['extract', 'html'],
+      extract: { schema: extractionSchema },
+      onlyMainContent: false,
+    }
+
+    if (isKsl) {
+      // Enhanced KSL-specific settings to bypass PerimeterX
+      scrapeConfig.mobile = false // Desktop mode sometimes works better
+      scrapeConfig.waitFor = 15000 // Longer initial wait for PerimeterX challenge
+      scrapeConfig.actions = [
+        {
+          type: 'wait',
+          milliseconds: 8000, // Long wait for PerimeterX challenge to resolve
+        },
+        {
+          type: 'scroll',
+          direction: 'down',
+          pixels: 500,
+        },
+        {
+          type: 'wait',
+          milliseconds: 3000,
+        },
+        {
+          type: 'scroll',
+          direction: 'down',
+          pixels: 1000,
+        },
+        {
+          type: 'wait',
+          milliseconds: 3000,
+        },
+        {
+          type: 'scroll',
+          direction: 'down',
+          pixels: 2000,
+        },
+        {
+          type: 'wait',
+          milliseconds: 4000, // Final wait for gallery to load
+        },
+      ]
+      
+      scrapeConfig.pageOptions = {
+        waitFor: 12000,
+        waitUntil: 'networkidle',
+      }
+      
+      scrapeConfig.headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Referer': 'https://www.google.com/',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+      }
+    } else {
+      // Standard settings for other sites
+      scrapeConfig.waitFor = 8000
+      scrapeConfig.actions = [
+        {
+          type: 'wait',
+          milliseconds: 3000,
+        },
+        {
+          type: 'scroll',
+          direction: 'down',
+          pixels: 2000,
+        },
+        {
+          type: 'wait',
+          milliseconds: 3000,
+        },
+      ]
+    }
+
     const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
       },
-      body: JSON.stringify({
-        url,
-        formats: ['extract', 'html'],
-        extract: { schema: extractionSchema },
-        onlyMainContent: false,
-        waitFor: 8000, // Longer wait for KSL JS to load
-        actions: [
-          {
-            type: 'wait',
-            milliseconds: 3000,
-          },
-          {
-            type: 'scroll',
-            direction: 'down',
-            pixels: 2000,
-          },
-          {
-            type: 'wait',
-            milliseconds: 3000,
-          },
-        ],
-      }),
+      body: JSON.stringify(scrapeConfig),
     })
 
     if (!firecrawlResponse.ok) {
       const errorText = await firecrawlResponse.text().catch(() => '')
-      console.warn(`Firecrawl HTTP error ${firecrawlResponse.status}: ${errorText?.slice(0, 200) || ''}`)
+      console.warn(`⚠️  Firecrawl HTTP error ${firecrawlResponse.status}: ${errorText?.slice(0, 200) || ''}`)
+      
+      // For 403/blocked responses, sometimes Firecrawl still returns HTML (the block page)
+      // Try to get it if available
+      if (firecrawlResponse.status === 403 || firecrawlResponse.status === 429) {
+        try {
+          const errorData = JSON.parse(errorText || '{}')
+          if (errorData?.data?.html) {
+            console.log(`📄 Got HTML from blocked response, will try to extract...`)
+            return { _firecrawl_html: errorData.data.html, _is_blocked: true }
+          }
+        } catch (e) {
+          // Not JSON or no HTML, continue
+        }
+      }
+      
       return null
     }
 
     const firecrawlData = await firecrawlResponse.json()
-    if (!firecrawlData?.success) {
-      console.warn(`Firecrawl failed: ${JSON.stringify(firecrawlData)?.slice(0, 300)}`)
-      return null
-    }
-
     const extract = firecrawlData?.data?.extract || null
     const html = firecrawlData?.data?.html || null
     
+    // Even if Firecrawl reports failure, try to extract from HTML if available
+    // (sometimes blocked pages still contain useful HTML)
+    if (!firecrawlData?.success) {
+      console.warn(`⚠️  Firecrawl reported failure: ${JSON.stringify(firecrawlData)?.slice(0, 300)}`)
+      // Still try to extract from HTML if we have it (block pages often have some HTML)
+      if (!html || html.length < 100) {
+        console.warn('No HTML available from Firecrawl, returning null')
+        return null
+      }
+      console.log(`📄 Firecrawl failed but we have HTML (${html.length} chars), will try to extract...`)
+    }
+    
     // Check if KSL blocked the request (block page detection)
-    if (html && (
+    const isBlocked = html && (
       html.includes('Blocked Request Notification') || 
       html.includes('forbiddenconnection@deseretdigital.com') ||
-      html.includes('Access to this page has been denied')
-    )) {
-      console.warn('Firecrawl returned KSL block page - KSL is blocking even Firecrawl requests')
-      return null
+      html.includes('Access to this page has been denied') ||
+      html.includes('PerimeterX') ||
+      html.includes('_pxCustomLogo') ||
+      (extract?.title && (extract.title.includes('Blocked') || extract.title.includes('Error') || extract.title.includes('Denied')))
+    )
+    
+    if (isBlocked && isKsl) {
+      console.warn('⚠️  Firecrawl returned KSL block page (PerimeterX detected) - trying fallback strategies...')
+      
+      // Strategy 2: Try to extract listing ID and construct image URLs
+      const listingIdMatch = url.match(/listing\/(\d+)/)
+      if (listingIdMatch) {
+        const listingId = listingIdMatch[1]
+        console.log(`📋 Found KSL listing ID: ${listingId}, attempting image URL construction...`)
+        
+        // KSL image pattern: https://img.ksl.com/slc/{first3}/{middle3}/{full}.{ext}
+        // Based on the one image we found: img.ksl.com/slc/2865/286508/28650891.png
+        // We can try to construct potential image URLs
+        // But this is limited - we'd need the actual image IDs
+        
+        // Try to extract any image URLs from the block page HTML itself
+        const blockPageImages: string[] = []
+        if (html) {
+          // Look for any img.ksl.com references in the HTML (even in block page)
+          const kslImgRegex = /https?:\/\/img\.(?:ksl\.com|ksldigital\.com)\/[^\s"<>]+\.(?:jpg|jpeg|png|webp|gif)/gi
+          let match
+          while ((match = kslImgRegex.exec(html)) !== null) {
+            blockPageImages.push(match[0])
+          }
+          
+          // Also try to extract from window._pxCustomLogo or other JS variables
+          const logoMatch = html.match(/window\._pxCustomLogo\s*=\s*['"]([^'"]+)['"]/)
+          if (logoMatch && logoMatch[1]) {
+            blockPageImages.push(logoMatch[1])
+          }
+          
+          // Look for image patterns in script tags
+          const scriptMatches = html.matchAll(/"https?:\/\/img\.(?:ksl\.com|ksldigital\.com)[^"]+"/gi)
+          for (const m of scriptMatches) {
+            blockPageImages.push(m[0].replace(/^["']|["']$/g, ''))
+          }
+        }
+        
+        if (blockPageImages.length > 0) {
+          console.log(`✅ Found ${blockPageImages.length} image reference(s) in block page`)
+          // Return what we found even if blocked
+          return {
+            ...(extract || {}),
+            images: [...new Set(blockPageImages)],
+            _firecrawl_html: html,
+            _is_blocked: true,
+            _source: 'block_page_extraction'
+          }
+        }
+      }
     }
     
     // Return both extract and HTML so we can extract images from HTML if extract doesn't have them
-    if (!extract || typeof extract !== 'object') return null
+    // Even if extract is empty, return HTML for extraction
+    const result = { ...(extract || {}), _firecrawl_html: html, _is_blocked: isBlocked || false }
+    if (!extract || typeof extract !== 'object') {
+      // Still return HTML for extraction even if extract failed
+      return html ? result : null
+    }
     
     // Attach HTML to extract object so caller can use it
-    return { ...extract, _firecrawl_html: html }
+    return result
   } catch (e: any) {
     console.warn(`Firecrawl exception: ${e?.message || String(e)}`)
     return null
@@ -963,9 +1248,22 @@ serve(async (req) => {
     }
 
     // Robust path: Firecrawl structured extraction first (works better on JS-heavy dealer sites).
-    const firecrawlResult = await tryFirecrawl(url)
-    const firecrawlExtract = firecrawlResult ? { ...firecrawlResult } : null
-    const firecrawlHtml = firecrawlResult?._firecrawl_html || null
+    let firecrawlResult: any = null
+    let firecrawlExtract: any = null
+    let firecrawlHtml: string | null = null
+    
+    try {
+      firecrawlResult = await tryFirecrawl(url)
+      firecrawlExtract = firecrawlResult && typeof firecrawlResult === 'object' && !firecrawlResult._firecrawl_html
+        ? { ...firecrawlResult }
+        : firecrawlResult && typeof firecrawlResult === 'object'
+          ? Object.fromEntries(Object.entries(firecrawlResult).filter(([k]) => k !== '_firecrawl_html' && k !== '_is_blocked'))
+          : null
+      firecrawlHtml = firecrawlResult?._firecrawl_html || null
+    } catch (e: any) {
+      console.warn(`⚠️  Firecrawl call failed: ${e?.message || String(e)}`)
+      // Continue without Firecrawl - will try direct fetch or HTML parsing
+    }
     // Remove internal field from extract
     if (firecrawlExtract && '_firecrawl_html' in firecrawlExtract) {
       delete firecrawlExtract._firecrawl_html
@@ -979,21 +1277,53 @@ serve(async (req) => {
     // because the page contains hi-res image URLs in data attributes.
     const needsHtmlParse = url.includes('lartdelautomobile.com') || url.includes('beverlyhillscarclub.com')
     // For KSL, always use HTML from Firecrawl for image extraction (even if extract exists)
-    const needsKslHtmlParse = url.includes('ksl.com') && firecrawlHtml
-    if (!html && (!firecrawlExtract || needsHtmlParse)) {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    // If Firecrawl failed for KSL, try direct fetch (even if blocked, we might get block page HTML with image refs)
+    const isKsl = url.includes('ksl.com')
+    const needsKslHtmlParse = isKsl && firecrawlHtml
+    const needsKslFallback = isKsl && !firecrawlHtml && !firecrawlExtract // KSL and Firecrawl completely failed
+    
+    if (!html && (!firecrawlExtract || needsHtmlParse || needsKslFallback)) {
+      // Strategy 1: Try Firecrawl STEALTH MODE for KSL (uses residential proxies)
+      if (needsKslFallback) {
+        const stealthHtml = await tryFirecrawlStealth(url)
+        if (stealthHtml && stealthHtml.length > 100) {
+          html = stealthHtml
+          console.log(`✅ Using Firecrawl STEALTH MODE HTML for KSL (${html.length} chars)`)
+        }
       }
+      
+      // Strategy 2: Direct fetch (fallback for non-KSL or if stealth failed)
+      if (!html) {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+        })
 
-      html = await response.text()
+        // Even if response is not ok (403/blocked), try to get HTML (might be block page with image refs)
+        if (!response.ok) {
+          if (needsKslFallback && (response.status === 403 || response.status === 429)) {
+            // For KSL, even blocked responses might have HTML with image references
+            try {
+              const blockedHtml = await response.text()
+              if (blockedHtml && blockedHtml.length > 100) {
+                console.log(`⚠️  Got blocked response (${response.status}) but extracting from HTML (${blockedHtml.length} chars)...`)
+                html = blockedHtml
+              } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+              }
+            } catch (e) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+            }
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          }
+        } else {
+          html = await response.text()
+        }
+      }
       try {
         doc = new DOMParser().parseFromString(html, 'text/html')
         if (!doc) {
@@ -1134,18 +1464,24 @@ serve(async (req) => {
 
     // If Firecrawl didn't yield images (or it wasn't used), use HTML extraction.
     // NOTE: For BaT listings, this is intentionally bypassed in favor of canonical gallery extraction above.
-    // For KSL, always try HTML extraction even if Firecrawl extract had images (extract may miss them)
-    const shouldExtractFromHtml = (!data.images || data.images.length === 0) || (url.includes('ksl.com') && html && html.length > 1000)
+    // For KSL, ALWAYS try HTML extraction (critical - Firecrawl extract misses gallery images)
+    // Even if Firecrawl was blocked, HTML might still have image references
+    const shouldExtractFromHtml = (!data.images || data.images.length === 0) || (url.includes('ksl.com') && html && html.length > 200)
     if (shouldExtractFromHtml && html) {
       try {
-        // Pass the original URL for KSL so we can resolve relative paths
+        console.log(`Extracting images from HTML (${html.length} chars) for ${url.includes('ksl.com') ? 'KSL' : 'non-KSL'} URL...`)
+        // Pass the original URL for KSL so we can resolve relative paths and filter properly
         const extractedImages = extractImageURLs(html, url)
+        console.log(`Extracted ${extractedImages?.length || 0} images from HTML`)
         if (extractedImages && extractedImages.length > 0) {
           const normalized = normalizeImageUrls(extractedImages)
-          // For KSL, merge with existing images (Firecrawl may have found some)
-          if (url.includes('ksl.com') && data.images && data.images.length > 0) {
-            const combined = [...new Set([...data.images, ...normalized])]
+          console.log(`After normalization: ${normalized.length} images`)
+          // For KSL, always prefer HTML-extracted images (they capture the full gallery)
+          if (url.includes('ksl.com')) {
+            // Merge but prioritize HTML-extracted images (they capture the full gallery)
+            const combined = [...new Set([...normalized, ...(data.images || [])])]
             data.images = combined
+            console.log(`KSL: Final image count: ${combined.length} (${normalized.length} from HTML + ${(data.images || []).length} from extract)`)
           } else {
             data.images = normalized
           }
@@ -1750,20 +2086,119 @@ function extractImageURLs(html: string, baseUrl?: string): string[] {
     }
   }
 
-  // Pattern 4: JSON data in script tags (for gallery systems)
+  // Pattern 4: srcset attributes (responsive images - KSL uses these heavily)
+  const srcsetRegex = /srcset=["']([^"']+)["']/gi
+  while ((match = srcsetRegex.exec(html)) !== null) {
+    const srcset = match[1]
+    // srcset format: "url1 1x, url2 2x" or "url1 640w, url2 1280w"
+    const urls = srcset.split(',').map(s => s.trim().split(/\s+/)[0]).filter(Boolean)
+    for (const url of urls) {
+      let fullUrl = url
+      if (url.startsWith('//')) {
+        fullUrl = 'https:' + url
+      } else if (url.startsWith('/') && baseDomain) {
+        fullUrl = baseDomain + url
+      } else if (!url.startsWith('http')) {
+        continue
+      }
+      
+      // Extract from Next.js image proxy
+      if (fullUrl.includes('_next/image?url=')) {
+        try {
+          const urlObj = new URL(fullUrl)
+          const urlParam = urlObj.searchParams.get('url')
+          if (urlParam) {
+            fullUrl = decodeURIComponent(urlParam)
+          }
+        } catch (e) {}
+      }
+      
+      if (fullUrl.startsWith('http') && !seen.has(fullUrl)) {
+        // For KSL, filter appropriately
+        if (baseUrl?.includes('ksl.com')) {
+          if (fullUrl.includes('ksl.com') || fullUrl.includes('ksldigital.com')) {
+            images.push(fullUrl)
+            seen.add(fullUrl)
+          }
+        } else {
+          images.push(fullUrl)
+          seen.add(fullUrl)
+        }
+      }
+    }
+  }
+
+  // Pattern 5: JSON data in script tags (for gallery systems)
   const jsonImagePatterns = [
     /"image":\s*"([^"]+)"/gi,
     /"url":\s*"([^"]+\.(jpg|jpeg|png|webp))"/gi,
     /"src":\s*"([^"]+\.(jpg|jpeg|png|webp))"/gi,
+    /"imageUrl":\s*"([^"]+)"/gi,
+    /"image_url":\s*"([^"]+)"/gi,
     /images:\s*\[([^\]]+)\]/gi,
+    // KSL-specific patterns
+    /"photos":\s*\[([^\]]+)\]/gi,
+    /images.*\[([^\]]+\.(jpg|jpeg|png|webp))\]/gi,
   ]
   
   for (const pattern of jsonImagePatterns) {
     while ((match = pattern.exec(html)) !== null) {
       const src = match[1]
       if (src && src.startsWith('http') && !seen.has(src)) {
-        images.push(src)
-        seen.add(src)
+        // Clean up URLs that might have trailing commas or brackets
+        let cleanUrl = src.replace(/[,\]}]+$/g, '').trim()
+        if (cleanUrl.includes('ksl.com') || cleanUrl.includes('ksldigital.com')) {
+          images.push(cleanUrl)
+          seen.add(cleanUrl)
+        }
+      }
+    }
+  }
+  
+  // Pattern 6: KSL-specific gallery patterns (look for img.ksl.com or img.ksldigital.com)
+  // KSL uses patterns like: img.ksl.com/slc/2865/286508/28650891.png
+  if (baseUrl?.includes('ksl.com')) {
+    // Multiple patterns to catch all KSL image formats
+    const kslPatterns = [
+      /https?:\/\/img\.(?:ksl\.com|ksldigital\.com)\/[^\s"<>]+\.(?:jpg|jpeg|png|webp|gif)/gi,
+      /img\.(?:ksl\.com|ksldigital\.com)\/[^\s"<>]+\.(?:jpg|jpeg|png|webp|gif)/gi,
+      // Also catch relative paths like /slc/2865/286508/28650891.png
+      /\/slc\/\d+\/\d+\/\d+\.(?:jpg|jpeg|png|webp|gif)/gi,
+    ]
+    
+    for (const pattern of kslPatterns) {
+      while ((match = pattern.exec(html)) !== null) {
+        let url = match[0]
+        // Convert relative paths to full URLs
+        if (url.startsWith('/')) {
+          url = `https://img.ksl.com${url}`
+        } else if (!url.startsWith('http')) {
+          url = `https://${url}`
+        }
+        if (!seen.has(url) && !url.includes('logo') && !url.includes('icon') && !url.includes('svg')) {
+          images.push(url)
+          seen.add(url)
+        }
+      }
+    }
+    
+    // Also look for KSL image patterns in JSON/script data
+    const kslJsonPatterns = [
+      /"image":\s*"(https?:\/\/[^"]*img\.(?:ksl\.com|ksldigital\.com)[^"]+)"/gi,
+      /"url":\s*"(https?:\/\/[^"]*img\.(?:ksl\.com|ksldigital\.com)[^"]+)"/gi,
+      /"src":\s*"(https?:\/\/[^"]*img\.(?:ksl\.com|ksldigital\.com)[^"]+)"/gi,
+      /images:\s*\[([^\]]*img\.(?:ksl\.com|ksldigital\.com)[^\]]*)\]/gi,
+    ]
+    
+    for (const pattern of kslJsonPatterns) {
+      while ((match = pattern.exec(html)) !== null) {
+        let url = match[1]
+        // Clean up any trailing commas/brackets
+        url = url.replace(/[,\]}]+$/g, '').trim()
+        if (url && url.startsWith('http') && !seen.has(url) && !url.includes('logo') && !url.includes('icon')) {
+          images.push(url)
+          seen.add(url)
+        }
       }
     }
   }
