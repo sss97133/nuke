@@ -130,7 +130,7 @@ export default function VehicleMemePanel({
   if (loading) {
     return (
       <div className="card">
-        <div className="card-body" style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '9pt' }}>
+        <div className="card-body">
           Loading...
         </div>
       </div>
@@ -143,9 +143,9 @@ export default function VehicleMemePanel({
 
   return (
     <div className="card">
-      <div className="card-body" style={{ padding: '8px' }}>
+      <div className="card-body">
         {!user?.id && (
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '8px' }}>
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
             Login to drop memes
           </div>
         )}
@@ -153,23 +153,21 @@ export default function VehicleMemePanel({
         <div style={{
           display: 'flex',
           flexWrap: expanded ? 'wrap' : 'nowrap',
-          gap: '6px',
+          gap: 'var(--space-1)',
           overflowX: expanded ? 'visible' : 'auto',
-          paddingBottom: expanded ? 0 : '4px',
         }}>
           {visibleMemes.map((a) => {
             const isSending = sendingActionId === a.id;
             return (
               <button
                 key={a.id}
+                className="button"
                 style={{
-                  flex: expanded ? '0 0 auto' : '0 0 56px',
-                  width: expanded ? '56px' : '56px',
-                  height: '56px',
-                  padding: '2px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface)',
+                  flex: expanded ? '0 0 auto' : '0 0 48px',
+                  width: '48px',
+                  height: '48px',
+                  padding: 0,
+                  minHeight: 0,
                   cursor: canInteract ? 'pointer' : 'not-allowed',
                   opacity: canInteract ? 1 : 0.5,
                   position: 'relative',
@@ -189,8 +187,7 @@ export default function VehicleMemePanel({
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    borderRadius: '4px',
-                    filter: isSending ? 'brightness(1.5)' : 'none',
+                    filter: isSending ? 'brightness(1.3)' : 'none',
                   }}
                   loading="lazy"
                   onError={(e) => {
@@ -203,20 +200,18 @@ export default function VehicleMemePanel({
           
           {!expanded && hasMore && (
             <button
+              className="button button-secondary"
               onClick={() => setExpanded(true)}
               style={{
-                flex: '0 0 56px',
-                width: '56px',
-                height: '56px',
-                borderRadius: '6px',
-                border: '1px solid var(--border)',
-                background: 'var(--bg)',
-                cursor: 'pointer',
+                flex: '0 0 48px',
+                width: '48px',
+                height: '48px',
+                padding: 0,
+                minHeight: 0,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '9pt',
-                color: 'var(--text-muted)',
+                fontSize: '8pt',
               }}
             >
               +{imageMemes.length - 6}
@@ -225,11 +220,11 @@ export default function VehicleMemePanel({
         </div>
         
         {expanded && hasMore && (
-          <div style={{ marginTop: '8px', textAlign: 'center' }}>
+          <div style={{ marginTop: 'var(--space-2)', textAlign: 'center' }}>
             <button
               className="button button-secondary"
               onClick={() => setExpanded(false)}
-              style={{ fontSize: '8pt', padding: '4px 12px' }}
+              style={{ fontSize: '8pt' }}
             >
               Collapse
             </button>
@@ -256,17 +251,10 @@ export default function VehicleMemePanel({
             className="card"
             style={{ width: 'min(320px, 90vw)', maxHeight: '80vh' }}
           >
-            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>{preview.title}</span>
-              <button 
-                className="button button-secondary" 
-                onClick={() => setPreview(null)}
-                style={{ padding: '4px 8px', fontSize: '9pt' }}
-              >
-                X
-              </button>
+            <div className="card-header">
+              {preview.title}
             </div>
-            <div className="card-body" style={{ padding: '12px' }}>
+            <div className="card-body">
               <img
                 src={preview.image_url!}
                 alt={preview.title}
@@ -274,15 +262,13 @@ export default function VehicleMemePanel({
                   width: '100%',
                   maxHeight: '240px',
                   objectFit: 'contain',
-                  borderRadius: '4px',
                   background: 'var(--bg)',
                 }}
               />
-              <div style={{ marginTop: '12px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <div style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
                 <button
                   className="button button-secondary"
                   onClick={() => setPreview(null)}
-                  style={{ fontSize: '9pt' }}
                 >
                   Cancel
                 </button>
@@ -293,7 +279,6 @@ export default function VehicleMemePanel({
                     void sendMeme(preview.id);
                     setPreview(null);
                   }}
-                  style={{ fontSize: '9pt' }}
                 >
                   {sendingActionId === preview.id ? 'Sending...' : 'Drop'}
                 </button>
