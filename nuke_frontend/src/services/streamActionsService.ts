@@ -163,6 +163,70 @@ export const StreamActionsService = {
     const { error } = await supabase.rpc('admin_delete_stream_action_pack', { p_pack_id: packId });
     if (error) throw error;
   },
+
+  async getVehicleMemeStats(vehicleId: string): Promise<{
+    totalDrops: number;
+    uniqueMemers: number;
+    topMeme: { title: string; count: number } | null;
+    recentDrops: ContentActionEvent[];
+  }> {
+    try {
+      // Get all drops for this vehicle
+      const { data, error } = await supabase
+        .from('content_action_events')
+        .select('id, title, sender_id, image_url, render_text, created_at')
+        .eq('vehicle_id', vehicleId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      
+      const drops = data || [];
+      const totalDrops = drops.length;
+      const uniqueMemers = new Set(drops.map(d => d.sender_id).filter(Boolean)).size;
+      
+      // Find top meme
+      const memeCounts = new Map<string, number>();
+      for (const d of drops) {
+        memeCounts.set(d.title, (memeCounts.get(d.title) || 0) + 1);
+      }
+      
+      let topMeme: { title: string; count: number } | null = null;
+      for (const [title, count] of memeCounts.entries()) {
+        if (!topMeme || count > topMeme.count) {
+          topMeme = { title, count };
+        }
+      }
+
+      return {
+        totalDrops,
+        uniqueMemers,
+        topMeme,
+        recentDrops: drops.slice(0, 5) as ContentActionEvent[],
+      };
+    } catch {
+      return {
+        totalDrops: 0,
+        uniqueMemers: 0,
+        topMeme: null,
+        recentDrops: [],
+      };
+    }
+  },
+
+  async getVehicleDropCount(vehicleId: string): Promise<number> {
+    try {
+      const { count, error } = await supabase
+        .from('content_action_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('vehicle_id', vehicleId);
+      
+      if (error) return 0;
+      return count || 0;
+    } catch {
+      return 0;
+    }
+  },
 };
 
 
