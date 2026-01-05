@@ -30,28 +30,20 @@ const isDryRun = process.argv.includes('--dry-run');
 const limitArg = process.argv.find(arg => arg.startsWith('--limit'));
 const maxListings = limitArg ? parseInt(limitArg.split('=')[1]) : null;
 
-// KSL search URL for vintage trucks/SUVs (1964-1991)
-const SEARCH_URLS = [
-  'https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/1',
-  'https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/2',
-  'https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/3',
-  'https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/4',
-  'https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/5',
-];
+// Generate search URLs dynamically to get all pages
+// KSL shows ~25-50 listings per page, 514 total = ~11-21 pages
+function generateSearchUrls() {
+  const urls = [];
+  for (let page = 1; page <= 25; page++) { // Over-estimate to ensure we get all
+    urls.push(`https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/${page}`);
+  }
+  return urls;
+}
 
-async function scrapeSearchPage(searchUrl) {
+const SEARCH_URLS = generateSearchUrls();
+
+async function scrapeSearchPage(searchUrl, browser) {
   console.log(`\n🔍 Scraping search page: ${searchUrl}`);
-  
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
-      '--disable-blink-features=AutomationControlled',
-      '--disable-features=IsolateOrigins,site-per-process',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--window-size=1920,1080',
-    ],
-  });
   
   const context = await browser.newContext({
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -73,7 +65,7 @@ async function scrapeSearchPage(searchUrl) {
   
   try {
     await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(8000); // PerimeterX wait
+    await page.waitForTimeout(10000); // Longer wait for PerimeterX (increased from 8s)
     
     // Scroll to load lazy content
     await page.evaluate(async () => {
@@ -143,14 +135,14 @@ async function scrapeSearchPage(searchUrl) {
       return results;
     });
     
-    await browser.close();
+    await context.close();
     
     console.log(`   ✅ Found ${listings.length} listings`);
     return listings;
     
   } catch (error) {
     console.error(`   ❌ Error: ${error.message}`);
-    await browser.close();
+    await context.close();
     return [];
   }
 }
@@ -413,31 +405,54 @@ async function main() {
   };
   
   log(`Started: ${new Date().toISOString()}`);
-  log(`Search URLs: ${SEARCH_URLS.length}`);
+  log(`Target: All 1964-1991 vehicles (estimated 514 listings)`);
+  log(`Max pages: 25`);
   log('');
   
-  // Scrape all search pages
+  // Scrape all search pages (stop when we hit an empty page)
   const allListings = [];
-  for (const searchUrl of SEARCH_URLS) {
+  let emptyPageCount = 0;
+  
+  for (let i = 0; i < SEARCH_URLS.length; i++) {
+    const searchUrl = SEARCH_URLS[i];
     const listings = await scrapeSearchPage(searchUrl);
-    allListings.push(...listings);
+    
+    if (listings.length === 0) {
+      emptyPageCount++;
+      log(`   ⚠️  Empty page (${emptyPageCount}/2) - might be end of results`);
+      
+      if (emptyPageCount >= 2) {
+        log(`   ✅ Reached end of search results at page ${i + 1}`);
+        break;
+      }
+    } else {
+      emptyPageCount = 0; // Reset counter
+      allListings.push(...listings);
+    }
     
     // Wait between search pages to avoid rate limits
-    if (SEARCH_URLS.indexOf(searchUrl) < SEARCH_URLS.length - 1) {
-      console.log('   ⏸️  Waiting 30s before next search page...');
-      await sleep(30000);
+    if (i < SEARCH_URLS.length - 1 && listings.length > 0) {
+      const waitTime = 25000 + Math.random() * 10000; // 25-35s
+      console.log(`   ⏸️  Waiting ${Math.round(waitTime/1000)}s before next search page...`);
+      await sleep(waitTime);
     }
   }
   
-  // Deduplicate
-  const uniqueListings = Array.from(
-    new Map(allListings.map(item => [item.url, item])).values()
-  );
-  
-  log(`\n📋 Total unique listings found: ${uniqueListings.length}`);
-  
-  const toProcess = maxListings ? uniqueListings.slice(0, maxListings) : uniqueListings;
-  log(`📋 Processing: ${toProcess.length} listings\n`);
+    // Deduplicate
+    const uniqueListings = Array.from(
+      new Map(allListings.map(item => [item.url, item])).values()
+    );
+    
+    log(`\n📋 Total unique listings found: ${uniqueListings.length}`);
+    
+    const toProcess = maxListings ? uniqueListings.slice(0, maxListings) : uniqueListings;
+    log(`📋 Processing: ${toProcess.length} listings\n`);
+    
+  } finally {
+    // Close search browser
+    await browser.close();
+    log(`   🔒 Browser closed\n`);
+  }
   
   // Process each listing
   for (let i = 0; i < toProcess.length; i++) {

@@ -22,7 +22,12 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzja
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const SEARCH_URL = 'https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/1';
+// Check first 3 pages to catch new listings (they appear on top)
+const SEARCH_URLS = [
+  'https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/1',
+  'https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/2',
+  'https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/3',
+];
 
 async function scrapeNewListings() {
   console.log(`\n🔍 Daily KSL Monitor - ${new Date().toISOString()}\n`);
@@ -109,8 +114,38 @@ async function scrapeNewListings() {
     });
     
     await browser.close();
+    return listings;
     
-    console.log(`✅ Found ${listings.length} current listings\n`);
+  } catch (error) {
+    console.error(`❌ Error scraping page: ${error.message}`);
+    await browser.close();
+    return [];
+  }
+}
+
+async function main() {
+  console.log(`\n🔍 Daily KSL Monitor - ${new Date().toISOString()}\n`);
+  
+  try {
+    // Scrape first 3 pages (new listings appear on top)
+    const allListings = [];
+    for (const searchUrl of SEARCH_URLS) {
+      console.log(`Checking: ${searchUrl}`);
+      const listings = await scrapeSearchPage(searchUrl);
+      allListings.push(...listings);
+      
+      if (SEARCH_URLS.indexOf(searchUrl) < SEARCH_URLS.length - 1) {
+        console.log(`   Waiting 30s...`);
+        await new Promise(resolve => setTimeout(resolve, 30000));
+      }
+    }
+    
+    // Deduplicate
+    const listings = Array.from(
+      new Map(allListings.map(item => [item.url, item])).values()
+    );
+    
+    console.log(`\n✅ Found ${listings.length} current listings\n`);
     
     // Check which are new
     const newListings = [];
