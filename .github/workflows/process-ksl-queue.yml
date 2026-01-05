@@ -1,0 +1,254 @@
+name: Process KSL Import Queue
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: 'Number of vehicles to process'
+        required: false
+        default: '50'
+  
+  # Run after search scraper completes
+  workflow_run:
+    workflows: ["Scrape KSL 1964-1991 Vehicles"]
+    types:
+      - completed
+  
+  # Daily at 7 AM MST (2 PM UTC) - 1 hour after search scraper
+  schedule:
+    - cron: '0 14 * * *'
+
+jobs:
+  process-queue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install chromium
+          npx playwright install-deps chromium
+      
+      - name: Process import queue
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BATCH_SIZE: ${{ github.event.inputs.batch_size || '50' }}
+        run: |
+          node << 'EOF'
+          import { chromium } from 'playwright';
+          import { createClient } from '@supabase/supabase-js';
+          
+          const supabase = createClient(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY
+          );
+          
+          const batchSize = parseInt(process.env.BATCH_SIZE || '50');
+          
+          console.log(`\n📋 Processing KSL import queue (batch: ${batchSize})...\n`);
+          
+          // Get pending KSL imports (1964-1991)
+          const { data: pending } = await supabase
+            .from('import_queue')
+            .select('id, url, raw_data')
+            .eq('source', 'ksl')
+            .eq('status', 'pending')
+            .order('discovered_at', { ascending: true })
+            .limit(batchSize);
+          
+          if (!pending || pending.length === 0) {
+            console.log('✅ No pending KSL imports\n');
+            process.exit(0);
+          }
+          
+          console.log(`📦 Found ${pending.length} pending imports\n`);
+          
+          const browser = await chromium.launch({
+            headless: true,
+            args: [
+              '--disable-blink-features=AutomationControlled',
+              '--disable-features=IsolateOrigins,site-per-process',
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+            ],
+          });
+          
+          const stats = { processed: 0, created: 0, failed: 0, images: 0 };
+          
+          for (const item of pending) {
+            console.log(`[${stats.processed + 1}/${pending.length}] ${item.url}`);
+            
+            const context = await browser.newContext({
+              userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+              viewport: { width: 1920, height: 1080 },
+              timezoneId: 'America/Denver',
+              geolocation: { latitude: 40.7608, longitude: -111.8910 },
+            });
+            
+            const page = await context.newPage();
+            await page.addInitScript(() => {
+              Object.defineProperty(navigator, 'webdriver', { get: () => false });
+              window.chrome = { runtime: {} };
+            });
+            
+            try {
+              await page.goto(item.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+              await page.waitForTimeout(10000);
+              
+              await page.evaluate(async () => {
+                await new Promise((resolve) => {
+                  let total = 0;
+                  const timer = setInterval(() => {
+                    window.scrollBy(0, 100);
+                    total += 100;
+                    if (total >= document.body.scrollHeight / 2) {
+                      clearInterval(timer);
+                      resolve();
+                    }
+                  }, 100);
+                });
+              });
+              
+              await page.waitForTimeout(2000);
+              
+              const data = await page.evaluate(() => {
+                const title = document.title.replace(' | KSL Cars', '').trim();
+                const bodyText = document.body?.textContent || '';
+                const result = { title, images: [] };
+                
+                const yearMatch = title.match(/\b(19\d{2}|20\d{2})\b/);
+                if (yearMatch) result.year = parseInt(yearMatch[0]);
+                
+                const afterYear = title.replace(/\b(19|20)\d{2}\b/, '').trim();
+                const parts = afterYear.split(/\s+/);
+                if (parts.length >= 2) {
+                  result.make = parts[0];
+                  result.model = parts.slice(1, 4).join(' ');
+                }
+                
+                const priceMatch = bodyText.match(/\$(\d{1,3}(?:,\d{3})*)/);
+                if (priceMatch) result.asking_price = parseInt(priceMatch[1].replace(/,/g, ''));
+                
+                const mileageMatch = bodyText.match(/(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)/i);
+                if (mileageMatch) result.mileage = parseInt(mileageMatch[1].replace(/,/g, ''));
+                
+                const vinMatch = bodyText.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
+                if (vinMatch) result.vin = vinMatch[1].toUpperCase();
+                
+                const seen = new Set();
+                document.querySelectorAll('img').forEach(img => {
+                  const src = img.src || img.getAttribute('data-src');
+                  if (src && src.includes('ksldigital.com') && !src.includes('logo') && !src.includes('icon') && !src.includes('svg') && !src.includes('weather') && !seen.has(src)) {
+                    seen.add(src);
+                    result.images.push(src);
+                  }
+                });
+                
+                return result;
+              });
+              
+              await context.close();
+              
+              if (!data.year || !data.make) {
+                stats.failed++;
+                console.log(`   ❌ Missing data`);
+                await supabase.from('import_queue').update({ status: 'failed' }).eq('id', item.id);
+                continue;
+              }
+              
+              console.log(`   📊 ${data.year} ${data.make} ${data.model} - ${data.images.length} images`);
+              
+              // Create vehicle
+              const { data: newVehicle, error } = await supabase
+                .from('vehicles')
+                .insert({
+                  year: data.year,
+                  make: data.make.toLowerCase(),
+                  model: data.model.toLowerCase(),
+                  vin: data.vin || null,
+                  mileage: data.mileage || null,
+                  asking_price: data.asking_price || null,
+                  profile_origin: 'ksl_import',
+                  discovery_source: 'ksl_github_action',
+                  discovery_url: item.url,
+                  origin_metadata: {
+                    ksl_title: data.title,
+                    scraped_at: new Date().toISOString(),
+                    image_count: data.images.length,
+                  },
+                  is_public: true,
+                  status: 'active',
+                })
+                .select('id')
+                .single();
+              
+              if (error) {
+                stats.failed++;
+                console.log(`   ❌ ${error.message}`);
+              } else {
+                stats.created++;
+                stats.images += data.images.length;
+                console.log(`   ✅ Created: ${newVehicle.id}`);
+                
+                // Upload images
+                if (data.images.length > 0) {
+                  await supabase.functions.invoke('backfill-images', {
+                    body: {
+                      vehicle_id: newVehicle.id,
+                      image_urls: data.images.slice(0, 50),
+                      source: 'ksl_listing',
+                      source_url: item.url,
+                    },
+                  });
+                  console.log(`   ✅ Images queued`);
+                }
+                
+                // Mark as processed
+                await supabase
+                  .from('import_queue')
+                  .update({ status: 'completed', processed_at: new Date().toISOString() })
+                  .eq('id', item.id);
+              }
+              
+              stats.processed++;
+              
+              // Rate limit
+              if (stats.processed < pending.length) {
+                await new Promise(r => setTimeout(r, 15000));
+              }
+              
+            } catch (error) {
+              stats.failed++;
+              console.log(`   ❌ Error: ${error.message}`);
+              await context.close();
+            }
+          }
+          
+          await browser.close();
+          
+          console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log(`Processed: ${stats.processed} | Created: ${stats.created} | Failed: ${stats.failed}`);
+          console.log(`Images: ${stats.images}`);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+          EOF
+      
+      - name: Create summary
+        run: |
+          echo "## 📊 KSL Import Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **URLs Found:** ${{ steps.scrape_search.outputs.total }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
+

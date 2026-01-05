@@ -1,0 +1,243 @@
+name: Scrape KSL 1964-1991 Vehicles
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      max_pages:
+        description: 'Max search pages to scrape (25 = all 514 listings)'
+        required: false
+        default: '25'
+      import_immediately:
+        description: 'Import vehicles immediately (vs queue only)'
+        required: false
+        default: 'false'
+  
+  # Daily schedule at 6 AM MST (1 PM UTC)
+  schedule:
+    - cron: '0 13 * * *'
+
+jobs:
+  scrape-and-import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480 # 8 hours max
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm ci
+          npx playwright install chromium
+          npx playwright install-deps chromium
+      
+      - name: Create logs directory
+        run: mkdir -p logs data
+      
+      - name: Scrape search pages for URLs
+        id: scrape_search
+        env:
+          MAX_PAGES: ${{ github.event.inputs.max_pages || '3' }}
+        run: |
+          node << 'EOF'
+          import { chromium } from 'playwright';
+          import fs from 'fs';
+          
+          const maxPages = parseInt(process.env.MAX_PAGES || '3');
+          console.log(`🔍 Scraping ${maxPages} pages for 1964-1991 vehicles...\n`);
+          
+          const browser = await chromium.launch({
+            headless: true,
+            args: [
+              '--disable-blink-features=AutomationControlled',
+              '--disable-features=IsolateOrigins,site-per-process',
+              '--no-sandbox',
+              '--disable-setuid-sandbox',
+            ],
+          });
+          
+          const allListings = [];
+          let emptyCount = 0;
+          
+          for (let pageNum = 1; pageNum <= maxPages && emptyCount < 2; pageNum++) {
+            console.log(`Page ${pageNum}...`);
+            
+            const context = await browser.newContext({
+              userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              viewport: { width: 1920, height: 1080 },
+              locale: 'en-US',
+              timezoneId: 'America/Denver',
+              geolocation: { latitude: 40.7608, longitude: -111.8910 },
+            });
+            
+            const page = await context.newPage();
+            
+            await page.addInitScript(() => {
+              Object.defineProperty(navigator, 'webdriver', { get: () => false });
+              window.chrome = { runtime: {} };
+              Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+            });
+            
+            const url = `https://cars.ksl.com/search/yearFrom/1964/yearTo/1991/page/${pageNum}`;
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.waitForTimeout(12000);
+            
+            await page.evaluate(async () => {
+              await new Promise((resolve) => {
+                let total = 0;
+                const timer = setInterval(() => {
+                  window.scrollBy(0, 100);
+                  total += 100;
+                  if (total >= document.body.scrollHeight) {
+                    clearInterval(timer);
+                    resolve();
+                  }
+                }, 100);
+              });
+            });
+            
+            await page.waitForTimeout(2000);
+            
+            const listings = await page.evaluate(() => {
+              const results = [];
+              const seen = new Set();
+              
+              document.querySelectorAll('a[href*="/listing/"]').forEach(link => {
+                const href = link.getAttribute('href');
+                if (!href) return;
+                
+                const url = href.startsWith('/') ? `https://cars.ksl.com${href}` : href;
+                const cleanUrl = url.split('?')[0].split('#')[0];
+                
+                if (seen.has(cleanUrl)) return;
+                seen.add(cleanUrl);
+                
+                const match = href.match(/listing\/(\d+)/);
+                if (match) {
+                  const card = link.closest('article, [class*="listing"], [class*="card"]');
+                  const title = card?.querySelector('h2, h3, h4, [class*="title"]')?.textContent?.trim() || '';
+                  results.push({ url: cleanUrl, listing_id: match[1], title });
+                }
+              });
+              
+              return results;
+            });
+            
+            await context.close();
+            
+            if (listings.length === 0) {
+              emptyCount++;
+              console.log(`   Empty (${emptyCount}/2)`);
+              if (emptyCount >= 2) break;
+            } else {
+              emptyCount = 0;
+              allListings.push(...listings);
+              console.log(`   ✅ ${listings.length} found (total: ${allListings.length})`);
+            }
+            
+            if (pageNum < maxPages) {
+              const wait = 45000 + Math.random() * 15000;
+              console.log(`   ⏸️  ${Math.round(wait/1000)}s wait...\n`);
+              await new Promise(r => setTimeout(r, wait));
+            }
+          }
+          
+          await browser.close();
+          
+          const unique = Array.from(new Map(allListings.map(l => [l.url, l])).values());
+          console.log(`\n✅ Total: ${unique.length} listings`);
+          
+          fs.writeFileSync('data/ksl-urls-github-action.json', JSON.stringify(unique, null, 2));
+          fs.writeFileSync(process.env.GITHUB_OUTPUT, `total=${unique.length}\n`, { flag: 'a' });
+          EOF
+      
+      - name: Queue listings for import
+        if: steps.scrape_search.outputs.total > 0
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          node << 'EOF'
+          import { createClient } from '@supabase/supabase-js';
+          import fs from 'fs';
+          
+          const supabase = createClient(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_SERVICE_ROLE_KEY
+          );
+          
+          const listings = JSON.parse(fs.readFileSync('data/ksl-urls-github-action.json', 'utf8'));
+          console.log(`\n📋 Queuing ${listings.length} listings for import...\n`);
+          
+          let queued = 0;
+          let existing = 0;
+          
+          for (const listing of listings) {
+            // Check if already exists
+            const { data: existingVehicle } = await supabase
+              .from('vehicles')
+              .select('id')
+              .eq('discovery_url', listing.url)
+              .maybeSingle();
+            
+            if (existingVehicle) {
+              existing++;
+              continue;
+            }
+            
+            // Check if in queue
+            const { data: inQueue } = await supabase
+              .from('import_queue')
+              .select('id')
+              .eq('url', listing.url)
+              .maybeSingle();
+            
+            if (inQueue) {
+              continue;
+            }
+            
+            // Queue for import
+            const { error } = await supabase
+              .from('import_queue')
+              .insert({
+                url: listing.url,
+                source: 'ksl',
+                status: 'pending',
+                discovered_at: new Date().toISOString(),
+                raw_data: { 
+                  title: listing.title,
+                  listing_id: listing.listing_id,
+                  discovered_via: 'github_action'
+                },
+              });
+            
+            if (!error) queued++;
+          }
+          
+          console.log(`✅ Queued: ${queued}`);
+          console.log(`⏭️  Already exist: ${existing}`);
+          console.log(`📊 Total processed: ${listings.length}\n`);
+          EOF
+      
+      - name: Upload URLs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ksl-urls-${{ github.run_number }}
+          path: data/ksl-urls-github-action.json
+          retention-days: 30
+      
+      - name: Summary
+        run: |
+          echo "## 📊 KSL Scraping Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total URLs found:** ${{ steps.scrape_search.outputs.total }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ✅ Complete" >> $GITHUB_STEP_SUMMARY
+
