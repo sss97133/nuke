@@ -51,11 +51,11 @@ curl -X POST "https://YOUR_PROJECT.supabase.co/functions/v1/discover-organizatio
 - Identifies extraction patterns (CSS selectors, regex, etc.)
 - Checks for reusable patterns from similar sites
 - Learns field mappings (price, year, make, model, VIN, etc.)
-- Stores patterns in `dealer_site_schemas` table
+- Stores patterns in `source_site_schemas` table
 
 ### 3. Pattern Storage
 
-- Stores site-specific schemas in `dealer_site_schemas`
+- Stores site-specific schemas in `source_site_schemas`
 - Can register reusable patterns in `extraction_pattern_registry`
 - Patterns are automatically reused for similar sites
 - Each pattern includes confidence scores and sample values
@@ -124,7 +124,7 @@ This tool integrates with:
 
 - `scrape-multi-source`: Uses learned patterns for extraction
 - `process-import-queue`: Processes extracted data
-- `dealer_site_schemas`: Stores learned patterns
+- `source_site_schemas`: Stores learned patterns
 - `extraction_pattern_registry`: Stores reusable patterns
 
 ## Example Workflow

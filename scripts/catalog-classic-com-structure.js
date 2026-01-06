@@ -4,7 +4,7 @@
  * Catalog Classic.com Structure
  * 
  * Step 1: Analyze and catalog Classic.com dealer profile structure
- * Step 2: Store schema in dealer_site_schemas table
+ * Step 2: Store schema in source_site_schemas table
  * 
  * This enables structure-first extraction - we know what to extract before extracting
  */
@@ -70,7 +70,7 @@ async function catalogClassicComStructure() {
         });
       }
 
-      console.log('\n✅ Schema stored in dealer_site_schemas table');
+      console.log('\n✅ Schema stored in source_site_schemas table');
       console.log('   Ready for structure-first extraction!\n');
 
       return data;
@@ -90,7 +90,7 @@ async function verifyCatalog() {
   console.log('\n🔍 Verifying catalog...\n');
 
   const { data: schemas, error } = await supabase
-    .from('dealer_site_schemas')
+    .from('source_site_schemas')
     .select('domain, site_name, site_type, extraction_confidence, is_valid, cataloged_at')
     .eq('domain', 'classic.com')
     .eq('is_valid', true);

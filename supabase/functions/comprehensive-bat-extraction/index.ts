@@ -49,6 +49,7 @@ function upgradeBatImageUrl(u: string): string {
 function isNoiseBatImageUrl(u: string): boolean {
   const f = String(u || "").toLowerCase();
   return (
+    // Original BaT-specific noise patterns
     f.includes("qotw") ||
     f.includes("winner-template") ||
     f.includes("weekly-weird") ||
@@ -58,7 +59,47 @@ function isNoiseBatImageUrl(u: string): boolean {
     f.includes("podcast-graphic") ||
     f.includes("thumbnail-template") ||
     f.includes("site-post-") ||
-    /\/web-\d{3,}-/i.test(f)
+    /\/web-\d{3,}-/i.test(f) ||
+
+    // Enhanced pollution filtering
+    f.includes("logo") || f.includes("header") || f.includes("footer") ||
+    f.includes("menu") || f.includes("nav") || f.includes("sidebar") ||
+    f.includes("advertisement") || f.includes("/ads/") || f.includes("advert") ||
+    f.includes("social") || f.includes("share") || f.includes("facebook") ||
+    f.includes("twitter") || f.includes("instagram") || f.includes("youtube") ||
+
+    // BaT-specific user/profile images
+    f.includes("default-avatar") || f.includes("profile-") ||
+    f.includes("comment-") || f.includes("user-") || f.includes("avatar") ||
+    f.includes("member-") || f.includes("seller-") ||
+
+    // UI elements and icons
+    /\/(icons?|sprites?|ui|layout|assets)\//i.test(f) ||
+    f.includes("icon-") || f.includes("sprite-") ||
+    f.includes("badge") || f.includes("button") ||
+    f.includes("arrow") || f.includes("chevron") ||
+
+    // Related listings/recommendations pollution
+    f.includes("related-") || f.includes("similar-") ||
+    f.includes("recommended-") || f.includes("also-") ||
+    f.includes("other-listings") || f.includes("more-from") ||
+
+    // BaT promotional content
+    f.includes("bat-logo") || f.includes("bringatrailer-") ||
+    f.includes("merchandise") || f.includes("apparel") ||
+    f.includes("newsletter") || f.includes("subscribe") ||
+
+    // Watermarks and overlays
+    f.includes("watermark") || f.includes("overlay") ||
+    f.includes("stamp") || f.includes("signature") ||
+
+    // Very small images (likely icons/UI elements)
+    /-\d{1,2}x\d{1,2}\./i.test(f) ||
+
+    // Empty or placeholder images
+    f.includes("placeholder") || f.includes("blank") ||
+    f.includes("empty") || f.includes("default.") ||
+    f.includes("no-image") || f.includes("not-found")
   );
 }
 

@@ -42,7 +42,7 @@ node scripts/catalog-classic-com-structure.js
 1. Fetches sample Classic.com dealer profile
 2. Analyzes HTML structure with AI
 3. Catalogs field locations (CSS selectors, regex patterns)
-4. Stores schema in `dealer_site_schemas` table
+4. Stores schema in `source_site_schemas` table
 
 ---
 
@@ -90,7 +90,7 @@ curl -X POST \
 
 ## Schema Structure
 
-Stored in `dealer_site_schemas.schema_data`:
+Stored in `source_site_schemas.schema_data`:
 
 ```json
 {

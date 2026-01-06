@@ -124,7 +124,7 @@ Deno.serve(async (req) => {
     let existingPatterns: any = null;
     if (!force_rediscover) {
       const { data: patterns } = await supabase
-        .from('dealer_site_schemas')
+        .from('source_site_schemas')
         .select('*')
         .eq('domain', new URL(siteUrl).hostname)
         .maybeSingle();
@@ -508,7 +508,7 @@ async function storeLearnedPatterns(
     };
 
     await supabase
-      .from('dealer_site_schemas')
+      .from('source_site_schemas')
       .upsert({
         domain,
         site_name: domain,

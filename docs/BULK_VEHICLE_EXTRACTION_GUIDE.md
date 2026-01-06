@@ -53,7 +53,7 @@ npm run discover-org -- <organization_id> --force
 
 ### 3. Pattern Learning
 - Each org teaches new patterns
-- Patterns stored in `dealer_site_schemas`
+- Patterns stored in `source_site_schemas`
 - Similar sites reuse patterns (faster extractions)
 
 ## Workflow to Reach 100k Vehicles

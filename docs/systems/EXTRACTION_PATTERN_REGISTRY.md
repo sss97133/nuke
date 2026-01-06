@@ -16,7 +16,7 @@ Before this system:
 
 **Three-Layer Pattern System:**
 
-1. **Site-Specific Schemas** (`dealer_site_schemas` table)
+1. **Site-Specific Schemas** (`source_site_schemas` table)
    - Stores complete extraction schemas per domain
    - Includes selectors, patterns, field mappings
    - Example: Classic.com sidebar structure, Cantech Automotive table structure
@@ -48,7 +48,7 @@ Register the pattern in the database:
 
 ```sql
 -- Site-specific schema
-INSERT INTO dealer_site_schemas (domain, site_name, schema_data, ...)
+INSERT INTO source_site_schemas (domain, site_name, schema_data, ...)
 VALUES ('classic.com', 'Classic.com', '{
   "fields": {
     "price": {
@@ -72,7 +72,7 @@ The scraper automatically checks for registered patterns:
 // In scrape-vehicle/index.ts
 const domain = new URL(url).hostname.replace(/^www\./, '');
 const schema = await supabase
-  .from('dealer_site_schemas')
+  .from('source_site_schemas')
   .select('schema_data')
   .eq('domain', domain)
   .single();
@@ -115,7 +115,7 @@ When scraping a new site, identify:
 **Option A: Site-Specific Schema** (if unique to one site)
 
 ```sql
-INSERT INTO dealer_site_schemas (domain, site_name, site_type, schema_data, notes, cataloged_by)
+INSERT INTO source_site_schemas (domain, site_name, site_type, schema_data, notes, cataloged_by)
 VALUES (
   'newsite.com',
   'New Site',

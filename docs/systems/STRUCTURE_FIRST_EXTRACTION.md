@@ -40,15 +40,30 @@ PHASE 2: EXTRACT DATA (Use structure knowledge)
 
 ### Step 1: Catalog Site Structure
 
-**Create**: `dealer_site_schemas` table
+**Create**: `source_site_schemas` table
 
 ```sql
-CREATE TABLE IF NOT EXISTS dealer_site_schemas (
+CREATE TABLE IF NOT EXISTS source_site_schemas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- Site Identity
   domain TEXT NOT NULL, -- '111motorcars.com', 'jordanmotorsports.com'
-  site_type TEXT, -- 'dealer_website', 'auction_house'
+  site_type TEXT CHECK (
+    site_type IN (
+      'directory',
+      'dealer_website',
+      'auction_house',
+      'marketplace',
+      'builder',
+      'manufacturer',
+      'broker',
+      'service_shop',
+      'supplier',
+      'fabricator',
+      'oem',
+      'platform'
+    )
+  ),
   
   -- Structure Mapping
   schema_data JSONB NOT NULL, -- Catalog of available fields and their locations
@@ -90,7 +105,7 @@ CREATE TABLE IF NOT EXISTS dealer_site_schemas (
 1. **Fetch sample pages** (homepage, about, inventory)
 2. **Analyze structure** with AI/Firecrawl
 3. **Catalog available fields** and their locations
-4. **Store schema** in `dealer_site_schemas`
+4. **Store schema** in `source_site_schemas`
 
 ---
 
