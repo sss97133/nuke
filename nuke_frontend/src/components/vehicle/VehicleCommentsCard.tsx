@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import VehicleMemePanel from './VehicleMemePanel';
 
 interface Comment {
   id: string;
@@ -24,13 +25,15 @@ interface VehicleCommentsCardProps {
   session: any;
   collapsed?: boolean;
   maxVisible?: number;
+  disabled?: boolean;
 }
 
 export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   vehicleId,
   session,
   collapsed = true,
-  maxVisible = 2
+  maxVisible = 2,
+  disabled = false
 }) => {
   const navigate = useNavigate();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -38,6 +41,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   const [expanded, setExpanded] = useState(!collapsed);
   const [newComment, setNewComment] = useState('');
   const [posting, setPosting] = useState(false);
+  const [memesExpanded, setMemesExpanded] = useState(false);
+  const [selectedMeme, setSelectedMeme] = useState<string | null>(null);
 
   useEffect(() => {
     loadComments();
@@ -323,6 +328,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
       if (!error) {
         setNewComment('');
+        setSelectedMeme(null);
         loadComments();
       }
     } catch (err) {
@@ -330,6 +336,13 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     } finally {
       setPosting(false);
     }
+  };
+
+  const handleMemeSelect = (memeUrl: string, memeTitle: string) => {
+    // Insert meme reference into comment
+    const memeRef = `[meme:${memeTitle}](${memeUrl})`;
+    setNewComment(prev => prev ? `${prev}\n${memeRef}` : memeRef);
+    setSelectedMeme(memeUrl);
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -567,16 +580,23 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                 fontSize: '8pt',
                 padding: '6px',
                 border: '1px solid var(--border)',
-                borderRadius: '4px',
                 resize: 'vertical',
                 fontFamily: 'inherit',
                 marginBottom: '6px'
               }}
             />
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            
+            {/* Meme selector and Post button row */}
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+              <VehicleMemePanel 
+                vehicleId={vehicleId} 
+                disabled={disabled}
+                onMemeSelect={handleMemeSelect}
+                compact
+              />
               <button
                 className="button button-primary"
-                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                style={{ fontSize: '8pt', padding: '4px 12px', flexShrink: 0 }}
                 onClick={handlePostComment}
                 disabled={posting || !newComment.trim()}
               >

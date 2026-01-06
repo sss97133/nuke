@@ -6,9 +6,13 @@ import { StreamActionsService, type StreamAction, type StreamActionPack } from '
 export default function VehicleMemePanel({
   vehicleId,
   disabled,
+  onMemeSelect,
+  compact,
 }: {
   vehicleId: string;
   disabled?: boolean;
+  onMemeSelect?: (memeUrl: string, memeTitle: string) => void;
+  compact?: boolean;
 }) {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -20,6 +24,7 @@ export default function VehicleMemePanel({
   const [sendingActionId, setSendingActionId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [preview, setPreview] = useState<StreamAction | null>(null);
+  const [selectedMeme, setSelectedMeme] = useState<string | null>(null);
   const holdTimerRef = useRef<number | null>(null);
 
   const targetKey = `vehicle:${vehicleId}`;
@@ -106,7 +111,11 @@ export default function VehicleMemePanel({
   const onPointerUp = (action: StreamAction) => {
     if (holdTimerRef.current) {
       clearHoldTimer();
-      if (user?.id && !disabled) {
+      // If onMemeSelect provided (compact mode), insert into comment
+      if (onMemeSelect && action.image_url) {
+        onMemeSelect(action.image_url, action.title);
+      } else if (user?.id && !disabled) {
+        // Otherwise send as normal meme drop
         void sendMeme(action.id);
       }
     }
@@ -141,6 +150,56 @@ export default function VehicleMemePanel({
     return null;
   }
 
+  // Compact mode: just a horizontal row of thumbnails, no card wrapper
+  if (compact) {
+    return (
+      <div style={{
+        display: 'flex',
+        gap: 'var(--space-1)',
+        overflowX: 'auto',
+        flex: 1,
+      }}>
+        {imageMemes.slice(0, 8).map((a) => {
+          const isSelected = selectedMeme === a.image_url;
+          return (
+            <button
+              key={a.id}
+              className="button"
+              style={{
+                flex: '0 0 32px',
+                width: '32px',
+                height: '32px',
+                padding: 0,
+                minHeight: 0,
+                cursor: 'pointer',
+                position: 'relative',
+                overflow: 'hidden',
+                opacity: isSelected ? 0.5 : 1,
+              }}
+              title={a.title}
+              onClick={() => onMemeSelect?.(a.image_url!, a.title)}
+            >
+              <img
+                src={a.image_url!}
+                alt={a.title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+                loading="lazy"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Full mode: card with expand/collapse
   return (
     <div className="card">
       <div className="card-body">

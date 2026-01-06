@@ -52,7 +52,7 @@ serve(async (req) => {
       console.log(`🔍 Looking for catalog with domain: ${domain}`);
       // Try to get valid catalog first, but fall back to any catalog if none found
       let { data: catalogSchema, error: catalogError } = await supabase
-        .from('dealer_site_schemas')
+        .from('source_site_schemas')
         .select('schema_data, site_type, domain, is_valid, extraction_confidence')
         .eq('domain', domain)
         .eq('is_valid', true)
@@ -62,7 +62,7 @@ serve(async (req) => {
       if (!catalogSchema) {
         console.log(`⚠️  No valid catalog found, trying any catalog for ${domain}`);
         const { data: anyCatalog, error: anyError } = await supabase
-          .from('dealer_site_schemas')
+          .from('source_site_schemas')
           .select('schema_data, site_type, domain, is_valid, extraction_confidence')
           .eq('domain', domain)
           .order('extraction_confidence', { ascending: false })
@@ -88,7 +88,7 @@ serve(async (req) => {
         console.log(`⚠️  No catalog found for domain: ${domain}`);
         // Check what domains exist
         const { data: allSchemas } = await supabase
-          .from('dealer_site_schemas')
+          .from('source_site_schemas')
           .select('domain, is_valid')
           .limit(10);
         console.log(`📋 Available catalogs:`, allSchemas);

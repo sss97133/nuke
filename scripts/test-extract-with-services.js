@@ -84,7 +84,7 @@ async function testExtractionWithServices() {
     
     // Verify catalog exists
     const { data: verifyCatalog } = await supabase
-      .from('dealer_site_schemas')
+      .from('source_site_schemas')
       .select('domain, is_valid, available_fields')
       .eq('domain', 'classic.com')
       .maybeSingle();

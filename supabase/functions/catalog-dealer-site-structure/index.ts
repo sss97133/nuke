@@ -53,7 +53,7 @@ serve(async (req) => {
     
     // Check if schema already exists
     const { data: existingSchema } = await supabase
-      .from('dealer_site_schemas')
+      .from('source_site_schemas')
       .select('*')
       .eq('domain', domain)
       .maybeSingle();
@@ -70,7 +70,7 @@ serve(async (req) => {
 
     // Step 3: Store/update schema
     const { data: savedSchema, error: saveError } = await supabase
-      .from('dealer_site_schemas')
+      .from('source_site_schemas')
       .upsert({
         domain: domain,
         site_name: extractSiteName(url),

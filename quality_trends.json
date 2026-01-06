@@ -1,0 +1,26 @@
+[
+  {
+    "timestamp": "2026-01-06T18:13:15.485Z",
+    "metrics": {
+      "total_vehicles": 50,
+      "vin_coverage": 0.58,
+      "engine_coverage": 0,
+      "transmission_coverage": 0,
+      "mileage_coverage": 0.9,
+      "description_coverage": 0.22,
+      "average_images_per_vehicle": 56.2,
+      "estimated_image_pollution_rate": 0,
+      "data_completeness_score": 0.654,
+      "extraction_accuracy_score": 0
+    },
+    "sample_info": {
+      "total_vehicles": 50,
+      "source_filter": "bat",
+      "date_range": {
+        "newest": "2025-12-29T23:49:07.581864+00:00",
+        "oldest": "2025-12-29T18:03:07.835039+00:00"
+      }
+    },
+    "source": "bat"
+  }
+]

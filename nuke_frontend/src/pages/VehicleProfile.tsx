@@ -43,7 +43,6 @@ import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
 import VehicleROISummaryCard from '../components/vehicle/VehicleROISummaryCard';
 import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
-import VehicleMemePanel from '../components/vehicle/VehicleMemePanel';
 import type { ContentActionEvent } from '../services/streamActionsService';
 // Lazy load heavy components to avoid circular dependencies
 const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/MergeProposalsPanel'));
@@ -3595,12 +3594,6 @@ const VehicleProfile: React.FC = () => {
           />
         </React.Suspense>
 
-        {/* Meme Drops (paid reactions) */}
-        {vehicle?.id && (
-          <section className="section">
-            <VehicleMemePanel vehicleId={vehicle.id} disabled={!vehicle?.isPublic && !session?.user?.id} />
-          </section>
-        )}
 
         {/* Add Organization Relationship Modal */}
         {showAddOrgRelationship && vehicle && session?.user?.id && (

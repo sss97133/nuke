@@ -2,7 +2,7 @@
 -- This ensures patterns we've learned stay with us for future extractions
 
 -- Pattern 1: Sidebar structure (Classic.com, Hagerty, etc.)
-INSERT INTO dealer_site_schemas (domain, site_name, site_type, schema_data, notes, cataloged_by)
+INSERT INTO source_site_schemas (domain, site_name, site_type, schema_data, notes, cataloged_by)
 VALUES (
   'classic.com',
   'Classic.com',
@@ -53,7 +53,7 @@ SET
   last_verified_at = NOW();
 
 -- Pattern 2: Table-based structure (Cantech Automotive, etc.)
-INSERT INTO dealer_site_schemas (domain, site_name, site_type, schema_data, notes, cataloged_by)
+INSERT INTO source_site_schemas (domain, site_name, site_type, schema_data, notes, cataloged_by)
 VALUES (
   'cantechautomotive.com',
   'Cantech Automotive',

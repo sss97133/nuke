@@ -30,7 +30,7 @@ Footer typically contains:
 1. **Scrape Classic.com Directory**
    - Source: `https://www.classic.com/data` (all dealers)
    - Extract all dealer profile URLs
-   - Store in `dealer_site_schemas` or queue table
+   - Store in `source_site_schemas` or queue table
 
 2. **Catalog Platform Types**
    - Identify platform (DealerFire, DealerSocket, custom)

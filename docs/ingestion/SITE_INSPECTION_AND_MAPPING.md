@@ -15,6 +15,7 @@ The system uses a **structure-first extraction** pattern to automatically inspec
 - **`catalog-dealer-site-structure`** - Can catalog structure and store schemas
 - **LLM (GPT-4o)** - Analyzes HTML/Markdown to identify fields
 - **Firecrawl** - Fetches rendered HTML with JavaScript executed
+- **Prompt Pack** - See [`docs/ingestion/LLM_PROMPTS.md`](./LLM_PROMPTS.md) for the exact instructions we feed Opus 4.5 and validators
 
 **Process**:
 1. **Fetch Site Content**: Uses Firecrawl to get HTML + Markdown of key pages (homepage, inventory, vehicle details)
@@ -28,7 +29,7 @@ The system uses a **structure-first extraction** pattern to automatically inspec
    - Regex patterns (e.g., `/\$([0-9,]+)/`)
    - JSON-LD structured data extraction
    - Script variable extraction
-4. **Schema Storage**: Patterns stored in `dealer_site_schemas` table for reuse
+4. **Schema Storage**: Patterns stored in `source_site_schemas` table for reuse
 
 **Output**: Complete site map with:
 - All available fields cataloged
@@ -41,7 +42,7 @@ The system uses a **structure-first extraction** pattern to automatically inspec
 **Goal**: Extract data using the cataloged structure.
 
 **Process**:
-1. **Lookup Schema**: Retrieves stored schema from `dealer_site_schemas`
+1. **Lookup Schema**: Retrieves stored schema from `source_site_schemas`
 2. **Apply Patterns**: Uses learned selectors/patterns to extract each field
 3. **Validation**: Validates completeness against required fields
 4. **Insertion**: Inserts data into database using standard insertion points
@@ -55,7 +56,7 @@ This is the **proper function** for organization ingestion. It does everything:
    ↓
 2. Learns extraction patterns adaptively
    ↓
-3. Stores patterns in dealer_site_schemas (for reuse)
+3. Stores patterns in source_site_schemas (for reuse)
    ↓
 4. Extracts all data using learned patterns
    ↓
@@ -99,7 +100,7 @@ Inspect → Catalog structure → Extract using catalog → Validate → Complet
 #    - Price: ".price", ".vehicle-price", "[data-price]"
 #    - Year/Make/Model: "h1.vehicle-title", ".vehicle-info"
 #    - Images: ".gallery img", "[data-image]"
-# 5. Stores schema in dealer_site_schemas
+# 5. Stores schema in source_site_schemas
 ```
 
 ### Step 2: Data Extraction (Automatic)
@@ -129,7 +130,7 @@ Inspect → Catalog structure → Extract using catalog → Validate → Complet
 
 **Option 2: Rebuild Using Structure-First Pattern**
 - Rebuild `ingest-org-complete` to follow the structure-first pattern
-- Use `dealer_site_schemas` for pattern storage
+- Use `source_site_schemas` for pattern storage
 - Use LLM analysis for site inspection
 - Use learned patterns for extraction
 
@@ -156,6 +157,8 @@ This will:
 5. ✅ Create vehicle profiles
 6. ✅ Link to organization
 
+See [`docs/ingestion/AGENT_PIPELINE.md`](./AGENT_PIPELINE.md) for the full mapper → validator → extraction → image QA orchestration powered by the new `ingestion_jobs` table.
+
 ### For Multiple Organizations
 
 ```bash
@@ -171,7 +174,7 @@ curl -X POST "https://YOUR_PROJECT.supabase.co/functions/v1/extract-all-orgs-inv
 
 ## Key Tables
 
-- **`dealer_site_schemas`**: Stores learned site structures and extraction patterns
+- **`source_site_schemas`**: Stores learned site structures and extraction patterns
 - **`businesses`**: Organization profiles
 - **`vehicles`**: Vehicle data
 - **`organization_vehicles`**: Links vehicles to organizations

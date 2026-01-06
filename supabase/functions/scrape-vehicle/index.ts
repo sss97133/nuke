@@ -1376,7 +1376,7 @@ serve(async (req) => {
       domain = new URL(url).hostname.replace(/^www\./, '');
       if (supabase) {
         const schemaResponse = await supabase
-          .from('dealer_site_schemas')
+          .from('source_site_schemas')
           .select('schema_data, site_name')
           .eq('domain', domain)
           .single();
