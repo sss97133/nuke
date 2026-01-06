@@ -8,11 +8,13 @@ export default function VehicleMemePanel({
   disabled,
   onMemeSelect,
   compact,
+  pickerMode,
 }: {
   vehicleId: string;
   disabled?: boolean;
   onMemeSelect?: (memeUrl: string, memeTitle: string) => void;
   compact?: boolean;
+  pickerMode?: boolean;
 }) {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -148,6 +150,51 @@ export default function VehicleMemePanel({
 
   if (imageMemes.length === 0) {
     return null;
+  }
+
+  // Picker mode: grid of memes in a popup
+  if (pickerMode) {
+    return (
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))',
+        gap: '2px',
+      }}>
+        {imageMemes.map((a) => {
+          return (
+            <button
+              key={a.id}
+              style={{
+                width: '100%',
+                aspectRatio: '1',
+                padding: 0,
+                border: '1px solid var(--border)',
+                background: 'var(--white)',
+                cursor: 'pointer',
+                overflow: 'hidden',
+              }}
+              title={a.title}
+              onClick={() => onMemeSelect?.(a.image_url!, a.title)}
+            >
+              <img
+                src={a.image_url!}
+                alt={a.title}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  display: 'block',
+                }}
+                loading="lazy"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+    );
   }
 
   // Compact mode: just a horizontal row of thumbnails, no card wrapper

@@ -599,7 +599,7 @@ serve(async (req) => {
     };
 
     // PARALLEL BATCH PROCESSING - 40x PERFORMANCE IMPROVEMENT FROM PATHETIC 30/HOUR
-    const BATCH_SIZE = 10; // Process 10 vehicles simultaneously
+    const BATCH_SIZE = 3; // Process 3 vehicles simultaneously for stability
     const EXTRACTION_TIMEOUT_MS = 120000; // 120 second timeout per extraction
 
     async function processQueueItemWithTimeout(item: any): Promise<any> {

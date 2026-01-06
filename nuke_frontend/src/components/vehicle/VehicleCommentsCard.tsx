@@ -41,8 +41,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   const [expanded, setExpanded] = useState(!collapsed);
   const [newComment, setNewComment] = useState('');
   const [posting, setPosting] = useState(false);
-  const [memesExpanded, setMemesExpanded] = useState(false);
-  const [selectedMeme, setSelectedMeme] = useState<string | null>(null);
+  const [memePickerOpen, setMemePickerOpen] = useState(false);
 
   useEffect(() => {
     loadComments();
@@ -328,7 +327,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
       if (!error) {
         setNewComment('');
-        setSelectedMeme(null);
+        setMemePickerOpen(false);
         loadComments();
       }
     } catch (err) {
@@ -342,8 +341,20 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     // Insert meme reference into comment
     const memeRef = `[meme:${memeTitle}](${memeUrl})`;
     setNewComment(prev => prev ? `${prev}\n${memeRef}` : memeRef);
-    setSelectedMeme(memeUrl);
+    setMemePickerOpen(false);
   };
+
+  // Keyboard shortcut: Ctrl+M or Cmd+M to open meme picker
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+        e.preventDefault();
+        setMemePickerOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -355,6 +366,50 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
     if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
     return date.toLocaleDateString();
+  };
+
+  const renderCommentText = (text: string) => {
+    // Parse markdown-style meme references: [meme:Title](url)
+    const memeRegex = /\[meme:([^\]]+)\]\(([^)]+)\)/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = memeRegex.exec(text)) !== null) {
+      // Add text before the meme
+      if (match.index > lastIndex) {
+        parts.push(text.substring(lastIndex, match.index));
+      }
+      
+      // Add the meme image
+      const title = match[1];
+      const url = match[2];
+      parts.push(
+        <img
+          key={match.index}
+          src={url}
+          alt={title}
+          title={title}
+          style={{
+            maxWidth: '200px',
+            maxHeight: '150px',
+            display: 'block',
+            marginTop: '4px',
+            marginBottom: '4px',
+            border: '1px solid var(--border)',
+          }}
+        />
+      );
+      
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+    
+    return parts.length > 0 ? parts : text;
   };
 
   const handleUsernameClick = async (comment: Comment) => {
@@ -556,7 +611,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         </span>
                       </div>
                       <div style={{ fontSize: '9pt', lineHeight: 1.4 }}>
-                        {comment.comment_text}
+                        {renderCommentText(comment.comment_text)}
                       </div>
                     </div>
                   </div>
@@ -568,11 +623,11 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
         {/* Add comment input */}
         {session?.user?.id && (
-          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', position: 'relative' }}>
             <textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
+              placeholder="Add a comment... (Ctrl+M for memes)"
               rows={2}
               disabled={posting}
               style={{
@@ -586,23 +641,78 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
               }}
             />
             
-            {/* Meme selector and Post button row */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-              <VehicleMemePanel 
-                vehicleId={vehicleId} 
-                disabled={disabled}
-                onMemeSelect={handleMemeSelect}
-                compact
-              />
+            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+              <button
+                className="button button-secondary"
+                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                onClick={() => setMemePickerOpen(!memePickerOpen)}
+                title="Meme picker (Ctrl+M)"
+              >
+                Memes
+              </button>
               <button
                 className="button button-primary"
-                style={{ fontSize: '8pt', padding: '4px 12px', flexShrink: 0 }}
+                style={{ fontSize: '8pt', padding: '4px 12px' }}
                 onClick={handlePostComment}
                 disabled={posting || !newComment.trim()}
               >
                 {posting ? 'Posting...' : 'Post'}
               </button>
             </div>
+
+            {/* Meme Picker Popup */}
+            {memePickerOpen && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                marginBottom: '4px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                zIndex: 1000,
+                maxHeight: '240px',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}>
+                <div style={{
+                  padding: '4px 6px',
+                  borderBottom: '1px solid var(--border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: 'var(--grey-100)',
+                }}>
+                  <span style={{ fontSize: '8pt', fontWeight: 600 }}>Select Meme</span>
+                  <button
+                    onClick={() => setMemePickerOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '8pt',
+                      padding: '2px 4px',
+                    }}
+                  >
+                    X
+                  </button>
+                </div>
+                <div style={{
+                  padding: '4px',
+                  overflowY: 'auto',
+                  flex: 1,
+                }}>
+                  <VehicleMemePanel 
+                    vehicleId={vehicleId} 
+                    disabled={disabled}
+                    onMemeSelect={handleMemeSelect}
+                    pickerMode
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
