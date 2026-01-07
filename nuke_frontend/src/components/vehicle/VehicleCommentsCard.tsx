@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleMemePanel from './VehicleMemePanel';
+import { FallbackAvatar } from '../common/AsciiAvatar';
 
 interface Comment {
   id: string;
@@ -527,34 +528,13 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                   borderLeft: isBaT ? '3px solid var(--grey-300)' : 'none'
                 }}>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                    {comment.user_avatar && (
-                      <img
-                        src={comment.user_avatar}
-                        alt=""
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          border: '1px solid var(--border)'
-                        }}
-                      />
-                    )}
-                    {!comment.user_avatar && (
-                      <div style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--grey-300)',
-                        color: 'var(--text)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '8pt',
-                        fontWeight: 600
-                      }}>
-                        {(comment.user_name || comment.author_username || 'U').charAt(0).toUpperCase()}
-                      </div>
-                    )}
+                    <FallbackAvatar
+                      src={comment.user_avatar}
+                      seed={comment.author_username || comment.user_name || comment.id || 'user'}
+                      platform={comment.source === 'bat' ? 'bat' : undefined}
+                      size={24}
+                      alt={comment.author_username || comment.user_name || 'User'}
+                    />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }}>
                         <button

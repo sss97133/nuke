@@ -36,10 +36,7 @@ Expect: VIN, mileage, color, imgs > 0, comments > 0
 
 ## Scale to 1000s of Vehicles
 
-1. **Fix queue processor**:
-   - Open `supabase/functions/process-bat-extraction-queue/index.ts`
-   - Replace `comprehensive-bat-extraction` call with two-step method
-   - See `docs/LLM_INSTRUCTIONS_SIMPLE.md` for exact code
+1. **Queue processor**: ✅ FIXED - Now uses `extract-premium-auction` + `extract-auction-comments`
 
 2. **Queue all vehicles**:
    ```sql
