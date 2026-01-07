@@ -58,3 +58,4 @@ flowchart LR
 
 Document the chosen tier in the job `payload.model_hint` so schedulers can reason about budget.
 
+

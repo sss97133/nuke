@@ -109,3 +109,4 @@ Send alerts to Slack/email with job metadata so engineers can react quickly.
 
 See `[docs/ingestion/AGENT_PIPELINE.md](./AGENT_PIPELINE.md)` for orchestration details and `[docs/ingestion/MODEL_STRATEGY.md](./MODEL_STRATEGY.md)` for cost tiers.
 
+

@@ -1,3 +1,35 @@
+-- Rename dealer_site_schemas -> source_site_schemas (and related indexes)
+
+DO $$
+BEGIN
+  IF to_regclass('public.dealer_site_schemas') IS NOT NULL
+     AND to_regclass('public.source_site_schemas') IS NULL THEN
+    EXECUTE 'ALTER TABLE dealer_site_schemas RENAME TO source_site_schemas';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF to_regclass('public.idx_dealer_site_schemas_domain') IS NOT NULL
+     AND to_regclass('public.idx_source_site_schemas_domain') IS NULL THEN
+    EXECUTE 'ALTER INDEX idx_dealer_site_schemas_domain RENAME TO idx_source_site_schemas_domain';
+  END IF;
+
+  IF to_regclass('public.idx_dealer_site_schemas_type') IS NOT NULL
+     AND to_regclass('public.idx_source_site_schemas_type') IS NULL THEN
+    EXECUTE 'ALTER INDEX idx_dealer_site_schemas_type RENAME TO idx_source_site_schemas_type';
+  END IF;
+
+  IF to_regclass('public.idx_dealer_site_schemas_valid') IS NOT NULL
+     AND to_regclass('public.idx_source_site_schemas_valid') IS NULL THEN
+    EXECUTE 'ALTER INDEX idx_dealer_site_schemas_valid RENAME TO idx_source_site_schemas_valid';
+  END IF;
+END $$;
+
+-- Ensure indexes exist regardless of rename order
+CREATE INDEX IF NOT EXISTS idx_source_site_schemas_domain ON source_site_schemas(domain);
+CREATE INDEX IF NOT EXISTS idx_source_site_schemas_type ON source_site_schemas(site_type);
+CREATE INDEX IF NOT EXISTS idx_source_site_schemas_valid ON source_site_schemas(is_valid) WHERE is_valid = true;
 -- Rename dealer_site_schemas -> source_site_schemas and expand metadata
 
 DO $$
