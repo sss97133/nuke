@@ -23,6 +23,8 @@ interface ValueProvenancePopupProps {
     final_price?: number | null;
     current_bid?: number | null;
     bid_count?: number | null;
+    view_count?: number | null;
+    watcher_count?: number | null;
     winner_name?: string | null;
     inserted_by_name?: string | null;
     inserted_at?: string | null;
@@ -70,6 +72,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   const [evidence, setEvidence] = useState<any[]>([]);
   const [batAuctionInfo, setBatAuctionInfo] = useState<{ platform?: string; platform_name?: string; url?: string; lot_number?: string; sale_date?: string } | null>(null);
   const [buyerProfileLink, setBuyerProfileLink] = useState<{ url: string; isExternal: boolean } | null>(null);
+  const [sellerProfileLink, setSellerProfileLink] = useState<{ url: string; isExternal: boolean } | null>(null);
   const [marketData, setMarketData] = useState<{ prices: number[]; mean: number; stdDev: number } | null>(null);
   
   // Helper to calculate days/years since sale
@@ -173,7 +176,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         .from('field_evidence')
         .select(`
           *,
-          profiles:auth.users(raw_user_meta_data)
+          profiles(id, raw_user_meta_data)
         `)
         .eq('vehicle_id', vehicleId)
         .eq('field_name', field)
@@ -199,7 +202,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           .from('auction_events')
           .select('metadata, auction_end_at')
           .eq('vehicle_id', vehicleId)
-          .order('auction_end_at', { ascending: false, nullsLast: true })
+          .order('auction_end_at', { ascending: false, nullsFirst: false })
           .limit(1)
           .maybeSingle();
         
@@ -208,7 +211,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           .from('external_listings')
           .select('platform, sold_at, metadata, bid_count, view_count, watcher_count, listing_url')
           .eq('vehicle_id', vehicleId)
-          .order('sold_at', { ascending: false, nullsLast: true })
+          .order('sold_at', { ascending: false, nullsFirst: false })
           .limit(1)
           .maybeSingle();
         
@@ -228,19 +231,28 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         const saleDate = listing?.sold_at || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date;
         
         // Extract lot number from URL for non-BaT platforms
-        const lotNumberFromUrl = (() => {
-          if (platform === 'mecum') {
-            const match = (listing?.listing_url || discoveryUrl).match(/\/lots\/(\d+)\//);
-            return match ? match[1] : null;
-          }
-          return null;
-        })();
+        let lotNumberFromUrl: string | null = null;
+        if (platform === 'mecum') {
+          const match = (listing?.listing_url || discoveryUrl).match(/\/lots\/(\d+)\//);
+          lotNumberFromUrl = match ? match[1] : null;
+        } else if (platform === 'bat') {
+          // Check bat_listings table for lot_number
+          const { data: batListing } = await supabase
+            .from('bat_listings')
+            .select('lot_number')
+            .eq('vehicle_id', vehicleId)
+            .limit(1)
+            .maybeSingle();
+          if (batListing?.lot_number) lotNumberFromUrl = batListing.lot_number;
+        }
         
         // Extract lot number from multiple possible sources
         const lotNumber = auctionEvent?.metadata?.lot_number ||
                          listing?.metadata?.lot_number || 
                          saleEvent?.metadata?.lot_number ||
                          lotNumberFromUrl ||
+                         (vehicle as any)?.origin_metadata?.lot_number ||
+                         (vehicle as any)?.origin_metadata?.bat_lot_number ||
                          null;
         
         // Extract seller username from multiple sources
@@ -279,13 +291,25 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             sale_date: saleDate
           };
           
+          // Get actual bid count from bat_bids table (most accurate)
+          let actualBidCount: number | null = null;
+          if (platform === 'bat') {
+            const { count: bidCount } = await supabase
+              .from('bat_bids')
+              .select('*', { count: 'exact', head: true })
+              .eq('vehicle_id', vehicleId);
+            actualBidCount = bidCount ?? null;
+          }
+          
           // Extract buyer name and seller info from metadata
           // Prefer context values (from live auction pulse) over database values (may be stale)
           auctionMetrics = {
             buyer_name: listing?.metadata?.buyer || saleEvent?.metadata?.buyer || saleEvent?.metadata?.buyer_username,
             seller_username: sellerUsername,
             seller_profile_url: sellerProfileUrl,
-            bid_count: (typeof context?.bid_count === 'number' && context.bid_count > 0) ? context.bid_count : (listing?.bid_count ?? null),
+            bid_count: (typeof context?.bid_count === 'number' && context.bid_count > 0) 
+              ? context.bid_count 
+              : (actualBidCount !== null ? actualBidCount : (listing?.bid_count ?? null)),
             view_count: (typeof context?.view_count === 'number' && context.view_count > 0) ? context.view_count : (listing?.view_count ?? null),
             watcher_count: (typeof context?.watcher_count === 'number' && context.watcher_count > 0) ? context.watcher_count : (listing?.watcher_count ?? null)
           };
@@ -294,13 +318,15 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           if (auctionMetrics.buyer_name && field === 'sale_price' && platform === 'bat') {
             const { data: buyerIdentity } = await supabase
               .from('external_identities')
-              .select('claimed_by_user_id, profile_url')
+              .select('claimed_by_user_id, profile_url, id')
               .eq('platform', 'bat')
               .eq('handle', auctionMetrics.buyer_name)
               .maybeSingle();
             
             if (buyerIdentity?.claimed_by_user_id) {
               setBuyerProfileLink({ url: `/profile/${buyerIdentity.claimed_by_user_id}`, isExternal: false });
+            } else if (buyerIdentity?.id) {
+              setBuyerProfileLink({ url: `/external-identity/${buyerIdentity.id}`, isExternal: false });
             } else {
               const batProfileUrl = buyerIdentity?.profile_url || `https://bringatrailer.com/member/${auctionMetrics.buyer_name}/`;
               const internal = `/claim-identity?platform=bat&handle=${encodeURIComponent(auctionMetrics.buyer_name)}&profileUrl=${encodeURIComponent(batProfileUrl)}`;
@@ -308,6 +334,27 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             }
           } else {
             setBuyerProfileLink(null);
+          }
+          
+          // Check if seller has linked N-Zero profile
+          if (auctionMetrics.seller_username && platform === 'bat') {
+            const { data: sellerIdentity } = await supabase
+              .from('external_identities')
+              .select('claimed_by_user_id, profile_url, id')
+              .eq('platform', 'bat')
+              .eq('handle', auctionMetrics.seller_username)
+              .maybeSingle();
+            
+            if (sellerIdentity?.claimed_by_user_id) {
+              setSellerProfileLink({ url: `/profile/${sellerIdentity.claimed_by_user_id}`, isExternal: false });
+            } else if (sellerIdentity?.id) {
+              setSellerProfileLink({ url: `/external-identity/${sellerIdentity.id}`, isExternal: false });
+            } else {
+              const proofUrl = auctionMetrics.seller_profile_url || `https://bringatrailer.com/member/${auctionMetrics.seller_username}/`;
+              setSellerProfileLink({ url: `/claim-identity?platform=bat&handle=${encodeURIComponent(auctionMetrics.seller_username)}&profileUrl=${encodeURIComponent(proofUrl)}`, isExternal: false });
+            }
+          } else {
+            setSellerProfileLink(null);
           }
         }
       }
@@ -638,67 +685,53 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 })()}
               </span>
             </div>
-            {/* Seller Username with BaT Profile Link */}
+            {/* Seller Username with Profile Link */}
             {provenance?.seller_username && (
               <div style={{ marginTop: '8px', fontSize: '8pt', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Seller:</span>
-                {(() => {
-                  const proofUrl = provenance.seller_profile_url || `https://bringatrailer.com/member/${provenance.seller_username}/`;
-                  const internal = `/claim-identity?platform=bat&handle=${encodeURIComponent(provenance.seller_username)}&profileUrl=${encodeURIComponent(proofUrl)}`;
-                  return (
-                    <>
-                      <a
-                        href={internal}
-                        style={{
-                          color: 'var(--primary)',
-                          textDecoration: 'underline',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontWeight: 600
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          navigate(internal);
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 14,
-                            height: 14,
-                            borderRadius: 999,
-                            border: '1px solid var(--border)',
-                            background: 'var(--surface)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '9px',
-                            fontWeight: 800,
-                            color: 'var(--text)',
-                            lineHeight: 1,
-                            paddingTop: 1,
-                            boxSizing: 'border-box'
-                          }}
-                          aria-hidden="true"
-                        >
-                          {String(provenance.seller_username || '').slice(0, 1).toUpperCase()}
-                        </span>
-                        {provenance.seller_username}
-                      </a>
-                      <a
-                        href={proofUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: 'var(--text-muted)', textDecoration: 'underline', fontWeight: 600 }}
-                        onClick={(e) => e.stopPropagation()}
-                        title="View source proof"
-                      >
-                        Proof
-                      </a>
-                    </>
-                  );
-                })()}
+                {sellerProfileLink ? (
+                  <a
+                    href={sellerProfileLink.url}
+                    style={{
+                      color: 'var(--primary)',
+                      textDecoration: 'underline',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontWeight: 600
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      navigate(sellerProfileLink.url);
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 999,
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '9px',
+                        fontWeight: 800,
+                        color: 'var(--text)',
+                        lineHeight: 1,
+                        paddingTop: 1,
+                        boxSizing: 'border-box'
+                      }}
+                      aria-hidden="true"
+                    >
+                      {String(provenance.seller_username || '').slice(0, 1).toUpperCase()}
+                    </span>
+                    {provenance.seller_username}
+                  </a>
+                ) : (
+                  <span>{provenance.seller_username}</span>
+                )}
               </div>
             )}
           </div>
@@ -892,21 +925,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           )}
 
           {/* Evidence (at minimum, the listing URL counts as evidence for auction telemetry) */}
-          {(context?.evidence_url || provenance?.bat_url) && (
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
-                Evidence
-              </div>
-              <a
-                href={String(context?.evidence_url || provenance?.bat_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ fontSize: '9pt', fontWeight: 700, textDecoration: 'underline' }}
-              >
-                Open listing
-              </a>
-            </div>
-          )}
+          {/* Evidence link removed - keeping users on site */}
 
           {/* Evidence Count */}
           {evidence.length > 0 && (

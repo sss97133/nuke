@@ -70,24 +70,52 @@ serve(async (req) => {
       try {
         console.log(`Processing vehicle ${item.vehicle_id} (${item.bat_url})`);
 
-        // Call comprehensive extraction
-        const { data: extractionResult, error: extractionError } = await supabase.functions.invoke(
-          'comprehensive-bat-extraction',
+        // Step 1: Extract core vehicle data (VIN, specs, images)
+        console.log(`  Step 1: Extracting core data...`);
+        const { data: coreResult, error: coreError } = await supabase.functions.invoke(
+          'extract-premium-auction',
           {
             body: {
-              batUrl: item.bat_url,
-              vehicleId: item.vehicle_id
+              url: item.bat_url,
+              max_vehicles: 1,
             }
           }
         );
 
-        if (extractionError) {
-          throw new Error(`Extraction failed: ${extractionError.message}`);
+        if (coreError) {
+          throw new Error(`extract-premium-auction failed: ${coreError.message}`);
         }
 
-        if (!extractionResult || !extractionResult.success) {
-          throw new Error(`Extraction returned failure: ${extractionResult?.error || 'Unknown error'}`);
+        if (!coreResult || !coreResult.success) {
+          throw new Error(`extract-premium-auction returned failure: ${coreResult?.error || 'Unknown error'}`);
         }
+
+        // Get vehicle_id from result (may create new or update existing)
+        const vehicleId = coreResult.created_vehicle_ids?.[0] || coreResult.updated_vehicle_ids?.[0] || item.vehicle_id;
+        console.log(`  Step 1 complete: Vehicle ID ${vehicleId}`);
+
+        // Step 2: Extract comments and bids
+        if (vehicleId) {
+          console.log(`  Step 2: Extracting comments/bids...`);
+          const { data: commentResult, error: commentError } = await supabase.functions.invoke(
+            'extract-auction-comments',
+            {
+              body: {
+                auction_url: item.bat_url,
+                vehicle_id: vehicleId,
+              }
+            }
+          );
+
+          if (commentError) {
+            // Comments extraction failure is non-critical - log but don't fail
+            console.warn(`  Step 2 warning: extract-auction-comments failed: ${commentError.message}`);
+          } else {
+            console.log(`  Step 2 complete: ${commentResult?.comments_extracted || 0} comments, ${commentResult?.bids_extracted || 0} bids`);
+          }
+        }
+
+        const extractionResult = { success: true, vehicle_id: vehicleId };
 
         // Mark as complete
         await supabase
