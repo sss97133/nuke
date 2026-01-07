@@ -123,7 +123,7 @@ const StreamingDashboard: React.FC<StreamingDashboardProps> = ({ userId, isOwnPr
   if (loading) {
     return (
       <div className="card">
-        <div className="card-body" style={{ textAlign: 'center', padding: '40px' }}>
+        <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
           <div className="text text-muted">Loading streaming dashboard...</div>
         </div>
       </div>

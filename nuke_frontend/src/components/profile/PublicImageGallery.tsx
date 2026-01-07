@@ -117,7 +117,7 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
   if (loading) {
     return (
       <div className="card">
-        <div className="card-body" style={{ textAlign: 'center', padding: '40px' }}>
+        <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
           <div className="text text-muted">Loading gallery...</div>
         </div>
       </div>
@@ -127,7 +127,7 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
   if (images.length === 0) {
     return (
       <div className="card">
-        <div className="card-body" style={{ textAlign: 'center', padding: '40px' }}>
+        <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
           <div className="text text-muted">
             {isOwnProfile ? 'No images in your gallery yet.' : 'No public images to display.'}
           </div>

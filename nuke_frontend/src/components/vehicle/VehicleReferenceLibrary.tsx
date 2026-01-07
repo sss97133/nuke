@@ -358,8 +358,8 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
   if (loadingFactory) {
     return (
       <div className="card">
-        <div className="card-body" style={{ textAlign: 'center', padding: '20px' }}>
-          <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Loading reference documents...</div>
+        <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
+          <div style={{ fontSize: 'var(--fs-8)', color: 'var(--text-secondary)' }}>Loading reference documents...</div>
         </div>
       </div>
     );
@@ -456,7 +456,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                           )}
                         </div>
                         
-                        <div className="card-body" style={{ padding: '12px' }}>
+                        <div className="card-body">
                           <div style={{ fontSize: '9pt', fontWeight: 600, marginBottom: '4px', lineHeight: 1.3 }}>
                             {book.title}
                           </div>

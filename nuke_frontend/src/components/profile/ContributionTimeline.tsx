@@ -256,7 +256,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
 
   return (
     <div className="card">
-      <div className="card-body" style={{ padding: 'var(--space-2)' }}>
+      <div className="card-body">
         {/* Compact stats row */}
         <div className="text-small" style={{ 
           display: 'flex', 

@@ -731,7 +731,7 @@ const VehicleTimeline: React.FC<{
 
   return (
     <div className="card">
-      <div className="card-body" style={{ paddingTop: '12px', position: 'relative' }}>
+      <div className="card-body" style={{ position: 'relative' }}>
 
         {/* Events auto-generated from images, receipts, work orders */}
 

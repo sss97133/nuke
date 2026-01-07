@@ -63,7 +63,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
   if (loading) {
     return (
       <div className="card">
-        <div className="card-body" style={{ textAlign: 'center', padding: '40px' }}>
+        <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
           <div className="text text-muted">Loading collection...</div>
         </div>
       </div>
@@ -73,7 +73,7 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
   if (vehicles.length === 0) {
     return (
       <div className="card">
-        <div className="card-body" style={{ textAlign: 'center', padding: '40px' }}>
+        <div className="card-body text-center" style={{ padding: 'var(--space-6)' }}>
           <div className="text text-muted">
             {isOwnProfile ? 'No vehicles in your collection yet.' : 'No public vehicles to display.'}
           </div>
