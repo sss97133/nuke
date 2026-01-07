@@ -115,3 +115,4 @@ CREATE INDEX IF NOT EXISTS idx_supplier_refs_status ON supplier_references(statu
 
 COMMENT ON TABLE supplier_references IS 'Mentions of suppliers/partners discovered on source sites (awaiting linkage)';
 
+

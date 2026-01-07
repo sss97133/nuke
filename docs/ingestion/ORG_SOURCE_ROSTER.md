@@ -98,3 +98,4 @@ Use this list to trigger the mapping agent (Opus 4.5) for first-time schema crea
 - As new ingestion tables (e.g., `ingestion_jobs`, `schema_proposals`) come online, extend these snippets so agents can quickly identify backlog segments.
 
 
+

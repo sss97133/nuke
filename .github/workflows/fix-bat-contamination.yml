@@ -1,0 +1,28 @@
+name: Fix BaT Contamination
+
+on:
+  workflow_dispatch:
+    inputs:
+      vehicle_id:
+        description: Vehicle ID to clean (single)
+        required: true
+        default: cde8da51-2b3b-4d82-8ca4-11e6f95d7928
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call edge function (apply + rehydrate)
+        env:
+          SERVICE_ROLE_JWT: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VEHICLE_ID: ${{ github.event.inputs.vehicle_id }}
+        run: |
+          if [ -z "$SERVICE_ROLE_JWT" ]; then
+            echo "Missing SUPABASE_SERVICE_ROLE_KEY secret"; exit 1; fi
+          curl -s -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/fix-vehicle-contamination" \
+            -H "Authorization: Bearer $SERVICE_ROLE_JWT" \
+            -H "Content-Type: application/json" \
+            -d "{\"vehicle_id\":\"$VEHICLE_ID\",\"apply\":true,\"rehydrate\":true}" \
+            -o response.json
+          cat response.json
+

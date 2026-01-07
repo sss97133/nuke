@@ -15,10 +15,10 @@ serve(async (req) => {
 
     // Test all possible Claude API key names
     const claudeKeys = {
-      'anthropic_api_key': Deno.env.get('anthropic_api_key'),
-      'NUKE_CLAUDE_API': Deno.env.get('NUKE_CLAUDE_API'),
-      'ANTHROPIC_API_KEY': Deno.env.get('ANTHROPIC_API_KEY'),
-      'CLAUDE_API_KEY': Deno.env.get('CLAUDE_API_KEY'),
+      'anthropic_api_key': (Deno.env.get('anthropic_api_key') ?? '').trim(),
+      'NUKE_CLAUDE_API': (Deno.env.get('NUKE_CLAUDE_API') ?? '').trim(),
+      'ANTHROPIC_API_KEY': (Deno.env.get('ANTHROPIC_API_KEY') ?? '').trim(),
+      'CLAUDE_API_KEY': (Deno.env.get('CLAUDE_API_KEY') ?? '').trim(),
     };
 
     // Test Firecrawl key
@@ -44,12 +44,12 @@ serve(async (req) => {
         const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${workingClaudeKey}`,
+            'x-api-key': workingClaudeKey,
             'Content-Type': 'application/json',
             'anthropic-version': '2023-06-01'
           },
           body: JSON.stringify({
-            model: 'claude-3-sonnet-20240229',
+            model: 'claude-3-haiku-20240307',
             max_tokens: 50,
             messages: [{
               role: 'user',
