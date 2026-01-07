@@ -44,7 +44,7 @@
 
 ## How to Extract a BaT Vehicle (Exact Steps)
 
-### Method 1: Manual Extraction (Two API Calls)
+### Method 1: Manual Extraction (Two API Calls) ✅ PROVEN
 
 ```bash
 # Step 1: Extract core vehicle data
@@ -68,14 +68,14 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/extract-auct
   }'
 ```
 
-### Method 2: Using the Script
+### Method 2: Using the Script ✅ PROVEN
 
 ```bash
 # One command, does both steps automatically
 ./scripts/extract-bat-vehicle.sh "https://bringatrailer.com/listing/1969-chevrolet-c10-pickup-193/"
 ```
 
-### Method 3: Using the Orchestrator (Single API Call)
+### Method 3: Using the Orchestrator (Single API Call) ⚠️ NEEDS TESTING
 
 ```bash
 # One API call, orchestrates both functions internally
@@ -87,7 +87,9 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/bat-extract-
   }'
 ```
 
-**Note**: The orchestrator (`bat-extract-complete-v1`) was updated to call both functions internally but **has not been tested yet**. Use Method 1 or 2 until orchestrator is verified.
+**Status**: Orchestrator code updated (2026-01-07) to use direct HTTP fetch with service role key. **Not yet tested** - needs verification that Edge Function secrets contain correct service role key.
+
+**Known Issue**: When testing from command line, the orchestrator gets 401 errors because it needs the actual service role key (not anon key) from Edge Function secrets. The function should work when called from within Supabase infrastructure.
 
 ---
 
@@ -145,7 +147,7 @@ WHERE v.discovery_url = 'YOUR_BAT_URL';
 |--------------|---------|--------|
 | `extract-premium-auction` | Core vehicle data extraction (VIN, specs, images) | ✅ PRODUCTION |
 | `extract-auction-comments` | Comments and bids extraction | ✅ PRODUCTION |
-| `bat-extract-complete-v1` | Orchestrator (calls both functions) | ⚠️ UPDATED (needs testing) |
+| `bat-extract-complete-v1` | Orchestrator (calls both functions) | ⚠️ UPDATED (needs testing with correct service role key) |
 
 ---
 
@@ -254,6 +256,17 @@ WHERE id = 'YOUR_VEHICLE_ID';
 
 **Not a bug**: This is the cost of complete, accurate extraction.
 
+### Issue 4: Orchestrator Authentication (401 Errors)
+
+**Problem**: When testing orchestrator from command line, it gets 401 errors.
+
+**Root Cause**: The orchestrator uses `Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")` which should be set in Edge Function secrets. When testing from command line, we're using anon key which doesn't work for function-to-function calls.
+
+**Solution**: 
+- The orchestrator should work when called from within Supabase infrastructure (cron jobs, other functions)
+- For manual testing, use Method 1 (two-step) or Method 2 (script) which are proven to work
+- Verify Edge Function secrets contain the correct service role key (should have `"role":"service_role"` in JWT)
+
 ---
 
 ## Migration Path (How to Switch to This System)
@@ -281,11 +294,11 @@ If using `process-bat-extraction-queue`, update it to call:
 Test `bat-extract-complete-v1` on a known-good BaT listing:
 ```bash
 curl -X POST "https://YOUR_PROJECT.supabase.co/functions/v1/bat-extract-complete-v1" \
-  -H "Authorization: Bearer YOUR_KEY" \
+  -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY" \
   -d '{"url": "https://bringatrailer.com/listing/1969-chevrolet-c10-pickup-193/"}'
 ```
 
-Verify it extracts the same data as the manual two-step process.
+**Note**: Must use actual service role key (not anon key). Verify it works, then mark as ✅ PRODUCTION.
 
 ### Step 4: Update Documentation
 
@@ -316,7 +329,7 @@ An orchestrator should:
 
 - ✅ `extract-premium-auction`: Micro-extractor for core vehicle data
 - ✅ `extract-auction-comments`: Micro-extractor for comments/bids
-- ⚠️ `bat-extract-complete-v1`: Orchestrator (updated, needs testing)
+- ⚠️ `bat-extract-complete-v1`: Orchestrator (updated 2026-01-07, needs testing with correct service role key)
 
 ---
 
@@ -372,6 +385,8 @@ FROM vehicles v WHERE v.discovery_url = 'BAT_URL';
 | 2026-01-07 | System proven on C10 (Lot #225,895) | First successful complete extraction |
 | 2026-01-07 | Updated `bat-extract-complete-v1` to be orchestrator | Single-trigger requirement |
 | 2026-01-07 | Created this documentation | Lock down proven system |
+| 2026-01-07 | Fixed orchestrator to use direct HTTP fetch | Function-to-function auth issue |
+| 2026-01-07 | Orchestrator deployed but needs testing | Verify with correct service role key |
 
 ---
 
@@ -382,4 +397,3 @@ FROM vehicles v WHERE v.discovery_url = 'BAT_URL';
 4. Getting user approval
 
 Any LLM continuing this work should read this document first and follow it exactly.
-
