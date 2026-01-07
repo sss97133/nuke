@@ -95,8 +95,10 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ profileUserId }) => 
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
-        Loading auction track record...
+      <div className="card">
+        <div className="card-body text-center" style={{ padding: 'var(--space-6)', color: 'var(--text-secondary)' }}>
+          Loading auction track record...
+        </div>
       </div>
     );
   }
@@ -141,9 +143,11 @@ export const PublicAuctionTrackRecord: React.FC<Props> = ({ profileUserId }) => 
       </div>
 
       {vehicles.length === 0 ? (
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
-          <div style={{ fontSize: '18px', marginBottom: '10px' }}>No Public Auctions Found</div>
-          <div style={{ fontSize: '14px' }}>This profile has no Bring a Trailer auctions linked yet.</div>
+        <div className="card">
+          <div className="card-body text-center" style={{ padding: 'var(--space-6)', color: 'var(--text-secondary)' }}>
+            <div style={{ fontSize: 'var(--fs-11)', marginBottom: 'var(--space-2)', fontWeight: 'bold' }}>No Public Auctions Found</div>
+            <div style={{ fontSize: 'var(--fs-10)' }}>This profile has no Bring a Trailer auctions linked yet.</div>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 'var(--space-4)' }}>

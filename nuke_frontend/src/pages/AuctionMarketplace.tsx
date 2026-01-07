@@ -658,11 +658,11 @@ export default function AuctionMarketplace() {
           <div className="card">
             <div className="card-body">
               {loading ? (
-                <div style={{ textAlign: 'center', padding: '40px 0', fontSize: '9pt', color: 'var(--text-muted)' }}>
+                <div className="text-center" style={{ padding: 'var(--space-6) 0', fontSize: 'var(--fs-9)', color: 'var(--text-secondary)' }}>
                   Loading auctions...
                 </div>
               ) : filteredListings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <div className="text-center" style={{ padding: 'var(--space-6) 0' }}>
                   <div style={{ fontSize: '10pt', marginBottom: '8px' }}>
                     {includeNoBidAuctions ? 'No live auctions found' : 'No auctions with bids found'}
                   </div>
