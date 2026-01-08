@@ -1,0 +1,228 @@
+/**
+ * SELECT PROCESSOR
+ * 
+ * Intelligently selects the best processor function for an import_queue item
+ * based on URL patterns, source metadata, and other factors.
+ * 
+ * This centralizes routing logic and makes it easy to add new sources.
+ */
+
+export interface ProcessorSelection {
+  functionName: string;
+  parameters: Record<string, any>;
+  reason: string;
+  priority: number; // Lower = higher priority
+}
+
+export interface QueueItem {
+  id?: string;
+  listing_url: string;
+  raw_data?: Record<string, any>;
+  source_id?: string;
+  listing_title?: string;
+  listing_year?: number;
+  listing_make?: string;
+  listing_model?: string;
+}
+
+/**
+ * Selects the best processor for an import_queue item
+ */
+export function selectProcessor(item: QueueItem): ProcessorSelection {
+  const url = (item.listing_url || '').toLowerCase();
+  const rawData = item.raw_data || {};
+  const source = (rawData.source || '').toLowerCase();
+
+  // ============================================================================
+  // BHCC (Beverly Hills Car Club) - BHCC-specific processor
+  // ============================================================================
+  if (url.includes('beverlyhillscarclub.com')) {
+    return {
+      functionName: 'process-bhcc-queue',
+      parameters: {
+        batch_size: 10,
+        external_images_only: true,
+        max_external_images: 18,
+        source_id: item.source_id || undefined,
+      },
+      reason: 'BHCC-specific processor (optimized for beverlyhillscarclub.com)',
+      priority: 1,
+    };
+  }
+
+  // ============================================================================
+  // BaT (Bring a Trailer) - Proven two-step extraction workflow
+  // Uses: extract-premium-auction (core data) + extract-auction-comments (comments/bids)
+  // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+  // ============================================================================
+  if (url.includes('bringatrailer.com') || source.includes('bat') || source.includes('bring')) {
+    return {
+      functionName: 'process-bat-from-import-queue', // Special handler for BaT items in import_queue
+      parameters: {
+        listing_url: item.listing_url,
+        queue_id: item.id,
+      },
+      reason: 'BaT proven two-step workflow: extract-premium-auction + extract-auction-comments',
+      priority: 2,
+    };
+  }
+
+  // ============================================================================
+  // KSL - KSL-specific processor (if exists)
+  // ============================================================================
+  if (url.includes('ksl.com') || source.includes('ksl')) {
+    return {
+      functionName: 'process-import-queue', // TODO: Create process-ksl-queue when process-import-queue is fixed
+      parameters: {
+        batch_size: 5,
+        fast_mode: true,
+        skip_image_upload: false,
+      },
+      reason: 'KSL listings (fallback to process-import-queue until KSL-specific processor exists)',
+      priority: 3,
+    };
+  }
+
+  // ============================================================================
+  // Classic.com - Auction house
+  // ============================================================================
+  if (url.includes('classic.com') || source.includes('classic')) {
+    return {
+      functionName: 'import-classic-auction',
+      parameters: {
+        url: item.listing_url,
+      },
+      reason: 'Classic.com auction house importer',
+      priority: 2,
+    };
+  }
+
+  // ============================================================================
+  // PCArmarket
+  // ============================================================================
+  if (url.includes('pcarmarket.com') || source.includes('pcarmarket')) {
+    return {
+      functionName: 'import-pcarmarket-listing',
+      parameters: {
+        url: item.listing_url,
+      },
+      reason: 'PCArmarket importer',
+      priority: 2,
+    };
+  }
+
+  // ============================================================================
+  // SBX Cars
+  // ============================================================================
+  if (url.includes('sbxcars.com') || source.includes('sbx')) {
+    return {
+      functionName: 'process-import-queue', // SBX scraper already populates import_queue
+      parameters: {
+        batch_size: 10,
+        fast_mode: true,
+        source_id: item.source_id || undefined,
+      },
+      reason: 'SBX Cars (processed via process-import-queue)',
+      priority: 4,
+    };
+  }
+
+  // ============================================================================
+  // DuPont Registry
+  // ============================================================================
+  if (url.includes('dupontregistry.com') || source.includes('dupont')) {
+    return {
+      functionName: 'process-import-queue',
+      parameters: {
+        batch_size: 5,
+        fast_mode: false, // DuPont needs full extraction
+      },
+      reason: 'DuPont Registry (full extraction needed)',
+      priority: 3,
+    };
+  }
+
+  // ============================================================================
+  // Mecum Auctions
+  // ============================================================================
+  if (url.includes('mecum.com') || source.includes('mecum')) {
+    return {
+      functionName: 'process-import-queue', // Mecum has dedicated scraper but uses import_queue
+      parameters: {
+        batch_size: 5,
+        fast_mode: false,
+      },
+      reason: 'Mecum Auctions (via process-import-queue)',
+      priority: 3,
+    };
+  }
+
+  // ============================================================================
+  // Dealer inventory (generic)
+  // ============================================================================
+  if (rawData.inventory_extraction === true || rawData.organization_id) {
+    return {
+      functionName: 'process-import-queue',
+      parameters: {
+        batch_size: 10,
+        fast_mode: true,
+        source_id: item.source_id || undefined,
+      },
+      reason: 'Dealer inventory extraction (organization-linked)',
+      priority: 4,
+    };
+  }
+
+  // ============================================================================
+  // Default / Unknown - Try generic processor
+  // ============================================================================
+  return {
+    functionName: 'process-import-queue',
+    parameters: {
+      batch_size: 5,
+      fast_mode: true,
+      skip_image_upload: false,
+    },
+    reason: `Unknown source (${url.substring(0, 50)}...), using generic processor`,
+    priority: 10, // Lowest priority
+  };
+}
+
+/**
+ * Groups queue items by their selected processor
+ */
+export function groupByProcessor(items: QueueItem[]): Map<string, QueueItem[]> {
+  const groups = new Map<string, QueueItem[]>();
+
+  for (const item of items) {
+    const selection = selectProcessor(item);
+    const key = selection.functionName;
+    
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(item);
+  }
+
+  return groups;
+}
+
+/**
+ * Gets a summary of processor distribution
+ */
+export function getProcessorSummary(items: QueueItem[]): Record<string, { count: number; reason: string }> {
+  const summary: Record<string, { count: number; reason: string }> = {};
+  
+  for (const item of items) {
+    const selection = selectProcessor(item);
+    const key = selection.functionName;
+    
+    if (!summary[key]) {
+      summary[key] = { count: 0, reason: selection.reason };
+    }
+    summary[key].count++;
+  }
+  
+  return summary;
+}
+

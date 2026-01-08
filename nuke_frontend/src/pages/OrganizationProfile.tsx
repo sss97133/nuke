@@ -868,10 +868,11 @@ export default function OrganizationProfile() {
           const nowDate = now.split('T')[0];
           
           // Batch load all vehicles, images, and auctions at once
-          const [allVehicles, allImages, allNativeAuctions, allExternalAuctions, allBatAuctions] = await Promise.all([
+          // Load ACTIVE auctions for display AND SOLD/ENDED listings for sold detection
+          const [allVehicles, allImages, allNativeAuctions, allExternalAuctions, allBatAuctions, soldExternalListings, soldBatListings, endedVehicleListings, allExternalListings] = await Promise.all([
             vehicleIds.length > 0 ? supabase
               .from('vehicles')
-              .select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score')
+              .select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome')
               .in('id', vehicleIds) : { data: [], error: null },
             vehicleIds.length > 0 ? supabase
               .from('vehicle_images')
@@ -895,7 +896,30 @@ export default function OrganizationProfile() {
               .from('bat_listings')
               .select('vehicle_id, id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url')
               .in('vehicle_id', vehicleIds)
-              .gt('auction_end_date', nowDate) : { data: [], error: null }
+              .gt('auction_end_date', nowDate) : { data: [], error: null },
+            // NEW: Load SOLD external listings for comprehensive sold detection
+            vehicleIds.length > 0 ? supabase
+              .from('external_listings')
+              .select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, final_price, sold_at, platform')
+              .in('vehicle_id', vehicleIds)
+              .eq('listing_status', 'sold') : { data: [], error: null },
+            // NEW: Load SOLD/ENDED bat listings
+            vehicleIds.length > 0 ? supabase
+              .from('bat_listings')
+              .select('vehicle_id, id, organization_id, listing_status, auction_end_date, final_bid')
+              .in('vehicle_id', vehicleIds)
+              .in('listing_status', ['sold', 'ended']) : { data: [], error: null },
+            // NEW: Load ENDED vehicle listings (past end date implies sold/ended)
+            vehicleIds.length > 0 ? supabase
+              .from('vehicle_listings')
+              .select('vehicle_id, id, status, auction_end_time')
+              .in('vehicle_id', vehicleIds)
+              .lte('auction_end_time', now) : { data: [], error: null },
+            // NEW: Load ALL external listings (to check for ended auctions)
+            vehicleIds.length > 0 ? supabase
+              .from('external_listings')
+              .select('vehicle_id, id, listing_status, end_date')
+              .in('vehicle_id', vehicleIds) : { data: [], error: null }
           ]);
           
           // Build lookup maps for O(1) access
@@ -909,6 +933,19 @@ export default function OrganizationProfile() {
           const nativeAuctionsByVehicleId = new Map((allNativeAuctions.data || []).map(a => [a.vehicle_id, a]));
           const externalAuctionsByVehicleId = new Map((allExternalAuctions.data || []).map(a => [a.vehicle_id, a]));
           const batAuctionsByVehicleId = new Map((allBatAuctions.data || []).map(a => [a.vehicle_id, a]));
+          
+          // NEW: Maps for sold/ended listings
+          const soldExternalListingsByVehicleId = new Map((soldExternalListings.data || []).map((a: any) => [a.vehicle_id, a]));
+          const soldBatListingsByVehicleId = new Map((soldBatListings.data || []).map((a: any) => [a.vehicle_id, a]));
+          const endedVehicleListingsByVehicleId = new Map((endedVehicleListings.data || []).map((a: any) => [a.vehicle_id, a]));
+          // Map of all external listings by vehicle_id to check for ended auctions
+          const allExternalListingsByVehicleId = new Map<string, any[]>();
+          (allExternalListings.data || []).forEach((listing: any) => {
+            if (!allExternalListingsByVehicleId.has(listing.vehicle_id)) {
+              allExternalListingsByVehicleId.set(listing.vehicle_id, []);
+            }
+            allExternalListingsByVehicleId.get(listing.vehicle_id)!.push(listing);
+          });
           
           // Enrich vehicles using pre-loaded data
           const enriched = (orgVehicles || []).map((ov: any) => {
@@ -985,9 +1022,71 @@ export default function OrganizationProfile() {
                 };
               }
               
-              // Use vehicle's sale data if org_vehicle doesn't have it
-              const finalSaleDate = ov.sale_date || vehicle?.sale_date;
-              const finalSalePrice = ov.sale_price || vehicle?.sale_price;
+              // COMPREHENSIVE SOLD DETECTION - Check all possible sources
+              const soldExternalListing = soldExternalListingsByVehicleId.get(ov.vehicle_id);
+              const soldBatListing = soldBatListingsByVehicleId.get(ov.vehicle_id);
+              const endedVehicleListing = endedVehicleListingsByVehicleId.get(ov.vehicle_id);
+              
+              // Check for ended external listings (past end date)
+              const externalListingsForVehicle = allExternalListingsByVehicleId.get(ov.vehicle_id) || [];
+              const hasEndedExternalListing = externalListingsForVehicle.some((listing: any) => {
+                if (!listing.end_date) return false;
+                const endDate = new Date(listing.end_date).getTime();
+                const isEnded = endDate <= Date.now();
+                return isEnded && (listing.listing_status === 'sold' || listing.listing_status === 'ended' || !listing.listing_status || listing.listing_status === 'active');
+              });
+              
+              // Comprehensive sold detection
+              const isSold = 
+                // From organization_vehicles
+                ov.status === 'sold' ||
+                ov.listing_status === 'sold' ||
+                Boolean(ov.sale_date) ||
+                Boolean(ov.sale_price) ||
+                
+                // From vehicles table
+                vehicle?.sale_status === 'sold' ||
+                Boolean(vehicle?.sale_date) ||
+                Boolean(vehicle?.sale_price) ||
+                vehicle?.auction_outcome === 'sold' ||
+                
+                // From external_listings (SOLD)
+                soldExternalListing?.listing_status === 'sold' ||
+                Boolean(soldExternalListing?.final_price) ||
+                Boolean(soldExternalListing?.sold_at) ||
+                
+                // From bat_listings (SOLD)
+                soldBatListing?.listing_status === 'sold' ||
+                Boolean(soldBatListing?.final_bid) ||
+                
+                // From vehicle_listings (ENDED - implied sold if ended)
+                Boolean(endedVehicleListing) ||
+                
+                // Check if any external listing has ended (past end date implies sold/ended)
+                hasEndedExternalListing ||
+                
+                // Check if active auctions have ended (past end date)
+                (externalAuction && new Date(externalAuction.end_date).getTime() <= Date.now() && externalAuction.listing_status !== 'active') ||
+                (batAuction && new Date(batAuction.auction_end_date).getTime() <= Date.now() && batAuction.listing_status !== 'sold' && batAuction.listing_status !== 'ended');
+              
+              // Use sold listing data to fill in missing sale info
+              let finalSaleDate = ov.sale_date || vehicle?.sale_date;
+              let finalSalePrice = ov.sale_price || vehicle?.sale_price;
+              
+              if (!finalSaleDate && soldExternalListing) {
+                finalSaleDate = soldExternalListing.sold_at || soldExternalListing.end_date;
+              }
+              if (!finalSalePrice && soldExternalListing) {
+                finalSalePrice = soldExternalListing.final_price || soldExternalListing.current_bid;
+              }
+              
+              if (!finalSalePrice && soldBatListing) {
+                finalSalePrice = soldBatListing.final_bid;
+              }
+              
+              if (!finalSaleDate && soldBatListing && soldBatListing.auction_end_date) {
+                finalSaleDate = soldBatListing.auction_end_date;
+              }
               
               const vehicleLocation =
                 (auctionData?.vehicle_location as string | null) ||
@@ -1026,6 +1125,7 @@ export default function OrganizationProfile() {
                 cost_basis: ov.cost_basis,
                 days_on_lot: ov.days_on_lot,
                 has_active_auction: !!auctionListing, // Flag for sorting
+                is_sold: isSold, // NEW: Comprehensive sold flag
                 auction_end_time: auctionData?.auction_end_time || null,
                 auction_current_bid: auctionData?.auction_current_bid || null,
                 auction_bid_count: auctionData?.auction_bid_count || 0,
@@ -1531,6 +1631,21 @@ export default function OrganizationProfile() {
                 }}
               />
             )}
+            {/* Show BaT logo for larger displays even if headerLogoUrl fails */}
+            {isBatOrg && !headerLogoUrl && (
+              <img
+                src="/vendor/bat/favicon.ico"
+                alt="Bring a Trailer"
+                width={89}
+                height={37}
+                style={{
+                  display: 'block',
+                  maxWidth: 120,
+                  height: 'auto',
+                  imageRendering: 'auto'
+                }}
+              />
+            )}
             {/* Favicon from website - show if no logo or as additional identifier */}
             {organization.website && (
               <FaviconIcon 
@@ -2014,8 +2129,15 @@ export default function OrganizationProfile() {
                         return false;
                       }
                       
-                      // Exclude sold/completed service vehicles
-                      const isSold = v.sale_date || v.sale_price || v.vehicle_sale_status === 'sold';
+                      // Exclude sold/completed service vehicles - use comprehensive sold detection
+                      const isSold = (v as any).is_sold || // Primary comprehensive flag
+                        v.sale_date || 
+                        v.sale_price || 
+                        v.vehicle_sale_status === 'sold' ||
+                        v.listing_status === 'sold' ||
+                        (v.vehicles && (v.vehicles as any).sale_price) ||
+                        (v.vehicles && (v.vehicles as any).sale_date) ||
+                        (v.vehicles && (v.vehicles as any).auction_outcome === 'sold');
                       return !isSold;
                     });
                     
@@ -2052,14 +2174,13 @@ export default function OrganizationProfile() {
                   
                   // Filter vehicles that are current inventory (not sold, active)
                   // Show vehicles that are:
-                  // 1. Not sold - check multiple indicators: sale_date, sale_price, vehicle_sale_status, status
-                  // 2. Active status
+                  // 1. Not sold - comprehensive detection from all sources
+                  // 2. Active status (not sold/archived)
                   // 3. Relationship type indicates inventory/for sale (not service/work vehicles)
                   // 4. EXCLUDE vehicles with active auctions (those are shown above)
-                  // 5. Preferably listing_status = 'for_sale' but include all active non-sold inventory vehicles
                   const productsForSale = vehicles.filter(v => {
-                    // Must be active
-                    if (v.status !== 'active') return false;
+                    // Must be active (not sold/archived status)
+                    if (v.status === 'sold' || v.status === 'archived') return false;
                     
                     // EXCLUDE vehicles with active auctions - they're shown in separate section above
                     if (v.has_active_auction) return false;
@@ -2087,14 +2208,15 @@ export default function OrganizationProfile() {
                       return false;
                     }
                     
-                    // Check all sold indicators
-                    const isSold = 
+                    // COMPREHENSIVE SOLD DETECTION - use the flag set during enrichment
+                    const isSold = (v as any).is_sold || // Primary comprehensive flag
                       v.sale_date || // Has sale date
                       v.sale_price || // Has sale price
                       v.vehicle_sale_status === 'sold' || // Vehicle marked as sold
                       v.listing_status === 'sold' || // Listing status says sold
                       (v.vehicles && (v.vehicles as any).sale_price) || // Vehicle has sale_price
-                      (v.vehicles && (v.vehicles as any).sale_date); // Vehicle has sale_date
+                      (v.vehicles && (v.vehicles as any).sale_date) || // Vehicle has sale_date
+                      (v.vehicles && (v.vehicles as any).auction_outcome === 'sold'); // Auction outcome is sold
                     
                     return !isSold;
                   });

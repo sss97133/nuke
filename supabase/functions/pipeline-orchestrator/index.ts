@@ -14,6 +14,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { selectProcessor, groupByProcessor, getProcessorSummary, type QueueItem } from '../_shared/select-processor.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -183,43 +184,191 @@ serve(async (req) => {
     if (!skipQueues) {
       console.log('\n⚙️  Step 3: Processing queues...');
 
-      // 3a. Drain import_queue (raw listings → vehicle profiles)
-      console.log('   Processing import_queue...');
+      // 3a. Route import_queue items using intelligent processor selection
+      console.log('   Routing import_queue using processor selection...');
       try {
-        // Call via direct fetch with explicit auth header (supabase client invoke doesn't always forward JWT from edge env)
         const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
         const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-        
-        // Use process-import-queue-fast (working alternative) while process-import-queue has BOOT_ERROR
-        // Fire-and-forget: don't wait for import_queue to finish (can take minutes)
-        fetch(`${SUPABASE_URL}/functions/v1/process-import-queue-fast`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SERVICE_KEY}`,
-          },
-          body: JSON.stringify({
-            batch_size: 10,
-            external_images_only: true,
-            max_external_images: 18,
-          }),
-        }).then(async (resp) => {
-          if (!resp.ok) {
-            console.error(`   [async] import_queue_fast HTTP ${resp.status}`);
-            return;
+
+        // Query pending items to determine routing
+        const { data: pendingItems, error: queueError } = await supabase
+          .from('import_queue')
+          .select('id, listing_url, raw_data, source_id, listing_title, listing_year, listing_make, listing_model')
+          .eq('status', 'pending')
+          .limit(100); // Sample first 100 to determine distribution
+
+        if (queueError) {
+          throw new Error(`Failed to query import_queue: ${queueError.message}`);
+        }
+
+        if (!pendingItems || pendingItems.length === 0) {
+          console.log(`   ℹ️  No pending items in import_queue`);
+          result.import_queue_processed = 0;
+        } else {
+          // Use intelligent processor selection
+          const summary = getProcessorSummary(pendingItems as QueueItem[]);
+          console.log(`   📊 Processor distribution:`);
+          for (const [funcName, info] of Object.entries(summary)) {
+            console.log(`      ${funcName}: ${info.count} items (${info.reason})`);
           }
-          const res = await resp.json();
-          console.log(`   [async] import_queue_fast: ${res.created || 0} created, ${res.updated || 0} updated`);
-        }).catch(e => {
-          console.error(`   [async] import_queue_fast error: ${e.message}`);
-        });
-        
-        result.import_queue_processed = -1; // -1 indicates async (result not known yet)
-        console.log(`   ✅ import_queue_fast triggered (async, batch_size=10)`);
+
+          // Group items by selected processor
+          const groups = groupByProcessor(pendingItems as QueueItem[]);
+
+          // Process each group by its selected function
+          for (const [functionName, items] of groups.entries()) {
+            if (items.length === 0) continue;
+
+            // Get selection details from first item (all items in group use same processor)
+            const selection = selectProcessor(items[0]);
+
+            console.log(`   🎯 Routing ${items.length} items to ${functionName}...`);
+
+            // Special handling for batch processors vs per-item processors
+            if (functionName === 'process-bhcc-queue' || functionName === 'process-import-queue') {
+              // Batch processors: call once with batch_size
+              fetch(`${SUPABASE_URL}/functions/v1/${functionName}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${SERVICE_KEY}`,
+                },
+                body: JSON.stringify({
+                  ...selection.parameters,
+                  batch_size: Math.min(items.length, selection.parameters.batch_size || 10),
+                }),
+              }).then(async (resp) => {
+                if (!resp.ok) {
+                  console.error(`   [async] ${functionName} HTTP ${resp.status}`);
+                  return;
+                }
+                const res = await resp.json();
+                console.log(`   [async] ${functionName}: ${res.created || res.processed || 0} processed`);
+              }).catch(e => {
+                console.error(`   [async] ${functionName} error: ${e.message}`);
+              });
+            } else if (functionName === 'process-bat-from-import-queue') {
+              // BaT items: Use proven two-step workflow (extract-premium-auction + extract-auction-comments)
+              // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+              const batch = items.slice(0, 2); // Process max 2 per cycle (BaT extractions take 30-60s each)
+              
+              Promise.all(batch.map(async (item) => {
+                try {
+                  const listingUrl = item.listing_url;
+                  
+                  // Step 1: Extract core vehicle data (VIN, specs, images)
+                  console.log(`   [async] BaT Step 1: extract-premium-auction for ${listingUrl.substring(0, 60)}...`);
+                  const step1Resp = await fetch(`${SUPABASE_URL}/functions/v1/extract-premium-auction`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${SERVICE_KEY}`,
+                    },
+                    body: JSON.stringify({
+                      url: listingUrl,
+                      max_vehicles: 1,
+                    }),
+                  });
+
+                  if (!step1Resp.ok) {
+                    throw new Error(`Step 1 failed: HTTP ${step1Resp.status}`);
+                  }
+
+                  const step1Result = await step1Resp.json();
+                  const vehicleId = step1Result.created_vehicle_ids?.[0] || step1Result.updated_vehicle_ids?.[0];
+
+                  if (!vehicleId) {
+                    throw new Error('No vehicle_id returned from extract-premium-auction');
+                  }
+
+                  // Step 2: Extract comments and bids
+                  console.log(`   [async] BaT Step 2: extract-auction-comments for vehicle ${vehicleId}`);
+                  const step2Resp = await fetch(`${SUPABASE_URL}/functions/v1/extract-auction-comments`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${SERVICE_KEY}`,
+                    },
+                    body: JSON.stringify({
+                      auction_url: listingUrl,
+                      vehicle_id: vehicleId,
+                    }),
+                  });
+
+                  if (!step2Resp.ok) {
+                    console.warn(`   [async] BaT Step 2 warning: extract-auction-comments failed (non-critical): HTTP ${step2Resp.status}`);
+                  }
+
+                  // Mark queue item as complete
+                  await supabase
+                    .from('import_queue')
+                    .update({
+                      status: 'complete',
+                      vehicle_id: vehicleId,
+                      processed_at: new Date().toISOString(),
+                    })
+                    .eq('id', item.id);
+
+                  console.log(`   [async] BaT extraction complete for ${item.id}: vehicle ${vehicleId}`);
+                } catch (e: any) {
+                  console.error(`   [async] BaT extraction error for ${item.id}: ${e.message}`);
+                  // Don't mark as failed yet - will retry on next cycle
+                }
+              })).then(() => {
+                console.log(`   [async] BaT: processed ${batch.length}/${items.length} items`);
+              }).catch(e => {
+                console.error(`   [async] BaT batch error: ${e.message}`);
+              });
+            } else if (functionName === 'import-classic-auction' || functionName === 'import-pcarmarket-listing') {
+              // Other per-item processors: process items individually (limit batch size to avoid overwhelming)
+              const batch = items.slice(0, 3); // Process max 3 per cycle for per-item processors
+              
+              Promise.all(batch.map(async (item) => {
+                try {
+                  const resp = await fetch(`${SUPABASE_URL}/functions/v1/${functionName}`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${SERVICE_KEY}`,
+                    },
+                    body: JSON.stringify(selection.parameters),
+                  });
+
+                  if (resp.ok) {
+                    const res = await resp.json();
+                    // Mark queue item as complete
+                    if (res.vehicleId || res.vehicle_id || res.success) {
+                      await supabase
+                        .from('import_queue')
+                        .update({
+                          status: 'complete',
+                          vehicle_id: res.vehicleId || res.vehicle_id || null,
+                          processed_at: new Date().toISOString(),
+                        })
+                        .eq('id', item.id);
+                    }
+                  } else {
+                    console.error(`   [async] ${functionName} failed for ${item.id}: HTTP ${resp.status}`);
+                  }
+                } catch (e: any) {
+                  console.error(`   [async] ${functionName} error for ${item.id}: ${e.message}`);
+                }
+              })).then(() => {
+                console.log(`   [async] ${functionName}: processed ${batch.length}/${items.length} items`);
+              }).catch(e => {
+                console.error(`   [async] ${functionName} batch error: ${e.message}`);
+              });
+            } else {
+              console.log(`   ⚠️  Unknown processor function: ${functionName}, skipping ${items.length} items`);
+            }
+          }
+
+          result.import_queue_processed = -1; // -1 indicates async (result not known yet)
+        }
 
       } catch (e: any) {
-        result.errors.push(`import_queue trigger error: ${e.message}`);
-        console.error(`   ❌ import_queue trigger error: ${e.message}`);
+        result.errors.push(`import_queue routing error: ${e.message}`);
+        console.error(`   ❌ import_queue routing error: ${e.message}`);
       }
 
       // 3b. Drain bat_extraction_queue (BaT profiles → complete data)

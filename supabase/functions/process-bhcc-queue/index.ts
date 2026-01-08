@@ -255,6 +255,22 @@ serve(async (req: Request) => {
       const listingUrl = safeString(item.listing_url);
       if (!listingUrl) continue;
 
+      // CRITICAL: This function ONLY handles BHCC (Beverly Hills Car Club) listings.
+      // BaT listings should be routed to the proven two-step workflow: extract-premium-auction + extract-auction-comments
+      // Other sources should use process-import-queue (currently has BOOT_ERROR).
+      if (!listingUrl.includes('beverlyhillscarclub.com')) {
+        console.log(`   ⏭️  Skipping non-BHCC URL: ${listingUrl.substring(0, 80)}...`);
+        // Mark as skipped (not failed) - another processor will handle it
+        await supabase
+          .from("import_queue")
+          .update({ 
+            status: "pending", // Keep as pending so orchestrator can route it correctly
+            attempts: (item.attempts ?? 0) + 0, // Don't increment attempts
+          } as any)
+          .eq("id", item.id);
+        continue;
+      }
+
       // mark processing
       await supabase
         .from("import_queue")
@@ -405,19 +421,33 @@ serve(async (req: Request) => {
         }
 
         // External images (fast): insert vehicle_images rows pointing to external URLs.
+        // Always create at least one image record from primary_image_url if images array is empty
         if (externalOnly) {
           if (!importUserId) throw new Error("Missing import_user_id (vehicle_images.user_id is required)");
           const images: string[] = Array.isArray(parsed.images) ? parsed.images.filter((u: any) => typeof u === "string" && u.startsWith("http")) : [];
-          const toInsert = images.slice(0, maxExternalImages);
+          
+          // If no images parsed but we have primary_image_url, use that
+          let toInsert = images.slice(0, maxExternalImages);
+          if (toInsert.length === 0 && existingVehicle?.primary_image_url) {
+            toInsert = [existingVehicle.primary_image_url];
+          } else if (toInsert.length === 0) {
+            // Try to get primary_image_url from newly created vehicle
+            const { data: newVeh } = await supabase.from("vehicles").select("primary_image_url").eq("id", vehicleId).single();
+            if (newVeh?.primary_image_url) {
+              toInsert = [newVeh.primary_image_url];
+            }
+          }
+          
           for (let i = 0; i < toInsert.length; i++) {
             const img = toInsert[i];
+            if (!img) continue;
             const { error: imgErr } = await supabase
               .from("vehicle_images")
               .insert({
                 vehicle_id: vehicleId,
                 user_id: importUserId,
                 image_url: img,
-                source: "dealer_scrape",
+                source: "fast_import",
                 source_url: listingUrl,
                 is_external: true,
                 position: i,

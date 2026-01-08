@@ -126,7 +126,7 @@ const getImageSource = (image: any): { type: string; label: string; color: strin
       type: 'bat', 
       label: 'BaT', 
       color: '#ef4444',
-      logoUrl: 'https://bringatrailer.com/wp-content/themes/flavor/bat/images/bat-icon.png'
+      logoUrl: '/vendor/bat/favicon.ico' // Use local vendor favicon for better quality
     };
   }
   if (source === 'organization_import' || storagePath.includes('organization_import') || storagePath.includes('collective')) {
