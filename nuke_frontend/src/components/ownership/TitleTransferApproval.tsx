@@ -47,11 +47,11 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('title_transfers')
+        .from('ownership_transfers')
         .select(`
           *,
           vehicle:vehicles(id, year, make, model, vin),
-          buyer:profiles!title_transfers_to_user_id_fkey(id, full_name, email)
+          buyer:profiles!ownership_transfers_to_user_id_fkey(id, full_name, email)
         `)
         .eq('from_user_id', userId)
         .eq('status', 'pending')

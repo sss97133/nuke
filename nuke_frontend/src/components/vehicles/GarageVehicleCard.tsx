@@ -64,7 +64,16 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
         return;
       }
 
-      setOrganizationRelationships(data || []);
+      // De-duplicate organization relationships to prevent duplicate keys
+      const unique = new Map<string, any>();
+      (data || []).forEach((rel: any) => {
+        const key = `${rel.organization_id || 'null'}-${rel.relationship_type || 'default'}`;
+        if (!unique.has(key)) {
+          unique.set(key, rel);
+        }
+      });
+
+      setOrganizationRelationships(Array.from(unique.values()));
     } catch (error) {
       console.error('Error loading org relationships:', error);
     }
@@ -615,15 +624,21 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
         {/* Relationship-aware metrics */}
         {organizationRelationships.length > 0 && session?.user?.id && (
           <div onClick={(e) => e.stopPropagation()}>
-            {organizationRelationships.map((orgRel) => (
-              <VehicleRelationshipMetrics
-                key={orgRel.organization_id}
-                vehicleId={vehicle.id}
-                organizationId={orgRel.organization_id}
-                relationshipType={orgRel.relationship_type}
-                userId={session.user.id}
-              />
-            ))}
+            {organizationRelationships.map((orgRel, orgIndex) => {
+              // Create a unique composite key that handles all edge cases
+              const orgId = orgRel.organization_id || `null-org-${orgIndex}`;
+              const relType = orgRel.relationship_type || 'default';
+              const uniqueKey = `metrics-${vehicle.id}-${orgId}-${relType}-${orgIndex}`;
+              return (
+                <VehicleRelationshipMetrics
+                  key={uniqueKey}
+                  vehicleId={vehicle.id}
+                  organizationId={orgRel.organization_id}
+                  relationshipType={orgRel.relationship_type}
+                  userId={session.user.id}
+                />
+              );
+            })}
           </div>
         )}
       </div>
