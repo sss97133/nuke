@@ -315,7 +315,56 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
     >
       {/* Image with status overlay */}
       <div style={{ position: 'relative', width: '100%', height: '140px', overflow: 'hidden', background: 'var(--bg)' }}>
-        <VehicleThumbnail vehicleId={vehicle.id} />
+        {(() => {
+          // Try to get image URL from multiple sources
+          let imageUrl: string | null = null;
+          
+          // First try: pre-loaded primaryImageUrl
+          if (vehicle.primaryImageUrl && typeof vehicle.primaryImageUrl === 'string') {
+            imageUrl = vehicle.primaryImageUrl;
+          }
+          // Second try: extract from vehicle_images array
+          else if (vehicle.vehicle_images && Array.isArray(vehicle.vehicle_images) && vehicle.vehicle_images.length > 0) {
+            const primaryImage = vehicle.vehicle_images.find((img: any) => img?.is_primary) || vehicle.vehicle_images[0];
+            if (primaryImage) {
+              imageUrl = primaryImage.variants?.large || primaryImage.variants?.medium || primaryImage.image_url || null;
+            }
+          }
+          // Third try: fallback to vehicle.primary_image_url or vehicle.image_url
+          else if (vehicle.primary_image_url && typeof vehicle.primary_image_url === 'string') {
+            imageUrl = vehicle.primary_image_url;
+          } else if (vehicle.image_url && typeof vehicle.image_url === 'string') {
+            imageUrl = vehicle.image_url;
+          }
+          
+          // Transform Supabase storage URLs for optimized rendering
+          if (imageUrl && typeof imageUrl === 'string') {
+            if (imageUrl.includes('/storage/v1/object/public/')) {
+              imageUrl = imageUrl.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=420&quality=85';
+            }
+            
+            return (
+              <img
+                src={imageUrl}
+                alt={`${vehicle.year || ''} ${vehicle.make || ''} ${vehicle.model || ''}`.trim() || 'Vehicle'}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+                onError={(e) => {
+                  // Hide broken image - VehicleThumbnail will render as fallback
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+                loading="lazy"
+              />
+            );
+          }
+          
+          // No image found - use VehicleThumbnail component
+          return <VehicleThumbnail vehicleId={vehicle.id} />;
+        })()}
         
         {/* Relationship badge - top left */}
         <div style={{ position: 'absolute', top: '6px', left: '6px' }}>
