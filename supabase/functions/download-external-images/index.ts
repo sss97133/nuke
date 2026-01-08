@@ -80,8 +80,24 @@ serve(async (req) => {
               return { success: false, error: "Invalid URL" };
             }
 
-            // Download image
+            // Download image with proper headers to bypass some hotlink protection
+            const headers: HeadersInit = {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            };
+            
+            // Add referrer for Cars & Bids and other auction sites
+            if (imageUrl.includes('carsandbids.com')) {
+              headers['Referer'] = 'https://carsandbids.com/';
+            } else if (imageUrl.includes('bringatrailer.com')) {
+              headers['Referer'] = 'https://bringatrailer.com/';
+            } else if (imageUrl.includes('media.carsandbids.com')) {
+              headers['Referer'] = 'https://carsandbids.com/';
+            }
+            
             const imageResponse = await fetch(imageUrl, {
+              headers,
               signal: AbortSignal.timeout(30000), // 30 second timeout
             });
 

@@ -3005,7 +3005,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           })()}
         </div>
 
-        <div ref={priceMenuRef} style={{ flex: '0 0 auto', textAlign: 'right', position: 'relative', zIndex: showFollowAuctionCard ? 1001 : 'auto' }}>
+        <div ref={priceMenuRef} style={{ 
+          flex: '0 1 auto', 
+          textAlign: 'right', 
+          position: 'relative', 
+          zIndex: showFollowAuctionCard ? 1001 : 'auto',
+          minWidth: 0,
+          maxWidth: '100%'
+        }}>
           <button
             type="button"
             onClick={(e) => {
@@ -3037,13 +3044,29 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 6
+              gap: 6,
+              flexWrap: 'wrap',
+              minWidth: 0,
+              maxWidth: '100%',
+              justifyContent: 'flex-end',
+              width: '100%'
             }}
             className="vehicle-price-button"
             title="Click to view price source, confidence, and trend"
           >
             <div 
-              style={{ fontSize: '9pt', fontWeight: 700, color: baseTextColor, lineHeight: 1, display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ 
+                fontSize: '9pt', 
+                fontWeight: 700, 
+                color: baseTextColor, 
+                lineHeight: 1, 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 6,
+                flexWrap: 'wrap',
+                minWidth: 0,
+                maxWidth: '100%'
+              }}
               title={priceWasCorrected ? 'Price was auto-corrected from listing (e.g., $15 -> $15,000)' : undefined}
             >
               <span
@@ -3075,6 +3098,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   // Blur effect for RNM auctions (reserve not met)
                   filter: isRNM && highBid && String(priceDisplay).toUpperCase() !== 'SOLD' ? 'blur(4px)' : 'none',
                   transition: 'filter 0.2s ease',
+                  flexShrink: 0,
+                  minWidth: 0,
                   ...(auctionPulseMs && isAuctionLive ? ({ ['--auction-pulse-ms' as any]: `${auctionPulseMs}ms` } as any) : {}),
                 }}
                 // Prefer compact visible text; reveal actual amount on hover when available.
@@ -3116,10 +3141,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 })()}
               </span>
               {priceWasCorrected && (
-                <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 500 }}>*</span>
+                <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 500, flexShrink: 0 }}>*</span>
               )}
               {daysSinceSale !== null && daysSinceSale >= 0 && (
-                <span style={{ fontSize: '7pt', color: mutedTextColor, fontWeight: 500, marginLeft: '4px' }}>
+                <span style={{ fontSize: '7pt', color: mutedTextColor, fontWeight: 500, marginLeft: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                   {daysSinceSale === 0 ? 'today' : `${daysSinceSale}d ago`}
                 </span>
               )}
@@ -3135,7 +3160,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   borderRadius: '3px',
                   letterSpacing: '0.5px',
                   lineHeight: 1,
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  display: 'inline-block'
                 }}>
                   {auctionContext.badge.text}
                 </span>

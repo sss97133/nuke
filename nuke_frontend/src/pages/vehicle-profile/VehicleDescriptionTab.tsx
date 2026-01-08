@@ -4,7 +4,6 @@ import VehicleCommentsCard from '../../components/vehicle/VehicleCommentsCard';
 import VehicleBasicInfo from './VehicleBasicInfo';
 import VehicleROISummaryCard from '../../components/vehicle/VehicleROISummaryCard';
 import { VehicleStructuredListingDataCard } from './VehicleStructuredListingDataCard';
-import ReferenceLibraryUpload from '../../components/reference/ReferenceLibraryUpload';
 import VehicleReferenceLibrary from '../../components/vehicle/VehicleReferenceLibrary';
 import type { Vehicle, VehiclePermissions } from './types';
 
@@ -50,20 +49,7 @@ const VehicleDescriptionTab: React.FC<VehicleDescriptionTabProps> = ({
         {/* Structured listing data (Options / Service records / etc.) */}
         <VehicleStructuredListingDataCard vehicle={vehicle} />
         
-        {/* Reference Documents - Upload */}
-        {session && (
-          <ReferenceLibraryUpload
-            vehicleId={vehicle.id}
-            year={vehicle.year}
-            make={vehicle.make}
-            series={(vehicle as any).series}
-            model={vehicle.model}
-            bodyStyle={(vehicle as any).body_style}
-            onUploadComplete={onReferenceLibraryRefresh}
-          />
-        )}
-        
-        {/* Reference Documents - Display */}
+        {/* Reference Documents - Upload and Display (merged) */}
         <VehicleReferenceLibrary
           vehicleId={vehicle.id}
           userId={session?.user?.id}
@@ -73,6 +59,7 @@ const VehicleDescriptionTab: React.FC<VehicleDescriptionTabProps> = ({
           model={vehicle.model}
           bodyStyle={(vehicle as any).body_style}
           refreshKey={referenceLibraryRefreshKey}
+          onUploadComplete={onReferenceLibraryRefresh}
         />
       </div>
 

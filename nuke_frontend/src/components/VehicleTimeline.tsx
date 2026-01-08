@@ -804,9 +804,9 @@ const VehicleTimeline: React.FC<{
                       </div>
                       
                       {/* Timeline and Years Grid in columns */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr minmax(60px, 80px)', gap: '8px', minWidth: 0 }}>
                         {/* Timeline grid column */}
-                        <div>
+                        <div style={{ minWidth: 0, overflow: 'hidden' }}>
 
 
                       {/* Vertical Day Grid: Weekday labels + 7 rows × 53 columns */}
@@ -1007,7 +1007,15 @@ const VehicleTimeline: React.FC<{
                         </div>
 
                         {/* Years column - moved to right side */}
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', paddingLeft: '4px' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'flex-start', 
+                          paddingLeft: '4px',
+                          minWidth: 0,
+                          width: '100%',
+                          overflow: 'hidden'
+                        }}>
                           {(() => {
                             const yearsToShow = yearIndex;
                             if (yearsToShow.length <= 5) {
@@ -1022,7 +1030,12 @@ const VehicleTimeline: React.FC<{
                                     background: 'none',
                                     border: 'none',
                                     lineHeight: '20px',
-                                    height: '20px'
+                                    height: '20px',
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
                                   }}
                                   onClick={() => selectYear(y)}
                                 >
@@ -1036,8 +1049,8 @@ const VehicleTimeline: React.FC<{
                               const rightColumn = yearsToShow.slice(midPoint);
 
                               return (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', width: '100%' }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', width: '100%', minWidth: 0 }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                                     {leftColumn.map(y => (
                                       <button
                                         key={y}
@@ -1048,7 +1061,12 @@ const VehicleTimeline: React.FC<{
                                           background: 'none',
                                           border: 'none',
                                           lineHeight: '20px',
-                                          height: '20px'
+                                          height: '20px',
+                                          width: '100%',
+                                          textAlign: 'left',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          whiteSpace: 'nowrap'
                                         }}
                                         onClick={() => selectYear(y)}
                                       >
@@ -1056,7 +1074,7 @@ const VehicleTimeline: React.FC<{
                                       </button>
                                     ))}
                                   </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                                     {rightColumn.map(y => (
                                       <button
                                         key={y}
@@ -1067,7 +1085,12 @@ const VehicleTimeline: React.FC<{
                                           background: 'none',
                                           border: 'none',
                                           lineHeight: '20px',
-                                          height: '20px'
+                                          height: '20px',
+                                          width: '100%',
+                                          textAlign: 'left',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          whiteSpace: 'nowrap'
                                         }}
                                         onClick={() => selectYear(y)}
                                       >
