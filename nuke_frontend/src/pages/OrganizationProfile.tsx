@@ -34,7 +34,12 @@ import { ProfileSuccessStoriesTab } from '../components/profile/ProfileSuccessSt
 import { getOrganizationProfileData } from '../services/profileStatsService';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
+import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import '../design-system.css';
+
+// Types for sorting and controls
+type OrgSortBy = 'newest' | 'oldest' | 'year' | 'make' | 'model' | 'price_high' | 'price_low';
+type OrgSortDirection = 'asc' | 'desc';
 
 interface Organization {
   id: string;
@@ -277,6 +282,44 @@ export default function OrganizationProfile() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const ownershipUploadId = `org-ownership-${organizationId}`;
   const [comprehensiveData, setComprehensiveData] = useState<any>(null);
+  
+  // Grid and sorting controls (similar to CursorHomepage)
+  const [cardsPerRow, setCardsPerRow] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_org_cardsPerRow');
+      const n = Number(saved);
+      if (Number.isFinite(n) && n >= 1 && n <= 16) return Math.round(n);
+      return 6;
+    } catch {
+      return 6;
+    }
+  });
+  const [sortBy, setSortBy] = useState<OrgSortBy>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_org_sortBy');
+      return (saved as OrgSortBy) || 'newest';
+    } catch {
+      return 'newest';
+    }
+  });
+  const [sortDirection, setSortDirection] = useState<OrgSortDirection>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_org_sortDirection');
+      return (saved as OrgSortDirection) || 'desc';
+    } catch {
+      return 'desc';
+    }
+  });
+  const [thumbFitMode, setThumbFitMode] = useState<'square' | 'original'>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_org_thumbFitMode');
+      return saved === 'original' ? 'original' : 'square';
+    } catch {
+      return 'square';
+    }
+  });
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [gridWidth, setGridWidth] = useState<number>(0);
 
   // One-time CSS for "aliveness" bursts
   useEffect(() => {
@@ -616,6 +659,96 @@ export default function OrganizationProfile() {
         imageInputRef.current.value = '';
       }
     }
+  };
+
+  // Save preferences to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_org_cardsPerRow', String(cardsPerRow));
+    } catch (err) {
+      console.warn('Failed to save cardsPerRow:', err);
+    }
+  }, [cardsPerRow]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_org_sortBy', sortBy);
+    } catch (err) {
+      console.warn('Failed to save sortBy:', err);
+    }
+  }, [sortBy]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_org_sortDirection', sortDirection);
+    } catch (err) {
+      console.warn('Failed to save sortDirection:', err);
+    }
+  }, [sortDirection]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_org_thumbFitMode', thumbFitMode);
+    } catch (err) {
+      console.warn('Failed to save thumbFitMode:', err);
+    }
+  }, [thumbFitMode]);
+
+  // Grid width tracking
+  useEffect(() => {
+    if (!gridRef.current) return;
+    
+    const updateGridWidth = () => {
+      if (gridRef.current) {
+        setGridWidth(gridRef.current.offsetWidth);
+      }
+    };
+    
+    updateGridWidth();
+    const resizeObserver = new ResizeObserver(updateGridWidth);
+    resizeObserver.observe(gridRef.current);
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Calculate card size based on grid width and cards per row
+  const gridCardSizePx = useMemo(() => {
+    const cols = Math.max(1, Math.min(16, Math.floor(cardsPerRow || 1)));
+    const gap = 8;
+    const w = Number(gridWidth) || 0;
+    if (!w) return undefined;
+    const px = (w - gap * (cols - 1)) / cols;
+    return Math.max(60, Math.floor(px));
+  }, [gridWidth, cardsPerRow]);
+
+  // Helper function to transform OrgVehicle to VehicleCardDense format
+  const transformVehicleForCard = (orgVehicle: OrgVehicle) => {
+    const vehicle = orgVehicle.vehicles || {};
+    return {
+      id: orgVehicle.vehicle_id,
+      // Check both orgVehicle fields and joined vehicles table
+      year: orgVehicle.vehicle_year || (vehicle as any)?.year || undefined,
+      make: orgVehicle.vehicle_make || (vehicle as any)?.make || undefined,
+      model: orgVehicle.vehicle_model || (vehicle as any)?.model || undefined,
+      series: (vehicle as any)?.series || undefined,
+      trim: (vehicle as any)?.trim || undefined,
+      vin: orgVehicle.vehicle_vin || (vehicle as any)?.vin || undefined,
+      mileage: (vehicle as any)?.mileage || undefined,
+      primary_image_url: orgVehicle.vehicle_image_url || (vehicle as any)?.primary_image_url || (vehicle as any)?.image_url || undefined,
+      image_url: orgVehicle.vehicle_image_url || (vehicle as any)?.image_url || undefined,
+      current_value: orgVehicle.vehicle_current_value || (vehicle as any)?.current_value || undefined,
+      asking_price: orgVehicle.vehicle_asking_price || (vehicle as any)?.asking_price || undefined,
+      sale_price: orgVehicle.sale_price || (vehicle as any)?.sale_price || undefined,
+      location: orgVehicle.vehicle_location || (vehicle as any)?.location || undefined,
+      discovery_url: organization?.website || orgVehicle.seller_org_website || undefined,
+      discovery_source: (vehicle as any)?.profile_origin || undefined,
+      created_at: (vehicle as any)?.created_at || undefined,
+      updated_at: (vehicle as any)?.updated_at || undefined,
+      profile_origin: (vehicle as any)?.profile_origin || undefined,
+      view_count: (vehicle as any)?.view_count || undefined,
+    };
   };
 
   useEffect(() => {
@@ -1872,14 +2005,15 @@ export default function OrganizationProfile() {
                   return false;
                 }
                 
-                // Check all sold indicators
-                const isSold = 
+                // Check all sold indicators - use comprehensive sold detection
+                const isSold = (v as any).is_sold ||
                   v.sale_date || 
                   v.sale_price || 
                   v.vehicle_sale_status === 'sold' ||
                   v.listing_status === 'sold' ||
                   (v.vehicles && (v.vehicles as any).sale_price) ||
-                  (v.vehicles && (v.vehicles as any).sale_date);
+                  (v.vehicles && (v.vehicles as any).sale_date) ||
+                  (v.vehicles && (v.vehicles as any).auction_outcome === 'sold');
                 
                 return !isSold;
               });
@@ -1894,211 +2028,50 @@ export default function OrganizationProfile() {
               if (sortedAuctions.length > 0) {
                 return (
                   <div className="card" style={{ marginBottom: '16px', border: '2px solid #dc2626' }}>
-                    <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700, color: '#dc2626' }}>
-                      LIVE AUCTIONS
+                    <div className="card-header" style={{ 
+                      fontSize: '11pt', 
+                      fontWeight: 700, 
+                      color: '#dc2626',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <span>LIVE AUCTIONS ({sortedAuctions.length})</span>
                     </div>
                     <div className="card-body">
-                      {sortedAuctions.map((vehicle) => {
-                        const signal = computeSignal({
-                          bids: vehicle.auction_bid_count,
-                          watchers: (vehicle as any).auction_watcher_count,
-                          views: (vehicle as any).auction_view_count,
-                          comments: (vehicle as any).auction_comment_count,
-                        });
-                        const tierLabel = tierLabelFromAnalysisTier((vehicle as any).analysis_tier ?? null);
-                        const formatTimeRemaining = (endTime: string | null) => {
-                          if (!endTime) return 'N/A';
-                          const now = new Date();
-                          const end = new Date(endTime);
-                          const diff = end.getTime() - now.getTime();
-                          if (diff <= 0) return 'Ended';
-                          const hours = Math.floor(diff / (60 * 60 * 1000));
-                          const days = Math.floor(hours / 24);
-                          if (days > 0) return `${days}d ${hours % 24}h`;
-                          return `${hours}h`;
-                        };
+                      <div
+                        ref={gridRef}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: `repeat(${Math.max(1, Math.min(16, cardsPerRow))}, minmax(0, 1fr))`,
+                          gap: '8px'
+                        }}
+                      >
+                        {sortedAuctions.map((vehicle) => {
+                        // Transform to VehicleCardDense format with auction metadata
+                        const vehicleData = transformVehicleForCard(vehicle);
+                        // Add auction-specific data
+                        vehicleData.auction_end_date = vehicle.auction_end_time || undefined;
+                        vehicleData.asking_price = vehicle.auction_current_bid ? vehicle.auction_current_bid / 100 : undefined;
+                        vehicleData.current_value = vehicle.auction_current_bid ? vehicle.auction_current_bid / 100 : undefined;
+                        vehicleData.view_count = (vehicle as any).auction_view_count || undefined;
                         
                         return (
-                        <div
-                          key={vehicle.id}
-                          style={{
-                            padding: '12px',
-                            marginBottom: '8px',
-                            border: '2px solid #dc2626',
-                            borderRadius: '4px',
-                            background: 'var(--surface)',
-                            cursor: 'pointer',
-                            position: 'relative'
-                          }}
-                          onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
-                        >
-                          <AliveBurst vehicleId={vehicle.vehicle_id} intensity={Math.min(18, Math.floor(signal.score / 12))} />
-                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: '6px' }}>
-                            <div style={{ display: 'flex', gap: 10, minWidth: 0, flex: 1 }}>
-                              {vehicle.vehicle_image_url ? (
-                                <img
-                                  src={vehicle.vehicle_image_url}
-                                  alt={`${vehicle.vehicle_year} ${vehicle.vehicle_make} ${vehicle.vehicle_model}`}
-                                  style={{
-                                    width: '96px',
-                                    height: '72px',
-                                    objectFit: 'cover',
-                                    borderRadius: '4px',
-                                    border: '1px solid var(--border)',
-                                    background: 'var(--grey-100)',
-                                  }}
-                                  loading="lazy"
-                                  decoding="async"
-                                  onError={(e) => {
-                                    const img = e.currentTarget as HTMLImageElement;
-                                    img.style.display = 'none';
-                                  }}
-                                />
-                              ) : (
-                                <div
-                                  style={{
-                                    width: '96px',
-                                    height: '72px',
-                                    borderRadius: '4px',
-                                    border: '1px solid var(--border)',
-                                    background: 'var(--grey-100)',
-                                  }}
-                                />
-                              )}
-
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                              <a 
-                                href={`/vehicle/${vehicle.vehicle_id}`}
-                                onClick={(e) => e.stopPropagation()}
-                                style={{ 
-                                  fontSize: '10pt', 
-                                  fontWeight: 700, 
-                                  color: '#dc2626', 
-                                  marginBottom: '2px',
-                                  display: 'block',
-                                  textDecoration: 'none'
-                                }}
-                                className="hover:underline"
-                              >
-                                {vehicle.vehicle_year} {vehicle.vehicle_make} {vehicle.vehicle_model}
-                              </a>
-
-                              <div style={{ marginTop: 4, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
-                                <div style={{ fontSize: '12pt', fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-                                  {vehicle.auction_current_bid ? formatUsd(vehicle.auction_current_bid / 100) : 'No bids yet'}
-                                </div>
-                                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                                  {vehicle.vehicle_location ? vehicle.vehicle_location : 'Location unknown'}
-                                </div>
-                              </div>
-
-                              <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                                {tierLabel ? (
-                                  <span style={{ fontSize: '7pt', color: 'var(--text-secondary)' }}>{tierLabel}</span>
-                                ) : null}
-                                <span style={{ fontSize: '7pt', color: 'var(--text-secondary)' }}>
-                                  SIGNAL {signal.score}
-                                </span>
-                                {signal.bids > 0 && (
-                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>BIDS {signal.bids}</span>
-                                )}
-                                {signal.watchers > 0 && (
-                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>WATCH {signal.watchers}</span>
-                                )}
-                                {signal.comments > 0 && (
-                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>COMM {signal.comments}</span>
-                                )}
-                                {signal.views > 0 && (
-                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>VIEWS {signal.views}</span>
-                                )}
-                                {!vehicle.auction_reserve_price && (
-                                  <span style={{ fontSize: '7pt', color: 'var(--warning)', fontWeight: 700 }}>NO RESERVE</span>
-                                )}
-                              </div>
-                            </div>
-                            </div>
-                            <div style={{ textAlign: 'right', marginLeft: '12px' }}>
-                              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginBottom: '2px' }}>
-                                Time Left
-                              </div>
-                              <div style={{ fontSize: '9pt', fontWeight: 700, color: '#dc2626', whiteSpace: 'nowrap' }}>
-                                {formatTimeRemaining(vehicle.auction_end_time ?? null)}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                              <div
-                                style={{
-                                  fontSize: '7pt',
-                                  padding: '2px 6px',
-                                  borderRadius: '2px',
-                                  background: '#dc2626',
-                                  color: 'white',
-                                  fontWeight: 700,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 6,
-                                  maxWidth: 220,
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                }}
-                                title={
-                                  vehicle.seller_org_name
-                                    ? `Seller: ${vehicle.seller_org_name}`
-                                    : vehicle.seller_handle
-                                      ? `Seller: ${vehicle.seller_handle}`
-                                      : 'Seller'
-                                }
-                              >
-                                {vehicle.seller_org_website ? (
-                                  <FaviconIcon
-                                    url={vehicle.seller_org_website}
-                                    textSize={7}
-                                    matchTextSize
-                                    preserveAspectRatio
-                                    style={{ marginRight: 0 }}
-                                  />
-                                ) : null}
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {vehicle.seller_org_name || vehicle.seller_handle || 'SELLER'}
-                                </span>
-                              </div>
-                              {vehicle.relationship_type && (
-                                <div style={{
-                                  fontSize: '7pt',
-                                  padding: '2px 6px',
-                                  borderRadius: '2px',
-                                  background: 'var(--surface)',
-                                  color: 'var(--text-secondary)',
-                                  border: '1px solid var(--border)'
-                                }}>
-                                  {vehicle.relationship_type.replace(/_/g, ' ')}
-                                </div>
-                              )}
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // If external auction, open in new tab
-                                  if (vehicle.auction_url) {
-                                    window.open(vehicle.auction_url, '_blank');
-                                  } else {
-                                    navigate(`/vehicle/${vehicle.vehicle_id}`);
-                                  }
-                                }}
-                                className="button button-primary button-small"
-                                style={{ fontSize: '8pt', padding: '4px 8px', whiteSpace: 'nowrap', background: '#dc2626', borderColor: '#dc2626' }}
-                              >
-                                {vehicle.auction_url ? 'View on Platform' : 'View Auction'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )})}
+                          <VehicleCardDense
+                            key={vehicle.id}
+                            vehicle={vehicleData}
+                            viewMode="grid"
+                            cardSizePx={gridCardSizePx}
+                            infoDense={false}
+                            viewerUserId={session?.user?.id}
+                            thermalPricing={false}
+                            thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}
+                            sourceStampUrl={organization?.website || vehicle.seller_org_website || vehicle.auction_url || undefined}
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -2108,8 +2081,132 @@ export default function OrganizationProfile() {
 
             {/* Vehicles for Sale / Currently in Service */}
             <div className="card" style={{ marginBottom: '16px' }}>
-              <div className="card-header" style={{ fontSize: '11pt', fontWeight: 700 }}>
-                {intelligence?.effectivePrimaryFocus === 'service' ? 'Currently in Service' : 'Vehicles for Sale'}
+              <div className="card-header" style={{ 
+                fontSize: '11pt', 
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                flexWrap: 'wrap'
+              }}>
+                <span>
+                  {intelligence?.effectivePrimaryFocus === 'service' ? 'Currently in Service' : 'Vehicles for Sale'}
+                  {vehicles.length > 0 && (
+                    <span style={{ fontSize: '9pt', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '8px' }}>
+                      ({vehicles.filter((v: any) => !v.is_sold && v.status === 'active').length})
+                    </span>
+                  )}
+                </span>
+                
+                {/* Controls Row */}
+                <div style={{ display: 'inline-flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Sort Controls - only show for inventory vehicles */}
+                  {intelligence?.effectivePrimaryFocus !== 'service' && (
+                    <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as OrgSortBy)}
+                        style={{
+                          padding: '2px 6px',
+                          fontSize: '8pt',
+                          border: '1px solid var(--border)',
+                          background: 'var(--surface)',
+                          color: 'var(--text)',
+                          fontFamily: '"MS Sans Serif", sans-serif',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="year">Year</option>
+                        <option value="make">Make</option>
+                        <option value="model">Model</option>
+                        <option value="price_high">Price: High</option>
+                        <option value="price_low">Price: Low</option>
+                      </select>
+                      
+                      <button
+                        onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+                        style={{
+                          padding: '2px 8px',
+                          fontSize: '8pt',
+                          border: '1px solid var(--border)',
+                          background: sortDirection === 'asc' ? 'var(--grey-600)' : 'var(--grey-200)',
+                          color: sortDirection === 'asc' ? 'var(--white)' : 'var(--text)',
+                          cursor: 'pointer',
+                          fontFamily: '"MS Sans Serif", sans-serif'
+                        }}
+                        title={`Sort ${sortDirection === 'asc' ? 'Ascending' : 'Descending'}`}
+                      >
+                        {sortDirection === 'asc' ? '↑' : '↓'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Grid Controls */}
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                    title={`${cardsPerRow} per row`}
+                  >
+                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: '"MS Sans Serif", sans-serif' }}>
+                      {cardsPerRow}/row
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="16"
+                      step="1"
+                      value={cardsPerRow}
+                      onChange={(e) => setCardsPerRow(parseInt(e.target.value, 10))}
+                      className="nuke-range nuke-range-accent"
+                      style={{ width: '110px' }}
+                    />
+                    <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setThumbFitMode('square');
+                        }}
+                        style={{
+                          padding: '1px 6px',
+                          fontSize: '7pt',
+                          border: '1px solid var(--border)',
+                          background: thumbFitMode === 'square' ? 'var(--grey-600)' : 'var(--grey-200)',
+                          color: thumbFitMode === 'square' ? 'var(--white)' : 'var(--text)',
+                          cursor: 'pointer',
+                          borderRadius: '999px',
+                          fontFamily: '"MS Sans Serif", sans-serif'
+                        }}
+                        title="Square crop thumbnails"
+                      >
+                        □
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setThumbFitMode('original');
+                        }}
+                        style={{
+                          padding: '1px 6px',
+                          fontSize: '7pt',
+                          border: '1px solid var(--border)',
+                          background: thumbFitMode === 'original' ? 'var(--grey-600)' : 'var(--grey-200)',
+                          color: thumbFitMode === 'original' ? 'var(--white)' : 'var(--text)',
+                          cursor: 'pointer',
+                          borderRadius: '999px',
+                          fontFamily: '"MS Sans Serif", sans-serif'
+                        }}
+                        title="Original aspect ratio thumbnails"
+                      >
+                        ⊞
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="card-body">
                 {(() => {
@@ -2150,12 +2247,15 @@ export default function OrganizationProfile() {
                     }
                     
                     return (
-                      <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', 
-                        gap: '12px' 
-                      }}>
-                        {serviceVehicles.slice(0, 8).map((vehicle) => (
+                      <div
+                        ref={gridRef}
+                        style={{ 
+                          display: 'grid', 
+                          gridTemplateColumns: `repeat(${Math.max(1, Math.min(16, cardsPerRow))}, minmax(0, 1fr))`, 
+                          gap: '8px' 
+                        }}
+                      >
+                        {serviceVehicles.map((vehicle) => (
                           <ServiceVehicleCardRich
                             key={vehicle.id}
                             vehicleId={vehicle.vehicle_id}
@@ -2229,274 +2329,86 @@ export default function OrganizationProfile() {
                     );
                   }
                   
-                  // IMPORTANT: Do not sort by price/value here. Scraped/derived values are often incomplete
-                  // and create misleading UI. Prefer a stable, non-financial sort (newer model years first).
-                  const sorted = [...productsForSale].sort((a, b) => {
-                    const ay = Number((a as any).vehicle_year || 0) || 0;
-                    const by = Number((b as any).vehicle_year || 0) || 0;
-                    if (ay !== by) return by - ay;
-                    const am = String((a as any).vehicle_make || '');
-                    const bm = String((b as any).vehicle_make || '');
-                    if (am !== bm) return am.localeCompare(bm);
-                    const amd = String((a as any).vehicle_model || '');
-                    const bmd = String((b as any).vehicle_model || '');
-                    return amd.localeCompare(bmd);
-                  });
+                  // Apply sorting based on sortBy and sortDirection
+                  let sorted = [...productsForSale];
+                  const dir = sortDirection === 'desc' ? 1 : -1;
+                  
+                  switch (sortBy) {
+                    case 'year':
+                      sorted.sort((a, b) => {
+                        const ay = Number((a as any).vehicle_year || 0) || 0;
+                        const by = Number((b as any).vehicle_year || 0) || 0;
+                        return dir * (by - ay);
+                      });
+                      break;
+                    case 'make':
+                      sorted.sort((a, b) => {
+                        const am = String((a as any).vehicle_make || '');
+                        const bm = String((b as any).vehicle_make || '');
+                        return dir * am.localeCompare(bm);
+                      });
+                      break;
+                    case 'model':
+                      sorted.sort((a, b) => {
+                        const amd = String((a as any).vehicle_model || '');
+                        const bmd = String((b as any).vehicle_model || '');
+                        return dir * amd.localeCompare(bmd);
+                      });
+                      break;
+                    case 'price_high':
+                      sorted.sort((a, b) => {
+                        const ap = Number((a as any).vehicle_current_value || (a as any).vehicle_asking_price || 0);
+                        const bp = Number((b as any).vehicle_current_value || (b as any).vehicle_asking_price || 0);
+                        return dir * (bp - ap);
+                      });
+                      break;
+                    case 'price_low':
+                      sorted.sort((a, b) => {
+                        const ap = Number((a as any).vehicle_current_value || (a as any).vehicle_asking_price || 0);
+                        const bp = Number((b as any).vehicle_current_value || (b as any).vehicle_asking_price || 0);
+                        return dir * (ap - bp);
+                      });
+                      break;
+                    case 'oldest':
+                    case 'newest':
+                    default:
+                      // Sort by year (newer first by default) as fallback
+                      sorted.sort((a, b) => {
+                        const ay = Number((a as any).vehicle_year || 0) || 0;
+                        const by = Number((b as any).vehicle_year || 0) || 0;
+                        if (ay !== by) return dir * (by - ay);
+                        const am = String((a as any).vehicle_make || '');
+                        const bm = String((b as any).vehicle_make || '');
+                        if (am !== bm) return am.localeCompare(bm);
+                        const amd = String((a as any).vehicle_model || '');
+                        const bmd = String((b as any).vehicle_model || '');
+                        return amd.localeCompare(bmd);
+                      });
+                      break;
+                  }
                   
                   return (
                     <div
+                      ref={gridRef}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-                        gap: '10px'
+                        gridTemplateColumns: `repeat(${Math.max(1, Math.min(16, cardsPerRow))}, minmax(0, 1fr))`,
+                        gap: '8px'
                       }}
                     >
-                      {sorted.slice(0, 12).map((vehicle) => {
-                        const title = `${vehicle.vehicle_year || ''} ${vehicle.vehicle_make || ''} ${vehicle.vehicle_model || ''}`.trim() || 'Vehicle';
-                        const relationshipLabel = vehicle.relationship_type
-                          ? String(vehicle.relationship_type).replace(/_/g, ' ')
-                          : null;
-                        const signal = computeSignal({
-                          bids: vehicle.auction_bid_count,
-                          watchers: (vehicle as any).auction_watcher_count,
-                          views: (vehicle as any).auction_view_count,
-                          comments: (vehicle as any).auction_comment_count,
-                        });
-                        const tierLabel = tierLabelFromAnalysisTier((vehicle as any).analysis_tier ?? null);
-                        const hasTelemetry = signal.bids > 0 || signal.watchers > 0 || signal.views > 0 || signal.comments > 0;
-
-                        // This section already represents inventory; avoid repeating "For Sale" on every tile.
-                        const listingStatus = String(vehicle.listing_status || '').toLowerCase();
-                        const showListingPill = Boolean(listingStatus) && listingStatus !== 'for_sale' && listingStatus !== 'sold';
-                        const listingLabel =
-                          listingStatus === 'reserved' ? 'Reserved' :
-                          listingStatus ? (vehicle.listing_status || 'Active') :
-                          null;
-
-                        return (
-                          <div
-                            key={vehicle.id}
-                            style={{
-                              border: '2px solid var(--border)',
-                              background: 'var(--surface)',
-                              padding: '12px',
-                              cursor: 'pointer',
-                              position: 'relative',
-                              transition: 'all 0.12s ease',
-                              borderRadius: '0px'
-                            }}
-                            onClick={() => navigate(`/vehicle/${vehicle.vehicle_id}`)}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = 'var(--text)';
-                              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
-                              e.currentTarget.style.transform = 'translateY(-1px)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.borderColor = 'var(--border)';
-                              e.currentTarget.style.boxShadow = 'none';
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}
-                          >
-                            <AliveBurst vehicleId={vehicle.vehicle_id} intensity={Math.min(14, Math.floor(signal.score / 18))} />
-                            <div
-                              style={{
-                                display: 'grid',
-                                gridTemplateColumns: '120px 1fr',
-                                gap: '12px',
-                                alignItems: 'start'
-                              }}
-                            >
-                              {/* Thumbnail with proper resolution */}
-                              <div
-                                style={{
-                                  width: '120px',
-                                  height: '90px',
-                                  border: '2px solid var(--border)',
-                                  background: 'var(--grey-100)',
-                                  overflow: 'hidden',
-                                  flexShrink: 0
-                                }}
-                              >
-                                <VehicleThumbnail
-                                  vehicleId={vehicle.vehicle_id}
-                                  vehicleName={title}
-                                  size="medium"
-                                />
-                              </div>
-
-                              {/* Main Content */}
-                              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {/* Title Row with Countdown */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                                  <a
-                                    href={`/vehicle/${vehicle.vehicle_id}`}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      navigate(`/vehicle/${vehicle.vehicle_id}`);
-                                    }}
-                                    style={{
-                                      fontSize: '11pt',
-                                      fontWeight: 700,
-                                      color: 'var(--text)',
-                                      display: 'block',
-                                      textDecoration: 'none',
-                                      lineHeight: 1.3,
-                                      flex: 1,
-                                      transition: 'color 0.12s ease'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.color = 'var(--accent)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.color = 'var(--text)';
-                                    }}
-                                  >
-                                    {title}
-                                  </a>
-                                  
-                                  {/* Countdown Timer */}
-                                  {vehicle.auction_end_time && <CountdownTimer endTime={vehicle.auction_end_time} />}
-                                </div>
-
-                                {/* Dealer Badge / Username Tag */}
-                                {(vehicle.seller_org_name || vehicle.seller_handle) && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    {vehicle.seller_org_website && (
-                                      <FaviconIcon
-                                        url={vehicle.seller_org_website}
-                                        textSize={8}
-                                        matchTextSize
-                                        preserveAspectRatio
-                                        style={{ marginRight: 0 }}
-                                      />
-                                    )}
-                                    <span
-                                      style={{
-                                        fontSize: '8pt',
-                                        padding: '3px 6px',
-                                        border: '1px solid var(--border)',
-                                        background: 'var(--grey-100)',
-                                        color: 'var(--text)',
-                                        fontWeight: 600,
-                                        borderRadius: '0px',
-                                        display: 'inline-block'
-                                      }}
-                                    >
-                                      {vehicle.seller_org_name || vehicle.seller_handle}
-                                    </span>
-                                  </div>
-                                )}
-
-                                {/* Price / Bid and Comment Count Row */}
-                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '2px' }}>
-                                  {(vehicle.sale_price || vehicle.auction_current_bid) && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                                      <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                                        {vehicle.sale_price ? 'Sold:' : 'Bid:'}
-                                      </span>
-                                      <span style={{ fontSize: '10pt', fontWeight: 700, color: 'var(--text)', fontFamily: 'monospace' }}>
-                                        {formatUsd((vehicle.sale_price || (vehicle.auction_current_bid ?? 0) / 100) || 0)}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {signal.comments > 0 && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                                      <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>Comments:</span>
-                                      <span style={{ fontSize: '9pt', fontWeight: 600, color: 'var(--text)' }}>
-                                        {signal.comments}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Signal Badges Row */}
-                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center', marginTop: '2px' }}>
-                                  {tierLabel && (
-                                    <span style={{ fontSize: '7pt', color: 'var(--text-secondary)' }}>
-                                      {tierLabel}
-                                    </span>
-                                  )}
-                                  {signal.score > 0 && (
-                                    <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                      SIGNAL {signal.score}
-                                    </span>
-                                  )}
-                                  {signal.bids > 0 && (
-                                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                                      BIDS {signal.bids}
-                                    </span>
-                                  )}
-                                  {signal.watchers > 0 && (
-                                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                                      WATCH {signal.watchers}
-                                    </span>
-                                  )}
-                                  {signal.views > 0 && (
-                                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
-                                      VIEWS {signal.views}
-                                    </span>
-                                  )}
-                                  {showListingPill && listingLabel && (
-                                    <span
-                                      style={{
-                                        fontSize: '7pt',
-                                        padding: '3px 6px',
-                                        border: '1px solid var(--border)',
-                                        background: 'var(--grey-100)',
-                                        color: 'var(--text)',
-                                        fontWeight: 700,
-                                        borderRadius: '0px'
-                                      }}
-                                    >
-                                      {listingLabel}
-                                    </span>
-                                  )}
-                                  {/* Sold/Unsold Badge */}
-                                  {(() => {
-                                    const status = String(vehicle.listing_status || '').toLowerCase();
-                                    if (status === 'sold' || vehicle.sale_price) {
-                                      return (
-                                        <span
-                                          style={{
-                                            fontSize: '7pt',
-                                            padding: '3px 6px',
-                                            border: '1px solid #166534',
-                                            background: '#dcfce7',
-                                            color: '#166534',
-                                            fontWeight: 700,
-                                            borderRadius: '0px'
-                                          }}
-                                        >
-                                          SOLD
-                                        </span>
-                                      );
-                                    }
-                                    if (status === 'unsold' || status === 'ended') {
-                                      return (
-                                        <span
-                                          style={{
-                                            fontSize: '7pt',
-                                            padding: '3px 6px',
-                                            border: '1px solid #991b1b',
-                                            background: '#fee2e2',
-                                            color: '#991b1b',
-                                            fontWeight: 700,
-                                            borderRadius: '0px'
-                                          }}
-                                        >
-                                          UNSOLD
-                                        </span>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {sorted.map((vehicle) => (
+                        <VehicleCardDense
+                          key={vehicle.id}
+                          vehicle={transformVehicleForCard(vehicle)}
+                          viewMode="grid"
+                          cardSizePx={gridCardSizePx}
+                          infoDense={false}
+                          viewerUserId={session?.user?.id}
+                          thermalPricing={false}
+                          thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}
+                          sourceStampUrl={organization?.website || vehicle.seller_org_website || undefined}
+                        />
+                      ))}
                     </div>
                   );
                 })()}
