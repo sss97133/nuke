@@ -143,12 +143,12 @@ serve(async (req) => {
       console.log('\n🔍 Step 2: Activating scrapers...');
 
       const scrapers = [
-        { name: 'BaT active auctions', fn: 'sync-active-auctions', body: { max_auctions: 50 } },
+        { name: 'BaT active auctions', fn: 'sync-active-auctions', body: { batch_size: 20 } },
         // Note: Premium auction scrapers are expensive and timeout-prone; skip for now
-        // { name: 'Mecum', fn: 'extract-premium-auction', body: { source: 'mecum', max_listings: 20 } },
-        // { name: 'Cars & Bids', fn: 'extract-premium-auction', body: { source: 'cars_bids', max_listings: 20 } },
-        // { name: 'Broad Arrow', fn: 'extract-premium-auction', body: { source: 'broad_arrow', max_listings: 20 } },
-        { name: 'Orgs inventory', fn: 'extract-all-orgs-inventory', body: { max_orgs: 5, timeout_seconds: 45 } },
+        // The orchestrator will trigger sync-active-auctions which handles BaT discovery
+        // Individual auction scrapers (Mecum, Cars & Bids, Broad Arrow) have their own crons
+        // that run less frequently - we don't need to duplicate that here
+        { name: 'Orgs inventory', fn: 'extract-all-orgs-inventory', body: { limit: 5, min_vehicle_threshold: 10 } },
       ];
 
       for (const scraper of scrapers) {
