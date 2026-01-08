@@ -114,12 +114,14 @@ interface OrgVehicle {
   vehicle_model?: string;
   vehicle_vin?: string;
   vehicle_current_value?: number;
+  vehicle_asking_price?: number;
   vehicle_image_url?: string;
   vehicle_location?: string | null;
   sale_date?: string;
   sale_price?: number;
   vehicle_sale_status?: string;
   listing_status?: string;
+  cost_basis?: number;
   has_active_auction?: boolean;
   auction_end_time?: string | null;
   auction_current_bid?: number | null;
@@ -137,6 +139,24 @@ interface OrgVehicle {
   analysis_tier?: number | null;
   signal_score?: number | null;
   vehicles?: any;
+  external_listings?: Array<{
+    id: string;
+    vehicle_id: string;
+    listing_status?: string;
+    end_date?: string;
+    current_bid?: any;
+    bid_count?: number | null;
+    comment_count?: number | null;
+    watcher_count?: number | null;
+    view_count?: number | null;
+    final_price?: any;
+    sold_at?: string | null;
+    platform?: string;
+    listing_url?: string;
+    source?: string;
+  }>;
+  bat_listing_title?: string | null;
+  is_sold?: boolean;
 }
 
 interface Offering {
@@ -777,6 +797,20 @@ export default function OrganizationProfile() {
       model = model || parsed.model;
     }
     
+    // Determine sale status from multiple sources
+    const saleStatus = orgVehicle.status === 'sold' 
+      ? 'sold' 
+      : orgVehicle.listing_status === 'sold'
+        ? 'sold'
+        : (vehicle as any)?.sale_status || undefined;
+    
+    // Get auction outcome if available
+    const auctionOutcome = (vehicle as any)?.auction_outcome || undefined;
+    
+    // Get external listings for auction data
+    const externalListings = (orgVehicle as any)?.external_listings || [];
+    const batListing = externalListings.find((el: any) => el.source === 'bat' || el.source === 'bringatrailer');
+    
     return {
       id: orgVehicle.vehicle_id,
       year: year || undefined,
@@ -788,9 +822,21 @@ export default function OrganizationProfile() {
       mileage: (vehicle as any)?.mileage || undefined,
       primary_image_url: orgVehicle.vehicle_image_url || (vehicle as any)?.primary_image_url || (vehicle as any)?.image_url || undefined,
       image_url: orgVehicle.vehicle_image_url || (vehicle as any)?.image_url || undefined,
+      // Investment data - prioritize orgVehicle for accurate org context
+      purchase_price: (vehicle as any)?.purchase_price || undefined,
+      cost_basis: orgVehicle.cost_basis || (vehicle as any)?.cost_basis || undefined,
       current_value: orgVehicle.vehicle_current_value || (vehicle as any)?.current_value || undefined,
       asking_price: orgVehicle.vehicle_asking_price || (vehicle as any)?.asking_price || undefined,
       sale_price: orgVehicle.sale_price || (vehicle as any)?.sale_price || undefined,
+      sale_status: saleStatus,
+      auction_outcome: auctionOutcome,
+      // Note: roi_pct and price_change are computed fields, not stored columns
+      // They would need to be calculated from purchase_price vs current_value
+      // Auction-specific data
+      bid_count: batListing?.bid_count || (vehicle as any)?.bid_count || undefined,
+      comment_count: batListing?.comment_count || (vehicle as any)?.comment_count || undefined,
+      watcher_count: batListing?.watcher_count || undefined,
+      external_listings: externalListings.length > 0 ? externalListings : undefined,
       location: orgVehicle.vehicle_location || (vehicle as any)?.location || undefined,
       discovery_url: organization?.website || orgVehicle.seller_org_website || undefined,
       discovery_source: (vehicle as any)?.profile_origin || undefined,
@@ -1055,7 +1101,7 @@ export default function OrganizationProfile() {
           const [allVehicles, allImages, allNativeAuctions, allExternalAuctions, allBatAuctions, soldExternalListings, soldBatListings, endedVehicleListings, allExternalListings] = await Promise.all([
             vehicleIds.length > 0 ? supabase
               .from('vehicles')
-              .select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome')
+              .select('id, year, make, model, vin, current_value, asking_price, purchase_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome')
               .in('id', vehicleIds) : { data: [], error: null },
             vehicleIds.length > 0 ? supabase
               .from('vehicle_images')
@@ -1072,7 +1118,7 @@ export default function OrganizationProfile() {
               .gt('auction_end_time', now) : { data: [], error: null },
             vehicleIds.length > 0 ? supabase
               .from('external_listings')
-              .select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata')
+              .select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, bid_count, comment_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata')
               .in('vehicle_id', vehicleIds)
               .gt('end_date', now) : { data: [], error: null },
             vehicleIds.length > 0 ? supabase
@@ -1324,7 +1370,24 @@ export default function OrganizationProfile() {
                 signal_score: typeof vehicle?.signal_score === 'number' ? vehicle.signal_score : null,
                 vehicles: vehicle || {},
                 // Attach bat_listing_title for parsing if year/make/model missing
-                bat_listing_title: batAuction?.bat_listing_title || soldBatListing?.bat_listing_title || null
+                bat_listing_title: batAuction?.bat_listing_title || soldBatListing?.bat_listing_title || null,
+                // Attach external_listings array for VehicleCardDense
+                external_listings: externalListingsForVehicle.length > 0 ? externalListingsForVehicle.map((el: any) => ({
+                  id: el.id,
+                  vehicle_id: el.vehicle_id,
+                  listing_status: el.listing_status,
+                  end_date: el.end_date,
+                  current_bid: el.current_bid,
+                  bid_count: el.bid_count || null,
+                  comment_count: el.comment_count || null,
+                  watcher_count: el.watcher_count || null,
+                  view_count: el.view_count || null,
+                  final_price: el.final_price || null,
+                  sold_at: el.sold_at || null,
+                  platform: el.platform,
+                  listing_url: el.listing_url,
+                  source: el.platform === 'bat' || el.platform === 'bringatrailer' ? 'bat' : el.platform
+                })) : []
               };
             } catch {
               return { id: ov.id, vehicle_id: ov.vehicle_id, relationship_type: ov.relationship_type, status: ov.status, vehicles: {} };

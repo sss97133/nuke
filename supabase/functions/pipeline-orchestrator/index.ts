@@ -99,6 +99,31 @@ serve(async (req) => {
     console.log(`   Mode: ${skipScrapers ? 'queues only' : skipQueues ? 'scrapers only' : 'full pipeline'}`);
 
     // ============================================================================
+    // STEP 0: Auto-queue backfill vehicles (runs periodically, doesn't block)
+    // ============================================================================
+    if (!skipQueues && !skipScrapers) {
+      try {
+        console.log('\n🔄 Step 0: Checking for BaT vehicles needing backfill...');
+        const { data: backfillResult, error: backfillError } = await supabase.rpc('auto_queue_bat_backfills', {
+          p_batch_size: 20, // Queue 20 at a time per run
+          p_priority: 75, // Lower priority than new extractions (100)
+        });
+        
+        if (!backfillError && backfillResult && backfillResult.length > 0) {
+          const queued = backfillResult[0]?.queued_count || 0;
+          const skipped = backfillResult[0]?.skipped_count || 0;
+          if (queued > 0) {
+            console.log(`   ✅ Queued ${queued} vehicles for backfill${skipped > 0 ? ` (${skipped} already queued)` : ''}`);
+          }
+        } else if (backfillError) {
+          console.warn(`   ⚠️  Backfill queuing error (non-critical): ${backfillError.message}`);
+        }
+      } catch (e: any) {
+        console.warn(`   ⚠️  Backfill queuing exception (non-critical): ${e.message}`);
+      }
+    }
+
+    // ============================================================================
     // STEP 1: Unlock orphaned "processing" rows
     // ============================================================================
     console.log('\n📂 Step 1: Unlocking orphaned queue items...');

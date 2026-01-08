@@ -1786,6 +1786,152 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           </div>
         </div>
       )}
+
+      {/* Card Body Below Image - Investment-Relevant Info */}
+      {viewMode === 'grid' && (
+        <div style={{
+          padding: '8px',
+          background: 'var(--surface)',
+          borderTop: '1px solid var(--border)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          minHeight: '80px'
+        }}>
+          {/* Title */}
+          <div style={{
+            fontSize: '10pt',
+            fontWeight: 700,
+            lineHeight: 1.2,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {vehicleTitle}
+          </div>
+
+          {/* Investment Metrics Row */}
+          {(() => {
+            const v: any = vehicle as any;
+            const purchasePrice = v.cost_basis || v.purchase_price || null;
+            const currentValue = v.current_value || v.sale_price || v.asking_price || null;
+            const roiPct = v.roi_pct || null;
+            const priceChange = v.price_change || null;
+            const saleStatus = String(v.sale_status || '').toLowerCase();
+            const auctionOutcome = String(v.auction_outcome || '').toLowerCase();
+            const externalListing = v?.external_listings?.[0];
+            const externalStatus = externalListing ? String(externalListing.listing_status || '').toLowerCase() : '';
+            const isSold = saleStatus === 'sold' || auctionOutcome === 'sold' || (externalStatus === 'sold' && (externalListing?.final_price || externalListing?.sold_at));
+            
+            // Calculate profit/loss
+            let profitLoss = null;
+            let profitLossPct = null;
+            if (currentValue && purchasePrice && purchasePrice > 0) {
+              profitLoss = currentValue - purchasePrice;
+              profitLossPct = ((currentValue / purchasePrice - 1) * 100);
+            }
+
+            return (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+                fontSize: '8pt'
+              }}>
+                {/* Current Value / Sale Price */}
+                {currentValue && (
+                  <div style={{ fontWeight: 700, fontSize: '9pt' }}>
+                    {isSold ? 'SOLD ' : ''}{new Intl.NumberFormat('en-US', { 
+                      style: 'currency', 
+                      currency: 'USD', 
+                      maximumFractionDigits: 0 
+                    }).format(currentValue)}
+                  </div>
+                )}
+
+                {/* Profit/Loss Badge */}
+                {profitLoss !== null && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    background: profitLoss > 0 
+                      ? 'rgba(16, 185, 129, 0.15)' 
+                      : profitLoss < 0 
+                        ? 'rgba(239, 68, 68, 0.15)' 
+                        : 'rgba(156, 163, 175, 0.15)',
+                    color: profitLoss > 0 
+                      ? '#10b981' 
+                      : profitLoss < 0 
+                        ? '#ef4444' 
+                        : 'var(--text-muted)',
+                    fontWeight: 700,
+                    fontSize: '8pt',
+                    width: 'fit-content'
+                  }}>
+                    {profitLoss > 0 ? '+' : ''}
+                    {new Intl.NumberFormat('en-US', { 
+                      style: 'currency', 
+                      currency: 'USD', 
+                      maximumFractionDigits: 0 
+                    }).format(profitLoss)}
+                    {profitLossPct !== null && (
+                      <span style={{ opacity: 0.8 }}>
+                        ({profitLossPct > 0 ? '+' : ''}{profitLossPct.toFixed(1)}%)
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* ROI % if available and no profit/loss calculated */}
+                {roiPct !== null && profitLoss === null && (
+                  <div style={{
+                    color: roiPct > 0 ? '#10b981' : roiPct < 0 ? '#ef4444' : 'var(--text-muted)',
+                    fontWeight: 600
+                  }}>
+                    ROI: {roiPct > 0 ? '+' : ''}{roiPct.toFixed(1)}%
+                  </div>
+                )}
+
+                {/* Key Stats Row */}
+                <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  flexWrap: 'wrap',
+                  fontSize: '7pt',
+                  color: 'var(--text-muted)',
+                  alignItems: 'center'
+                }}>
+                  {vehicle.mileage && vehicle.mileage > 0 && (
+                    <span>{Math.floor(vehicle.mileage).toLocaleString()} mi</span>
+                  )}
+                  {vehicle.vin && (
+                    <span style={{ fontFamily: 'monospace' }}>{vehicle.vin.slice(-4)}</span>
+                  )}
+                  {vehicle.location && (
+                    <span>{vehicle.location}</span>
+                  )}
+                  {/* Auction stats for live auctions */}
+                  {isActiveAuction && (() => {
+                    const bidCount = v?.external_listings?.[0]?.bid_count ?? v?.bid_count ?? null;
+                    const watcherCount = v?.external_listings?.[0]?.watcher_count ?? null;
+                    const commentCount = v?.external_listings?.[0]?.comment_count ?? v?.comment_count ?? null;
+                    return (
+                      <>
+                        {bidCount !== null && <span>{bidCount} {bidCount === 1 ? 'bid' : 'bids'}</span>}
+                        {watcherCount !== null && <span>{watcherCount} watching</span>}
+                        {commentCount !== null && <span>{commentCount} {commentCount === 1 ? 'comment' : 'comments'}</span>}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
     </Link>
   );
 };
