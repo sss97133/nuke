@@ -38,7 +38,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
         .select(`
           *,
           vehicle:vehicles!contract_assets_asset_id_fkey(id, year, make, model, current_value, location),
-          organization:businesses!contract_assets_asset_id_fkey(id, name, business_type, location)
+          organization:businesses!contract_assets_asset_id_fkey(id, business_name, business_type, city, state, country)
         `)
         .eq('contract_id', contractId);
 

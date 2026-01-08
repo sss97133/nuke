@@ -143,15 +143,30 @@ async function queueNewAuctionsForDiscovery(auctionUrls) {
           }
         );
 
-        if (extractError || !extractResult?.success) {
-          console.warn(`   ⚠️  Failed to extract ${url}: ${extractError?.message || extractResult?.error}`);
+        if (extractError) {
+          console.warn(`   ⚠️  Extract function error for ${url}: ${extractError.message}`);
           errors++;
-        } else if (extractResult.vehicle_id) {
+          continue;
+        }
+
+        if (!extractResult || !extractResult.success) {
+          console.warn(`   ⚠️  Extract failed for ${url}: ${extractResult?.error || 'Unknown error'}`);
+          errors++;
+          continue;
+        }
+
+        // Check for vehicle_id in various places (function might return it differently)
+        const vehicleId = extractResult.vehicle_id || 
+                         extractResult.vehicles?.[0]?.id || 
+                         extractResult.data?.vehicle_id ||
+                         extractResult.data?.vehicles?.[0]?.id;
+
+        if (vehicleId) {
           // Queue the newly created vehicle for full extraction
           const { error: queueError } = await supabase
             .from('bat_extraction_queue')
             .upsert({
-              vehicle_id: extractResult.vehicle_id,
+              vehicle_id: vehicleId,
               bat_url: url,
               status: 'pending',
               priority: 50,
@@ -163,7 +178,45 @@ async function queueNewAuctionsForDiscovery(auctionUrls) {
 
           if (!queueError) {
             queued++;
-            console.log(`   ✅ Created and queued vehicle ${extractResult.vehicle_id}`);
+            console.log(`   ✅ Created and queued vehicle ${vehicleId}`);
+          } else {
+            console.warn(`   ⚠️  Failed to queue vehicle ${vehicleId}: ${queueError.message}`);
+            errors++;
+          }
+        } else {
+          // Try to find the vehicle that was just created by URL
+          console.log(`   🔍 Vehicle ID not in response, searching by URL...`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for DB insert
+          
+          const { data: newVehicle } = await supabase
+            .from('vehicles')
+            .select('id')
+            .eq('bat_auction_url', url)
+            .maybeSingle();
+          
+          if (newVehicle?.id) {
+            const { error: queueError } = await supabase
+              .from('bat_extraction_queue')
+              .upsert({
+                vehicle_id: newVehicle.id,
+                bat_url: url,
+                status: 'pending',
+                priority: 50,
+                attempts: 0
+              }, {
+                onConflict: 'vehicle_id',
+                ignoreDuplicates: false
+              });
+
+            if (!queueError) {
+              queued++;
+              console.log(`   ✅ Found and queued vehicle ${newVehicle.id}`);
+            } else {
+              errors++;
+            }
+          } else {
+            console.warn(`   ⚠️  Could not find vehicle after extraction for ${url}`);
+            errors++;
           }
         }
       }
