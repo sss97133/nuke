@@ -46,7 +46,8 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
   const loadTransfers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      // Try ownership_transfers first (current schema), fallback to title_transfers if needed
+      let query = supabase
         .from('ownership_transfers')
         .select(`
           *,
@@ -57,7 +58,33 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
+      let { data, error } = await query;
+
+      // Gracefully handle schema mismatch - table or relationship might not exist
+      if (error && (error.code === 'PGRST200' || error.message?.includes('relationship'))) {
+        console.log('ownership_transfers relationship not available, trying simpler query');
+        // Try without relationship join
+        const simpleQuery = supabase
+          .from('ownership_transfers')
+          .select('*')
+          .eq('from_user_id', userId)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false });
+        
+        const simpleResult = await simpleQuery;
+        if (!simpleResult.error) {
+          data = simpleResult.data;
+          error = null;
+        }
+      }
+
       if (error) {
+        // Table doesn't exist - feature not available
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          console.log('Title transfer feature not available');
+          setTransfers([]);
+          return;
+        }
         console.error('Error loading transfers:', error);
         return;
       }
