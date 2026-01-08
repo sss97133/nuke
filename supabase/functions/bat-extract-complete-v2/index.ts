@@ -1,4 +1,15 @@
-// BaT Complete Extractor v2
+// ⚠️ SEARCH ALERT: If you searched for "BaT extraction" or "bringatrailer extraction"
+// and found this file, STOP. Read docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md first.
+//
+// ⚠️ DEPRECATED: This function is deprecated and incomplete (missing VIN/specs).
+// 
+// ✅ USE THIS INSTEAD (Approved Two-Step Workflow):
+// 1. extract-premium-auction (core data: VIN, specs, images, auction_events)
+// 2. extract-auction-comments (comments, bids)
+//
+// Documentation: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+
+// BaT Complete Extractor v2 (DEPRECATED - DO NOT USE)
 // Combines best of: batDomMap.ts + extract-premium-auction VIN/specs logic
 // ALL data mandatory - uses battle-tested code only
 

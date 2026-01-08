@@ -1,5 +1,24 @@
 # LLM Instructions - BaT Extraction System
 
+## ⚠️ BaT Extraction - CRITICAL RULES
+
+**MANDATORY READING:** `docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md`
+
+**DO NOT:**
+- Use `comprehensive-bat-extraction` for BaT listings
+- Use `import-bat-listing` for BaT listings  
+- Use `bat-extract-complete-v1/v2/v3` for BaT listings
+
+**ALWAYS:**
+1. Use `extract-premium-auction` for core data (VIN, specs, images, auction_events)
+2. Use `extract-auction-comments` for comments/bids
+
+**If you see code using deprecated functions, update it to use the approved workflow.**
+
+**These deprecated functions now return 410 Gone errors in production.**
+
+---
+
 ## How to Extract ONE BaT Vehicle
 
 ```bash
