@@ -28,6 +28,15 @@ const SearchResults = ({ results, searchSummary, loading = false }: SearchResult
       case 'shop':
         return `/org/${result.id}`;
       case 'user':
+        // Check if this is an external identity (BaT member, etc.)
+        if (result.id?.startsWith('external_')) {
+          const externalId = result.id.replace('external_', '');
+          return `/profile/external/${externalId}`;
+        }
+        // Check if metadata has external_identity_id
+        if (result.metadata?.external_identity_id) {
+          return `/profile/external/${result.metadata.external_identity_id}`;
+        }
         return `/profile/${result.id}`;
       case 'timeline_event':
         return result.metadata?.vehicle_id ? `/vehicle/${result.metadata.vehicle_id}?t=timeline&event=${result.id}` : undefined;

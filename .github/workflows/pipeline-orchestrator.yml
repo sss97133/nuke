@@ -1,0 +1,75 @@
+name: Pipeline Orchestrator
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # Every 10 minutes
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+concurrency:
+  group: pipeline-orchestrator
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    
+    steps:
+      - name: Validate Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "❌ Missing required secret: SUPABASE_URL"
+            exit 1
+          fi
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "❌ Missing required secret: SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          echo "✅ All required secrets are set"
+      
+      - name: Trigger Pipeline Orchestrator
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "🚀 Triggering pipeline orchestrator..."
+          
+          RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
+            "${SUPABASE_URL%/}/functions/v1/pipeline-orchestrator" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            --max-time 60)
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo ""
+          echo "Response:"
+          echo "$BODY" | head -c 3000
+          echo ""
+          
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo ""
+            echo "✅ Pipeline orchestrator triggered successfully"
+            # Try to parse and display key metrics if available
+            echo "$BODY" | grep -o '"unlocked_import_queue":[0-9]*' || true
+            echo "$BODY" | grep -o '"import_queue_processed":[0-9]*' || true
+            echo "$BODY" | grep -o '"bat_queue_processed":[0-9]*' || true
+          else
+            echo ""
+            echo "❌ Pipeline orchestrator failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "📊 Pipeline orchestrator workflow completed"
+          echo "The orchestrator will continue processing queues asynchronously"
+          echo "Check Supabase logs for full results"
+

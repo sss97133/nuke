@@ -24,20 +24,21 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { batchSize = 10, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 10, maxAttempts: 3 }));
+    const { batchSize = 1, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 1, maxAttempts: 3 }));
 
-    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 10, 200));
+    // SLOW AND ACCURATE: Process ONE at a time
+    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 1, 1)); // Force to 1 for accuracy
     const safeMaxAttempts = Math.max(1, Math.min(Number(maxAttempts) || 3, 20));
     const workerId = `process-bat-extraction-queue:${crypto.randomUUID?.() || String(Date.now())}`;
 
-    console.log(`Processing BaT extraction queue (batch size: ${safeBatchSize}, max attempts: ${safeMaxAttempts})`);
+    console.log(`Processing BaT extraction queue (SLOW & ACCURATE: batch size: ${safeBatchSize}, max attempts: ${safeMaxAttempts})`);
 
     // Claim work atomically (prevents double-processing under concurrent cron / manual runs).
     const { data: queueItems, error: queueError } = await supabase.rpc('claim_bat_extraction_queue_batch', {
       p_batch_size: safeBatchSize,
       p_max_attempts: safeMaxAttempts,
       p_worker_id: workerId,
-      p_lock_ttl_seconds: 15 * 60,
+      p_lock_ttl_seconds: 20 * 60, // 20 minutes lock (extractions can take 3-5 minutes)
     });
 
     if (queueError) {
@@ -71,19 +72,59 @@ serve(async (req) => {
         console.log(`Processing vehicle ${item.vehicle_id} (${item.bat_url})`);
 
         // Step 1: Extract core vehicle data (VIN, specs, images)
-        console.log(`  Step 1: Extracting core data...`);
-        const { data: coreResult, error: coreError } = await supabase.functions.invoke(
-          'extract-premium-auction',
-          {
-            body: {
-              url: item.bat_url,
-              max_vehicles: 1,
+        // SLOW & ACCURATE: Let it take as long as it needs (up to Edge Function limit)
+        console.log(`  Step 1: Extracting core data (this may take 3-5 minutes, be patient)...`);
+        
+        // Use anon key for function-to-function calls (extract-premium-auction has verify_jwt: true)
+        // Prefer INTERNAL_INVOKE_JWT, fall back to SUPABASE_ANON_KEY
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+        const invokeJwt = Deno.env.get('INTERNAL_INVOKE_JWT') ?? 
+                         Deno.env.get('SUPABASE_ANON_KEY') ?? 
+                         Deno.env.get('ANON_KEY') ?? '';
+        
+        if (!invokeJwt) {
+          throw new Error('Missing INTERNAL_INVOKE_JWT or SUPABASE_ANON_KEY for function-to-function calls');
+        }
+        
+        let coreResult: any;
+        let coreError: any;
+        
+        try {
+          const response = await fetch(
+            `${supabaseUrl}/functions/v1/extract-premium-auction`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${invokeJwt}`,
+                'apikey': invokeJwt,
+              },
+              body: JSON.stringify({
+                url: item.bat_url,
+                max_vehicles: 1,
+              }),
             }
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
           }
-        );
+
+          coreResult = await response.json();
+        } catch (e: any) {
+          // Catch any thrown errors (including timeouts)
+          coreError = e;
+        }
 
         if (coreError) {
-          throw new Error(`extract-premium-auction failed: ${coreError.message}`);
+          // Check if it's a timeout - these are expected for complex listings
+          const errorMsg = coreError.message || String(coreError);
+          if (errorMsg.includes('504') || errorMsg.includes('timeout') || errorMsg.includes('Gateway Timeout') || errorMsg.includes('non-2xx')) {
+            // Timeout is expected for complex listings - retry with exponential backoff
+            throw new Error(`extract-premium-auction timed out (listing may be too complex). Will retry with backoff.`);
+          }
+          throw new Error(`extract-premium-auction failed: ${errorMsg}`);
         }
 
         if (!coreResult || !coreResult.success) {
@@ -97,21 +138,33 @@ serve(async (req) => {
         // Step 2: Extract comments and bids
         if (vehicleId) {
           console.log(`  Step 2: Extracting comments/bids...`);
-          const { data: commentResult, error: commentError } = await supabase.functions.invoke(
-            'extract-auction-comments',
-            {
-              body: {
-                auction_url: item.bat_url,
-                vehicle_id: vehicleId,
+          try {
+            const commentResponse = await fetch(
+              `${supabaseUrl}/functions/v1/extract-auction-comments`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${invokeJwt}`,
+                  'apikey': invokeJwt,
+                },
+                body: JSON.stringify({
+                  auction_url: item.bat_url,
+                  vehicle_id: vehicleId,
+                }),
               }
-            }
-          );
+            );
 
-          if (commentError) {
-            // Comments extraction failure is non-critical - log but don't fail
-            console.warn(`  Step 2 warning: extract-auction-comments failed: ${commentError.message}`);
-          } else {
-            console.log(`  Step 2 complete: ${commentResult?.comments_extracted || 0} comments, ${commentResult?.bids_extracted || 0} bids`);
+            if (!commentResponse.ok) {
+              const errorText = await commentResponse.text().catch(() => 'Unknown error');
+              console.warn(`  Step 2 warning: extract-auction-comments failed: HTTP ${commentResponse.status}: ${errorText}`);
+            } else {
+              const commentResult = await commentResponse.json();
+              console.log(`  Step 2 complete: ${commentResult?.comments_extracted || 0} comments, ${commentResult?.bids_extracted || 0} bids`);
+            }
+          } catch (e: any) {
+            // Non-critical - log but continue
+            console.warn(`  Step 2 warning: extract-auction-comments exception: ${e.message}`);
           }
         }
 
@@ -138,6 +191,7 @@ serve(async (req) => {
         const errorMsg = error.message || String(error);
         console.error(`Failed to process ${item.vehicle_id}: ${errorMsg}`);
 
+        // item.attempts is already incremented by claim_bat_extraction_queue_batch
         const attemptsNow = Number(item.attempts || 0);
 
         // Mark as failed if max attempts reached, otherwise leave as pending with backoff

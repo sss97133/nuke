@@ -190,33 +190,32 @@ serve(async (req) => {
         const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
         const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
         
+        // Use process-import-queue-fast (working alternative) while process-import-queue has BOOT_ERROR
         // Fire-and-forget: don't wait for import_queue to finish (can take minutes)
-        fetch(`${SUPABASE_URL}/functions/v1/process-import-queue`, {
+        fetch(`${SUPABASE_URL}/functions/v1/process-import-queue-fast`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${SERVICE_KEY}`,
           },
           body: JSON.stringify({
-            batch_size: 3,
-            max_attempts: 3,
-            priority_only: false,
-            skip_image_upload: true, // Images backfilled separately
-            fast_mode: true,
+            batch_size: 10,
+            external_images_only: true,
+            max_external_images: 18,
           }),
         }).then(async (resp) => {
           if (!resp.ok) {
-            console.error(`   [async] import_queue HTTP ${resp.status}`);
+            console.error(`   [async] import_queue_fast HTTP ${resp.status}`);
             return;
           }
           const res = await resp.json();
-          console.log(`   [async] import_queue: ${res.succeeded}/${res.processed} succeeded`);
+          console.log(`   [async] import_queue_fast: ${res.created || 0} created, ${res.updated || 0} updated`);
         }).catch(e => {
-          console.error(`   [async] import_queue error: ${e.message}`);
+          console.error(`   [async] import_queue_fast error: ${e.message}`);
         });
         
         result.import_queue_processed = -1; // -1 indicates async (result not known yet)
-        console.log(`   ✅ import_queue triggered (async, batch_size=3, fast_mode)`);
+        console.log(`   ✅ import_queue_fast triggered (async, batch_size=10)`);
 
       } catch (e: any) {
         result.errors.push(`import_queue trigger error: ${e.message}`);
@@ -261,30 +260,31 @@ serve(async (req) => {
     }
 
     // ============================================================================
-    // STEP 4: Collect metrics
+    // STEP 4: Collect metrics (fast queries only)
     // ============================================================================
     console.log('\n📊 Step 4: Collecting metrics...');
 
-    // Queue depths
-    const { data: importDepth } = await supabase
-      .from('import_queue')
-      .select('status', { count: 'exact', head: true });
+    // Fast queue depth queries (parallel)
+    const [importStatsResult, batStatsResult] = await Promise.all([
+      supabase
+        .from('import_queue')
+        .select('status')
+        .in('status', ['pending', 'processing'])
+        .limit(10000), // Limit to avoid timeout
+      supabase
+        .from('bat_extraction_queue')
+        .select('status')
+        .in('status', ['pending', 'processing'])
+        .limit(10000)
+    ]);
     
-    const { data: importStats } = await supabase
-      .from('import_queue')
-      .select('status')
-      .in('status', ['pending', 'processing']);
+    const importStats = importStatsResult.data || [];
+    const batStats = batStatsResult.data || [];
     
-    result.queue_depths.import_pending = importStats?.filter(x => x.status === 'pending').length || 0;
-    result.queue_depths.import_processing = importStats?.filter(x => x.status === 'processing').length || 0;
-
-    const { data: batStats } = await supabase
-      .from('bat_extraction_queue')
-      .select('status')
-      .in('status', ['pending', 'processing']);
-    
-    result.queue_depths.bat_pending = batStats?.filter(x => x.status === 'pending').length || 0;
-    result.queue_depths.bat_processing = batStats?.filter(x => x.status === 'processing').length || 0;
+    result.queue_depths.import_pending = importStats.filter(x => x.status === 'pending').length || 0;
+    result.queue_depths.import_processing = importStats.filter(x => x.status === 'processing').length || 0;
+    result.queue_depths.bat_pending = batStats.filter(x => x.status === 'pending').length || 0;
+    result.queue_depths.bat_processing = batStats.filter(x => x.status === 'processing').length || 0;
 
     console.log(`   Queue depths:`);
     console.log(`     import_queue: ${result.queue_depths.import_pending} pending, ${result.queue_depths.import_processing} processing`);
