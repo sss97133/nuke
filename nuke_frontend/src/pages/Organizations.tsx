@@ -1,5 +1,5 @@
 // Organizations Directory - Browse all organizations
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { SUPABASE_URL } from '../lib/env';
@@ -84,32 +84,20 @@ export default function Organizations() {
   const [mergeSource, setMergeSource] = useState<string | null>(null);
   const [mergeTarget, setMergeTarget] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Debug: Log Supabase connection info
-    console.log('[Organizations] Component mounted, Supabase URL:', SUPABASE_URL);
-    
-    // Get user location if "near me" is in search
-    if (searchQuery.toLowerCase().includes('near me')) {
-      navigator.geolocation?.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        () => {
-          console.warn('Could not get user location');
-        }
-      );
-    }
+  // Calculate distance between two coordinates (Haversine formula)
+  const calculateDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }, []);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      loadOrganizations(session);
-    });
-  }, [searchQuery]);
-
-  const loadOrganizations = async (userSession?: any) => {
+  const loadOrganizations = useCallback(async (userSession?: any) => {
     try {
       setLoading(true);
 
@@ -247,6 +235,11 @@ export default function Organizations() {
         }
         orgs = data || [];
         console.log('[Organizations] Loaded', orgs.length, 'organizations (total available:', count || 'unknown', ')');
+        
+        // Safety check: if count says there are orgs but data is empty, log warning
+        if (count && count > 0 && (!data || data.length === 0)) {
+          console.warn('[Organizations] ⚠️  Count indicates', count, 'organizations exist, but query returned none. Possible RLS or filtering issue.');
+        }
       }
 
       if (error) throw error;
@@ -308,20 +301,32 @@ export default function Organizations() {
       setLoading(false);
       console.log('[Organizations] Loading complete');
     }
-  };
+  }, [searchQuery, calculateDistance, userLocation]);
 
-  // Calculate distance between two coordinates (Haversine formula)
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 3959; // Earth's radius in miles
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
+  useEffect(() => {
+    // Debug: Log Supabase connection info
+    console.log('[Organizations] Component mounted, Supabase URL:', SUPABASE_URL);
+    
+    // Get user location if "near me" is in search
+    if (searchQuery && searchQuery.toLowerCase().includes('near me')) {
+      navigator.geolocation?.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        () => {
+          console.warn('Could not get user location');
+        }
+      );
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      loadOrganizations(session);
+    });
+  }, [searchQuery, loadOrganizations]);
 
   // Get unique business types and locations
   const businessTypes = Array.from(new Set(organizations.map(o => o.business_type).filter(Boolean)));
