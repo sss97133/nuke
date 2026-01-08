@@ -183,6 +183,9 @@ function isValidBusinessName(name: string | null | undefined): boolean {
   // Reject names that contain newlines (listing text)
   if (trimmed.includes('\n')) return false;
   
+  // Reject names that are URLs
+  if (/^https?:\/\//i.test(trimmed)) return false;
+  
   // Reject names that look like listing descriptions
   const lower = trimmed.toLowerCase();
   const listingIndicators = [
@@ -1694,7 +1697,14 @@ serve(async (req) => {
         // NOTE: Canonical org table is `businesses` (not legacy `organizations`).
         // VALIDATION: Only create orgs with valid business names OR websites
         const hasValidName = dealerName && isValidBusinessName(dealerName);
-        const hasWebsite = dealerWebsite && typeof dealerWebsite === 'string' && dealerWebsite.startsWith('http');
+        
+        // Validate website format more strictly
+        function isValidWebsite(url: string | null | undefined): boolean {
+          if (!url || typeof url !== 'string') return false;
+          // Must start with http/https and have a valid domain
+          return /^https?:\/\/[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(url.trim());
+        }
+        const hasWebsite = dealerWebsite && isValidWebsite(dealerWebsite);
         
         if (!organizationId && (hasValidName || hasWebsite)) {
           const orgSlug = dealerName 
@@ -1780,13 +1790,33 @@ serve(async (req) => {
                 }
               }
               
-              // Final check: require either valid name OR website
+              // Final check: require either valid name OR valid website
+              // CRITICAL: Never create orgs with null business_name AND invalid/null website
               if (!finalBusinessName && !hasWebsite) {
                 console.warn(`⚠️ Cannot create org: no valid name or website`);
+              } else if (!finalBusinessName && hasWebsite) {
+                // If we have a valid website but no name, use a fallback name from domain
+                const domainMatch = dealerWebsite.match(/https?:\/\/(?:www\.)?([^.]+)/);
+                if (domainMatch && domainMatch[1]) {
+                  const domainName = domainMatch[1].replace(/-/g, ' ');
+                  const fallbackName = domainName.charAt(0).toUpperCase() + domainName.slice(1).toLowerCase();
+                  if (isValidBusinessName(fallbackName)) {
+                    finalBusinessName = fallbackName;
+                  } else {
+                    console.warn(`⚠️ Cannot create org: website "${dealerWebsite}" provided but unable to extract valid name`);
+                  }
+                } else {
+                  console.warn(`⚠️ Cannot create org: website "${dealerWebsite}" provided but unable to extract domain name`);
+                }
+              }
+              
+              // Final validation: require business_name if creating
+              if (!finalBusinessName) {
+                console.warn(`⚠️ Skipping org creation: final validation failed - no valid business_name`);
               } else {
                 const orgData: any = {
-                  business_name: finalBusinessName || null,
-                  website: dealerWebsite || null,
+                  business_name: finalBusinessName,
+                  website: hasWebsite ? dealerWebsite : null,
                   phone: dealerPhone || null,
                   city: dealerLocation || null,
                   business_type: 'dealership',
@@ -1801,15 +1831,62 @@ serve(async (req) => {
                   }
                 };
             
-                const { data: newOrg, error: orgError } = await supabase
-                  .from('businesses')
-                  .insert(orgData)
-                  .select('id')
-                  .single();
+                // Use upsert to handle race conditions: if org already exists by website or name, use it
+                // This prevents duplicate creation when multiple queue items process in parallel
+                let newOrg = null;
+                let orgError = null;
+                
+                if (hasWebsite) {
+                  // Try to find existing org by website first (strongest match)
+                  const { data: existingByWebsite } = await supabase
+                    .from('businesses')
+                    .select('id')
+                    .eq('website', dealerWebsite)
+                    .maybeSingle();
+                  
+                  if (existingByWebsite) {
+                    newOrg = existingByWebsite;
+                    organizationId = existingByWebsite.id;
+                    console.log(`Found existing business by website (race condition check): ${dealerWebsite} -> ${existingByWebsite.id}`);
+                  }
+                }
+                
+                if (!newOrg) {
+                  // Check by name as well before creating
+                  const { data: existingByName } = await supabase
+                    .from('businesses')
+                    .select('id, website')
+                    .ilike('business_name', finalBusinessName)
+                    .maybeSingle();
+                  
+                  if (existingByName) {
+                    newOrg = existingByName;
+                    organizationId = existingByName.id;
+                    console.log(`Found existing business by name (race condition check): ${finalBusinessName} -> ${existingByName.id}`);
+                    
+                    // Update website if missing
+                    if (hasWebsite && !existingByName.website) {
+                      await supabase
+                        .from('businesses')
+                        .update({ website: dealerWebsite })
+                        .eq('id', existingByName.id);
+                    }
+                  } else {
+                    // Create new organization
+                    const insertResult = await supabase
+                      .from('businesses')
+                      .insert(orgData)
+                      .select('id')
+                      .single();
+                    
+                    newOrg = insertResult.data;
+                    orgError = insertResult.error;
+                  }
+                }
                 
                 if (newOrg && !orgError) {
-                  organizationId = newOrg.id;
-                  console.log(`Created new business: ${orgData.business_name || dealerWebsite} (${organizationId})`);
+                  if (!organizationId) organizationId = newOrg.id;
+                  console.log(`Created new business: ${orgData.business_name} (${organizationId})`);
                   
                   // Auto-merge duplicates after creation
                   try {
