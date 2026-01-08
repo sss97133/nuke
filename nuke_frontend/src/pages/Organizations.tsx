@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { SUPABASE_URL } from '../lib/env';
 import { OrganizationSearchService } from '../services/organizationSearch';
 import { getOrgInvestorMetrics, type OrgMetricData } from '../utils/orgInvestorMetrics';
 import { FaviconIcon } from '../components/common/FaviconIcon';
@@ -84,6 +85,9 @@ export default function Organizations() {
   const [mergeTarget, setMergeTarget] = useState<string | null>(null);
 
   useEffect(() => {
+    // Debug: Log Supabase connection info
+    console.log('[Organizations] Component mounted, Supabase URL:', SUPABASE_URL);
+    
     // Get user location if "near me" is in search
     if (searchQuery.toLowerCase().includes('near me')) {
       navigator.geolocation?.getCurrentPosition(
@@ -111,6 +115,14 @@ export default function Organizations() {
 
       let orgs: any[] = [];
       let error: any = null;
+
+      // Debug logging
+      console.log('[Organizations] Loading organizations...', {
+        hasSearchQuery: !!searchQuery.trim(),
+        searchQuery: searchQuery,
+        hasSession: !!userSession,
+        userId: userSession?.user?.id
+      });
 
       // If search query exists, use intelligent search
       if (searchQuery.trim()) {
@@ -148,13 +160,12 @@ export default function Organizations() {
               const orgIds = [...new Set(orgVehicles.map(ov => ov.organization_id))];
               
               if (orgIds.length > 0) {
-                // Load those organizations (limit to 20 for card view)
-                const { data, error: orgError } = await supabase
-                  .from('businesses')
-                  .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at')
-                  .eq('is_public', true)
-                  .in('id', orgIds)
-                  .limit(20);
+                  // Load those organizations
+                       const { data, error: orgError } = await supabase
+                         .from('businesses')
+                         .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at')
+                         .eq('is_public', true)
+                         .in('id', orgIds);
                 
                 if (!orgError) {
                   orgs = data || [];
@@ -189,8 +200,7 @@ export default function Organizations() {
               .from('businesses')
               .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at')
               .eq('is_public', true)
-              .in('id', orgIds)
-              .limit(20);
+              .in('id', orgIds);
             
             if (!orgError) {
               orgs = data || [];
@@ -198,16 +208,32 @@ export default function Organizations() {
           }
         }
       } else {
-        // No search - load organizations with pagination (limit to 20)
+        // No search - load all public organizations
+        console.log('[Organizations] Fetching all public organizations...');
         const { data, error: orgError } = await supabase
           .from('businesses')
           .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at')
           .eq('is_public', true)
-          .order('created_at', { ascending: false })
-          .limit(20);
+          .order('created_at', { ascending: false });
         
-        if (orgError) throw orgError;
+        console.log('[Organizations] Query result:', {
+          hasError: !!orgError,
+          error: orgError,
+          dataLength: data?.length || 0,
+          data: data?.slice(0, 3) // Log first 3 orgs for debugging
+        });
+        
+        if (orgError) {
+          console.error('[Organizations] Query error details:', {
+            message: orgError.message,
+            details: orgError.details,
+            hint: orgError.hint,
+            code: orgError.code
+          });
+          throw orgError;
+        }
         orgs = data || [];
+        console.log('[Organizations] Loaded', orgs.length, 'organizations');
       }
 
       if (error) throw error;
@@ -259,11 +285,15 @@ export default function Organizations() {
         total_sales: 0 // Not needed for card view
       }));
 
+      console.log('[Organizations] Setting organizations state:', enriched.length, 'items');
       setOrganizations(enriched);
     } catch (error) {
-      console.error('Error loading organizations:', error);
+      console.error('[Organizations] Error loading organizations:', error);
+      // Set empty array on error to show "No organizations found" message
+      setOrganizations([]);
     } finally {
       setLoading(false);
+      console.log('[Organizations] Loading complete');
     }
   };
 

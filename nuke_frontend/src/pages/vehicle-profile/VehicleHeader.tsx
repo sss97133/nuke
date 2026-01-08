@@ -156,8 +156,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       const code = cityCodes[city.toLowerCase()];
       if (code) return { short: code, full: `${city}, ${state || ''}`.trim() };
     }
-    // Next: state abbreviation
-    if (state) return { short: state, full: city ? `${city}, ${state}` : state };
+    // Next: state abbreviation (but skip if it's corrupted data like ":")
+    if (state && state !== ':' && state.length <= 3) return { short: state, full: city ? `${city}, ${state}` : state };
     // Fallback: bat_location or listing_location (extract state if possible)
     if (batLoc && batLoc !== 'United States') {
       const stateMatch = batLoc.match(/,\s*([A-Z]{2})\b/);
