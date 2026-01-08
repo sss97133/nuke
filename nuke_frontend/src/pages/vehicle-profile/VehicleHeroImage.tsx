@@ -60,7 +60,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
             backgroundColor: 'var(--bg)', // Fallback background
             backgroundImage: backgroundImageCss,
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
+            backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
           }}
         >

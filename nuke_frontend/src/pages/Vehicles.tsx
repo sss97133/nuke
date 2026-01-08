@@ -95,6 +95,7 @@ const VehiclesInner: React.FC = () => {
   const [preferenceFilter, setPreferenceFilter] = useState<'all' | 'favorites' | 'hidden' | 'collection'>('all');
   const [collectionFilter, setCollectionFilter] = useState<string | null>(null);
   const [discoverySourceFilter, setDiscoverySourceFilter] = useState<string | null>(null);
+  const [displayLimit, setDisplayLimit] = useState(50); // Initial display limit for pagination
   const [vehiclePreferences, setVehiclePreferences] = useState<Map<string, {
     is_favorite: boolean;
     is_hidden: boolean;
@@ -170,7 +171,9 @@ const VehiclesInner: React.FC = () => {
     if (session?.user?.id) {
       loadVehiclePreferences();
     }
-  }, [session, selectedOrganizationId]); // Reload vehicle relationships when session or organization changes
+    // Reset pagination when filters change
+    setDisplayLimit(50);
+  }, [session, selectedOrganizationId, activeTab, preferenceFilter, collectionFilter, discoverySourceFilter]); // Reload vehicle relationships when session or organization changes
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -356,6 +359,7 @@ const VehiclesInner: React.FC = () => {
               color: vehicle.color,
               mileage: vehicle.mileage,
               primaryImageUrl: imageUrl,
+              vehicle_images: vehicle.vehicle_images || [], // Pass images array for fallback
               isAnonymous: false,
               created_at: vehicle.created_at
             },
@@ -409,6 +413,7 @@ const VehiclesInner: React.FC = () => {
               color: vehicle.color,
               mileage: vehicle.mileage,
               primaryImageUrl: imageUrl,
+              vehicle_images: vehicle.vehicle_images || [], // Pass images array for fallback
               isAnonymous: false,
               created_at: vehicle.created_at
             },
@@ -1794,7 +1799,7 @@ const VehiclesInner: React.FC = () => {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {filteredRelationships.slice(0, 60).map((rel) => (
                       <Link
-                        key={rel.vehicle.id}
+                        key={`sidebar-${rel.vehicle.id}-${rel.relationshipType || 'default'}`}
                         to={`/vehicle/${rel.vehicle.id}`}
                         style={{
                           display: 'block',
@@ -1924,12 +1929,13 @@ const VehiclesInner: React.FC = () => {
                               gap: '12px'
                             }}
                           >
-                            {group.items.map((relationship) => {
+                            {group.items.slice(0, displayLimit).map((relationship) => {
                               const vehicle = relationship?.vehicle;
                               if (!vehicle || !relationship) return null;
                               const isSelected = selectedVehicleIds.has(vehicle.id);
+                              // Use composite key to avoid duplicates when same vehicle appears in multiple groups
                               return (
-                                <div key={vehicle.id} style={{ position: 'relative' }}>
+                                <div key={`${vehicle.id}-${group.type}-${relationship.relationshipType || 'default'}`} style={{ position: 'relative' }}>
                                   {session?.user?.id && (
                                     <>
                                       {/* Keep selection/drag controls away from card's own top badges */}
@@ -2011,6 +2017,17 @@ const VehiclesInner: React.FC = () => {
                                 </div>
                               );
                             })}
+                            {group.items.length > displayLimit && (
+                              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '20px' }}>
+                                <button
+                                  type="button"
+                                  className="button button-secondary"
+                                  onClick={() => setDisplayLimit(prev => prev + 50)}
+                                >
+                                  Load More ({group.items.length - displayLimit} remaining)
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -2023,12 +2040,13 @@ const VehiclesInner: React.FC = () => {
                         gap: '12px'
                       }}
                     >
-                      {filteredRelationships.map((relationship) => {
+                      {filteredRelationships.slice(0, displayLimit).map((relationship) => {
                         const vehicle = relationship?.vehicle;
                         if (!vehicle || !relationship) return null;
                         const isSelected = selectedVehicleIds.has(vehicle.id);
+                        // Use composite key to avoid duplicates
                         return (
-                          <div key={vehicle.id} style={{ position: 'relative' }}>
+                          <div key={`${vehicle.id}-${relationship.relationshipType || 'default'}`} style={{ position: 'relative' }}>
                             {session?.user?.id && (
                               <>
                                 {/* Keep selection/drag controls away from card's own top badges */}
@@ -2110,6 +2128,17 @@ const VehiclesInner: React.FC = () => {
                           </div>
                         );
                       })}
+                      {filteredRelationships.length > displayLimit && (
+                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '20px' }}>
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            onClick={() => setDisplayLimit(prev => prev + 50)}
+                          >
+                            Load More ({filteredRelationships.length - displayLimit} remaining)
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
