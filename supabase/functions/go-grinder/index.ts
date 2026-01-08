@@ -109,25 +109,65 @@ Deno.serve(async (req: Request) => {
     out.notes.push("seed_skipped_budget");
   }
 
-  // 2) Deep-import a few discovered BaT listings
+  // 2) Deep-import a few discovered BaT listings using approved two-step workflow
+  // ✅ APPROVED WORKFLOW: extract-premium-auction + extract-auction-comments
+  // ⚠️ Do NOT use import-bat-listing (deprecated)
+  // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
   if (batImportBatch > 0 && listingUrls.length > 0) {
     const take = Math.min(batImportBatch, listingUrls.length, 2); // keep tiny per invocation
     for (let i = 0; i < take; i++) {
-      if (!canRun(12_000)) {
+      if (!canRun(18_000)) { // Increased budget for two-step workflow
         out.notes.push("bat_import_skipped_budget");
         break;
       }
       const url = listingUrls[i];
       if (!url) continue;
       out.bat_import_attempted++;
-      const r = await postJson(
-        `${fnBase}/import-bat-listing`,
-        invokeHeaders,
-        { url },
-        Math.min(45_000, Math.max(10_000, remainingMs() - 2_000)),
-      );
-      if (r.ok && (r.json?.success === true || r.json?.vehicleId || r.json?.vehicle_id)) out.bat_import_ok++;
-      else out.notes.push(`bat_import_failed:${r.status}`);
+      
+      try {
+        // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
+        const step1 = await postJson(
+          `${fnBase}/extract-premium-auction`,
+          invokeHeaders,
+          { url, max_vehicles: 1 },
+          Math.min(50_000, Math.max(15_000, remainingMs() - 5_000)),
+        );
+        
+        if (!step1.ok || !step1.json?.success) {
+          out.notes.push(`bat_import_step1_failed:${step1.status}`);
+          continue;
+        }
+        
+        const vehicleId = step1.json?.created_vehicle_ids?.[0] || step1.json?.updated_vehicle_ids?.[0];
+        if (!vehicleId) {
+          out.notes.push("bat_import_no_vehicle_id");
+          continue;
+        }
+        
+        // Step 2: Extract comments and bids (non-critical, don't fail if this fails)
+        if (canRun(10_000)) {
+          const step2 = await postJson(
+            `${fnBase}/extract-auction-comments`,
+            invokeHeaders,
+            { auction_url: url, vehicle_id: vehicleId },
+            Math.min(30_000, Math.max(8_000, remainingMs() - 2_000)),
+          );
+          
+          if (step2.ok) {
+            out.bat_import_ok++;
+          } else {
+            // Step 1 succeeded, step 2 failed - still count as OK since core data extracted
+            out.bat_import_ok++;
+            out.notes.push(`bat_import_step2_failed_non_critical:${step2.status}`);
+          }
+        } else {
+          // Step 1 succeeded but no budget for step 2 - still count as OK
+          out.bat_import_ok++;
+          out.notes.push("bat_import_step2_skipped_budget");
+        }
+      } catch (e: any) {
+        out.notes.push(`bat_import_error:${e?.message || String(e)}`);
+      }
     }
   } else if (batImportBatch > 0 && listingUrls.length === 0) {
     out.notes.push("no_bat_urls_discovered");

@@ -185,14 +185,43 @@ Deno.serve(async (req) => {
       await admin.from("vehicles").update({ origin_metadata: nextOmAttempt, updated_at: safeNowIso() }).eq("id", v.id).catch(() => null);
 
       try {
-        const { data, error } = await admin.functions.invoke("import-bat-listing", {
+        // ✅ APPROVED WORKFLOW: Use extract-premium-auction + extract-auction-comments
+        // ⚠️ Do NOT use import-bat-listing (deprecated)
+        // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+        
+        // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
+        const step1Result = await admin.functions.invoke("extract-premium-auction", {
           body: {
             url,
-            allowFuzzyMatch: false,
-            imageBatchSize: 50,
+            max_vehicles: 1,
           },
         });
-        if (error) throw error;
+        
+        if (step1Result.error) {
+          throw new Error(`Step 1 failed: ${step1Result.error.message}`);
+        }
+        
+        const vehicleId = step1Result.data?.created_vehicle_ids?.[0] || 
+                         step1Result.data?.updated_vehicle_ids?.[0] || 
+                         v.id;
+        
+        if (!vehicleId) {
+          throw new Error("No vehicle_id returned from extract-premium-auction");
+        }
+        
+        // Step 2: Extract comments and bids (non-critical)
+        try {
+          await admin.functions.invoke("extract-auction-comments", {
+            body: {
+              auction_url: url,
+              vehicle_id: vehicleId,
+            },
+          });
+        } catch (commentError: any) {
+          // Non-critical - log but don't fail
+          console.warn(`Step 2 (comments) failed (non-critical): ${commentError?.message || String(commentError)}`);
+        }
+        
         out.invoked++;
         out.repaired++;
 
@@ -208,7 +237,13 @@ Deno.serve(async (req) => {
         };
         await admin.from("vehicles").update({ origin_metadata: nextOmResult, updated_at: safeNowIso() }).eq("id", v.id).catch(() => null);
 
-        if (out.sample.length < 10) out.sample.push({ vehicle_id: v.id, url, invoked: true, result: data || null });
+        if (out.sample.length < 10) out.sample.push({ 
+          vehicle_id: v.id, 
+          url, 
+          invoked: true, 
+          result: step1Result.data || null,
+          workflow: 'approved-two-step',
+        });
       } catch (e: any) {
         out.failed++;
         const nextOmResult = {
