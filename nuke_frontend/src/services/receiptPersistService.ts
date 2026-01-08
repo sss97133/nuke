@@ -42,17 +42,31 @@ export class ReceiptPersistService {
       const items = parsed.items || [];
       if (items.length > 0) {
         // Simple auto-categorization for parts to power valuation categories
+        // Maps to parts_category enum values (lowercase)
         const autoCategory = (desc?: string, existing?: string | null) => {
-          if (existing) return existing;
+          if (existing) return existing.toLowerCase(); // Normalize existing to lowercase
           const d = (desc || '').toLowerCase();
-          if (/engine|motor|intake|exhaust|radiator|coolant|filter|spark/.test(d)) return 'Engine';
-          if (/brake|pad|rotor|caliper|master/.test(d)) return 'Brakes';
-          if (/suspension|shock|spring|coilover|strut/.test(d)) return 'Suspension';
-          if (/transmission|clutch|gear|drivetrain/.test(d)) return 'Transmission';
-          if (/tire|wheel|rim/.test(d)) return 'Wheels & Tires';
-          if (/body|panel|fender|hood|bumper|paint|wrap/.test(d)) return 'Body/Paint';
-          if (/interior|seat|trim|dash|carpet|stereo/.test(d)) return 'Interior';
-          if (/electrical|wiring|harness|battery|alternator/.test(d)) return 'Electrical';
+          if (/engine|motor|intake|exhaust|radiator|coolant|filter|spark/.test(d)) return 'engine';
+          if (/brake|pad|rotor|caliper|master/.test(d)) return 'brakes';
+          if (/suspension|shock|spring|coilover|strut/.test(d)) return 'suspension';
+          if (/transmission|clutch|gear|drivetrain/.test(d)) return 'transmission';
+          if (/tire|wheel|rim/.test(d)) return 'tools'; // Wheels/tires map to tools (or could be consumables)
+          if (/body|panel|fender|hood|bumper|paint|wrap/.test(d)) return 'paint'; // Body/Paint maps to paint
+          if (/interior|seat|trim|dash|carpet|stereo/.test(d)) return 'interior';
+          if (/electrical|wiring|harness|battery|alternator/.test(d)) return 'electrical';
+          // Additional mappings for receipt extraction
+          if (/fuel|gas|tank|pump|injector/.test(d)) return 'fuel_system';
+          if (/exhaust|muffler|pipe|header/.test(d)) return 'exhaust';
+          if (/cooling|radiator|thermostat|water|pump/.test(d)) return 'cooling';
+          if (/hvac|heating|air|conditioning|ac|climate/.test(d)) return 'hvac';
+          if (/light|bulb|led|halogen/.test(d)) return 'lighting';
+          if (/audio|stereo|speaker|radio|head|unit/.test(d)) return 'audio';
+          if (/safety|airbag|seatbelt|sensor/.test(d)) return 'safety';
+          if (/maintenance|service|oil|filter|fluid/.test(d)) return 'maintenance';
+          if (/tax|taxes/.test(d)) return 'tax';
+          if (/fee|fees|charge|charges/.test(d)) return 'fee';
+          if (/shipping|freight|delivery/.test(d)) return 'shipping';
+          if (/storage|storage fee/.test(d)) return 'storage';
           return null;
         };
         const rows = items.map((it, idx) => ({

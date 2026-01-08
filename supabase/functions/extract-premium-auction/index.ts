@@ -423,62 +423,122 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     console.warn('Error extracting from JSON-LD:', e?.message);
   }
   
-  // Method 5: Extract from __NEXT_DATA__ or window.__INITIAL_STATE__ (Next.js/React apps)
+  // Method 5: Extract from __NEXT_DATA__ (PRIORITY - Cars & Bids uses Next.js)
   try {
     const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
     const nextDataMatch = h.match(nextDataPattern);
     if (nextDataMatch && nextDataMatch[1]) {
       try {
         const nextData = JSON.parse(nextDataMatch[1]);
-        // Navigate through Next.js data structure to find images
-        const findImagesInObject = (obj: any, depth = 0): string[] => {
-          if (depth > 10) return []; // Prevent infinite recursion
-          if (!obj || typeof obj !== 'object') return [];
+        
+        // CRITICAL: Cars & Bids stores images at props.pageProps.auction.images or props.pageProps.auction.photos
+        // Navigate directly to the auction object (most reliable path)
+        const auction = nextData?.props?.pageProps?.auction || 
+                       nextData?.props?.pageProps?.data?.auction ||
+                       nextData?.props?.pageProps?.listing ||
+                       nextData?.props?.auction ||
+                       nextData?.auction;
+        
+        if (auction) {
+          // Extract from known Cars & Bids image paths
+          const imageArrays = [
+            auction.images,
+            auction.photos,
+            auction.gallery,
+            auction.media,
+            auction.photoUrls,
+            auction.imageUrls,
+            auction.image_urls,
+            auction.photo_urls,
+          ].filter(Boolean);
           
-          const found: string[] = [];
-          
-          // Check if this object has image arrays
-          if (Array.isArray(obj)) {
-            for (const item of obj) {
-              if (typeof item === 'string' && isVehicleImage(item)) {
-                found.push(upgradeToFullRes(item));
-              } else if (typeof item === 'object') {
-                found.push(...findImagesInObject(item, depth + 1));
-              }
-            }
-          } else {
-            // Check common image property names
-            const imageKeys = ['images', 'photos', 'gallery', 'imageUrls', 'photoUrls', 'image_urls', 'photo_urls'];
-            for (const key of imageKeys) {
-              if (Array.isArray(obj[key])) {
-                for (const img of obj[key]) {
-                  const url = typeof img === 'string' ? img : (img?.url || img?.src || img?.image || img?.full || img?.original || null);
-                  if (url && typeof url === 'string' && isVehicleImage(url)) {
-                    found.push(upgradeToFullRes(url));
+          for (const imageArray of imageArrays) {
+            if (Array.isArray(imageArray)) {
+              for (const img of imageArray) {
+                // Handle both string URLs and image objects
+                let url: string | null = null;
+                if (typeof img === 'string') {
+                  url = img;
+                } else if (typeof img === 'object' && img !== null) {
+                  // Try common image object properties (prioritize full-res)
+                  url = img.url || img.src || img.full || img.original || img.large || img.image || img.photo || null;
+                }
+                
+                if (url && typeof url === 'string' && isVehicleImage(url)) {
+                  const upgraded = upgradeToFullRes(url);
+                  if (upgraded) {
+                    urls.add(upgraded);
+                    // Also add variants if they exist (some images have multiple sizes)
+                    if (img && typeof img === 'object') {
+                      const variants = [img.full, img.original, img.large, img.medium];
+                      for (const variant of variants) {
+                        if (variant && typeof variant === 'string' && isVehicleImage(variant)) {
+                          urls.add(upgradeToFullRes(variant));
+                        }
+                      }
+                    }
                   }
                 }
-              } else if (typeof obj[key] === 'string' && isVehicleImage(obj[key])) {
-                found.push(upgradeToFullRes(obj[key]));
-              }
-            }
-            
-            // Recursively search nested objects
-            for (const value of Object.values(obj)) {
-              if (typeof value === 'object' && value !== null) {
-                found.push(...findImagesInObject(value, depth + 1));
               }
             }
           }
-          
-          return found;
-        };
-        
-        const nextDataImages = findImagesInObject(nextData);
-        for (const img of nextDataImages) {
-          if (img) urls.add(img);
         }
-      } catch {
-        // Not valid JSON, continue
+        
+        // Fallback: Recursive search if direct path didn't work
+        if (urls.size === 0) {
+          const findImagesInObject = (obj: any, depth = 0): string[] => {
+            if (depth > 10) return [];
+            if (!obj || typeof obj !== 'object') return [];
+            
+            const found: string[] = [];
+            
+            if (Array.isArray(obj)) {
+              for (const item of obj) {
+                if (typeof item === 'string' && isVehicleImage(item)) {
+                  found.push(upgradeToFullRes(item));
+                } else if (typeof item === 'object') {
+                  found.push(...findImagesInObject(item, depth + 1));
+                }
+              }
+            } else {
+              const imageKeys = ['images', 'photos', 'gallery', 'imageUrls', 'photoUrls', 'image_urls', 'photo_urls'];
+              for (const key of imageKeys) {
+                if (Array.isArray(obj[key])) {
+                  for (const img of obj[key]) {
+                    const url = typeof img === 'string' ? img : (img?.url || img?.src || img?.image || img?.full || img?.original || null);
+                    if (url && typeof url === 'string' && isVehicleImage(url)) {
+                      found.push(upgradeToFullRes(url));
+                    }
+                  }
+                } else if (typeof obj[key] === 'string' && isVehicleImage(obj[key])) {
+                  found.push(upgradeToFullRes(obj[key]));
+                }
+              }
+              
+              // Recursively search nested objects (limit depth to avoid performance issues)
+              if (depth < 5) {
+                for (const value of Object.values(obj)) {
+                  if (typeof value === 'object' && value !== null) {
+                    found.push(...findImagesInObject(value, depth + 1));
+                  }
+                }
+              }
+            }
+            
+            return found;
+          };
+          
+          const nextDataImages = findImagesInObject(nextData);
+          for (const img of nextDataImages) {
+            if (img) urls.add(img);
+          }
+        }
+        
+        if (urls.size > 0) {
+          console.log(`✅ Extracted ${urls.size} images from __NEXT_DATA__`);
+        }
+      } catch (e: any) {
+        console.warn('Error parsing __NEXT_DATA__ for images:', e?.message);
       }
     }
   } catch (e: any) {
@@ -3678,7 +3738,9 @@ async function storeVehiclesInDatabase(
         // Hoist auctionEventId to outer scope so it can be used in bidders block.
         let auctionEventId: string | null = null;
 
-        if (data?.id && listingUrl && (Array.isArray(vehicle.comments) || Array.isArray(vehicle.bid_history))) {
+        // ⚠️ CRITICAL: Always create/update auction_events for BaT listings (not just when comments/bid_history exist)
+        // This ensures we track sale status, outcomes, and auction data even if comments extraction happens later
+        if (data?.id && listingUrl) {
           try {
             // Determine auction_events.source for this listing
             const eventSource = platform === 'cars_and_bids' ? 'cars_and_bids' : (platform || 'unknown');
@@ -3695,14 +3757,33 @@ async function storeVehiclesInDatabase(
               auctionEventId = existingEvent.id;
 
               const sourceListingIdFromUrl = String(listingUrl).match(/\/auctions\/([^\/\?#]+)/i)?.[1] || null;
+              
+              // ⚠️ CRITICAL: Re-calculate outcome when updating (may have been wrong before)
+              const endDate = vehicle.auction_end_date ? new Date(vehicle.auction_end_date) : null;
+              const hasSalePrice = Number.isFinite(vehicle.sale_price) && vehicle.sale_price > 0;
+              const hasHighBid = Number.isFinite(vehicle.high_bid) && vehicle.high_bid > 0;
+              const hasFinalBid = Number.isFinite(vehicle.final_bid) && vehicle.final_bid > 0;
+              
+              const outcome: string =
+                hasSalePrice ? 'sold' : // Only sold if we have sale_price (from "Sold for")
+                (vehicle.reserve_met === false ? 'reserve_not_met' :
+                  (hasHighBid || hasFinalBid ? 'bid_to' : // Has bids but no sale = "bid to" status
+                    (endDate && Number.isFinite(endDate.getTime()) && endDate > new Date() ? 'pending' : 'no_sale')));
 
               await supabase
                 .from('auction_events')
                 .update({
                   source: eventSource,
                   source_listing_id: vehicle.auction_id || vehicle.listing_id || sourceListingIdFromUrl,
+                  outcome, // ⚠️ CRITICAL: Update outcome (fixes wrong sale status)
+                  // high_bid: highest bid regardless of outcome
+                  high_bid: Number.isFinite(vehicle.high_bid) ? vehicle.high_bid :
+                            (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid :
+                             (Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null)),
+                  // winning_bid: ONLY set if actually sold (has sale_price)
+                  winning_bid: hasSalePrice ? (Number.isFinite(vehicle.sale_price) ? vehicle.sale_price : null) : null,
+                  winning_bidder: (hasSalePrice && (vehicle.buyer_username || vehicle.buyer)) ? (vehicle.buyer_username || vehicle.buyer) : null,
                   seller_name: deriveSellerBuyer(vehicle).seller,
-                  winning_bidder: vehicle.buyer_username || vehicle.buyer || null,
                   comments_count: Array.isArray(vehicle.comments) ? vehicle.comments.length : (Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null),
                   bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : null,
                   updated_at: nowIso(),
@@ -3712,10 +3793,17 @@ async function storeVehiclesInDatabase(
               const endDate = vehicle.auction_end_date ? new Date(vehicle.auction_end_date) : null;
               // auction_events.outcome CHECK constraint:
               // sold, reserve_not_met, no_sale, bid_to, cancelled, relisted, pending
+              // ⚠️ CRITICAL: Only mark as 'sold' if sale_price exists (from "Sold for", not "Bid to")
+              // If we have high_bid but NO sale_price, it's NOT sold (reserve not met or no sale)
+              const hasSalePrice = Number.isFinite(vehicle.sale_price) && vehicle.sale_price > 0;
+              const hasHighBid = Number.isFinite(vehicle.high_bid) && vehicle.high_bid > 0;
+              const hasFinalBid = Number.isFinite(vehicle.final_bid) && vehicle.final_bid > 0;
+              
               const outcome: string =
-                Number.isFinite(vehicle.sale_price) || Number.isFinite(vehicle.final_bid) ? 'sold' :
+                hasSalePrice ? 'sold' : // Only sold if we have sale_price (from "Sold for")
                 (vehicle.reserve_met === false ? 'reserve_not_met' :
-                  (endDate && Number.isFinite(endDate.getTime()) && endDate > new Date() ? 'pending' : 'no_sale'));
+                  (hasHighBid || hasFinalBid ? 'bid_to' : // Has bids but no sale = "bid to" status
+                    (endDate && Number.isFinite(endDate.getTime()) && endDate > new Date() ? 'pending' : 'no_sale')));
               const { data: newEvent, error: eventError } = await supabase
                 .from('auction_events')
                 .upsert({
@@ -3724,9 +3812,14 @@ async function storeVehiclesInDatabase(
                   source_url: listingUrl,
                   source_listing_id: vehicle.auction_id || vehicle.listing_id || null,
                   outcome,
-                  high_bid: Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null,
-                  winning_bid: Number.isFinite(vehicle.sale_price) ? vehicle.sale_price : (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid : null),
-                  winning_bidder: vehicle.buyer_username || vehicle.buyer || null,
+                  // high_bid: highest bid regardless of outcome (can be from "Bid to" or "Sold for")
+                  high_bid: Number.isFinite(vehicle.high_bid) ? vehicle.high_bid :
+                            (Number.isFinite(vehicle.final_bid) ? vehicle.final_bid :
+                             (Number.isFinite(vehicle.current_bid) ? vehicle.current_bid : null)),
+                  // winning_bid: ONLY set if actually sold (has sale_price)
+                  // DO NOT set from final_bid or high_bid if no sale_price (those are just "Bid to" amounts)
+                  winning_bid: hasSalePrice ? (Number.isFinite(vehicle.sale_price) ? vehicle.sale_price : null) : null,
+                  winning_bidder: (hasSalePrice && (vehicle.buyer_username || vehicle.buyer)) ? (vehicle.buyer_username || vehicle.buyer) : null,
                   seller_name: deriveSellerBuyer(vehicle).seller,
                   comments_count: Array.isArray(vehicle.comments) ? vehicle.comments.length : (Number.isFinite(vehicle.comment_count) ? vehicle.comment_count : null),
                   bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : null,
@@ -5546,18 +5639,95 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
         }
       }
       
-      // Sale price / high bid (for ended auctions)
-      const pricePatterns = [
-        /(?:sold\s*for|winning\s*bid|final\s*price|hammer\s*price)[:\s$]*([0-9,]+)/i,
-        /"sale_price"[:\s]*(\d+)/i,
-        /"high_bid"[:\s]*(\d+)/i,
+      // ⚠️ CRITICAL: Distinguish "Bid to $X" (NOT SOLD) vs "Sold for $X" (SOLD)
+      // BaT result pages show:
+      // - "Bid to USD $X" = highest bid, but NOT sold (reserve not met or no sale)
+      // - "Sold for $X" or "Sold to $X" = actually sold
+      // - "This [vehicle] got away" = NOT SOLD
+      
+      // Check for "got away" or "not sold" indicators first
+      const gotAwayPatterns = [
+        /got\s+away/i,
+        /did\s+not\s+sell/i,
+        /no\s+sale/i,
+        /not\s+sold/i,
+        /reserve\s+not\s+met/i,
       ];
-      for (const pattern of pricePatterns) {
+      const hasGotAway = gotAwayPatterns.some(pattern => pattern.test(h));
+      
+      // Extract "Bid to $X" (high bid, NOT sale price)
+      const bidToMatch = h.match(/Bid\s+to\s+(?:USD\s*)?\$?([0-9,]+)/i);
+      if (bidToMatch?.[1]) {
+        const highBid = parseInt(bidToMatch[1].replace(/,/g, ''), 10);
+        if (highBid > 100 && highBid < 100000000) {
+          specs.high_bid = highBid;
+          specs.final_bid = highBid;
+          // DO NOT set sale_price - this is just the high bid, not a sale
+          if (hasGotAway) {
+            specs.reserve_met = false;
+          }
+        }
+      }
+      
+      // Extract "Sold for $X" or "Sold to $X" (actual sale)
+      const soldPatterns = [
+        /Sold\s+(?:for|to)\s+(?:USD\s*)?\$?([0-9,]+)/i,
+        /Sold\s+(?:USD\s*)?\$?([0-9,]+)\s+(?:on|for)/i,
+        /(?:winning\s*bid|final\s*price|hammer\s*price)[:\s\$]*([0-9,]+)/i,
+      ];
+      for (const pattern of soldPatterns) {
         const m = h.match(pattern);
-        if (m?.[1]) {
+        if (m?.[1] && !h.match(/Bid\s+to/i)) { // Make sure it's not "Bid to"
           const price = parseInt(m[1].replace(/,/g, ''), 10);
           if (price > 100 && price < 100000000) {
             specs.sale_price = price;
+            specs.final_bid = price;
+            specs.high_bid = price;
+            break;
+          }
+        }
+      }
+      
+      // Fallback: JSON-LD or structured data
+      const jsonPricePatterns = [
+        /"sale_price"[:\s]*(\d+)/i,
+        /"final_price"[:\s]*(\d+)/i,
+      ];
+      for (const pattern of jsonPricePatterns) {
+        const m = h.match(pattern);
+        if (m?.[1] && !specs.sale_price) {
+          const price = parseInt(m[1].replace(/,/g, ''), 10);
+          if (price > 100 && price < 100000000) {
+            specs.sale_price = price;
+            break;
+          }
+        }
+      }
+      
+      // Extract high_bid from JSON if not already set
+      if (!specs.high_bid) {
+        const highBidMatch = h.match(/"high_bid"[:\s]*(\d+)/i);
+        if (highBidMatch?.[1]) {
+          const highBid = parseInt(highBidMatch[1].replace(/,/g, ''), 10);
+          if (highBid > 100 && highBid < 100000000) {
+            specs.high_bid = highBid;
+          }
+        }
+      }
+      
+      // Extract bid count (separate from comment count)
+      // Look for patterns like "X bids" or "X Bids" (not "X Comments")
+      const bidCountPatterns = [
+        /(\d+)\s+bids?/i,
+        /"bid_count"[:\s]*(\d+)/i,
+        /"bids"[:\s]*(\d+)/i,
+      ];
+      for (const pattern of bidCountPatterns) {
+        const m = h.match(pattern);
+        if (m?.[1]) {
+          const bidCount = parseInt(m[1].replace(/,/g, ''), 10);
+          if (bidCount >= 0 && bidCount < 100000) {
+            specs.bid_count = bidCount;
             break;
           }
         }
@@ -5595,13 +5765,16 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       body_style: { type: "string", description: "Body style (Roadster, Coupe, Sedan, etc.)" },
       
       // Auction data
-      current_bid: { type: "number", description: "Current bid amount (for active auctions)" },
-      high_bid: { type: "number", description: "Highest bid (for ended auctions)" },
-      final_bid: { type: "number", description: "Final winning bid amount" },
-      sale_price: { type: "number", description: "Sale price (if sold)" },
+      // ⚠️ CRITICAL: Distinguish between "Bid to $X" (NOT SOLD) vs "Sold for $X" (SOLD)
+      // - If page says "Bid to $X" or "got away" → set high_bid, final_bid, but NOT sale_price
+      // - If page says "Sold for $X" or "Sold to $X" → set sale_price, final_bid, high_bid
+      current_bid: { type: "number", description: "Current bid amount (for active auctions only)" },
+      high_bid: { type: "number", description: "Highest bid amount (can be from 'Bid to $X' or 'Sold for $X')" },
+      final_bid: { type: "number", description: "Final bid amount (can be high bid even if not sold)" },
+      sale_price: { type: "number", description: "Sale price ONLY if auction actually sold (from 'Sold for $X', NOT 'Bid to $X'). Do NOT set this if page says 'got away' or 'Bid to'." },
       reserve_price: { type: "number", description: "Reserve price (if disclosed)" },
-      reserve_met: { type: "boolean", description: "Reserve met" },
-      bid_count: { type: "number", description: "Total number of bids" },
+      reserve_met: { type: "boolean", description: "Reserve met (false if page says 'got away' or 'reserve not met')" },
+      bid_count: { type: "number", description: "Total number of BIDS (not comments). Look for 'X bids' or 'X Bids' text." },
       view_count: { type: "number", description: "Number of views" },
       watcher_count: { type: "number", description: "Number of watchers" },
       comment_count: { type: "number", description: "Number of comments" },
@@ -5729,8 +5902,19 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     // Extract specs from HTML as fallback when Firecrawl AI extraction fails
     const htmlSpecs = html ? extractBatSpecsFromHtml(html) : {};
     console.log(`BaT HTML specs extracted:`, JSON.stringify(htmlSpecs));
+    
+    // ⚠️ VERIFICATION: Log what we extracted from HTML to verify against source
+    if (htmlSpecs.high_bid && !htmlSpecs.sale_price) {
+      console.log(`✅ VERIFIED: HTML shows "Bid to $${htmlSpecs.high_bid}" (NOT sold) - sale_price will be null`);
+    } else if (htmlSpecs.sale_price) {
+      console.log(`✅ VERIFIED: HTML shows "Sold for $${htmlSpecs.sale_price}" (SOLD) - sale_price will be set`);
+    }
+    if (htmlSpecs.bid_count !== undefined) {
+      console.log(`✅ VERIFIED: HTML extracted ${htmlSpecs.bid_count} bids (separate from comments)`);
+    }
 
     // Merge ALL extracted data comprehensively - use HTML fallbacks for missing fields
+    // ⚠️ CRITICAL: HTML extraction distinguishes "Bid to $X" (not sold) vs "Sold for $X" (sold)
     const merged = {
       ...vehicle,
       listing_url: normalizedUrl,
@@ -5743,18 +5927,30 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       drivetrain: vehicle?.drivetrain || htmlSpecs.drivetrain || null,
       vin: vehicle?.vin || htmlSpecs.vin || null,
       location: vehicle?.location || htmlSpecs.location || null,
-      // Preserve all auction data
+      // ⚠️ CRITICAL: Prioritize HTML extraction for prices (it distinguishes "Bid to" vs "Sold for")
+      // Only set sale_price if HTML extracted it (meaning "Sold for"), NOT "Bid to"
+      high_bid: typeof htmlSpecs.high_bid === 'number' ? htmlSpecs.high_bid :
+                (typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null),
+      final_bid: typeof htmlSpecs.final_bid === 'number' ? htmlSpecs.final_bid :
+                 (typeof htmlSpecs.high_bid === 'number' ? htmlSpecs.high_bid :
+                  (typeof vehicle?.final_bid === 'number' ? vehicle.final_bid : null)),
+      // sale_price ONLY if HTML extracted "Sold for" (not "Bid to")
+      sale_price: typeof htmlSpecs.sale_price === 'number' ? htmlSpecs.sale_price :
+                  (typeof vehicle?.sale_price === 'number' ? vehicle.sale_price : null),
+      // current_bid for active auctions, otherwise use high_bid
       current_bid: typeof vehicle?.current_bid === 'number' ? vehicle.current_bid : 
-                   (typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null),
-      high_bid: typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null,
-      final_bid: typeof vehicle?.final_bid === 'number' ? vehicle.final_bid : null,
-      sale_price: typeof vehicle?.sale_price === 'number' ? vehicle.sale_price : (htmlSpecs.sale_price ?? null),
+                   (typeof htmlSpecs.high_bid === 'number' ? htmlSpecs.high_bid :
+                    (typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null)),
+      // Reserve status from HTML if detected
+      reserve_met: typeof htmlSpecs.reserve_met === 'boolean' ? htmlSpecs.reserve_met :
+                   (typeof vehicle?.reserve_met === 'boolean' ? vehicle.reserve_met : null),
       reserve_price: typeof vehicle?.reserve_price === 'number' ? vehicle.reserve_price : null,
       auction_end_date: vehicle?.auction_end_date || null,
       auction_start_date: vehicle?.auction_start_date || null,
       sale_date: vehicle?.sale_date || null,
-      // Preserve all metrics
-      bid_count: typeof vehicle?.bid_count === 'number' ? vehicle.bid_count : null,
+      // Preserve all metrics (prioritize HTML extraction for bid_count)
+      bid_count: typeof htmlSpecs.bid_count === 'number' ? htmlSpecs.bid_count :
+                 (typeof vehicle?.bid_count === 'number' ? vehicle.bid_count : null),
       view_count: typeof vehicle?.view_count === 'number' ? vehicle.view_count : null,
       watcher_count: typeof vehicle?.watcher_count === 'number' ? vehicle.watcher_count : null,
       comment_count: typeof vehicle?.comment_count === 'number' ? vehicle.comment_count : null,
@@ -5771,6 +5967,15 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     };
 
     console.log(`Extracted merged object VIN: "${merged.vin}", mileage: ${merged.mileage}, images: ${merged.images?.length || 0}`);
+    
+    // ⚠️ VERIFICATION: Log final extracted values for cross-checking
+    console.log(`📊 EXTRACTION VERIFICATION:`);
+    console.log(`   sale_price: ${merged.sale_price || 'NULL'} ${merged.sale_price ? '(SOLD)' : '(NOT SOLD)'}`);
+    console.log(`   high_bid: ${merged.high_bid || 'NULL'}`);
+    console.log(`   final_bid: ${merged.final_bid || 'NULL'}`);
+    console.log(`   bid_count: ${merged.bid_count || 'NULL'}`);
+    console.log(`   Expected outcome: ${merged.sale_price ? 'sold' : (merged.high_bid ? 'bid_to' : 'no_sale')}`);
+    
     extracted.push(merged);
   } catch (e: any) {
     issues.push(`BaT listing scrape failed: ${normalizedUrl} (${e?.message || String(e)})`);
