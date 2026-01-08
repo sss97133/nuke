@@ -153,7 +153,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           created_at: batListing.created_at || batListing.sale_date || new Date().toISOString(),
           source_name: 'Bring a Trailer',
           source_url: batListing.listing_url,
-          logo_url: 'https://bringatrailer.com/wp-content/themes/flavor/bat/images/bat-icon.png',
+          logo_url: '/vendor/bat/favicon.ico',
           verified_by: 'BaT'
         });
       }
@@ -196,7 +196,7 @@ const ValidationPopupV2: React.FC<ValidationPopupV2Props> = ({
           created_at: new Date().toISOString(),
           source_name: 'Bring a Trailer',
           source_url: vehicleOrigin.bat_auction_url,
-          logo_url: 'https://bringatrailer.com/wp-content/themes/flavor/bat/images/bat-icon.png',
+          logo_url: '/vendor/bat/favicon.ico',
           verified_by: 'BaT'
         });
       }
