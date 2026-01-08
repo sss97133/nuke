@@ -723,15 +723,65 @@ export default function OrganizationProfile() {
     return Math.max(60, Math.floor(px));
   }, [gridWidth, cardsPerRow]);
 
+  // Helper function to parse year/make/model from BaT listing title
+  const parseBatTitle = (title: string | null | undefined): { year?: number; make?: string; model?: string } => {
+    if (!title) return {};
+    
+    // Extract year (4 digits)
+    const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+    const year = yearMatch ? parseInt(yearMatch[0], 10) : undefined;
+    if (year && (year < 1885 || year > new Date().getFullYear() + 1)) return {};
+    
+    if (!year) return {};
+    
+    // Everything after the year is make + model
+    const afterYear = title.slice(title.indexOf(yearMatch![0]) + yearMatch![0].length).trim();
+    const parts = afterYear.split(/\s+/).filter(p => p.length > 0);
+    
+    if (parts.length === 0) return { year };
+    
+    // First 1-2 words are usually make (handles "Mercedes-Benz", "Land Rover", etc.)
+    let make: string | undefined;
+    let model: string | undefined;
+    
+    // Check for hyphenated makes
+    if (parts[0].toLowerCase() === 'mercedes-benz' || parts[0].toLowerCase().startsWith('mercedes')) {
+      make = parts.slice(0, 2).join(' ').toLowerCase();
+      if (parts.length > 2) model = parts.slice(2).join(' ').toLowerCase();
+    } else if (parts[0].toLowerCase() === 'land-rover' || (parts[0].toLowerCase() === 'land' && parts[1]?.toLowerCase() === 'rover')) {
+      make = parts.slice(0, 2).join(' ').toLowerCase();
+      if (parts.length > 2) model = parts.slice(2).join(' ').toLowerCase();
+    } else {
+      // Single word make (Ford, BMW, Porsche, etc.)
+      make = parts[0].toLowerCase();
+      if (parts.length > 1) model = parts.slice(1).join(' ').toLowerCase();
+    }
+    
+    return { year, make, model };
+  };
+
   // Helper function to transform OrgVehicle to VehicleCardDense format
   const transformVehicleForCard = (orgVehicle: OrgVehicle) => {
     const vehicle = orgVehicle.vehicles || {};
+    
+    // Try to get year/make/model from multiple sources
+    let year = orgVehicle.vehicle_year || (vehicle as any)?.year;
+    let make = orgVehicle.vehicle_make || (vehicle as any)?.make;
+    let model = orgVehicle.vehicle_model || (vehicle as any)?.model;
+    
+    // If still missing, try parsing from bat_listing_title if available
+    if ((!year || !make || !model) && (orgVehicle as any).bat_listing_title) {
+      const parsed = parseBatTitle((orgVehicle as any).bat_listing_title);
+      year = year || parsed.year;
+      make = make || parsed.make;
+      model = model || parsed.model;
+    }
+    
     return {
       id: orgVehicle.vehicle_id,
-      // Check both orgVehicle fields and joined vehicles table
-      year: orgVehicle.vehicle_year || (vehicle as any)?.year || undefined,
-      make: orgVehicle.vehicle_make || (vehicle as any)?.make || undefined,
-      model: orgVehicle.vehicle_model || (vehicle as any)?.model || undefined,
+      year: year || undefined,
+      make: make || undefined,
+      model: model || undefined,
       series: (vehicle as any)?.series || undefined,
       trim: (vehicle as any)?.trim || undefined,
       vin: orgVehicle.vehicle_vin || (vehicle as any)?.vin || undefined,
@@ -1027,7 +1077,7 @@ export default function OrganizationProfile() {
               .gt('end_date', now) : { data: [], error: null },
             vehicleIds.length > 0 ? supabase
               .from('bat_listings')
-              .select('vehicle_id, id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url')
+              .select('vehicle_id, id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url, bat_listing_title')
               .in('vehicle_id', vehicleIds)
               .gt('auction_end_date', nowDate) : { data: [], error: null },
             // NEW: Load SOLD external listings for comprehensive sold detection
@@ -1039,7 +1089,7 @@ export default function OrganizationProfile() {
             // NEW: Load SOLD/ENDED bat listings
             vehicleIds.length > 0 ? supabase
               .from('bat_listings')
-              .select('vehicle_id, id, organization_id, listing_status, auction_end_date, final_bid')
+              .select('vehicle_id, id, organization_id, listing_status, auction_end_date, final_bid, bat_listing_title')
               .in('vehicle_id', vehicleIds)
               .in('listing_status', ['sold', 'ended']) : { data: [], error: null },
             // NEW: Load ENDED vehicle listings (past end date implies sold/ended)
@@ -1272,7 +1322,9 @@ export default function OrganizationProfile() {
                 seller_handle: auctionData?.seller_handle || null,
                 analysis_tier: typeof vehicle?.analysis_tier === 'number' ? vehicle.analysis_tier : null,
                 signal_score: typeof vehicle?.signal_score === 'number' ? vehicle.signal_score : null,
-                vehicles: vehicle || {}
+                vehicles: vehicle || {},
+                // Attach bat_listing_title for parsing if year/make/model missing
+                bat_listing_title: batAuction?.bat_listing_title || soldBatListing?.bat_listing_title || null
               };
             } catch {
               return { id: ov.id, vehicle_id: ov.vehicle_id, relationship_type: ov.relationship_type, status: ov.status, vehicles: {} };
