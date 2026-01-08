@@ -2515,10 +2515,11 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
     !normalizedUrl.replace(/\/+$/, "").endsWith("/auctions");
 
   const indexUrl = isDirectListing ? "https://carsandbids.com/auctions" : (normalizedUrl.includes("carsandbids.com/auctions") ? normalizedUrl : "https://carsandbids.com/auctions");
-  const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  // ⚠️ FREE MODE: Firecrawl is optional - we'll use direct fetch + __NEXT_DATA__ extraction
+  const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") || null;
   const sourceWebsite = "https://carsandbids.com";
 
-  // Step 1: Firecrawl-based "DOM map" to bypass bot protection on the index page
+  // Step 1: Try to discover listing URLs (Firecrawl is optional now)
   let listingUrls: string[] = [];
   let mapRaw: any = null;
 
@@ -2528,59 +2529,11 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
     listingUrls = [cleanUrl];
   }
 
-  if (listingUrls.length === 0) {
-  try {
-    const mapped = await fetchJsonWithTimeout(
-      FIRECRAWL_MAP_URL,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${firecrawlKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          url: indexUrl,
-          includeSubdomains: false,
-          limit: 500,
-        }),
-      },
-      20000,
-      "Firecrawl map",
-    );
-    mapRaw = mapped;
-
-    const urls: string[] =
-      mapped?.data?.urls ||
-      mapped?.urls ||
-      mapped?.data ||
-      mapped?.links ||
-      [];
-
-    if (Array.isArray(urls) && urls.length > 0) {
-      listingUrls = urls
-        .map((u: any) => String(u || "").trim())
-        .filter((u: string) => u.startsWith("http"))
-        .filter((u: string) => u.includes("carsandbids.com/auctions/") && !u.includes("?"))
-        .filter((u: string) => {
-          const lower = u.toLowerCase();
-          if (lower.endsWith(".xml")) return false;
-          if (lower.includes("sitemap")) return false;
-          // CRITICAL: Exclude /video URLs - those are not the actual listing pages
-          if (lower.includes("/video")) return false;
-          return true;
-        })
-        .map((u: string) => u.replace(/\/video\/?$/, '')) // Strip /video suffix just in case
-        .slice(0, 300);
-    }
-  } catch (e: any) {
-    console.warn("Firecrawl index discovery failed, will try direct fetch fallback:", e?.message || String(e));
-  }
-
-  // Fallback: Firecrawl scrape the index page to get markdown, then extract listing URLs from that text.
-  if (listingUrls.length === 0) {
+  // Try Firecrawl discovery only if API key is available
+  if (listingUrls.length === 0 && firecrawlKey) {
     try {
-      const fc = await fetchJsonWithTimeout(
-        FIRECRAWL_SCRAPE_URL,
+      const mapped = await fetchJsonWithTimeout(
+        FIRECRAWL_MAP_URL,
         {
           method: "POST",
           headers: {
@@ -2589,39 +2542,94 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
           },
           body: JSON.stringify({
             url: indexUrl,
-            formats: ["markdown"],
+            includeSubdomains: false,
+            limit: 500,
           }),
         },
         20000,
-        "Firecrawl index scrape",
+        "Firecrawl map",
       );
+      mapRaw = mapped;
 
-      const markdown: string =
-        fc?.data?.markdown ||
-        fc?.markdown ||
-        "";
+      const urls: string[] =
+        mapped?.data?.urls ||
+        mapped?.urls ||
+        mapped?.data ||
+        mapped?.links ||
+        [];
 
-      if (markdown) {
-        listingUrls = extractCarsAndBidsListingUrlsFromText(markdown, 300);
-        if (debug) {
-          mapRaw = mapRaw || {};
-          mapRaw._debug_index_markdown_len = markdown.length;
-        }
+      if (Array.isArray(urls) && urls.length > 0) {
+        listingUrls = urls
+          .map((u: any) => String(u || "").trim())
+          .filter((u: string) => u.startsWith("http"))
+          .filter((u: string) => u.includes("carsandbids.com/auctions/") && !u.includes("?"))
+          .filter((u: string) => {
+            const lower = u.toLowerCase();
+            if (lower.endsWith(".xml")) return false;
+            if (lower.includes("sitemap")) return false;
+            // CRITICAL: Exclude /video URLs - those are not the actual listing pages
+            if (lower.includes("/video")) return false;
+            return true;
+          })
+          .map((u: string) => u.replace(/\/video\/?$/, '')) // Strip /video suffix just in case
+          .slice(0, 300);
       }
     } catch (e: any) {
-      console.warn("Firecrawl index scrape fallback failed:", e?.message || String(e));
+      console.warn("Firecrawl index discovery failed (or not configured), will try direct fetch:", e?.message || String(e));
+    }
+
+    // Fallback: Firecrawl scrape the index page to get markdown, then extract listing URLs from that text.
+    if (listingUrls.length === 0 && firecrawlKey) {
+      try {
+        const fc = await fetchJsonWithTimeout(
+          FIRECRAWL_SCRAPE_URL,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${firecrawlKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              url: indexUrl,
+              formats: ["markdown"],
+            }),
+          },
+          20000,
+          "Firecrawl index scrape",
+        );
+
+        const markdown: string =
+          fc?.data?.markdown ||
+          fc?.markdown ||
+          "";
+
+        if (markdown) {
+          listingUrls = extractCarsAndBidsListingUrlsFromText(markdown, 300);
+          if (debug) {
+            mapRaw = mapRaw || {};
+            mapRaw._debug_index_markdown_len = markdown.length;
+          }
+        }
+      } catch (e: any) {
+        console.warn("Firecrawl index scrape fallback failed:", e?.message || String(e));
+      }
     }
   }
 
-  // Fallback: direct fetch link discovery (often blocked, but cheap when it works)
+  // Fallback: direct fetch link discovery (FREE - works when page has links in HTML)
   if (listingUrls.length === 0) {
     try {
+      console.log("📡 FREE MODE: Using direct fetch for index discovery (no Firecrawl)");
       const indexHtml = await fetchTextWithTimeout(indexUrl, 12000, "Cars & Bids index fetch");
       listingUrls = extractCarsAndBidsListingUrls(indexHtml, 300);
-    } catch {
-      // ignore
+      if (listingUrls.length === 0) {
+        console.warn("⚠️ Direct fetch found no listing URLs - may need Firecrawl for index pages");
+      } else {
+        console.log(`✅ Direct fetch found ${listingUrls.length} listing URLs`);
+      }
+    } catch (e: any) {
+      console.warn(`⚠️ Direct index fetch failed: ${e?.message || String(e)}`);
     }
-  }
   }
 
   // Step 2: Firecrawl per-listing extraction (small pages, bounded time)
@@ -2726,61 +2734,123 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
       let html = "";
       let llmExtractedForThisVehicle: Record<string, any> = {};
       
-      // Try Firecrawl first, but fall back to direct fetch if it fails
+      // ⚠️ FREE MODE: Try direct fetch first (extracts from __NEXT_DATA__), Firecrawl is optional
+      let firecrawlAttempted = false;
+      
+      // Try direct fetch first (FREE - Cars & Bids embeds data in __NEXT_DATA__)
       try {
-        const firecrawlData = await fetchJsonWithRetry(
-          FIRECRAWL_SCRAPE_URL,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${firecrawlKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              url: listingUrl,
-              formats: ["html", "extract"],
-              onlyMainContent: false,
-              waitFor: 10000, // Reduced wait time
-              // Simplified actions - just scroll, no clicks
-              actions: [
-                { type: "wait", milliseconds: 3000 },
-                { type: "scroll", direction: "down", pixels: 2000 },
-                { type: "wait", milliseconds: 3000 },
-                { type: "scroll", direction: "down", pixels: 3000 },
-                { type: "wait", milliseconds: 3000 },
-              ],
-              extract: { schema: listingSchema },
-            }),
-          },
-          FIRECRAWL_LISTING_TIMEOUT_MS,
-          "Firecrawl listing scrape",
-          3, // Max 3 retries
-        );
-
-        vehicle = firecrawlData?.data?.extract || {};
-        html = String(firecrawlData?.data?.html || "");
-      } catch (firecrawlError: any) {
-      console.warn(`⚠️ Firecrawl failed (${firecrawlError?.message}), falling back to direct HTML fetch`);
-      // Fallback: Direct HTML fetch
-      try {
+        console.log(`📡 FREE MODE: Fetching ${listingUrl} directly (extracting from __NEXT_DATA__)`);
         html = await fetchTextWithTimeout(listingUrl, 30000, "Direct HTML fetch");
         console.log(`✅ Got HTML via direct fetch (${html.length} chars)`);
         
-        // Debug: Check for __NEXT_DATA__
+        // Check for __NEXT_DATA__ - this is where Cars & Bids stores all vehicle data
         if (html.includes('__NEXT_DATA__')) {
-          console.log(`✅ Found __NEXT_DATA__ in HTML`);
+          console.log(`✅ Found __NEXT_DATA__ in HTML - can extract images/vehicle data without Firecrawl`);
           const nextDataMatch = html.match(/<script[^>]*id=["']__NEXT_DATA__["'][^>]*>/i);
           if (nextDataMatch) {
-            console.log(`✅ Found __NEXT_DATA__ script tag`);
+            console.log(`✅ Found __NEXT_DATA__ script tag - full extraction possible`);
+          }
+          
+          // Extract vehicle data from __NEXT_DATA__ (if not already extracted by Firecrawl)
+          if (!vehicle || Object.keys(vehicle).length === 0) {
+            try {
+              const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>(.*?)<\/script>/gis;
+              const nextDataMatch = html.match(nextDataPattern);
+              if (nextDataMatch && nextDataMatch[1]) {
+                const nextData = JSON.parse(nextDataMatch[1]);
+                const auction = nextData?.props?.pageProps?.auction || 
+                               nextData?.props?.pageProps?.data?.auction ||
+                               nextData?.props?.pageProps?.listing ||
+                               nextData?.props?.auction ||
+                               nextData?.auction;
+                
+                if (auction) {
+                  // Extract basic vehicle info from __NEXT_DATA__
+                  vehicle = {
+                    year: auction.year || vehicle.year,
+                    make: auction.make || vehicle.make,
+                    model: auction.model || vehicle.model,
+                    trim: auction.trim || vehicle.trim,
+                    vin: auction.vin || vehicle.vin,
+                    mileage: auction.mileage || auction.odometer || vehicle.mileage,
+                    color: auction.color || auction.exterior_color || vehicle.color,
+                    interior_color: auction.interior_color || vehicle.interior_color,
+                    transmission: auction.transmission || vehicle.transmission,
+                    drivetrain: auction.drivetrain || vehicle.drivetrain,
+                    engine_size: auction.engine || auction.engine_size || vehicle.engine_size,
+                    fuel_type: auction.fuel_type || vehicle.fuel_type,
+                    body_style: auction.body_style || auction.bodyType || vehicle.body_style,
+                    current_bid: auction.current_bid || auction.highest_bid || auction.currentBid || vehicle.current_bid,
+                    bid_count: auction.bid_count || auction.bids?.length || auction.bidCount || vehicle.bid_count,
+                    comment_count: auction.comment_count || auction.comments?.length || auction.commentCount || vehicle.comment_count,
+                  };
+                  console.log(`✅ Extracted vehicle data from __NEXT_DATA__`);
+                }
+              }
+            } catch (nextDataError: any) {
+              console.warn(`⚠️ Failed to parse __NEXT_DATA__: ${nextDataError?.message}`);
+            }
           }
         } else {
-          console.warn(`⚠️ No __NEXT_DATA__ found in HTML - page may require JavaScript`);
+          console.warn(`⚠️ No __NEXT_DATA__ found in HTML - page may require JavaScript rendering`);
+          // If no __NEXT_DATA__ and we have Firecrawl key, try Firecrawl as fallback
+          if (firecrawlKey && !firecrawlAttempted) {
+            firecrawlAttempted = true;
+            throw new Error("No __NEXT_DATA__ found, will try Firecrawl");
+          }
         }
       } catch (directError: any) {
-        console.error(`❌ Direct fetch also failed: ${directError?.message}`);
-        throw new Error(`Both Firecrawl and direct fetch failed: ${directError?.message}`);
+        // If direct fetch failed or no __NEXT_DATA__, try Firecrawl (if available)
+        if (firecrawlKey && !firecrawlAttempted) {
+          firecrawlAttempted = true;
+          console.warn(`⚠️ Direct fetch failed or incomplete, trying Firecrawl fallback (${directError?.message})`);
+          try {
+            const firecrawlData = await fetchJsonWithRetry(
+              FIRECRAWL_SCRAPE_URL,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${firecrawlKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  url: listingUrl,
+                  formats: ["html", "extract"],
+                  onlyMainContent: false,
+                  waitFor: 10000,
+                  actions: [
+                    { type: "wait", milliseconds: 3000 },
+                    { type: "scroll", direction: "down", pixels: 2000 },
+                    { type: "wait", milliseconds: 3000 },
+                    { type: "scroll", direction: "down", pixels: 3000 },
+                    { type: "wait", milliseconds: 3000 },
+                  ],
+                  extract: { schema: listingSchema },
+                }),
+              },
+              FIRECRAWL_LISTING_TIMEOUT_MS,
+              "Firecrawl listing scrape",
+              3,
+            );
+
+            vehicle = firecrawlData?.data?.extract || {};
+            html = String(firecrawlData?.data?.html || "");
+            console.log(`✅ Got HTML via Firecrawl (${html.length} chars)`);
+          } catch (firecrawlError: any) {
+            console.error(`❌ Firecrawl also failed: ${firecrawlError?.message}`);
+            // If both failed and we don't have HTML, throw error
+            if (!html) {
+              throw new Error(`Both direct fetch and Firecrawl failed: ${directError?.message || 'No HTML obtained'}`);
+            }
+            // Otherwise continue with partial HTML from direct fetch
+          }
+        } else {
+          // No Firecrawl key or already tried - just use what we have or throw
+          if (!html) {
+            throw new Error(`Direct fetch failed and Firecrawl not available: ${directError?.message}`);
+          }
+        }
       }
-    }
     
     // Debug: Log extraction results
     if (debug && html) {
@@ -4736,7 +4806,8 @@ async function extractMecum(url: string, maxVehicles: number) {
     ? normalizedUrl.split("?")[0]
     : (normalizedUrl.includes("mecum.com/lots/") ? normalizedUrl : "https://www.mecum.com/lots/");
 
-  const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  // ⚠️ FREE MODE: Firecrawl is optional - use direct fetch where possible
+  const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") || null;
   const sourceWebsite = "https://www.mecum.com";
 
   let listingUrls: string[] = [];
@@ -4746,8 +4817,8 @@ async function extractMecum(url: string, maxVehicles: number) {
     listingUrls = [indexUrl];
   }
 
-  // Step 1: Discover listing URLs via Firecrawl map (best for JS-heavy indexes)
-  if (listingUrls.length === 0) {
+  // Step 1: Discover listing URLs via Firecrawl map (optional - only if API key available)
+  if (listingUrls.length === 0 && firecrawlKey) {
     try {
       const mapped = await fetchJsonWithTimeout(
         FIRECRAWL_MAP_URL,
@@ -4795,8 +4866,8 @@ async function extractMecum(url: string, maxVehicles: number) {
     }
   }
 
-  // Fallback: scrape markdown and regex out listing URLs
-  if (listingUrls.length === 0) {
+  // Fallback: scrape markdown and regex out listing URLs (only if Firecrawl key available)
+  if (listingUrls.length === 0 && firecrawlKey) {
     try {
       const fc = await fetchJsonWithTimeout(
         FIRECRAWL_SCRAPE_URL,
@@ -4823,13 +4894,19 @@ async function extractMecum(url: string, maxVehicles: number) {
     }
   }
 
-  // Fallback: direct fetch (cheap if it works)
+  // Fallback: direct fetch (FREE - works when page has links in HTML)
   if (listingUrls.length === 0) {
     try {
+      console.log("📡 FREE MODE: Using direct fetch for Mecum index discovery");
       const html = await fetchTextWithTimeout(indexUrl, 12000, "Mecum index fetch");
       listingUrls = extractMecumListingUrlsFromText(html, 500);
-    } catch {
-      // ignore
+      if (listingUrls.length > 0) {
+        console.log(`✅ Direct fetch found ${listingUrls.length} Mecum listing URLs`);
+      } else {
+        console.warn("⚠️ Direct fetch found no listing URLs - may need Firecrawl for index pages");
+      }
+    } catch (e: any) {
+      console.warn(`⚠️ Direct Mecum index fetch failed: ${e?.message || String(e)}`);
     }
   }
 
@@ -4893,102 +4970,89 @@ async function extractMecum(url: string, maxVehicles: number) {
       let markdown = "";
       let images: string[] = [];
       
-      // Step 1: Firecrawl with actions to trigger gallery opening
-      // Click gallery buttons to load images that are lazy-loaded
-      try {
-        const firecrawlMarkdown = await fetchJsonWithTimeout(
-          FIRECRAWL_SCRAPE_URL,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${firecrawlKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              url: listingUrl,
-              formats: ["markdown", "html"],
-              onlyMainContent: false,
-              waitFor: 8000,
-              actions: [
-                {
-                  type: "wait",
-                  milliseconds: 3000, // Wait for initial page load
-                },
-                {
-                  type: "scroll",
-                  direction: "down",
-                  pixels: 500, // Scroll down to trigger lazy loading
-                },
-                {
-                  type: "wait",
-                  milliseconds: 2000, // Wait for images to load
-                },
-                {
-                  type: "scroll",
-                  direction: "down",
-                  pixels: 1000, // Scroll more to load gallery
-                },
-                {
-                  type: "wait",
-                  milliseconds: 2000, // Wait for more images
-                },
-                {
-                  type: "scroll",
-                  direction: "up",
-                  pixels: 300, // Scroll back up
-                },
-                {
-                  type: "wait",
-                  milliseconds: 1000, // Final wait
-                },
-              ],
-            }),
-          },
-          FIRECRAWL_LISTING_TIMEOUT_MS,
-          "Firecrawl with gallery trigger",
-        );
-        
-        markdown = String(firecrawlMarkdown?.data?.markdown || firecrawlMarkdown?.markdown || "");
-        html = String(firecrawlMarkdown?.data?.html || "");
-        
-        // Extract images from markdown (URLs often appear in markdown even if HTML doesn't render)
-        if (markdown) {
-          const markdownImages = extractMecumImagesFromHtml(markdown);
-          images = [...images, ...markdownImages];
-        }
-      } catch (e: any) {
-        console.warn(`Firecrawl markdown failed: ${e?.message || String(e)}`);
-      }
-      
-      // Step 2: Extract from HTML if we got it
-      if (html && images.length === 0) {
-        const htmlImages = extractMecumImagesFromHtml(html);
-        images = [...images, ...htmlImages];
-      }
-      
-      // Step 3: Firecrawl structured extraction for vehicle data
+      // Step 1: Try direct fetch first (FREE), then Firecrawl if available and needed
       let vehicle: any = {};
+      
+      // Try direct fetch first (FREE MODE)
       try {
-        const firecrawlData = await fetchJsonWithTimeout(
-          FIRECRAWL_SCRAPE_URL,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${firecrawlKey}`,
-              "Content-Type": "application/json",
+        console.log(`📡 FREE MODE: Fetching Mecum listing ${listingUrl} directly`);
+        html = await fetchTextWithTimeout(listingUrl, 30000, "Direct Mecum listing fetch");
+        console.log(`✅ Got HTML via direct fetch (${html.length} chars)`);
+        
+        // Extract images from HTML
+        if (html) {
+          const htmlImages = extractMecumImagesFromHtml(html);
+          images = [...images, ...htmlImages];
+        }
+      } catch (directError: any) {
+        console.warn(`⚠️ Direct fetch failed: ${directError?.message}`);
+      }
+      
+      // Step 2: Try Firecrawl if available and we don't have enough data
+      if (firecrawlKey && (images.length === 0 || !html)) {
+        try {
+          console.log(`🔥 Trying Firecrawl for Mecum listing (images: ${images.length}, html: ${html ? 'yes' : 'no'})`);
+          const firecrawlMarkdown = await fetchJsonWithTimeout(
+            FIRECRAWL_SCRAPE_URL,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${firecrawlKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                url: listingUrl,
+                formats: ["markdown", "html", "extract"],
+                onlyMainContent: false,
+                waitFor: 8000,
+                actions: [
+                  {
+                    type: "wait",
+                    milliseconds: 3000,
+                  },
+                  {
+                    type: "scroll",
+                    direction: "down",
+                    pixels: 500,
+                  },
+                  {
+                    type: "wait",
+                    milliseconds: 2000,
+                  },
+                  {
+                    type: "scroll",
+                    direction: "down",
+                    pixels: 1000,
+                  },
+                  {
+                    type: "wait",
+                    milliseconds: 2000,
+                  },
+                ],
+                extract: { schema: listingSchema },
+              }),
             },
-            body: JSON.stringify({
-              url: listingUrl,
-              formats: ["extract"],
-              onlyMainContent: false,
-              waitFor: 5000,
-              extract: { schema: listingSchema },
-            }),
-          },
-          FIRECRAWL_LISTING_TIMEOUT_MS,
-          "Firecrawl structured extract",
-        );
-        vehicle = firecrawlData?.data?.extract || {};
+            FIRECRAWL_LISTING_TIMEOUT_MS,
+            "Firecrawl Mecum listing",
+          );
+          
+          if (!html) {
+            markdown = String(firecrawlMarkdown?.data?.markdown || firecrawlMarkdown?.markdown || "");
+            html = String(firecrawlMarkdown?.data?.html || "");
+          }
+          
+          // Extract images from markdown if we got it
+          if (markdown && images.length === 0) {
+            const markdownImages = extractMecumImagesFromHtml(markdown);
+            images = [...images, ...markdownImages];
+          }
+          
+          // Extract vehicle data if available
+          vehicle = firecrawlMarkdown?.data?.extract || {};
+        } catch (e: any) {
+          console.warn(`Firecrawl failed: ${e?.message || String(e)}`);
+        }
+      }
         
         // Merge Firecrawl images if any
         if (Array.isArray(vehicle?.images) && vehicle.images.length > 0) {
@@ -5191,7 +5255,8 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
     ? normalizedUrl.split("?")[0]
     : (normalizedUrl.includes("barrett-jackson.com/Events") ? normalizedUrl : "https://www.barrett-jackson.com/Events/");
 
-  const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  // ⚠️ FREE MODE: Firecrawl is optional - use direct fetch where possible
+  const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") || null;
   const sourceWebsite = "https://www.barrett-jackson.com";
 
   let listingUrls: string[] = [];
@@ -5201,8 +5266,8 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
     listingUrls = [indexUrl];
   }
 
-  // Step 1: Discover listing URLs via Firecrawl map
-  if (listingUrls.length === 0) {
+  // Step 1: Discover listing URLs via Firecrawl map (optional - only if API key available)
+  if (listingUrls.length === 0 && firecrawlKey) {
     try {
       const mapped = await fetchJsonWithTimeout(
         FIRECRAWL_MAP_URL,
@@ -5246,8 +5311,8 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
     }
   }
 
-  // Fallback: scrape markdown and regex out listing URLs
-  if (listingUrls.length === 0) {
+  // Fallback: scrape markdown and regex out listing URLs (only if Firecrawl key available)
+  if (listingUrls.length === 0 && firecrawlKey) {
     try {
       const fc = await fetchJsonWithTimeout(
         FIRECRAWL_SCRAPE_URL,
@@ -5271,6 +5336,24 @@ async function extractBarrettJackson(url: string, maxVehicles: number) {
       if (markdown) listingUrls = extractBarrettJacksonListingUrlsFromText(markdown, 500);
     } catch (e: any) {
       console.warn("Barrett-Jackson markdown discovery failed:", e?.message || String(e));
+    }
+  }
+
+  // Fallback: direct fetch (FREE - works when page has links in HTML)
+  if (listingUrls.length === 0) {
+    try {
+      console.log("📡 FREE MODE: Using direct fetch for Barrett-Jackson index discovery");
+      const html = await fetchTextWithTimeout(indexUrl, 12000, "Barrett-Jackson index fetch");
+      // Extract URLs from HTML directly if possible
+      const extracted = extractBarrettJacksonListingUrlsFromText(html, 500);
+      if (extracted.length > 0) {
+        listingUrls = extracted;
+        console.log(`✅ Direct fetch found ${listingUrls.length} Barrett-Jackson listing URLs`);
+      } else {
+        console.warn("⚠️ Direct fetch found no listing URLs - may need Firecrawl for index pages");
+      }
+    } catch (e: any) {
+      console.warn(`⚠️ Direct Barrett-Jackson index fetch failed: ${e?.message || String(e)}`);
     }
   }
 
@@ -6008,7 +6091,8 @@ async function extractBroadArrow(url: string, maxVehicles: number) {
         ? normalizedUrl 
         : "https://www.broadarrowauctions.com/vehicles/results");
 
-  const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  // ⚠️ FREE MODE: Firecrawl is optional - use direct fetch where possible
+  const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") || null;
   const sourceWebsite = "https://www.broadarrowauctions.com";
 
   let listingUrls: string[] = [];
@@ -6018,8 +6102,8 @@ async function extractBroadArrow(url: string, maxVehicles: number) {
     listingUrls = [indexUrl];
   }
 
-  // Step 1: Discover listing URLs via Firecrawl map (for results pages)
-  if (listingUrls.length === 0) {
+  // Step 1: Discover listing URLs via Firecrawl map (optional - only if API key available)
+  if (listingUrls.length === 0 && firecrawlKey) {
     try {
       const mapped = await fetchJsonWithTimeout(
         FIRECRAWL_MAP_URL,
@@ -6066,8 +6150,8 @@ async function extractBroadArrow(url: string, maxVehicles: number) {
     }
   }
 
-  // Fallback: scrape markdown and regex out listing URLs
-  if (listingUrls.length === 0) {
+  // Fallback: scrape markdown and regex out listing URLs (only if Firecrawl key available)
+  if (listingUrls.length === 0 && firecrawlKey) {
     try {
       const fc = await fetchJsonWithTimeout(
         FIRECRAWL_SCRAPE_URL,
@@ -6098,6 +6182,27 @@ async function extractBroadArrow(url: string, maxVehicles: number) {
       }
     } catch (e: any) {
       console.warn("Broad Arrow markdown discovery failed:", e?.message || String(e));
+    }
+  }
+
+  // Fallback: direct fetch (FREE - works when page has links in HTML)
+  if (listingUrls.length === 0) {
+    try {
+      console.log("📡 FREE MODE: Using direct fetch for Broad Arrow index discovery");
+      const html = await fetchTextWithTimeout(indexUrl, 12000, "Broad Arrow index fetch");
+      // Extract URLs from HTML directly
+      const urlMatches = html.match(/\/vehicles\/[a-zA-Z0-9_-]+\/[^\/\s\)"']+/g) || [];
+      if (urlMatches.length > 0) {
+        listingUrls = Array.from(new Set(urlMatches))
+          .map((path: string) => `https://www.broadarrowauctions.com${path}`)
+          .filter((u: string) => !u.includes("/results") && !u.includes("/available") && !u.includes("/past-auctions"))
+          .slice(0, 500);
+        console.log(`✅ Direct fetch found ${listingUrls.length} Broad Arrow listing URLs`);
+      } else {
+        console.warn("⚠️ Direct fetch found no listing URLs - may need Firecrawl for index pages");
+      }
+    } catch (e: any) {
+      console.warn(`⚠️ Direct Broad Arrow index fetch failed: ${e?.message || String(e)}`);
     }
   }
 

@@ -848,7 +848,9 @@ export default function AIDataIngestionSearch() {
           height: '28px',
           transition: 'all 0.12s ease',
           width: '100%',
-          minWidth: 0
+          minWidth: 0,
+          boxSizing: 'border-box',
+          overflow: 'hidden'
         }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -900,13 +902,15 @@ export default function AIDataIngestionSearch() {
             padding: '2px 4px',
             fontSize: '8pt',
             height: '20px',
-            width: '20px',
+            minWidth: '24px',
+            width: '24px',
             opacity: 1,
             whiteSpace: 'nowrap',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            marginLeft: '2px'
+            marginLeft: '2px',
+            boxSizing: 'border-box'
           }}
           title={actionsOpen ? 'Hide actions' : 'Show actions'}
         >

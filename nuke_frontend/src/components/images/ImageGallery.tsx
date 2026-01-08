@@ -2085,39 +2085,97 @@ const ImageGallery = ({
 
       {/* Gallery Controls */}
       <div className="card-header">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', flexWrap: 'wrap', minWidth: 0 }}>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'flex-start', 
+          gap: 'var(--space-2)', 
+          flexWrap: 'wrap', 
+          minWidth: 0,
+          width: '100%',
+          boxSizing: 'border-box'
+        }}>
+          {/* Image Count - positioned on the left */}
+          <span style={{ 
+            fontSize: '8pt', 
+            color: 'var(--text-muted)', 
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            marginRight: 'auto'
+          }}>
+            {allImages.length} {allImages.length === 1 ? 'image' : 'images'}
+          </span>
+
           {/* View Mode */}
-          <div style={{ display: 'flex', border: '2px solid var(--border)', backgroundColor: 'var(--white)' }}>
+          <div style={{ 
+            display: 'flex', 
+            border: '2px solid var(--border)', 
+            backgroundColor: 'var(--white)',
+            flexShrink: 0
+          }}>
             <button
               onClick={() => setViewMode('grid')}
               className={viewMode === 'grid' ? 'button button-primary' : 'button'}
-              style={{ padding: '4px 12px', fontSize: '8pt', margin: 0, border: 'none', borderRadius: 0, height: '24px', minHeight: '24px' }}
+              style={{ 
+                padding: '4px 12px', 
+                fontSize: '8pt', 
+                margin: 0, 
+                border: 'none', 
+                borderRadius: 0, 
+                height: '24px', 
+                minHeight: '24px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
             >
               Grid
             </button>
             <button
               onClick={() => setViewMode('masonry')}
               className={viewMode === 'masonry' ? 'button button-primary' : 'button'}
-              style={{ padding: '4px 12px', fontSize: '8pt', margin: 0, border: 'none', borderRadius: 0, height: '24px', minHeight: '24px' }}
+              style={{ 
+                padding: '4px 12px', 
+                fontSize: '8pt', 
+                margin: 0, 
+                border: 'none', 
+                borderRadius: 0, 
+                height: '24px', 
+                minHeight: '24px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
             >
               Full
             </button>
             <button
               onClick={() => setViewMode('list')}
               className={viewMode === 'list' ? 'button button-primary' : 'button'}
-              style={{ padding: '4px 12px', fontSize: '8pt', margin: 0, border: 'none', borderRadius: 0, height: '24px', minHeight: '24px' }}
+              style={{ 
+                padding: '4px 12px', 
+                fontSize: '8pt', 
+                margin: 0, 
+                border: 'none', 
+                borderRadius: 0, 
+                height: '24px', 
+                minHeight: '24px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}
             >
               Info
             </button>
           </div>
 
-          {/* Image Count */}
-          <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontWeight: 600 }}>
-            {allImages.length} {allImages.length === 1 ? 'image' : 'images'}
-          </span>
-
           {/* Toggle Buttons for Sorting */}
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: '4px', 
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            flexShrink: 1,
+            minWidth: 0
+          }}>
             {/* Group by Source Toggle */}
             <button
               onClick={() => {
@@ -2130,7 +2188,8 @@ const ImageGallery = ({
                 padding: '4px 8px', 
                 height: '24px', 
                 minHeight: '24px',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
               title="Group images by source (User, Import Queue, Organization, BaT, External)"
             >
@@ -2148,7 +2207,8 @@ const ImageGallery = ({
                 padding: '4px 8px', 
                 height: '24px', 
                 minHeight: '24px',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
               title="Group images by category"
             >
@@ -2168,7 +2228,8 @@ const ImageGallery = ({
                 padding: '4px 8px', 
                 height: '24px', 
                 minHeight: '24px',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
               title={`Chronological: ${chronologicalMode === 'off' ? 'Off' : chronologicalMode === 'asc' ? 'Ascending' : 'Descending'}`}
             >
@@ -2178,8 +2239,20 @@ const ImageGallery = ({
 
           {/* Images Per Row Slider */}
           {viewMode === 'grid' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '120px' }}>
-              <span style={{ fontSize: '7pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{imagesPerRow}/row</span>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              minWidth: '120px',
+              maxWidth: '200px',
+              flexShrink: 1
+            }}>
+              <span style={{ 
+                fontSize: '7pt', 
+                color: 'var(--text-muted)', 
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}>{imagesPerRow}/row</span>
               <input
                 type="range"
                 min="1"
@@ -2187,7 +2260,7 @@ const ImageGallery = ({
                 value={imagesPerRow}
                 onChange={(e) => setImagesPerRow(parseInt(e.target.value, 10))}
                 className="nuke-range nuke-range-accent"
-                style={{ flex: 1 }}
+                style={{ flex: 1, minWidth: 0 }}
                 title={`${imagesPerRow} images per row`}
               />
             </div>
@@ -2202,7 +2275,8 @@ const ImageGallery = ({
               padding: '4px 8px', 
               height: '24px', 
               minHeight: '24px',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              flexShrink: 0
             }}
             title="Preserve original image aspect ratio"
           >
@@ -2222,7 +2296,9 @@ const ImageGallery = ({
                 border: '2px solid var(--warning)',
                 background: 'var(--warning-light)',
                 color: 'var(--warning-dark)',
-                fontWeight: 700
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
             >
               RESUME UPLOAD ({queueStats.pending + queueStats.failed} files)
@@ -2244,7 +2320,15 @@ const ImageGallery = ({
           <button
             onClick={handleUploadClick}
             className="button button-primary"
-            style={{ fontSize: '8pt', padding: '4px 12px', cursor: 'pointer', height: '24px', minHeight: '24px' }}
+            style={{ 
+              fontSize: '8pt', 
+              padding: '4px 12px', 
+              cursor: 'pointer', 
+              height: '24px', 
+              minHeight: '24px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
+            }}
           >
             Upload
           </button>

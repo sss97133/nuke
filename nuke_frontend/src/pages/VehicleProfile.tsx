@@ -49,7 +49,6 @@ const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/Merge
 // VehicleProfileTabs removed - using curated layout instead
 import { calculateFieldScores, calculateFieldScore, analyzeImageEvidence, type FieldSource } from '../services/vehicleFieldScoring';
 import type { Session } from '@supabase/supabase-js';
-import ReferenceLibraryUpload from '../components/reference/ReferenceLibraryUpload';
 import VehicleReferenceLibrary from '../components/vehicle/VehicleReferenceLibrary';
 import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel';
 import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
@@ -2630,10 +2629,18 @@ const VehicleProfile: React.FC = () => {
           .map((r: any) => resolveDbImageUrl(r))
           .filter(Boolean) as string[];
         
-        // For BaT vehicles, prioritize origin_metadata images (certified source) over DB images
-        const poolForFiltering = isBat && originImages.length > 0 
-          ? [...originImages, ...fallbackPool] // Origin images first for BaT
-          : [...fallbackPool, ...originImages]; // Default: DB images first, then origin
+        // Prioritize Supabase-hosted images (no external API calls needed)
+        // Filter originImages to only include Supabase-hosted URLs (exclude external URLs that may be blocked/expired)
+        const supabaseHostedOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
+        const externalOriginImages = originImages.filter((url: string) => !isSupabaseHostedImageUrl(url));
+        
+        // Always prioritize DB images (Supabase-hosted) first, then Supabase-hosted origin images, then external as last resort
+        const poolForFiltering = [
+          ...fallbackPool, // DB images first (always Supabase-hosted, no API calls)
+          ...supabaseHostedOriginImages, // Supabase-hosted origin images (no API calls)
+          // External origin images only as last resort (may fail, but better than nothing)
+          ...(fallbackPool.length === 0 && supabaseHostedOriginImages.length === 0 ? externalOriginImages : [])
+        ];
         const filteredPool = filterProfileImages(poolForFiltering, vehicle);
         
         // Score images for "money shot" quality (exterior, full vehicle, good for hero)
@@ -2865,20 +2872,22 @@ const VehicleProfile: React.FC = () => {
         
         images = filterProfileImages(preFiltered.length > 0 ? preFiltered : raw, vehicle);
 
-        // If this is a Classic.com scraped vehicle, prefer the origin_metadata gallery over contaminated imports.
+        // If this is a Classic.com scraped vehicle, prefer Supabase-hosted origin_metadata gallery over contaminated imports.
         // Keep any non-imported images (e.g., manual uploads) in front.
-        if (isClassicScrape && originImages.length > 0) {
+        // Only use Supabase-hosted origin images to avoid external API calls
+        const supabaseHostedOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
+        if (isClassicScrape && supabaseHostedOriginImages.length > 0) {
           const manual = (imageRecords || [])
             .filter((r: any) => r?.image_url && !isImportedStoragePath(r?.storage_path))
             .map((r: any) => normalizeUrl(r?.image_url))
             .filter(Boolean) as string[];
 
-          const merged = Array.from(new Set([...manual, ...originImages]));
+          const merged = Array.from(new Set([...manual, ...supabaseHostedOriginImages]));
           const mergedFiltered = filterProfileImages(merged, vehicle);
 
           // If DB images look significantly larger than the source gallery, assume contamination and override display set.
           const dbCount = images.length;
-          const sourceCount = declaredCount ?? originImages.length;
+          const sourceCount = declaredCount ?? supabaseHostedOriginImages.length;
           const looksContaminated = dbCount > sourceCount + 10;
 
           if (looksContaminated && mergedFiltered.length > 0) {
@@ -2886,9 +2895,11 @@ const VehicleProfile: React.FC = () => {
           }
         }
 
-        // For BaT vehicles, origin_metadata is the ONLY certified source for listing images
+        // For BaT vehicles, prefer Supabase-hosted origin_metadata images (certified source)
         // But user-uploaded images (with user_id, not import_queue) should still be shown
-        if (isBat && originImages.length > 0) {
+        // Only use Supabase-hosted origin images to avoid external API calls
+        const supabaseHostedOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
+        if (isBat && supabaseHostedOriginImages.length > 0) {
           // Get user-uploaded images (those with user_id and not from import_queue)
           const userUploaded = (imageRecords || [])
             .filter((r: any) => {
@@ -2898,15 +2909,15 @@ const VehicleProfile: React.FC = () => {
             .map((r: any) => resolveDbImageUrl(r))
             .filter(Boolean) as string[];
 
-          // Combine: origin_metadata images first (certified BaT source), then user uploads
-          const combined = Array.from(new Set([...originImages, ...userUploaded]));
+          // Combine: Supabase-hosted origin_metadata images first (certified BaT source, no API calls), then user uploads
+          const combined = Array.from(new Set([...supabaseHostedOriginImages, ...userUploaded]));
           const batFiltered = filterProfileImages(combined, vehicle);
           
           if (batFiltered.length > 0) {
             images = batFiltered;
-            // Prefer origin_metadata image for lead, but fall back to user upload if needed
+            // Prefer Supabase-hosted origin_metadata image for lead, but fall back to user upload if needed
             const originLead = batFiltered.find((u) => 
-              originImages.some(orig => normalizeUrl(orig) === normalizeUrl(u))
+              supabaseHostedOriginImages.some(orig => normalizeUrl(orig) === normalizeUrl(u))
             ) || batFiltered.find((u) => isSupabaseHostedImageUrl(u)) || batFiltered[0] || null;
             if (originLead) setLeadImageUrl(originLead);
           }
@@ -3013,9 +3024,10 @@ const VehicleProfile: React.FC = () => {
           }
         }
         
-        // Final fallback: If still no images, use originImages
-        if (images.length === 0 && originImages.length > 0) {
-          images = filterProfileImages(originImages, vehicle);
+        // Final fallback: If still no images, use only Supabase-hosted originImages (skip external URLs)
+        const supabaseOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
+        if (images.length === 0 && supabaseOriginImages.length > 0) {
+          images = filterProfileImages(supabaseOriginImages, vehicle);
           // Also set lead image from originImages if current lead is invalid or missing
           if (!lead || String(lead || '').toLowerCase().includes('import_queue')) {
             const originLead = images.find((u) => isSupabaseHostedImageUrl(u)) || images[0] || null;
@@ -3038,10 +3050,11 @@ const VehicleProfile: React.FC = () => {
         // Would generate 400 errors: createSignedUrl calls failing
         // Using direct public URLs instead which work fine
       } else {
-        // No DB rows: try origin_metadata images first (from scraping)
+        // No DB rows: try Supabase-hosted origin_metadata images first (skip external URLs that require API calls)
         try {
-          if (originImages.length > 0) {
-            images = originImages;
+          const supabaseOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
+          if (supabaseOriginImages.length > 0) {
+            images = supabaseOriginImages;
             setVehicleImages(images);
             if (!leadImageUrl && images[0]) {
               setLeadImageUrl(images[0]);
@@ -3453,23 +3466,7 @@ const VehicleProfile: React.FC = () => {
               {/* Structured listing data (Options / Service records / etc.) */}
               <VehicleStructuredListingDataCard vehicle={vehicle} />
               
-              {/* Reference Documents - Upload */}
-              {session && (
-                <ReferenceLibraryUpload
-                  vehicleId={vehicle.id}
-                  year={vehicle.year}
-                  make={vehicle.make}
-                  series={(vehicle as any).series}
-                  model={vehicle.model}
-                  bodyStyle={(vehicle as any).body_style}
-                  onUploadComplete={() => {
-                    loadVehicle();
-                    setReferenceLibraryRefreshKey((v) => v + 1);
-                  }}
-                />
-              )}
-              
-              {/* Reference Documents - Display */}
+              {/* Reference Documents - Upload and Display (merged) */}
               <VehicleReferenceLibrary
                 vehicleId={vehicle.id}
                 userId={session?.user?.id}
@@ -3479,6 +3476,10 @@ const VehicleProfile: React.FC = () => {
                 model={vehicle.model}
                 bodyStyle={(vehicle as any).body_style}
                 refreshKey={referenceLibraryRefreshKey}
+                onUploadComplete={() => {
+                  loadVehicle();
+                  setReferenceLibraryRefreshKey((v) => v + 1);
+                }}
               />
 
               {/* Description */}
