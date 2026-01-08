@@ -128,11 +128,11 @@ DECLARE
   image_map JSONB;
 BEGIN
   -- Step 1: Collect all vehicle IDs that will be returned
-  SELECT ARRAY_AGG(DISTINCT v.id)
+  SELECT ARRAY_AGG(DISTINCT vehicle_id)
   INTO all_vehicle_ids
   FROM (
     -- Vehicles uploaded by user
-    SELECT v.id
+    SELECT v.id AS vehicle_id
     FROM vehicles v
     WHERE (v.user_id = p_user_id OR v.uploaded_by = p_user_id)
       AND should_show_in_user_profile(v.id, p_user_id) = true
@@ -140,7 +140,7 @@ BEGIN
     UNION
     
     -- Discovered vehicles
-    SELECT v.id
+    SELECT v.id AS vehicle_id
     FROM discovered_vehicles dv
     JOIN vehicles v ON v.id = dv.vehicle_id
     WHERE dv.user_id = p_user_id
@@ -150,7 +150,7 @@ BEGIN
     UNION
     
     -- Verified ownerships
-    SELECT ov.vehicle_id
+    SELECT ov.vehicle_id AS vehicle_id
     FROM ownership_verifications ov
     WHERE ov.user_id = p_user_id
       AND ov.status = 'approved'
@@ -158,7 +158,7 @@ BEGIN
     UNION
     
     -- Permission-based ownerships
-    SELECT vup.vehicle_id
+    SELECT vup.vehicle_id AS vehicle_id
     FROM vehicle_user_permissions vup
     WHERE vup.user_id = p_user_id
       AND vup.is_active = true

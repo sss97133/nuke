@@ -1797,9 +1797,9 @@ const VehiclesInner: React.FC = () => {
 
                 <SidebarSection title={`Vehicles (${filteredRelationships.length})`} sectionKey="vehicles">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {filteredRelationships.slice(0, 60).map((rel) => (
+                    {filteredRelationships.slice(0, 60).map((rel, index) => (
                       <Link
-                        key={`sidebar-${rel.vehicle.id}-${rel.relationshipType || 'default'}`}
+                        key={`sidebar-${rel.vehicle.id}-${rel.relationshipType || 'default'}-${index}`}
                         to={`/vehicle/${rel.vehicle.id}`}
                         style={{
                           display: 'block',
@@ -1929,13 +1929,13 @@ const VehiclesInner: React.FC = () => {
                               gap: '12px'
                             }}
                           >
-                            {group.items.slice(0, displayLimit).map((relationship) => {
+                            {group.items.slice(0, displayLimit).map((relationship, index) => {
                               const vehicle = relationship?.vehicle;
                               if (!vehicle || !relationship) return null;
                               const isSelected = selectedVehicleIds.has(vehicle.id);
-                              // Use composite key to avoid duplicates when same vehicle appears in multiple groups
+                              // Use composite key with index to avoid duplicates when same vehicle appears in multiple groups
                               return (
-                                <div key={`${vehicle.id}-${group.type}-${relationship.relationshipType || 'default'}`} style={{ position: 'relative' }}>
+                                <div key={`${vehicle.id}-${group.type}-${relationship.relationshipType || 'default'}-${index}`} style={{ position: 'relative' }}>
                                   {session?.user?.id && (
                                     <>
                                       {/* Keep selection/drag controls away from card's own top badges */}
@@ -2040,13 +2040,13 @@ const VehiclesInner: React.FC = () => {
                         gap: '12px'
                       }}
                     >
-                      {filteredRelationships.slice(0, displayLimit).map((relationship) => {
+                      {filteredRelationships.slice(0, displayLimit).map((relationship, index) => {
                         const vehicle = relationship?.vehicle;
                         if (!vehicle || !relationship) return null;
                         const isSelected = selectedVehicleIds.has(vehicle.id);
-                        // Use composite key to avoid duplicates
+                        // Use composite key with index to avoid duplicates when same vehicle appears multiple times
                         return (
-                          <div key={`${vehicle.id}-${relationship.relationshipType || 'default'}`} style={{ position: 'relative' }}>
+                          <div key={`filtered-${vehicle.id}-${relationship.relationshipType || 'default'}-${index}`} style={{ position: 'relative' }}>
                             {session?.user?.id && (
                               <>
                                 {/* Keep selection/drag controls away from card's own top badges */}
