@@ -6,6 +6,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { APPROVED_BAT_EXTRACTORS } from "../_shared/approved-extractors.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,18 +21,22 @@ interface ExtractionRequest {
 }
 
 function determineOptimalExtractor(url: string): {
-  functionName: string;
+  functionName: string | null; // null = special handling required (e.g., BaT two-step)
   reason: string;
   expectedDataQuality: 'high' | 'medium' | 'low';
+  requiresSpecialHandling?: boolean; // true for BaT (needs two-step workflow)
 } {
   const urlLower = url.toLowerCase();
 
-  // BaT - Use comprehensive extractor for full specs
+  // BaT - Use approved two-step workflow (extract-premium-auction + extract-auction-comments)
+  // ⚠️ Do NOT use comprehensive-bat-extraction (deprecated)
+  // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
   if (urlLower.includes('bringatrailer.com')) {
     return {
-      functionName: 'comprehensive-bat-extraction',
-      reason: 'BaT listing detected - using comprehensive extractor for VIN/engine/transmission/specs',
-      expectedDataQuality: 'high'
+      functionName: null, // Special handling - will call two functions
+      reason: `BaT listing detected - using approved two-step workflow: ${APPROVED_BAT_EXTRACTORS.CORE_DATA} + ${APPROVED_BAT_EXTRACTORS.COMMENTS}`,
+      expectedDataQuality: 'high',
+      requiresSpecialHandling: true,
     };
   }
 
@@ -148,6 +153,74 @@ serve(async (req) => {
     const extractionPayload: any = { url };
     if (vehicle_id) extractionPayload.vehicle_id = vehicle_id;
     if (source) extractionPayload.source = source;
+
+    // Special handling for BaT URLs (two-step approved workflow)
+    if (strategy.requiresSpecialHandling && url.toLowerCase().includes('bringatrailer.com')) {
+      console.log(`🎯 Smart router: BaT URL detected - using approved two-step workflow`);
+      console.log(`   Step 1: ${APPROVED_BAT_EXTRACTORS.CORE_DATA}`);
+      console.log(`   Step 2: ${APPROVED_BAT_EXTRACTORS.COMMENTS}`);
+      
+      // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
+      const step1Result = await supabase.functions.invoke(APPROVED_BAT_EXTRACTORS.CORE_DATA, {
+        body: {
+          url,
+          max_vehicles: 1,
+        }
+      });
+
+      if (step1Result.error) {
+        throw new Error(`Step 1 (${APPROVED_BAT_EXTRACTORS.CORE_DATA}) failed: ${step1Result.error.message}`);
+      }
+
+      const vehicleId = step1Result.data?.created_vehicle_ids?.[0] || 
+                       step1Result.data?.updated_vehicle_ids?.[0] || 
+                       vehicle_id;
+
+      if (!vehicleId) {
+        throw new Error(`No vehicle_id returned from ${APPROVED_BAT_EXTRACTORS.CORE_DATA}`);
+      }
+
+      // Step 2: Extract comments and bids
+      const step2Result = await supabase.functions.invoke(APPROVED_BAT_EXTRACTORS.COMMENTS, {
+        body: {
+          auction_url: url,
+          vehicle_id: vehicleId,
+        }
+      });
+
+      // Comments extraction is non-critical - log warnings but don't fail
+      if (step2Result.error) {
+        console.warn(`⚠️ Step 2 (${APPROVED_BAT_EXTRACTORS.COMMENTS}) failed (non-critical): ${step2Result.error.message}`);
+      } else {
+        console.log(`✅ Step 2 complete: ${step2Result.data?.comments_extracted || 0} comments, ${step2Result.data?.bids_extracted || 0} bids`);
+      }
+
+      // Return combined result
+      return new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            ...step1Result.data,
+            comments_extraction: step2Result.data || null,
+          },
+          vehicle_id: vehicleId,
+          extraction_method: `approved-bat-workflow`,
+          extraction_steps: [
+            APPROVED_BAT_EXTRACTORS.CORE_DATA,
+            APPROVED_BAT_EXTRACTORS.COMMENTS,
+          ],
+          strategy_reason: strategy.reason,
+          data_quality_expected: strategy.expectedDataQuality,
+          should_skip_basic_extraction: true,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // For non-BaT URLs, use single function extraction
+    if (!strategy.functionName) {
+      throw new Error(`No extractor determined for URL: ${url}`);
+    }
 
     console.log(`🎯 Smart router: ${url} → ${strategy.functionName} (${strategy.reason})`);
 

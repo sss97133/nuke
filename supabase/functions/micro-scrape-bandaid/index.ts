@@ -134,15 +134,43 @@ async function executeActions(
           break;
 
         case 'comprehensive-bat-extraction':
+          // ✅ UPDATED: Use approved two-step workflow instead of deprecated comprehensive-bat-extraction
+          // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
           if (vehicle.discovery_url?.includes('bringatrailer.com')) {
-            const { error: batError } = await supabase.functions.invoke('comprehensive-bat-extraction', {
-              body: {
-                vehicle_id: gap.vehicle_id,
-                bat_url: vehicle.discovery_url,
-              },
-            });
-            if (!batError) results.succeeded++;
-            else results.failed++;
+            try {
+              // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
+              const step1Result = await supabase.functions.invoke('extract-premium-auction', {
+                body: {
+                  url: vehicle.discovery_url,
+                  max_vehicles: 1,
+                },
+              });
+              
+              if (step1Result.error) {
+                results.failed++;
+              } else {
+                const vehicleId = step1Result.data?.created_vehicle_ids?.[0] || 
+                                 step1Result.data?.updated_vehicle_ids?.[0] || 
+                                 gap.vehicle_id;
+                
+                // Step 2: Extract comments and bids (non-critical)
+                try {
+                  await supabase.functions.invoke('extract-auction-comments', {
+                    body: {
+                      auction_url: vehicle.discovery_url,
+                      vehicle_id: vehicleId,
+                    },
+                  });
+                } catch (commentError) {
+                  // Non-critical - step 1 succeeded, so count as success
+                  console.warn(`Comments extraction failed (non-critical): ${(commentError as any)?.message}`);
+                }
+                
+                results.succeeded++;
+              }
+            } catch (e: any) {
+              results.failed++;
+            }
           }
           break;
 

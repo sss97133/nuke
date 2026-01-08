@@ -139,19 +139,17 @@ async function runSampleExtraction(supabase: any, testUrl?: string, compareExtra
     };
 
     if (compareExtractors && url.includes('bringatrailer.com')) {
-      // Compare with old import-bat-listing
-      console.log('Testing old import-bat-listing for comparison...');
-      const oldStart = Date.now();
-      const { data: oldData, error: oldError } = await supabase.functions.invoke('import-bat-listing', {
-        body: { url, vehicle_id: crypto.randomUUID() }
-      });
-      const oldTime = Date.now() - oldStart;
-
+      // ⚠️ DEPRECATED: import-bat-listing is deprecated and returns 410 Gone
+      // Skipping comparison with deprecated function
+      // Approved workflow is extract-premium-auction + extract-auction-comments
+      // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+      console.log('⚠️ Skipping comparison - import-bat-listing is deprecated');
       results.extraction_results.old_extractor = {
-        success: !oldError && oldData?.success,
-        error: oldError?.message,
-        response_time_ms: oldTime,
-        extracted_fields: oldData ? Object.keys(oldData).length : 0
+        success: false,
+        error: 'DEPRECATED: import-bat-listing is deprecated',
+        response_time_ms: 0,
+        extracted_fields: 0,
+        note: 'Use extract-premium-auction + extract-auction-comments instead'
       };
     }
 
@@ -424,8 +422,18 @@ async function runExtractionComparison(supabase: any, testUrl?: string) {
     results.comparison.smart_router = { error: error.message };
   }
 
-  // Test old method (if applicable)
+  // ⚠️ DEPRECATED: import-bat-listing is deprecated - skip comparison
+  // Approved workflow is extract-premium-auction + extract-auction-comments
+  // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
   if (url.includes('bringatrailer.com')) {
+    results.comparison.old_method = {
+      success: false,
+      error: 'DEPRECATED: import-bat-listing is deprecated',
+      response_time_ms: 0,
+      note: 'Use extract-premium-auction + extract-auction-comments instead'
+    };
+    
+    /* DISABLED - Old method is deprecated
     try {
       const oldStart = Date.now();
       const { data: oldData, error: oldError } = await supabase.functions.invoke('import-bat-listing', {
@@ -445,6 +453,7 @@ async function runExtractionComparison(supabase: any, testUrl?: string) {
     } catch (error: any) {
       results.comparison.old_method = { error: error.message };
     }
+    */
   }
 
   // Analyze improvements

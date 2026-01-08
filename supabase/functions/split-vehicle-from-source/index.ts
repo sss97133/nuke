@@ -246,13 +246,32 @@ serve(async (req) => {
       // ignore
     }
 
-    // Kick off deeper extraction (best-effort). This is the “build solid profile from BaT” step.
+    // Kick off deeper extraction (best-effort) using approved two-step workflow.
+    // ✅ APPROVED WORKFLOW: extract-premium-auction + extract-auction-comments
+    // ⚠️ Do NOT use comprehensive-bat-extraction (deprecated)
+    // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
     try {
-      await admin.functions.invoke("comprehensive-bat-extraction", {
-        body: { batUrl: sourceUrl, vehicleId: newVehicle.id },
+      // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
+      const step1Result = await admin.functions.invoke("extract-premium-auction", {
+        body: { url: sourceUrl, max_vehicles: 1 },
       });
+      
+      if (step1Result.error) {
+        console.log(`extract-premium-auction invoke failed (non-fatal): ${step1Result.error.message}`);
+      } else {
+        const vehicleId = step1Result.data?.created_vehicle_ids?.[0] || 
+                         step1Result.data?.updated_vehicle_ids?.[0] || 
+                         newVehicle.id;
+        
+        // Step 2: Extract comments and bids (non-critical, fire-and-forget)
+        admin.functions.invoke("extract-auction-comments", {
+          body: { auction_url: sourceUrl, vehicle_id: vehicleId },
+        }).catch((e: any) => {
+          console.log(`extract-auction-comments invoke failed (non-fatal): ${e?.message || String(e)}`);
+        });
+      }
     } catch (e) {
-      console.log("comprehensive-bat-extraction invoke failed (non-fatal):", (e as any)?.message);
+      console.log("BaT extraction workflow failed (non-fatal):", (e as any)?.message);
     }
 
     return new Response(

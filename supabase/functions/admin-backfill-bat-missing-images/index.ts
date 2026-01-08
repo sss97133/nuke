@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       failed: 0,
       sample: [] as any[],
       note:
-        "Invokes import-bat-listing for BaT vehicles that currently have 0 rows in vehicle_images (fixes: UI shows images via fallback but DB is empty).",
+        "Invokes approved BaT extraction workflow (extract-premium-auction) for BaT vehicles that currently have 0 rows in vehicle_images (fixes: UI shows images via fallback but DB is empty).",
     };
 
     for (const v of (vehicles || [])) {
@@ -97,16 +97,26 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const { data, error } = await admin.functions.invoke("import-bat-listing", {
+        // ✅ APPROVED WORKFLOW: Use extract-premium-auction (extracts images + core data)
+        // ⚠️ Do NOT use import-bat-listing (deprecated)
+        // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+        // Note: extract-premium-auction extracts images as part of its workflow
+        
+        const { data, error } = await admin.functions.invoke("extract-premium-auction", {
           body: {
             url,
-            allowFuzzyMatch: false,
-            imageBatchSize: 50,
+            max_vehicles: 1,
           },
         });
         if (error) throw error;
         out.invoked++;
-        if (out.sample.length < 10) out.sample.push({ vehicle_id: v.id, url, invoked: true, result: data || null });
+        if (out.sample.length < 10) out.sample.push({ 
+          vehicle_id: v.id, 
+          url, 
+          invoked: true, 
+          result: data || null,
+          workflow: 'approved-extract-premium-auction',
+        });
       } catch (e: any) {
         out.failed++;
         if (out.sample.length < 10) out.sample.push({ vehicle_id: v.id, url, invoked: false, error: e?.message || String(e) });
