@@ -705,7 +705,15 @@ const Profile: React.FC = () => {
 
             {activeTab === 'auctions' && (
               <div>
-                {isOwnProfile ? <MyAuctions /> : <PublicAuctionTrackRecord profileUserId={profile.id} />}
+                {isOwnProfile ? (
+                  <MyAuctions />
+                ) : (
+                  <PublicAuctionTrackRecord
+                    listings={comprehensiveData?.listings || []}
+                    loading={!comprehensiveData}
+                    profileName={profile.full_name || profile.username || null}
+                  />
+                )}
               </div>
             )}
 

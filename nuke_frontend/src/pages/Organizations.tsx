@@ -210,16 +210,21 @@ export default function Organizations() {
       } else {
         // No search - load all public organizations
         console.log('[Organizations] Fetching all public organizations...');
-        const { data, error: orgError } = await supabase
+        console.log('[Organizations] Supabase URL:', SUPABASE_URL);
+        console.log('[Organizations] Has session:', !!userSession, 'User ID:', userSession?.user?.id);
+        
+        const { data, error: orgError, count } = await supabase
           .from('businesses')
-          .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at')
+          .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at', { count: 'exact' })
           .eq('is_public', true)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(20);
         
         console.log('[Organizations] Query result:', {
           hasError: !!orgError,
           error: orgError,
           dataLength: data?.length || 0,
+          count: count,
           data: data?.slice(0, 3) // Log first 3 orgs for debugging
         });
         
@@ -228,12 +233,20 @@ export default function Organizations() {
             message: orgError.message,
             details: orgError.details,
             hint: orgError.hint,
-            code: orgError.code
+            code: orgError.code,
+            statusCode: orgError.status
           });
+          
+          // If it's an RLS error, provide helpful message
+          if (orgError.code === 'PGRST301' || orgError.message?.includes('permission') || orgError.message?.includes('row-level security')) {
+            console.error('[Organizations] ⚠️  RLS Policy Issue: The query was blocked by Row Level Security policies.');
+            console.error('[Organizations] Check if public access is allowed for is_public = true organizations.');
+          }
+          
           throw orgError;
         }
         orgs = data || [];
-        console.log('[Organizations] Loaded', orgs.length, 'organizations');
+        console.log('[Organizations] Loaded', orgs.length, 'organizations (total available:', count || 'unknown', ')');
       }
 
       if (error) throw error;

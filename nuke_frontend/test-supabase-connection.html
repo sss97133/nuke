@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Supabase Connection</title>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    
+    // Get values from the same env source as the app
+    const url = 'https://qkgaybvrernstplzjaam.supabase.co';
+    const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2F5YnZyZXJuc3RwbHpqYWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzNjkwMjEsImV4cCI6MjA1Mzk0NTAyMX0.lw3dTV1mE1vf7OXDpBLCulj82SoqqXR2eAVLc4wfDlk';
+    
+    const supabase = createClient(url, key);
+    
+    async function test() {
+      const output = document.getElementById('output');
+      output.innerHTML = '<p>Testing connection...</p>';
+      
+      try {
+        // Test 1: Basic connection
+        output.innerHTML += '<p>✓ Supabase client created</p>';
+        
+        // Test 2: Query organizations
+        output.innerHTML += '<p>Querying businesses table...</p>';
+        const { data, error, count } = await supabase
+          .from('businesses')
+          .select('id, business_name, business_type', { count: 'exact' })
+          .eq('is_public', true)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        if (error) {
+          output.innerHTML += `<p style="color: red;">❌ Error: ${error.message}</p>`;
+          output.innerHTML += `<p style="color: red;">Code: ${error.code}</p>`;
+          output.innerHTML += `<p style="color: red;">Details: ${JSON.stringify(error.details)}</p>`;
+          output.innerHTML += `<p style="color: red;">Hint: ${error.hint}</p>`;
+        } else {
+          output.innerHTML += `<p style="color: green;">✓ Query successful!</p>`;
+          output.innerHTML += `<p>Total public organizations: ${count || data?.length || 0}</p>`;
+          output.innerHTML += `<p>Returned ${data?.length || 0} organizations:</p>`;
+          if (data && data.length > 0) {
+            const list = data.map(org => `<li>${org.business_name || '(no name)'} (${org.business_type || 'N/A'})</li>`).join('');
+            output.innerHTML += `<ul>${list}</ul>`;
+          } else {
+            output.innerHTML += '<p style="color: orange;">⚠️ No organizations returned</p>';
+          }
+        }
+        
+        // Test 3: Check session
+        const { data: { session } } = await supabase.auth.getSession();
+        output.innerHTML += `<p>Session: ${session ? `Logged in as ${session.user.email}` : 'Not logged in (anon)'}</p>`;
+        
+      } catch (err) {
+        output.innerHTML += `<p style="color: red;">❌ Exception: ${err.message}</p>`;
+        console.error(err);
+      }
+    }
+    
+    test();
+  </script>
+</head>
+<body>
+  <h1>Supabase Connection Test</h1>
+  <div id="output"></div>
+</body>
+</html>
+
