@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { handleExpectedError, shouldLogError, getErrorKey } from '../../utils/errorCache';
 
 interface ConfirmationQuestion {
   question_id: string;
@@ -22,8 +23,12 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
   const [questions, setQuestions] = useState<ConfirmationQuestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [responding, setResponding] = useState<Set<string>>(new Set());
+  const hasAttemptedLoad = useRef(false);
 
   useEffect(() => {
+    // Prevent duplicate loads from React Strict Mode
+    if (hasAttemptedLoad.current) return;
+    hasAttemptedLoad.current = true;
     loadQuestions();
   }, [userId]);
 
@@ -34,19 +39,23 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
         .rpc('generate_vehicle_confirmation_questions', { p_user_id: userId });
 
       if (error) {
-        // Gracefully handle missing RPC function (feature may not be implemented yet)
-        if (error.code === 'PGRST202' || error.message?.includes('does not exist')) {
-          console.log('Vehicle confirmation questions feature not available');
+        // Silently handle missing RPC function (feature not implemented)
+        if (handleExpectedError(error, 'Vehicle Confirmation Questions')) {
           setQuestions([]);
           return;
         }
-        console.error('Error loading questions:', error);
+        // Only log unexpected errors
+        if (shouldLogError(getErrorKey(error, 'VehicleConfirmationQuestions'))) {
+          console.error('Error loading questions:', error);
+        }
         return;
       }
 
       setQuestions(data || []);
     } catch (error) {
-      console.error('Error loading questions:', error);
+      if (shouldLogError(getErrorKey(error, 'VehicleConfirmationQuestions'))) {
+        console.error('Error loading questions:', error);
+      }
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { handleExpectedError, shouldLogError, getErrorKey } from '../../utils/errorCache';
 
 interface TitleTransfer {
   id: string;
@@ -38,8 +39,12 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
   const [processing, setProcessing] = useState<Set<string>>(new Set());
   const [showDisputeForm, setShowDisputeForm] = useState<string | null>(null);
   const [disputeReason, setDisputeReason] = useState('');
+  const hasAttemptedLoad = useRef(false);
 
   useEffect(() => {
+    // Prevent duplicate loads from React Strict Mode
+    if (hasAttemptedLoad.current) return;
+    hasAttemptedLoad.current = true;
     loadTransfers();
   }, [userId]);
 
@@ -62,7 +67,6 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
 
       // Gracefully handle schema mismatch - table or relationship might not exist
       if (error && (error.code === 'PGRST200' || error.message?.includes('relationship'))) {
-        console.log('ownership_transfers relationship not available, trying simpler query');
         // Try without relationship join
         const simpleQuery = supabase
           .from('ownership_transfers')
@@ -79,19 +83,23 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
       }
 
       if (error) {
-        // Table doesn't exist - feature not available
-        if (error.code === '42P01' || error.message?.includes('does not exist')) {
-          console.log('Title transfer feature not available');
+        // Silently handle missing feature
+        if (handleExpectedError(error, 'Title Transfers')) {
           setTransfers([]);
           return;
         }
-        console.error('Error loading transfers:', error);
+        // Only log unexpected errors
+        if (shouldLogError(getErrorKey(error, 'TitleTransferApproval'))) {
+          console.error('Error loading transfers:', error);
+        }
         return;
       }
 
       setTransfers(data || []);
     } catch (error) {
-      console.error('Error loading transfers:', error);
+      if (shouldLogError(getErrorKey(error, 'TitleTransferApproval'))) {
+        console.error('Error loading transfers:', error);
+      }
     } finally {
       setLoading(false);
     }
