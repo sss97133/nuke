@@ -114,6 +114,22 @@ const VehiclesInner: React.FC = () => {
       return true;
     }
   });
+  
+  // Sidebar width - default 280px, stored in localStorage
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('vehicles.sidebarWidth');
+      if (saved) {
+        const width = parseInt(saved, 10);
+        if (width >= 200 && width <= 600) return width;
+      }
+    } catch {
+      // ignore
+    }
+    return 280;
+  });
+  
+  const [isResizing, setIsResizing] = useState(false);
   const [sidebarSections, setSidebarSections] = useState<{
     selection: boolean;
     inbox: boolean;
@@ -165,6 +181,47 @@ const VehiclesInner: React.FC = () => {
       // ignore
     }
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('vehicles.sidebarWidth', String(sidebarWidth));
+    } catch {
+      // ignore
+    }
+  }, [sidebarWidth]);
+
+  // Handle sidebar resize
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const sidebarElement = document.querySelector('.vehicle-library-sidebar') as HTMLElement;
+    if (!sidebarElement) return;
+
+    const startX = sidebarElement.getBoundingClientRect().left;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - startX;
+      const newWidth = Math.max(200, Math.min(600, startWidth + deltaX));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, sidebarWidth]);
 
   useEffect(() => {
     loadVehicleRelationships();
@@ -1446,25 +1503,84 @@ const VehiclesInner: React.FC = () => {
           <aside
             className={`vehicle-library-sidebar ${sidebarCollapsed ? 'vehicle-library-sidebar-collapsed' : ''}`}
             aria-label="Vehicle sidebar"
+            style={!sidebarCollapsed ? { 
+              width: `${sidebarWidth}px`,
+              flex: `0 0 ${sidebarWidth}px`,
+              minWidth: `${sidebarWidth}px`,
+              position: 'relative'
+            } : undefined}
           >
             <div className="vehicle-library-sidebar-header">
-              <button
-                type="button"
-                className="button button-secondary button-small"
-                onClick={() => setSidebarCollapsed(v => !v)}
-              >
-                {sidebarCollapsed ? 'EXPAND' : 'COLLAPSE'}
-              </button>
               {!sidebarCollapsed && (
-                <button
-                  type="button"
-                  className="button button-primary button-small"
-                  onClick={() => navigate('/vehicle/add')}
-                >
-                  ADD VEHICLE
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="button button-secondary button-small"
+                    onClick={() => setSidebarCollapsed(v => !v)}
+                  >
+                    COLLAPSE
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-primary button-small"
+                    onClick={() => navigate('/vehicle/add')}
+                  >
+                    ADD VEHICLE
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      min="200"
+                      max="600"
+                      value={sidebarWidth}
+                      onChange={(e) => {
+                        const width = parseInt(e.target.value, 10);
+                        if (width >= 200 && width <= 600) {
+                          setSidebarWidth(width);
+                        }
+                      }}
+                      style={{
+                        width: '50px',
+                        padding: '2px 4px',
+                        fontSize: '7pt',
+                        border: '1px solid var(--border-light)',
+                        background: 'var(--white)'
+                      }}
+                      title="Sidebar width (px)"
+                    />
+                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>px</span>
+                  </div>
+                </>
               )}
             </div>
+            
+            {/* Resize handle */}
+            {!sidebarCollapsed && (
+              <div
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setIsResizing(true);
+                }}
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: '6px',
+                  cursor: 'col-resize',
+                  background: 'transparent',
+                  zIndex: 10,
+                  transition: 'background 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(0, 123, 255, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+                title="Drag to resize sidebar"
+              />
+            )}
 
             {!sidebarCollapsed && (
               <div className="vehicle-library-sidebar-scroll">
@@ -1864,6 +1980,15 @@ const VehiclesInner: React.FC = () => {
                 />
               </div>
               <div className="vehicle-library-toolbar-right">
+                {sidebarCollapsed && (
+                  <button
+                    type="button"
+                    className="button button-secondary button-small"
+                    onClick={() => setSidebarCollapsed(false)}
+                  >
+                    EXPAND
+                  </button>
+                )}
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
@@ -1938,27 +2063,6 @@ const VehiclesInner: React.FC = () => {
                                 <div key={`${vehicle.id}-${group.type}-${relationship.relationshipType || 'default'}-${index}`} style={{ position: 'relative' }}>
                                   {session?.user?.id && (
                                     <>
-                                      {/* Keep selection/drag controls away from card's own top badges */}
-                                      <div
-                                        draggable
-                                        onDragStart={(e) => handleCardDragStart(e, vehicle.id)}
-                                        style={{
-                                          position: 'absolute',
-                                          bottom: '38px',
-                                          right: '8px',
-                                          zIndex: 10,
-                                          background: 'var(--surface-glass)',
-                                          border: '1px solid var(--border-light)',
-                                          padding: '3px 6px',
-                                          fontSize: '8px',
-                                          fontWeight: 700,
-                                          cursor: 'grab',
-                                          userSelect: 'none'
-                                        }}
-                                        title="Drag to a collection or organization in the sidebar"
-                                      >
-                                        DRAG
-                                      </div>
 
                                       <div
                                         style={{
@@ -2049,27 +2153,6 @@ const VehiclesInner: React.FC = () => {
                           <div key={`filtered-${vehicle.id}-${relationship.relationshipType || 'default'}-${index}`} style={{ position: 'relative' }}>
                             {session?.user?.id && (
                               <>
-                                {/* Keep selection/drag controls away from card's own top badges */}
-                                <div
-                                  draggable
-                                  onDragStart={(e) => handleCardDragStart(e, vehicle.id)}
-                                  style={{
-                                    position: 'absolute',
-                                    bottom: '38px',
-                                    right: '8px',
-                                    zIndex: 10,
-                                    background: 'var(--surface-glass)',
-                                    border: '1px solid var(--border-light)',
-                                    padding: '3px 6px',
-                                    fontSize: '8px',
-                                    fontWeight: 700,
-                                    cursor: 'grab',
-                                    userSelect: 'none'
-                                  }}
-                                  title="Drag to a collection or organization in the sidebar"
-                                >
-                                  DRAG
-                                </div>
 
                                 <div
                                   style={{
