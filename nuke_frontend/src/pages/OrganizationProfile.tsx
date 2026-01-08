@@ -743,15 +743,20 @@ export default function OrganizationProfile() {
       
       setOrganization(org);
       
-      // Load comprehensive profile data (BaT-style stats)
-      try {
-        const comprehensive = await getOrganizationProfileData(organizationId);
-        setComprehensiveData(comprehensive);
-      } catch (err) {
-        console.warn('[OrgProfile] Failed to load comprehensive profile data:', err);
-      }
+      // CRITICAL: Set loading to false IMMEDIATELY after org loads so page can render
+      setLoading(false);
       
-      // Load organization intelligence (respects explicit settings)
+      // Load comprehensive profile data (BaT-style stats) - LAZY LOAD in background
+      (async () => {
+        try {
+          const comprehensive = await getOrganizationProfileData(organizationId);
+          setComprehensiveData(comprehensive);
+        } catch (err) {
+          console.warn('[OrgProfile] Failed to load comprehensive profile data:', err);
+        }
+      })();
+      
+      // Load organization intelligence (respects explicit settings) - LAZY LOAD in background
       (async () => {
         try {
           const intelligence = await OrganizationIntelligenceService.getIntelligence(organizationId);
@@ -794,9 +799,6 @@ export default function OrganizationProfile() {
           ]);
         }
       })();
-      
-      // CRITICAL: Set loading to false IMMEDIATELY after org loads so page can render
-      setLoading(false);
 
       // STEP 2: Load everything else in background (non-blocking)
       // Images - Load ALL fields needed for display
@@ -860,181 +862,191 @@ export default function OrganizationProfile() {
             return;
           }
           
-                  // Enrich vehicles in background
-          const enriched = await Promise.allSettled(
-            (orgVehicles || []).map(async (ov: any) => {
-              try {
-                const now = new Date().toISOString();
-                const [vehicleResult, imageResult, nativeAuction, externalAuction, batAuction] = await Promise.all([
-                  supabase
-                    .from('vehicles')
-                    .select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score')
-                    .eq('id', ov.vehicle_id)
-                    .single(),
-                  // Prefer primary image, but fall back to the first available image so thumbnails don't look "broken"
-                  supabase
-                    .from('vehicle_images')
-                    .select('thumbnail_url, medium_url, image_url, variants')
-                    .eq('vehicle_id', ov.vehicle_id)
-                    .order('is_primary', { ascending: false })
-                    .order('created_at', { ascending: true })
-                    .limit(1)
-                    .maybeSingle(),
-                  // Check for active native auction listing
-                  supabase.from('vehicle_listings')
-                    .select('id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents')
-                    .eq('vehicle_id', ov.vehicle_id)
-                    .eq('status', 'active')
-                    .in('sale_type', ['auction', 'live_auction'])
-                    .gt('auction_end_time', now)
-                    .maybeSingle(),
-                  // Check for active external listing (BaT, Cars & Bids, etc.)
-                  // Use end_date > NOW() as primary check (more reliable than status)
-                  supabase.from('external_listings')
-                    .select('id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata')
-                    .eq('vehicle_id', ov.vehicle_id)
-                    .gt('end_date', now)
-                    .maybeSingle(),
-                  // Check for active BaT listing
-                  // Use auction_end_date > NOW() as primary check (more reliable than status)
-                  supabase.from('bat_listings')
-                    .select('id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url')
-                    .eq('vehicle_id', ov.vehicle_id)
-                    .gt('auction_end_date', now.split('T')[0])
-                    .maybeSingle()
-                ]);
-                
-                // Determine which auction is active (prioritize native, then external, then bat)
-                let auctionListing = nativeAuction.data || externalAuction.data || batAuction.data;
-                let auctionData: any = null;
-                
-                if (nativeAuction.data) {
-                  auctionData = {
-                    auction_end_time: nativeAuction.data.auction_end_time,
-                    auction_current_bid: nativeAuction.data.current_high_bid_cents,
-                    auction_bid_count: nativeAuction.data.bid_count || 0,
-                    auction_reserve_price: nativeAuction.data.reserve_price_cents,
-                    auction_platform: null,
-                    auction_url: null,
-                    auction_view_count: null,
-                    auction_watcher_count: null
-                  };
-                } else if (externalAuction.data) {
-                  const endDate = externalAuction.data.end_date;
-                  const meta = externalAuction.data.metadata && typeof externalAuction.data.metadata === 'object' ? externalAuction.data.metadata : {};
-                  const metaLocation = typeof meta?.location === 'string' ? meta.location : null;
-                  // Parse current_bid (may be string or number)
-                  const parseBid = (bid: any): number | null => {
-                    if (bid === null || bid === undefined) return null;
-                    if (typeof bid === 'number') return Math.round(bid * 100);
-                    if (typeof bid === 'string') {
-                      const cleaned = bid.replace(/[^0-9.]/g, '');
-                      const num = parseFloat(cleaned);
-                      return Number.isFinite(num) ? Math.round(num * 100) : null;
-                    }
-                    return null;
-                  };
-                  auctionData = {
-                    auction_end_time: endDate,
-                    auction_current_bid: parseBid(externalAuction.data.current_bid),
-                    auction_bid_count: externalAuction.data.bid_count || 0,
-                    auction_reserve_price: externalAuction.data.reserve_price ? Math.round(Number(externalAuction.data.reserve_price) * 100) : null,
-                    auction_platform: externalAuction.data.platform,
-                    auction_url: externalAuction.data.listing_url,
-                    auction_view_count: typeof externalAuction.data.view_count === 'number' ? externalAuction.data.view_count : null,
-                    auction_watcher_count: typeof externalAuction.data.watcher_count === 'number' ? externalAuction.data.watcher_count : null,
-                    auction_comment_count: null,
-                    vehicle_location: metaLocation || null,
-                    seller_org_id: typeof externalAuction.data.organization_id === 'string' ? externalAuction.data.organization_id : null,
-                    seller_handle: null
-                  };
-                } else if (batAuction.data) {
-                  // Convert DATE to TIMESTAMPTZ for end of day
-                  const endDate = new Date(batAuction.data.auction_end_date);
-                  endDate.setHours(23, 59, 59, 999);
-                  // Use high_bid for live auctions, final_bid only for sold auctions
-                  const isLive = endDate.getTime() > Date.now();
-                  const currentBid = (batAuction.data.final_bid || null);
-                  auctionData = {
-                    auction_end_time: endDate.toISOString(),
-                    auction_current_bid: currentBid ? Math.round(Number(currentBid) * 100) : null,
-                    auction_bid_count: batAuction.data.bid_count || 0,
-                    auction_reserve_price: batAuction.data.reserve_price ? Math.round(Number(batAuction.data.reserve_price) * 100) : null,
-                    auction_platform: 'bat',
-                    auction_url: batAuction.data.bat_listing_url,
-                    auction_view_count: typeof batAuction.data.view_count === 'number' ? batAuction.data.view_count : null,
-                    auction_watcher_count: null,
-                    auction_comment_count: typeof batAuction.data.comment_count === 'number' ? batAuction.data.comment_count : null,
-                    seller_org_id: typeof batAuction.data.organization_id === 'string' ? batAuction.data.organization_id : null,
-                    seller_handle: typeof batAuction.data.seller_username === 'string' ? batAuction.data.seller_username : null
-                  };
-                }
-                
-                // Use vehicle's sale data if org_vehicle doesn't have it
-                const finalSaleDate = ov.sale_date || vehicleResult.data?.sale_date;
-                const finalSalePrice = ov.sale_price || vehicleResult.data?.sale_price;
-                
-                const vehicleLocation =
-                  (auctionData?.vehicle_location as string | null) ||
-                  (vehicleResult.data?.listing_location_raw as string | null) ||
-                  (vehicleResult.data?.listing_location as string | null) ||
-                  null;
-
-                const imgVariants = imageResult.data?.variants && typeof imageResult.data.variants === 'object' ? imageResult.data.variants : {};
-                const bestImg =
-                  (typeof imgVariants?.thumbnail === 'string' && imgVariants.thumbnail) ||
-                  (typeof imgVariants?.medium === 'string' && imgVariants.medium) ||
-                  (typeof imageResult.data?.thumbnail_url === 'string' && imageResult.data.thumbnail_url) ||
-                  (typeof imageResult.data?.medium_url === 'string' && imageResult.data.medium_url) ||
-                  (typeof imageResult.data?.image_url === 'string' && imageResult.data.image_url) ||
-                  null;
-
-                return {
-                  id: ov.id,
-                  vehicle_id: ov.vehicle_id,
-                  relationship_type: ov.relationship_type,
-                  status: ov.status,
-                  start_date: ov.start_date,
-                  end_date: ov.end_date,
-                  sale_date: finalSaleDate,
-                  sale_price: finalSalePrice,
-                  vehicle_year: vehicleResult.data?.year,
-                  vehicle_make: vehicleResult.data?.make,
-                  vehicle_model: vehicleResult.data?.model,
-                  vehicle_vin: vehicleResult.data?.vin,
-                  vehicle_current_value: vehicleResult.data?.current_value,
-                  vehicle_asking_price: vehicleResult.data?.asking_price || ov.asking_price,
-                  vehicle_sale_status: vehicleResult.data?.sale_status,
-                  vehicle_image_url: bestImg,
-                  vehicle_location: vehicleLocation,
-                  listing_status: ov.listing_status,
-                  cost_basis: ov.cost_basis,
-                  days_on_lot: ov.days_on_lot,
-                  has_active_auction: !!auctionListing, // Flag for sorting
-                  auction_end_time: auctionData?.auction_end_time || null,
-                  auction_current_bid: auctionData?.auction_current_bid || null,
-                  auction_bid_count: auctionData?.auction_bid_count || 0,
-                  auction_reserve_price: auctionData?.auction_reserve_price || null,
-                  auction_platform: auctionData?.auction_platform || null,
-                  auction_url: auctionData?.auction_url || null,
-                  auction_view_count: auctionData?.auction_view_count || null,
-                  auction_watcher_count: auctionData?.auction_watcher_count || null,
-                  auction_comment_count: auctionData?.auction_comment_count || null,
-                  seller_org_id: auctionData?.seller_org_id || null,
-                  seller_handle: auctionData?.seller_handle || null,
-                  analysis_tier: typeof vehicleResult.data?.analysis_tier === 'number' ? vehicleResult.data.analysis_tier : null,
-                  signal_score: typeof vehicleResult.data?.signal_score === 'number' ? vehicleResult.data.signal_score : null,
-                  vehicles: vehicleResult.data || {}
-                };
-              } catch {
-                return { id: ov.id, vehicle_id: ov.vehicle_id, relationship_type: ov.relationship_type, status: ov.status, vehicles: {} };
-              }
-            })
-          );
+                  // OPTIMIZED: Batch load all vehicle data instead of N+1 queries
+          const vehicleIds = (orgVehicles || []).map((ov: any) => ov.vehicle_id).filter(Boolean);
+          const now = new Date().toISOString();
+          const nowDate = now.split('T')[0];
           
-          const baseRows = enriched
-            .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-            .map((r) => r.value) as OrgVehicle[];
+          // Batch load all vehicles, images, and auctions at once
+          const [allVehicles, allImages, allNativeAuctions, allExternalAuctions, allBatAuctions] = await Promise.all([
+            vehicleIds.length > 0 ? supabase
+              .from('vehicles')
+              .select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score')
+              .in('id', vehicleIds) : { data: [], error: null },
+            vehicleIds.length > 0 ? supabase
+              .from('vehicle_images')
+              .select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at')
+              .in('vehicle_id', vehicleIds)
+              .order('is_primary', { ascending: false })
+              .order('created_at', { ascending: true }) : { data: [], error: null },
+            vehicleIds.length > 0 ? supabase
+              .from('vehicle_listings')
+              .select('vehicle_id, id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents')
+              .in('vehicle_id', vehicleIds)
+              .eq('status', 'active')
+              .in('sale_type', ['auction', 'live_auction'])
+              .gt('auction_end_time', now) : { data: [], error: null },
+            vehicleIds.length > 0 ? supabase
+              .from('external_listings')
+              .select('vehicle_id, id, organization_id, listing_status, end_date, current_bid, bid_count, reserve_price, platform, listing_url, view_count, watcher_count, metadata')
+              .in('vehicle_id', vehicleIds)
+              .gt('end_date', now) : { data: [], error: null },
+            vehicleIds.length > 0 ? supabase
+              .from('bat_listings')
+              .select('vehicle_id, id, organization_id, seller_username, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price, bat_listing_url')
+              .in('vehicle_id', vehicleIds)
+              .gt('auction_end_date', nowDate) : { data: [], error: null }
+          ]);
+          
+          // Build lookup maps for O(1) access
+          const vehiclesById = new Map((allVehicles.data || []).map(v => [v.id, v]));
+          const imagesByVehicleId = new Map<string, any>();
+          (allImages.data || []).forEach(img => {
+            if (!imagesByVehicleId.has(img.vehicle_id)) {
+              imagesByVehicleId.set(img.vehicle_id, img);
+            }
+          });
+          const nativeAuctionsByVehicleId = new Map((allNativeAuctions.data || []).map(a => [a.vehicle_id, a]));
+          const externalAuctionsByVehicleId = new Map((allExternalAuctions.data || []).map(a => [a.vehicle_id, a]));
+          const batAuctionsByVehicleId = new Map((allBatAuctions.data || []).map(a => [a.vehicle_id, a]));
+          
+          // Enrich vehicles using pre-loaded data
+          const enriched = (orgVehicles || []).map((ov: any) => {
+            try {
+              const vehicle = vehiclesById.get(ov.vehicle_id);
+              const image = imagesByVehicleId.get(ov.vehicle_id);
+              const nativeAuction = nativeAuctionsByVehicleId.get(ov.vehicle_id);
+              const externalAuction = externalAuctionsByVehicleId.get(ov.vehicle_id);
+              const batAuction = batAuctionsByVehicleId.get(ov.vehicle_id);
+                
+              // Determine which auction is active (prioritize native, then external, then bat)
+              let auctionListing = nativeAuction || externalAuction || batAuction;
+              let auctionData: any = null;
+              
+              if (nativeAuction) {
+                auctionData = {
+                  auction_end_time: nativeAuction.auction_end_time,
+                  auction_current_bid: nativeAuction.current_high_bid_cents,
+                  auction_bid_count: nativeAuction.bid_count || 0,
+                  auction_reserve_price: nativeAuction.reserve_price_cents,
+                  auction_platform: null,
+                  auction_url: null,
+                  auction_view_count: null,
+                  auction_watcher_count: null
+                };
+              } else if (externalAuction) {
+                const endDate = externalAuction.end_date;
+                const meta = externalAuction.metadata && typeof externalAuction.metadata === 'object' ? externalAuction.metadata : {};
+                const metaLocation = typeof meta?.location === 'string' ? meta.location : null;
+                // Parse current_bid (may be string or number)
+                const parseBid = (bid: any): number | null => {
+                  if (bid === null || bid === undefined) return null;
+                  if (typeof bid === 'number') return Math.round(bid * 100);
+                  if (typeof bid === 'string') {
+                    const cleaned = bid.replace(/[^0-9.]/g, '');
+                    const num = parseFloat(cleaned);
+                    return Number.isFinite(num) ? Math.round(num * 100) : null;
+                  }
+                  return null;
+                };
+                auctionData = {
+                  auction_end_time: endDate,
+                  auction_current_bid: parseBid(externalAuction.current_bid),
+                  auction_bid_count: externalAuction.bid_count || 0,
+                  auction_reserve_price: externalAuction.reserve_price ? Math.round(Number(externalAuction.reserve_price) * 100) : null,
+                  auction_platform: externalAuction.platform,
+                  auction_url: externalAuction.listing_url,
+                  auction_view_count: typeof externalAuction.view_count === 'number' ? externalAuction.view_count : null,
+                  auction_watcher_count: typeof externalAuction.watcher_count === 'number' ? externalAuction.watcher_count : null,
+                  auction_comment_count: null,
+                  vehicle_location: metaLocation || null,
+                  seller_org_id: typeof externalAuction.organization_id === 'string' ? externalAuction.organization_id : null,
+                  seller_handle: null
+                };
+              } else if (batAuction) {
+                // Convert DATE to TIMESTAMPTZ for end of day
+                const endDate = new Date(batAuction.auction_end_date);
+                endDate.setHours(23, 59, 59, 999);
+                // Use high_bid for live auctions, final_bid only for sold auctions
+                const isLive = endDate.getTime() > Date.now();
+                const currentBid = (batAuction.final_bid || null);
+                auctionData = {
+                  auction_end_time: endDate.toISOString(),
+                  auction_current_bid: currentBid ? Math.round(Number(currentBid) * 100) : null,
+                  auction_bid_count: batAuction.bid_count || 0,
+                  auction_reserve_price: batAuction.reserve_price ? Math.round(Number(batAuction.reserve_price) * 100) : null,
+                  auction_platform: 'bat',
+                  auction_url: batAuction.bat_listing_url,
+                  auction_view_count: typeof batAuction.view_count === 'number' ? batAuction.view_count : null,
+                  auction_watcher_count: null,
+                  auction_comment_count: typeof batAuction.comment_count === 'number' ? batAuction.comment_count : null,
+                  seller_org_id: typeof batAuction.organization_id === 'string' ? batAuction.organization_id : null,
+                  seller_handle: typeof batAuction.seller_username === 'string' ? batAuction.seller_username : null
+                };
+              }
+              
+              // Use vehicle's sale data if org_vehicle doesn't have it
+              const finalSaleDate = ov.sale_date || vehicle?.sale_date;
+              const finalSalePrice = ov.sale_price || vehicle?.sale_price;
+              
+              const vehicleLocation =
+                (auctionData?.vehicle_location as string | null) ||
+                (vehicle?.listing_location_raw as string | null) ||
+                (vehicle?.listing_location as string | null) ||
+                null;
+
+              const imgVariants = image?.variants && typeof image.variants === 'object' ? image.variants : {};
+              const bestImg =
+                (typeof imgVariants?.thumbnail === 'string' && imgVariants.thumbnail) ||
+                (typeof imgVariants?.medium === 'string' && imgVariants.medium) ||
+                (typeof image?.thumbnail_url === 'string' && image.thumbnail_url) ||
+                (typeof image?.medium_url === 'string' && image.medium_url) ||
+                (typeof image?.image_url === 'string' && image.image_url) ||
+                null;
+
+              return {
+                id: ov.id,
+                vehicle_id: ov.vehicle_id,
+                relationship_type: ov.relationship_type,
+                status: ov.status,
+                start_date: ov.start_date,
+                end_date: ov.end_date,
+                sale_date: finalSaleDate,
+                sale_price: finalSalePrice,
+                vehicle_year: vehicle?.year,
+                vehicle_make: vehicle?.make,
+                vehicle_model: vehicle?.model,
+                vehicle_vin: vehicle?.vin,
+                vehicle_current_value: vehicle?.current_value,
+                vehicle_asking_price: vehicle?.asking_price || ov.asking_price,
+                vehicle_sale_status: vehicle?.sale_status,
+                vehicle_image_url: bestImg,
+                vehicle_location: vehicleLocation,
+                listing_status: ov.listing_status,
+                cost_basis: ov.cost_basis,
+                days_on_lot: ov.days_on_lot,
+                has_active_auction: !!auctionListing, // Flag for sorting
+                auction_end_time: auctionData?.auction_end_time || null,
+                auction_current_bid: auctionData?.auction_current_bid || null,
+                auction_bid_count: auctionData?.auction_bid_count || 0,
+                auction_reserve_price: auctionData?.auction_reserve_price || null,
+                auction_platform: auctionData?.auction_platform || null,
+                auction_url: auctionData?.auction_url || null,
+                auction_view_count: auctionData?.auction_view_count || null,
+                auction_watcher_count: auctionData?.auction_watcher_count || null,
+                auction_comment_count: auctionData?.auction_comment_count || null,
+                seller_org_id: auctionData?.seller_org_id || null,
+                seller_handle: auctionData?.seller_handle || null,
+                analysis_tier: typeof vehicle?.analysis_tier === 'number' ? vehicle.analysis_tier : null,
+                signal_score: typeof vehicle?.signal_score === 'number' ? vehicle.signal_score : null,
+                vehicles: vehicle || {}
+              };
+            } catch {
+              return { id: ov.id, vehicle_id: ov.vehicle_id, relationship_type: ov.relationship_type, status: ov.status, vehicles: {} };
+            }
+          });
+          
+          const baseRows = enriched as OrgVehicle[];
 
           // Batch-load seller org metadata (for favicon + dealer name)
           const sellerOrgIds = Array.from(
