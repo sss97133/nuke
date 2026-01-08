@@ -32,14 +32,11 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
       if (contractError) throw contractError;
       setContract(contractData);
 
-      // Load assets using transparency view
+      // Load assets - cannot use relationship syntax because asset_id is polymorphic
+      // (references different tables based on asset_type, no FK constraints)
       const { data: assetsData, error: assetsError } = await supabase
         .from('contract_assets')
-        .select(`
-          *,
-          vehicle:vehicles!contract_assets_asset_id_fkey(id, year, make, model, current_value, location),
-          organization:businesses!contract_assets_asset_id_fkey(id, business_name, business_type, city, state, country)
-        `)
+        .select('*')
         .eq('contract_id', contractId);
 
       if (assetsError) throw assetsError;
@@ -52,7 +49,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
           case 'vehicle':
             const { data: vehicleData } = await supabase
               .from('vehicles')
-              .select('id, year, make, model, current_value, location, purchase_location, is_public')
+              .select('id, year, make, model, current_value, location, purchase_location, city, state, country, is_public')
               .eq('id', asset.asset_id)
               .single();
             details = vehicleData;
@@ -60,7 +57,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
           case 'organization':
             const { data: orgData } = await supabase
               .from('businesses')
-              .select('id, name, business_type, location')
+              .select('id, business_name, business_type, city, state, country')
               .eq('id', asset.asset_id)
               .single();
             details = orgData;
@@ -277,7 +274,7 @@ export default function ContractTransparency({ contractId, onBack }: ContractTra
                 const allocationPct = totalValue > 0 ? ((asset.current_value_cents || 0) / totalValue * 100) : 0;
                 const assetName = asset.details ? 
                   (asset.asset_type === 'vehicle' ? `${asset.details.year} ${asset.details.make} ${asset.details.model}` :
-                   asset.asset_type === 'organization' ? asset.details.name :
+                   asset.asset_type === 'organization' ? asset.details.business_name :
                    `${asset.asset_type.toUpperCase()} #${asset.asset_id.slice(-8)}`) :
                   `${asset.asset_type.toUpperCase()} #${asset.asset_id.slice(-8)}`;
 
