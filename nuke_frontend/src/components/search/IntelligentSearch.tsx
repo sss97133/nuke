@@ -685,6 +685,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     try {
       // Prefer the unified search edge function when available (single request).
       // Fall back to the existing multi-query client search if invoke fails.
+      let edgeFunctionWorked = false;
       try {
         const { data: edgeData, error: edgeError } = await supabase.functions.invoke('search', {
           body: {
@@ -697,10 +698,14 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           const edgeResults = (edgeData as any).results as SearchResult[];
           const edgeSummary = String((edgeData as any).search_summary || '') || `Found ${edgeResults.length} results for "${searchQuery.trim()}".`;
           onSearchResults(edgeResults, edgeSummary);
+          edgeFunctionWorked = true;
           return;
+        } else if (edgeError) {
+          console.warn('Search Edge Function error (falling back to client search):', edgeError);
         }
-      } catch {
-        // ignore
+      } catch (edgeErr: any) {
+        // Edge function might not be deployed or network error - that's ok, use fallback
+        console.warn('Search Edge Function unavailable (using client search):', edgeErr?.message || 'Unknown error');
       }
 
       const analysis = parseSearchQuery(searchQuery);
@@ -787,19 +792,24 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
       // Update search history
       setSearchHistory(prev => [searchQuery, ...prev.filter(q => q !== searchQuery)].slice(0, 10));
 
-      const response: SearchResponse = {
-        results: results.slice(0, 50),
-        total_count: results.length,
-        search_summary: summary,
-        suggested_filters: generateSuggestedFilters(analysis, results),
-        search_insights: searchInsights
-      };
+      // Always show results, even if empty - give user feedback
+      if (results.length === 0) {
+        onSearchResults([], `No results found for "${searchQuery.trim()}". Try a different search term or check your spelling.`);
+      } else {
+        const response: SearchResponse = {
+          results: results.slice(0, 50),
+          total_count: results.length,
+          search_summary: summary,
+          suggested_filters: generateSuggestedFilters(analysis, results),
+          search_insights: searchInsights
+        };
+        onSearchResults(response.results, response.search_summary);
+      }
 
-      onSearchResults(response.results, response.search_summary);
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Search error:', error);
-      onSearchResults([], 'Search encountered an error. Please try again.');
+      const errorMessage = error?.message || 'Unknown error';
+      onSearchResults([], `Search encountered an error: ${errorMessage}. Please try again.`);
     } finally {
       setIsSearching(false);
     }
@@ -871,26 +881,50 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           vehicleQuery = vehicleQuery.or(`year.eq.${year},make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
         } else {
           // Text search across multiple fields (PostgREST doesn't support type casting in or filters)
-          vehicleQuery = vehicleQuery.or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
+          // Also search VIN if it looks like a VIN
+          const isVIN = /^[A-HJ-NPR-Z0-9]{11,17}$/i.test(searchTerm.replace(/[^A-Z0-9]/gi, ''));
+          if (isVIN) {
+            vehicleQuery = vehicleQuery.or(`vin.ilike.%${searchTermSafe}%,make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
+          } else {
+            vehicleQuery = vehicleQuery.or(`make.ilike.%${searchTermSafe}%,model.ilike.%${searchTermSafe}%,description.ilike.%${searchTermSafe}%`);
+          }
         }
 
         const { data: simpleResults, error } = await vehicleQuery.limit(20);
         
         if (error) {
-          console.error('Simple search error:', error);
-          return [];
+          console.error('Simple vehicle search error:', error);
+          // Don't return empty - try even simpler search
+          const fallbackQuery = supabase
+            .from('vehicles')
+            .select('id, year, make, model, color, description, created_at, uploaded_by')
+            .eq('is_public', true)
+            .ilike('make', `%${searchTermSafe}%`)
+            .limit(20);
+          
+          const { data: fallbackResults } = await fallbackQuery;
+          vehicles = (fallbackResults || []).map((v: any) => ({
+            id: v.id,
+            year: v.year,
+            make: v.make,
+            model: v.model,
+            color: v.color,
+            description: v.description,
+            created_at: v.created_at,
+            relevance: 0.3
+          }));
+        } else {
+          vehicles = (simpleResults || []).map((v: any) => ({
+            id: v.id,
+            year: v.year,
+            make: v.make,
+            model: v.model,
+            color: v.color,
+            description: v.description,
+            created_at: v.created_at,
+            relevance: 0.5
+          }));
         }
-
-        vehicles = (simpleResults || []).map((v: any) => ({
-          id: v.id,
-          year: v.year,
-          make: v.make,
-          model: v.model,
-          color: v.color,
-          description: v.description,
-          created_at: v.created_at,
-          relevance: 0.5
-        }));
       }
 
       // Fetch images separately
