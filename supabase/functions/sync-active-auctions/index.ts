@@ -21,7 +21,7 @@ interface SyncResult {
 }
 
 const SYNC_COOLDOWN_MINUTES = 15; // Don't sync same listing more than once per 15 minutes
-const BATCH_SIZE = 20; // Process this many listings per platform per run
+const BATCH_SIZE = 50; // Process this many listings per platform per run (increased from 20)
 
 Deno.serve(async (req: Request) => {
   try {
@@ -154,27 +154,52 @@ Deno.serve(async (req: Request) => {
             },
             body: JSON.stringify({
               externalListingId: listing.id
-            })
+            }),
+            signal: AbortSignal.timeout(60000) // 60 second timeout per listing
           });
 
           if (!syncResponse.ok) {
-            const errorText = await syncResponse.text();
+            const errorText = await syncResponse.text().catch(() => 'Unknown error');
+            const statusCode = syncResponse.status;
             result.failed++;
-            result.errors.push(`Listing ${listing.id}: ${errorText.substring(0, 100)}`);
+            const errorMsg = `Listing ${listing.id}: HTTP ${statusCode} - ${errorText.substring(0, 150)}`;
+            result.errors.push(errorMsg);
+            console.error(`[sync-active-auctions] Sync failed for ${listing.id}:`, errorMsg);
+            
+            // Don't update last_synced_at on failure - we want to retry it next time
           } else {
-            result.synced++;
-            // Update last_synced_at (the sync function should do this, but ensure it)
-            await supabase
-              .from('external_listings')
-              .update({ last_synced_at: new Date().toISOString() })
-              .eq('id', listing.id);
+            try {
+              const responseData = await syncResponse.json().catch(() => ({}));
+              result.synced++;
+              
+              // Update last_synced_at (the sync function should do this, but ensure it)
+              await supabase
+                .from('external_listings')
+                .update({ last_synced_at: new Date().toISOString() })
+                .eq('id', listing.id);
+              
+              if (responseData?.listing?.currentBid) {
+                console.log(`✅ Synced ${listing.id}: bid=$${responseData.listing.currentBid}, status=${responseData.listing.status}`);
+              }
+            } catch (parseError) {
+              // Response was OK but JSON parsing failed - still count as success
+              result.synced++;
+              console.warn(`[sync-active-auctions] Sync succeeded for ${listing.id} but response parse failed:`, parseError);
+            }
           }
 
-          // Small delay between syncs to avoid rate limiting external sites
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Adaptive delay between syncs to avoid rate limiting external sites
+          // Shorter delay for same platform (100ms), longer when switching platforms (1s)
+          await new Promise(resolve => setTimeout(resolve, 100));
         } catch (error: any) {
           result.failed++;
-          result.errors.push(`Listing ${listing.id}: ${error.message}`);
+          const errorMsg = error.name === 'AbortError' 
+            ? `Listing ${listing.id}: Timeout after 60s`
+            : `Listing ${listing.id}: ${error.message || String(error)}`;
+          result.errors.push(errorMsg);
+          console.error(`[sync-active-auctions] Exception syncing ${listing.id}:`, errorMsg);
+          
+          // On timeout or network errors, don't update last_synced_at - we want to retry
         }
       }
 

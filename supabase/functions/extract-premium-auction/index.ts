@@ -5463,7 +5463,8 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     };
   }
 
-  const firecrawlKey = requiredEnv("FIRECRAWL_API_KEY");
+  // ⚠️ NO PAID APIs: Using direct fetch + HTML parsing only
+  // Removed Firecrawl dependency due to budget constraints
   const sourceWebsite = "https://bringatrailer.com";
 
   // Import BaT extraction utilities
@@ -5525,12 +5526,27 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     return Array.from(new Set(urls));
   };
 
-  // HTML-based extraction for BaT specs (fallback when Firecrawl AI fails)
+  // HTML-based extraction for BaT specs (NO PAID APIs - direct HTML parsing)
   const extractBatSpecsFromHtml = (html: string): Record<string, any> => {
     const h = String(html || '');
     const specs: Record<string, any> = {};
     
     try {
+      // Extract title/year/make/model from page title or heading
+      const titleMatch = h.match(/<title[^>]*>([^<]+)<\/title>/i) || 
+                        h.match(/<h1[^>]*>([^<]+)<\/h1>/i) ||
+                        h.match(/"title"[:\s]*"([^"]+)"/i);
+      if (titleMatch?.[1]) {
+        specs.title = titleMatch[1].trim();
+        // Parse year/make/model from title (e.g., "1965 Chevrolet Corvette")
+        const titleParts = specs.title.match(/^(\d{4})\s+([A-Za-z][A-Za-z\s&]+?)\s+(.+?)(?:\s+on\s+Bring\s+a\s+Trailer|$)/i);
+        if (titleParts) {
+          specs.year = parseInt(titleParts[1], 10);
+          specs.make = titleParts[2].trim();
+          specs.model = titleParts[3].trim();
+        }
+      }
+      
       // Extract from "essentials" or "listing-essentials" section
       // BaT uses a structured format like: <strong>Mileage</strong><span>36,000</span>
       
@@ -5806,59 +5822,47 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
   const issues: string[] = [];
 
   try {
-    const firecrawlData = await fetchJsonWithTimeout(
-      FIRECRAWL_SCRAPE_URL,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${firecrawlKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          url: normalizedUrl,
-          formats: ["extract", "html"],
-          onlyMainContent: false,
-          waitFor: 8000, // Wait for gallery to load
-          actions: [
-            {
-              type: "wait",
-              milliseconds: 2000, // Initial page load
-            },
-            {
-              type: "scroll",
-              direction: "down",
-              pixels: 2000, // Scroll to trigger lazy loading
-            },
-            {
-              type: "wait",
-              milliseconds: 2000, // Wait for images to load
-            },
-            // Note: BaT galleries have ALL image data embedded in data-gallery-items JSON
-            // No need to click "load more" - we extract from the JSON attribute directly
-          ],
-          extract: { schema: listingSchema },
-        }),
-      },
-      FIRECRAWL_LISTING_TIMEOUT_MS,
-      "Firecrawl BaT listing scrape",
-    );
-
-    const vehicle = firecrawlData?.data?.extract || {};
-    const html = String(firecrawlData?.data?.html || "");
-
-    // Extract high-res images from HTML gallery (more reliable than Firecrawl extraction)
-    let images: string[] = [];
-    if (html) {
-      images = extractBatGalleryImagesFromHtml(html);
-    }
+    // ⚠️ FREE MODE: Direct HTML fetch only (no Firecrawl, no AI)
+    console.log(`🌐 Fetching BaT listing HTML directly (free mode)...`);
+    const html = await fetchTextWithTimeout(normalizedUrl, 30000, "Direct BaT HTML fetch");
     
-    // Merge Firecrawl images if any, but prioritize HTML extraction
-    if (images.length === 0 && Array.isArray(vehicle?.images) && vehicle.images.length > 0) {
-      images = vehicle.images.map((u: string) => upgradeBatImageUrl(u));
-    }
+    // BaT pages have all data embedded in HTML/JSON, so we parse directly
+    // No need for Firecrawl or AI - everything is in the HTML
+    
+    // Extract high-res images from HTML gallery
+    const images = extractBatGalleryImagesFromHtml(html);
+    
+    // Parse vehicle data from HTML (extractBatSpecsFromHtml handles everything)
+    const htmlSpecs = extractBatSpecsFromHtml(html);
+    
+    // Build vehicle object from HTML parsing (no AI needed)
+    const vehicle: any = {
+      title: htmlSpecs.title || null,
+      year: htmlSpecs.year || null,
+      make: htmlSpecs.make || null,
+      model: htmlSpecs.model || null,
+      trim: htmlSpecs.trim || null,
+      vin: htmlSpecs.vin || null,
+      mileage: htmlSpecs.mileage || null,
+      color: htmlSpecs.color || null,
+      interior_color: htmlSpecs.interior_color || null,
+      transmission: htmlSpecs.transmission || null,
+      drivetrain: htmlSpecs.drivetrain || null,
+      engine_size: htmlSpecs.engine_size || null,
+      displacement: htmlSpecs.displacement || null,
+      location: htmlSpecs.location || null,
+      // Auction data
+      sale_price: htmlSpecs.sale_price || null,
+      high_bid: htmlSpecs.high_bid || null,
+      final_bid: htmlSpecs.final_bid || null,
+      current_bid: htmlSpecs.current_bid || null,
+      reserve_met: htmlSpecs.reserve_met ?? null,
+      bid_count: htmlSpecs.bid_count || null,
+      images: images,
+    };
 
     // Upgrade all image URLs to highest resolution and filter out non-vehicle images
-    images = images.map(upgradeBatImageUrl).filter((u: string) => {
+    const filteredImages = images.map(upgradeBatImageUrl).filter((u: string) => {
       const lower = u.toLowerCase();
       // CRITICAL: Exclude storage URLs - we want external BaT URLs only
       if (lower.includes('supabase.co') || lower.includes('storage/') || lower.includes('import_queue')) {
@@ -5899,9 +5903,7 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       return true;
     });
 
-    // Extract specs from HTML as fallback when Firecrawl AI extraction fails
-    const htmlSpecs = html ? extractBatSpecsFromHtml(html) : {};
-    console.log(`BaT HTML specs extracted:`, JSON.stringify(htmlSpecs));
+    console.log(`✅ BaT HTML extraction complete: ${filteredImages.length} images, specs extracted`);
     
     // ⚠️ VERIFICATION: Log what we extracted from HTML to verify against source
     if (htmlSpecs.high_bid && !htmlSpecs.sale_price) {
@@ -5910,60 +5912,15 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       console.log(`✅ VERIFIED: HTML shows "Sold for $${htmlSpecs.sale_price}" (SOLD) - sale_price will be set`);
     }
     if (htmlSpecs.bid_count !== undefined) {
-      console.log(`✅ VERIFIED: HTML extracted ${htmlSpecs.bid_count} bids (separate from comments)`);
+      console.log(`✅ VERIFIED: HTML extracted ${htmlSpecs.bid_count} bids`);
     }
 
-    // Merge ALL extracted data comprehensively - use HTML fallbacks for missing fields
+    // Build final merged object from HTML-extracted data
     // ⚠️ CRITICAL: HTML extraction distinguishes "Bid to $X" (not sold) vs "Sold for $X" (sold)
     const merged = {
       ...vehicle,
       listing_url: normalizedUrl,
-      images, // High-res images from HTML gallery extraction
-      // Vehicle specs with HTML fallback
-      mileage: vehicle?.mileage ?? htmlSpecs.mileage ?? null,
-      color: vehicle?.color || htmlSpecs.color || null,
-      transmission: vehicle?.transmission || htmlSpecs.transmission || null,
-      engine_size: vehicle?.engine_size || htmlSpecs.engine_size || null,
-      drivetrain: vehicle?.drivetrain || htmlSpecs.drivetrain || null,
-      vin: vehicle?.vin || htmlSpecs.vin || null,
-      location: vehicle?.location || htmlSpecs.location || null,
-      // ⚠️ CRITICAL: Prioritize HTML extraction for prices (it distinguishes "Bid to" vs "Sold for")
-      // Only set sale_price if HTML extracted it (meaning "Sold for"), NOT "Bid to"
-      high_bid: typeof htmlSpecs.high_bid === 'number' ? htmlSpecs.high_bid :
-                (typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null),
-      final_bid: typeof htmlSpecs.final_bid === 'number' ? htmlSpecs.final_bid :
-                 (typeof htmlSpecs.high_bid === 'number' ? htmlSpecs.high_bid :
-                  (typeof vehicle?.final_bid === 'number' ? vehicle.final_bid : null)),
-      // sale_price ONLY if HTML extracted "Sold for" (not "Bid to")
-      sale_price: typeof htmlSpecs.sale_price === 'number' ? htmlSpecs.sale_price :
-                  (typeof vehicle?.sale_price === 'number' ? vehicle.sale_price : null),
-      // current_bid for active auctions, otherwise use high_bid
-      current_bid: typeof vehicle?.current_bid === 'number' ? vehicle.current_bid : 
-                   (typeof htmlSpecs.high_bid === 'number' ? htmlSpecs.high_bid :
-                    (typeof vehicle?.high_bid === 'number' ? vehicle.high_bid : null)),
-      // Reserve status from HTML if detected
-      reserve_met: typeof htmlSpecs.reserve_met === 'boolean' ? htmlSpecs.reserve_met :
-                   (typeof vehicle?.reserve_met === 'boolean' ? vehicle.reserve_met : null),
-      reserve_price: typeof vehicle?.reserve_price === 'number' ? vehicle.reserve_price : null,
-      auction_end_date: vehicle?.auction_end_date || null,
-      auction_start_date: vehicle?.auction_start_date || null,
-      sale_date: vehicle?.sale_date || null,
-      // Preserve all metrics (prioritize HTML extraction for bid_count)
-      bid_count: typeof htmlSpecs.bid_count === 'number' ? htmlSpecs.bid_count :
-                 (typeof vehicle?.bid_count === 'number' ? vehicle.bid_count : null),
-      view_count: typeof vehicle?.view_count === 'number' ? vehicle.view_count : null,
-      watcher_count: typeof vehicle?.watcher_count === 'number' ? vehicle.watcher_count : null,
-      comment_count: typeof vehicle?.comment_count === 'number' ? vehicle.comment_count : null,
-      // Preserve location and parties
-      location: vehicle?.location || null,
-      seller: vehicle?.seller || vehicle?.seller_username || null,
-      seller_username: vehicle?.seller_username || null,
-      buyer: vehicle?.buyer || vehicle?.buyer_username || null,
-      buyer_username: vehicle?.buyer_username || null,
-      lot_number: vehicle?.lot_number || null,
-      // Preserve all specs
-      displacement: vehicle?.displacement || null,
-      features: Array.isArray(vehicle?.features) ? vehicle.features : null,
+      images: filteredImages, // High-res images from HTML gallery extraction
     };
 
     console.log(`Extracted merged object VIN: "${merged.vin}", mileage: ${merged.mileage}, images: ${merged.images?.length || 0}`);
@@ -5997,7 +5954,7 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     created_vehicle_ids: created.created_ids,
     updated_vehicle_ids: created.updated_ids,
     issues: [...issues, ...created.errors],
-    extraction_method: "firecrawl_extract_with_html_gallery_parsing",
+    extraction_method: "direct_html_parsing_free_mode",
     timestamp: new Date().toISOString(),
     // Debug info
     debug_extraction: extracted.length > 0 ? {

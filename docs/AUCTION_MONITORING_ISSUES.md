@@ -168,14 +168,28 @@ function getPollingInterval(endDate: string | null): number {
 
 ## Immediate Action Items
 
-### Priority 1: Fix Comments Extraction
-1. ✅ Integrate `extract-auction-comments` call into `sync-bat-listing`
-2. ✅ Update `sync-bat-listing` to extract comments when syncing active auctions
-3. ✅ Ensure `bat_listings.comment_count` is updated
+### Priority 1: Fix Comments Extraction ✅ COMPLETED
+1. ✅ Integrated `extract-auction-comments` call into `sync-bat-listing` (with cost control)
+2. ✅ Comments are extracted asynchronously when auction ending soon (< 24h) or significant bid increase
+3. ✅ `extract-auction-comments` already updates `bat_listings.comment_count` and `auction_comments` table
 
-### Priority 2: Sync Both Tables
-1. ✅ Update `sync-bat-listing` to also update `bat_listings` table
-2. ✅ Ensure bid counts are synced to both tables
+### Priority 2: Sync Both Tables ✅ COMPLETED
+1. ✅ Updated `sync-bat-listing` to also update `bat_listings` table
+2. ✅ Both `external_listings` and `bat_listings` now stay in sync with:
+   - `bid_count`, `final_bid`, `view_count`
+   - `listing_status`, `sale_price`, `sale_date`
+   - `auction_end_date`
+
+### Priority 3: Improve Batch Processing ✅ COMPLETED
+1. ✅ Increased batch size from 20 to 50 listings per run
+2. ✅ Added better error handling with timeouts (60s per listing)
+3. ✅ Improved logging and error reporting
+4. ✅ Created health check functions to monitor sync status
+
+### Priority 4: Verify Cron Jobs ✅ COMPLETED
+1. ✅ Created migration to update cron job with new batch size
+2. ✅ Added `check_auction_sync_health()` function
+3. ✅ Added `check_sync_coverage()` function for monitoring
 
 ### Priority 3: Verify Cron Jobs Are Active
 ```sql
@@ -205,11 +219,45 @@ LIMIT 10;
 After implementing fixes:
 
 1. ✅ Verify `external_listings.current_bid` updates every 15 minutes
+   - **Test**: Run `SELECT * FROM check_sync_coverage();` to see sync coverage
 2. ✅ Verify `bat_listings.bid_count` updates when syncing
-3. ✅ Verify `bat_listings.comment_count` and `external_listings.comment_count` update
+   - **Test**: Check that `bat_listings` rows are updated after sync runs
+3. ✅ Verify `bat_listings.comment_count` updates via `extract-auction-comments`
+   - **Test**: Check that comments are extracted for auctions ending soon
 4. ✅ Verify `auction_comments` table gets new comments during live auctions
+   - **Test**: Monitor `auction_comments` table for new entries after comment extraction
 5. ✅ Verify sold status is detected and updated promptly
+   - **Test**: Check that `listing_status` changes to 'sold' when auction ends
 6. ✅ Verify frontend shows accurate bid counts and comment counts
+   - **Test**: Check organization profile page shows current bids and comments
+
+## Monitoring Commands
+
+```sql
+-- Check if sync cron job is running
+SELECT * FROM check_auction_sync_health();
+
+-- Check sync coverage
+SELECT * FROM check_sync_coverage();
+
+-- Check recent sync activity
+SELECT 
+  platform,
+  COUNT(*) as total,
+  COUNT(*) FILTER (WHERE last_synced_at >= NOW() - INTERVAL '15 minutes') as synced_recently,
+  MAX(last_synced_at) as last_sync
+FROM external_listings
+WHERE listing_status = 'active' AND sync_enabled = TRUE
+GROUP BY platform;
+
+-- Check bat_listings sync status
+SELECT 
+  COUNT(*) as total,
+  COUNT(*) FILTER (WHERE listing_status = 'active') as active,
+  COUNT(*) FILTER (WHERE last_updated_at >= NOW() - INTERVAL '15 minutes') as updated_recently,
+  MAX(last_updated_at) as last_update
+FROM bat_listings;
+```
 
 ---
 
