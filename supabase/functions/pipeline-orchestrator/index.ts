@@ -15,6 +15,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { selectProcessor, groupByProcessor, getProcessorSummary, type QueueItem } from '../_shared/select-processor.ts';
+import { isApprovedBatExtractor, APPROVED_BAT_EXTRACTORS } from '../_shared/approved-extractors.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -248,17 +249,41 @@ serve(async (req) => {
                 console.error(`   [async] ${functionName} error: ${e.message}`);
               });
             } else if (functionName === 'process-bat-from-import-queue') {
-              // BaT items: Use proven two-step workflow (extract-premium-auction + extract-auction-comments)
-              // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+              // ✅ APPROVED BaT WORKFLOW (DO NOT CHANGE)
+              // This implements the mandatory two-step workflow:
+              // 1. extract-premium-auction (APPROVED_BAT_EXTRACTORS.CORE_DATA)
+              // 2. extract-auction-comments (APPROVED_BAT_EXTRACTORS.COMMENTS)
+              // 
+              // ⚠️ Do NOT replace with deprecated functions:
+              // - comprehensive-bat-extraction
+              // - import-bat-listing
+              // - bat-extract-complete-v*
+              //
+              // Documentation: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+              // 
               const batch = items.slice(0, 2); // Process max 2 per cycle (BaT extractions take 30-60s each)
+              
+              // Validate we're using approved extractors
+              const step1Function = APPROVED_BAT_EXTRACTORS.CORE_DATA; // 'extract-premium-auction'
+              const step2Function = APPROVED_BAT_EXTRACTORS.COMMENTS; // 'extract-auction-comments'
+              
+              if (!isApprovedBatExtractor(step1Function)) {
+                console.error(`❌ CRITICAL: Step 1 function ${step1Function} is not approved!`);
+                throw new Error(`CRITICAL: Step 1 function ${step1Function} is not approved!`);
+              }
+              if (!isApprovedBatExtractor(step2Function)) {
+                console.error(`❌ CRITICAL: Step 2 function ${step2Function} is not approved!`);
+                throw new Error(`CRITICAL: Step 2 function ${step2Function} is not approved!`);
+              }
               
               Promise.all(batch.map(async (item) => {
                 try {
                   const listingUrl = item.listing_url;
                   
-                  // Step 1: Extract core vehicle data (VIN, specs, images)
-                  console.log(`   [async] BaT Step 1: extract-premium-auction for ${listingUrl.substring(0, 60)}...`);
-                  const step1Resp = await fetch(`${SUPABASE_URL}/functions/v1/extract-premium-auction`, {
+                  // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
+                  // ✅ Using APPROVED extractor: extract-premium-auction
+                  console.log(`   [async] BaT Step 1: ${step1Function} for ${listingUrl.substring(0, 60)}...`);
+                  const step1Resp = await fetch(`${SUPABASE_URL}/functions/v1/${step1Function}`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -278,12 +303,13 @@ serve(async (req) => {
                   const vehicleId = step1Result.created_vehicle_ids?.[0] || step1Result.updated_vehicle_ids?.[0];
 
                   if (!vehicleId) {
-                    throw new Error('No vehicle_id returned from extract-premium-auction');
+                    throw new Error(`No vehicle_id returned from ${step1Function}`);
                   }
 
                   // Step 2: Extract comments and bids
-                  console.log(`   [async] BaT Step 2: extract-auction-comments for vehicle ${vehicleId}`);
-                  const step2Resp = await fetch(`${SUPABASE_URL}/functions/v1/extract-auction-comments`, {
+                  // ✅ Using APPROVED extractor: extract-auction-comments
+                  console.log(`   [async] BaT Step 2: ${step2Function} for vehicle ${vehicleId}`);
+                  const step2Resp = await fetch(`${SUPABASE_URL}/functions/v1/${step2Function}`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',

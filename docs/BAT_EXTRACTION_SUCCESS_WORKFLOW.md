@@ -1,6 +1,38 @@
-# BaT Extraction Success Workflow
+# ✅ BaT Extraction Success Workflow - THE DEFINITIVE GUIDE
 
-> **Status**: ✅ PROVEN WORKFLOW - Use this for all BaT vehicle extractions
+**⚠️ CRITICAL: This is the ONLY approved workflow for BaT extraction.**
+
+**Last Updated:** 2026-01-07  
+**Status:** ✅ PRODUCTION - DO NOT DEVIATE
+
+## ⚠️ FOR ALL LLMs: READ THIS FIRST
+
+If you are modifying BaT extraction code, you MUST use this workflow. 
+Do NOT use any other functions. They are deprecated and will be removed.
+
+### ✅ APPROVED TWO-STEP WORKFLOW (MANDATORY)
+
+**Step 1: Core Data Extraction**
+- Function: `extract-premium-auction`
+- What it does: Extracts VIN, specs, images, auction data
+- Creates: vehicles, external_listings, auction_events
+- Returns: `created_vehicle_ids` or `updated_vehicle_ids`
+
+**Step 2: Comments/Bids Extraction**  
+- Function: `extract-auction-comments`
+- What it does: Extracts ALL comments and bids via DOM parsing
+- Requires: `auction_event_id` and `vehicle_id` (can resolve from URL)
+- Creates: auction_comments, external_identities
+
+### ❌ DEPRECATED FUNCTIONS (DO NOT USE)
+
+**NEVER use these functions for BaT extraction:**
+- ❌ `comprehensive-bat-extraction` - Only extracts images, missing comments
+- ❌ `import-bat-listing` - Only extracts images, incomplete
+- ❌ `bat-extract-complete-v1/v2/v3` - Incomplete/untested
+- ❌ `bat-simple-extract` - Limited to ~50 comments from JSON
+
+**These functions will return 410 Gone errors in production.**
 
 ## Overview
 

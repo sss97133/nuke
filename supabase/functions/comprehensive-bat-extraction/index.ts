@@ -133,6 +133,41 @@ function extractBatGalleryUrlsFromHtml(html: string): { urls: string[]; method: 
 }
 
 Deno.serve(async (req: Request) => {
+  // ⚠️ SEARCH ALERT: If you searched for "BaT extraction" or "bringatrailer extraction"
+  // and found this file, STOP. Read docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md first.
+  // 
+  // This file uses DEPRECATED functions. Do NOT copy this pattern.
+  // Use extract-premium-auction + extract-auction-comments instead.
+  
+  // ⚠️ DEPRECATED FUNCTION: comprehensive-bat-extraction
+  // 
+  // This function is DEPRECATED and should NOT be used for BaT extraction.
+  // It only extracts images and does NOT extract comments or create auction_events.
+  // 
+  // ✅ USE THIS INSTEAD (Approved Two-Step Workflow):
+  // 1. extract-premium-auction (core data: VIN, specs, images, auction_events)
+  // 2. extract-auction-comments (comments, bids)
+  // 
+  // Documentation: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+  // 
+  console.error('⚠️ DEPRECATED FUNCTION CALLED: comprehensive-bat-extraction');
+  console.error('⚠️ Use extract-premium-auction + extract-auction-comments instead');
+  console.error('⚠️ See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md');
+  
+  // Return deprecation error
+  return json(410, {
+    success: false,
+    error: 'DEPRECATED: comprehensive-bat-extraction is deprecated',
+    message: 'Use extract-premium-auction + extract-auction-comments instead',
+    documentation: 'See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md',
+    approved_workflow: {
+      step1: 'extract-premium-auction',
+      step2: 'extract-auction-comments',
+    },
+  });
+
+  // CODE BELOW IS DISABLED - DO NOT USE
+  /*
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -208,6 +243,7 @@ Deno.serve(async (req: Request) => {
     console.error("[comprehensive-bat-extraction] error:", e);
     return json(500, { success: false, error: e?.message || String(e) });
   }
+  */
 });
 
 

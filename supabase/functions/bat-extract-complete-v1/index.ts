@@ -1,4 +1,16 @@
-// BaT Complete Extractor v1 - Orchestrator
+// ⚠️ SEARCH ALERT: If you searched for "BaT extraction" or "bringatrailer extraction"
+// and found this file, STOP. Read docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md first.
+//
+// ⚠️ DEPRECATED: This function is deprecated and incomplete.
+// Use the pipeline-orchestrator's BaT routing instead, which uses the approved workflow.
+//
+// ✅ APPROVED WORKFLOW (use this):
+// 1. extract-premium-auction (core data: VIN, specs, images, auction_events)
+// 2. extract-auction-comments (comments, bids)
+//
+// Documentation: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+
+// BaT Complete Extractor v1 - Orchestrator (DEPRECATED - use pipeline-orchestrator instead)
 // Single trigger that calls proven extractors internally:
 // 1. extract-premium-auction (core vehicle data: VIN, specs, images)
 // 2. extract-auction-comments (comments and bids)

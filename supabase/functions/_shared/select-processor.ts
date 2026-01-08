@@ -5,7 +5,15 @@
  * based on URL patterns, source metadata, and other factors.
  * 
  * This centralizes routing logic and makes it easy to add new sources.
+ * 
+ * ⚠️ FOR BaT: Always uses the approved two-step workflow:
+ * 1. extract-premium-auction (core data)
+ * 2. extract-auction-comments (comments/bids)
+ * 
+ * See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
  */
+
+import { APPROVED_BAT_EXTRACTORS } from './approved-extractors.ts';
 
 export interface ProcessorSelection {
   functionName: string;
@@ -51,19 +59,32 @@ export function selectProcessor(item: QueueItem): ProcessorSelection {
   }
 
   // ============================================================================
-  // BaT (Bring a Trailer) - Proven two-step extraction workflow
-  // Uses: extract-premium-auction (core data) + extract-auction-comments (comments/bids)
-  // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
+  // BaT (Bring a Trailer) - APPROVED TWO-STEP WORKFLOW (MANDATORY)
+  // 
+  // ⚠️ CRITICAL: Do NOT route to deprecated functions like:
+  // - comprehensive-bat-extraction
+  // - import-bat-listing  
+  // - bat-extract-complete-v*
+  //
+  // ✅ APPROVED WORKFLOW:
+  // Step 1: extract-premium-auction (core data + images + auction_events)
+  // Step 2: extract-auction-comments (comments + bids)
+  //
+  // Documentation: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
   // ============================================================================
   if (url.includes('bringatrailer.com') || source.includes('bat') || source.includes('bring')) {
     return {
-      functionName: 'process-bat-from-import-queue', // Special handler for BaT items in import_queue
+      functionName: 'process-bat-from-import-queue', // Special orchestrator handler
       parameters: {
         listing_url: item.listing_url,
         queue_id: item.id,
+        // Orchestrator will call:
+        // 1. extract-premium-auction (APPROVED_BAT_EXTRACTORS.CORE_DATA)
+        // 2. extract-auction-comments (APPROVED_BAT_EXTRACTORS.COMMENTS)
       },
-      reason: 'BaT proven two-step workflow: extract-premium-auction + extract-auction-comments',
+      reason: `BaT approved workflow: ${APPROVED_BAT_EXTRACTORS.CORE_DATA} + ${APPROVED_BAT_EXTRACTORS.COMMENTS}`,
       priority: 2,
+      documentation: 'docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md',
     };
   }
 
