@@ -21,6 +21,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
   const [loading, setLoading] = useState(true);
   const [organizationRelationships, setOrganizationRelationships] = useState<any[]>([]);
   const [session, setSession] = useState<any>(null);
+  const [showValueTooltip, setShowValueTooltip] = useState(false);
 
   const FEATURE_VEHICLE_ANALYTICS_UNAVAILABLE_KEY = 'featureVehicleAnalyticsUnavailable';
 
@@ -192,14 +193,15 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
       <span
         style={{
           fontSize: '7pt',
-          fontWeight: 600,
-          padding: '2px 6px',
-          borderRadius: '2px',
+          fontWeight: 700,
+          padding: '4px 8px',
+          borderRadius: '3px',
           color: badge.color,
           background: badge.bg,
-          border: `1px solid ${badge.color}40`,
+          border: `2px solid ${badge.color}`,
           textTransform: 'uppercase',
-          letterSpacing: '0.5px'
+          letterSpacing: '0.5px',
+          backdropFilter: 'blur(4px)'
         }}
       >
         {badge.text}
@@ -313,8 +315,14 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
         e.currentTarget.style.boxShadow = 'none';
       }}
     >
-      {/* Image with status overlay */}
-      <div style={{ position: 'relative', width: '100%', height: '140px', overflow: 'hidden', background: 'var(--bg)' }}>
+      {/* Image with status overlay - 16:9 aspect ratio */}
+      <div style={{ 
+        position: 'relative', 
+        width: '100%', 
+        aspectRatio: '16 / 9',
+        overflow: 'hidden', 
+        background: '#f3f4f6'
+      }}>
         {(() => {
           // Try to get image URL from multiple sources
           let imageUrl: string | null = null;
@@ -340,7 +348,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
           // Transform Supabase storage URLs for optimized rendering
           if (imageUrl && typeof imageUrl === 'string') {
             if (imageUrl.includes('/storage/v1/object/public/')) {
-              imageUrl = imageUrl.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=420&quality=85';
+              imageUrl = imageUrl.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=632&height=356&quality=85&resize=cover';
             }
             
             return (
@@ -350,7 +358,8 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
                 style={{
                   width: '100%',
                   height: '100%',
-                  objectFit: 'cover'
+                  objectFit: 'cover',
+                  objectPosition: 'center'
                 }}
                 onError={(e) => {
                   // Hide broken image - VehicleThumbnail will render as fallback
@@ -375,15 +384,16 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
         <div
           style={{
             position: 'absolute',
-            top: '6px',
-            right: '6px',
+            top: '8px',
+            right: '8px',
             background: healthScore >= 75 ? '#dcfce7' : healthScore >= 50 ? '#fef3c7' : '#fee2e2',
-            border: `1px solid ${healthScore >= 75 ? '#166534' : healthScore >= 50 ? '#92400e' : '#991b1b'}`,
-            color: healthScore >= 75 ? '#166534' : healthScore >= 50 ? '#92400e' : '#991b1b',
-            padding: '2px 6px',
-            borderRadius: '2px',
+            border: `2px solid ${healthScore >= 75 ? '#15803d' : healthScore >= 50 ? '#d97706' : '#dc2626'}`,
+            color: healthScore >= 75 ? '#15803d' : healthScore >= 50 ? '#b45309' : '#991b1b',
+            padding: '4px 8px',
+            borderRadius: '3px',
             fontSize: '7pt',
-            fontWeight: 700
+            fontWeight: 700,
+            backdropFilter: 'blur(4px)'
           }}
         >
           {healthScore}%
@@ -394,14 +404,15 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
           <div
             style={{
               position: 'absolute',
-              bottom: '6px',
-              left: '6px',
-              background: 'rgba(0,0,0,0.7)',
-              color: 'white',
-              padding: '2px 6px',
-              borderRadius: '2px',
+              bottom: '8px',
+              left: '8px',
+              background: 'rgba(0,0,0,0.75)',
+              color: '#fff',
+              padding: '4px 8px',
+              borderRadius: '3px',
               fontSize: '7pt',
-              fontWeight: 600
+              fontWeight: 600,
+              backdropFilter: 'blur(4px)'
             }}
           >
             {liveData.imageCount} photos
@@ -414,11 +425,11 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
         {/* Vehicle name */}
         <h3
           style={{
-            fontSize: '10pt',
+            fontSize: '11pt',
             fontWeight: 700,
-            margin: '0 0 6px 0',
-            lineHeight: 1.2,
-            color: '#000'
+            margin: '0 0 8px 0',
+            lineHeight: 1.3,
+            color: '#111827'
           }}
         >
           {vehicle.year} {vehicle.make} {vehicle.model}
@@ -430,15 +441,15 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
             {/* Value/ROI */}
             {vehicle.current_value && vehicle.purchase_price ? (
               <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
-                <span style={{ color: '#6b7280' }}>Value: </span>
-                <span style={{ fontWeight: 700 }}>
+                <span style={{ color: '#4b5563', fontWeight: 500 }}>Value: </span>
+                <span style={{ fontWeight: 700, color: '#111827' }}>
                   {formatCurrency(vehicle.current_value)}
                 </span>
                 <span
                   style={{
                     marginLeft: '6px',
-                    color: vehicle.current_value >= vehicle.purchase_price ? '#166534' : '#991b1b',
-                    fontWeight: 600
+                    color: vehicle.current_value >= vehicle.purchase_price ? '#15803d' : '#dc2626',
+                    fontWeight: 700
                   }}
                 >
                   {vehicle.current_value >= vehicle.purchase_price ? '+' : ''}
@@ -447,24 +458,24 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
               </div>
             ) : vehicle.current_value ? (
               <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
-                <span style={{ color: '#6b7280' }}>Value: </span>
-                <span style={{ fontWeight: 700 }}>{formatCurrency(vehicle.current_value)}</span>
+                <span style={{ color: '#4b5563', fontWeight: 500 }}>Value: </span>
+                <span style={{ fontWeight: 700, color: '#111827' }}>{formatCurrency(vehicle.current_value)}</span>
               </div>
             ) : null}
 
             {/* Latest activity */}
             {liveData.latestEvent ? (
               <div style={{ fontSize: '8pt', marginBottom: '4px' }}>
-                <span style={{ color: '#6b7280' }}>Last: </span>
-                <span style={{ color: '#000' }}>
+                <span style={{ color: '#4b5563', fontWeight: 500 }}>Last: </span>
+                <span style={{ color: '#111827', fontWeight: 500 }}>
                   {liveData.latestEvent.title || liveData.latestEvent.event_type}
                 </span>
-                <span style={{ color: '#9ca3af', marginLeft: '4px' }}>
+                <span style={{ color: '#6b7280', marginLeft: '4px' }}>
                   {getTimeAgo(liveData.latestEvent.event_date)}
                 </span>
               </div>
             ) : (
-              <div style={{ fontSize: '8pt', marginBottom: '4px', color: '#9ca3af' }}>
+              <div style={{ fontSize: '8pt', marginBottom: '4px', color: '#6b7280' }}>
                 No activity yet
               </div>
             )}
@@ -475,12 +486,13 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
                 display: 'flex',
                 gap: '8px',
                 fontSize: '7pt',
-                color: '#6b7280',
+                color: '#4b5563',
                 borderTop: '1px solid #e5e7eb',
-                paddingTop: '6px'
+                paddingTop: '8px',
+                marginTop: '6px'
               }}
             >
-              <span>{liveData.eventCount} events</span>
+              <span style={{ fontWeight: 500 }}>{liveData.eventCount} events</span>
               <span>·</span>
               <span>{liveData.viewCount} views</span>
               {vehicle.mileage && (
@@ -497,12 +509,19 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
         {primaryAction && (
           <div
             style={{
+              position: 'relative',
               marginTop: '8px',
-              padding: '6px 8px',
-              background: primaryAction.type === 'critical' ? '#fee2e2' : primaryAction.type === 'high' ? '#fef3c7' : '#f3f4f6',
-              border: `1px solid ${primaryAction.type === 'critical' ? '#991b1b' : primaryAction.type === 'high' ? '#92400e' : '#9ca3af'}`,
+              padding: '8px 10px',
+              background: primaryAction.type === 'critical' ? '#fff5f5' : primaryAction.type === 'high' ? '#fffbeb' : '#f9fafb',
+              border: `2px solid ${primaryAction.type === 'critical' ? '#dc2626' : primaryAction.type === 'high' ? '#d97706' : '#6b7280'}`,
               borderRadius: '2px'
             }}
+            onMouseEnter={(e) => {
+              if (primaryAction.text === 'Set Value') {
+                setShowValueTooltip(true);
+              }
+            }}
+            onMouseLeave={() => setShowValueTooltip(false)}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -512,19 +531,64 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
           >
             <div
               style={{
-                fontSize: '7pt',
+                fontSize: '8pt',
                 fontWeight: 700,
-                color: primaryAction.type === 'critical' ? '#991b1b' : primaryAction.type === 'high' ? '#92400e' : '#4b5563',
-                marginBottom: '2px',
+                color: primaryAction.type === 'critical' ? '#991b1b' : primaryAction.type === 'high' ? '#92400e' : '#1f2937',
+                marginBottom: '4px',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px'
               }}
             >
               {primaryAction.icon} {primaryAction.text}
             </div>
-            <div style={{ fontSize: '7pt', color: '#6b7280' }}>
+            <div style={{ 
+              fontSize: '7pt', 
+              color: primaryAction.type === 'critical' ? '#7f1d1d' : primaryAction.type === 'high' ? '#78350f' : '#374151',
+              lineHeight: 1.4
+            }}>
               {primaryAction.reason}
             </div>
+            
+            {/* Tooltip for Set Value / Track Investment */}
+            {showValueTooltip && primaryAction.text === 'Set Value' && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  marginBottom: '8px',
+                  padding: '10px 12px',
+                  background: '#1f2937',
+                  color: '#fff',
+                  borderRadius: '4px',
+                  fontSize: '7pt',
+                  lineHeight: 1.5,
+                  whiteSpace: 'nowrap',
+                  zIndex: 1000,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  border: '1px solid #374151'
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: '4px' }}>Track Your Investment</div>
+                <div style={{ color: '#d1d5db' }}>
+                  Set purchase price and current value to see your vehicle's ROI over time
+                </div>
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '-4px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 0,
+                    height: 0,
+                    borderLeft: '4px solid transparent',
+                    borderRight: '4px solid transparent',
+                    borderTop: '4px solid #1f2937'
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
 
