@@ -17,6 +17,12 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  // Guard clause: if organization data is missing, don't render
+  if (!organization || !organization.organization) {
+    console.warn('[OrganizationCard] Missing organization data:', organization);
+    return null;
+  }
+
   const formatRole = (role: string) => {
     return role
       .split('_')
@@ -64,6 +70,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
     return `$${value.toLocaleString()}`;
   };
 
+  const org = organization.organization;
   const statusBadge = getStatusBadge(organization.status);
   const stats = organization.stats || {
     vehicle_count: 0,
@@ -91,10 +98,10 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
     >
       <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-          {organization.organization.logo_url ? (
+          {org.logo_url ? (
             <img
-              src={organization.organization.logo_url}
-              alt={organization.organization.business_name}
+              src={org.logo_url}
+              alt={org.business_name || 'Organization'}
               style={{
                 width: '40px',
                 height: '40px',
@@ -117,15 +124,15 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
                 color: '#666',
               }}
             >
-              {organization.organization.business_name.charAt(0).toUpperCase()}
+              {(org.business_name || '?').charAt(0).toUpperCase()}
             </div>
           )}
           <div style={{ flex: 1 }}>
             <h3 className="heading-3" style={{ margin: 0, fontSize: '16px' }}>
-              {organization.organization.business_name}
+              {org.business_name || 'Unknown Organization'}
             </h3>
             <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
-              {organization.organization.business_type?.replace(/_/g, ' ')}
+              {org.business_type?.replace(/_/g, ' ') || ''}
             </div>
           </div>
         </div>
@@ -176,7 +183,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
           >
             {statusBadge.text}
           </span>
-          {organization.organization.is_verified && (
+          {org.is_verified && (
             <span
               style={{
                 fontSize: '10px',
@@ -190,7 +197,7 @@ const OrganizationCard: React.FC<OrganizationCardProps> = ({
               VERIFIED
             </span>
           )}
-          <LiveAuctionBadge organization={organization.organization} />
+          <LiveAuctionBadge organization={org} />
         </div>
 
         {/* Quick Stats */}

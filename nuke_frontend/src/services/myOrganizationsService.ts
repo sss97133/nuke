@@ -105,8 +105,12 @@ export class MyOrganizationsService {
         return [];
       }
 
+      if (!data || data.length === 0) {
+        return [];
+      }
+
       // Sort in memory for nested column ordering (businesses.business_name)
-      if (data && filters?.sortBy === 'name') {
+      if (filters?.sortBy === 'name') {
         data.sort((a, b) => {
           const aName = a.businesses?.business_name || '';
           const bName = b.businesses?.business_name || '';
@@ -114,13 +118,15 @@ export class MyOrganizationsService {
         });
       }
 
-      return data || [];
-
-      if (error) throw error;
-
-      // Load stats for each organization
+      // Load stats for each organization and transform data structure
       const organizationsWithStats = await Promise.all(
         (data || []).map(async (affiliation: any) => {
+          // Skip if businesses data is missing (shouldn't happen with inner join, but safety check)
+          if (!affiliation.businesses) {
+            console.warn('[MyOrganizationsService] Missing businesses data for affiliation:', affiliation.id);
+            return null;
+          }
+
           const stats = await this.getOrganizationStats(affiliation.organization_id);
           const preferences = await this.getOrganizationPreferences(affiliation.organization_id);
 
@@ -145,14 +151,17 @@ export class MyOrganizationsService {
         })
       );
 
+      // Filter out any null entries (from missing businesses data)
+      const validOrgs = organizationsWithStats.filter(org => org !== null) as MyOrganization[];
+
       // Sort by value if requested (after loading stats)
       if (filters?.sortBy === 'value') {
-        organizationsWithStats.sort((a, b) => 
+        validOrgs.sort((a, b) => 
           (b.stats?.total_value || 0) - (a.stats?.total_value || 0)
         );
       }
 
-      return organizationsWithStats;
+      return validOrgs;
     } catch (error) {
       console.error('Error loading my organizations:', error);
       return [];

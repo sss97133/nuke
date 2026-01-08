@@ -54,8 +54,11 @@ const MyOrganizations: React.FC = () => {
       setLoading(true);
       const data = await MyOrganizationsService.getMyOrganizations(filters);
       
+      // Filter out any organizations with missing organization data
+      const validOrgs = data.filter(org => org && org.organization);
+      
       // Sort pinned organizations first
-      const sorted = data.sort((a, b) => {
+      const sorted = validOrgs.sort((a, b) => {
         const aPinned = a.preferences?.is_pinned ? 1 : 0;
         const bPinned = b.preferences?.is_pinned ? 1 : 0;
         if (aPinned !== bPinned) return bPinned - aPinned;

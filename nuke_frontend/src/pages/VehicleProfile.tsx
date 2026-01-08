@@ -1602,7 +1602,7 @@ const VehicleProfile: React.FC = () => {
         setLeadImageUrl(primaryImg);
       }
 
-      // Derive auction pulse for header (prefer external_listings over stale vehicles.* fields)
+        // Derive auction pulse for header (prefer external_listings over stale vehicles.* fields)
       try {
         const rpcCache = (window as any).__vehicleProfileRpcData;
         const listings =
@@ -1672,6 +1672,10 @@ const VehicleProfile: React.FC = () => {
               : null);
 
         if (effective?.listing_url && effective?.platform) {
+          // CRITICAL: Only load comments/bids if vehicle actually came from this BAT listing
+          // Don't load BAT comments for KSL vehicles
+          const shouldLoadComments = isFromBat && !isFromKsl;
+          
           // Lightweight comment telemetry (best-effort; table may not exist in some envs)
           // IMPORTANT: Separate bids from comments - don't combine them
           let bidCount: number | null = typeof (effective as any)?.bid_count === 'number' ? (effective as any).bid_count : null;
@@ -1680,6 +1684,7 @@ const VehicleProfile: React.FC = () => {
           let lastCommentAt: string | null = null;
 
           try {
+            // Only query comments if vehicle actually came from BAT
             const [
               bidCountResult,
               commentCountResult,
@@ -1688,43 +1693,56 @@ const VehicleProfile: React.FC = () => {
               lastSeller
             ] = await Promise.all([
               // Count only bids (where bid_amount is not null)
-              bidCount === null
+              (shouldLoadComments && bidCount === null)
                 ? supabase
                     .from('auction_comments')
                     .select('id', { count: 'exact', head: true })
                     .eq('vehicle_id', vehicleData.id)
+                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
                     .not('bid_amount', 'is', null)
-                : Promise.resolve({ count: bidCount } as any),
+                : Promise.resolve({ count: bidCount || 0 } as any),
               // Count only non-bid comments (where bid_amount is null or comment_type != 'bid')
-              supabase
-                .from('auction_comments')
-                .select('id', { count: 'exact', head: true })
-                .eq('vehicle_id', vehicleData.id)
-                .or('bid_amount.is.null,comment_type.neq.bid'),
-              supabase
-                .from('auction_comments')
-                .select('posted_at, author_username')
-                .eq('vehicle_id', vehicleData.id)
-                .not('bid_amount', 'is', null)
-                .order('posted_at', { ascending: false })
-                .limit(1)
-                .maybeSingle(),
-              supabase
-                .from('auction_comments')
-                .select('posted_at')
-                .eq('vehicle_id', vehicleData.id)
-                .or('bid_amount.is.null,comment_type.neq.bid')
-                .order('posted_at', { ascending: false })
-                .limit(1)
-                .maybeSingle(),
-              supabase
-                .from('auction_comments')
-                .select('author_username')
-                .eq('vehicle_id', vehicleData.id)
-                .eq('is_seller', true)
-                .order('posted_at', { ascending: false })
-                .limit(1)
-                .maybeSingle(),
+              shouldLoadComments
+                ? supabase
+                    .from('auction_comments')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('vehicle_id', vehicleData.id)
+                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
+                    .or('bid_amount.is.null,comment_type.neq.bid')
+                : Promise.resolve({ count: 0 } as any),
+              shouldLoadComments
+                ? supabase
+                    .from('auction_comments')
+                    .select('posted_at, author_username')
+                    .eq('vehicle_id', vehicleData.id)
+                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
+                    .not('bid_amount', 'is', null)
+                    .order('posted_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
+                : Promise.resolve({ data: null } as any),
+              shouldLoadComments
+                ? supabase
+                    .from('auction_comments')
+                    .select('posted_at')
+                    .eq('vehicle_id', vehicleData.id)
+                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
+                    .or('bid_amount.is.null,comment_type.neq.bid')
+                    .order('posted_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
+                : Promise.resolve({ data: null } as any),
+              shouldLoadComments
+                ? supabase
+                    .from('auction_comments')
+                    .select('author_username')
+                    .eq('vehicle_id', vehicleData.id)
+                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
+                    .eq('is_seller', true)
+                    .order('posted_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
+                : Promise.resolve({ data: null } as any),
             ]);
 
             if (bidCount === null) bidCount = typeof (bidCountResult as any)?.count === 'number' ? (bidCountResult as any).count : null;
