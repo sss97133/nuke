@@ -19,6 +19,7 @@ import vinDecoderService from '../../services/vinDecoder';
 import UpdateSalePriceModal from '../../components/vehicle/UpdateSalePriceModal';
 import { FollowAuctionCard } from '../../components/auction/FollowAuctionCard';
 import OrganizationInvestmentCard from '../../components/organization/OrganizationInvestmentCard';
+import { CircularAvatar } from '../../components/common/CircularAvatar';
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
   owner: 'Owner',
@@ -1146,8 +1147,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       .sort((a, b) => sellerRels.indexOf(pickRel(a)) - sellerRels.indexOf(pickRel(b)))[0];
 
     if (first?.business_name) {
+      // Ensure we use business_name, not description or any other field
+      const businessName = String(first.business_name || '').trim();
+      // If business_name appears to be a description (too long or contains certain patterns), fall back to organization ID or skip
+      if (!businessName || businessName.length > 100 || businessName.toLowerCase().includes('is a dealer') || businessName.toLowerCase().includes('specializing')) {
+        // Skip this badge if business_name looks corrupted
+        return null;
+      }
       return {
-        label: String(first.business_name),
+        label: businessName,
         logo_url: first.logo_url ? String(first.logo_url) : null,
         relationship: pickRel(first),
       };
@@ -1838,7 +1846,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           {vehicle?.id && <MemeDropBadge vehicleId={vehicle.id} compact />}
 
           {/* Location Badge with Dropdown */}
-          {locationDisplay && (
+          {locationDisplay && locationDisplay.short && locationDisplay.short.trim().length > 0 && locationDisplay.short !== ':' && (
             <div ref={locationRef} style={{ position: 'relative' }}>
               <button
                 type="button"
@@ -1859,7 +1867,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   padding: '2px 4px',
                   color: 'var(--text-muted)',
                 }}
-                title={`Location: ${locationDisplay.full}`}
+                title={`Location: ${locationDisplay.full || locationDisplay.short}`}
               >
                 {locationDisplay.short}
               </button>
@@ -2928,16 +2936,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          width: '22px',
-                          height: '22px',
-                          border: '1px solid var(--border)',
-                          borderRadius: '50%',
-                          background: 'var(--surface)',
-                          color: baseTextColor,
                           padding: 0,
                           margin: 0,
                           cursor: 'pointer',
-                          transition: 'transform 0.1s ease'
+                          transition: 'transform 0.1s ease',
+                          background: 'transparent',
+                          border: 'none'
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'scale(1.1)';
@@ -2947,15 +2951,29 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         }}
                       >
                       {isBatOrg ? (
-                          <img src="/vendor/bat/favicon.ico" alt="Bring a Trailer" style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+                          <div style={{ width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <img src="/vendor/bat/favicon.ico" alt="Bring a Trailer" style={{ margin: 0, width: '18px', height: '18px', objectFit: 'contain' }} />
+                          </div>
                         ) : isCarsAndBidsOrg ? (
-                          <FaviconIcon url={carsAndBidsUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+                          <div style={{ width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <FaviconIcon url={carsAndBidsUrl} size={18} style={{ margin: 0 }} />
+                          </div>
                         ) : org.logo_url ? (
-                          <img src={org.logo_url} alt={org.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <CircularAvatar
+                            src={org.logo_url}
+                            alt={org.business_name}
+                            size={22}
+                            fallback={org.business_name?.charAt(0)?.toUpperCase() || '?'}
+                          />
                         ) : orgWebsiteUrl ? (
-                          <FaviconIcon url={orgWebsiteUrl} size={16} style={{ margin: 0, width: '100%', height: '100%', objectFit: 'contain', padding: '2px' }} />
+                          <div style={{ width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <FaviconIcon url={orgWebsiteUrl} size={18} style={{ margin: 0 }} />
+                          </div>
                         ) : (
-                          org.business_name.charAt(0).toUpperCase()
+                          <CircularAvatar
+                            size={22}
+                            fallback={org.business_name?.charAt(0)?.toUpperCase() || '?'}
+                          />
                         )}
                       </button>
                     );
