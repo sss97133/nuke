@@ -14,101 +14,176 @@ const PublicImageGallery: React.FC<PublicImageGalleryProps> = ({ userId, isOwnPr
     loadImages();
   }, [userId]);
 
+  const IMAGE_SELECT = `
+    id,
+    image_url,
+    thumbnail_url,
+    medium_url,
+    storage_path,
+    source,
+    source_url,
+    user_id,
+    created_at,
+    exif_data,
+    vehicle:vehicles!vehicle_images_vehicle_id_fkey(id, is_public, user_id, year, make, model),
+    device_attributions(
+      ghost_user_id,
+      actual_contributor_id
+    )
+  `;
+
+  const SOURCE_BLOCKLIST = new Set([
+    'bat_import',
+    'bat_listing',
+    'external_import',
+    'organization_import',
+    'scraper',
+    'url_scraper',
+    'classic_com_indexing',
+    'classic_scrape',
+    'collector_scrape'
+  ]);
+
+  const IMPORT_PATH_TOKENS = [
+    'import_queue',
+    'external_import',
+    'organization_import',
+    'bat_import',
+    'classic.com/veh',
+    'bringatrailer.com/wp-content/uploads'
+  ];
+
+  const REMOTE_HOST_BLOCKLIST = [
+    'bringatrailer.com',
+    'carsandbids.com',
+    'classic.com',
+    'hemmings.com',
+    'dealeraccelerate',
+    'ebayimg.com',
+    'goodingco.com',
+    'bonhams.com',
+    'barrett-jackson.com',
+    'barrettjackson.com',
+    'rmsothebys.com'
+  ];
+
+  const looksImported = (value?: string | null) => {
+    if (!value) return false;
+    const lower = String(value).toLowerCase();
+    return IMPORT_PATH_TOKENS.some(token => lower.includes(token));
+  };
+
+  const isRemoteBlockedHost = (value?: string | null) => {
+    if (!value) return false;
+    const lower = String(value).toLowerCase();
+    if (!lower.startsWith('http')) return false;
+    if (lower.includes('supabase.co/storage')) return false;
+    return REMOTE_HOST_BLOCKLIST.some(host => lower.includes(host));
+  };
+
+  const dedupeById = (rows: any[]) => {
+    const seen = new Set<string>();
+    return rows.filter(row => {
+      if (!row?.id) return false;
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
+  };
+
+  const fetchImagesByIds = async (ids: string[]): Promise<any[]> => {
+    if (ids.length === 0) return [];
+    const chunkSize = 50;
+    const chunks: any[] = [];
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const { data, error } = await supabase
+        .from('vehicle_images')
+        .select(IMAGE_SELECT)
+        .in('id', chunk);
+      if (error) {
+        console.error('Error loading attributed image chunk:', error);
+        continue;
+      }
+      chunks.push(...(data || []));
+    }
+    return chunks;
+  };
+
+  const hasTrustedAttribution = (img: any): boolean => {
+    if (!img) return false;
+    if (img.user_id === userId) return true;
+    const deviceAttrs = Array.isArray(img.device_attributions) ? img.device_attributions : [];
+    return deviceAttrs.some((attr: any) => attr?.actual_contributor_id === userId);
+  };
+
+  const passesSourceGuards = (img: any): boolean => {
+    const src = String(img?.source || '').toLowerCase();
+    if (src && SOURCE_BLOCKLIST.has(src)) return false;
+    if (looksImported(img?.storage_path)) return false;
+    if (looksImported(img?.image_url)) return false;
+    if (isRemoteBlockedHost(img?.image_url)) return false;
+    const sourceUrl = String(img?.source_url || '').trim();
+    if (sourceUrl.startsWith('http')) return false;
+    const exifSourceUrl = String(img?.exif_data?.source_url || '').trim();
+    if (exifSourceUrl.startsWith('http')) return false;
+    return true;
+  };
+
+  const isVisibleToViewer = (img: any): boolean => {
+    if (isOwnProfile) return true;
+    if (!img?.vehicle) return false;
+    return Boolean(img.vehicle.is_public);
+  };
+
   const loadImages = async () => {
     try {
       setLoading(true);
-      
-      // Get external identities for this user to find BaT images
-      const { data: externalIdentities } = await supabase
-        .from('external_identities')
-        .select('id, platform, handle')
-        .eq('claimed_by_user_id', userId);
-      
-      const identityIds = externalIdentities?.map(ei => ei.id) || [];
-      
-      // Load images actually taken/photographed by this user
-      // Filter by attribution fields (schema has evolved; many legacy/imported rows won't have user_id set)
-      let query = supabase
+
+      const { data: userImages, error: userImagesError } = await supabase
         .from('vehicle_images')
-        .select(`
-          *,
-          vehicle:vehicles!vehicle_images_vehicle_id_fkey(id, is_public, user_id, year, make, model)
-        `)
-        .or(`user_id.eq.${userId},documented_by_user_id.eq.${userId},submitted_by.eq.${userId}`) // Photographer/author attribution
-
-      // If viewing someone else's profile, only show images from public vehicles
-      if (!isOwnProfile) {
-        query = query.eq('vehicle.is_public', true);
-      }
-
-      const { data: userImages, error: userImagesError } = await query
+        .select(IMAGE_SELECT)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (userImagesError) throw userImagesError;
 
-      // Also load BaT images linked via external identities
-      let batImages: any[] = [];
-      if (identityIds.length > 0) {
-        // Find vehicles where user is seller/buyer via external identities
-        const { data: sellerListings } = await supabase
-          .from('bat_listings')
-          .select('vehicle_id')
-          .in('seller_external_identity_id', identityIds);
-        
-        const { data: buyerListings } = await supabase
-          .from('bat_listings')
-          .select('vehicle_id')
-          .in('buyer_external_identity_id', identityIds);
-        
-        const allVehicleIds = [...new Set([
-          ...(sellerListings || []).map((l: any) => l.vehicle_id),
-          ...(buyerListings || []).map((l: any) => l.vehicle_id)
-        ].filter(Boolean))];
-        
-        if (allVehicleIds.length > 0) {
-          const { data: batImagesData, error: batImagesError } = await supabase
-            .from('vehicle_images')
-            .select(`
-              *,
-              vehicle:vehicles!vehicle_images_vehicle_id_fkey(id, is_public, user_id, year, make, model)
-            `)
-            .in('vehicle_id', allVehicleIds)
-            .or('source.eq.bat_import,source.eq.bat_listing')
-            .order('created_at', { ascending: false })
-            .limit(100);
-          
-          if (!batImagesError && batImagesData) {
-            batImages = batImagesData;
-          }
-        }
-      }
+      const directImages = userImages || [];
+      const directIds = new Set(directImages.map((img: any) => img.id));
 
-      // IMPORTANT:
-      // The importer sets vehicle_images.user_id to a "runner" user for RLS/ownership in some flows.
-      // Those are NOT actually authored/taken by that user and should not appear in a user's gallery.
-      // Filter out imported/scraped images by source and/or presence of a source URL in exif_data.
-      // BUT: Include BaT images if they're linked via external identities
-      const cleaned = [...(userImages || []), ...batImages].filter((img: any, index: number, self: any[]) => {
-        // Remove duplicates
-        if (self.findIndex((i: any) => i.id === img.id) !== index) return false;
-        
-        const src = String(img?.source || '').toLowerCase();
-        // Include BaT images if they're from vehicles linked via external identities
-        if (src === 'bat_import' || src === 'bat_listing') {
-          return batImages.some((bi: any) => bi.id === img.id);
-        }
-        // Do not attribute other imported/scraped images to the importing runner user.
-        // These will later be attributed via external identities (e.g. BaT usernames) or claimed by humans.
-        if (src === 'organization_import' || src === 'external_import' || src === 'scraper') return false;
-        const exifSourceUrl = String(img?.exif_data?.source_url || '').trim();
-        if (exifSourceUrl.startsWith('http')) return false;
-        return true;
-      });
+      const { data: attributionRows, error: attributionError } = await supabase
+        .from('device_attributions')
+        .select('image_id')
+        .eq('actual_contributor_id', userId)
+        .limit(500);
+
+      if (attributionError) throw attributionError;
+
+      const attributedIds = (attributionRows || [])
+        .map(row => row?.image_id)
+        .filter((id): id is string => Boolean(id) && !directIds.has(id));
+
+      const attributedImages = attributedIds.length > 0
+        ? await fetchImagesByIds(Array.from(new Set(attributedIds)))
+        : [];
+
+      const combined = dedupeById([...directImages, ...attributedImages]);
+
+      const cleaned = combined
+        .filter(img => hasTrustedAttribution(img))
+        .filter(img => passesSourceGuards(img))
+        .filter(img => isVisibleToViewer(img))
+        .sort((a, b) => {
+          const aDate = new Date(a?.created_at || 0).getTime();
+          const bDate = new Date(b?.created_at || 0).getTime();
+          return bDate - aDate;
+        });
 
       setImages(cleaned);
     } catch (error) {
       console.error('Error loading image gallery:', error);
+      setImages([]);
     } finally {
       setLoading(false);
     }

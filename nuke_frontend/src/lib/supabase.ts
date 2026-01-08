@@ -58,8 +58,8 @@ export const supabase = _supabaseInit.client;
 
 // Utility to get Supabase Functions URL
 export const getSupabaseFunctionsUrl = () => {
-  if (!initSupabase.url) throw new Error('VITE_SUPABASE_URL is not defined');
-  return `${initSupabase.url}/functions/v1`;
+  if (!_supabaseInit.url) throw new Error('VITE_SUPABASE_URL is not defined');
+  return `${_supabaseInit.url}/functions/v1`;
 };
 
 // Suppress non-critical errors (404s for optional tables, WebSocket connection failures)
