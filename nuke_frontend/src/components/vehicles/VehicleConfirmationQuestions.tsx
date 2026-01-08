@@ -34,6 +34,12 @@ const VehicleConfirmationQuestions: React.FC<VehicleConfirmationQuestionsProps> 
         .rpc('generate_vehicle_confirmation_questions', { p_user_id: userId });
 
       if (error) {
+        // Gracefully handle missing RPC function (feature may not be implemented yet)
+        if (error.code === 'PGRST202' || error.message?.includes('does not exist')) {
+          console.log('Vehicle confirmation questions feature not available');
+          setQuestions([]);
+          return;
+        }
         console.error('Error loading questions:', error);
         return;
       }

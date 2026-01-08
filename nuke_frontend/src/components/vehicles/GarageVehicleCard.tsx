@@ -623,7 +623,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
 
         {/* Relationship-aware metrics */}
         {organizationRelationships.length > 0 && session?.user?.id && (
-          <div onClick={(e) => e.stopPropagation()}>
+          <div key={`org-metrics-wrapper-${vehicle.id}`} onClick={(e) => e.stopPropagation()}>
             {organizationRelationships.map((orgRel, orgIndex) => {
               // Create a unique composite key that handles all edge cases
               const orgId = orgRel.organization_id || `null-org-${orgIndex}`;

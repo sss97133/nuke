@@ -74,35 +74,52 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
 
       // If no parking rate in notes, try to get from organization settings
       if (!parkingCostPerDay && organizationId) {
-        const { data: orgSettings } = await supabase
-          .from('businesses')
-          .select('parking_rate_per_day')
-          .eq('id', organizationId)
-          .single();
-        
-        if (orgSettings?.parking_rate_per_day) {
-          parkingCostPerDay = orgSettings.parking_rate_per_day;
+        try {
+          const { data: orgSettings, error: orgError } = await supabase
+            .from('businesses')
+            .select('parking_rate_per_day')
+            .eq('id', organizationId)
+            .single();
+          
+          // Gracefully handle missing table or column
+          if (!orgError && orgSettings?.parking_rate_per_day) {
+            parkingCostPerDay = orgSettings.parking_rate_per_day;
+          }
+        } catch (error) {
+          // Column or table may not exist - silently skip
+          console.log('Parking rate not available for organization');
         }
       }
 
       // Load financial records from timeline events
-      const { data: timelineEvents } = await supabase
-        .from('timeline_events')
-        .select(`
-          id,
-          metadata,
-          receipt_amount,
-          event_financial_records (
-            labor_cost,
-            labor_hours,
-            labor_rate,
-            parts_cost,
-            supplies_cost,
-            total_cost
-          )
-        `)
-        .eq('vehicle_id', vehicleId)
-        .eq('organization_id', organizationId);
+      let timelineEvents: any[] = [];
+      try {
+        const { data, error: eventsError } = await supabase
+          .from('timeline_events')
+          .select(`
+            id,
+            metadata,
+            receipt_amount,
+            event_financial_records (
+              labor_cost,
+              labor_hours,
+              labor_rate,
+              parts_cost,
+              supplies_cost,
+              total_cost
+            )
+          `)
+          .eq('vehicle_id', vehicleId)
+          .eq('organization_id', organizationId);
+        
+        // Gracefully handle missing relationship or column
+        if (!eventsError && data) {
+          timelineEvents = data;
+        }
+      } catch (error) {
+        // Organization relationship column may not exist - silently skip
+        console.log('Timeline events with organization filter not available');
+      }
 
       // Calculate totals
       let materialCost = 0;
