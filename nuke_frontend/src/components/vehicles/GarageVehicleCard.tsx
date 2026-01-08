@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleThumbnail from '../VehicleThumbnail';
 import VehicleRelationshipMetrics from './VehicleRelationshipMetrics';
+import VehicleValueEditModal from './VehicleValueEditModal';
 import { handleExpectedError } from '../../utils/errorCache';
 import '../../design-system.css';
 
@@ -23,6 +24,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
   const [organizationRelationships, setOrganizationRelationships] = useState<any[]>([]);
   const [session, setSession] = useState<any>(null);
   const [showValueTooltip, setShowValueTooltip] = useState(false);
+  const [showValueModal, setShowValueModal] = useState(false);
 
   const FEATURE_VEHICLE_ANALYTICS_UNAVAILABLE_KEY = 'featureVehicleAnalyticsUnavailable';
 
@@ -277,34 +279,60 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
 
   const primaryAction = getPrimaryAction();
 
-  // Calculate health score (0-100)
+  // Calculate health score (0-100) - Profile completeness indicator
   const getHealthScore = () => {
     let score = 0;
-    if (!liveData) return 0;
+    const breakdown: string[] = [];
+    if (!liveData) return { score: 0, breakdown: ['No data loaded'] };
 
     // Has value info: +25
-    if (vehicle.current_value || vehicle.purchase_price) score += 25;
+    if (vehicle.current_value || vehicle.purchase_price) {
+      score += 25;
+      breakdown.push('Has value info (+25%)');
+    } else {
+      breakdown.push('Missing value info (0%)');
+    }
 
     // Has images: +25
-    if (liveData.imageCount > 0) score += 25;
+    if (liveData.imageCount > 0) {
+      score += 25;
+      breakdown.push(`Has ${liveData.imageCount} image${liveData.imageCount !== 1 ? 's' : ''} (+25%)`);
+    } else {
+      breakdown.push('No images (0%)');
+    }
 
     // Has timeline events: +25
-    if (liveData.eventCount > 0) score += 25;
+    if (liveData.eventCount > 0) {
+      score += 25;
+      breakdown.push(`Has ${liveData.eventCount} timeline event${liveData.eventCount !== 1 ? 's' : ''} (+25%)`);
+    } else {
+      breakdown.push('No timeline events (0%)');
+    }
 
     // Recent activity (within 30 days): +25
     if (liveData.latestEvent) {
       const daysSinceActivity = Math.floor(
         (new Date().getTime() - new Date(liveData.latestEvent.event_date).getTime()) / (1000 * 60 * 60 * 24)
       );
-      if (daysSinceActivity <= 30) score += 25;
+      if (daysSinceActivity <= 30) {
+        score += 25;
+        breakdown.push(`Recent activity (${daysSinceActivity}d ago) (+25%)`);
+      } else {
+        breakdown.push(`Stale activity (${daysSinceActivity}d ago) (0%)`);
+      }
+    } else {
+      breakdown.push('No recent activity (0%)');
     }
 
-    return score;
+    return { score, breakdown };
   };
 
-  const healthScore = getHealthScore();
+  const healthScoreData = getHealthScore();
+  const healthScore = typeof healthScoreData === 'number' ? healthScoreData : healthScoreData.score;
+  const healthBreakdown = typeof healthScoreData === 'object' && 'breakdown' in healthScoreData ? healthScoreData.breakdown : [];
 
   return (
+    <>
     <Link
       to={`/vehicle/${vehicle.id}`}
       style={{
@@ -394,7 +422,7 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
           {getStatusBadge()}
         </div>
 
-        {/* Health score - top right */}
+        {/* Health score - top right with breakdown tooltip */}
         <div
           style={{
             position: 'absolute',
@@ -407,8 +435,10 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
             borderRadius: '3px',
             fontSize: '7pt',
             fontWeight: 700,
-            backdropFilter: 'blur(4px)'
+            backdropFilter: 'blur(4px)',
+            cursor: 'help'
           }}
+          title={`Profile Health: ${healthScore}%\n\nBreakdown:\n${healthBreakdown.join('\n')}\n\nThis score indicates how complete your vehicle profile is. Add value info, images, timeline events, and recent activity to improve it.`}
         >
           {healthScore}%
         </div>
@@ -539,8 +569,12 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              // Navigate to specific action
-              window.location.href = `/vehicle/${vehicle.id}`;
+              // Open modal for "Set Value", navigate for other actions
+              if (primaryAction.text === 'Set Value') {
+                setShowValueModal(true);
+              } else {
+                window.location.href = `/vehicle/${vehicle.id}`;
+              }
             }}
           >
             <div
@@ -634,6 +668,9 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
               const orgId = orgRel.organization_id || `null-org-${orgIndex}`;
               const relType = orgRel.relationship_type || 'default';
               const uniqueKey = `metrics-${vehicle.id}-${orgId}-${relType}-${orgIndex}`;
+              // Only show metrics for relationship types that support them
+              const supportsMetrics = ['service_provider', 'work_location', 'owner'].includes(relType);
+              if (!supportsMetrics) return null;
               return (
                 <VehicleRelationshipMetrics
                   key={uniqueKey}
@@ -646,8 +683,61 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
             })}
           </div>
         )}
+        
+        {/* Info message when vehicle has no organization relationships */}
+        {organizationRelationships.length === 0 && session?.user?.id && (
+          <div 
+            style={{
+              marginTop: '8px',
+              padding: '6px 8px',
+              background: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: '2px',
+              fontSize: '7pt',
+              color: '#6b7280',
+              textAlign: 'center'
+            }}
+            title="Service metrics appear when this vehicle is linked to an organization (service provider, work location, or owner). Link this vehicle to an organization on the vehicle profile page to see cost tracking, days on lot, and other metrics."
+          >
+            No organization link — metrics unavailable
+          </div>
+        )}
       </div>
     </Link>
+
+    {/* Value Edit Modal - Outside Link to prevent navigation */}
+    {showValueModal && (
+      <VehicleValueEditModal
+        vehicleId={vehicle.id}
+        vehicleName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+        currentPurchasePrice={vehicle.purchase_price || null}
+        currentValue={vehicle.current_value || null}
+        onClose={() => setShowValueModal(false)}
+        onSave={async () => {
+          // Reload vehicle data from database to get updated values
+          try {
+            const { data: updatedVehicle } = await supabase
+              .from('vehicles')
+              .select('purchase_price, current_value')
+              .eq('id', vehicle.id)
+              .single();
+            
+            if (updatedVehicle) {
+              // Update local vehicle object
+              vehicle.purchase_price = updatedVehicle.purchase_price;
+              vehicle.current_value = updatedVehicle.current_value;
+            }
+          } catch (error) {
+            console.error('Error refreshing vehicle data:', error);
+          }
+          
+          // Reload vehicle metrics and refresh parent
+          loadVehicleMetrics();
+          if (onRefresh) onRefresh();
+        }}
+      />
+    )}
+    </>
   );
 };
 

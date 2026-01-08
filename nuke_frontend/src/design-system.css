@@ -875,9 +875,10 @@ body {
 }
 
 .vehicle-library-sidebar-collapsed {
-  width: 56px;
-  flex: 0 0 56px;
-  min-width: 56px;
+  width: 0;
+  flex: 0 0 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .vehicle-library-main {
