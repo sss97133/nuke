@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import VehicleCardDense from '../vehicles/VehicleCardDense';
 
 type AuctionSource = 'bat' | 'external';
 
@@ -67,6 +68,72 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [reserveFilter, setReserveFilter] = useState<ReserveFilter>('all');
   const [soldFilter, setSoldFilter] = useState<SoldFilter>('all');
+  const [cardsPerRow, setCardsPerRow] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_auctions_cardsPerRow');
+      const n = Number(saved);
+      if (Number.isFinite(n) && n >= 1 && n <= 16) return Math.round(n);
+      return 4;
+    } catch {
+      return 4;
+    }
+  });
+  const [thumbFitMode, setThumbFitMode] = useState<'square' | 'original'>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_auctions_thumbFitMode');
+      return saved === 'original' ? 'original' : 'square';
+    } catch {
+      return 'square';
+    }
+  });
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [gridWidth, setGridWidth] = useState<number>(0);
+
+  // Save preferences to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_auctions_cardsPerRow', String(cardsPerRow));
+    } catch (err) {
+      console.warn('Failed to save cardsPerRow:', err);
+    }
+  }, [cardsPerRow]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_auctions_thumbFitMode', thumbFitMode);
+    } catch (err) {
+      console.warn('Failed to save thumbFitMode:', err);
+    }
+  }, [thumbFitMode]);
+
+  // Grid width tracking
+  useEffect(() => {
+    if (!gridRef.current) return;
+    
+    const updateGridWidth = () => {
+      if (gridRef.current) {
+        setGridWidth(gridRef.current.offsetWidth);
+      }
+    };
+    
+    updateGridWidth();
+    const resizeObserver = new ResizeObserver(updateGridWidth);
+    resizeObserver.observe(gridRef.current);
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Calculate card size based on grid width and cards per row
+  const gridCardSizePx = useMemo(() => {
+    const cols = Math.max(1, Math.min(16, Math.floor(cardsPerRow || 1)));
+    const gap = 12;
+    const w = Number(gridWidth) || 0;
+    if (!w) return undefined;
+    const px = (w - gap * (cols - 1)) / cols;
+    return Math.max(60, Math.floor(px));
+  }, [gridWidth, cardsPerRow]);
 
   useEffect(() => {
     let mounted = true;
@@ -346,6 +413,73 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
         </div>
       </div>
 
+      {/* Grid Controls */}
+      <div className="card" style={{ marginBottom: '12px' }}>
+        <div className="card-body" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+            title={`${cardsPerRow} per row`}
+          >
+            <div style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: '"MS Sans Serif", sans-serif' }}>
+              {cardsPerRow}/row
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="16"
+              step="1"
+              value={cardsPerRow}
+              onChange={(e) => setCardsPerRow(parseInt(e.target.value, 10))}
+              className="nuke-range nuke-range-accent"
+              style={{ width: '110px' }}
+            />
+            <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setThumbFitMode('square');
+                }}
+                style={{
+                  padding: '1px 6px',
+                  fontSize: '7pt',
+                  border: '1px solid var(--border)',
+                  background: thumbFitMode === 'square' ? 'var(--grey-600)' : 'var(--grey-200)',
+                  color: thumbFitMode === 'square' ? 'var(--white)' : 'var(--text)',
+                  cursor: 'pointer',
+                  borderRadius: '999px',
+                  fontFamily: '"MS Sans Serif", sans-serif'
+                }}
+                title="Square crop thumbnails"
+              >
+                □
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setThumbFitMode('original');
+                }}
+                style={{
+                  padding: '1px 6px',
+                  fontSize: '7pt',
+                  border: '1px solid var(--border)',
+                  background: thumbFitMode === 'original' ? 'var(--grey-600)' : 'var(--grey-200)',
+                  color: thumbFitMode === 'original' ? 'var(--white)' : 'var(--text)',
+                  cursor: 'pointer',
+                  borderRadius: '999px',
+                  fontFamily: '"MS Sans Serif", sans-serif'
+                }}
+                title="Original aspect ratio thumbnails"
+              >
+                ⊞
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {filtered.length === 0 ? (
         <div className="card">
           <div className="card-body" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '9pt' }}>
@@ -353,85 +487,52 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+        <div
+          ref={gridRef}
+          style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, Math.min(16, cardsPerRow))}, minmax(0, 1fr))`, gap: '12px' }}
+        >
           {filtered.map((r) => {
             const v = r.vehicle_id ? vehiclesById[r.vehicle_id] : undefined;
             const img = r.vehicle_id ? bestImageByVehicleId[r.vehicle_id] : undefined;
 
-            const label =
-              v && (v.year || v.make || v.model)
-                ? `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim()
-                : r.title || 'Vehicle';
-
-            const endTs = r.end_time ? new Date(r.end_time) : null;
-            const endStr = endTs && !Number.isNaN(endTs.getTime()) ? endTs.toLocaleString() : null;
-            const hasReserve = typeof r.reserve_price_cents === 'number' && r.reserve_price_cents > 0;
-
-            // Determine if sold for display
+            // Determine if sold
             const isSold = Boolean(r.final_price_cents) || r.listing_status === 'sold';
-            const price = isSold
-              ? (r.final_price_cents ?? null)
-              : (r.listing_status === 'active'
-                  ? (r.current_bid_cents ?? null)
-                  : (r.current_bid_cents ?? null));
+            const now = Date.now();
+            const end = r.end_time ? new Date(r.end_time).getTime() : 0;
+            const isLive = r.listing_status === 'active' && end > now;
+
+            // Transform auction row to vehicle format for VehicleCardDense
+            const vehicleData = {
+              id: r.vehicle_id || r.id,
+              year: v?.year || undefined,
+              make: v?.make || undefined,
+              model: v?.model || undefined,
+              primary_image_url: img || undefined,
+              image_url: img || undefined,
+              sale_price: isSold && r.final_price_cents ? r.final_price_cents / 100 : undefined,
+              asking_price: !isSold && r.current_bid_cents ? r.current_bid_cents / 100 : undefined,
+              current_value: !isSold && r.current_bid_cents ? r.current_bid_cents / 100 : undefined,
+              discovery_url: r.url || undefined,
+              discovery_source: r.platform || undefined,
+              view_count: r.view_count > 0 ? r.view_count : undefined,
+              // Add auction metadata that VehicleCardDense can use
+              auction_end_date: r.end_time || undefined,
+              auction_outcome: isSold ? 'sold' : (!isLive && !isSold ? 'ended' : undefined),
+              sale_status: isSold ? 'sold' : undefined,
+            };
 
             return (
-              <div
+              <VehicleCardDense
                 key={`${r.source}:${r.id}`}
-                className="card hover-lift"
-                style={{ cursor: 'pointer', overflow: 'hidden' }}
-                onClick={() => {
-                  if (r.url) {
-                    window.open(r.url, '_blank', 'noopener,noreferrer');
-                    return;
-                  }
-                  if (r.vehicle_id) navigate(`/vehicle/${r.vehicle_id}`);
-                }}
-              >
-                <div style={{ display: 'flex', gap: 10, padding: 12 }}>
-                  <div
-                    style={{
-                      width: 96,
-                      height: 72,
-                      border: '1px solid var(--border)',
-                      background: img ? `url(${img}) center/cover no-repeat` : 'var(--surface)',
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: '10pt', fontWeight: 800, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {label}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                        {r.platform ? String(r.platform).toUpperCase() : 'AUCTION'}
-                      </span>
-                      {r.listing_status ? (
-                        <span style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>{String(r.listing_status).toUpperCase()}</span>
-                      ) : null}
-                      {!hasReserve ? (
-                        <span style={{ fontSize: '8pt', color: 'var(--warning)', fontWeight: 800 }}>NO RESERVE</span>
-                      ) : (
-                        <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>RESERVE</span>
-                      )}
-                    </div>
-                    <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-                      <div style={{ fontSize: '12pt', fontWeight: 900 }}>
-                        {formatUsdFromCents(price)}
-                      </div>
-                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'right' }}>
-                        {endStr ? `Ends ${endStr}` : 'End time unknown'}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 6, display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: '8pt', color: 'var(--text-muted)' }}>
-                      {r.bid_count > 0 ? <span>Bids {r.bid_count}</span> : <span>Bids 0</span>}
-                      {r.comment_count > 0 ? <span>Comments {r.comment_count}</span> : null}
-                      {r.view_count > 0 ? <span>Views {r.view_count}</span> : null}
-                      {r.watcher_count > 0 ? <span>Watch {r.watcher_count}</span> : null}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                vehicle={vehicleData as any}
+                viewMode="grid"
+                cardSizePx={gridCardSizePx}
+                infoDense={false}
+                viewerUserId={undefined}
+                thermalPricing={false}
+                thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}
+                sourceStampUrl={r.url || undefined}
+              />
             );
           })}
         </div>

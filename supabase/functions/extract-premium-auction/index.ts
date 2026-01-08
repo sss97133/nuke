@@ -4165,7 +4165,18 @@ function cleanImageUrl(url: string, platform?: string): string {
       .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
       .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1');
   } else if (cleaned.includes('carsandbids.com')) {
-    // Cars & Bids: remove query params and upgrade thumbnails to full-res
+    // Cars & Bids: Remove CDN path parameters to get full resolution
+    // Example: /cdn-cgi/image/width=80,height=80,quality=70,fit=cover/... -> /cdn-cgi/image/...
+    if (cleaned.includes('cdn-cgi/image/')) {
+      // Remove path-based parameters (width=, height=, quality=, fit=)
+      cleaned = cleaned.replace(/cdn-cgi\/image\/width=\d+,height=\d+,quality=\d+,fit=\w+\//, 'cdn-cgi/image/');
+      cleaned = cleaned.replace(/cdn-cgi\/image\/width=\d+,height=\d+,quality=\d+\//, 'cdn-cgi/image/');
+      cleaned = cleaned.replace(/cdn-cgi\/image\/width=\d+,height=\d+\//, 'cdn-cgi/image/');
+      cleaned = cleaned.replace(/cdn-cgi\/image\/width=\d+,quality=\d+\//, 'cdn-cgi/image/');
+      cleaned = cleaned.replace(/cdn-cgi\/image\/width=\d+\//, 'cdn-cgi/image/');
+      cleaned = cleaned.replace(/cdn-cgi\/image\/quality=\d+\//, 'cdn-cgi/image/');
+    }
+    // Remove query params
     cleaned = cleaned.split('?')[0];
     // Remove size suffixes to get full resolution
     cleaned = cleaned
