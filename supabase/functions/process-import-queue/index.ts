@@ -172,6 +172,51 @@ function cleanModelName(model: string): string {
 }
 
 // Helper function to validate make against known makes list
+// Helper function to validate business names - prevents creating fake orgs from listing text
+function isValidBusinessName(name: string | null | undefined): boolean {
+  if (!name || typeof name !== 'string') return false;
+  
+  const trimmed = name.trim();
+  if (trimmed.length < 3) return false;
+  if (trimmed.length > 100) return false; // Too long, likely listing description
+  
+  // Reject names that contain newlines (listing text)
+  if (trimmed.includes('\n')) return false;
+  
+  // Reject names that look like listing descriptions
+  const lower = trimmed.toLowerCase();
+  const listingIndicators = [
+    /^(looking to buy|selling|for sale|trade|rust|repair|cash for|part trade|upgrade|import|will consider|will not respond|possible|available|special|smoke free|weather vehicle|got it during|covid|years old|miles on|lot of|very|this|it has|original|special|The interior|The grounds|The BMW|The classic|am selling|RUST|PART|CASH|WANTED|FRESH|Timeless|modern|powered|This|GMC|CHEVY|VOLVO|Bold|Rat|Custom|Compact|MOST AMAZING|beautiful and elegant|four speed|freightliner|INTERNATIONAL|Moes|CHEVY CAPRICE|CAPRICE|Elite Mustang)/i,
+    /^(the |a |an )\w{1,20}$/i, // Short phrases starting with article
+    /\b(vehicle|car|truck|suv|sedan|coupe|convertible|hatchback|wagon)\b/i, // Vehicle types
+    /\b(selling|buy|trade|swap|consider|cash|finance|payment|credit)\b/i, // Commerce terms
+    /\b(rust|repair|damage|accident|wreck|salvage)\b/i, // Condition terms
+    /\b(\d+\s*(mile|miles|mileage|year|years|old))\b/i, // Listing descriptors
+  ];
+  
+  for (const pattern of listingIndicators) {
+    if (pattern.test(trimmed)) {
+      return false;
+    }
+  }
+  
+  // Must have at least 2 words, or be a recognizable single-word business name
+  const words = trimmed.split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 1) {
+    // Single word names should be at least 4 chars and not common vehicle/listing terms
+    const singleWord = words[0].toLowerCase();
+    const invalidSingleWords = ['chevrolet', 'gmc', 'ford', 'bmw', 'mercedes', 'toyota', 'honda', 'volvo', 'ultra', 'fresh', 'timeless', 'modern', 'powered', 'possible', 'wanted', 'rust', 'repair', 'cash', 'part', 'trade', 'selling', 'buying', 'chevy', 'caprice', 'moes', 'volvo'];
+    if (singleWord.length < 4 || invalidSingleWords.includes(singleWord)) {
+      return false;
+    }
+  }
+  
+  // Reject if name looks like vehicle model or description
+  if (words.length > 5) return false; // Too many words = likely description
+  
+  return true;
+}
+
 function isValidMake(make: string): boolean {
   if (!make) return false;
   
@@ -1647,7 +1692,11 @@ serve(async (req) => {
         
         // Get or create organization (intelligent dealer detection)
         // NOTE: Canonical org table is `businesses` (not legacy `organizations`).
-        if (!organizationId && ((dealerName && dealerName.length > 2) || dealerWebsite)) {
+        // VALIDATION: Only create orgs with valid business names OR websites
+        const hasValidName = dealerName && isValidBusinessName(dealerName);
+        const hasWebsite = dealerWebsite && typeof dealerWebsite === 'string' && dealerWebsite.startsWith('http');
+        
+        if (!organizationId && (hasValidName || hasWebsite)) {
           const orgSlug = dealerName 
             ? dealerName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
             : null;
@@ -1703,63 +1752,84 @@ serve(async (req) => {
               });
             }
           } else {
-            // Create new business
-            const orgData: any = {
-              business_name: dealerName || null,
-              website: dealerWebsite || null,
-              phone: dealerPhone || null,
-              city: dealerLocation || null,
-              business_type: 'dealership',
-              type: 'dealer',
-              is_public: true,
-              is_verified: false,
-              status: 'active',
-              discovered_via: 'import_queue',
-              source_url: item.listing_url,
-              metadata: {
-                org_slug: orgSlug,
-              }
-            };
-            
-            if (!dealerName && dealerWebsite) {
-              // Extract name from domain if no name found
-              const domainMatch = dealerWebsite.match(/https?:\/\/(?:www\.)?([^.]+)/);
-              if (domainMatch) {
-                const domainName = domainMatch[1].replace(/-/g, ' ');
-                orgData.business_name = domainName.split(/(?=[A-Z])/).map((w: string) => 
-                  w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
-                ).join(' ');
-                orgData.metadata.org_slug = domainName.replace(/[^a-z0-9]+/g, '-');
-              }
-            }
-            
-            const { data: newOrg, error: orgError } = await supabase
-              .from('businesses')
-              .insert(orgData)
-              .select('id')
-              .single();
-            
-            if (newOrg && !orgError) {
-              organizationId = newOrg.id;
-              console.log(`Created new business: ${orgData.business_name || dealerWebsite} (${organizationId})`);
-              
-              // Auto-merge duplicates after creation
-              try {
-                await supabase.functions.invoke('auto-merge-duplicate-orgs', {
-                  body: { organizationId: newOrg.id }
-                });
-              } catch (mergeError) {
-                console.warn('⚠️ Auto-merge check failed (non-critical):', mergeError);
-              }
-              
-              // Trigger inventory sync for new dealer
-              if (dealerWebsite) {
-                triggerDealerInventorySync(newOrg.id, dealerWebsite, supabase).catch(err => {
-                  console.warn(`⚠️ Failed to trigger inventory sync: ${err.message}`);
-                });
-              }
+            // VALIDATION: Only create if we have a valid name or website
+            if (!hasValidName && !hasWebsite) {
+              console.warn(`⚠️ Skipping org creation: invalid name "${dealerName}" and no website`);
+              // Don't create organization, but continue processing the vehicle
             } else {
-              console.warn(`⚠️ Failed to create organization: ${orgError?.message || 'Unknown error'}`);
+              // Create new business
+              let finalBusinessName = hasValidName ? dealerName : null;
+              
+              // Extract name from domain if no valid name found but website exists
+              if (!finalBusinessName && dealerWebsite) {
+                const domainMatch = dealerWebsite.match(/https?:\/\/(?:www\.)?([^.]+)/);
+                if (domainMatch) {
+                  const domainName = domainMatch[1].replace(/-/g, ' ');
+                  finalBusinessName = domainName.split(/(?=[A-Z])/).map((w: string) => 
+                    w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+                  ).join(' ');
+                  
+                  // Validate the extracted name too
+                  if (!isValidBusinessName(finalBusinessName)) {
+                    // Fallback to cleaned domain
+                    finalBusinessName = domainName.charAt(0).toUpperCase() + domainName.slice(1).toLowerCase();
+                    if (!isValidBusinessName(finalBusinessName)) {
+                      finalBusinessName = null; // Last resort: no name
+                    }
+                  }
+                }
+              }
+              
+              // Final check: require either valid name OR website
+              if (!finalBusinessName && !hasWebsite) {
+                console.warn(`⚠️ Cannot create org: no valid name or website`);
+              } else {
+                const orgData: any = {
+                  business_name: finalBusinessName || null,
+                  website: dealerWebsite || null,
+                  phone: dealerPhone || null,
+                  city: dealerLocation || null,
+                  business_type: 'dealership',
+                  type: 'dealer',
+                  is_public: true,
+                  is_verified: false,
+                  status: 'active',
+                  discovered_via: 'import_queue',
+                  source_url: item.listing_url,
+                  metadata: {
+                    org_slug: finalBusinessName ? (finalBusinessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')) : null,
+                  }
+                };
+            
+                const { data: newOrg, error: orgError } = await supabase
+                  .from('businesses')
+                  .insert(orgData)
+                  .select('id')
+                  .single();
+                
+                if (newOrg && !orgError) {
+                  organizationId = newOrg.id;
+                  console.log(`Created new business: ${orgData.business_name || dealerWebsite} (${organizationId})`);
+                  
+                  // Auto-merge duplicates after creation
+                  try {
+                    await supabase.functions.invoke('auto-merge-duplicate-orgs', {
+                      body: { organizationId: newOrg.id }
+                    });
+                  } catch (mergeError) {
+                    console.warn('⚠️ Auto-merge check failed (non-critical):', mergeError);
+                  }
+                  
+                  // Trigger inventory sync for new dealer
+                  if (dealerWebsite) {
+                    triggerDealerInventorySync(newOrg.id, dealerWebsite, supabase).catch(err => {
+                      console.warn(`⚠️ Failed to trigger inventory sync: ${err.message}`);
+                    });
+                  }
+                } else {
+                  console.warn(`⚠️ Failed to create organization: ${orgError?.message || 'Unknown error'}`);
+                }
+              }
             }
           }
         }

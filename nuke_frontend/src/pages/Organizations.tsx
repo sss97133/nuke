@@ -148,12 +148,13 @@ export default function Organizations() {
               const orgIds = [...new Set(orgVehicles.map(ov => ov.organization_id))];
               
               if (orgIds.length > 0) {
-                // Load those organizations
+                // Load those organizations (limit to 20 for card view)
                 const { data, error: orgError } = await supabase
                   .from('businesses')
-                  .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, primary_focus, total_listings, total_bids, total_sold, total_revenue, gross_margin_pct, inventory_turnover, avg_days_to_sell, project_completion_rate, repeat_customer_rate, repeat_customer_count, gmv, receipt_count, listing_count, total_projects, created_at')
+                  .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at')
                   .eq('is_public', true)
-                  .in('id', orgIds);
+                  .in('id', orgIds)
+                  .limit(20);
                 
                 if (!orgError) {
                   orgs = data || [];
@@ -186,9 +187,10 @@ export default function Organizations() {
           if (orgIds.length > 0) {
             const { data, error: orgError } = await supabase
               .from('businesses')
-              .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, primary_focus, total_listings, total_bids, total_sold, total_revenue, gross_margin_pct, inventory_turnover, avg_days_to_sell, project_completion_rate, repeat_customer_rate, repeat_customer_count, gmv, receipt_count, listing_count, total_projects, created_at')
+              .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at')
               .eq('is_public', true)
-              .in('id', orgIds);
+              .in('id', orgIds)
+              .limit(20);
             
             if (!orgError) {
               orgs = data || [];
@@ -196,12 +198,13 @@ export default function Organizations() {
           }
         }
       } else {
-        // No search - load all organizations
+        // No search - load organizations with pagination (limit to 20)
         const { data, error: orgError } = await supabase
           .from('businesses')
-          .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, labor_rate, primary_focus, total_listings, total_bids, total_sold, total_revenue, gross_margin_pct, inventory_turnover, avg_days_to_sell, project_completion_rate, repeat_customer_rate, repeat_customer_count, gmv, receipt_count, listing_count, total_projects, created_at')
+          .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at')
           .eq('is_public', true)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(20);
         
         if (orgError) throw orgError;
         orgs = data || [];
@@ -209,8 +212,10 @@ export default function Organizations() {
 
       if (error) throw error;
 
-      // Load primary images for all orgs
+      // Only load minimal data needed for cards - use existing total_* columns
       const orgIds = orgs?.map(o => o.id) || [];
+      
+      // Load primary images for all orgs (one batch query)
       if (orgIds.length > 0) {
         const { data: images } = await supabase
           .from('organization_images')
@@ -221,12 +226,14 @@ export default function Organizations() {
 
         const imageMap: Record<string, OrgImage | null> = {};
         images?.forEach(img => {
-          imageMap[img.organization_id] = img;
+          if (!imageMap[img.organization_id]) { // Only first logo per org
+            imageMap[img.organization_id] = img;
+          }
         });
         setOrgImages(imageMap);
       }
 
-      // Load user following status if logged in
+      // Load user following status if logged in (one batch query)
       if (userSession?.user?.id && orgIds.length > 0) {
         const { data: followData } = await supabase
           .from('organization_followers')
@@ -239,55 +246,17 @@ export default function Organizations() {
         }
       }
 
-      // OPTIMIZED: Batch load all stats in 3 queries instead of N*3
-      const [contributorData, inventoryData, followerData] = await Promise.all([
-        // Get all contributors grouped by org
-        supabase
-          .from('organization_contributors')
-          .select('organization_id')
-          .in('organization_id', orgIds),
-        
-        // Get all inventory grouped by org
-        supabase
-          .from('organization_inventory')
-          .select('organization_id')
-          .in('organization_id', orgIds),
-        
-        // Get all followers grouped by org
-        supabase
-          .from('organization_followers')
-          .select('organization_id')
-          .in('organization_id', orgIds)
-      ]);
-
-      // Build count maps
-      const contributorCounts: Record<string, number> = {};
-      const inventoryCounts: Record<string, number> = {};
-      const followerCounts: Record<string, number> = {};
-
-      contributorData.data?.forEach(c => {
-        contributorCounts[c.organization_id] = (contributorCounts[c.organization_id] || 0) + 1;
-      });
-
-      inventoryData.data?.forEach(i => {
-        inventoryCounts[i.organization_id] = (inventoryCounts[i.organization_id] || 0) + 1;
-      });
-
-      followerData.data?.forEach(f => {
-        followerCounts[f.organization_id] = (followerCounts[f.organization_id] || 0) + 1;
-      });
-
-      // Enrich orgs with counts (no async loops!)
+      // Use existing total_* columns from businesses table - no need to query related tables
+      // For card display, we only need basic info and counts that are already on the org
       const enriched = (orgs || []).map(org => ({
         ...org,
-        total_inventory: inventoryCounts[org.id] || 0,
-        contributor_count: contributorCounts[org.id] || 0,
-        followers: followerCounts[org.id] || 0,
+        total_inventory: org.total_vehicles || 0, // Use total_vehicles as inventory count
+        contributor_count: 0, // Not needed for card view
+        followers: 0, // Will be shown on detail page
         current_viewers: 0,
         recent_work_orders: 0,
-        // Map fields for metric function compatibility
-        total_sales: org.total_sold || org.total_sales,
-        vehicle_count: org.total_vehicles || org.vehicle_count
+        vehicle_count: org.total_vehicles || 0,
+        total_sales: 0 // Not needed for card view
       }));
 
       setOrganizations(enriched);

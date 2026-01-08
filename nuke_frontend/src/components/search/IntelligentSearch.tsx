@@ -44,7 +44,7 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     }
   });
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [autocompleteResults, setAutocompleteResults] = useState<Array<{id: string; title: string; type: string}>>([]);
+  const [autocompleteResults, setAutocompleteResults] = useState<Array<{id: string; title: string; type: string; metadata?: any}>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -114,23 +114,35 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     if (query.length > 2 && !isSearching) {
       debounceTimerRef.current = setTimeout(async () => {
         try {
-          // Quick autocomplete search
-          const [vehicles, orgs] = await Promise.all([
-            supabase
-              .from('vehicles')
-              .select('id, year, make, model')
-              .eq('is_public', true)
-              .or(`make.ilike.%${escapeILike(query)}%,model.ilike.%${escapeILike(query)}%,year::text.ilike.%${escapeILike(query)}%`)
-              .limit(3),
+          const querySafe = escapeILike(query);
+          // Quick autocomplete search - skip vehicle search for queries that look like usernames
+          const looksLikeUsername = query.length < 20 && /^[a-zA-Z0-9_\-]+$/.test(query);
+          
+          const [vehicles, orgs, externalIdentities] = await Promise.all([
+            // Only search vehicles if it doesn't look like a username
+            !looksLikeUsername
+              ? supabase
+                  .from('vehicles')
+                  .select('id, year, make, model')
+                  .eq('is_public', true)
+                  .or(`make.ilike.%${querySafe}%,model.ilike.%${querySafe}%`)
+                  .limit(3)
+              : Promise.resolve({ data: [], error: null }),
             supabase
               .from('businesses')
               .select('id, business_name')
               .eq('is_public', true)
-              .ilike('business_name', `%${escapeILike(query)}%`)
-              .limit(3)
+              .ilike('business_name', `%${querySafe}%`)
+              .limit(3),
+            // Search external identities (BaT usernames, etc.)
+            supabase
+              .from('external_identities')
+              .select('id, platform, handle, metadata')
+              .ilike('handle', `%${querySafe}%`)
+              .limit(5)
           ]);
 
-          const results: Array<{id: string; title: string; type: string}> = [];
+          const results: Array<{id: string; title: string; type: string; metadata?: any}> = [];
           
           if (vehicles.data) {
             vehicles.data.forEach((v: any) => {
@@ -148,6 +160,32 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                 id: o.id,
                 title: o.business_name,
                 type: 'organization'
+              });
+            });
+          }
+
+          // Add external identities (BaT usernames, etc.)
+          if (externalIdentities.data) {
+            externalIdentities.data.forEach((identity: any) => {
+              const metadata = identity.metadata || {};
+              const memberSince = metadata.member_since;
+              const commentsCount = metadata.comments_count || metadata.total_comments || 0;
+              const subtitle = memberSince 
+                ? `BaT member • ${commentsCount || 0} comments`
+                : `${identity.platform.toUpperCase()} user`;
+              
+              results.push({
+                id: `external_${identity.id}`,
+                title: identity.handle,
+                type: 'user',
+                metadata: {
+                  platform: identity.platform,
+                  handle: identity.handle,
+                  external_identity_id: identity.id,
+                  subtitle: subtitle,
+                  member_since: memberSince,
+                  comments_count: commentsCount
+                }
               });
             });
           }
@@ -1110,23 +1148,74 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         return [];
       }
 
-      // Use full-text search
-      const users = await fullTextSearchService.searchProfiles(searchTerm, { limit: 10 });
+      const results: SearchResult[] = [];
 
-      return users.map(user => ({
-        id: user.id,
-        type: 'user' as const,
-        title: user.full_name || user.username || 'Unknown User',
-        description: user.bio || `User: ${user.username || ''}`,
-        metadata: {
-          username: user.username,
-          full_name: user.full_name,
-          avatar_url: user.avatar_url
-        },
-        relevance_score: user.relevance || 0.75,
-        image_url: user.avatar_url,
-        created_at: user.created_at
-      }));
+      // 1. Search profiles (internal users)
+      const users = await fullTextSearchService.searchProfiles(searchTerm, { limit: 10 });
+      users.forEach(user => {
+        results.push({
+          id: user.id,
+          type: 'user' as const,
+          title: user.full_name || user.username || 'Unknown User',
+          description: user.bio || `User: ${user.username || ''}`,
+          metadata: {
+            username: user.username,
+            full_name: user.full_name,
+            avatar_url: user.avatar_url
+          },
+          relevance_score: user.relevance || 0.75,
+          image_url: user.avatar_url,
+          created_at: user.created_at
+        });
+      });
+
+      // 2. Search external identities (BaT usernames, etc.)
+      const { data: externalIdentities, error: extError } = await supabase
+        .from('external_identities')
+        .select('id, platform, handle, metadata')
+        .or(`handle.ilike.%${searchTerm}%,handle.ilike.%${searchTerm.toLowerCase()}%`)
+        .limit(10);
+
+      if (!extError && externalIdentities) {
+        externalIdentities.forEach(identity => {
+          const metadata = identity.metadata || {};
+          const memberSince = metadata.member_since;
+          const commentsCount = metadata.comments_count || metadata.total_comments || 0;
+          const description = memberSince 
+            ? `BaT member since ${memberSince}${commentsCount ? ` • ${commentsCount} comments` : ''}`
+            : `${identity.platform.toUpperCase()} user${commentsCount ? ` • ${commentsCount} comments` : ''}`;
+
+          results.push({
+            id: `external_${identity.id}`,
+            type: 'user' as const,
+            title: identity.handle,
+            description: description,
+            metadata: {
+              platform: identity.platform,
+              handle: identity.handle,
+              external_identity_id: identity.id,
+              member_since: memberSince,
+              comments_count: commentsCount,
+              metadata: metadata
+            },
+            relevance_score: identity.handle.toLowerCase() === searchTerm.toLowerCase() ? 0.9 : 0.7,
+            created_at: metadata.scraped_at || null
+          });
+        });
+      }
+
+      // Sort by relevance (exact match first)
+      results.sort((a, b) => {
+        if (a.relevance_score !== b.relevance_score) {
+          return b.relevance_score - a.relevance_score;
+        }
+        // If relevance is same, prefer external identities with more comments
+        const aComments = a.metadata?.comments_count || 0;
+        const bComments = b.metadata?.comments_count || 0;
+        return bComments - aComments;
+      });
+
+      return results.slice(0, 10); // Return top 10
     } catch (error) {
       console.error('Users search exception:', error);
       return [];
@@ -1555,6 +1644,11 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
           navigate(`/vehicle/${selected.id}`);
         } else if (selected.type === 'organization') {
           navigate(`/org/${selected.id}`);
+        } else if (selected.type === 'user' && selected.id?.startsWith('external_')) {
+          const externalId = selected.id.replace('external_', '');
+          navigate(`/profile/external/${externalId}`);
+        } else if (selected.type === 'user') {
+          navigate(`/profile/${selected.id}`);
         }
         setShowSuggestions(false);
       } else {
@@ -1691,6 +1785,11 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                       navigate(`/vehicle/${result.id}`);
                     } else if (result.type === 'organization') {
                       navigate(`/org/${result.id}`);
+                    } else if (result.type === 'user' && result.id?.startsWith('external_')) {
+                      const externalId = result.id.replace('external_', '');
+                      navigate(`/profile/external/${externalId}`);
+                    } else if (result.type === 'user') {
+                      navigate(`/profile/${result.id}`);
                     }
                     setShowSuggestions(false);
                   }}
@@ -1713,9 +1812,16 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
                     color: '#000',
                     minWidth: '20px'
                   }}>
-                    {result.type === 'vehicle' ? 'V' : 'O'}
+                    {result.type === 'vehicle' ? 'V' : result.type === 'organization' ? 'O' : 'U'}
                   </span>
-                  <span style={{ flex: 1 }}>{result.title}</span>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <span>{result.title}</span>
+                    {result.type === 'user' && result.metadata?.subtitle && (
+                      <span style={{ fontSize: '7pt', color: '#666', marginTop: '2px' }}>
+                        {result.metadata.subtitle}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
