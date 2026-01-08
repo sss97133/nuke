@@ -107,60 +107,101 @@ serve(async (req) => {
     }
     if (!vehicleId) throw new Error('Missing vehicle_id (and could not resolve by auction_event_id, external_listings, or vehicles URLs)')
 
-    // Use Firecrawl to get JavaScript-rendered page (REQUIRED for BaT comments)
-    const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
-    if (!firecrawlKey) {
-      throw new Error('FIRECRAWL_API_KEY is required for comment extraction. BaT pages require JavaScript rendering.')
+    // ⚠️ FREE MODE: Direct HTML fetch (no Firecrawl due to budget constraints)
+    // BaT comments may be in HTML or require JS rendering - try direct fetch first
+    console.log('🌐 Fetching BaT page HTML directly (free mode - no Firecrawl)...')
+    
+    let html = ''
+    try {
+      const response = await fetch(auctionUrlNorm, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        },
+        signal: AbortSignal.timeout(30000)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      html = await response.text()
+      
+      if (!html || html.length < 1000) {
+        throw new Error(`Direct fetch returned insufficient HTML (${html?.length || 0} chars)`)
+      }
+      
+      console.log(`✅ Direct fetch returned ${html.length} characters of HTML`)
+    } catch (e: any) {
+      console.error(`❌ Direct fetch failed: ${e.message}`)
+      throw new Error(`Direct HTML fetch failed: ${e.message}. BaT comments may require JavaScript rendering (Firecrawl needed).`)
     }
     
-    console.log('🔥 Using Firecrawl to fetch BaT page with JS rendering...')
-    const fcResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${firecrawlKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        url: auctionUrlNorm,
-        formats: ['html'],
-        onlyMainContent: false,
-        waitFor: 8000, // Give JS time to render BaT's dynamic comments
-        actions: [
-          {
-            type: 'wait',
-            milliseconds: 2000 // Initial page load
-          },
-          {
-            type: 'scroll',
-            direction: 'down',
-            pixels: 3000 // Scroll to trigger lazy loading of comments
-          },
-          {
-            type: 'wait',
-            milliseconds: 3000 // Wait for comments to load after scroll
+    // ⚠️ PRIORITY: Extract from embedded JSON comments array (BaT embeds comments as "comments":[{...}])
+    // This is the FREE way to get comments without JavaScript rendering!
+    let commentsFromJson: any[] = []
+    try {
+      // Pattern 1: Look for "comments":[{...},...,{...}] in HTML
+      const commentsMatch = html.match(/"comments":\s*\[([\s\S]*?)\](?=,"[a-z])/)
+      if (commentsMatch && commentsMatch[1]) {
+        try {
+          const arrayContent = '[' + commentsMatch[1] + ']'
+          const parsed = JSON.parse(arrayContent)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            console.log(`✅ Found ${parsed.length} comments in embedded JSON array`)
+            commentsFromJson = parsed
           }
-        ]
-      }),
-      signal: AbortSignal.timeout(60000) // 60 second timeout
-    })
-    
-    if (!fcResp.ok) {
-      const errorText = await fcResp.text().catch(() => '')
-      throw new Error(`Firecrawl API error ${fcResp.status}: ${errorText.slice(0, 200)}`)
+        } catch (parseErr: any) {
+          console.warn(`⚠️ Failed to parse comments JSON array: ${parseErr?.message}`)
+        }
+      }
+      
+      // Pattern 2: Try __NEXT_DATA__ (BaT might use Next.js for some pages)
+      if (commentsFromJson.length === 0) {
+        const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i
+        const nextDataMatch = html.match(nextDataPattern)
+        if (nextDataMatch && nextDataMatch[1]) {
+          try {
+            const nextData = JSON.parse(nextDataMatch[1])
+            const pageData = nextData?.props?.pageProps?.pageData || nextData?.props?.pageProps || {}
+            const listing = pageData.listing || pageData
+            const rawComments = pageData.comments || listing?.comments || []
+            
+            if (Array.isArray(rawComments) && rawComments.length > 0) {
+              console.log(`✅ Found ${rawComments.length} comments in __NEXT_DATA__`)
+              commentsFromJson = rawComments
+            }
+          } catch (e: any) {
+            console.warn(`⚠️ Failed to parse __NEXT_DATA__ for comments: ${e?.message}`)
+          }
+        }
+      }
+      
+      // Pattern 3: Try individual comment objects (fallback for edge cases)
+      if (commentsFromJson.length === 0) {
+        const objectMatches = html.matchAll(/\{"channels":\[.*?"type":"(bat-bid|comment)".*?\}/g)
+        const found: any[] = []
+        for (const match of objectMatches) {
+          try {
+            const obj = JSON.parse(match[0])
+            if (obj?.type && (obj.type === 'bat-bid' || obj.type === 'comment')) {
+              found.push(obj)
+            }
+          } catch { /* skip malformed */ }
+        }
+        if (found.length > 0) {
+          console.log(`✅ Found ${found.length} comments from individual JSON objects`)
+          commentsFromJson = found
+        }
+      }
+    } catch (e: any) {
+      console.warn(`⚠️ Failed to extract comments from JSON: ${e?.message}`)
     }
-    
-    const fcData = await fcResp.json()
-    if (!fcData.success) {
-      throw new Error(`Firecrawl failed: ${fcData.error || JSON.stringify(fcData).slice(0, 200)}`)
-    }
-    
-    const html = fcData.data?.html || ''
-    if (!html) {
-      throw new Error('Firecrawl returned no HTML content')
-    }
-    
-    console.log(`✅ Firecrawl returned ${html.length} characters of HTML`)
-    
+
     const doc = new DOMParser().parseFromString(html, 'text/html')
     if (!doc) throw new Error('Failed to parse HTML (DOMParser returned null)')
 
@@ -168,20 +209,97 @@ serve(async (req) => {
     const auctionEndMatch = html.match(/Auction ended?[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i)
     const auctionEndDate = auctionEndMatch ? new Date(auctionEndMatch[1]) : new Date()
 
-    // Extract all comments - try multiple selectors for robustness
-    let commentElements = doc.querySelectorAll('.comment')
-    if (commentElements.length === 0) {
-      // Fallback: look for comment-like structures in comments-javascript-enabled
-      const commentsContainer = doc.querySelector('#comments-javascript-enabled')
-      if (commentsContainer) {
-        // Try to find individual comment blocks by looking for patterns
-        commentElements = commentsContainer.querySelectorAll('[data-cursor-element-id]')
-      }
-    }
-    
     const comments = []
     const authorSet = new Set<string>()
     const authorProfileUrls = new Map<string, string>() // Map author username to profile URL
+    
+    // Process comments from embedded JSON (preferred method - FREE, no JS needed!)
+    if (commentsFromJson.length > 0) {
+      console.log(`🔄 Processing ${commentsFromJson.length} comments from embedded JSON...`)
+      for (let i = 0; i < commentsFromJson.length; i++) {
+        const c = commentsFromJson[i]
+        const authorRaw = String(c?.authorName || c?.author || '').trim()
+        const author = authorRaw.replace(/\s*\(The\s+Seller\)/i, '').trim() || 'Unknown'
+        const isSeller = authorRaw.toLowerCase().includes('(the seller)')
+        
+        // Parse timestamp (BaT uses Unix timestamp in seconds)
+        const timestamp = c?.timestamp ? (typeof c.timestamp === 'number' ? new Date(c.timestamp * 1000) : new Date(c.timestamp)) : null
+        const posted_at = timestamp || auctionEndDate
+        
+        // Extract text (may be HTML, strip tags)
+        const rawText = String(c?.content || c?.comment || c?.text || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+        if (!rawText || rawText.length < 3) continue
+        
+        // Detect comment type
+        const isBid = c?.type === 'bat-bid' || /bid\s+placed\s+by/i.test(rawText)
+        const bidAmount = (isBid && c?.bidAmount) ? (typeof c.bidAmount === 'number' ? c.bidAmount : parseFloat(String(c.bidAmount).replace(/,/g, ''))) : null
+        
+        const comment_type = 
+          bidAmount ? 'bid' :
+          isSeller ? 'seller_response' :
+          rawText.includes('?') ? 'question' :
+          'observation'
+        
+        const hours_until_close = timestamp ? (auctionEndDate.getTime() - posted_at.getTime()) / (1000 * 60 * 60) : 0
+        
+        // Generate content hash for idempotency
+        const content_hash = await sha256Hex([
+          'bat',
+          String(auctionUrlNorm),
+          String(i + 1),
+          String(posted_at.toISOString()),
+          String(author),
+          String(rawText),
+        ].join('|'))
+        
+        // Extract profile URL if available
+        if (c?.authorProfileUrl || (author && author !== 'Unknown')) {
+          const profileUrl = c?.authorProfileUrl || `https://bringatrailer.com/member/${author.toLowerCase().replace(/\s+/g, '-')}`
+          authorProfileUrls.set(author, profileUrl)
+        }
+        
+        comments.push({
+          auction_event_id: eventId,
+          vehicle_id: vehicleId,
+          platform: 'bringatrailer',
+          source_url: String(auctionUrlNorm),
+          content_hash,
+          sequence_number: i + 1,
+          posted_at: posted_at.toISOString(),
+          hours_until_close: Math.max(0, hours_until_close),
+          author_username: author,
+          is_seller: isSeller,
+          author_total_likes: typeof c?.likes === 'number' ? c.likes : 0,
+          comment_type,
+          comment_text: rawText,
+          word_count: rawText.split(/\s+/).length,
+          has_question: rawText.includes('?'),
+          has_media: Boolean(c?.hasImage || c?.hasVideo),
+          bid_amount: bidAmount,
+          comment_likes: typeof c?.commentLikes === 'number' ? c.commentLikes : 0
+        })
+        
+        if (author && author !== 'Unknown') {
+          authorSet.add(author)
+        }
+      }
+      
+      console.log(`✅ Successfully processed ${comments.length} comments from embedded JSON (FREE mode!)`)
+    }
+    
+    // Fallback: Try DOM parsing if JSON extraction had no comments
+    if (comments.length === 0) {
+      console.log(`⚠️ No comments found in embedded JSON, trying DOM fallback (may not work without JS rendering)...`)
+      // Extract all comments - try multiple selectors for robustness
+      let commentElements = doc.querySelectorAll('.comment')
+      if (commentElements.length === 0) {
+        // Fallback: look for comment-like structures in comments-javascript-enabled
+        const commentsContainer = doc.querySelector('#comments-javascript-enabled')
+        if (commentsContainer) {
+          // Try to find individual comment blocks by looking for patterns
+          commentElements = commentsContainer.querySelectorAll('[data-cursor-element-id]')
+        }
+      }
     
     for (let i = 0; i < commentElements.length; i++) {
       const el = commentElements[i]
@@ -323,7 +441,8 @@ serve(async (req) => {
         authorSet.add(author)
       }
     }
-
+    } // End of DOM fallback section
+    
     console.log(`Extracted ${comments.length} comments`)
 
     // Upsert external identities (platform + handle) with profile URLs so later humans can claim/merge them.

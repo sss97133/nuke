@@ -207,42 +207,83 @@ serve(async (req) => {
 
     console.log(`✅ Resolved vehicle_id: ${vehicleId}, event_id: ${eventId || 'none'}`)
 
-    // Fetch HTML using Firecrawl (Cars & Bids comments require JavaScript rendering)
-    const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY')
-    if (!firecrawlKey) {
-      throw new Error('FIRECRAWL_API_KEY not configured')
-    }
-
-    console.log('🌐 Fetching HTML with Firecrawl (JavaScript rendering required)...')
+    // Try direct fetch first (Cars & Bids uses Next.js, so __NEXT_DATA__ should be in initial HTML)
+    console.log('🌐 Fetching HTML directly (__NEXT_DATA__ should be available)...')
     
-    const firecrawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${firecrawlKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url: auctionUrlNorm,
-        pageOptions: {
-          waitFor: 3000, // Wait 3 seconds for JavaScript to render
+    let html = ''
+    try {
+      const directResponse = await fetch(auctionUrlNorm, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
-        formats: ['html'],
-      }),
-    })
+      })
 
-    if (!firecrawlResponse.ok) {
-      const errorText = await firecrawlResponse.text()
-      throw new Error(`Firecrawl failed: ${firecrawlResponse.status} ${errorText}`)
-    }
+      if (!directResponse.ok) {
+        throw new Error(`Direct fetch failed: ${directResponse.status} ${directResponse.statusText}`)
+      }
 
-    const firecrawlData = await firecrawlResponse.json()
-    const html = firecrawlData?.data?.[0]?.html || firecrawlData?.html || ''
-    
-    if (!html || html.length < 1000) {
-      throw new Error(`Firecrawl returned insufficient HTML (${html.length} chars)`)
+      html = await directResponse.text()
+      
+      if (!html || html.length < 1000) {
+        throw new Error(`Direct fetch returned insufficient HTML (${html.length} chars)`)
+      }
+
+      // Check if __NEXT_DATA__ is present (indicates Next.js data is available)
+      const hasNextData = html.includes('__NEXT_DATA__')
+      console.log(`✅ Direct fetch returned ${html.length} characters of HTML (__NEXT_DATA__: ${hasNextData})`)
+
+      // If __NEXT_DATA__ is present, we can extract from it directly
+      if (hasNextData) {
+        console.log('✅ __NEXT_DATA__ found - can extract comments without Firecrawl')
+      } else {
+        console.warn('⚠️ No __NEXT_DATA__ found - comments may require JavaScript rendering')
+      }
+    } catch (directError: any) {
+      console.warn(`⚠️ Direct fetch failed: ${directError.message}, trying Firecrawl...`)
+      
+      // Fallback to Firecrawl if direct fetch fails
+      const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY') || Deno.env.get('FIRECRAWL_KEY')
+      if (!firecrawlKey) {
+        console.error('❌ FIRECRAWL_API_KEY not configured, and direct fetch failed')
+        throw new Error(`Direct fetch failed and FIRECRAWL_API_KEY not configured: ${directError.message}`)
+      }
+
+      console.log('🌐 Fetching HTML with Firecrawl (JavaScript rendering fallback)...')
+      
+      const firecrawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${firecrawlKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: auctionUrlNorm,
+          pageOptions: {
+            waitFor: 3000, // Wait 3 seconds for JavaScript to render
+          },
+          formats: ['html'],
+        }),
+      })
+
+      if (!firecrawlResponse.ok) {
+        const errorText = await firecrawlResponse.text()
+        const errorData = JSON.parse(errorText || '{}')
+        if (errorData.error?.includes('credits') || errorData.error?.includes('Insufficient')) {
+          throw new Error(`Firecrawl account has insufficient credits. Direct fetch also failed. Please add credits to Firecrawl account or use an active auction URL.`)
+        }
+        throw new Error(`Firecrawl failed: ${firecrawlResponse.status} ${errorText}`)
+      }
+
+      const firecrawlData = await firecrawlResponse.json()
+      html = firecrawlData?.data?.[0]?.html || firecrawlData?.html || ''
+      
+      if (!html || html.length < 1000) {
+        throw new Error(`Firecrawl returned insufficient HTML (${html.length} chars)`)
+      }
+      
+      console.log(`✅ Firecrawl returned ${html.length} characters of HTML`)
     }
-    
-    console.log(`✅ Firecrawl returned ${html.length} characters of HTML`)
 
     // Try to extract from __NEXT_DATA__ first (more reliable)
     let commentsFromNextData: any[] = []

@@ -175,6 +175,109 @@ Deno.serve(async (req: Request) => {
 
     if (updateError) throw updateError;
 
+    // Also update bat_listings table if a corresponding row exists
+    // Match by bat_listing_url (normalize URL for matching - try both with and without trailing slash)
+    const normalizedBatUrl = listing.listing_url.replace(/\/$/, ''); // Remove trailing slash
+    const normalizedBatUrlWithSlash = normalizedBatUrl + '/';
+    
+    // Try to find matching bat_listings row
+    let batListing: any = null;
+    const { data: batListing1 } = await supabase
+      .from('bat_listings')
+      .select('id, comment_count')
+      .eq('bat_listing_url', normalizedBatUrl)
+      .maybeSingle();
+    
+    if (batListing1) {
+      batListing = batListing1;
+    } else {
+      const { data: batListing2 } = await supabase
+        .from('bat_listings')
+        .select('id, comment_count')
+        .eq('bat_listing_url', normalizedBatUrlWithSlash)
+        .maybeSingle();
+      if (batListing2) {
+        batListing = batListing2;
+      }
+    }
+
+    if (batListing) {
+      // Map listing_status to bat_listings status format
+      const batStatus = newStatus === 'sold' ? 'sold' : 
+                       newStatus === 'ended' ? 'ended' : 
+                       newStatus === 'active' ? 'active' : 
+                       batListing.comment_count ? 'ended' : 'active'; // Keep existing if no new status
+
+      // Determine final_bid (use final_price if sold, otherwise current_bid)
+      const finalBid = finalPrice || currentBid || null;
+
+      // Update bat_listings with synced data
+      const { error: batUpdateError } = await supabase
+        .from('bat_listings')
+        .update({
+          bid_count: bidCount || 0,
+          final_bid: finalBid,
+          view_count: viewCount || 0,
+          listing_status: batStatus,
+          sale_price: finalPrice || null,
+          sale_date: finalPrice ? (new Date().toISOString().split('T')[0]) : null,
+          auction_end_date: endDateIso ? (new Date(endDateIso).toISOString().split('T')[0]) : null,
+          last_updated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', batListing.id);
+
+      if (batUpdateError) {
+        console.warn(`Failed to update bat_listings for ${batListing.id}:`, batUpdateError);
+        // Don't throw - bat_listings update failure shouldn't fail the entire sync
+      } else {
+        console.log(`✅ Updated bat_listings ${batListing.id} with bid_count=${bidCount}, final_bid=${finalBid}, status=${batStatus}`);
+      }
+    } else {
+      console.log(`ℹ️ No bat_listings row found for URL: ${normalizedBatUrl}`);
+    }
+
+    // Extract comments for active auctions (with cost control - only if auction ending soon or bid increased)
+    // This ensures comment_count stays updated without excessive Firecrawl costs
+    const shouldExtractComments = 
+      newStatus === 'active' && 
+      listing.end_date && 
+      (
+        // Extract comments if auction ending in < 24 hours OR bid increased significantly
+        (new Date(listing.end_date).getTime() - Date.now() < 24 * 60 * 60 * 1000) ||
+        (listing.current_bid && currentBid && currentBid > listing.current_bid && (currentBid - listing.current_bid) >= 5000)
+      );
+
+    if (shouldExtractComments && listing.vehicle_id) {
+      console.log(`📝 Extracting comments for active auction ending soon or significant bid increase`);
+      try {
+        // Call extract-auction-comments asynchronously (don't wait - this is expensive)
+        // This ensures comments are updated without blocking the sync
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+        const commentsUrl = `${supabaseUrl}/functions/v1/extract-auction-comments`;
+        
+        fetch(commentsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            auction_url: listing.listing_url,
+            vehicle_id: listing.vehicle_id,
+            auction_event_id: null, // Will be resolved by extract-auction-comments
+          })
+        }).catch(err => {
+          console.warn(`Failed to trigger comment extraction (non-fatal):`, err);
+        });
+        
+        console.log(`✅ Triggered async comment extraction for ${listing.listing_url}`);
+      } catch (err) {
+        console.warn(`Comment extraction trigger failed (non-fatal):`, err);
+      }
+    }
+
     // If bid increased significantly, create timeline event and notification
     if (listing.current_bid && currentBid && currentBid > listing.current_bid) {
       const bidIncrease = currentBid - listing.current_bid;
