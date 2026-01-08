@@ -39,7 +39,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
         case 'organization':
           query = supabase
             .from('businesses')
-            .select('id, name, business_type, location')
+            .select('id, business_name, business_type, city, state, country')
             .limit(50);
           break;
         case 'bond':
@@ -90,7 +90,7 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
       id: asset.id,
       type: assetType,
       name: assetType === 'vehicle' ? `${asset.year} ${asset.make} ${asset.model}` :
-            assetType === 'organization' ? asset.name :
+            assetType === 'organization' ? asset.business_name :
             `${assetType} #${asset.id.slice(-8)}`,
       value_cents: valueCents,
       allocation_pct: null,
@@ -195,12 +195,12 @@ export default function AssetSelector({ selectedAssets, onAssetsChange, onBack, 
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '10pt', fontWeight: 700 }}>
                           {assetType === 'vehicle' ? `${asset.year} ${asset.make} ${asset.model}` :
-                           assetType === 'organization' ? asset.name :
+                           assetType === 'organization' ? asset.business_name :
                            `${assetType.toUpperCase()} #${asset.id.slice(-8)}`}
                         </div>
                         <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '2px' }}>
                           {valueCents > 0 ? formatUSD(valueCents) : 'Value not set'}
-                          {asset.location && ` • ${asset.location}`}
+                          {asset.city && ` • ${[asset.city, asset.state, asset.country].filter(Boolean).join(', ')}`}
                         </div>
                       </div>
                       <button
