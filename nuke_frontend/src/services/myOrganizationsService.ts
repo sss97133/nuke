@@ -85,11 +85,9 @@ export class MyOrganizationsService {
         query = query.eq('role', filters.role);
       }
 
-      // Apply sorting
+      // Apply sorting - PostgREST doesn't support ordering by nested columns (businesses.business_name)
+      // So we'll do in-memory sorting for 'name', but use PostgREST for other sorts
       switch (filters?.sortBy) {
-        case 'name':
-          query = query.order('businesses.business_name', { ascending: true });
-          break;
         case 'contributions':
           query = query.order('contribution_count', { ascending: false });
           break;
@@ -97,9 +95,26 @@ export class MyOrganizationsService {
         default:
           query = query.order('start_date', { ascending: false });
           break;
+        // 'name' will be sorted in memory after fetching
       }
 
       const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching organizations:', error);
+        return [];
+      }
+
+      // Sort in memory for nested column ordering (businesses.business_name)
+      if (data && filters?.sortBy === 'name') {
+        data.sort((a, b) => {
+          const aName = a.businesses?.business_name || '';
+          const bName = b.businesses?.business_name || '';
+          return aName.localeCompare(bName);
+        });
+      }
+
+      return data || [];
 
       if (error) throw error;
 
