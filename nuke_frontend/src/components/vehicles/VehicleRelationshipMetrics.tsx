@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { handleExpectedError } from '../../utils/errorCache';
 
 interface VehicleRelationshipMetricsProps {
   vehicleId: string;
@@ -84,10 +85,13 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
           // Gracefully handle missing table or column
           if (!orgError && orgSettings?.parking_rate_per_day) {
             parkingCostPerDay = orgSettings.parking_rate_per_day;
+          } else if (orgError) {
+            // Silently handle missing feature
+            handleExpectedError(orgError, 'Parking Rate');
           }
         } catch (error) {
           // Column or table may not exist - silently skip
-          console.log('Parking rate not available for organization');
+          handleExpectedError(error, 'Parking Rate');
         }
       }
 
@@ -115,10 +119,13 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
         // Gracefully handle missing relationship or column
         if (!eventsError && data) {
           timelineEvents = data;
+        } else if (eventsError) {
+          // Silently handle missing feature
+          handleExpectedError(eventsError, 'Timeline Events Organization Filter');
         }
       } catch (error) {
         // Organization relationship column may not exist - silently skip
-        console.log('Timeline events with organization filter not available');
+        handleExpectedError(error, 'Timeline Events Organization Filter');
       }
 
       // Calculate totals

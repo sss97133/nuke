@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleThumbnail from '../VehicleThumbnail';
 import VehicleRelationshipMetrics from './VehicleRelationshipMetrics';
+import { handleExpectedError } from '../../utils/errorCache';
 import '../../design-system.css';
 
 interface GarageVehicleCardProps {
@@ -129,10 +130,11 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
               .eq('event_type', 'view')
       ]);
 
-      if (imageCountError) console.warn('[GarageVehicleCard] image count unavailable:', imageCountError.message || imageCountError);
-      if (eventCountError) console.warn('[GarageVehicleCard] event count unavailable:', eventCountError.message || eventCountError);
-      if (latestEventError) console.warn('[GarageVehicleCard] latest event unavailable:', latestEventError.message || latestEventError);
-      if (valuationError) console.warn('[GarageVehicleCard] valuation unavailable:', valuationError.message || valuationError);
+      // Silently handle missing resources - these are expected in some deployments
+      if (imageCountError) handleExpectedError(imageCountError, 'Image Count');
+      if (eventCountError) handleExpectedError(eventCountError, 'Event Count');
+      if (latestEventError) handleExpectedError(latestEventError, 'Latest Event');
+      if (valuationError) handleExpectedError(valuationError, 'Valuation');
       if (viewCountError) {
         if (isMissingResourceError(viewCountError)) {
           try {
@@ -140,8 +142,11 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
           } catch {
             // ignore
           }
+          // Silently handle missing analytics feature
+          handleExpectedError(viewCountError, 'Vehicle Analytics');
         } else {
-          console.warn('[GarageVehicleCard] view count unavailable:', viewCountError.message || viewCountError);
+          // Only log unexpected errors once
+          handleExpectedError(viewCountError, 'Vehicle Analytics');
         }
       }
 
