@@ -84,8 +84,6 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
 
   const loadVehicleMetrics = async () => {
     try {
-      const analyticsUnavailable = typeof window !== 'undefined' && localStorage.getItem(FEATURE_VEHICLE_ANALYTICS_UNAVAILABLE_KEY) === '1';
-
       // Get real counts and data
       const [
         { count: imageCount, error: imageCountError },
@@ -122,14 +120,11 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
           .order('valuation_date', { ascending: false })
           .limit(1),
         
-        // View count (analytics)
-        analyticsUnavailable
-          ? Promise.resolve({ count: 0, error: null } as any)
-          : supabase
-              .from('vehicle_analytics')
-              .select('id', { count: 'estimated', head: true })
-              .eq('vehicle_id', vehicle.id)
-              .eq('event_type', 'view')
+        // View count (use vehicle_views table instead of vehicle_analytics)
+        supabase
+          .from('vehicle_views')
+          .select('id', { count: 'estimated', head: true })
+          .eq('vehicle_id', vehicle.id)
       ]);
 
       // Silently handle missing resources - these are expected in some deployments

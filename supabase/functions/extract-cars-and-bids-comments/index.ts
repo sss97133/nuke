@@ -286,6 +286,7 @@ serve(async (req) => {
     }
 
     // Try to extract from __NEXT_DATA__ first (more reliable)
+    // Use recursive search to find comments in nested structures (Cars & Bids may store them in various locations)
     let commentsFromNextData: any[] = []
     try {
       const nextDataPattern = /<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i
@@ -297,9 +298,77 @@ serve(async (req) => {
                        nextData?.props?.auction ||
                        nextData?.auction
 
+        // First try direct path
         if (auction && Array.isArray(auction.comments)) {
-          console.log(`✅ Found ${auction.comments.length} comments in __NEXT_DATA__`)
+          console.log(`✅ Found ${auction.comments.length} comments in __NEXT_DATA__ (direct path)`)
           commentsFromNextData = auction.comments
+        }
+        
+        // ALWAYS do recursive search to find ALL comments (comments may be in nested structures)
+        const findCommentsArray = (root: any, depth = 0, seen = new Set<any>()): any[] | null => {
+          if (depth > 12) return null
+          if (!root || typeof root !== 'object') return null
+          if (seen.has(root)) return null // Avoid circular references
+          seen.add(root)
+
+          // Check common comment array locations
+          const candidateArrays = [
+            root?.comments,
+            root?.commentThreads,
+            root?.comment_threads,
+            root?.items, // Sometimes comments are in an items array
+            root?.results, // GraphQL-style results
+          ].filter(Boolean)
+
+          for (const arr of candidateArrays) {
+            if (Array.isArray(arr) && arr.length > 0) {
+              // Verify it looks like a comments array (has objects with text/body/content/message)
+              const firstItem = arr[0]
+              if (firstItem && typeof firstItem === 'object') {
+                const hasCommentLikeField = firstItem.text || firstItem.body || firstItem.content || firstItem.message || firstItem.node?.text || firstItem.node?.body
+                if (hasCommentLikeField) {
+                  return arr
+                }
+              }
+            }
+          }
+
+          // Check GraphQL relay structure (edges)
+          const edges = root?.comments?.edges || root?.edges
+          if (Array.isArray(edges) && edges.length > 0) {
+            return edges
+          }
+
+          // Recursively search nested objects
+          if (depth < 8) {
+            if (Array.isArray(root)) {
+              for (const item of root) {
+                if (item && typeof item === 'object') {
+                  const found = findCommentsArray(item, depth + 1, seen)
+                  if (found) return found
+                }
+              }
+            } else {
+              for (const key of Object.keys(root)) {
+                const value = root[key]
+                if (value && typeof value === 'object') {
+                  const found = findCommentsArray(value, depth + 1, seen)
+                  if (found) return found
+                }
+              }
+            }
+          }
+
+          return null
+        }
+
+        // Use recursive search to find comments array
+        const commentsArray = findCommentsArray(auction || nextData)
+        if (commentsArray && Array.isArray(commentsArray) && commentsArray.length > 0) {
+          if (commentsFromNextData.length === 0 || commentsArray.length > commentsFromNextData.length) {
+            console.log(`✅ Found ${commentsArray.length} comments in __NEXT_DATA__ (recursive search)`)
+            commentsFromNextData = commentsArray
+          }
         }
       }
     } catch (e: any) {
@@ -362,12 +431,14 @@ serve(async (req) => {
     // Process comments from __NEXT_DATA__ (most reliable)
     if (commentsFromNextData.length > 0) {
       for (let i = 0; i < commentsFromNextData.length; i++) {
-        const commentData = commentsFromNextData[i]
+        // Handle GraphQL relay structure (edge.node) or direct comment objects
+        const rawComment = commentsFromNextData[i]
+        const commentData = rawComment?.node || rawComment // Support GraphQL relay edges
         
-        const authorRaw = commentData.author || commentData.username || commentData.user?.username || commentData.user?.name || 'Unknown'
+        const authorRaw = commentData?.author || commentData?.username || commentData?.user?.username || commentData?.user?.name || commentData?.user?.handle || 'Unknown'
         const author = String(authorRaw).trim() || 'Unknown'
-        const text = commentData.text || commentData.content || commentData.body || commentData.message || ''
-        const postedAt = commentData.created_at || commentData.timestamp || commentData.date || commentData.posted_at
+        const text = commentData?.text || commentData?.content || commentData?.body || commentData?.message || ''
+        const postedAt = commentData?.created_at || commentData?.timestamp || commentData?.date || commentData?.posted_at || commentData?.createdAt
         
         if (!text || text.length < 3) continue
 
