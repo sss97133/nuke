@@ -3305,12 +3305,17 @@ async function storeVehiclesInDatabase(
       }
       const title = vehicle.title || vehicle.listing_title || null;
       const vinRaw = typeof vehicle.vin === "string" ? vehicle.vin.trim().toUpperCase() : "";
-      // Only consider valid 17-character VINs (excluding I, O, Q per spec)
-      const isValidVin = vinRaw.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(vinRaw);
+      // Accept 17-character VINs (modern) OR 4-16 character chassis numbers (vintage vehicles)
+      // Vintage vehicles like BMW 507 have chassis numbers like "70077" (5 digits) instead of 17-char VINs
+      const isModernVin = vinRaw.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(vinRaw);
+      const isVintageChassis = vinRaw.length >= 4 && vinRaw.length <= 16 && /^[A-HJ-NPR-Z0-9]{4,16}$/.test(vinRaw);
+      const isValidVin = isModernVin || isVintageChassis;
       const vin = isValidVin ? vinRaw : null;
       
       if (vinRaw && !isValidVin) {
-        console.log(`⚠️ Invalid VIN detected: "${vinRaw}" (length: ${vinRaw.length}) - using discovery_url for lookup`);
+        console.log(`⚠️ Invalid VIN/chassis detected: "${vinRaw}" (length: ${vinRaw.length}) - using discovery_url for lookup`);
+      } else if (vin && isVintageChassis) {
+        console.log(`✅ Found vintage chassis number: "${vin}" (${vin.length} chars)`);
       }
       const rawListingDescription = vehicle.description || null;
 
@@ -5711,17 +5716,34 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
         }
       }
       
-      // VIN - look for 17-character alphanumeric strings (excluding I, O, Q)
+      // VIN/Chassis - look for 17-character VINs (modern) OR shorter chassis numbers (vintage)
+      // Vintage vehicles (pre-1981) often have chassis numbers like "70077" (5 digits) instead of 17-char VINs
+      // Patterns: "VIN:", "Chassis:", "chassis 70077", etc.
       const vinPatterns = [
+        // Modern VINs (17 characters)
         /(?:vin|vehicle\s*identification)[:\s#]*["']?([A-HJ-NPR-Z0-9]{17})\b/i,
         /\bvin[:\s#]*([A-HJ-NPR-Z0-9]{17})\b/i,
         /"vin"[:\s]*"([A-HJ-NPR-Z0-9]{17})"/i,
+        // Chassis numbers (4-16 characters for vintage vehicles)
+        /(?:chassis|chassis\s*no|chassis\s*number)[:\s#]*["']?([A-HJ-NPR-Z0-9]{4,16})\b/i,
+        /\bchassis[:\s]*([A-HJ-NPR-Z0-9]{4,16})\b/i,
+        /"chassis"[:\s]*"([A-HJ-NPR-Z0-9]{4,16})"/i,
+        // Pattern: "chassis 70077" (in text, not just in structured data)
+        /\bchassis\s+([A-HJ-NPR-Z0-9]{4,16})\b/i,
+        // BaT essentials format: "<li>Chassis: 70077</li>" or "<li>Chassis: <a>70077</a></li>"
+        /<li[^>]*>\s*Chassis:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{4,16})<\/a>\s*<\/li>/i,
+        /<li[^>]*>\s*Chassis:\s*([A-HJ-NPR-Z0-9]{4,16})\s*<\/li>/i,
       ];
       for (const pattern of vinPatterns) {
         const m = h.match(pattern);
         if (m?.[1]) {
-          specs.vin = m[1].toUpperCase();
-          break;
+          const value = m[1].toUpperCase().trim();
+          // Accept 17-char VINs OR 4-16 char chassis numbers (no I, O, Q in either)
+          if ((value.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(value)) ||
+              (value.length >= 4 && value.length <= 16 && /^[A-HJ-NPR-Z0-9]{4,16}$/.test(value))) {
+            specs.vin = value;
+            break;
+          }
         }
       }
       

@@ -1697,7 +1697,7 @@ const VehicleProfile: React.FC = () => {
                     .from('auction_comments')
                     .select('id', { count: 'exact', head: true })
                     .eq('vehicle_id', vehicleData.id)
-                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
+                    .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                     .not('bid_amount', 'is', null)
                 : Promise.resolve({ count: bidCount || 0 } as any),
               // Count only non-bid comments (where bid_amount is null or comment_type != 'bid')
@@ -1706,7 +1706,7 @@ const VehicleProfile: React.FC = () => {
                     .from('auction_comments')
                     .select('id', { count: 'exact', head: true })
                     .eq('vehicle_id', vehicleData.id)
-                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
+                    .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                     .or('bid_amount.is.null,comment_type.neq.bid')
                 : Promise.resolve({ count: 0 } as any),
               shouldLoadComments
@@ -1714,7 +1714,7 @@ const VehicleProfile: React.FC = () => {
                     .from('auction_comments')
                     .select('posted_at, author_username')
                     .eq('vehicle_id', vehicleData.id)
-                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
+                    .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                     .not('bid_amount', 'is', null)
                     .order('posted_at', { ascending: false })
                     .limit(1)
@@ -1725,7 +1725,7 @@ const VehicleProfile: React.FC = () => {
                     .from('auction_comments')
                     .select('posted_at')
                     .eq('vehicle_id', vehicleData.id)
-                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
+                    .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                     .or('bid_amount.is.null,comment_type.neq.bid')
                     .order('posted_at', { ascending: false })
                     .limit(1)
@@ -1736,7 +1736,7 @@ const VehicleProfile: React.FC = () => {
                     .from('auction_comments')
                     .select('author_username')
                     .eq('vehicle_id', vehicleData.id)
-                    .eq('listing_url', effective.listing_url) // CRITICAL: Only comments from this listing
+                    .eq('source_url', effective.listing_url) // CRITICAL: Only comments from this listing (using source_url field)
                     .eq('is_seller', true)
                     .order('posted_at', { ascending: false })
                     .limit(1)
@@ -2875,19 +2875,19 @@ const VehicleProfile: React.FC = () => {
         // If this is a Classic.com scraped vehicle, prefer Supabase-hosted origin_metadata gallery over contaminated imports.
         // Keep any non-imported images (e.g., manual uploads) in front.
         // Only use Supabase-hosted origin images to avoid external API calls
-        const supabaseHostedOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
-        if (isClassicScrape && supabaseHostedOriginImages.length > 0) {
+        const classicSupabaseHostedOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
+        if (isClassicScrape && classicSupabaseHostedOriginImages.length > 0) {
           const manual = (imageRecords || [])
             .filter((r: any) => r?.image_url && !isImportedStoragePath(r?.storage_path))
             .map((r: any) => normalizeUrl(r?.image_url))
             .filter(Boolean) as string[];
 
-          const merged = Array.from(new Set([...manual, ...supabaseHostedOriginImages]));
+          const merged = Array.from(new Set([...manual, ...classicSupabaseHostedOriginImages]));
           const mergedFiltered = filterProfileImages(merged, vehicle);
 
           // If DB images look significantly larger than the source gallery, assume contamination and override display set.
           const dbCount = images.length;
-          const sourceCount = declaredCount ?? supabaseHostedOriginImages.length;
+          const sourceCount = declaredCount ?? classicSupabaseHostedOriginImages.length;
           const looksContaminated = dbCount > sourceCount + 10;
 
           if (looksContaminated && mergedFiltered.length > 0) {
@@ -2898,8 +2898,8 @@ const VehicleProfile: React.FC = () => {
         // For BaT vehicles, prefer Supabase-hosted origin_metadata images (certified source)
         // But user-uploaded images (with user_id, not import_queue) should still be shown
         // Only use Supabase-hosted origin images to avoid external API calls
-        const supabaseHostedOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
-        if (isBat && supabaseHostedOriginImages.length > 0) {
+        const batSupabaseHostedOriginImages = originImages.filter((url: string) => isSupabaseHostedImageUrl(url));
+        if (isBat && batSupabaseHostedOriginImages.length > 0) {
           // Get user-uploaded images (those with user_id and not from import_queue)
           const userUploaded = (imageRecords || [])
             .filter((r: any) => {
@@ -2910,14 +2910,14 @@ const VehicleProfile: React.FC = () => {
             .filter(Boolean) as string[];
 
           // Combine: Supabase-hosted origin_metadata images first (certified BaT source, no API calls), then user uploads
-          const combined = Array.from(new Set([...supabaseHostedOriginImages, ...userUploaded]));
+          const combined = Array.from(new Set([...batSupabaseHostedOriginImages, ...userUploaded]));
           const batFiltered = filterProfileImages(combined, vehicle);
           
           if (batFiltered.length > 0) {
             images = batFiltered;
             // Prefer Supabase-hosted origin_metadata image for lead, but fall back to user upload if needed
             const originLead = batFiltered.find((u) => 
-              supabaseHostedOriginImages.some(orig => normalizeUrl(orig) === normalizeUrl(u))
+              batSupabaseHostedOriginImages.some(orig => normalizeUrl(orig) === normalizeUrl(u))
             ) || batFiltered.find((u) => isSupabaseHostedImageUrl(u)) || batFiltered[0] || null;
             if (originLead) setLeadImageUrl(originLead);
           }

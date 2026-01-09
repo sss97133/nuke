@@ -1816,13 +1816,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     >
       <div style={{ 
         display: 'flex', 
-        flexWrap: 'wrap', 
+        flexWrap: 'nowrap', 
         justifyContent: 'flex-start', 
         alignItems: 'center', 
         gap: '8px', 
         flex: '1 1 auto',
         minWidth: 0,
         height: '31px',
+        overflow: 'hidden',
         marginTop: 0,
         marginBottom: 0,
         paddingTop: 0,
@@ -1837,17 +1838,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </div>
 
         {/* 2. Badges Section */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+        <div className="vehicle-header-badges" style={{ display: 'flex', flexWrap: 'nowrap', gap: 6, alignItems: 'center', flexShrink: 0, overflow: 'hidden', maxWidth: '100%' }}>
           {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
-            <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
+            <div className="badge-priority-2">
+              <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
+            </div>
           ) : null}
 
           {/* Meme Drop Count Badge */}
-          {vehicle?.id && <MemeDropBadge vehicleId={vehicle.id} compact />}
+          {vehicle?.id && (
+            <div className="badge-priority-4">
+              <MemeDropBadge vehicleId={vehicle.id} compact />
+            </div>
+          )}
 
           {/* Location Badge with Dropdown */}
           {locationDisplay && locationDisplay.short && locationDisplay.short.trim().length > 0 && locationDisplay.short !== ':' && (
-            <div ref={locationRef} style={{ position: 'relative' }}>
+            <div ref={locationRef} className="badge-priority-3" style={{ position: 'relative' }}>
               <button
                 type="button"
                 onClick={(e) => {
@@ -1989,9 +1996,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             </div>
           )}
 
-          {/* Owner Badge with Claim Dropdown - shows best guess owner */}
-          {ownerGuess && !permissions?.isVerifiedOwner && (
-            <div ref={ownerClaimRef} style={{ position: 'relative' }}>
+          {/* Owner Badge with Claim Dropdown - shows best guess owner (only show if not replacing "Claim this vehicle") */}
+          {ownerGuess && !permissions?.isVerifiedOwner && !responsibleName && (
+            <div ref={ownerClaimRef} className="badge-priority-5" style={{ position: 'relative' }}>
               <button
                 type="button"
                 onClick={(e) => {
@@ -2003,12 +2010,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   fontWeight: 600,
                   fontFamily: 'monospace',
                   display: 'inline-flex',
-                  alignItems: 'baseline',
+                  alignItems: 'center',
                   cursor: 'pointer',
                   background: 'transparent',
                   border: 'none',
                   padding: '2px 4px',
                   color: 'var(--text-muted)',
+                  height: '100%',
                 }}
                 title={`Owner (unverified): @${ownerGuess.username}`}
               >
@@ -2668,6 +2676,34 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 }
 
                 if (isDiscoveredVehicle) {
+                  // If ownerGuess exists, show owner name instead of "Claim this vehicle"
+                  if (ownerGuess && !permissions?.isVerifiedOwner) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowOwnerClaimDropdown(!showOwnerClaimDropdown);
+                        }}
+                        style={{
+                          fontSize: '9px',
+                          fontWeight: 600,
+                          fontFamily: 'monospace',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '2px 4px',
+                          color: baseTextColor,
+                          height: '100%',
+                        }}
+                        title={`Owner (unverified): @${ownerGuess.username}`}
+                      >
+                        @{ownerGuess.username}<sup style={{ fontSize: '6px', color: 'var(--warning)', marginLeft: '1px' }}>*</sup>
+                      </button>
+                    );
+                  }
                   return (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                       {batIdentityHref?.winner?.handle && !isAuctionLive ? (
@@ -2707,7 +2743,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         }}
                         title={
                           hasClaim
-                            ? (claimNeedsId ? 'Claim started. Upload your driver’s license to complete.' : 'Claim submitted.')
+                            ? (claimNeedsId ? 'Claim started. Upload your driver's license to complete.' : 'Claim submitted.')
                             : (batIdentityHref?.winner?.handle
                               ? `Winner is ${batIdentityHref.winner.handle}. If that's you, claim your BaT identity and upload a title document.`
                               : 'Upload title document to claim ownership')
@@ -2720,7 +2756,36 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 }
                 
                 // For user-uploaded vehicles, show "Claim this vehicle" button instead of uploader name
+                // OR show ownerGuess if available
                 if (!isOrgName && !isVerified) {
+                  // If ownerGuess exists, show owner name instead of "Claim this vehicle"
+                  if (ownerGuess && !permissions?.isVerifiedOwner) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowOwnerClaimDropdown(!showOwnerClaimDropdown);
+                        }}
+                        style={{
+                          fontSize: '9px',
+                          fontWeight: 600,
+                          fontFamily: 'monospace',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          background: 'transparent',
+                          border: 'none',
+                          padding: '2px 4px',
+                          color: baseTextColor,
+                          height: '100%',
+                        }}
+                        title={`Owner (unverified): @${ownerGuess.username}`}
+                      >
+                        @{ownerGuess.username}<sup style={{ fontSize: '6px', color: 'var(--warning)', marginLeft: '1px' }}>*</sup>
+                      </button>
+                    );
+                  }
                   return (
                     <a
                       href={claimHref}
@@ -2748,7 +2813,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                       }}
                       title={
                         hasClaim
-                          ? (claimNeedsId ? 'Claim started. Upload your driver’s license to complete.' : 'Claim submitted.')
+                          ? (claimNeedsId ? 'Claim started. Upload your driver's license to complete.' : 'Claim submitted.')
                           : 'Upload title document to claim ownership'
                       }
                     >
@@ -2794,31 +2859,58 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               })()
             ) : (
               // Show claim button for vehicles not in a live auction and not already owned by current user
+              // OR show ownerGuess if available
               !isAuctionLive && !isOwner && session?.user?.id ? (
-                <a
-                  href={claimHref}
-                  onClick={(e) => {
-                    if (onClaimClick) {
-                      e.preventDefault();
-                      onClaimClick();
-                    }
-                  }}
-                  style={{
-                    border: '1px solid var(--primary)',
-                    background: 'var(--surface)',
-                    color: 'var(--primary)',
-                    fontWeight: 600,
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '8pt',
-                    textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center'
-                  }}
-                >
-                  Claim This Vehicle
-                </a>
+                ownerGuess && !permissions?.isVerifiedOwner ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowOwnerClaimDropdown(!showOwnerClaimDropdown);
+                    }}
+                    style={{
+                      fontSize: '9px',
+                      fontWeight: 600,
+                      fontFamily: 'monospace',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '2px 4px',
+                      color: baseTextColor,
+                      height: '100%',
+                    }}
+                    title={`Owner (unverified): @${ownerGuess.username}`}
+                  >
+                    @{ownerGuess.username}<sup style={{ fontSize: '6px', color: 'var(--warning)', marginLeft: '1px' }}>*</sup>
+                  </button>
+                ) : (
+                  <a
+                    href={claimHref}
+                    onClick={(e) => {
+                      if (onClaimClick) {
+                        e.preventDefault();
+                        onClaimClick();
+                      }
+                    }}
+                    style={{
+                      border: '1px solid var(--primary)',
+                      background: 'var(--surface)',
+                      color: 'var(--primary)',
+                      fontWeight: 600,
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '8pt',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    Claim This Vehicle
+                  </a>
+                )
               ) : null
             )}
             {responsibleName && showOwnerCard && ownerProfile && (
@@ -2894,7 +2986,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             if (allDisplayOrgs.length === 0) return null;
             
             return (
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <div className="badge-priority-1" style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
                 {allDisplayOrgs
                   .filter((org) => {
                     const name = String(org?.business_name || '').toLowerCase();

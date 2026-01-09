@@ -18,6 +18,24 @@ BEGIN
 END $$;
 
 -- =====================================================
+-- ADD RATING COLUMN TO vehicle_listings (if needed)
+-- =====================================================
+
+DO $$
+BEGIN
+  -- Add rating column if it doesn't exist (needed for seller tier calculations)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'vehicle_listings' AND column_name = 'rating'
+  ) THEN
+    ALTER TABLE vehicle_listings 
+    ADD COLUMN rating DECIMAL(3,2) CHECK (rating >= 0 AND rating <= 5);
+    
+    COMMENT ON COLUMN vehicle_listings.rating IS 'Seller rating for this listing (0-5 scale). Used for tier calculations.';
+  END IF;
+END $$;
+
+-- =====================================================
 -- SELLER TIER REFRESH FUNCTION
 -- =====================================================
 
