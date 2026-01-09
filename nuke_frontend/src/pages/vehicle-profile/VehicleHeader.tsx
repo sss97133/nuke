@@ -2741,11 +2741,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
                           (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
                         }}
-                        title={
-                          hasClaim
-                            ? (claimNeedsId ? 'Claim started. Upload your driver's license to complete.' : 'Claim submitted.')
-                            : (batIdentityHref?.winner?.handle
-                              ? `Winner is ${batIdentityHref.winner.handle}. If that's you, claim your BaT identity and upload a title document.`
+                          title={
+                            hasClaim
+                              ? (claimNeedsId ? 'Claim started. Upload your driver\'s license to complete.' : 'Claim submitted.')
+                              : (batIdentityHref?.winner?.handle
+                                ? `Winner is ${batIdentityHref.winner.handle}. If that's you, claim your BaT identity and upload a title document.`
                               : 'Upload title document to claim ownership')
                         }
                       >
@@ -2811,11 +2811,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
                         (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
                       }}
-                      title={
-                        hasClaim
-                          ? (claimNeedsId ? 'Claim started. Upload your driver's license to complete.' : 'Claim submitted.')
-                          : 'Upload title document to claim ownership'
-                      }
+                        title={
+                          hasClaim
+                            ? (claimNeedsId ? 'Claim started. Upload your driver\'s license to complete.' : 'Claim submitted.')
+                            : 'Upload title document to claim ownership'
+                        }
                     >
                       {hasClaim ? (claimNeedsId ? 'Complete claim' : 'Claim submitted') : 'Claim this vehicle'}
                     </a>
