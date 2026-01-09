@@ -45,18 +45,13 @@ DECLARE
   v_velocity_score INTEGER := 0;
   v_total_score INTEGER := 0;
   v_upload_dates DATE[];
-  v_consecutive_days INTEGER := 0;
   v_max_consecutive INTEGER := 0;
   v_items_per_day DECIMAL;
-  v_vehicle_filter TEXT;
+  v_days_in_30 INTEGER;
+  v_days_per_week DECIMAL;
+  v_recent_activity INTEGER;
+  v_old_activity INTEGER;
 BEGIN
-  -- Build vehicle filter
-  IF p_vehicle_id IS NOT NULL THEN
-    v_vehicle_filter := format('AND vehicle_id = %L', p_vehicle_id);
-  ELSE
-    v_vehicle_filter := '';
-  END IF;
-  
   -- Get all upload dates from images, timeline events, and receipts
   WITH all_activity AS (
     SELECT DISTINCT DATE(created_at) as activity_date
@@ -88,26 +83,21 @@ BEGIN
       v_daily_frequency_score := 8;
     ELSE
       -- Calculate days per week
-      DECLARE
-        v_days_in_30 INTEGER;
-        v_days_per_week DECIMAL;
-      BEGIN
-        v_days_in_30 := array_length(
-          (SELECT array_agg(DISTINCT activity_date) 
-           FROM unnest(v_upload_dates) activity_date 
-           WHERE activity_date >= CURRENT_DATE - INTERVAL '30 days'),
-          1
-        );
-        v_days_per_week := COALESCE((v_days_in_30::DECIMAL / 4.33), 0);
-        
-        IF v_days_per_week >= 5 THEN
-          v_daily_frequency_score := 6;
-        ELSIF v_days_per_week >= 3 THEN
-          v_daily_frequency_score := 4;
-        ELSIF v_days_per_week >= 1 THEN
-          v_daily_frequency_score := 2;
-        END IF;
-      END;
+      v_days_in_30 := array_length(
+        (SELECT array_agg(DISTINCT activity_date) 
+         FROM unnest(v_upload_dates) activity_date 
+         WHERE activity_date >= CURRENT_DATE - INTERVAL '30 days'),
+        1
+      );
+      v_days_per_week := COALESCE((v_days_in_30::DECIMAL / 4.33), 0);
+      
+      IF v_days_per_week >= 5 THEN
+        v_daily_frequency_score := 6;
+      ELSIF v_days_per_week >= 3 THEN
+        v_daily_frequency_score := 4;
+      ELSIF v_days_per_week >= 1 THEN
+        v_daily_frequency_score := 2;
+      END IF;
     END IF;
   END IF;
   
@@ -143,33 +133,28 @@ BEGIN
   END IF;
   
   -- Apply temporal decay (weight recent activity more)
-  DECLARE
-    v_recent_activity INTEGER;
-    v_old_activity INTEGER;
-  BEGIN
-    SELECT COUNT(DISTINCT DATE(created_at)) INTO v_recent_activity
-    FROM (
-      SELECT created_at FROM vehicle_images WHERE user_id = p_user_id
-      UNION
-      SELECT created_at FROM vehicle_timeline_events WHERE user_id = p_user_id
-    ) activity
-    WHERE DATE(created_at) >= CURRENT_DATE - INTERVAL '7 days';
-    
-    SELECT COUNT(DISTINCT DATE(created_at)) INTO v_old_activity
-    FROM (
-      SELECT created_at FROM vehicle_images WHERE user_id = p_user_id
-      UNION
-      SELECT created_at FROM vehicle_timeline_events WHERE user_id = p_user_id
-    ) activity
-    WHERE DATE(created_at) < CURRENT_DATE - INTERVAL '7 days'
-      AND DATE(created_at) >= CURRENT_DATE - INTERVAL '90 days';
-    
-    -- If no recent activity, apply decay
-    IF v_recent_activity = 0 AND v_old_activity > 0 THEN
-      v_daily_frequency_score := LEAST(10, v_daily_frequency_score * 0.5)::INTEGER;
-      v_velocity_score := LEAST(5, v_velocity_score * 0.5)::INTEGER;
-    END IF;
-  END;
+  SELECT COUNT(DISTINCT DATE(created_at)) INTO v_recent_activity
+  FROM (
+    SELECT created_at FROM vehicle_images WHERE user_id = p_user_id
+    UNION
+    SELECT created_at FROM vehicle_timeline_events WHERE user_id = p_user_id
+  ) activity
+  WHERE DATE(created_at) >= CURRENT_DATE - INTERVAL '7 days';
+  
+  SELECT COUNT(DISTINCT DATE(created_at)) INTO v_old_activity
+  FROM (
+    SELECT created_at FROM vehicle_images WHERE user_id = p_user_id
+    UNION
+    SELECT created_at FROM vehicle_timeline_events WHERE user_id = p_user_id
+  ) activity
+  WHERE DATE(created_at) < CURRENT_DATE - INTERVAL '7 days'
+    AND DATE(created_at) >= CURRENT_DATE - INTERVAL '90 days';
+  
+  -- If no recent activity, apply decay
+  IF v_recent_activity = 0 AND v_old_activity > 0 THEN
+    v_daily_frequency_score := LEAST(10, v_daily_frequency_score * 0.5)::INTEGER;
+    v_velocity_score := LEAST(5, v_velocity_score * 0.5)::INTEGER;
+  END IF;
   
   v_total_score := v_daily_frequency_score + v_velocity_score;
   
@@ -648,20 +633,29 @@ DECLARE
   v_other_builds INTEGER;
   v_avg_quality DECIMAL;
 BEGIN
-  -- Check if user is linked to verified organization
+  -- Check if user is linked to verified organization via business_ownership
+  -- Handle both organizations table and businesses table
   SELECT 
-    bo.organization_id,
-    EXISTS(SELECT 1 FROM organizations o WHERE o.id = bo.organization_id AND o.is_verified = TRUE)
+    bo.business_id,
+    COALESCE(
+      EXISTS(SELECT 1 FROM organizations o WHERE o.id = bo.business_id AND o.is_verified = TRUE),
+      EXISTS(SELECT 1 FROM businesses b WHERE b.id = bo.business_id AND b.is_verified = TRUE),
+      FALSE
+    )
   INTO v_organization_id, v_is_verified
   FROM business_ownership bo
   WHERE bo.owner_id = p_user_id
   LIMIT 1;
   
-  -- Also check organization_contributors
+  -- Also check organization_contributors (which references organizations or businesses)
   IF NOT v_is_verified THEN
     SELECT 
       oc.organization_id,
-      EXISTS(SELECT 1 FROM organizations o WHERE o.id = oc.organization_id AND o.is_verified = TRUE)
+      COALESCE(
+        EXISTS(SELECT 1 FROM organizations o WHERE o.id = oc.organization_id AND o.is_verified = TRUE),
+        EXISTS(SELECT 1 FROM businesses b WHERE b.id = oc.organization_id AND b.is_verified = TRUE),
+        FALSE
+      )
     INTO v_organization_id, v_is_verified
     FROM organization_contributors oc
     WHERE oc.user_id = p_user_id

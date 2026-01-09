@@ -9,6 +9,7 @@ import { TechnicianWorkTimeline } from './TechnicianWorkTimeline';
 import { TimelineEventService } from '../services/timelineEventService';
 import { ComprehensiveWorkOrderReceipt } from './ComprehensiveWorkOrderReceipt';
 import { ParticipantBadge } from './auction/AuctionBadges';
+import { generateDaySummary, generateEventSummary } from '../utils/timelineSummary';
 
 // Types
 // Note: DB supports auction_* event types via timeline_events constraint migration.
@@ -1332,7 +1333,11 @@ const VehicleTimeline: React.FC<{
             tabIndex={0}
             ref={(el) => el?.focus()}
           >
-            <div className="card" style={{ maxWidth: '800px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}>
+            <div 
+              className="card" 
+              style={{ maxWidth: '800px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                   <button
@@ -1353,13 +1358,29 @@ const VehicleTimeline: React.FC<{
                   >
                     PREV DAY
                   </button>
-                  <h4 style={{ fontSize: '10px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-                    {new Date(selectedDayEvents[0].event_date).toLocaleDateString('en-US', {
-                      month: 'numeric',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <h4 style={{ fontSize: '10px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+                      {new Date(selectedDayEvents[0].event_date).toLocaleDateString('en-US', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </h4>
+                    {(() => {
+                      const uniqueEvents = (selectedDayEvents || []).filter((ev, idx, arr) => 
+                        arr.findIndex(e => e.id === ev.id || (e.title === ev.title && e.event_date === ev.event_date)) === idx
+                      );
+                      const daySummary = generateDaySummary(uniqueEvents);
+                      if (daySummary.primary && daySummary.primary !== 'No events') {
+                        return (
+                          <div style={{ fontSize: '8px', color: 'var(--text-muted)', fontWeight: 500, lineHeight: 1.3 }}>
+                            {daySummary.primary}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
                   {(() => {
                     const ev = selectedDayEvents[0] as any;
                     const md = (ev?.metadata || {}) as any;
