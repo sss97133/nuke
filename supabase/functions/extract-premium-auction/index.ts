@@ -201,6 +201,17 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     // ALWAYS exclude SVGs (never vehicle photos)
     if (lower.endsWith('.svg') || lower.includes('.svg?')) return true;
     
+    // CRITICAL: Exclude edit/preview/draft images - these are NOT final vehicle photos
+    // Pattern: filename contains "(edit)", "(preview)", "(draft)", "edit)" without opening paren, etc.
+    if (lower.includes('(edit)') || lower.includes('(preview)') || lower.includes('(draft)') || 
+        lower.includes('edit).') || lower.includes('preview).') || lower.includes('draft).') ||
+        lower.match(/\(edit/i) || lower.match(/edit\)/i)) {
+      return true;
+    }
+    
+    // Exclude paths with /edit/ that aren't in /photos/ context (editing interface, not gallery)
+    if (lower.includes('/edit/') && !lower.includes('/photos/')) return true;
+    
     // Exclude org branding and UI elements (these belong in org-assets bucket)
     if (lower.includes('/countries/')) return true; // Country flags
     if (lower.includes('/logo') || lower.includes('/logos/')) return true;
@@ -259,6 +270,29 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     
     // Exclude icons/logos
     if (lower.includes('/icon') || lower.includes('/logo')) return false;
+    
+    // CRITICAL: Exclude edit/preview/draft images in filenames - these are NOT final vehicle photos
+    // Pattern: filename contains "(edit)", "-(edit)", "(preview)", "(draft)", or variations
+    // Examples: 3vpGQDzR.O-8lX-AMW-(edit).jpg, 3vpGQDzR.m870SuvV7-(edit).jpg
+    // Valid images typically have paths like: /photos/s-1pEmzwg32wR.jpg or /photos/exterior/...
+    if (lower.includes('(edit)') || lower.includes('-(edit)') || lower.includes('(preview)') || lower.includes('(draft)') ||
+        lower.includes('edit).') || lower.includes('preview).') || lower.includes('draft).') ||
+        lower.match(/\(edit/i) || lower.match(/edit\)/i) || lower.match(/[\.\-]edit\)/i) || lower.match(/\(edit[\.\-]/i)) {
+      return false;
+    }
+    
+    // Exclude application/upload paths that are clearly not gallery photos
+    // Cars & Bids uses /photos/exterior/, /photos/interior/, /photos/other/ for real photos
+    // But /photos/application/ often contains upload previews, not final gallery images
+    if (lower.includes('/photos/application/') || lower.includes('/application/')) {
+      // Only exclude if it's clearly an upload/preview, not a final photo
+      // Keep if it looks like a final photo path (has proper filename structure)
+      const filename = lower.split('/').pop() || '';
+      // If filename looks like an upload preview (very short, or has upload markers)
+      if (filename.length < 10 || filename.includes('upload') || filename.includes('temp') || filename.includes('preview')) {
+        return false;
+      }
+    }
     
     // NOTE: Documents (window stickers, spec sheets, etc.) are KEPT - they're valuable data
     // They'll just be marked as is_document=true and excluded from primary selection
@@ -3556,9 +3590,32 @@ async function storeVehiclesInDatabase(
           
           payload.origin_metadata = newOriginMetadata;
           
+          // CRITICAL: Only update fields that have actual values - preserve existing data when extraction yields null/empty
+          const { data: existingVehicleDataForVin } = await supabase
+            .from("vehicles")
+            .select("mileage, color, transmission, engine_size, drivetrain, year, make, model, trim")
+            .eq("id", existing.id)
+            .single();
+          
+          const existingDataForVin = existingVehicleDataForVin || {};
+          
+          // Build update payload that preserves existing values when extraction yields null/empty
+          const updatePayloadForVin: any = {
+            ...payload,
+            mileage: payload.mileage !== null && payload.mileage !== undefined ? payload.mileage : existingDataForVin.mileage,
+            color: payload.color || existingDataForVin.color,
+            transmission: payload.transmission || existingDataForVin.transmission,
+            engine_size: payload.engine_size || existingDataForVin.engine_size,
+            drivetrain: payload.drivetrain || existingDataForVin.drivetrain,
+            year: payload.year !== null && payload.year !== undefined ? payload.year : existingDataForVin.year,
+            make: payload.make !== "Unknown" ? payload.make : (existingDataForVin.make || payload.make),
+            model: payload.model !== "Unknown" ? payload.model : (existingDataForVin.model || payload.model),
+            trim: payload.trim || existingDataForVin.trim,
+          };
+          
           const { data: updated, error: updateErr } = await supabase
             .from("vehicles")
-            .update(payload)
+            .update(updatePayloadForVin)
             .eq("id", existing.id)
             .select("id")
             .single();
@@ -3566,7 +3623,7 @@ async function storeVehiclesInDatabase(
           error = updateErr;
           if (!updateErr && updated?.id) {
             updatedIds.push(String(updated.id));
-            // CRITICAL: Also insert images for updated vehicles
+            // CRITICAL: Also insert images for updated vehicles (only if we found new images)
             if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
               console.log(`Inserting ${vehicle.images.length} images for UPDATED vehicle ${updated.id}`);
               const img = await insertVehicleImages(supabase, updated.id, vehicle.images, source, listingUrl, { 
@@ -3576,6 +3633,8 @@ async function storeVehiclesInDatabase(
               });
               console.log(`Inserted ${img.inserted} images${img.downloaded ? `, downloaded ${img.downloaded}` : ''} for updated vehicle, ${img.errors.length} errors`);
               errors.push(...img.errors);
+            } else {
+              console.log(`No new images found for updated vehicle ${updated.id} - preserving existing images`);
             }
           }
         } else {
@@ -3673,10 +3732,37 @@ async function storeVehiclesInDatabase(
           
           payload.origin_metadata = newOriginMetadata;
           
-          // Update existing vehicle
+          // CRITICAL: Only update fields that have actual values - preserve existing data when extraction yields null/empty
+          // This prevents overwriting existing data when old listings don't have complete __NEXT_DATA__
+          const { data: existingVehicleData } = await supabase
+            .from("vehicles")
+            .select("mileage, color, transmission, engine_size, drivetrain, year, make, model, trim, vin")
+            .eq("id", existingByUrl.id)
+            .single();
+          
+          const existingData = existingVehicleData || {};
+          
+          // Build update payload that preserves existing values when extraction yields null/empty
+          const updatePayload: any = {
+            ...payload,
+            // Only update these fields if extraction found actual values (not null/empty)
+            mileage: payload.mileage !== null && payload.mileage !== undefined ? payload.mileage : existingData.mileage,
+            color: payload.color || existingData.color,
+            transmission: payload.transmission || existingData.transmission,
+            engine_size: payload.engine_size || existingData.engine_size,
+            drivetrain: payload.drivetrain || existingData.drivetrain,
+            // Preserve basic vehicle info if extraction is incomplete
+            year: payload.year !== null && payload.year !== undefined ? payload.year : existingData.year,
+            make: payload.make !== "Unknown" ? payload.make : (existingData.make || payload.make),
+            model: payload.model !== "Unknown" ? payload.model : (existingData.model || payload.model),
+            trim: payload.trim || existingData.trim,
+            vin: payload.vin || existingData.vin,
+          };
+          
+          // Update existing vehicle (preserving existing data when extraction is incomplete)
           const { data: updated, error: updateErr } = await supabase
             .from("vehicles")
-            .update(payload)
+            .update(updatePayload)
             .eq("id", existingByUrl.id)
             .select("id")
             .single();
@@ -3684,7 +3770,7 @@ async function storeVehiclesInDatabase(
           error = updateErr;
           if (!updateErr && updated?.id) {
             updatedIds.push(String(updated.id));
-            // CRITICAL: Also insert images for updated vehicles
+            // CRITICAL: Also insert images for updated vehicles (only if we found new images)
             if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
               console.log(`Inserting ${vehicle.images.length} images for UPDATED vehicle ${updated.id}`);
               const img = await insertVehicleImages(supabase, updated.id, vehicle.images, source, listingUrl, { 
@@ -3694,6 +3780,8 @@ async function storeVehiclesInDatabase(
               });
               console.log(`Inserted ${img.inserted} images${img.downloaded ? `, downloaded ${img.downloaded}` : ''} for updated vehicle, ${img.errors.length} errors`);
               errors.push(...img.errors);
+            } else {
+              console.log(`No new images found for updated vehicle ${updated.id} - preserving existing images`);
             }
           }
         } else {
@@ -4526,6 +4614,31 @@ async function insertVehicleImages(
     if (lower.includes('twitter.com/share')) return true;
     if (lower.includes('/og-image') || lower.includes('/preview') || lower.includes('/share')) return true;
     
+    // CRITICAL: Exclude edit/preview/draft images in filenames - these are NOT final vehicle photos
+    // Pattern: filename contains "(edit)", "-(edit)", "(preview)", "(draft)", or variations
+    // Examples: 
+    //   /photos/3vpGQDzR.O-8lX-AMW-(edit).jpg (editing preview - NOT a final photo)
+    //   /photos/3vpGQDzR.m870SuvV7-(edit).jpg (editing preview - NOT a final photo)
+    // Valid images typically have paths like: /photos/s-1pEmzwg32wR.jpg or /photos/exterior/...
+    if (lower.includes('(edit)') || lower.includes('-(edit)') || lower.includes('(preview)') || lower.includes('(draft)') ||
+        lower.includes('edit).') || lower.includes('preview).') || lower.includes('draft).') ||
+        lower.match(/\(edit/i) || lower.match(/edit\)/i) || lower.match(/\(.*edit/i) ||
+        lower.match(/[\.\-]edit\)/i) || lower.match(/\(edit[\.\-]/i)) {
+      return true;
+    }
+    
+    // Exclude application/upload paths that are upload previews, not final gallery images
+    // Cars & Bids uses /photos/exterior/, /photos/interior/, /photos/other/ for real photos
+    // But /photos/application/ often contains upload previews/editing images
+    if (lower.includes('/photos/application/') || lower.includes('/application/')) {
+      const filename = lower.split('/').pop() || '';
+      // Exclude if it looks like an upload preview (short filename, or has edit/upload markers)
+      if (filename.length < 10 || filename.includes('edit') || filename.includes('upload') || 
+          filename.includes('temp') || filename.includes('preview') || filename.includes('(edit)')) {
+        return true;
+      }
+    }
+    
     // Organization/dealer logos
     if (lower.includes('organization-logos/') || lower.includes('organization_logos/')) return true;
     if (lower.includes('images.classic.com/uploads/dealer/')) return true;
@@ -4846,11 +4959,11 @@ async function insertVehicleImages(
 function extractCarsAndBidsListingUrls(html: string, limit: number): string[] {
   const urls = new Set<string>();
   
-  // PRIORITY 1: Look for auction-link class with actual listing URLs (most reliable)
-  // Pattern: <a class="auction-link" href="/auctions/ID/year-make-model">
-  const auctionLinkPattern = /<a[^>]*class=["'][^"']*auction-link[^"']*["'][^>]*href=["'](\/auctions\/[^"']+)["']/gi;
+  // PRIORITY 1: Look for auction-item containers with hero links (most reliable - actual listings page structure)
+  // Pattern: <li class="auction-item"><a class="hero" href="/auctions/ID/year-make-model">
+  const auctionItemHeroPattern = /<li[^>]*class=["'][^"']*auction-item[^"']*["'][^>]*>[\s\S]*?<a[^>]*class=["'][^"']*hero[^"']*["'][^>]*href=["'](\/auctions\/[^"']+)["']/gi;
   let m: RegExpExecArray | null;
-  while ((m = auctionLinkPattern.exec(html)) !== null) {
+  while ((m = auctionItemHeroPattern.exec(html)) !== null) {
     const path = m[1];
     if (!path) continue;
     // Exclude /video URLs
@@ -4859,7 +4972,35 @@ function extractCarsAndBidsListingUrls(html: string, limit: number): string[] {
     if (urls.size >= Math.max(1, limit)) break;
   }
   
-  // PRIORITY 2: Look for full listing URLs with year-make-model pattern
+  // PRIORITY 2: Look for auction-link class with actual listing URLs (fallback)
+  // Pattern: <a class="auction-link" href="/auctions/ID/year-make-model">
+  if (urls.size < limit) {
+    const auctionLinkPattern = /<a[^>]*class=["'][^"']*auction-link[^"']*["'][^>]*href=["'](\/auctions\/[^"']+)["']/gi;
+    while ((m = auctionLinkPattern.exec(html)) !== null) {
+      const path = m[1];
+      if (!path) continue;
+      // Exclude /video URLs
+      if (path.includes('/video')) continue;
+      urls.add(`https://carsandbids.com${path.split('?')[0]}`);
+      if (urls.size >= Math.max(1, limit)) break;
+    }
+  }
+  
+  // PRIORITY 3: Look for hero class links (direct - covers listings page)
+  // Pattern: <a class="hero" href="/auctions/ID/year-make-model">
+  if (urls.size < limit) {
+    const heroLinkPattern = /<a[^>]*class=["'][^"']*hero[^"']*["'][^>]*href=["'](\/auctions\/[^"']+)["']/gi;
+    while ((m = heroLinkPattern.exec(html)) !== null) {
+      const path = m[1];
+      if (!path) continue;
+      // Exclude /video URLs
+      if (path.includes('/video')) continue;
+      urls.add(`https://carsandbids.com${path.split('?')[0]}`);
+      if (urls.size >= Math.max(1, limit)) break;
+    }
+  }
+  
+  // PRIORITY 4: Look for full listing URLs with year-make-model pattern (fallback pattern matching)
   // Pattern: /auctions/ID/year-make-model (this is the actual listing, not /video)
   if (urls.size < limit) {
     const fullListingPattern = /href=["'](\/auctions\/[a-zA-Z0-9]+\/[0-9]{4}-[^"']+)["']/gi;
