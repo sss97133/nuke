@@ -53,12 +53,14 @@ export async function updatePriceWithSource(
       const sourceType = determineSourceType(metadata);
       const confidenceScore = determineConfidence(metadata, sourceType);
       const isVerified = determineVerified(metadata, sourceType);
+      const sourceName = deriveSourceName(metadata);
 
       const sourceRecord = {
         vehicle_id: vehicleId,
         field_name: field,
         field_value: value.toString(),
         source_type: sourceType,
+        source_name: sourceName,
         source_url: metadata.url || null,
         extraction_method: metadata.source || 'manual_entry',
         confidence_score: confidenceScore,
@@ -73,7 +75,7 @@ export async function updatePriceWithSource(
       const { error: sourceError } = await supabase
         .from('vehicle_field_sources')
         .upsert(sourceRecord, {
-          onConflict: 'vehicle_id,field_name,source_type,source_url'
+          onConflict: 'vehicle_id,field_name,source_type,source_name'
         });
 
       if (sourceError) {
@@ -99,6 +101,36 @@ export async function updatePriceWithSource(
   } catch (error: any) {
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * Derive source name from metadata
+ * The unique constraint uses source_name, not source_url, so we need to derive a name
+ */
+function deriveSourceName(metadata: PriceSourceMetadata): string {
+  // Use platform if available
+  if (metadata.platform) {
+    return metadata.platform;
+  }
+  
+  // Extract domain from URL if available
+  if (metadata.url) {
+    try {
+      const url = new URL(metadata.url);
+      return url.hostname.replace('www.', '');
+    } catch {
+      // If URL parsing fails, use a sanitized version
+      return metadata.url.substring(0, 100);
+    }
+  }
+  
+  // Use source type as fallback
+  if (metadata.source) {
+    return metadata.source;
+  }
+  
+  // Default fallback
+  return 'Unknown';
 }
 
 /**

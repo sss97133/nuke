@@ -228,14 +228,38 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
     if (isGarbageImage(url)) return false;
     
     const lower = url.toLowerCase();
-    // Must be from media.carsandbids.com
-    if (!lower.includes('media.carsandbids.com')) return false;
+    // Must be from media.carsandbids.com (or cdn.carsandbids.com for CDN URLs)
+    if (!lower.includes('media.carsandbids.com') && !lower.includes('cdn.carsandbids.com')) return false;
+    
+    // CRITICAL: Exclude Vimeo CDN thumbnails (these are video thumbnails, not vehicle photos)
+    if (lower.includes('vimeocdn.com')) return false;
+    if (lower.includes('vimeo.com')) return false;
+    
     // Exclude video thumbnails/freeze frames
     if (lower.includes('/video') || lower.includes('/videos/') || lower.match(/video[\/\-]/)) return false;
-    if (lower.includes('thumbnail') || (lower.includes('thumb') && !lower.match(/thumbnail/i))) {
-      // Allow 'thumbnail' in path only if it's clearly a gallery image path
-      if (!lower.match(/\/photos\/|\/images\/|\/gallery\//)) return false;
+    
+    // Exclude thumbnail paths that are clearly UI elements, not gallery images
+    if (lower.includes('/thumbnail') || lower.includes('/thumbnails/')) {
+      // Only allow thumbnails if they're in a gallery/photos context
+      if (!lower.match(/\/photos\/|\/images\/|\/gallery\/|\/auctions\//)) return false;
     }
+    
+    // Exclude tiny thumbnails by URL parameters (width=80, width=100, width=120, etc.)
+    // These are UI thumbnails, not full-resolution vehicle images
+    if (lower.includes('width=80') || lower.includes('width=100') || lower.includes('width=120')) {
+      // Only allow if it's clearly a gallery image that will be upgraded
+      if (!lower.match(/\/photos\/|\/images\/|\/gallery\/|\/auctions\//)) return false;
+    }
+    
+    // Exclude avatar/profile images
+    if (lower.includes('/avatar') || lower.includes('/profile') || lower.includes('/user/')) return false;
+    
+    // Exclude social sharing/preview images
+    if (lower.includes('/og-image') || lower.includes('/preview') || lower.includes('/share')) return false;
+    
+    // Exclude icons/logos
+    if (lower.includes('/icon') || lower.includes('/logo')) return false;
+    
     // NOTE: Documents (window stickers, spec sheets, etc.) are KEPT - they're valuable data
     // They'll just be marked as is_document=true and excluded from primary selection
     // Exclude small thumbnails by size suffix (but we'll upgrade them)
@@ -439,8 +463,90 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
                        nextData?.props?.auction ||
                        nextData?.auction;
         
+        // Recursive function to find ALL images in the __NEXT_DATA__ structure
+        // This is critical because Cars & Bids may store images in various nested locations
+        const findImagesInObject = (obj: any, depth = 0, seen = new Set<any>()): string[] => {
+          if (depth > 12) return []; // Increased depth limit
+          if (!obj || typeof obj !== 'object') return [];
+          if (seen.has(obj)) return []; // Avoid circular references
+          seen.add(obj);
+          
+          const found: string[] = [];
+          
+          // Check if this is an array of images
+          if (Array.isArray(obj)) {
+            for (const item of obj) {
+              if (typeof item === 'string' && isVehicleImage(item)) {
+                found.push(upgradeToFullRes(item));
+              } else if (typeof item === 'object' && item !== null) {
+                // Check if this object represents an image (has url/src properties)
+                const imgUrl = item.url || item.src || item.full || item.original || item.large || item.image || item.photo || null;
+                if (imgUrl && typeof imgUrl === 'string' && isVehicleImage(imgUrl)) {
+                  found.push(upgradeToFullRes(imgUrl));
+                  // Also check variants
+                  const variants = [item.full, item.original, item.large, item.medium, item.highRes, item.high_res];
+                  for (const variant of variants) {
+                    if (variant && typeof variant === 'string' && isVehicleImage(variant)) {
+                      found.push(upgradeToFullRes(variant));
+                    }
+                  }
+                }
+                // Recursively search nested objects
+                found.push(...findImagesInObject(item, depth + 1, seen));
+              }
+            }
+          } else {
+            // Check known image array keys first
+            const imageKeys = ['images', 'photos', 'gallery', 'media', 'imageUrls', 'photoUrls', 'image_urls', 'photo_urls', 'items', 'results'];
+            for (const key of imageKeys) {
+              const value = obj[key];
+              if (Array.isArray(value)) {
+                for (const img of value) {
+                  if (typeof img === 'string' && isVehicleImage(img)) {
+                    found.push(upgradeToFullRes(img));
+                  } else if (typeof img === 'object' && img !== null) {
+                    const imgUrl = img.url || img.src || img.full || img.original || img.large || img.image || img.photo || null;
+                    if (imgUrl && typeof imgUrl === 'string' && isVehicleImage(imgUrl)) {
+                      found.push(upgradeToFullRes(imgUrl));
+                      // Check variants
+                      const variants = [img.full, img.original, img.large, img.medium, img.highRes, img.high_res];
+                      for (const variant of variants) {
+                        if (variant && typeof variant === 'string' && isVehicleImage(variant)) {
+                          found.push(upgradeToFullRes(variant));
+                        }
+                      }
+                    }
+                  }
+                }
+              } else if (typeof value === 'string' && isVehicleImage(value)) {
+                found.push(upgradeToFullRes(value));
+              }
+            }
+            
+            // Recursively search ALL nested objects (not just known keys)
+            // This catches images stored in unexpected locations
+            if (depth < 8) {
+              for (const key of Object.keys(obj)) {
+                const value = obj[key];
+                // Skip already-processed image keys to avoid duplicates
+                if (imageKeys.includes(key)) continue;
+                // Skip non-object values (primitives won't contain images)
+                if (value && typeof value === 'object') {
+                  found.push(...findImagesInObject(value, depth + 1, seen));
+                }
+                // Also check if the value itself is an image URL string
+                if (typeof value === 'string' && isVehicleImage(value)) {
+                  found.push(upgradeToFullRes(value));
+                }
+              }
+            }
+          }
+          
+          return found;
+        };
+        
+        // First try direct paths (faster)
         if (auction) {
-          // Extract from known Cars & Bids image paths
           const imageArrays = [
             auction.images,
             auction.photos,
@@ -455,12 +561,10 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
           for (const imageArray of imageArrays) {
             if (Array.isArray(imageArray)) {
               for (const img of imageArray) {
-                // Handle both string URLs and image objects
                 let url: string | null = null;
                 if (typeof img === 'string') {
                   url = img;
                 } else if (typeof img === 'object' && img !== null) {
-                  // Try common image object properties (prioritize full-res)
                   url = img.url || img.src || img.full || img.original || img.large || img.image || img.photo || null;
                 }
                 
@@ -468,9 +572,9 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
                   const upgraded = upgradeToFullRes(url);
                   if (upgraded) {
                     urls.add(upgraded);
-                    // Also add variants if they exist (some images have multiple sizes)
+                    // Also add variants
                     if (img && typeof img === 'object') {
-                      const variants = [img.full, img.original, img.large, img.medium];
+                      const variants = [img.full, img.original, img.large, img.medium, img.highRes, img.high_res];
                       for (const variant of variants) {
                         if (variant && typeof variant === 'string' && isVehicleImage(variant)) {
                           urls.add(upgradeToFullRes(variant));
@@ -484,54 +588,11 @@ function extractCarsAndBidsImagesFromHtml(html: string): string[] {
           }
         }
         
-        // Fallback: Recursive search if direct path didn't work
-        if (urls.size === 0) {
-          const findImagesInObject = (obj: any, depth = 0): string[] => {
-            if (depth > 10) return [];
-            if (!obj || typeof obj !== 'object') return [];
-            
-            const found: string[] = [];
-            
-            if (Array.isArray(obj)) {
-              for (const item of obj) {
-                if (typeof item === 'string' && isVehicleImage(item)) {
-                  found.push(upgradeToFullRes(item));
-                } else if (typeof item === 'object') {
-                  found.push(...findImagesInObject(item, depth + 1));
-                }
-              }
-            } else {
-              const imageKeys = ['images', 'photos', 'gallery', 'imageUrls', 'photoUrls', 'image_urls', 'photo_urls'];
-              for (const key of imageKeys) {
-                if (Array.isArray(obj[key])) {
-                  for (const img of obj[key]) {
-                    const url = typeof img === 'string' ? img : (img?.url || img?.src || img?.image || img?.full || img?.original || null);
-                    if (url && typeof url === 'string' && isVehicleImage(url)) {
-                      found.push(upgradeToFullRes(url));
-                    }
-                  }
-                } else if (typeof obj[key] === 'string' && isVehicleImage(obj[key])) {
-                  found.push(upgradeToFullRes(obj[key]));
-                }
-              }
-              
-              // Recursively search nested objects (limit depth to avoid performance issues)
-              if (depth < 5) {
-                for (const value of Object.values(obj)) {
-                  if (typeof value === 'object' && value !== null) {
-                    found.push(...findImagesInObject(value, depth + 1));
-                  }
-                }
-              }
-            }
-            
-            return found;
-          };
-          
-          const nextDataImages = findImagesInObject(nextData);
-          for (const img of nextDataImages) {
-            if (img) urls.add(img);
-          }
+        // ALWAYS do recursive search to find ALL images (not just when urls.size === 0)
+        // Cars & Bids may store images in nested structures that direct paths miss
+        const nextDataImages = findImagesInObject(auction || nextData);
+        for (const img of nextDataImages) {
+          if (img) urls.add(img);
         }
         
         if (urls.size > 0) {
@@ -2765,26 +2826,54 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
                                nextData?.auction;
                 
                 if (auction) {
-                  // Extract basic vehicle info from __NEXT_DATA__
-                  vehicle = {
-                    year: auction.year || vehicle.year,
-                    make: auction.make || vehicle.make,
-                    model: auction.model || vehicle.model,
-                    trim: auction.trim || vehicle.trim,
-                    vin: auction.vin || vehicle.vin,
-                    mileage: auction.mileage || auction.odometer || vehicle.mileage,
-                    color: auction.color || auction.exterior_color || vehicle.color,
-                    interior_color: auction.interior_color || vehicle.interior_color,
-                    transmission: auction.transmission || vehicle.transmission,
-                    drivetrain: auction.drivetrain || vehicle.drivetrain,
-                    engine_size: auction.engine || auction.engine_size || vehicle.engine_size,
-                    fuel_type: auction.fuel_type || vehicle.fuel_type,
-                    body_style: auction.body_style || auction.bodyType || vehicle.body_style,
-                    current_bid: auction.current_bid || auction.highest_bid || auction.currentBid || vehicle.current_bid,
-                    bid_count: auction.bid_count || auction.bids?.length || auction.bidCount || vehicle.bid_count,
-                    comment_count: auction.comment_count || auction.comments?.length || auction.commentCount || vehicle.comment_count,
+                  // Recursive function to find field values in nested structures
+                  const findFieldValue = (obj: any, fieldNames: string[], depth = 0, seen = new Set<any>()): any => {
+                    if (depth > 10 || !obj || typeof obj !== 'object') return null;
+                    if (seen.has(obj)) return null;
+                    seen.add(obj);
+                    
+                    // Check direct keys
+                    for (const fieldName of fieldNames) {
+                      if (obj[fieldName] !== null && obj[fieldName] !== undefined && obj[fieldName] !== '') {
+                        return obj[fieldName];
+                      }
+                    }
+                    
+                    // Recursively search nested objects
+                    if (depth < 6) {
+                      for (const value of Object.values(obj)) {
+                        if (value && typeof value === 'object') {
+                          const found = findFieldValue(value, fieldNames, depth + 1, seen);
+                          if (found !== null) return found;
+                        }
+                      }
+                    }
+                    
+                    return null;
                   };
-                  console.log(`✅ Extracted vehicle data from __NEXT_DATA__`);
+                  
+                  // Extract basic vehicle info from __NEXT_DATA__ with recursive search
+                  vehicle = {
+                    year: findFieldValue(auction, ['year', 'modelYear', 'model_year'], 0, new Set()) || vehicle.year,
+                    make: findFieldValue(auction, ['make', 'manufacturer'], 0, new Set()) || vehicle.make,
+                    model: findFieldValue(auction, ['model', 'modelName', 'model_name'], 0, new Set()) || vehicle.model,
+                    trim: findFieldValue(auction, ['trim', 'trimLevel', 'trim_level'], 0, new Set()) || vehicle.trim,
+                    vin: findFieldValue(auction, ['vin', 'vehicleIdentificationNumber', 'vehicle_id'], 0, new Set()) || vehicle.vin,
+                    mileage: findFieldValue(auction, ['mileage', 'odometer', 'odometerReading', 'odometer_reading', 'miles'], 0, new Set()) || vehicle.mileage,
+                    color: findFieldValue(auction, ['color', 'exteriorColor', 'exterior_color', 'paintColor', 'paint_color', 'exterior'], 0, new Set()) || vehicle.color,
+                    interior_color: findFieldValue(auction, ['interiorColor', 'interior_color', 'interior'], 0, new Set()) || vehicle.interior_color,
+                    transmission: findFieldValue(auction, ['transmission', 'trans', 'transmissionType', 'transmission_type'], 0, new Set()) || vehicle.transmission,
+                    drivetrain: findFieldValue(auction, ['drivetrain', 'driveTrain', 'drive_train', 'driveType', 'drive_type'], 0, new Set()) || vehicle.drivetrain,
+                    engine_size: findFieldValue(auction, ['engine', 'engineSize', 'engine_size', 'engineDescription', 'engine_description', 'displacement'], 0, new Set()) || vehicle.engine_size,
+                    fuel_type: findFieldValue(auction, ['fuelType', 'fuel_type', 'fuel'], 0, new Set()) || vehicle.fuel_type,
+                    body_style: findFieldValue(auction, ['bodyStyle', 'body_style', 'bodyType', 'body_type'], 0, new Set()) || vehicle.body_style,
+                    current_bid: findFieldValue(auction, ['currentBid', 'current_bid', 'highestBid', 'highest_bid', 'currentPrice', 'current_price'], 0, new Set()) || vehicle.current_bid,
+                    bid_count: (findFieldValue(auction, ['bidCount', 'bid_count', 'bids'], 0, new Set()) || 
+                               (Array.isArray(auction.bids) ? auction.bids.length : null)) || vehicle.bid_count,
+                    comment_count: (findFieldValue(auction, ['commentCount', 'comment_count', 'comments'], 0, new Set()) ||
+                                   (Array.isArray(auction.comments) ? auction.comments.length : null)) || vehicle.comment_count,
+                  };
+                  console.log(`✅ Extracted vehicle data from __NEXT_DATA__ (with recursive search)`);
                 }
               }
             } catch (nextDataError: any) {
@@ -4390,6 +4479,7 @@ async function insertVehicleImages(
   const delayMs = options?.delayMs ?? 1000; // 1 second delay between batches
   
   // Universal garbage filter - these should NEVER be vehicle images
+  // Based on user feedback: "most the cars and bids dont" have images, suggesting many URLs are false flags
   const isGarbageUrl = (url: string): boolean => {
     if (!url || typeof url !== 'string') return true;
     const lower = url.toLowerCase();
@@ -4397,10 +4487,24 @@ async function insertVehicleImages(
     // ALWAYS exclude SVGs (never vehicle photos)
     if (lower.endsWith('.svg') || lower.includes('.svg?') || lower.includes('.svg#')) return true;
     
-    // Exclude tiny thumbnails (80x80, 100x100, 120x120 etc.) - not useful as vehicle images
-    if (lower.includes('width=80') && lower.includes('height=80')) return true;
-    if (lower.includes('width=100') && lower.includes('height=100')) return true;
-    if (lower.includes('width=120') && lower.includes('height=120')) return true;
+    // Exclude tiny thumbnails by URL parameters (80x80, 100x100, 120x120 etc.) - these are UI elements, not vehicle photos
+    if (lower.includes('width=80') || lower.includes('width=100') || lower.includes('width=120')) {
+      // Allow only if it's clearly a gallery image path that will be upgraded to full res
+      if (!lower.match(/\/photos\/|\/images\/|\/gallery\/|\/auctions\//)) return true;
+    }
+    
+    // Exclude Vimeo CDN thumbnails (video thumbnails, not vehicle photos)
+    if (lower.includes('vimeocdn.com')) return true;
+    if (lower.includes('vimeo.com')) return true;
+    
+    // Exclude video-related paths
+    if (lower.includes('/video') || lower.includes('/videos/') || lower.match(/video[\/\-]/)) return true;
+    
+    // Exclude thumbnail paths that are UI elements, not gallery images
+    if (lower.includes('/thumbnail') || lower.includes('/thumbnails/')) {
+      // Only allow if clearly in a gallery/photos context
+      if (!lower.match(/\/photos\/|\/images\/|\/gallery\/|\/auctions\//)) return true;
+    }
     
     // Exclude org branding and UI elements
     if (lower.includes('/countries/')) return true;
@@ -4408,20 +4512,37 @@ async function insertVehicleImages(
     if (lower.includes('/icon') || lower.includes('/icons/')) return true;
     if (lower.includes('/assets/') || lower.includes('/static/')) return true;
     if (lower.includes('/button') || lower.includes('/badge')) return true;
-    if (lower.includes('/avatar') || lower.includes('/profile_pic')) return true;
+    if (lower.includes('/avatar') || lower.includes('/profile_pic') || lower.includes('/profile/')) return true;
     if (lower.includes('/favicon')) return true;
     if (lower.includes('/seller/')) return true;
     if (lower.includes('placeholder')) return true;
+    
+    // Exclude user/profile images
+    if (lower.includes('/user/') || lower.includes('/users/')) return true;
     
     // Exclude social sharing images
     if (lower.includes('linkedin.com') || lower.includes('shareArticle')) return true;
     if (lower.includes('facebook.com/sharer')) return true;
     if (lower.includes('twitter.com/share')) return true;
+    if (lower.includes('/og-image') || lower.includes('/preview') || lower.includes('/share')) return true;
     
     // Organization/dealer logos
     if (lower.includes('organization-logos/') || lower.includes('organization_logos/')) return true;
     if (lower.includes('images.classic.com/uploads/dealer/')) return true;
     if (lower.includes('/uploads/dealer/')) return true;
+    
+    // Cars & Bids specific: Exclude CDN paths that are clearly thumbnails (not gallery images)
+    // If the URL has very small size parameters and is not in a gallery context, it's likely a false flag
+    if (lower.includes('cdn-cgi/image/')) {
+      // Check for very small sizes in the path
+      if (lower.match(/width=\d+/)) {
+        const widthMatch = lower.match(/width=(\d+)/);
+        if (widthMatch && parseInt(widthMatch[1]) < 200) {
+          // If it's a very small width (< 200px) and not in a gallery context, exclude it
+          if (!lower.match(/\/photos\/|\/images\/|\/gallery\/|\/auctions\/|\/media\//)) return true;
+        }
+      }
+    }
     
     return false;
   };

@@ -11,10 +11,10 @@
 
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-dotenv.config({ path: '../nuke_frontend/.env.local' });
+dotenv.config({ path: '.env' });
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
@@ -84,11 +84,14 @@ async function createOrganization() {
       .insert({
         business_name: 'Fantasy Junction',
         website: EXTERNAL_WEBSITE,
-        business_type: 'dealer',
-        source: 'bat',
+        business_type: 'dealership',
+        city: 'Emeryville',
+        state: 'CA',
+        country: 'US',
         metadata: {
           discovered_from: BAT_MEMBER_URL,
           platform: 'bat',
+          source: 'bat',
           discovered_at: new Date().toISOString(),
           bat_username: BAT_USERNAME,
           bat_member_url: BAT_MEMBER_URL,
