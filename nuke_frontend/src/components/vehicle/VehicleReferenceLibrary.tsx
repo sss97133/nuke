@@ -565,19 +565,19 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
             </h3>
           </div>
           <div className="card-body">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* Upload Section - Only show if user is logged in */}
               {userId && (
                 <div style={{
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: '4px',
-                  padding: '12px'
+                  padding: '8px'
                 }}>
-                  <h4 style={{ margin: '0 0 8px 0', fontSize: '9pt', fontWeight: 700 }}>
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '8pt', fontWeight: 700 }}>
                     Upload Reference Documents
                   </h4>
-                  <p style={{ fontSize: '7pt', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
+                  <p style={{ fontSize: '7pt', color: 'var(--text-muted)', margin: '0 0 8px 0' }}>
                     Drop brochures, manuals, or images. Everything is detected automatically.
                   </p>
 
@@ -590,11 +590,11 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                         disabled={uploading || extracting}
                         multiple
                         style={{ 
-                          fontSize: '8pt', 
+                          fontSize: '7pt', 
                           width: '100%',
-                          padding: '8px',
+                          padding: '6px',
                           border: '2px dashed var(--border)',
-                          borderRadius: '4px',
+                          borderRadius: '3px',
                           background: 'var(--surface)',
                           cursor: uploading ? 'wait' : 'pointer'
                         }}
@@ -628,7 +628,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                       onClick={handleUpload}
                       disabled={files.length === 0 || uploading || extracting}
                       className="button button-primary"
-                      style={{ fontSize: '8pt', width: '100%' }}
+                      style={{ fontSize: '7pt', width: '100%', padding: '6px 8px' }}
                     >
                       {uploading ? `Uploading ${files.length} file${files.length > 1 ? 's' : ''}...` : extracting ? 'Extracting data...' : `Upload ${files.length > 0 ? files.length : ''} Document${files.length > 1 ? 's' : ''}`}
                     </button>
@@ -636,17 +636,17 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
 
                   {showSuccess && uploadedFiles.length > 0 && (
                     <div style={{
-                      marginTop: '12px',
+                      marginTop: '8px',
                       background: '#f0fdf4',
                       border: '2px solid #22c55e',
                       borderRadius: '4px',
-                      padding: '10px'
+                      padding: '8px'
                     }}>
-                      <div style={{ fontSize: '8pt', fontWeight: 700, color: '#15803d', marginBottom: '6px' }}>
+                      <div style={{ fontSize: '7pt', fontWeight: 700, color: '#15803d', marginBottom: '4px' }}>
                         ✓ {uploadedFiles.length} Document{uploadedFiles.length > 1 ? 's' : ''} Uploaded!
                       </div>
-                      <div style={{ fontSize: '7pt', color: '#166534', marginBottom: '6px' }}>
-                        Your files are safe. Extraction is processing in background.
+                      <div style={{ fontSize: '7pt', color: '#166534', marginBottom: '4px' }}>
+                        Extraction processing in background.
                       </div>
                       <button
                         onClick={() => {
@@ -659,8 +659,8 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                           background: 'transparent',
                           border: '1px solid #22c55e',
                           color: '#15803d',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
+                          padding: '3px 6px',
+                          borderRadius: '3px',
                           cursor: 'pointer'
                         }}
                       >

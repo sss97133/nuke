@@ -3589,3 +3589,35 @@ button:focus-visible {
   }
 }
 
+/* Vehicle Header Badges - Responsive hiding */
+/* Priority order: 1 = org icons (always visible), 2 = odometer, 3 = location, 4 = meme drop, 5 = owner badge */
+
+/* Hide priority 5 (owner badge) on smaller screens */
+@media (max-width: 1200px) {
+  .vehicle-header-badges .badge-priority-5 {
+    display: none !important;
+  }
+}
+
+/* Hide priority 4 (meme drop) on medium screens */
+@media (max-width: 1000px) {
+  .vehicle-header-badges .badge-priority-4 {
+    display: none !important;
+  }
+}
+
+/* Hide priority 3 (location) on smaller screens */
+@media (max-width: 800px) {
+  .vehicle-header-badges .badge-priority-3 {
+    display: none !important;
+  }
+}
+
+/* Keep priority 2 (odometer) and priority 1 (org icons) visible as long as possible */
+/* Only hide odometer on very small screens */
+@media (max-width: 600px) {
+  .vehicle-header-badges .badge-priority-2 {
+    display: none !important;
+  }
+}
+
