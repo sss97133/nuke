@@ -235,6 +235,15 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             (!auctionPlatform && c.author_username ? externalIdentityByPlatformHandle.get(`bat:${c.author_username}`) : null) ||
             null;
 
+          // Convert bid_amount properly - handle both numeric and string types
+          let bidAmount: number | undefined = undefined;
+          if (c.bid_amount != null) {
+            const num = typeof c.bid_amount === 'number' ? c.bid_amount : Number(c.bid_amount);
+            if (!isNaN(num) && num > 0) {
+              bidAmount = num;
+            }
+          }
+          
           allComments.push({
             id: `auction-${c.id}`,
             user_id: identity?.claimed_by_user_id || null,
@@ -243,8 +252,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             created_at: c.posted_at,
             posted_at: c.posted_at,
             user_name: c.author_username,
-            comment_type: c.comment_type,
-            bid_amount: c.bid_amount ? Number(c.bid_amount) : undefined,
+            comment_type: c.comment_type || (bidAmount ? 'bid' : undefined),
+            bid_amount: bidAmount,
             is_seller: c.is_seller,
             source: 'auction',
             auction_platform: auctionPlatform,
@@ -562,16 +571,17 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                             {auctionPlatform === 'cars_and_bids' ? 'Cars & Bids' : auctionPlatform}
                           </span>
                         )}
-                        {isBid && comment.bid_amount && (
+                        {isBid && comment.bid_amount != null && comment.bid_amount > 0 && (
                           <span style={{ 
                             fontSize: '8pt', 
                             fontWeight: 700, 
                             color: '#059669',
                             backgroundColor: '#d1fae5',
                             padding: '2px 6px',
-                            borderRadius: '4px'
+                            borderRadius: '4px',
+                            marginLeft: '4px'
                           }}>
-                            ${comment.bid_amount.toLocaleString()} BID
+                            ${typeof comment.bid_amount === 'number' ? comment.bid_amount.toLocaleString() : String(comment.bid_amount)} BID
                           </span>
                         )}
                         {comment.is_seller && (
