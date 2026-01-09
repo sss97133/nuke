@@ -16,6 +16,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { FaviconIcon } from './common/FaviconIcon';
+import { generateEventSummary } from '../utils/timelineSummary';
 
 interface ComprehensiveWorkOrderReceiptProps {
   eventId: string;
@@ -164,6 +165,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
     lot_number?: string;
     sale_price?: number;
   } | null>(null);
+  const [minimalEvent, setMinimalEvent] = useState<any>(null); // Store minimal event data for fallback summary
 
   useEffect(() => {
     loadData();
@@ -192,9 +194,14 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         
         if (eventError || !eventData) {
           console.error('Failed to load event:', eventError?.message);
+          // Store minimal event data for fallback summary
+          setMinimalEvent({ id: eventId, error: eventError?.message || 'Event not found' });
           setLoading(false);
           return;
         }
+        
+        // Store minimal event for summary generation
+        setMinimalEvent(eventData);
         
         // Map timeline_events to WorkOrder shape
         wo = {
@@ -220,6 +227,8 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         } as WorkOrder;
       } else {
         wo = viewData;
+        // Store minimal event for summary generation
+        setMinimalEvent(viewData);
       }
       
       setWorkOrder(wo);
@@ -356,6 +365,9 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
   }
 
   if (!workOrder) {
+    // Generate contextual summary from minimal event data if available
+    const summary = minimalEvent ? generateEventSummary(minimalEvent) : null;
+    
     return createPortal(
       <div 
         style={{
@@ -372,25 +384,75 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         }}
         onClick={onClose}
       >
-        <div style={{ 
-          background: 'var(--surface)', 
-          padding: '24px', 
-          border: '2px solid var(--border)',
-          maxWidth: '400px'
-        }}>
-          <div style={{ fontSize: '10pt', marginBottom: '16px' }}>
-            Could not load work order data. Please try again.
+        <div 
+          style={{ 
+            background: 'var(--surface)', 
+            padding: '24px', 
+            border: '2px solid var(--border)',
+            maxWidth: '500px',
+            borderRadius: '8px'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '12px' }}>
+            Work Order Summary
           </div>
+          
+          {summary ? (
+            <>
+              <div style={{ fontSize: '10pt', marginBottom: '12px', lineHeight: 1.5 }}>
+                <div style={{ fontWeight: 600, marginBottom: '8px' }}>
+                  {summary.primary}
+                </div>
+                {summary.details.length > 0 && (
+                  <div style={{ fontSize: '9pt', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    {summary.details.map((detail, idx) => (
+                      <div key={idx} style={{ marginBottom: '4px' }}>
+                        {detail}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ 
+                fontSize: '8pt', 
+                color: 'var(--text-muted)', 
+                fontStyle: 'italic',
+                marginBottom: '16px',
+                padding: '8px',
+                background: 'var(--grey-50)',
+                borderRadius: '4px'
+              }}>
+                Note: Full receipt details are not available. This is a summary based on available event data.
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: '10pt', marginBottom: '16px', color: 'var(--text-muted)' }}>
+              Could not load work order data. The event may not exist or you may not have permission to view it.
+            </div>
+          )}
+          
           <button
-            onClick={onClose}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
             style={{
               padding: '8px 16px',
-              fontSize: '8pt',
+              fontSize: '9pt',
               fontWeight: 'bold',
               backgroundColor: 'var(--surface)',
               border: '2px solid var(--border)',
               color: 'var(--text)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              borderRadius: '4px',
+              transition: 'var(--transition)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--grey-100)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--surface)';
             }}
           >
             CLOSE

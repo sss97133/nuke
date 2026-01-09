@@ -4888,6 +4888,7 @@ const CursorHomepage: React.FC = () => {
                 viewMode="grid"
                 cardSizePx={gridCardSizePx}
                 infoDense={false}
+                showDetailOverlay={false}
                 viewerUserId={session?.user?.id}
                 thermalPricing={thermalPricing}
                 thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}
@@ -4896,7 +4897,7 @@ const CursorHomepage: React.FC = () => {
                   ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
                 }
               />
-          ))}
+            ))}
         </div>
         )}
 

@@ -9,16 +9,19 @@ interface Comment {
   user_id?: string | null;
   comment_text: string;
   created_at: string;
+  updated_at?: string; // For detecting edited comments
   posted_at?: string;
   user_name?: string;
   user_avatar?: string;
-  author_username?: string; // For BaT comments
+  author_username?: string; // For external platform comments (BaT, Cars & Bids, etc.)
   comment_type?: string; // 'bid', 'question', 'observation', etc.
   bid_amount?: number;
   is_seller?: boolean;
-  source?: 'nzero' | 'auction' | 'bat'; // Distinguish N-Zero comments from auction_comments and BaT
-  auction_platform?: string | null;
+  source?: 'nzero' | 'auction' | 'bat' | 'facebook' | 'instagram' | 'sbx' | 'pcar' | 'cars_and_bids'; // All comment sources
+  auction_platform?: string | null; // Platform name: 'bat', 'cars_and_bids', 'pcarmarket', 'sbx', 'facebook', 'instagram', etc.
   external_identity_id?: string; // For linking to profiles
+  media_urls?: string[]; // For Instagram images, Facebook photos, etc.
+  comment_url?: string; // Direct link to original comment
 }
 
 interface VehicleCommentsCardProps {
@@ -43,6 +46,9 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   const [newComment, setNewComment] = useState('');
   const [posting, setPosting] = useState(false);
   const [memePickerOpen, setMemePickerOpen] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState<string>('');
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     loadComments();
@@ -86,54 +92,49 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       setLoading(true);
       
       // Load ALL comment sources: N-Zero, auction_comments, AND bat_comments
+      // Use pagination to fetch all comments (Supabase default limit is 1000, so we fetch in batches)
+      const fetchAllComments = async (table: string, select: string, orderBy: string, orderDir: 'asc' | 'desc' = 'desc') => {
+        const allResults: any[] = [];
+        let offset = 0;
+        const batchSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const query = supabase
+            .from(table)
+            .select(select)
+            .eq('vehicle_id', vehicleId)
+            .order(orderBy, { ascending: orderDir === 'asc' })
+            .range(offset, offset + batchSize - 1);
+
+          const { data, error } = await query;
+
+          if (error) {
+            console.warn(`Error fetching ${table}:`, error);
+            break;
+          }
+
+          if (data && data.length > 0) {
+            allResults.push(...data);
+            offset += batchSize;
+            hasMore = data.length === batchSize; // If we got a full batch, there might be more
+          } else {
+            hasMore = false;
+          }
+        }
+
+        return { data: allResults, error: null };
+      };
+
       const [nzeroCommentsResult, auctionCommentsResult, batCommentsResult] = await Promise.all([
         // N-Zero vehicle comments
-        supabase
-          .from('vehicle_comments')
-          .select('id, user_id, comment_text, created_at')
-          .eq('vehicle_id', vehicleId)
-          .order('created_at', { ascending: false })
-          .limit(100),
+        fetchAllComments('vehicle_comments', 'id, user_id, comment_text, created_at, updated_at', 'created_at', 'desc'),
         
-        // Auction comments (from auction_comments table)
-        supabase
-          .from('auction_comments')
-          .select(`
-            id,
-            author_username,
-            comment_text,
-            posted_at,
-            comment_type,
-            bid_amount,
-            is_seller,
-            platform,
-            source_url,
-            auction_event_id,
-            external_identity_id,
-            vehicle_id
-          `)
-          .eq('vehicle_id', vehicleId)
-          .order('posted_at', { ascending: false })
-          .limit(200),
+        // Auction comments (from auction_comments table) - supports: BaT, Cars & Bids, PCar Market, SBX Cars, etc.
+        fetchAllComments('auction_comments', 'id, author_username, comment_text, posted_at, comment_type, bid_amount, is_seller, platform, source_url, auction_event_id, external_identity_id, vehicle_id, media_urls', 'posted_at', 'desc'),
         
-        // BaT comments (from bat_comments table) - THIS WAS MISSING!
-        supabase
-          .from('bat_comments')
-          .select(`
-            id,
-            bat_username,
-            comment_text,
-            comment_timestamp,
-            bat_listing_id,
-            vehicle_id,
-            external_identity_id,
-            contains_bid,
-            is_seller_comment,
-            likes_count
-          `)
-          .eq('vehicle_id', vehicleId)
-          .order('comment_timestamp', { ascending: false })
-          .limit(200)
+        // BaT comments (from bat_comments table) - legacy BaT-specific table
+        fetchAllComments('bat_comments', 'id, bat_username, comment_text, comment_timestamp, bat_listing_id, vehicle_id, external_identity_id, contains_bid, is_seller_comment, likes_count', 'comment_timestamp', 'desc')
       ]);
 
       const allComments: Comment[] = [];
@@ -174,6 +175,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             user_id: c.user_id,
             comment_text: c.comment_text,
             created_at: c.created_at,
+            updated_at: c.updated_at,
             user_name: profile?.full_name || profile?.username || 'User',
             user_avatar: profile?.avatar_url,
             source: 'nzero'
@@ -244,6 +246,22 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             }
           }
           
+          // Determine source based on platform
+          let commentSource: 'auction' | 'bat' | 'facebook' | 'instagram' | 'sbx' | 'pcar' | 'cars_and_bids' = 'auction';
+          if (auctionPlatform === 'bat' || auctionPlatform === 'bringatrailer') {
+            commentSource = 'bat';
+          } else if (auctionPlatform === 'cars_and_bids' || auctionPlatform === 'carsandbids') {
+            commentSource = 'cars_and_bids';
+          } else if (auctionPlatform === 'pcarmarket' || auctionPlatform === 'pcar') {
+            commentSource = 'pcar';
+          } else if (auctionPlatform === 'sbx' || auctionPlatform === 'sbxcars') {
+            commentSource = 'sbx';
+          } else if (auctionPlatform === 'facebook') {
+            commentSource = 'facebook';
+          } else if (auctionPlatform === 'instagram') {
+            commentSource = 'instagram';
+          }
+          
           allComments.push({
             id: `auction-${c.id}`,
             user_id: identity?.claimed_by_user_id || null,
@@ -255,10 +273,12 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             comment_type: c.comment_type || (bidAmount ? 'bid' : undefined),
             bid_amount: bidAmount,
             is_seller: c.is_seller,
-            source: 'auction',
+            source: commentSource,
             auction_platform: auctionPlatform,
             external_identity_id: identity?.id || c.external_identity_id,
-            user_avatar: identity?.profile_url || undefined
+            user_avatar: identity?.profile_url || undefined,
+            media_urls: Array.isArray(c.media_urls) ? c.media_urls : undefined,
+            comment_url: c.source_url || undefined
           });
         }
       }
@@ -344,6 +364,44 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
       console.error('Failed to post comment:', err);
     } finally {
       setPosting(false);
+    }
+  };
+
+  const handleStartEdit = (comment: Comment) => {
+    setEditingCommentId(comment.id);
+    setEditingText(comment.comment_text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCommentId(null);
+    setEditingText('');
+  };
+
+  const handleUpdateComment = async (commentId: string) => {
+    if (!session?.user?.id || !editingText.trim()) return;
+
+    setUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('vehicle_comments')
+        .update({
+          comment_text: editingText.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', commentId)
+        .eq('user_id', session.user.id); // Ensure user owns the comment
+
+      if (!error) {
+        setEditingCommentId(null);
+        setEditingText('');
+        loadComments();
+      } else {
+        console.error('Failed to update comment:', error);
+      }
+    } catch (err) {
+      console.error('Failed to update comment:', err);
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -524,10 +582,15 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {visibleComments.map((comment) => {
               const displayDate = comment.posted_at || comment.created_at;
-              const isBid = comment.comment_type === 'bid' || comment.bid_amount !== undefined;
+              // Check if this is a bid - either comment_type is 'bid' OR bid_amount is set
+              const hasBidAmount = comment.bid_amount != null && (typeof comment.bid_amount === 'number' ? comment.bid_amount > 0 : Number(comment.bid_amount) > 0);
+              const isBid = comment.comment_type === 'bid' || hasBidAmount;
               const isBaT = comment.source === 'bat';
               const isAuction = comment.source === 'auction';
               const auctionPlatform = (comment as any).auction_platform ? String((comment as any).auction_platform) : null;
+              
+              // Get bid amount for display
+              const bidAmount = hasBidAmount ? (typeof comment.bid_amount === 'number' ? comment.bid_amount : Number(comment.bid_amount)) : null;
               
               return (
                 <div key={comment.id} style={{ 
@@ -540,7 +603,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                     <FallbackAvatar
                       src={comment.user_avatar}
                       seed={comment.author_username || comment.user_name || comment.id || 'user'}
-                      platform={comment.source === 'bat' ? 'bat' : undefined}
+                      platform={comment.source === 'bat' || comment.source === 'facebook' || comment.source === 'instagram' ? comment.source : undefined}
                       size={24}
                       alt={comment.author_username || comment.user_name || 'User'}
                     />
@@ -561,17 +624,47 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         >
                           {comment.user_name || comment.author_username}
                         </button>
-                        {isBaT && (
+                        {/* Platform badges for all external sources */}
+                        {comment.source === 'bat' && (
                           <span style={{ fontSize: '7pt', color: '#2563eb', fontWeight: 600 }}>
                             BaT
                           </span>
                         )}
-                        {isAuction && auctionPlatform && auctionPlatform !== 'bat' && (
+                        {comment.source === 'auction' && auctionPlatform && (
                           <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                            {auctionPlatform === 'cars_and_bids' ? 'Cars & Bids' : auctionPlatform}
+                            {auctionPlatform === 'cars_and_bids' ? 'Cars & Bids' :
+                             auctionPlatform === 'pcarmarket' ? 'PCar Market' :
+                             auctionPlatform === 'sbx' ? 'SBX Cars' :
+                             auctionPlatform === 'bringatrailer' ? 'BaT' :
+                             auctionPlatform}
                           </span>
                         )}
-                        {isBid && comment.bid_amount != null && comment.bid_amount > 0 && (
+                        {comment.source === 'facebook' && (
+                          <span style={{ fontSize: '7pt', color: '#1877f2', fontWeight: 600 }}>
+                            Facebook
+                          </span>
+                        )}
+                        {comment.source === 'instagram' && (
+                          <span style={{ fontSize: '7pt', color: '#e4405f', fontWeight: 600 }}>
+                            Instagram
+                          </span>
+                        )}
+                        {comment.source === 'sbx' && (
+                          <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                            SBX Cars
+                          </span>
+                        )}
+                        {comment.source === 'pcar' && (
+                          <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                            PCar Market
+                          </span>
+                        )}
+                        {comment.source === 'cars_and_bids' && (
+                          <span style={{ fontSize: '7pt', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                            Cars & Bids
+                          </span>
+                        )}
+                        {isBid && bidAmount && bidAmount > 0 && (
                           <span style={{ 
                             fontSize: '8pt', 
                             fontWeight: 700, 
@@ -581,7 +674,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                             borderRadius: '4px',
                             marginLeft: '4px'
                           }}>
-                            ${typeof comment.bid_amount === 'number' ? comment.bid_amount.toLocaleString() : String(comment.bid_amount)} BID
+                            ${bidAmount.toLocaleString()} BID
                           </span>
                         )}
                         {comment.is_seller && (
@@ -598,10 +691,114 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                         )}
                         <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
                           {formatTimeAgo(displayDate)}
+                          {comment.updated_at && comment.updated_at !== comment.created_at && (
+                            <span style={{ marginLeft: '4px', fontStyle: 'italic' }}>(edited)</span>
+                          )}
                         </span>
+                        {/* Edit button - only for user's own N-Zero comments */}
+                        {comment.source === 'nzero' && comment.user_id === session?.user?.id && !editingCommentId && (
+                          <button
+                            onClick={() => handleStartEdit(comment)}
+                            style={{
+                              fontSize: '7pt',
+                              background: 'none',
+                              border: 'none',
+                              padding: '2px 6px',
+                              cursor: 'pointer',
+                              color: 'var(--text-muted)',
+                              textDecoration: 'underline',
+                              marginLeft: '8px'
+                            }}
+                            title="Edit comment"
+                          >
+                            Edit
+                          </button>
+                        )}
                       </div>
                       <div style={{ fontSize: '9pt', lineHeight: 1.4 }}>
-                        {renderCommentText(comment.comment_text)}
+                        {editingCommentId === comment.id ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <textarea
+                              value={editingText}
+                              onChange={(e) => setEditingText(e.target.value)}
+                              rows={3}
+                              disabled={updating}
+                              style={{
+                                width: '100%',
+                                fontSize: '8pt',
+                                padding: '6px',
+                                border: '1px solid var(--border)',
+                                resize: 'vertical',
+                                fontFamily: 'inherit'
+                              }}
+                            />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={() => handleUpdateComment(comment.id)}
+                                disabled={updating || !editingText.trim()}
+                                className="button button-primary"
+                                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                              >
+                                {updating ? 'Saving...' : 'Save'}
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                disabled={updating}
+                                className="button button-secondary"
+                                style={{ fontSize: '8pt', padding: '4px 12px' }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {renderCommentText(comment.comment_text)}
+                            {/* Show media URLs for Instagram/Facebook comments */}
+                            {comment.media_urls && comment.media_urls.length > 0 && (
+                              <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                {comment.media_urls.slice(0, 3).map((url, idx) => (
+                                  <img
+                                    key={idx}
+                                    src={url}
+                                    alt={`Media ${idx + 1}`}
+                                    style={{
+                                      maxWidth: '100px',
+                                      maxHeight: '100px',
+                                      objectFit: 'cover',
+                                      borderRadius: '4px',
+                                      border: '1px solid var(--border)',
+                                      cursor: 'pointer'
+                                    }}
+                                    onClick={() => window.open(url, '_blank')}
+                                  />
+                                ))}
+                                {comment.media_urls.length > 3 && (
+                                  <span style={{ fontSize: '7pt', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                                    +{comment.media_urls.length - 3} more
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {/* Link to original comment if available */}
+                            {comment.comment_url && (
+                              <div style={{ marginTop: '4px' }}>
+                                <a
+                                  href={comment.comment_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    fontSize: '7pt',
+                                    color: 'var(--text-muted)',
+                                    textDecoration: 'underline'
+                                  }}
+                                >
+                                  View original →
+                                </a>
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

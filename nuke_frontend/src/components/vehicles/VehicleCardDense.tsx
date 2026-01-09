@@ -1788,7 +1788,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       )}
 
       {/* Card Body Below Image - Investment-Relevant Info */}
-      {viewMode === 'grid' && (
+      {/* Only show card body when overlay is disabled (original grid view behavior) */}
+      {viewMode === 'grid' && !showDetailOverlay && (
         <div style={{
           padding: '8px',
           background: 'var(--surface)',
