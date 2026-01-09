@@ -760,15 +760,19 @@ const VehicleTimeline: React.FC<{
                     <div
                       key={targetYear}
                       id={`year-${targetYear}`}
-                      className="rounded-lg p-2"
+                      className="rounded-lg"
                       style={{
                         background: 'var(--surface)',
                         border: '1px solid var(--border)',
                         color: 'var(--text)',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px'
                       }}
                     >
                       {/* Months header positioned above everything */}
-                      <div style={{ marginBottom: '2px' }}>
+                      <div style={{ marginBottom: '4px' }}>
                         <div
                           style={{
                             display: 'grid',
@@ -792,8 +796,9 @@ const VehicleTimeline: React.FC<{
                                   gridColumn: `${startWeek + 2} / span ${monthWidth}`,
                                   textAlign: 'center',
                                   fontSize: '8pt',
-                                  color: 'var(--text-secondary)',
-                                  lineHeight: '8px'
+                                  color: 'var(--text-muted)',
+                                  lineHeight: '8px',
+                                  fontWeight: 500
                                 }}
                               >
                                 {monthNames[monthIndex]}
@@ -804,7 +809,7 @@ const VehicleTimeline: React.FC<{
                       </div>
                       
                       {/* Timeline and Years Grid in columns */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr minmax(60px, 80px)', gap: '8px', minWidth: 0 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr minmax(60px, 80px)', gap: '12px', minWidth: 0 }}>
                         {/* Timeline grid column */}
                         <div style={{ minWidth: 0, overflow: 'hidden' }}>
 
@@ -846,7 +851,7 @@ const VehicleTimeline: React.FC<{
                             {/* Weekday labels (Mon-Sun) */}
                             <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, 12px)', gap: '2px' }}>
                               {['M','T','W','T','F','S','S'].map((d, i) => (
-                                <div key={i} style={{ textAlign: 'center', fontSize: '8pt', color: 'var(--text-secondary)', lineHeight: '12px' }}>{d}</div>
+                                <div key={i} style={{ textAlign: 'center', fontSize: '8pt', color: 'var(--text-muted)', lineHeight: '12px', fontWeight: 500 }}>{d}</div>
                               ))}
                             </div>
                             {/* Timeline grid */}
@@ -1011,10 +1016,12 @@ const VehicleTimeline: React.FC<{
                           display: 'flex', 
                           flexDirection: 'column', 
                           alignItems: 'flex-start', 
-                          paddingLeft: '4px',
+                          paddingLeft: '8px',
+                          paddingTop: '4px',
                           minWidth: 0,
                           width: '100%',
-                          overflow: 'hidden'
+                          overflow: 'hidden',
+                          gap: '2px'
                         }}>
                           {(() => {
                             const yearsToShow = yearIndex;
@@ -1023,21 +1030,37 @@ const VehicleTimeline: React.FC<{
                               return yearsToShow.map(y => (
                                 <button
                                   key={y}
-                                  className={`text-left ${selectedYear === y ? 'font-bold text-black' : 'text-gray-500 hover:text-black'}`}
                                   style={{
-                                    padding: '0',
+                                    padding: '2px 4px',
                                     fontSize: '8pt',
-                                    background: 'none',
-                                    border: 'none',
-                                    lineHeight: '20px',
+                                    background: selectedYear === y ? 'var(--primary)' : 'transparent',
+                                    border: selectedYear === y ? '1px solid var(--primary)' : '1px solid transparent',
+                                    borderRadius: '3px',
+                                    lineHeight: '16px',
                                     height: '20px',
                                     width: '100%',
                                     textAlign: 'left',
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap'
+                                    whiteSpace: 'nowrap',
+                                    color: selectedYear === y ? '#ffffff' : 'var(--text)',
+                                    fontWeight: selectedYear === y ? 700 : 500,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.12s ease'
                                   }}
                                   onClick={() => selectYear(y)}
+                                  onMouseEnter={(e) => {
+                                    if (selectedYear !== y) {
+                                      e.currentTarget.style.background = 'var(--surface-hover)';
+                                      e.currentTarget.style.borderColor = 'var(--border)';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (selectedYear !== y) {
+                                      e.currentTarget.style.background = 'transparent';
+                                      e.currentTarget.style.borderColor = 'transparent';
+                                    }
+                                  }}
                                 >
                                   {y}
                                 </button>
@@ -1049,50 +1072,82 @@ const VehicleTimeline: React.FC<{
                               const rightColumn = yearsToShow.slice(midPoint);
 
                               return (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', width: '100%', minWidth: 0 }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '100%', minWidth: 0 }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: '2px' }}>
                                     {leftColumn.map(y => (
                                       <button
                                         key={y}
-                                        className={`text-left ${selectedYear === y ? 'font-bold text-black' : 'text-gray-500 hover:text-black'}`}
                                         style={{
-                                          padding: '0',
+                                          padding: '2px 4px',
                                           fontSize: '8pt',
-                                          background: 'none',
-                                          border: 'none',
-                                          lineHeight: '20px',
+                                          background: selectedYear === y ? 'var(--primary)' : 'transparent',
+                                          border: selectedYear === y ? '1px solid var(--primary)' : '1px solid transparent',
+                                          borderRadius: '3px',
+                                          lineHeight: '16px',
                                           height: '20px',
                                           width: '100%',
                                           textAlign: 'left',
                                           overflow: 'hidden',
                                           textOverflow: 'ellipsis',
-                                          whiteSpace: 'nowrap'
+                                          whiteSpace: 'nowrap',
+                                          color: selectedYear === y ? '#ffffff' : 'var(--text)',
+                                          fontWeight: selectedYear === y ? 700 : 500,
+                                          cursor: 'pointer',
+                                          transition: 'all 0.12s ease'
                                         }}
                                         onClick={() => selectYear(y)}
+                                        onMouseEnter={(e) => {
+                                          if (selectedYear !== y) {
+                                            e.currentTarget.style.background = 'var(--surface-hover)';
+                                            e.currentTarget.style.borderColor = 'var(--border)';
+                                          }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (selectedYear !== y) {
+                                            e.currentTarget.style.background = 'transparent';
+                                            e.currentTarget.style.borderColor = 'transparent';
+                                          }
+                                        }}
                                       >
                                         {y}
                                       </button>
                                     ))}
                                   </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: '2px' }}>
                                     {rightColumn.map(y => (
                                       <button
                                         key={y}
-                                        className={`text-left ${selectedYear === y ? 'font-bold text-black' : 'text-gray-500 hover:text-black'}`}
                                         style={{
-                                          padding: '0',
+                                          padding: '2px 4px',
                                           fontSize: '8pt',
-                                          background: 'none',
-                                          border: 'none',
-                                          lineHeight: '20px',
+                                          background: selectedYear === y ? 'var(--primary)' : 'transparent',
+                                          border: selectedYear === y ? '1px solid var(--primary)' : '1px solid transparent',
+                                          borderRadius: '3px',
+                                          lineHeight: '16px',
                                           height: '20px',
                                           width: '100%',
                                           textAlign: 'left',
                                           overflow: 'hidden',
                                           textOverflow: 'ellipsis',
-                                          whiteSpace: 'nowrap'
+                                          whiteSpace: 'nowrap',
+                                          color: selectedYear === y ? '#ffffff' : 'var(--text)',
+                                          fontWeight: selectedYear === y ? 700 : 500,
+                                          cursor: 'pointer',
+                                          transition: 'all 0.12s ease'
                                         }}
                                         onClick={() => selectYear(y)}
+                                        onMouseEnter={(e) => {
+                                          if (selectedYear !== y) {
+                                            e.currentTarget.style.background = 'var(--surface-hover)';
+                                            e.currentTarget.style.borderColor = 'var(--border)';
+                                          }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          if (selectedYear !== y) {
+                                            e.currentTarget.style.background = 'transparent';
+                                            e.currentTarget.style.borderColor = 'transparent';
+                                          }
+                                        }}
                                       >
                                         {y}
                                       </button>
