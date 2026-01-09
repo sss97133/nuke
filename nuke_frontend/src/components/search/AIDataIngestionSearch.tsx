@@ -899,18 +899,19 @@ export default function AIDataIngestionSearch() {
           className="button-win95"
           style={{
             flexShrink: 0,
-            padding: '2px 4px',
-            fontSize: '8pt',
-            height: '20px',
-            minWidth: '24px',
-            width: '24px',
+            padding: '1px 3px',
+            fontSize: '7pt',
+            height: '18px',
+            minWidth: '18px',
+            width: '18px',
             opacity: 1,
             whiteSpace: 'nowrap',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginLeft: '2px',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            lineHeight: '1'
           }}
           title={actionsOpen ? 'Hide actions' : 'Show actions'}
         >

@@ -3582,3 +3582,10 @@ button:focus-visible {
   color: var(--text) !important;
 }
 
+/* Year quick buttons - hide when container is too narrow */
+@media (max-width: 900px) {
+  .year-quick-buttons {
+    display: none !important;
+  }
+}
+

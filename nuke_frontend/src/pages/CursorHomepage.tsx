@@ -3308,52 +3308,27 @@ const CursorHomepage: React.FC = () => {
                 {filters.makes.length > 0 ? `make: ${filters.makes.join(', ')}` : 'make'}
               </button>
               
-              {/* Price sort button */}
-              <button
-                onClick={() => {
-                  if (sortBy === 'price_high') {
-                    // Currently high -> switch to low
-                    setSortBy('price_low');
-                    setSortDirection('asc');
-                  } else if (sortBy === 'price_low') {
-                    // Currently low -> switch to high
-                    setSortBy('price_high');
-                    setSortDirection('desc');
-                  } else {
-                    // Not sorted by price -> start with high
-                    setSortBy('price_high');
-                    setSortDirection('desc');
-                  }
-                }}
-                className="button-win95"
-                style={{
-                  padding: '3px 7px',
-                  fontSize: '7pt',
-                  background: (sortBy === 'price_high' || sortBy === 'price_low') ? 'var(--grey-600)' : 'var(--white)',
-                  color: (sortBy === 'price_high' || sortBy === 'price_low') ? 'var(--white)' : 'var(--text)',
-                  fontWeight: (sortBy === 'price_high' || sortBy === 'price_low') ? 700 : 400,
-                  border: (sortBy === 'price_high' || sortBy === 'price_low') ? '1px solid var(--grey-600)' : '1px solid var(--border)'
-                }}
-              >
-                price
-              </button>
-              
-              {/* Price filter button */}
+              {/* Price button - combines sort and filter */}
               <button
                 onClick={() => toggleCollapsedSection('priceFilters')}
                 className="button-win95"
                 style={{
                   padding: '3px 7px',
                   fontSize: '7pt',
-                  background: !collapsedSections.priceFilters ? 'var(--grey-600)' : (filters.priceMin || filters.priceMax) ? 'var(--grey-300)' : 'var(--white)',
+                  background: !collapsedSections.priceFilters ? 'var(--grey-600)' : ((filters.priceMin || filters.priceMax) || (sortBy === 'price_high' || sortBy === 'price_low')) ? 'var(--grey-300)' : 'var(--white)',
                   color: !collapsedSections.priceFilters ? 'var(--white)' : 'var(--text)',
-                  fontWeight: (!collapsedSections.priceFilters || filters.priceMin || filters.priceMax) ? 700 : 400,
+                  fontWeight: (!collapsedSections.priceFilters || (filters.priceMin || filters.priceMax) || (sortBy === 'price_high' || sortBy === 'price_low')) ? 700 : 400,
                   border: !collapsedSections.priceFilters ? '1px solid var(--grey-600)' : '1px solid var(--border)'
                 }}
               >
-                {(filters.priceMin || filters.priceMax) 
-                  ? `$${filters.priceMin ? (filters.priceMin/1000).toFixed(0) + 'k' : '?'}-${filters.priceMax ? (filters.priceMax/1000).toFixed(0) + 'k' : '?'}`
-                  : 'price range'}
+                {(() => {
+                  if (filters.priceMin || filters.priceMax) {
+                    return `$${filters.priceMin ? (filters.priceMin/1000).toFixed(0) + 'k' : '?'}-${filters.priceMax ? (filters.priceMax/1000).toFixed(0) + 'k' : '?'}`;
+                  }
+                  if (sortBy === 'price_high') return 'price (high)';
+                  if (sortBy === 'price_low') return 'price (low)';
+                  return 'price';
+                })()}
               </button>
               
               {/* Location filter button */}
@@ -3448,41 +3423,30 @@ const CursorHomepage: React.FC = () => {
               )}
             </div>
             
-            {/* Price sort direction indicator */}
-            {(sortBy === 'price_high' || sortBy === 'price_low') && (
-              <div style={{
-                marginBottom: '8px',
-                padding: '6px',
-                background: 'var(--grey-50)',
-                border: '1px solid var(--border)',
-                display: 'flex',
-                gap: '4px',
-                alignItems: 'center',
-                fontSize: '7pt'
-              }}>
-                {sortBy === 'price_high' ? 'highest first' : 'lowest first'} in price
-              </div>
-            )}
-
             {/* Expanded filter controls - shown when sections are open */}
             <div style={{ padding: '6px' }}>
               {/* Year filters - expanded */}
               {!collapsedSections.yearFilters && (
-                <div style={{
-                  marginBottom: '8px',
-                  padding: '6px',
-                  background: 'var(--grey-50)',
-                  border: '1px solid var(--border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px'
-                }}>
+                <div 
+                  style={{
+                    marginBottom: '8px',
+                    padding: '6px',
+                    background: 'var(--grey-50)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'row',
+                    gap: '8px',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    minWidth: 0
+                  }}
+                >
                   {/* Year range input */}
                   <div style={{
                     display: 'flex',
                     gap: '4px',
                     alignItems: 'center',
-                    flexWrap: 'wrap'
+                    flexShrink: 0
                   }}>
                     <input
                       type="number"
@@ -3528,8 +3492,18 @@ const CursorHomepage: React.FC = () => {
                     )}
                   </div>
                   
-                  {/* Quick year buttons */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {/* Quick year buttons - only visible if container is wide enough */}
+                  <div 
+                    className="year-quick-buttons"
+                    style={{ 
+                      display: 'flex', 
+                      flexWrap: 'wrap', 
+                      gap: '4px',
+                      overflow: 'hidden',
+                      minWidth: 0,
+                      flex: '1 1 auto'
+                    }}
+                  >
                     {[
                       { label: '64-91', min: 1964, max: 1991 },
                       { label: '73-87', min: 1973, max: 1987 },
@@ -3558,7 +3532,9 @@ const CursorHomepage: React.FC = () => {
                             background: isActive ? 'var(--grey-600)' : 'var(--white)',
                             color: isActive ? 'var(--white)' : 'var(--text)',
                             fontWeight: isActive ? 700 : 400,
-                            border: isActive ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                            border: isActive ? '1px solid var(--grey-600)' : '1px solid var(--border)',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0
                           }}
                           title={`Year: ${range.min}-${range.max}`}
                         >
@@ -4092,40 +4068,84 @@ const CursorHomepage: React.FC = () => {
                   background: 'var(--grey-50)',
                   border: '1px solid var(--border)',
                   display: 'flex',
-                  gap: '4px',
-                  alignItems: 'center'
+                  gap: '6px',
+                  alignItems: 'center',
+                  flexWrap: 'wrap'
                 }}>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="min"
-                    value={filters.priceMin || ''}
-                    onChange={(e) => setFilters({...filters, priceMin: e.target.value ? parseInt(e.target.value) : null})}
-                    style={{
-                      width: '70px',
-                      padding: '3px 5px',
-                      border: '1px solid var(--border)',
-                      fontSize: '7pt',
-                      fontFamily: '"MS Sans Serif", sans-serif'
-                    }}
-                  />
-                  <span style={{ fontSize: '7pt' }}>–</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="max"
-                    value={filters.priceMax || ''}
-                    onChange={(e) => setFilters({...filters, priceMax: e.target.value ? parseInt(e.target.value) : null})}
-                    style={{
-                      width: '70px',
-                      padding: '3px 5px',
-                      border: '1px solid var(--border)',
-                      fontSize: '7pt',
-                      fontFamily: '"MS Sans Serif", sans-serif'
-                    }}
-                  />
+                  {/* Sort direction toggle */}
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>sort:</span>
+                    <button
+                      onClick={() => {
+                        if (sortBy === 'price_high') {
+                          setSortBy('price_low');
+                          setSortDirection('asc');
+                        } else if (sortBy === 'price_low') {
+                          setSortBy(null);
+                          setSortDirection('asc');
+                        } else {
+                          setSortBy('price_high');
+                          setSortDirection('desc');
+                        }
+                      }}
+                      className="button-win95"
+                      style={{
+                        padding: '3px 7px',
+                        fontSize: '7pt',
+                        background: (sortBy === 'price_high' || sortBy === 'price_low') ? 'var(--grey-600)' : 'var(--white)',
+                        color: (sortBy === 'price_high' || sortBy === 'price_low') ? 'var(--white)' : 'var(--text)',
+                        fontWeight: (sortBy === 'price_high' || sortBy === 'price_low') ? 700 : 400,
+                        border: (sortBy === 'price_high' || sortBy === 'price_low') ? '1px solid var(--grey-600)' : '1px solid var(--border)'
+                      }}
+                    >
+                      {sortBy === 'price_high' ? 'highest first' : sortBy === 'price_low' ? 'lowest first' : 'none'}
+                    </button>
+                  </div>
+
+                  {/* Price range inputs */}
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>range:</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="min"
+                      value={filters.priceMin || ''}
+                      onChange={(e) => setFilters({...filters, priceMin: e.target.value ? parseInt(e.target.value) : null})}
+                      style={{
+                        width: '70px',
+                        padding: '3px 5px',
+                        border: '1px solid var(--border)',
+                        fontSize: '7pt',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    />
+                    <span style={{ fontSize: '7pt' }}>–</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="max"
+                      value={filters.priceMax || ''}
+                      onChange={(e) => setFilters({...filters, priceMax: e.target.value ? parseInt(e.target.value) : null})}
+                      style={{
+                        width: '70px',
+                        padding: '3px 5px',
+                        border: '1px solid var(--border)',
+                        fontSize: '7pt',
+                        fontFamily: '"MS Sans Serif", sans-serif'
+                      }}
+                    />
+                    {(filters.priceMin || filters.priceMax) && (
+                      <button
+                        onClick={() => setFilters({...filters, priceMin: null, priceMax: null})}
+                        className="button-win95"
+                        style={{ padding: '3px 7px', fontSize: '7pt' }}
+                      >
+                        clear
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 

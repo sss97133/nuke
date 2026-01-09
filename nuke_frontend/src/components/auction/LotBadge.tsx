@@ -77,7 +77,11 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
   };
 
   const formattedDate = formatDate(date);
-  const hasDetails = salePrice || estimateLow || estimateHigh || listingUrl;
+  const hasDetails = salePrice || estimateLow || estimateHigh || listingUrl || lotNumber || date || location;
+  
+  // Determine if auction is upcoming (date is in the future)
+  const isUpcoming = date ? new Date(date) > new Date() : false;
+  const isPast = salePrice !== null && salePrice !== undefined;
 
   return (
     <div
@@ -97,54 +101,40 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
           }
         }}
         style={{
-          background: 'transparent',
-          border: '1px solid var(--border)',
-          borderRadius: '4px',
-          padding: '4px 8px',
+          background: isPast ? '#dcfce7' : isUpcoming ? '#dbeafe' : '#fef3c7',
+          border: `1px solid ${isPast ? '#22c55e' : isUpcoming ? '#3b82f6' : '#f59e0b'}`,
+          borderRadius: '3px',
+          padding: '2px 6px',
           cursor: hasDetails ? 'pointer' : 'default',
           fontFamily: 'inherit',
-          fontSize: '10px',
-          color: 'var(--text)',
+          fontSize: '7pt',
+          color: isPast ? '#15803d' : isUpcoming ? '#1e40af' : '#92400e',
+          fontWeight: 700,
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: '4px',
           transition: 'all 0.12s ease',
           textAlign: 'left',
+          whiteSpace: 'nowrap',
+          lineHeight: '1.2'
         }}
         onMouseEnter={(e) => {
           if (hasDetails) {
-            e.currentTarget.style.borderColor = 'var(--accent)';
-            e.currentTarget.style.background = 'var(--grey-50)';
+            e.currentTarget.style.opacity = '0.85';
           }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--border)';
-          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.opacity = '1';
         }}
-        title={hasDetails ? 'Click to view auction details' : undefined}
+        title={hasDetails ? 'Click for auction details' : undefined}
       >
-        {lotNumber && (
-          <>
-            <span style={{ fontWeight: 700 }}>Lot {lotNumber}</span>
-            <span style={{ color: 'var(--text-muted)' }}>//</span>
-          </>
-        )}
-        {formattedDate && (
-          <>
-            <time dateTime={date || undefined} style={{ fontStyle: 'italic' }}>
-              {formattedDate}
-            </time>
-            {location && <span style={{ color: 'var(--text-muted)' }}>//</span>}
-          </>
-        )}
-        {location && <span>{location}</span>}
+        {isPast ? 'SOLD' : isUpcoming ? 'UPCOMING' : 'AUCTION'}
         {hasDetails && (
           <span style={{ 
-            marginLeft: '4px',
-            fontSize: '8px',
-            color: 'var(--text-muted)',
+            fontSize: '6pt',
             transition: 'transform 0.12s ease',
             transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+            lineHeight: '1'
           }}>
             ▼
           </span>
@@ -156,35 +146,66 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
           style={{
             position: 'absolute',
             top: '100%',
-            left: 0,
+            right: 0,
             marginTop: '4px',
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: '4px',
-            padding: '8px 12px',
-            minWidth: '200px',
+            padding: '8px 10px',
+            minWidth: '180px',
+            maxWidth: '250px',
             zIndex: 1000,
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            fontSize: '9px',
+            fontSize: '8pt',
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          {lotNumber && (
+            <div style={{ marginBottom: '6px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
+                Lot Number
+              </div>
+              <div style={{ fontWeight: 600, fontSize: '9pt' }}>
+                {lotNumber}
+              </div>
+            </div>
+          )}
+          {formattedDate && (
+            <div style={{ marginBottom: '6px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
+                Date
+              </div>
+              <div style={{ fontWeight: 600, fontSize: '9pt' }}>
+                {formattedDate}
+              </div>
+            </div>
+          )}
+          {location && (
+            <div style={{ marginBottom: '6px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
+                Location
+              </div>
+              <div style={{ fontWeight: 600, fontSize: '9pt' }}>
+                {location}
+              </div>
+            </div>
+          )}
           {salePrice && (
             <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '8px', marginBottom: '2px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
                 Sold For
               </div>
-              <div style={{ fontWeight: 700, fontSize: '11px', color: '#22c55e' }}>
+              <div style={{ fontWeight: 700, fontSize: '10pt', color: '#22c55e' }}>
                 {formatCurrency(salePrice)}
               </div>
             </div>
           )}
           {(estimateLow || estimateHigh) && (
             <div style={{ marginBottom: '6px' }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: '8px', marginBottom: '2px' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: '7pt', marginBottom: '2px' }}>
                 Estimate
               </div>
-              <div style={{ fontWeight: 600, fontSize: '10px' }}>
+              <div style={{ fontWeight: 600, fontSize: '9pt' }}>
                 {estimateLow && estimateHigh
                   ? `${formatCurrency(estimateLow)} - ${formatCurrency(estimateHigh)}`
                   : estimateLow
@@ -205,7 +226,7 @@ export const LotBadge: React.FC<LotBadgeProps> = ({
                 style={{
                   color: 'var(--accent)',
                   textDecoration: 'none',
-                  fontSize: '9px',
+                  fontSize: '8pt',
                   fontWeight: 600,
                 }}
                 onMouseEnter={(e) => {
