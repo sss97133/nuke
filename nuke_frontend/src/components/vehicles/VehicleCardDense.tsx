@@ -8,6 +8,7 @@ import { OdometerBadge } from '../vehicle/OdometerBadge';
 import { useVehicleImages } from '../../hooks/useVehicleImages';
 import { LotBadge } from '../auction/LotBadge';
 import { getAuctionMode, isActiveAuction as isInActiveAuction, getAuctionStateInfo } from '../../services/unifiedAuctionStateService';
+import { OwnershipDetailsPopup } from './OwnershipDetailsPopup';
 
 const parseMoneyNumber = (val: any): number | null => {
   if (val === null || val === undefined) return null;
@@ -109,6 +110,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [touchStart, setTouchStart] = React.useState(0);
   const [auctionNow, setAuctionNow] = React.useState(() => Date.now());
+  const [showOwnershipPopup, setShowOwnershipPopup] = React.useState(false);
 
   // Local CSS for badge animations. We scope keyframes to avoid collisions
   // (the design system defines multiple `@keyframes pulse` variations).
@@ -791,6 +793,39 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return v.cost_basis || v.purchase_price || null;
   }, [vehicle]);
 
+  // Check if SOLD badge should be shown (time-based: hide after 30 days)
+  const shouldShowSoldBadge = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const saleDate = v.sale_date || 
+                     (v.external_listings?.[0]?.sold_at) ||
+                     null;
+    
+    if (!saleDate) return true; // Show if no sale date (let other logic decide)
+    
+    const SOLD_BADGE_DISPLAY_DAYS = 30;
+    const sale = new Date(saleDate).getTime();
+    if (!Number.isFinite(sale)) return true;
+    
+    const daysSinceSale = (Date.now() - sale) / (1000 * 60 * 60 * 24);
+    return daysSinceSale <= SOLD_BADGE_DISPLAY_DAYS;
+  }, [vehicle]);
+
+  // Check if vehicle is sold (for popup clickability)
+  const isSold = React.useMemo(() => {
+    const v: any = vehicle as any;
+    const outcome = String(v.auction_outcome || '').toLowerCase();
+    const saleStatus = String(v.sale_status || '').toLowerCase();
+    const externalListing = v?.external_listings?.[0];
+    const externalStatus = externalListing ? String(externalListing.listing_status || '').toLowerCase() : '';
+    const hasFinalPrice = externalListing?.final_price || null;
+    const hasSoldAt = externalListing?.sold_at || null;
+    
+    return outcome === 'sold' || 
+           saleStatus === 'sold' || 
+           (externalStatus === 'sold' && (hasFinalPrice || hasSoldAt)) ||
+           (typeof v.sale_price === 'number' && v.sale_price > 0 && saleStatus === 'sold');
+  }, [vehicle]);
+
   // STATE-BASED: What's the most relevant price to show RIGHT NOW?
   const badgeMainText = React.useMemo(() => {
     const v: any = vehicle as any;
@@ -802,30 +837,12 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     }
     
     // PRIORITY 2: RECENTLY COMPLETED TRANSACTION (what just happened)
-    const outcome = String(v.auction_outcome || '').toLowerCase();
-    const saleStatus = String(v.sale_status || '').toLowerCase();
-    
-    // Check external_listings for more reliable status
-    const externalListing = v?.external_listings?.[0];
-    const externalStatus = externalListing ? String(externalListing.listing_status || '').toLowerCase() : '';
-    const hasFinalPrice = externalListing?.final_price || null;
-    const hasSoldAt = externalListing?.sold_at || null;
-    
-    // For timed auctions, sale_price alone doesn't mean sold - need explicit status
-    // Only consider it sold if:
-    // 1. auction_outcome is explicitly 'sold', OR
-    // 2. sale_status is explicitly 'sold', OR
-    // 3. external_listings has listing_status='sold' with final_price/sold_at, OR
-    // 4. sale_price exists AND sale_status is 'sold' (not just 'available')
-    const isRecentlySold = 
-      outcome === 'sold' || 
-      saleStatus === 'sold' || 
-      (externalStatus === 'sold' && (hasFinalPrice || hasSoldAt)) ||
-      (typeof v.sale_price === 'number' && v.sale_price > 0 && saleStatus === 'sold');
-    
-    if (isRecentlySold) {
+    // Only show SOLD if within time window
+    if (isSold && shouldShowSoldBadge) {
       return `SOLD ${auctionHighBidText || ''}`.trim();
     }
+    
+    // If sold but beyond time window, fall through to show asset value
     
     // Check if auction ended but didn't sell (RNM, no sale, etc.)
     if (outcome === 'reserve_not_met' || outcome === 'ended' || outcome === 'no_sale' || externalStatus === 'ended') {
@@ -865,7 +882,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(ownerCost);
     }
     return displayPrice; // Will be "—" if nothing found
-  }, [isActiveAuction, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost]);
+  }, [isActiveAuction, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost, isSold, shouldShowSoldBadge]);
 
   // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {
@@ -1088,7 +1105,34 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
           {/* Price/Bid badge (no favicon here) - Show LotBadge for Mecum, otherwise show price */}
           {showPriceOverlay && (mecumLotData || badgeMainText !== '—') && (
-            <div style={{ ...badgeStyle, top: '8px', right: '8px' }}>
+            <div 
+              style={{ 
+                ...badgeStyle, 
+                top: '8px', 
+                right: '8px',
+                cursor: (isSold && shouldShowSoldBadge) ? 'pointer' : 'default',
+                transition: (isSold && shouldShowSoldBadge) ? 'all 0.12s ease' : undefined,
+              }}
+              onClick={(e) => {
+                if (isSold && shouldShowSoldBadge) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowOwnershipPopup(true);
+                }
+              }}
+              onMouseEnter={(e) => {
+                if (isSold && shouldShowSoldBadge) {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (isSold && shouldShowSoldBadge) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = undefined;
+                }
+              }}
+            >
               {mecumLotData ? (
                 <LotBadge
                   lotNumber={mecumLotData.lotNumber}
@@ -1310,6 +1354,23 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             >
               {vehicle.active_viewers} watching
             </div>
+          )}
+
+          {/* Ownership Details Popup */}
+          {showOwnershipPopup && (
+            <OwnershipDetailsPopup
+              vehicleId={vehicle.id}
+              isOpen={showOwnershipPopup}
+              onClose={() => setShowOwnershipPopup(false)}
+              salePrice={(() => {
+                const v: any = vehicle as any;
+                return v.sale_price || v.external_listings?.[0]?.final_price || null;
+              })()}
+              saleDate={(() => {
+                const v: any = vehicle as any;
+                return v.sale_date || v.external_listings?.[0]?.sold_at || null;
+              })()}
+            />
           )}
         </div>
       </Link>
@@ -1586,7 +1647,33 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
         {/* Price/Bid badge (no favicon here) - Show LotBadge for Mecum, otherwise show price */}
         {showPriceOverlay && (mecumLotData || badgeMainText !== '—') && (
-          <div style={badgeStyle}>
+          <div 
+            style={{
+              ...badgeStyle,
+              cursor: (isSold && shouldShowSoldBadge) ? 'pointer' : 'default',
+              transition: (isSold && shouldShowSoldBadge) ? 'all 0.12s ease' : undefined,
+            }}
+            onClick={(e) => {
+              // Make clickable if sold and within display window
+              if (isSold && shouldShowSoldBadge) {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowOwnershipPopup(true);
+              }
+            }}
+            onMouseEnter={(e) => {
+              if (isSold && shouldShowSoldBadge) {
+                e.currentTarget.style.transform = 'scale(1.05)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (isSold && shouldShowSoldBadge) {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = undefined;
+              }
+            }}
+          >
             {mecumLotData ? (
               <LotBadge
                 lotNumber={mecumLotData.lotNumber}
@@ -1932,6 +2019,23 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             );
           })()}
         </div>
+      )}
+
+      {/* Ownership Details Popup */}
+      {showOwnershipPopup && (
+        <OwnershipDetailsPopup
+          vehicleId={vehicle.id}
+          isOpen={showOwnershipPopup}
+          onClose={() => setShowOwnershipPopup(false)}
+          salePrice={(() => {
+            const v: any = vehicle as any;
+            return v.sale_price || v.external_listings?.[0]?.final_price || null;
+          })()}
+          saleDate={(() => {
+            const v: any = vehicle as any;
+            return v.sale_date || v.external_listings?.[0]?.sold_at || null;
+          })()}
+        />
       )}
     </Link>
   );
