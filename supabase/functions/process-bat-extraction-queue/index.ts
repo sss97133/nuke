@@ -134,7 +134,14 @@ serve(async (req) => {
 
         // Get vehicle_id from result (may create new or update existing)
         const vehicleId = coreResult.created_vehicle_ids?.[0] || coreResult.updated_vehicle_ids?.[0] || item.vehicle_id;
+        
+        // Check extraction quality from response
+        const extractedImages = coreResult.debug_extraction?.images_count || 0;
+        const extractedVin = coreResult.debug_extraction?.vin || null;
+        const extractedMileage = coreResult.debug_extraction?.mileage || null;
+        
         console.log(`  Step 1 complete: Vehicle ID ${vehicleId}`);
+        console.log(`  Extraction quality: ${extractedImages} images, VIN: ${extractedVin ? '✅' : '❌'}, Mileage: ${extractedMileage ? '✅' : '❌'}`);
 
         // Step 2: Extract comments and bids
         if (vehicleId) {
@@ -171,22 +178,107 @@ serve(async (req) => {
 
         const extractionResult = { success: true, vehicle_id: vehicleId };
 
-        // Mark as complete
-        await supabase
-          .from('bat_extraction_queue')
-          .update({
-            status: 'complete',
-            completed_at: new Date().toISOString(),
-            error_message: null,
-            locked_at: null,
-            locked_by: null,
-            next_attempt_at: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', item.id);
+        // ✅ VALIDATION: Check if extraction was actually complete (not partial)
+        // Verify critical data was extracted AND stored: images, VIN, specs
+        const { data: vehicle, error: vehicleError } = await supabase
+          .from('vehicles')
+          .select('id, vin, mileage, color, transmission, engine_size')
+          .eq('id', vehicleId)
+          .single();
 
-        results.completed++;
-        console.log(`Completed extraction for vehicle ${item.vehicle_id}`);
+        if (vehicleError || !vehicle) {
+          throw new Error(`Vehicle ${vehicleId} not found after extraction: ${vehicleError?.message || 'Unknown error'}`);
+        }
+
+        const { count: imageCount, error: imageCountError } = await supabase
+          .from('vehicle_images')
+          .select('id', { count: 'exact', head: true })
+          .eq('vehicle_id', vehicleId);
+
+        // Check extraction completeness
+        const hasVin = vehicle?.vin && vehicle.vin !== '';
+        const hasSpecs = vehicle?.mileage || vehicle?.color || vehicle?.transmission || vehicle?.engine_size;
+        const hasImages = (imageCount || 0) > 0;
+        const hasCriticalData = hasVin || hasSpecs;
+
+        // ⚠️ CRITICAL: Images are REQUIRED for BaT listings (should have 50-200 images)
+        // If extraction said it found images but none were stored, that's a storage failure
+        const extractionSaidImages = extractedImages > 0;
+        const imagesActuallyStored = hasImages;
+        const imageStorageFailure = extractionSaidImages && !imagesActuallyStored;
+
+        // Determine if extraction was partial
+        // Partial = missing images OR missing critical data
+        const isPartial = !hasImages || (!hasCriticalData && !hasVin);
+        const missingData = [];
+        if (!hasImages) {
+          if (extractionSaidImages) {
+            missingData.push('images (extraction found but storage failed)');
+          } else {
+            missingData.push('images (extraction found none)');
+          }
+        }
+        if (!hasVin && !hasSpecs) missingData.push('critical_data (VIN/specs)');
+
+        if (isPartial) {
+          // Partial extraction - don't mark as complete, retry later
+          const attemptsNow = Number(item.attempts || 0);
+          const isLastAttempt = attemptsNow >= safeMaxAttempts;
+
+          if (isLastAttempt) {
+            // Last attempt - mark as partial but keep it for manual review
+            await supabase
+              .from('bat_extraction_queue')
+              .update({
+                status: 'failed',
+                error_message: `Partial extraction: Missing ${missingData.join(', ')}. Vehicle created but incomplete.`,
+                locked_at: null,
+                locked_by: null,
+                next_attempt_at: null,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.id);
+            
+            results.failed++;
+            console.warn(`⚠️ Partial extraction for vehicle ${item.vehicle_id}: Missing ${missingData.join(', ')}`);
+          } else {
+            // Retry with backoff
+            const baseSeconds = 5 * 60;
+            const delaySeconds = Math.min(6 * 60 * 60, baseSeconds * Math.pow(2, Math.max(0, attemptsNow - 1)));
+            const nextAttemptAt = new Date(Date.now() + delaySeconds * 1000).toISOString();
+
+            await supabase
+              .from('bat_extraction_queue')
+              .update({
+                status: 'pending',
+                error_message: `Partial extraction (attempt ${attemptsNow}): Missing ${missingData.join(', ')}. Will retry.`,
+                locked_at: null,
+                locked_by: null,
+                next_attempt_at: nextAttemptAt,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', item.id);
+
+            console.warn(`⚠️ Partial extraction for vehicle ${item.vehicle_id}: Missing ${missingData.join(', ')}. Retrying in ${delaySeconds / 60} minutes.`);
+          }
+        } else {
+          // ✅ Complete extraction - all critical data present
+          await supabase
+            .from('bat_extraction_queue')
+            .update({
+              status: 'complete',
+              completed_at: new Date().toISOString(),
+              error_message: null,
+              locked_at: null,
+              locked_by: null,
+              next_attempt_at: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', item.id);
+
+          results.completed++;
+          console.log(`✅ Complete extraction for vehicle ${item.vehicle_id}: ${imageCount || 0} images, VIN: ${hasVin ? '✅' : 'N/A'}, Specs: ${hasSpecs ? '✅' : 'N/A'}`);
+        }
 
       } catch (error: any) {
         const errorMsg = error.message || String(error);

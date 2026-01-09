@@ -830,6 +830,12 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const badgeMainText = React.useMemo(() => {
     const v: any = vehicle as any;
     
+    // Extract status fields at the beginning
+    const outcome = String(v.auction_outcome || '').toLowerCase();
+    const saleStatus = String(v.sale_status || '').toLowerCase();
+    const externalListing = v?.external_listings?.[0];
+    const externalStatus = externalListing ? String(externalListing.listing_status || '').toLowerCase() : '';
+    
     // PRIORITY 1: ACTIVE TRANSACTION STATE (what's happening NOW)
     if (isActiveAuction) {
       // Live auction - show bid amount (badge will add "BID" label separately)
