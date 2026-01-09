@@ -1346,7 +1346,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
             src={imageUrl}
             alt="Vehicle"
             onLoad={() => setImageLoaded(true)}
-            className="object-cover select-none"
+            className="object-contain select-none"
             style={{ 
               pointerEvents: 'auto',
               transform: `rotate(${rotation}deg) scale(${zoom})`,
@@ -1354,9 +1354,9 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               display: 'block',
               filter: isSensitive ? 'blur(20px)' : 'none',
               cursor: zoom > 1 ? 'grab' : 'default',
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover'
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain'
             }}
           />
 
@@ -1398,6 +1398,19 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               touchAction: 'pan-y'
             }}
           >
+            {/* Sidebar Header with Minimize Button */}
+            <div className="flex items-center justify-between px-3 py-2 border-b-2 border-white/20">
+              <span className="text-[8px] text-white/50 font-bold uppercase tracking-wide">INFO PANEL</span>
+              <button 
+                onClick={() => setShowSidebar(false)}
+                className="px-2 py-1 bg-transparent border border-white/30 text-white text-[8px] font-bold uppercase tracking-wide hover:border-white hover:bg-white/10 transition-all duration-150"
+                style={{ fontFamily: 'Arial, sans-serif' }}
+                title="Minimize sidebar"
+              >
+                MINIMIZE
+              </button>
+            </div>
+
             {/* Tabs - Cursor Style */}
             <div className="flex border-b-2 border-white/20">
               {(canEdit || isAdmin) && (
