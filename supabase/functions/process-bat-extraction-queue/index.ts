@@ -26,12 +26,13 @@ serve(async (req) => {
 
     const { batchSize = 1, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 1, maxAttempts: 3 }));
 
-    // SLOW AND ACCURATE: Process ONE at a time
-    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 1, 1)); // Force to 1 for accuracy
+    // Configurable batch size (default: 1 for accuracy, can be increased for speed)
+    // Recommended: Start with 1-5 for testing, then increase to 10-20 once stable
+    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 1, 50)); // Max 50 at a time
     const safeMaxAttempts = Math.max(1, Math.min(Number(maxAttempts) || 3, 20));
     const workerId = `process-bat-extraction-queue:${crypto.randomUUID?.() || String(Date.now())}`;
 
-    console.log(`Processing BaT extraction queue (SLOW & ACCURATE: batch size: ${safeBatchSize}, max attempts: ${safeMaxAttempts})`);
+    console.log(`Processing BaT extraction queue (batch size: ${safeBatchSize}, max attempts: ${safeMaxAttempts})`);
 
     // Claim work atomically (prevents double-processing under concurrent cron / manual runs).
     const { data: queueItems, error: queueError } = await supabase.rpc('claim_bat_extraction_queue_batch', {

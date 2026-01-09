@@ -100,7 +100,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   // Derive current owner (best guess) from BaT data
   const ownerGuess = useMemo(() => {
     const v = vehicle as any;
-    const isSold = v?.sale_status === 'sold' || v?.sale_price > 0 || v?.auction_outcome === 'sold';
+    // Don't mark as sold if reserve_not_met or no_sale
+    const auctionOutcome = String(v?.auction_outcome || '').toLowerCase();
+    const isRNM = auctionOutcome === 'reserve_not_met' || auctionOutcome === 'no_sale';
+    const isSold = !isRNM && (v?.sale_status === 'sold' || (v?.sale_price > 0 && auctionOutcome === 'sold') || auctionOutcome === 'sold');
     
     // Filter out obviously invalid/useless usernames
     const isValidUsername = (username: string | null | undefined): boolean => {
@@ -1469,13 +1472,27 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const sourceUrl = batUrl || kslUrl || (vehicle as any)?.discovery_url;
     
     // Never allow conflicting states like "SOLD RNM".
-    // SOLD wins if we have any sold signal (telemetry > canonical fields > legacy outcome).
+    // Check auction_outcome FIRST - it's the most authoritative
+    // RNM/No Sale takes precedence over sale_price (high bid != sold)
+    const vehicleOutcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
     const telemetryStatus = auctionPulse?.listing_url ? String(auctionPulse.listing_status || '').toLowerCase() : '';
+    
+    // If auction_outcome explicitly says reserve_not_met or no_sale, use that (don't override with sale_price)
+    if (vehicleOutcome === 'reserve_not_met' || vehicleOutcome === 'no_sale') {
+      const outcome = vehicleOutcome;
+      return {
+        badge: badges[outcome] || null,
+        link: sourceUrl,
+        outcome: outcome
+      };
+    }
+    
+    // SOLD wins if we have any sold signal (telemetry > canonical fields > legacy outcome)
     const hasSoldSignal =
       telemetryStatus === 'sold' ||
+      (vehicleOutcome === 'sold') ||
       (typeof (auctionPulse as any)?.final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) ||
-      (typeof (vehicle as any)?.sale_price === 'number' && Number.isFinite((vehicle as any).sale_price) && (vehicle as any).sale_price > 0) ||
-      rawOutcome === 'sold';
+      (typeof (vehicle as any)?.sale_price === 'number' && Number.isFinite((vehicle as any).sale_price) && (vehicle as any).sale_price > 0 && vehicleOutcome !== 'reserve_not_met' && vehicleOutcome !== 'no_sale');
 
     const outcome = hasSoldSignal ? 'sold' : rawOutcome;
 
@@ -2145,10 +2162,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             // Hide seller badge if Cars & Bids platform badge OR origin badge is showing Cars & Bids
             if (isCarsAndBidsConsigner && (isCarsAndBidsPulse || isCarsAndBidsOrigin)) return null;
             
-            // Hide consigner badge entirely when org avatar is showing the same org
-            // The circular avatar is cleaner - no need for redundant text badge that drives traffic offsite
+            // Show seller as circular favicon icon (not text badge)
+            // Find matching organization for favicon
             const sellerLabelLower = sellerBadge.label?.toLowerCase() || '';
-            const hasMatchingOrgAvatar = visibleOrganizations.some((org: any) => {
+            const sellerOrg = visibleOrganizations.find((org: any) => {
               const orgName = String(org?.business_name || '').toLowerCase();
               if (!orgName || !sellerLabelLower) return false;
               // Match if org name contains first word of seller label or vice versa
@@ -2159,34 +2176,96 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 sellerFirstWord.includes(orgFirstWord)
               );
             });
-            if (hasMatchingOrgAvatar) return null;
             
-            return (sellerBadge as any)?.href ? (
-              <Link
-                to={String((sellerBadge as any).href)}
-                onClick={(e) => e.stopPropagation()}
-                className="badge badge-secondary"
-                title={sellerBadge.relationship === 'consigner' ? 'Consigner' : 'Seller'}
-                style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 280, textDecoration: 'none', color: 'inherit' }}
-              >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {sellerBadge.label}
-                </span>
-              </Link>
-            ) : (
-              <span
-                className="badge badge-secondary"
-                title={sellerBadge.relationship === 'consigner' ? 'Consigner' : 'Seller'}
-                style={{ fontSize: '10px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: 280 }}
-              >
-                {sellerBadge.logo_url ? (
-                  <img src={sellerBadge.logo_url} alt="" style={{ width: 14, height: 14, borderRadius: 3, objectFit: 'cover' }} />
-                ) : null}
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {sellerBadge.label}
-                </span>
-              </span>
-            );
+            // If we have a matching org, show circular favicon icon
+            if (sellerOrg) {
+              const orgWebsiteUrl = sellerOrg.website || sellerOrg.business_website;
+              const isBatOrg = String(sellerOrg.business_name || '').toLowerCase().includes('bring a trailer') || 
+                              String(sellerOrg.business_name || '').toLowerCase().includes('bat');
+              
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (sellerOrg.organization_id) {
+                      window.location.href = `/org/${sellerOrg.organization_id}`;
+                    } else if ((sellerBadge as any)?.href) {
+                      window.location.href = String((sellerBadge as any).href);
+                    }
+                  }}
+                  title={`${sellerOrg.business_name} (${formatRelationship(sellerOrg.relationship_type)}) - Click to view profile`}
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 999,
+                    border: '1px solid var(--border)',
+                    background: 'var(--surface)',
+                    padding: 0,
+                    margin: 0,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {isBatOrg ? (
+                    <img src="/vendor/bat/favicon.ico" alt="Bring a Trailer" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                  ) : sellerOrg.logo_url ? (
+                    <CircularAvatar
+                      src={sellerOrg.logo_url}
+                      alt={sellerOrg.business_name}
+                      size={14}
+                      fallback={sellerOrg.business_name?.charAt(0)?.toUpperCase() || '?'}
+                    />
+                  ) : orgWebsiteUrl ? (
+                    <FaviconIcon url={orgWebsiteUrl} size={14} style={{ margin: 0 }} />
+                  ) : (
+                    <CircularAvatar
+                      size={14}
+                      fallback={sellerOrg.business_name?.charAt(0)?.toUpperCase() || '?'}
+                    />
+                  )}
+                </button>
+              );
+            }
+            
+            // Fallback: If seller badge has href (BaT user), show circular favicon
+            if ((sellerBadge as any)?.href && (sellerBadge as any)?.kind === 'bat_user') {
+              const proofUrl = (sellerBadge as any)?.proofUrl || `https://bringatrailer.com/member/${(sellerBadge as any)?.handle}/`;
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.location.href = String((sellerBadge as any).href);
+                  }}
+                  title={`Seller: @${(sellerBadge as any)?.handle || sellerBadge.label} - Click to claim identity`}
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 999,
+                    border: '1px solid var(--border)',
+                    background: 'var(--surface)',
+                    padding: 0,
+                    margin: 0,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <FaviconIcon url={proofUrl} size={14} style={{ margin: 0 }} />
+                </button>
+              );
+            }
+            
+            // Last resort: text badge (shouldn't happen if orgs are linked properly)
+            return null;
           })()}
           {/* Live auction pulse badges (vehicle-first: auction is just a live data source) */}
           {/* Fade out auction badges after auction ends (especially unsold) - show asset value instead */}
@@ -2238,18 +2317,76 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   transition: 'opacity 0.3s ease'
                 }}
               >
-                {/* Only show platform badge if consigner badge and origin badge aren't already showing BaT */}
+                {/* Always show platform badge (BaT) as circular favicon icon */}
                 {(() => {
-                  const isBatConsigner = sellerBadge && (sellerBadge.label?.toLowerCase().includes('bring a trailer') || sellerBadge.label?.toLowerCase().includes('bat'));
-                  const isBatOrigin = (vehicle as any)?.profile_origin === 'bat_import' || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com');
-                  // Hide platform badge if BaT is already shown elsewhere
-                  return !isBatConsigner && !isBatOrigin ? (
-                    <AuctionPlatformBadge
-                      platform={auctionPulse.platform}
-                      urlForFavicon={auctionPulse.listing_url}
-                      label={auctionPulse.platform === 'bat' ? 'BaT' : undefined}
-                    />
-                  ) : null;
+                  const isBat = auctionPulse.platform === 'bat' || String((vehicle as any)?.discovery_url || '').includes('bringatrailer.com');
+                  const batUrl = auctionPulse.listing_url || (vehicle as any)?.bat_auction_url || (vehicle as any)?.discovery_url || 'https://bringatrailer.com';
+                  
+                  if (isBat) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (batUrl) window.open(batUrl, '_blank');
+                        }}
+                        title="Bring a Trailer - Click to view listing"
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 999,
+                          border: '1px solid var(--border)',
+                          background: 'var(--surface)',
+                          padding: 0,
+                          margin: 0,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <img src="/vendor/bat/favicon.ico" alt="Bring a Trailer" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
+                      </button>
+                    );
+                  }
+                  
+                  if (auctionPulse.platform) {
+                    const platformUrl = auctionPulse.listing_url || 
+                      (auctionPulse.platform === 'cars_and_bids' ? 'https://carsandbids.com' : 
+                       auctionPulse.platform === 'ebay_motors' ? 'https://ebay.com' : 
+                       'https://n-zero.com');
+                    return (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (auctionPulse.listing_url) window.open(auctionPulse.listing_url, '_blank');
+                        }}
+                        title={`${auctionPulse.platform} - Click to view listing`}
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 999,
+                          border: '1px solid var(--border)',
+                          background: 'var(--surface)',
+                          padding: 0,
+                          margin: 0,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <FaviconIcon url={platformUrl} size={14} style={{ margin: 0 }} />
+                      </button>
+                    );
+                  }
+                  
+                  return null;
                 })()}
                 {/* Seller bubble: if we have a BaT seller handle, show a circle that opens seller info on click */}
                 {batIdentityHref?.seller?.handle ? (() => {

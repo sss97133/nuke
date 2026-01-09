@@ -3200,6 +3200,124 @@ async function extractCarsAndBids(url: string, maxVehicles: number, debug: boole
   const shouldDownload = downloadImages !== false; // Default to true for Cars & Bids
   const created = await storeVehiclesInDatabase(extracted, "Cars & Bids", sourceWebsite, shouldDownload);
 
+  // Step 4: Record extraction attempts for version tracking and comparison
+  // This allows us to see what was extracted and compare different extraction attempts
+  // Following the BaT extraction pattern - save extraction results so we can see who did it right/wrong
+  const attemptSupabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+  const EXTRACTOR_NAME = "extract-premium-auction";
+  const EXTRACTOR_VERSION = "cars-and-bids-v1"; // Version this Cars & Bids extractor
+  
+  // Build a map of discovery_url -> vehicle_id from created/updated results
+  const vehicleIdMap = new Map<string, string>();
+  
+  // Get vehicle IDs that were created/updated by looking them up by discovery_url
+  for (const vehicle of extracted) {
+    if (!vehicle.discovery_url) continue;
+    
+    try {
+      const { data: existing } = await attemptSupabase
+        .from("vehicles")
+        .select("id")
+        .eq("discovery_url", vehicle.discovery_url)
+        .maybeSingle();
+      
+      if (existing?.id) {
+        vehicleIdMap.set(vehicle.discovery_url, existing.id);
+      }
+    } catch (err: any) {
+      console.warn(`Failed to lookup vehicle_id for ${vehicle.discovery_url}:`, err?.message);
+    }
+  }
+  
+  // Record extraction attempts (non-blocking)
+  const attemptPromises = extracted.map(async (vehicle) => {
+    const vehicleId = vehicleIdMap.get(vehicle.discovery_url || '');
+    
+    if (!vehicleId || !vehicle.discovery_url) return;
+    
+    // Build metrics from extraction
+    const metrics = {
+      images: {
+        found: vehicle.images?.length || 0,
+        valid: vehicle.images?.filter((img: string) => {
+          const lower = String(img).toLowerCase();
+          return !lower.includes('(edit)') && !lower.includes('-(edit)');
+        }).length || 0,
+        edit_images_filtered: vehicle.images?.filter((img: string) => {
+          const lower = String(img).toLowerCase();
+          return lower.includes('(edit)') || lower.includes('-(edit)');
+        }).length || 0,
+      },
+      fields: {
+        vin: !!vehicle.vin,
+        mileage: !!vehicle.mileage,
+        color: !!vehicle.color,
+        transmission: !!vehicle.transmission,
+        engine_size: !!vehicle.engine_size,
+        drivetrain: !!vehicle.drivetrain,
+      },
+      auction: {
+        has_bid_history: (vehicle.bid_history?.length || 0) > 0,
+        has_comments: (vehicle.comments?.length || 0) > 0,
+        has_bidders: (vehicle.bidders?.length || 0) > 0,
+      },
+    };
+    
+    // Determine status
+    const hasCoreFields = vehicle.mileage || vehicle.color || vehicle.transmission || vehicle.engine_size;
+    const hasImages = (vehicle.images?.length || 0) > 0;
+    const status = hasCoreFields && hasImages ? "success" : 
+                   (hasCoreFields || hasImages) ? "partial" : "failed";
+    
+    // Record extraction attempt (non-blocking - don't fail if this fails)
+    try {
+      await attemptSupabase.rpc("record_extraction_attempt", {
+        p_vehicle_id: vehicleId,
+        p_source_url: vehicle.discovery_url || vehicle.listing_url,
+        p_source_type: "cars_and_bids",
+        p_extractor_name: EXTRACTOR_NAME,
+        p_extractor_version: EXTRACTOR_VERSION,
+        p_status: status,
+        p_metrics: metrics,
+        p_extracted_data: {
+          // Store full extraction result for comparison - this is what we can review
+          vehicle: {
+            year: vehicle.year,
+            make: vehicle.make,
+            model: vehicle.model,
+            vin: vehicle.vin,
+            mileage: vehicle.mileage,
+            color: vehicle.color,
+            transmission: vehicle.transmission,
+            engine_size: vehicle.engine_size,
+            drivetrain: vehicle.drivetrain,
+          },
+          images: {
+            total: vehicle.images?.length || 0,
+            valid_count: metrics.images.valid,
+            edit_images_filtered: metrics.images.edit_images_filtered,
+            sample: vehicle.images?.slice(0, 10) || [], // Store sample for comparison
+            // Note: We store all URLs so we can compare what different versions extracted
+            all_urls: vehicle.images || [],
+          },
+          auction: {
+            current_bid: vehicle.current_bid,
+            bid_count: vehicle.bid_count,
+            comment_count: vehicle.comment_count,
+            has_structured_sections: Object.keys(vehicle.structured_sections || {}).length > 0,
+          },
+        },
+      });
+      console.log(`✅ Recorded extraction attempt for vehicle ${vehicleId} (${status})`);
+    } catch (err: any) {
+      console.warn(`⚠️ Failed to record extraction attempt for ${vehicleId}:`, err?.message);
+      // Non-blocking - continue even if recording fails
+    }
+  });
+  
+  // Wait for all recording attempts (non-blocking, but we wait to ensure they complete)
+  await Promise.allSettled(attemptPromises);
+
   const baseResult: any = {
     success: true,
     source: "Cars & Bids",
@@ -3600,17 +3718,36 @@ async function storeVehiclesInDatabase(
           const existingDataForVin = existingVehicleDataForVin || {};
           
           // Build update payload that preserves existing values when extraction yields null/empty
+          // CRITICAL: Only update fields if extraction found actual non-null values - never overwrite with null
           const updatePayloadForVin: any = {
             ...payload,
-            mileage: payload.mileage !== null && payload.mileage !== undefined ? payload.mileage : existingDataForVin.mileage,
-            color: payload.color || existingDataForVin.color,
-            transmission: payload.transmission || existingDataForVin.transmission,
-            engine_size: payload.engine_size || existingDataForVin.engine_size,
-            drivetrain: payload.drivetrain || existingDataForVin.drivetrain,
-            year: payload.year !== null && payload.year !== undefined ? payload.year : existingDataForVin.year,
-            make: payload.make !== "Unknown" ? payload.make : (existingDataForVin.make || payload.make),
-            model: payload.model !== "Unknown" ? payload.model : (existingDataForVin.model || payload.model),
-            trim: payload.trim || existingDataForVin.trim,
+            mileage: (payload.mileage !== null && payload.mileage !== undefined && payload.mileage !== 0) 
+              ? payload.mileage 
+              : (existingDataForVin.mileage !== null && existingDataForVin.mileage !== undefined ? existingDataForVin.mileage : payload.mileage),
+            color: (payload.color && payload.color.trim() && payload.color !== "Unknown") 
+              ? payload.color 
+              : (existingDataForVin.color ? existingDataForVin.color : payload.color),
+            transmission: (payload.transmission && payload.transmission.trim()) 
+              ? payload.transmission 
+              : (existingDataForVin.transmission ? existingDataForVin.transmission : payload.transmission),
+            engine_size: (payload.engine_size && payload.engine_size.trim()) 
+              ? payload.engine_size 
+              : (existingDataForVin.engine_size ? existingDataForVin.engine_size : payload.engine_size),
+            drivetrain: (payload.drivetrain && payload.drivetrain.trim()) 
+              ? payload.drivetrain 
+              : (existingDataForVin.drivetrain ? existingDataForVin.drivetrain : payload.drivetrain),
+            year: (payload.year !== null && payload.year !== undefined && payload.year > 1900) 
+              ? payload.year 
+              : (existingDataForVin.year ? existingDataForVin.year : payload.year),
+            make: (payload.make && payload.make !== "Unknown" && payload.make.trim()) 
+              ? payload.make 
+              : (existingDataForVin.make && existingDataForVin.make !== "Unknown" ? existingDataForVin.make : payload.make),
+            model: (payload.model && payload.model !== "Unknown" && payload.model.trim()) 
+              ? payload.model 
+              : (existingDataForVin.model && existingDataForVin.model !== "Unknown" ? existingDataForVin.model : payload.model),
+            trim: (payload.trim && payload.trim.trim()) 
+              ? payload.trim 
+              : (existingDataForVin.trim ? existingDataForVin.trim : payload.trim),
           };
           
           const { data: updated, error: updateErr } = await supabase
@@ -3743,20 +3880,42 @@ async function storeVehiclesInDatabase(
           const existingData = existingVehicleData || {};
           
           // Build update payload that preserves existing values when extraction yields null/empty
+          // CRITICAL: Only update fields if extraction found actual non-null values - never overwrite with null
           const updatePayload: any = {
             ...payload,
-            // Only update these fields if extraction found actual values (not null/empty)
-            mileage: payload.mileage !== null && payload.mileage !== undefined ? payload.mileage : existingData.mileage,
-            color: payload.color || existingData.color,
-            transmission: payload.transmission || existingData.transmission,
-            engine_size: payload.engine_size || existingData.engine_size,
-            drivetrain: payload.drivetrain || existingData.drivetrain,
+            // Only update these fields if extraction found actual values (not null/empty/undefined)
+            // Use existing value if extraction didn't find anything
+            mileage: (payload.mileage !== null && payload.mileage !== undefined && payload.mileage !== 0) 
+              ? payload.mileage 
+              : (existingData.mileage !== null && existingData.mileage !== undefined ? existingData.mileage : payload.mileage),
+            color: (payload.color && payload.color.trim() && payload.color !== "Unknown") 
+              ? payload.color 
+              : (existingData.color ? existingData.color : payload.color),
+            transmission: (payload.transmission && payload.transmission.trim()) 
+              ? payload.transmission 
+              : (existingData.transmission ? existingData.transmission : payload.transmission),
+            engine_size: (payload.engine_size && payload.engine_size.trim()) 
+              ? payload.engine_size 
+              : (existingData.engine_size ? existingData.engine_size : payload.engine_size),
+            drivetrain: (payload.drivetrain && payload.drivetrain.trim()) 
+              ? payload.drivetrain 
+              : (existingData.drivetrain ? existingData.drivetrain : payload.drivetrain),
             // Preserve basic vehicle info if extraction is incomplete
-            year: payload.year !== null && payload.year !== undefined ? payload.year : existingData.year,
-            make: payload.make !== "Unknown" ? payload.make : (existingData.make || payload.make),
-            model: payload.model !== "Unknown" ? payload.model : (existingData.model || payload.model),
-            trim: payload.trim || existingData.trim,
-            vin: payload.vin || existingData.vin,
+            year: (payload.year !== null && payload.year !== undefined && payload.year > 1900) 
+              ? payload.year 
+              : (existingData.year ? existingData.year : payload.year),
+            make: (payload.make && payload.make !== "Unknown" && payload.make.trim()) 
+              ? payload.make 
+              : (existingData.make && existingData.make !== "Unknown" ? existingData.make : payload.make),
+            model: (payload.model && payload.model !== "Unknown" && payload.model.trim()) 
+              ? payload.model 
+              : (existingData.model && existingData.model !== "Unknown" ? existingData.model : payload.model),
+            trim: (payload.trim && payload.trim.trim()) 
+              ? payload.trim 
+              : (existingData.trim ? existingData.trim : payload.trim),
+            vin: (payload.vin && payload.vin.trim()) 
+              ? payload.vin 
+              : (existingData.vin ? existingData.vin : payload.vin),
           };
           
           // Update existing vehicle (preserving existing data when extraction is incomplete)
