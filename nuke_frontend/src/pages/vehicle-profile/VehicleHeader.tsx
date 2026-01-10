@@ -1858,7 +1858,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         <div className="vehicle-header-badges" style={{ display: 'flex', flexWrap: 'nowrap', gap: 6, alignItems: 'center', flexShrink: 0, overflow: 'hidden', maxWidth: '100%' }}>
           {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
             <div className="badge-priority-2">
-              <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
+            <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
             </div>
           ) : null}
 
@@ -2210,7 +2210,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     justifyContent: 'center',
                     boxSizing: 'border-box',
                   }}
-                >
+              >
                   {isBatOrg ? (
                     <img src="/vendor/bat/favicon.ico" alt="Bring a Trailer" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
                   ) : sellerOrg.logo_url ? (
@@ -2878,11 +2878,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
                           (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
                         }}
-                          title={
-                            hasClaim
+                        title={
+                          hasClaim
                               ? (claimNeedsId ? 'Claim started. Upload your driver\'s license to complete.' : 'Claim submitted.')
-                              : (batIdentityHref?.winner?.handle
-                                ? `Winner is ${batIdentityHref.winner.handle}. If that's you, claim your BaT identity and upload a title document.`
+                            : (batIdentityHref?.winner?.handle
+                              ? `Winner is ${batIdentityHref.winner.handle}. If that's you, claim your BaT identity and upload a title document.`
                               : 'Upload title document to claim ownership')
                         }
                       >
@@ -2948,11 +2948,11 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                         (e.currentTarget as HTMLAnchorElement).style.background = 'var(--white)';
                         (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(0)';
                       }}
-                        title={
-                          hasClaim
+                      title={
+                        hasClaim
                             ? (claimNeedsId ? 'Claim started. Upload your driver\'s license to complete.' : 'Claim submitted.')
-                            : 'Upload title document to claim ownership'
-                        }
+                          : 'Upload title document to claim ownership'
+                      }
                     >
                       {hasClaim ? (claimNeedsId ? 'Complete claim' : 'Claim submitted') : 'Claim this vehicle'}
                     </a>
@@ -3023,30 +3023,30 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                     @{ownerGuess.username}<sup style={{ fontSize: '6px', color: 'var(--warning)', marginLeft: '1px' }}>*</sup>
                   </button>
                 ) : (
-                  <a
-                    href={claimHref}
-                    onClick={(e) => {
-                      if (onClaimClick) {
-                        e.preventDefault();
-                        onClaimClick();
-                      }
-                    }}
-                    style={{
-                      border: '1px solid var(--primary)',
-                      background: 'var(--surface)',
-                      color: 'var(--primary)',
-                      fontWeight: 600,
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '8pt',
-                      textDecoration: 'none',
-                      display: 'inline-flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    Claim This Vehicle
-                  </a>
+                <a
+                  href={claimHref}
+                  onClick={(e) => {
+                    if (onClaimClick) {
+                      e.preventDefault();
+                      onClaimClick();
+                    }
+                  }}
+                  style={{
+                    border: '1px solid var(--primary)',
+                    background: 'var(--surface)',
+                    color: 'var(--primary)',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '8pt',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center'
+                  }}
+                >
+                  Claim This Vehicle
+                </a>
                 )
               ) : null
             )}

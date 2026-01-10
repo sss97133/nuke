@@ -154,6 +154,110 @@ async function getVehiclesNeedingFix() {
   return scoredVehicles;
 }
 
+function titleCase(str) {
+  if (!str) return null;
+  return str
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function parseMakeModel(parts) {
+  const multiWordMakes = {
+    'alfa': { full: 'Alfa Romeo', requiresSecond: 'romeo' },
+    'mercedes': { full: 'Mercedes-Benz', requiresSecond: 'benz' },
+    'land': { full: 'Land Rover', requiresSecond: 'rover' },
+    'aston': { full: 'Aston Martin', requiresSecond: 'martin' },
+    'factory': { full: 'Factory Five', requiresSecond: 'five' },
+  };
+  
+  if (parts.length >= 2) {
+    const firstPart = parts[0].toLowerCase();
+    const secondPart = parts[1].toLowerCase();
+    
+    if (multiWordMakes[firstPart] && secondPart === multiWordMakes[firstPart].requiresSecond) {
+      const make = multiWordMakes[firstPart].full;
+      const model = parts.slice(2)
+        .filter(p => !/^\d{2,3}$/.test(p))
+        .map(p => {
+          if (/^\d+[a-z]?$/i.test(p) || p.length <= 3 || /^(gt|rs|rsr|s|t)$/i.test(p)) {
+            return p.toUpperCase();
+          }
+          return titleCase(p);
+        })
+        .join(' ')
+        .replace(/\s+\d{2,3}$/, '')
+        .trim() || null;
+      return { make, model };
+    }
+  }
+  
+  if (parts.length >= 2) {
+    const make = titleCase(parts[0]);
+    let modelParts = parts.slice(1);
+    
+    while (modelParts.length > 0) {
+      const lastPart = modelParts[modelParts.length - 1];
+      if (/^\d{1,4}$/.test(lastPart)) {
+        if (modelParts.length > 1) {
+          const prevPart = modelParts[modelParts.length - 2].toLowerCase();
+          if (/[a-z]$/.test(prevPart) || /^(plus|sport|gt|rs|rsr|t|coupe|roadster|convertible|elite|elan|junior|zagato|cheetah|race|car)$/.test(prevPart)) {
+            modelParts = modelParts.slice(0, -1);
+            continue;
+          }
+        }
+        break;
+      }
+      break;
+    }
+    
+    const model = modelParts
+      .map(p => {
+        if (/^\d+[a-z]?$/i.test(p) || p.length <= 3 || /^(gt|rs|rsr|s|t)$/i.test(p)) {
+          return p.toUpperCase();
+        }
+        return titleCase(p);
+      })
+      .join(' ')
+      .trim() || null;
+    
+    return { make, model };
+  }
+  
+  return { make: null, model: null };
+}
+
+function parseBatUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  
+  try {
+    const matchWithYear = url.match(/\/listing\/(\d{4})-([a-z0-9-]+)\/?$/i);
+    if (matchWithYear && matchWithYear[1] && matchWithYear[2]) {
+      const year = parseInt(matchWithYear[1], 10);
+      if (Number.isFinite(year) && year >= 1885 && year <= new Date().getFullYear() + 1) {
+        const parts = matchWithYear[2].split('-').filter(Boolean);
+        if (parts.length >= 2) {
+          const parsed = parseMakeModel(parts);
+          return { year, ...parsed };
+        }
+      }
+    }
+    
+    const matchNoYear = url.match(/\/listing\/([a-z0-9-]+)\/?$/i);
+    if (matchNoYear && matchNoYear[1]) {
+      const parts = matchNoYear[1].split('-').filter(Boolean);
+      if (parts.length >= 2) {
+        const parsed = parseMakeModel(parts);
+        return { year: null, ...parsed };
+      }
+    }
+    
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function extractVehicleData(vehicle) {
   const url = vehicle.discovery_url || vehicle.bat_auction_url;
   if (!url) {
@@ -186,17 +290,55 @@ async function extractVehicleData(vehicle) {
       vehicleId = extractResult.created_vehicle_ids[0];
     }
     
+    // CRITICAL: Check if make/model are still "Unknown" after extraction
+    // If so, try URL parsing as fallback
+    const { data: currentVehicle } = await supabase
+      .from('vehicles')
+      .select('make, model')
+      .eq('id', vehicleId)
+      .single();
+    
+    const needsUrlFallback = currentVehicle && (
+      (currentVehicle.make && currentVehicle.make.toLowerCase() === 'unknown') ||
+      (currentVehicle.model && currentVehicle.model.toLowerCase() === 'unknown') ||
+      (!currentVehicle.make || !currentVehicle.model)
+    );
+    
+    if (needsUrlFallback) {
+      console.log(`   🔄 Extraction didn't fix make/model, trying URL parsing fallback...`);
+      const urlParsed = parseBatUrl(url);
+      if (urlParsed && urlParsed.make && urlParsed.make.toLowerCase() !== 'unknown') {
+        const updatePayload = {};
+        if (urlParsed.year) updatePayload.year = urlParsed.year;
+        if (urlParsed.make) updatePayload.make = urlParsed.make;
+        if (urlParsed.model) updatePayload.model = urlParsed.model;
+        
+        const { error: updateError } = await supabase
+          .from('vehicles')
+          .update(updatePayload)
+          .eq('id', vehicleId);
+        
+        if (!updateError) {
+          console.log(`   ✅ Fixed make/model via URL parsing: ${urlParsed.year || '?'} ${urlParsed.make} ${urlParsed.model || '?'}`);
+        } else {
+          console.log(`   ⚠️  URL parsing fallback update failed: ${updateError.message}`);
+        }
+      }
+    }
+    
     // Step 2: Extract comments if auction_event exists
+    // Wait a moment for auction_event to be created/committed
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     let commentsExtracted = 0;
-    if (vehicle.has_auction_event || extractResult.vehicles_updated > 0 || extractResult.vehicles_created > 0) {
-      // Check if auction_event exists now
-      const { data: aeData } = await supabase
+    if (extractResult.vehicles_updated > 0 || extractResult.vehicles_created > 0) {
+      // Check if auction_event exists now (after extraction)
+      const { data: aeData, error: aeError } = await supabase
         .from('auction_events')
         .select('id')
         .eq('vehicle_id', vehicleId)
         .eq('platform', 'bat')
-        .limit(1)
-        .single();
+        .maybeSingle();
       
       if (aeData && aeData.id) {
         console.log(`   💬 Step 2: Extracting comments...`);
@@ -209,13 +351,22 @@ async function extractVehicleData(vehicle) {
             }
           });
           
-          if (!commentsError && commentsResult) {
-            commentsExtracted = commentsResult.comments_extracted || 0;
+          if (!commentsError && commentsResult && commentsResult.success !== false) {
+            commentsExtracted = commentsResult.comments_extracted || commentsResult.comments?.length || 0;
+            if (commentsExtracted > 0) {
+              console.log(`      ✅ Extracted ${commentsExtracted} comments`);
+            } else {
+              console.log(`      ℹ️  No comments found (may not have any)`);
+            }
+          } else {
+            console.log(`      ⚠️  Comments extraction skipped: ${commentsError?.message || commentsResult?.error || 'Unknown error'}`);
           }
         } catch (e) {
           // Comments extraction is non-critical, continue
-          console.log(`   ⚠️  Comments extraction failed (non-critical): ${e.message}`);
+          console.log(`      ⚠️  Comments extraction failed (non-critical): ${e.message}`);
         }
+      } else {
+        console.log(`   ℹ️  No auction_event found - comments extraction skipped (vehicle may be upcoming auction)`);
       }
     }
     
