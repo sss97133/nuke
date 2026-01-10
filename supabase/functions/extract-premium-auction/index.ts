@@ -161,6 +161,64 @@ function parseCarsAndBidsIdentityFromUrl(listingUrl: string): { year: number | n
   }
 }
 
+function parseBatIdentityFromUrl(listingUrl: string): { year: number | null; make: string | null; model: string | null; title: string | null } {
+  try {
+    const u = new URL(listingUrl);
+    // BaT URL pattern: /listing/1969-alfa-romeo-gtv-1750-16
+    const m = u.pathname.match(/\/listing\/(\d{4})-([a-z0-9-]+)\/?$/i);
+    if (!m?.[1] || !m?.[2]) return { year: null, make: null, model: null, title: null };
+    const year = Number(m[1]);
+    if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 1) {
+      return { year: null, make: null, model: null, title: null };
+    }
+    
+    const parts = String(m[2]).split("-").filter(Boolean);
+    if (parts.length < 2) return { year, make: null, model: null, title: null };
+    
+    // Handle multi-word makes (e.g., "alfa-romeo", "mercedes-benz")
+    let make: string | null = null;
+    let model: string | null = null;
+    
+    // Common multi-word makes
+    const multiWordMakes: Record<string, string> = {
+      'alfa': 'Alfa Romeo',
+      'mercedes': 'Mercedes-Benz',
+      'land': 'Land Rover',
+      'aston': 'Aston Martin',
+    };
+    
+    // Check if first part is a multi-word make prefix
+    const firstPart = parts[0].toLowerCase();
+    if (multiWordMakes[firstPart] && parts.length > 1) {
+      const makeParts = multiWordMakes[firstPart].split(' ');
+      const secondPart = parts[1].toLowerCase();
+      if (secondPart === makeParts[1]?.toLowerCase()) {
+        // Two-word make (e.g., "alfa-romeo")
+        make = multiWordMakes[firstPart];
+        model = parts.slice(2).map(titleCaseToken).join(' ').trim() || null;
+      } else {
+        // Single-word make (e.g., "alfa" without "romeo")
+        make = titleCaseToken(parts[0]);
+        model = parts.slice(1).map(titleCaseToken).join(' ').trim() || null;
+      }
+    } else {
+      // Single-word make
+      make = titleCaseToken(parts[0]);
+      model = parts.slice(1).map(titleCaseToken).join(' ').trim() || null;
+    }
+    
+    // Clean up model (remove trailing numbers like "1750", "16")
+    if (model) {
+      model = model.replace(/\s+\d+$/, '').trim();
+    }
+    
+    const title = [year, make, model].filter(Boolean).join(" ");
+    return { year, make, model, title: title || null };
+  } catch {
+    return { year: null, make: null, model: null, title: null };
+  }
+}
+
 function extractCarsAndBidsImagesFromHtml(html: string): string[] {
   const h = String(html || "");
   const urls = new Set<string>();
@@ -3567,9 +3625,11 @@ async function storeVehiclesInDatabase(
                           (Number.isFinite(vehicle.current_bid) ? vehicle.current_bid :
                            (Number.isFinite(vehicle.high_bid) ? vehicle.high_bid : null));
 
+      // Don't default to "Unknown" - use null if extraction failed
+      // The update logic will preserve existing data if we pass null
       const payload = {
-          make: vehicle.make || "Unknown",
-          model: vehicle.model || "Unknown",
+          make: vehicle.make || null,
+          model: vehicle.model || null,
           year: Number.isFinite(vehicle.year) ? vehicle.year : null,
           trim: vehicle.trim || null,
           trim_level: vehicle.trim_level || null,
@@ -3724,9 +3784,10 @@ async function storeVehiclesInDatabase(
             mileage: (payload.mileage !== null && payload.mileage !== undefined && payload.mileage !== 0) 
               ? payload.mileage 
               : (existingDataForVin.mileage !== null && existingDataForVin.mileage !== undefined ? existingDataForVin.mileage : payload.mileage),
-            color: (payload.color && payload.color.trim() && payload.color !== "Unknown") 
+            // Never set "Unknown" - use null if extraction failed
+            color: (payload.color && payload.color.trim() && payload.color.toLowerCase() !== "unknown") 
               ? payload.color 
-              : (existingDataForVin.color ? existingDataForVin.color : payload.color),
+              : (existingDataForVin.color && existingDataForVin.color.trim() && existingDataForVin.color.toLowerCase() !== "unknown" ? existingDataForVin.color : null),
             transmission: (payload.transmission && payload.transmission.trim()) 
               ? payload.transmission 
               : (existingDataForVin.transmission ? existingDataForVin.transmission : payload.transmission),
@@ -3739,12 +3800,13 @@ async function storeVehiclesInDatabase(
             year: (payload.year !== null && payload.year !== undefined && payload.year > 1900) 
               ? payload.year 
               : (existingDataForVin.year ? existingDataForVin.year : payload.year),
-            make: (payload.make && payload.make !== "Unknown" && payload.make.trim()) 
+            // Never set "Unknown" - use null if extraction failed, preserve existing data if valid
+            make: (payload.make && payload.make.trim() && payload.make.toLowerCase() !== "unknown") 
               ? payload.make 
-              : (existingDataForVin.make && existingDataForVin.make !== "Unknown" ? existingDataForVin.make : payload.make),
-            model: (payload.model && payload.model !== "Unknown" && payload.model.trim()) 
+              : (existingDataForVin.make && existingDataForVin.make.trim() && existingDataForVin.make.toLowerCase() !== "unknown" ? existingDataForVin.make : null),
+            model: (payload.model && payload.model.trim() && payload.model.toLowerCase() !== "unknown") 
               ? payload.model 
-              : (existingDataForVin.model && existingDataForVin.model !== "Unknown" ? existingDataForVin.model : payload.model),
+              : (existingDataForVin.model && existingDataForVin.model.trim() && existingDataForVin.model.toLowerCase() !== "unknown" ? existingDataForVin.model : null),
             trim: (payload.trim && payload.trim.trim()) 
               ? payload.trim 
               : (existingDataForVin.trim ? existingDataForVin.trim : payload.trim),
@@ -3888,9 +3950,10 @@ async function storeVehiclesInDatabase(
             mileage: (payload.mileage !== null && payload.mileage !== undefined && payload.mileage !== 0) 
               ? payload.mileage 
               : (existingData.mileage !== null && existingData.mileage !== undefined ? existingData.mileage : payload.mileage),
-            color: (payload.color && payload.color.trim() && payload.color !== "Unknown") 
+            // Never set "Unknown" - use null if extraction failed
+            color: (payload.color && payload.color.trim() && payload.color.toLowerCase() !== "unknown") 
               ? payload.color 
-              : (existingData.color ? existingData.color : payload.color),
+              : (existingData.color && existingData.color.trim() && existingData.color.toLowerCase() !== "unknown" ? existingData.color : null),
             transmission: (payload.transmission && payload.transmission.trim()) 
               ? payload.transmission 
               : (existingData.transmission ? existingData.transmission : payload.transmission),
@@ -3904,12 +3967,13 @@ async function storeVehiclesInDatabase(
             year: (payload.year !== null && payload.year !== undefined && payload.year > 1900) 
               ? payload.year 
               : (existingData.year ? existingData.year : payload.year),
-            make: (payload.make && payload.make !== "Unknown" && payload.make.trim()) 
+            // Never set "Unknown" - use null if extraction failed, preserve existing data if valid
+            make: (payload.make && payload.make.trim() && payload.make.toLowerCase() !== "unknown") 
               ? payload.make 
-              : (existingData.make && existingData.make !== "Unknown" ? existingData.make : payload.make),
-            model: (payload.model && payload.model !== "Unknown" && payload.model.trim()) 
+              : (existingData.make && existingData.make.trim() && existingData.make.toLowerCase() !== "unknown" ? existingData.make : null),
+            model: (payload.model && payload.model.trim() && payload.model.toLowerCase() !== "unknown") 
               ? payload.model 
-              : (existingData.model && existingData.model !== "Unknown" ? existingData.model : payload.model),
+              : (existingData.model && existingData.model.trim() && existingData.model.toLowerCase() !== "unknown" ? existingData.model : null),
             trim: (payload.trim && payload.trim.trim()) 
               ? payload.trim 
               : (existingData.trim ? existingData.trim : payload.trim),
@@ -4399,12 +4463,14 @@ async function storeVehiclesInDatabase(
         if (data?.id && Array.isArray(vehicle.bidders) && vehicle.bidders.length > 0) {
           try {
             const nowIso = new Date().toISOString();
-            const identityRows = vehicle.bidders.map((bidder: any) => ({
-              platform: 'cars_and_bids',
-              handle: bidder.username || 'Unknown',
-              profile_url: bidder.profile_url || `https://carsandbids.com/user/${bidder.username}`,
-              display_name: bidder.username,
-              last_seen_at: nowIso,
+            const identityRows = vehicle.bidders
+              .filter((bidder: any) => bidder.username && bidder.username.trim()) // Filter out empty usernames - never set "Unknown"
+              .map((bidder: any) => ({
+                platform: 'cars_and_bids',
+                handle: bidder.username,
+                profile_url: bidder.profile_url || `https://carsandbids.com/user/${bidder.username}`,
+                display_name: bidder.username,
+                last_seen_at: nowIso,
               updated_at: nowIso,
               metadata: {
                 is_buyer: bidder.is_buyer || false,
@@ -6361,12 +6427,18 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     // Parse vehicle data from HTML (extractBatSpecsFromHtml handles everything)
     const htmlSpecs = extractBatSpecsFromHtml(html);
     
+    // Fallback: Parse from URL slug if HTML extraction failed to get make/model/year
+    const urlIdentity = (!htmlSpecs.make || !htmlSpecs.model || !htmlSpecs.year) ? parseBatIdentityFromUrl(normalizedUrl) : null;
+    if (urlIdentity) {
+      console.log(`✅ Extracted from URL slug: ${urlIdentity.year} ${urlIdentity.make} ${urlIdentity.model}`);
+    }
+    
     // Build vehicle object from HTML parsing (no AI needed)
     const vehicle: any = {
-      title: htmlSpecs.title || null,
-      year: htmlSpecs.year || null,
-      make: htmlSpecs.make || null,
-      model: htmlSpecs.model || null,
+      title: htmlSpecs.title || urlIdentity?.title || null,
+      year: htmlSpecs.year || urlIdentity?.year || null,
+      make: htmlSpecs.make || urlIdentity?.make || null,
+      model: htmlSpecs.model || urlIdentity?.model || null,
       trim: htmlSpecs.trim || null,
       vin: htmlSpecs.vin || null,
       mileage: htmlSpecs.mileage || null,

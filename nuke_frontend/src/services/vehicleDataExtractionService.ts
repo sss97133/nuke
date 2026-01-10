@@ -45,9 +45,10 @@ export class VehicleDataExtractionService {
   ): ExtractedVehicleFields {
     const make = this.normalizeMake(rawMake);
     if (!make) {
+      // Never default to "Unknown" - return null if extraction fails
       return {
-        make: rawMake || 'Unknown',
-        model: rawModel || 'Unknown',
+        make: rawMake || null,
+        model: rawModel || null,
         series: null,
         trim: null,
         confidence: 'low',
@@ -75,9 +76,10 @@ export class VehicleDataExtractionService {
     }
 
     // Fallback: normalize model name but don't extract series/trim
+    // Never default to "Unknown" - return null if extraction fails
     return {
       make,
-      model: normalizeModelName(rawModel || 'Unknown'),
+      model: rawModel ? normalizeModelName(rawModel) : null,
       series: null,
       trim: null,
       confidence: 'low',
