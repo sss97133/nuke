@@ -111,16 +111,31 @@ serve(async (req) => {
     // BaT comments may be in HTML or require JS rendering - try direct fetch first
     console.log('🌐 Fetching BaT page HTML directly (free mode - no Firecrawl)...')
     
+    // User agent rotation for IP safety (avoids detection patterns)
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+    ]
+    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)]
+    
+    // Random delay to appear more human (1-3 seconds)
+    const humanDelay = Math.random() * 2000 + 1000
+    await new Promise(resolve => setTimeout(resolve, humanDelay))
+    
     let html = ''
     try {
       const response = await fetch(auctionUrlNorm, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'User-Agent': randomUserAgent,
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.5',
           'Accept-Encoding': 'gzip, deflate, br',
           'Connection': 'keep-alive',
           'Upgrade-Insecure-Requests': '1',
+          'Referer': 'https://www.google.com/', // Appear to come from search
         },
         signal: AbortSignal.timeout(30000)
       })

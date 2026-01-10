@@ -433,27 +433,7 @@ async function runExtractionComparison(supabase: any, testUrl?: string) {
       note: 'Use extract-premium-auction + extract-auction-comments instead'
     };
     
-    /* DISABLED - Old method is deprecated
-    try {
-      const oldStart = Date.now();
-      const { data: oldData, error: oldError } = await supabase.functions.invoke('import-bat-listing', {
-        body: { url, vehicle_id: crypto.randomUUID() }
-      });
-      const oldTime = Date.now() - oldStart;
-
-      results.comparison.old_method = {
-        success: !oldError && oldData?.success,
-        response_time_ms: oldTime,
-        fields_extracted: oldData ? Object.keys(oldData).length : 0,
-        has_vin: false, // Old method doesn't extract VIN
-        has_engine: false, // Old method doesn't extract engine
-        has_transmission: false, // Old method doesn't extract transmission
-        error: oldError?.message
-      };
-    } catch (error: any) {
-      results.comparison.old_method = { error: error.message };
-    }
-    */
+    // NOTE: Old method invocation removed to prevent accidental use of deprecated functions.
   }
 
   // Analyze improvements

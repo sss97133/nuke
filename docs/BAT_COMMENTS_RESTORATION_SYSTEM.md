@@ -150,10 +150,12 @@ BaT may block requests that:
 
 ### How We Handle It
 
-1. **Randomized Delays**: 2-4 seconds between requests
-2. **User-Agent Rotation**: Randomizes browser user agents
-3. **Batch Processing**: Small batches (50 vehicles) to avoid long-running requests
-4. **Error Handling**: Gracefully handles rate limit errors and continues
+1. **Randomized Delays**: 2-4 seconds between requests (randomized per request)
+2. **User-Agent Rotation**: Rotates between 5 different browser user agents (Chrome, Firefox, Safari on Windows/Mac/Linux)
+3. **Human-like Behavior**: 1-3 second random delays before each fetch to appear more human
+4. **Referer Headers**: Uses Google.com as referer to appear to come from search
+5. **Batch Processing**: Small batches (50 vehicles) to avoid long-running requests
+6. **Error Handling**: Gracefully handles rate limit errors and continues (up to 10 consecutive failures)
 
 ### If You Get Blocked
 
@@ -272,5 +274,6 @@ This usually means there's a database constraint issue.
 
 **Last Updated**: 2026-02-01  
 **Status**: ✅ Production Ready  
-**Firecrawl Required**: ❌ No (uses direct HTML fetch)
+**Firecrawl Required**: ❌ No (uses direct HTML fetch)  
+**IP Rotation**: ✅ Yes (user agent rotation + randomized delays + referer headers)
 

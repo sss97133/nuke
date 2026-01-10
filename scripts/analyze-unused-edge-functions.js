@@ -47,7 +47,6 @@ const FRONTEND_FUNCTIONS = new Set([
   'backfill-profile-stats',
   'detect-sensitive-document',
   'scrape-bat-member',
-  'import-bat-listing',
   'ai-agent-supervisor',
   'split-vehicle-from-source',
   'analyze-and-source-pending',
