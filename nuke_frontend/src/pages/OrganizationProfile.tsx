@@ -2165,30 +2165,30 @@ export default function OrganizationProfile() {
                         }}
                       >
                         {sortedAuctions.map((vehicle) => {
-                          // Transform to VehicleCardDense format with auction metadata
-                          const vehicleData = transformVehicleForCard(vehicle);
-                          // Add auction-specific data
-                          vehicleData.auction_end_date = vehicle.auction_end_time || undefined;
-                          vehicleData.asking_price = vehicle.auction_current_bid ? vehicle.auction_current_bid / 100 : undefined;
-                          vehicleData.current_value = vehicle.auction_current_bid ? vehicle.auction_current_bid / 100 : undefined;
-                          vehicleData.view_count = (vehicle as any).auction_view_count || undefined;
-                          
-                          return (
-                            <VehicleCardDense
-                              key={vehicle.id}
-                              vehicle={vehicleData}
-                              viewMode="grid"
-                              cardSizePx={gridCardSizePx}
-                              infoDense={false}
-                              viewerUserId={session?.user?.id}
-                              thermalPricing={false}
-                              thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}
-                              sourceStampUrl={organization?.website || vehicle.seller_org_website || vehicle.auction_url || undefined}
-                            />
-                          );
-                        })}
-                      </div>
+                        // Transform to VehicleCardDense format with auction metadata
+                        const vehicleData = transformVehicleForCard(vehicle);
+                        // Add auction-specific data
+                        vehicleData.auction_end_date = vehicle.auction_end_time || undefined;
+                        vehicleData.asking_price = vehicle.auction_current_bid ? vehicle.auction_current_bid / 100 : undefined;
+                        vehicleData.current_value = vehicle.auction_current_bid ? vehicle.auction_current_bid / 100 : undefined;
+                        vehicleData.view_count = (vehicle as any).auction_view_count || undefined;
+                        
+                        return (
+                          <VehicleCardDense
+                            key={vehicle.id}
+                            vehicle={vehicleData}
+                            viewMode="grid"
+                            cardSizePx={gridCardSizePx}
+                            infoDense={false}
+                            viewerUserId={session?.user?.id}
+                            thermalPricing={false}
+                            thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}
+                            sourceStampUrl={organization?.website || vehicle.seller_org_website || vehicle.auction_url || undefined}
+                          />
+                        );
+                      })}
                     </div>
+                  </div>
                   </div>
                 );
               }

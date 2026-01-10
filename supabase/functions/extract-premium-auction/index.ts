@@ -4466,11 +4466,11 @@ async function storeVehiclesInDatabase(
             const identityRows = vehicle.bidders
               .filter((bidder: any) => bidder.username && bidder.username.trim()) // Filter out empty usernames - never set "Unknown"
               .map((bidder: any) => ({
-                platform: 'cars_and_bids',
+              platform: 'cars_and_bids',
                 handle: bidder.username,
-                profile_url: bidder.profile_url || `https://carsandbids.com/user/${bidder.username}`,
-                display_name: bidder.username,
-                last_seen_at: nowIso,
+              profile_url: bidder.profile_url || `https://carsandbids.com/user/${bidder.username}`,
+              display_name: bidder.username,
+              last_seen_at: nowIso,
               updated_at: nowIso,
               metadata: {
                 is_buyer: bidder.is_buyer || false,
@@ -6428,17 +6428,24 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     const htmlSpecs = extractBatSpecsFromHtml(html);
     
     // Fallback: Parse from URL slug if HTML extraction failed to get make/model/year
-    const urlIdentity = (!htmlSpecs.make || !htmlSpecs.model || !htmlSpecs.year) ? parseBatIdentityFromUrl(normalizedUrl) : null;
+    // CRITICAL: Also check for "Unknown" strings (not just null/empty)
+    const needsUrlFallback = !htmlSpecs.make || !htmlSpecs.model || !htmlSpecs.year ||
+                             (htmlSpecs.make && htmlSpecs.make.toLowerCase() === 'unknown') ||
+                             (htmlSpecs.model && htmlSpecs.model.toLowerCase() === 'unknown');
+    const urlIdentity = needsUrlFallback ? parseBatIdentityFromUrl(normalizedUrl) : null;
     if (urlIdentity) {
       console.log(`✅ Extracted from URL slug: ${urlIdentity.year} ${urlIdentity.make} ${urlIdentity.model}`);
     }
     
     // Build vehicle object from HTML parsing (no AI needed)
+    // CRITICAL: Prioritize URL parsing over HTML if HTML returned "Unknown"
+    const htmlMakeValid = htmlSpecs.make && htmlSpecs.make.toLowerCase() !== 'unknown';
+    const htmlModelValid = htmlSpecs.model && htmlSpecs.model.toLowerCase() !== 'unknown';
     const vehicle: any = {
       title: htmlSpecs.title || urlIdentity?.title || null,
       year: htmlSpecs.year || urlIdentity?.year || null,
-      make: htmlSpecs.make || urlIdentity?.make || null,
-      model: htmlSpecs.model || urlIdentity?.model || null,
+      make: (htmlMakeValid ? htmlSpecs.make : null) || urlIdentity?.make || null,
+      model: (htmlModelValid ? htmlSpecs.model : null) || urlIdentity?.model || null,
       trim: htmlSpecs.trim || null,
       vin: htmlSpecs.vin || null,
       mileage: htmlSpecs.mileage || null,

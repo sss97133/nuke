@@ -3468,18 +3468,18 @@ const VehicleProfile: React.FC = () => {
               
               {/* Reference Documents - Upload and Display (merged) */}
               <VehicleReferenceLibrary
-                vehicleId={vehicle.id}
+                  vehicleId={vehicle.id}
                 userId={session?.user?.id}
-                year={vehicle.year}
-                make={vehicle.make}
-                series={(vehicle as any).series}
-                model={vehicle.model}
-                bodyStyle={(vehicle as any).body_style}
+                  year={vehicle.year}
+                  make={vehicle.make}
+                  series={(vehicle as any).series}
+                  model={vehicle.model}
+                  bodyStyle={(vehicle as any).body_style}
                 refreshKey={referenceLibraryRefreshKey}
-                onUploadComplete={() => {
-                  loadVehicle();
-                  setReferenceLibraryRefreshKey((v) => v + 1);
-                }}
+                  onUploadComplete={() => {
+                    loadVehicle();
+                    setReferenceLibraryRefreshKey((v) => v + 1);
+                  }}
               />
 
               {/* Description */}
