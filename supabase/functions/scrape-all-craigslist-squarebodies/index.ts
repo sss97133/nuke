@@ -496,10 +496,19 @@ serve(async (req) => {
               continue
             }
             
-            // If model is missing, use "Unknown" so we can still create the vehicle
+            // If model is missing, leave as null - do NOT create vehicle with bad data
             if (!finalModel || finalModel.trim() === '') {
-              console.warn(`  ⚠️ Model missing for "${scrapeData.data.title}", using "Unknown"`)
-              finalModel = 'Unknown'
+              console.warn(`  ⚠️ Model missing for "${scrapeData.data.title}" - SKIPPING vehicle (no bad data)`)
+              const missingModelError = {
+                message: `Cannot process - missing model: model="${finalModel}"`,
+                listingUrl: listingUrl,
+                title: scrapeData.data.title
+              }
+              if (!firstError) firstError = missingModelError
+              allErrors.push(missingModelError)
+              stats.errors++
+              stats.processed++
+              continue
             }
             
             console.log(`  ✅ Processing vehicle: ${yearNum} ${finalMake} ${finalModel}`)

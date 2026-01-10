@@ -437,9 +437,16 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
         // Extract from title as fallback if scraper didn't find make/model
         const titleExtraction = scrapedData.title ? extractFromTitle(scrapedData.title) : { make: null, model: null };
         
-        // Use scraped data, fallback to title extraction, fallback to "Unknown" for make (required field)
-        const finalMake = scrapedData.make || titleExtraction.make || 'Unknown';
-        const finalModel = scrapedData.model || titleExtraction.model || 'Unknown';
+        // Use scraped data, fallback to title extraction, but NEVER use "Unknown" - leave null or fail
+        // Make is required - if we can't extract it, don't create the vehicle
+        const finalMake = scrapedData.make || titleExtraction.make || null;
+        const finalModel = scrapedData.model || titleExtraction.model || null;
+        
+        // Fail if we don't have make (required field)
+        if (!finalMake || !finalMake.trim()) {
+          console.warn('Cannot create vehicle - missing make');
+          return; // Don't create vehicle with bad data
+        }
         
         // Create vehicle immediately
         const vehicleData: any = {
