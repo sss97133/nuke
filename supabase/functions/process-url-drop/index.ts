@@ -236,8 +236,8 @@ async function processBaTListingURL(url: string, supabase: any) {
   const { data: existing } = await supabase
     .from('vehicles')
     .select('id')
-    .eq('listing_url', url)
-    .single();
+    .or(`listing_url.eq.${url},discovery_url.eq.${url},bat_auction_url.eq.${url}`)
+    .maybeSingle();
 
   if (existing) {
     return {
@@ -246,25 +246,44 @@ async function processBaTListingURL(url: string, supabase: any) {
     };
   }
 
-  // Call existing BaT import function
-  const importResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/import-bat-listing`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ url })
+  // ✅ Approved BaT workflow (do NOT use deprecated import-bat-listing/comprehensive-bat-extraction)
+  const { data: coreData, error: coreErr } = await supabase.functions.invoke('extract-premium-auction', {
+    body: { url, max_vehicles: 1 }
   });
 
-  const importData = await importResponse.json();
-
-  if (!importData.success) {
-    throw new Error('Failed to import BaT listing');
+  if (coreErr || !coreData?.success) {
+    throw new Error(coreErr?.message || coreData?.error || 'Failed to extract BaT listing');
   }
 
+  const vehicleId =
+    coreData?.created_vehicle_ids?.[0] ||
+    coreData?.updated_vehicle_ids?.[0] ||
+    coreData?.vehicle_id ||
+    null;
+
+  if (!vehicleId) {
+    throw new Error('BaT extraction succeeded but no vehicle_id returned');
+  }
+
+  // Best-effort comments/bids (non-critical)
+  try {
+    await supabase.functions.invoke('extract-auction-comments', {
+      body: { auction_url: url, vehicle_id: vehicleId }
+    });
+  } catch {
+    // ignore
+  }
+
+  // Return the freshly created/updated vehicle row (best-effort)
+  const { data: vehicle } = await supabase
+    .from('vehicles')
+    .select('*')
+    .eq('id', vehicleId)
+    .maybeSingle();
+
   return {
-    entityData: importData.vehicle,
-    entityId: importData.vehicleId
+    entityData: vehicle || { listing_url: url },
+    entityId: vehicleId
   };
 }
 

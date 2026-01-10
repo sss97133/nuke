@@ -48,10 +48,10 @@ const BaTBulkImporter: React.FC<Props> = ({
   const importSingleListing = async (batUrl: string): Promise<ImportResult> => {
     return batRateLimiter.execute(async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('import-bat-listing', {
+        const { data, error } = await supabase.functions.invoke('complete-bat-import', {
           body: {
-            batUrl,
-            organizationId
+            bat_url: batUrl,
+            organization_id: organizationId
           }
         });
 
@@ -62,8 +62,8 @@ const BaTBulkImporter: React.FC<Props> = ({
         return {
           url: batUrl,
           success: true,
-          vehicleId: data.vehicleId,
-          listing: data.listing
+          vehicleId: data?.vehicleId || data?.vehicle_id,
+          listing: data?.listing
         };
       } catch (error: any) {
         return { url: batUrl, success: false, error: error.message };
@@ -345,11 +345,9 @@ const BaTBulkImporter: React.FC<Props> = ({
           }}>
             <div style={{ fontWeight: 600, marginBottom: '4px' }}>What this does:</div>
             <ul style={{ margin: 0, paddingLeft: '20px' }}>
-              <li>Extracts year, make, model, VIN, sale price, sale date from each BaT listing</li>
-              <li>Matches to existing vehicles in your inventory (by VIN or fuzzy match)</li>
-              <li>Creates new vehicle profiles if no match found</li>
-              <li>Marks vehicles as "SOLD" with BaT-verified pricing</li>
-              <li>Adds data validation entries (100% confidence from BaT)</li>
+              <li>Runs the approved BaT extractors to create or update each vehicle profile</li>
+              <li>Links each imported vehicle to this organization as a seller</li>
+              <li>Attempts comment/bid extraction (best-effort; may be incomplete in free mode)</li>
             </ul>
           </div>
 
@@ -363,7 +361,7 @@ const BaTBulkImporter: React.FC<Props> = ({
             border: '1px solid rgba(59, 130, 246, 0.3)'
           }}>
             <div style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--accent)' }}>
-              🚀 Coming Soon: Reverse Flow
+              Coming Soon: Reverse Flow
             </div>
             <div>
               Once your profiles are complete, you'll be able to submit vehicles TO BaT with one click.

@@ -772,7 +772,7 @@ const AdminMissionControl: React.FC = () => {
         </div>
         <div className="card-body">
           <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
-            Fixes BaT profiles where the UI can show a gallery but `vehicle_images` has 0 rows by re-invoking `import-bat-listing` in a controlled batch.
+            Fixes BaT profiles where the UI can show a gallery but `vehicle_images` has 0 rows by re-extracting the canonical BaT gallery and writing image rows into `vehicle_images`.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
@@ -919,7 +919,7 @@ const AdminMissionControl: React.FC = () => {
         </div>
         <div className="card-body">
           <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
-            Selects incomplete BaT vehicles and re-invokes `import-bat-listing`, which chains image backfill, comprehensive extraction, and comment ingestion.
+            Selects incomplete BaT vehicles and runs the approved workflow (core extraction + best-effort comments) to top off images, description, location, and auction metadata.
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>

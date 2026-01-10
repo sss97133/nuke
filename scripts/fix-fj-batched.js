@@ -40,26 +40,7 @@ function extractBatData(html) {
   const h = String(html || '');
   const data = {};
   
-  // VIN - comprehensive patterns
-  const vinPatterns = [
-    /<li[^>]*>\s*VIN:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{8,17})<\/a>\s*<\/li>/i,
-    /<li[^>]*>\s*VIN:\s*([A-HJ-NPR-Z0-9]{8,17})\s*<\/li>/i,
-    /<li[^>]*>\s*Chassis:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{4,16})<\/a>\s*<\/li>/i,
-    /<li[^>]*>\s*Chassis:\s*([A-HJ-NPR-Z0-9]{4,16})\s*<\/li>/i,
-    /(?:vin|vehicle\s*identification|chassis)[:\s#]*["']?([A-HJ-NPR-Z0-9]{8,17})\b/i,
-    /"vin"[:\s]*"([A-HJ-NPR-Z0-9]{8,17})"/i,
-  ];
-  for (const pattern of vinPatterns) {
-    const m = h.match(pattern);
-    if (m?.[1]) {
-      const v = m[1].toUpperCase().trim();
-      if (v.length >= 8 && v.length <= 17 && !/[IOQ]/.test(v)) {
-        data.vin = v;
-        break;
-      }
-    }
-  }
-  
+  // Extract essentials section first
   const essentialsStart = h.search(/<div[^>]*class="[^"]*essentials[^"]*"[^>]*>/i);
   let essentialsText = '';
   if (essentialsStart !== -1) {
@@ -68,6 +49,30 @@ function extractBatData(html) {
   }
   
   const searchText = essentialsText || h;
+  
+  // VIN - comprehensive patterns (handle "Chassis:" format)
+  const vinPatterns = [
+    /<li[^>]*>\s*VIN:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{8,17})<\/a>\s*<\/li>/i,
+    /<li[^>]*>\s*VIN:\s*([A-HJ-NPR-Z0-9]{8,17})\s*<\/li>/i,
+    /<li[^>]*>\s*Chassis:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{8,17})<\/a>\s*<\/li>/i,
+    /<li[^>]*>\s*Chassis:\s*([A-HJ-NPR-Z0-9]{8,17})\s*<\/li>/i,
+    // Match "Chassis: 1G1YY26Y565100149" in essentials text
+    /Chassis:\s*([A-HJ-NPR-Z0-9]{8,17})\b/i,
+    /Chassis[:\s]+([A-HJ-NPR-Z0-9]{8,17})\b/i,
+    /(?:vin|vehicle\s*identification)[:\s#]*["']?([A-HJ-NPR-Z0-9]{8,17})\b/i,
+    /"vin"[:\s]*"([A-HJ-NPR-Z0-9]{8,17})"/i,
+  ];
+  for (const pattern of vinPatterns) {
+    const m = searchText.match(pattern) || h.match(pattern);
+    if (m?.[1]) {
+      const v = m[1].toUpperCase().trim();
+      // Accept 8-17 character VINs/chassis numbers (no I, O, Q)
+      if (v.length >= 8 && v.length <= 17 && !/[IOQ]/.test(v)) {
+        data.vin = v;
+        break;
+      }
+    }
+  }
   
   // Mileage
   const mileagePatterns = [
@@ -189,16 +194,58 @@ async function fixVehicle(vehicle) {
       updates.description = extracted.description;
     }
     
-    // Trim from model name
+    // Trim from model name - more comprehensive patterns
     if (!vehicle.trim && vehicle.model) {
-      const trimMatch = vehicle.model.match(/\b(GT|GTS|GTI|GTR|RS|RSR|S|SE|LE|LX|EX|TURBO|TURBO\s+S|S4|S6|S8|AMG|M3|M5|M6|Z06|ZR1|Type\s+R|Type\s+S|Si|R\/T|SRT|Hellcat|Trackhawk|Coupe|Convertible|Roadster|Sedan|Wagon|SUV)\b/i);
-      if (trimMatch) {
-        updates.trim = trimMatch[1].trim();
+      // Try multiple trim patterns
+      const trimPatterns = [
+        /\b(Z06|ZR1|GT3|GT3\s+RS|GT3\s+RS\s+Weissach|GT|GTS|GTI|GTR|RS|RSR|S|SE|LE|LX|EX|Si|R\/T|SRT|Hellcat|Trackhawk|AMG|M3|M4|M5|M6|Type\s+R|Type\s+S)\b/i,
+        /\b(Coupe|Convertible|Roadster|Cabriolet|Targa|Sedan|Wagon|SUV|Hatchback|Pickup|Hardtop|Spider)\b/i,
+        /\b(Super\s+Sport|SS|Turbo|Twin\s+Turbo|Supercharged|Base|Deluxe|Custom|Special|Limited|Ultimate|Premium|Sport|Racing)\b/i,
+        /\b(\d+[a-z]?)\s*(Coupe|Convertible|Roadster|Sedan|Wagon)\b/i, // e.g. "911 Turbo"
+      ];
+      
+      for (const pattern of trimPatterns) {
+        const trimMatch = vehicle.model.match(pattern);
+        if (trimMatch && trimMatch[1]) {
+          const trim = trimMatch[1].trim();
+          // Skip if it's just a number or too short
+          if (trim.length >= 2 && !/^\d+$/.test(trim)) {
+            updates.trim = trim;
+            break;
+          }
+        }
+      }
+      
+      // Also try extracting from description if available
+      if (!updates.trim && extracted.description) {
+        const descTrimMatch = extracted.description.match(/\b(GT|GTS|GTI|GTR|RS|RSR|S|SE|Turbo|AMG|M\d+|Z06|ZR1)\b/i);
+        if (descTrimMatch) {
+          updates.trim = descTrimMatch[1].trim();
+        }
       }
     }
     
+    // Check what's actually missing vs what we extracted
+    const missingFields = [];
+    if (!vehicle.vin) missingFields.push('VIN');
+    if (!vehicle.trim) missingFields.push('trim');
+    if (!vehicle.description || vehicle.description.length < 100) missingFields.push('description');
+    
     if (Object.keys(updates).length === 0) {
-      return { success: true, updated: false, message: 'No missing fields found' };
+      // If vehicle still needs fixes but we didn't extract anything, report what's missing
+      if (missingFields.length > 0) {
+        const extractedFields = [];
+        if (extracted.vin) extractedFields.push('VIN');
+        if (extracted.trim) extractedFields.push('trim');
+        if (extracted.description) extractedFields.push('description');
+        
+        return { 
+          success: true, 
+          updated: false, 
+          message: `Missing: ${missingFields.join(', ')} but couldn't extract from HTML${extractedFields.length > 0 ? ` (found: ${extractedFields.join(', ')})` : ''}` 
+        };
+      }
+      return { success: true, updated: false, message: 'Already complete' };
     }
     
     const { error } = await supabase
@@ -351,7 +398,7 @@ async function main() {
   console.log('\n' + '='.repeat(70));
   console.log('🎉 ALL BATCHES COMPLETE');
   console.log('='.repeat(70));
-  console.log(`Total Processed: ${offset + (totalSuccess + totalFailed)}`);
+  console.log(`Total Processed: ${allVehiclesNeedingFixes.length} vehicles`);
   console.log(`✅ Successful: ${totalSuccess}`);
   console.log(`🔄 Total Updated: ${totalUpdated}`);
   console.log(`❌ Failed: ${totalFailed}`);

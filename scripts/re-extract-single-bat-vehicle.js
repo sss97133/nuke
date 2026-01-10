@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * Re-extract BaT images for a single vehicle using comprehensive-bat-extraction
- * This ensures all 120+ full-resolution images from data-gallery-items are extracted
+ * Re-extract BaT images for a single vehicle using the approved workflow.
+ * This ensures the canonical gallery (data-gallery-items) is re-parsed and written into:
+ * - vehicles.origin_metadata.image_urls (if used)
+ * - vehicle_images rows (for UI)
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -51,10 +53,21 @@ async function reExtractVehicle(vehicleId) {
   console.log(`📊 Current image count in origin_metadata: ${oldCount}`);
   
   try {
-    // Use import-bat-listing which properly extracts from data-gallery-items
-    console.log(`\n🚀 Calling import-bat-listing...`);
-    const { data, error } = await supabase.functions.invoke('import-bat-listing', {
-      body: { batUrl, vehicleId }
+    // Ensure this specific vehicle is the one updated by URL-based extractors
+    await supabase
+      .from('vehicles')
+      .update({
+        discovery_url: batUrl,
+        listing_url: batUrl,
+        bat_auction_url: batUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', vehicleId);
+    
+    // Approved workflow: extract-premium-auction (core data incl. images)
+    console.log(`\n🚀 Calling extract-premium-auction...`);
+    const { data, error } = await supabase.functions.invoke('extract-premium-auction', {
+      body: { url: batUrl, max_vehicles: 1 }
     });
     
     if (error) {

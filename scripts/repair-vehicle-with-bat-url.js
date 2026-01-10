@@ -69,60 +69,64 @@ async function main() {
 
   console.log(`📋 Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
 
-  // Step 1: Import BaT listing (this will update the vehicle and extract data)
-  console.log(`\n📥 Step 1: Importing BaT listing...`);
+  // Step 0: Ensure URL-based extractors target THIS vehicle row
+  console.log(`\n🔗 Step 0: Attaching BaT URL to this vehicle...`);
   try {
-    const { data: importData, error: importError } = await supabase.functions.invoke('import-bat-listing', {
-      body: {
-        batUrl,
-        vehicleId  // This will match and update the existing vehicle
-      },
-      headers: {
-        'Authorization': `Bearer ${supabaseKey}`
-      }
-    });
-
-    if (importError) {
-      console.error('❌ Import error:', importError);
-    } else if (importData?.vehicleId) {
-      console.log('✅ BaT listing imported successfully!');
-    } else {
-      console.warn('⚠️  Import returned:', importData);
+    const { error: attachErr } = await supabase
+      .from('vehicles')
+      .update({
+        discovery_url: batUrl,
+        listing_url: batUrl,
+        bat_auction_url: batUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', vehicleId);
+    if (attachErr) {
+      console.warn('⚠️  Could not attach URL (non-fatal):', attachErr.message);
     }
   } catch (error) {
-    console.error('❌ Error importing:', error.message);
+    console.warn('⚠️  Could not attach URL (non-fatal):', error.message);
   }
 
-  // Step 2: Run comprehensive extraction to ensure all data is extracted
-  console.log(`\n📥 Step 2: Running comprehensive BaT extraction...`);
+  // Step 1: Core extraction (approved)
+  console.log(`\n📥 Step 1: Extracting core data (VIN/specs/images/auction metadata)...`);
   try {
-    const { data: extractData, error: extractError } = await supabase.functions.invoke('comprehensive-bat-extraction', {
-      body: {
-        batUrl,
-        vehicleId
-      },
-      headers: {
-        'Authorization': `Bearer ${supabaseKey}`
-      }
+    const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-premium-auction', {
+      body: { url: batUrl, max_vehicles: 1 }
     });
 
     if (extractError) {
-      console.error('❌ Extraction error:', extractError);
+      console.error('❌ Core extraction error:', extractError);
     } else if (extractData?.success) {
-      console.log('✅ Comprehensive extraction completed!');
-      console.log('   Extracted:', {
-        vin: extractData.data?.vin || 'N/A',
-        mileage: extractData.data?.mileage || 'N/A',
-        engine: extractData.data?.engine || 'N/A',
-        sale_price: extractData.data?.sale_price || 'N/A',
-        bid_count: extractData.data?.bid_count || 'N/A',
-        comment_count: extractData.data?.comment_count || 'N/A',
-      });
+      console.log('✅ Core extraction completed!');
+      const extractedVehicleId = extractData?.created_vehicle_ids?.[0] || extractData?.updated_vehicle_ids?.[0] || null;
+      if (extractedVehicleId && extractedVehicleId !== vehicleId) {
+        console.warn(`⚠️  Note: extractor updated/created a different vehicle_id: ${extractedVehicleId}`);
+      }
     } else {
-      console.warn('⚠️  Extraction returned:', extractData);
+      console.warn('⚠️  Core extraction returned:', extractData);
     }
   } catch (error) {
-    console.error('❌ Error extracting:', error.message);
+    console.error('❌ Error extracting core data:', error.message);
+  }
+
+  // Step 2: Comments/bids (approved, best-effort)
+  console.log(`\n💬 Step 2: Extracting comments and bids (best-effort)...`);
+  try {
+    const { data: commentsData, error: commentsError } = await supabase.functions.invoke('extract-auction-comments', {
+      body: { auction_url: batUrl, vehicle_id: vehicleId }
+    });
+
+    if (commentsError) {
+      console.warn('⚠️  Comments/bids extraction error (non-fatal):', commentsError.message || commentsError);
+    } else {
+      console.log('✅ Comments/bids step returned:', {
+        comments_extracted: commentsData?.comments_extracted ?? commentsData?.comments ?? null,
+        bids_extracted: commentsData?.bids_extracted ?? commentsData?.bids ?? null,
+      });
+    }
+  } catch (error) {
+    console.warn('⚠️  Comments/bids extraction failed (non-fatal):', error.message);
   }
 
   // Step 3: Verify the data
