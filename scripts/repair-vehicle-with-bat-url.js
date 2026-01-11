@@ -38,7 +38,7 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://qkgaybvrernstplzja
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseKey) {
-  console.error('❌ SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_ANON_KEY not set');
+  console.error('SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_ANON_KEY not set');
   process.exit(1);
 }
 
@@ -53,7 +53,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`🔧 Repairing vehicle ${vehicleId} with BaT URL: ${batUrl}\n`);
+  console.log(`Repairing vehicle ${vehicleId} with BaT URL: ${batUrl}\n`);
 
   // Verify vehicle exists
   const { data: vehicle, error: vehicleError } = await supabase
@@ -67,10 +67,10 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`📋 Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
+  console.log(`Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model}`);
 
   // Step 0: Ensure URL-based extractors target THIS vehicle row
-  console.log(`\n🔗 Step 0: Attaching BaT URL to this vehicle...`);
+  console.log(`\nStep 0: Attaching BaT URL to this vehicle...`);
   try {
     const { error: attachErr } = await supabase
       .from('vehicles')
@@ -82,55 +82,55 @@ async function main() {
       })
       .eq('id', vehicleId);
     if (attachErr) {
-      console.warn('⚠️  Could not attach URL (non-fatal):', attachErr.message);
+      console.warn('Could not attach URL (non-fatal):', attachErr.message);
     }
   } catch (error) {
-    console.warn('⚠️  Could not attach URL (non-fatal):', error.message);
+    console.warn('Could not attach URL (non-fatal):', error.message);
   }
 
   // Step 1: Core extraction (approved)
-  console.log(`\n📥 Step 1: Extracting core data (VIN/specs/images/auction metadata)...`);
+  console.log(`\nStep 1: Extracting core data (VIN/specs/images/auction metadata)...`);
   try {
-    const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-premium-auction', {
-      body: { url: batUrl, max_vehicles: 1 }
+    const { data: extractData, error: extractError } = await supabase.functions.invoke('extract-bat-core', {
+      body: { url: batUrl, vehicle_id: vehicleId, prefer_snapshot: true }
     });
 
     if (extractError) {
-      console.error('❌ Core extraction error:', extractError);
+      console.error('Core extraction error:', extractError);
     } else if (extractData?.success) {
-      console.log('✅ Core extraction completed!');
+      console.log('Core extraction completed');
       const extractedVehicleId = extractData?.created_vehicle_ids?.[0] || extractData?.updated_vehicle_ids?.[0] || null;
       if (extractedVehicleId && extractedVehicleId !== vehicleId) {
-        console.warn(`⚠️  Note: extractor updated/created a different vehicle_id: ${extractedVehicleId}`);
+        console.warn(`Note: extractor updated/created a different vehicle_id: ${extractedVehicleId}`);
       }
     } else {
-      console.warn('⚠️  Core extraction returned:', extractData);
+      console.warn('Core extraction returned:', extractData);
     }
   } catch (error) {
-    console.error('❌ Error extracting core data:', error.message);
+    console.error('Error extracting core data:', error.message);
   }
 
   // Step 2: Comments/bids (approved, best-effort)
-  console.log(`\n💬 Step 2: Extracting comments and bids (best-effort)...`);
+  console.log(`\nStep 2: Extracting comments and bids (best-effort)...`);
   try {
     const { data: commentsData, error: commentsError } = await supabase.functions.invoke('extract-auction-comments', {
       body: { auction_url: batUrl, vehicle_id: vehicleId }
     });
 
     if (commentsError) {
-      console.warn('⚠️  Comments/bids extraction error (non-fatal):', commentsError.message || commentsError);
+      console.warn('Comments/bids extraction error (non-fatal):', commentsError.message || commentsError);
     } else {
-      console.log('✅ Comments/bids step returned:', {
+      console.log('Comments/bids step returned:', {
         comments_extracted: commentsData?.comments_extracted ?? commentsData?.comments ?? null,
         bids_extracted: commentsData?.bids_extracted ?? commentsData?.bids ?? null,
       });
     }
   } catch (error) {
-    console.warn('⚠️  Comments/bids extraction failed (non-fatal):', error.message);
+    console.warn('Comments/bids extraction failed (non-fatal):', error.message);
   }
 
   // Step 3: Verify the data
-  console.log(`\n🔍 Step 3: Verifying extracted data...`);
+  console.log(`\nStep 3: Verifying extracted data...`);
   const { data: updatedVehicle, error: verifyError } = await supabase
     .from('vehicles')
     .select(`
@@ -142,7 +142,7 @@ async function main() {
     .single();
 
   if (!verifyError && updatedVehicle) {
-    console.log('\n✅ Final vehicle data:');
+    console.log('\nFinal vehicle data:');
     console.log(`   BaT URL: ${updatedVehicle.bat_auction_url || 'None'}`);
     console.log(`   VIN: ${updatedVehicle.vin || 'None'}`);
     console.log(`   Mileage: ${updatedVehicle.mileage || 'None'}`);
@@ -156,10 +156,10 @@ async function main() {
     console.log(`   Timeline Events: ${updatedVehicle.timeline_events?.[0]?.count || 0}`);
     console.log(`   Description: ${updatedVehicle.description ? `${updatedVehicle.description.substring(0, 100)}...` : 'None'}`);
   } else {
-    console.error('❌ Error verifying data:', verifyError?.message);
+    console.error('Error verifying data:', verifyError?.message);
   }
 
-  console.log('\n✅ Repair complete!');
+  console.log('\nRepair complete');
 }
 
 main().catch(console.error);

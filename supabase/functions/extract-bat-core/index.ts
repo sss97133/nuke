@@ -724,38 +724,69 @@ serve(async (req) => {
       ].filter(Boolean))
     );
 
-    console.log(`extract-bat-core: fetching ${listingUrlNorm}`);
-
     let html = "";
     let httpStatus: number | null = null;
     let userAgent = "";
-    try {
-      const fetched = await fetchHtmlDirect(listingUrlNorm);
-      html = fetched.html;
-      httpStatus = fetched.status;
-      userAgent = fetched.userAgent;
-    } catch (e: any) {
+    let htmlSource: "snapshot" | "direct" = "direct";
+
+    // Prefer existing DB snapshots (reduces BaT load + avoids bans). Can be disabled per-request.
+    const preferSnapshot = body?.prefer_snapshot === false ? false : true;
+    if (preferSnapshot) {
+      try {
+        const { data: snap, error: snapErr } = await supabase
+          .from("listing_page_snapshots")
+          .select("id, html, http_status, fetched_at")
+          .eq("platform", "bat")
+          .eq("success", true)
+          .eq("http_status", 200)
+          .in("listing_url", urlCandidates)
+          .order("fetched_at", { ascending: false, nullsFirst: false })
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!snapErr && snap?.html && String(snap.html).length > 1000) {
+          html = String(snap.html);
+          httpStatus = typeof (snap as any)?.http_status === "number" ? (snap as any).http_status : 200;
+          userAgent = `snapshot:${String((snap as any)?.id || "")}`;
+          htmlSource = "snapshot";
+          console.log(`extract-bat-core: using snapshot for ${listingUrlCanonical}`);
+        }
+      } catch (e: any) {
+        console.warn(`extract-bat-core: snapshot lookup failed (non-fatal): ${e?.message || String(e)}`);
+      }
+    }
+    if (!html) {
+      console.log(`extract-bat-core: fetching ${listingUrlNorm}`);
+      try {
+        const fetched = await fetchHtmlDirect(listingUrlNorm);
+        html = fetched.html;
+        httpStatus = fetched.status;
+        userAgent = fetched.userAgent;
+        htmlSource = "direct";
+      } catch (e: any) {
+        await trySaveHtmlSnapshot({
+          supabase,
+          listingUrl: listingUrlNorm,
+          httpStatus: null,
+          success: false,
+          errorMessage: e?.message ? String(e.message) : "Direct fetch failed",
+          html: null,
+          metadata: { extractor: "extract-bat-core", mode: "free" },
+        });
+        throw e;
+      }
+
       await trySaveHtmlSnapshot({
         supabase,
         listingUrl: listingUrlNorm,
-        httpStatus: null,
-        success: false,
-        errorMessage: e?.message ? String(e.message) : "Direct fetch failed",
-        html: null,
-        metadata: { extractor: "extract-bat-core", mode: "free" },
+        httpStatus,
+        success: true,
+        errorMessage: null,
+        html,
+        metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
       });
-      throw e;
     }
-
-    await trySaveHtmlSnapshot({
-      supabase,
-      listingUrl: listingUrlNorm,
-      httpStatus,
-      success: true,
-      errorMessage: null,
-      html,
-      metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
-    });
 
     const identity = extractTitleIdentity(html, listingUrlCanonical);
     const essentials = extractEssentials(html);
@@ -870,20 +901,80 @@ serve(async (req) => {
         modelLower.includes("|") ||
         modelLower.includes("auction preview");
 
+      const looksLikeBatBoilerplate = (t: string): boolean => {
+        const s = String(t || "").toLowerCase();
+        return (
+          s.includes("for sale on bat auctions") ||
+          s.includes("bring a trailer") ||
+          s.includes("bringatrailer.com") ||
+          s.includes("sold for $") ||
+          s.includes("(lot #") ||
+          s.includes("lot #") ||
+          s.includes("auction preview") ||
+          s.includes("| bring a trailer") ||
+          s.includes("|")
+        );
+      };
+
+      const wordCount = (t: string): number => {
+        return String(t || "").trim().split(/\s+/).filter(Boolean).length;
+      };
+
+      const looksLikeEngineSpec = (t: string): boolean => {
+        const s = String(t || "");
+        return (
+          /\b\d+(?:\.\d+)?-?\s*Liter\b/i.test(s) ||
+          /\b\d+(?:\.\d+)?\s*L\b/i.test(s) ||
+          /\bV\d\b/i.test(s) ||
+          /\b[0-9,]{3,5}\s*cc\b/i.test(s) ||
+          /\b\d{2,3}\s*ci\b/i.test(s) ||
+          /\bcubic\s+inch\b/i.test(s) ||
+          /\bflat[-\s]?four\b/i.test(s) ||
+          /\bflat[-\s]?six\b/i.test(s) ||
+          /\binline[-\s]?(?:three|four|five|six)\b/i.test(s) ||
+          /\binline[-\s]?\d\b/i.test(s) ||
+          /\bv-?twin\b/i.test(s)
+        );
+      };
+
+      const looksLikeTransmissionSpec = (t: string): boolean => {
+        const s = String(t || "");
+        return (
+          /\b(transmission|transaxle|gearbox)\b/i.test(s) ||
+          /\b(manual|automatic)\b/i.test(s) ||
+          /\b(cvt|dct)\b/i.test(s) ||
+          /\bdual[-\s]?clutch\b/i.test(s) ||
+          /\b(\d{1,2}-speed|four-speed|five-speed|six-speed|seven-speed|eight-speed|nine-speed|ten-speed)\b/i.test(s) ||
+          /\b(th400|th350|4l60|4l80|zf|getrag|tiptronic|pdk)\b/i.test(s)
+        );
+      };
+
       const isPollutedSpec = (field: string, val: any): boolean => {
         const t = String(val ?? "").trim().toLowerCase();
         if (!t) return false;
         if (t === "var" || t === "cycles") return true;
+        if (looksLikeBatBoilerplate(t)) return true;
+        if (t.length > 140) return true;
         if (field === "transmission") {
-          if (t.startsWith(",") || t.includes("driving experien") || t.includes("for sale on bat auctions") || t.includes("bring a trailer")) {
+          if (
+            t.startsWith(",") ||
+            t.includes("driving experien") ||
+            t.includes("is said to have") ||
+            t.includes("were removed sometime") ||
+            (!looksLikeTransmissionSpec(t) && (wordCount(t) > 18 || t.length > 90)) ||
+            (/[.!?]/.test(t) && t.length > 60)
+          ) {
             return true;
           }
         }
         if (field === "color") {
           if (t === "var") return true;
+          if (t.length > 80) return true;
         }
         if (field === "engine_size") {
           if (t === "cycles") return true;
+          if (!looksLikeEngineSpec(t) && (wordCount(t) > 14 || t.length > 90)) return true;
+          if (!looksLikeEngineSpec(t) && (t.includes("table") || t.includes("coffee"))) return true;
         }
         return false;
       };
@@ -915,19 +1006,31 @@ serve(async (req) => {
       if (!existing?.bat_lot_number && essentials.lot_number) updatePayload.bat_lot_number = essentials.lot_number;
 
       if (!existing?.mileage && essentials.mileage) updatePayload.mileage = essentials.mileage;
-      if ((!existing?.color || isPollutedSpec("color", existing?.color)) && essentials.exterior_color) {
+      const existingColorPolluted = isPollutedSpec("color", existing?.color);
+      if ((!existing?.color || existingColorPolluted) && essentials.exterior_color) {
         updatePayload.color = essentials.exterior_color;
-        if (!existing?.color_source) updatePayload.color_source = "bring a trailer";
+        updatePayload.color_source = "bring a trailer";
+      } else if (existingColorPolluted && !essentials.exterior_color) {
+        updatePayload.color = null;
+        updatePayload.color_source = null;
       }
       if (!existing?.interior_color && essentials.interior_color) updatePayload.interior_color = essentials.interior_color;
-      if ((!existing?.transmission || isPollutedSpec("transmission", existing?.transmission)) && essentials.transmission) {
+      const existingTransmissionPolluted = isPollutedSpec("transmission", existing?.transmission);
+      if ((!existing?.transmission || existingTransmissionPolluted) && essentials.transmission) {
         updatePayload.transmission = essentials.transmission;
-        if (!existing?.transmission_source) updatePayload.transmission_source = "bring a trailer";
+        updatePayload.transmission_source = "bring a trailer";
+      } else if (existingTransmissionPolluted && !essentials.transmission) {
+        updatePayload.transmission = null;
+        updatePayload.transmission_source = null;
       }
       if (!existing?.drivetrain && essentials.drivetrain) updatePayload.drivetrain = essentials.drivetrain;
-      if ((!existing?.engine_size || isPollutedSpec("engine_size", existing?.engine_size)) && essentials.engine) {
+      const existingEnginePolluted = isPollutedSpec("engine_size", existing?.engine_size);
+      if ((!existing?.engine_size || existingEnginePolluted) && essentials.engine) {
         updatePayload.engine_size = essentials.engine;
-        if (!existing?.engine_source) updatePayload.engine_source = "bring a trailer";
+        updatePayload.engine_source = "bring a trailer";
+      } else if (existingEnginePolluted && !essentials.engine) {
+        updatePayload.engine_size = null;
+        updatePayload.engine_source = null;
       }
 
       // Auction outcomes / counters (set if missing)
@@ -958,13 +1061,28 @@ serve(async (req) => {
           Boolean(updatePayload?.vin) &&
           (code === "23505" || msg.includes("vehicles_vin_unique_index"));
 
-        if (isVinUniqueConflict) {
-          console.warn(`VIN unique conflict for vehicle ${vehicleId} (vin=${String(updatePayload.vin)}). Retrying update without vin...`);
+        // Another common case: discovery_url is unique; duplicates can exist due to long-lived ingest.
+        // Do NOT fail the whole extraction; just avoid setting discovery_url on this row.
+        const isDiscoveryUrlUniqueConflict =
+          Boolean(updatePayload?.discovery_url) &&
+          (code === "23505" || msg.includes("vehicles_discovery_url_unique"));
+
+        if (isVinUniqueConflict || isDiscoveryUrlUniqueConflict) {
+          const dropped: string[] = [];
           try {
-            delete updatePayload.vin;
+            if (isVinUniqueConflict) {
+              delete updatePayload.vin;
+              dropped.push("vin");
+            }
+            if (isDiscoveryUrlUniqueConflict) {
+              delete updatePayload.discovery_url;
+              dropped.push("discovery_url");
+            }
           } catch {
             // ignore
           }
+
+          console.warn(`Unique conflict for vehicle ${vehicleId}. Retrying update without: ${dropped.join(", ") || "unknown"}`);
 
           const { error: retryErr } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
           if (retryErr) {
@@ -974,7 +1092,7 @@ serve(async (req) => {
               re?.details ? String(re.details) :
               re?.hint ? String(re.hint) :
               JSON.stringify(re);
-            throw new Error(`vehicles update failed (after removing vin): ${rmsg}`);
+            throw new Error(`vehicles update failed (after removing ${dropped.join(", ") || "conflicting fields"}): ${rmsg}`);
           }
         } else {
           throw new Error(`vehicles update failed: ${msg}`);
