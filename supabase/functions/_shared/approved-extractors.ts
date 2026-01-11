@@ -4,7 +4,7 @@
  * ⚠️ CRITICAL: Do NOT use deprecated functions for BaT extraction.
  * 
  * ✅ APPROVED WORKFLOW (use this):
- * 1. extract-premium-auction (core data: VIN, specs, images, auction_events)
+ * 1. extract-bat-core (core data: HTML snapshot + clean identity + essentials/images/auction_events)
  * 2. extract-auction-comments (comments, bids)
  * 
  * ❌ DEPRECATED (DO NOT USE):

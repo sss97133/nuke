@@ -110,7 +110,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // 2) Deep-import a few discovered BaT listings using approved two-step workflow
-  // ✅ APPROVED WORKFLOW: extract-premium-auction + extract-auction-comments
+  // ✅ APPROVED WORKFLOW: extract-bat-core + extract-auction-comments
   // ⚠️ Do NOT use import-bat-listing (deprecated)
   // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
   if (batImportBatch > 0 && listingUrls.length > 0) {
@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
       try {
         // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
         const step1 = await postJson(
-          `${fnBase}/extract-premium-auction`,
+          `${fnBase}/extract-bat-core`,
           invokeHeaders,
           { url, max_vehicles: 1 },
           Math.min(50_000, Math.max(15_000, remainingMs() - 5_000)),

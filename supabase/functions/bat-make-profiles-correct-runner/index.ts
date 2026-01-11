@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
       repaired: 0,
       sample: [] as any[],
       note:
-        "Selects incomplete BaT vehicles (images/description/location/comments) and re-invokes import-bat-listing which chains image backfill + comprehensive extraction + comment ingestion.",
+        "Selects incomplete BaT vehicles (images/description/location/comments) and re-invokes the approved two-step workflow: extract-bat-core (core + HTML snapshot) then extract-auction-comments (comments/bids + HTML snapshot).",
     };
 
     for (const v of vehicles || []) {
@@ -185,12 +185,13 @@ Deno.serve(async (req) => {
       await admin.from("vehicles").update({ origin_metadata: nextOmAttempt, updated_at: safeNowIso() }).eq("id", v.id).catch(() => null);
 
       try {
-        // ✅ APPROVED WORKFLOW: Use extract-premium-auction + extract-auction-comments
-        // ⚠️ Do NOT use import-bat-listing (deprecated)
+        // ✅ APPROVED WORKFLOW:
+        // 1) extract-bat-core
+        // 2) extract-auction-comments
         // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
         
         // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
-        const step1Result = await admin.functions.invoke("extract-premium-auction", {
+        const step1Result = await admin.functions.invoke("extract-bat-core", {
           body: {
             url,
             max_vehicles: 1,
@@ -206,7 +207,7 @@ Deno.serve(async (req) => {
                          v.id;
         
         if (!vehicleId) {
-          throw new Error("No vehicle_id returned from extract-premium-auction");
+          throw new Error("No vehicle_id returned from extract-bat-core");
         }
         
         // Step 2: Extract comments and bids (non-critical)

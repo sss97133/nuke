@@ -109,13 +109,22 @@ function parseBatIdentityFromUrl(listingUrl: string): {
 } {
   try {
     const u = new URL(listingUrl);
-    const m = u.pathname.match(/\/listing\/(\d{4})-([a-z0-9-]+)\/?$/i);
+    // NOTE: u.pathname is percent-encoded; BaT slugs can include things like %C2%BC (¼) and %C2%BD (½).
+    // We capture the full slug (until next '/') then decode it.
+    const m = u.pathname.match(/\/listing\/(\d{4})-([^/]+)\/?$/i);
     if (!m?.[1] || !m?.[2]) return { year: null, make: null, model: null, title: null };
     const year = Number(m[1]);
     if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 1) {
       return { year: null, make: null, model: null, title: null };
     }
-    const parts = String(m[2]).split("-").filter(Boolean);
+    let slug = String(m[2]);
+    try {
+      slug = decodeURIComponent(slug);
+    } catch {
+      // keep raw slug if decoding fails
+    }
+
+    const parts = slug.split("-").filter(Boolean);
     if (parts.length < 2) return { year, make: null, model: null, title: null };
 
     const multiWordMakes: Record<string, string> = {
@@ -291,6 +300,9 @@ function extractEssentials(html: string): {
   // Seller (from essentials)
   const essentialsIdx = h.indexOf('<div class="essentials"');
   const win = essentialsIdx >= 0 ? h.slice(essentialsIdx, essentialsIdx + 300000) : h;
+  const winText = stripTags(win).replace(/\s+/g, " ").trim();
+  const fullText = stripTags(h).replace(/\s+/g, " ").trim();
+  const text = winText || fullText;
 
   const sellerMatch =
     win.match(/<strong>Seller<\/strong>:\s*<a[^>]*href=["'][^"']*\/member\/([^"\/]+)\/?["'][^>]*>([^<]+)<\/a>/i) ||
@@ -347,7 +359,7 @@ function extractEssentials(html: string): {
   let sale_price: number | null = null;
   let high_bid: number | null = null;
 
-  const bidToMatch = h.match(/Bid\s+to\s+(?:USD\s*)?\$?([0-9,]+)/i);
+  const bidToMatch = text.match(/Bid\s+to\s+(?:USD\s*)?\$?([0-9,]+)/i);
   if (bidToMatch?.[1]) {
     const n = parseInt(bidToMatch[1].replace(/,/g, ""), 10);
     if (Number.isFinite(n) && n > 0) high_bid = n;
@@ -358,8 +370,8 @@ function extractEssentials(html: string): {
     /Sold\s+(?:USD\s*)?\$?([0-9,]+)\s+(?:on|for)/i,
   ];
   for (const p of soldPatterns) {
-    const m = h.match(p);
-    if (m?.[1] && !/Bid\s+to/i.test(h)) {
+    const m = text.match(p);
+    if (m?.[1]) {
       const n = parseInt(m[1].replace(/,/g, ""), 10);
       if (Number.isFinite(n) && n > 0) {
         sale_price = n;
@@ -396,21 +408,71 @@ function extractEssentials(html: string): {
         if (idMatch?.[1]) vin = idMatch[1].toUpperCase().trim();
       }
       if (!mileage) {
-        const milesMatch = t.match(/\b([0-9,]+)\s*Miles?\b/i) || t.match(/\b~\s*([0-9,]+)\s*Miles?\b/i);
+        const milesMatch =
+          t.match(/\b([0-9,]+)\s*Miles?\b/i) ||
+          t.match(/\b~\s*([0-9,]+)\s*Miles?\b/i);
+        const milesKMatch =
+          t.match(/\b(\d+(?:\.\d+)?)\s*k\s*Miles?\b/i) ||
+          t.match(/\b(\d+(?:\.\d+)?)k\s*Miles?\b/i);
+
         if (milesMatch?.[1]) {
           const n = parseInt(milesMatch[1].replace(/,/g, ""), 10);
           if (Number.isFinite(n) && n > 0 && n < 10000000) mileage = n;
+        } else if (milesKMatch?.[1]) {
+          const n = Math.round(parseFloat(milesKMatch[1]) * 1000);
+          if (Number.isFinite(n) && n > 0 && n < 10000000) mileage = n;
         }
       }
-      if (!transmission && /transmission/i.test(t) && t.length <= 80) transmission = t;
+      if (!transmission) {
+        const looksLikeTransmission =
+          t.length <= 80 &&
+          !/(miles|paint|upholstery|chassis|vin|engine)\b/i.test(t) &&
+          (
+            /\btransmission\b/i.test(t) ||
+            /\btransaxle\b/i.test(t) ||
+            /\bgearbox\b/i.test(t) ||
+            /\bcvt\b/i.test(t) ||
+            /\bdct\b/i.test(t) ||
+            /\bdual[-\s]?clutch\b/i.test(t) ||
+            (
+              /\b(manual|automatic)\b/i.test(t) &&
+              (/\b(\d{1,2}-speed|four-speed|five-speed|six-speed|seven-speed|eight-speed|nine-speed|ten-speed)\b/i.test(t) || /\btransaxle\b/i.test(t))
+            )
+          );
+        if (looksLikeTransmission) transmission = t;
+      }
+      if (!drivetrain) {
+        const dm = t.match(/\b(AWD|4WD|RWD|FWD|4x4)\b/i);
+        if (dm?.[1]) drivetrain = dm[1].toUpperCase();
+      }
       if (!engine) {
-        if (/\b\d+(?:\.\d+)?-?\s*Liter\b/i.test(t) || /\b\d+(?:\.\d+)?\s*L\b/i.test(t) || /\bV\d\b/i.test(t)) {
-          if (!/exhaust|wheels|brakes/i.test(t)) engine = t;
-        }
+        const looksLikeEngine =
+          (
+            /\b\d+(?:\.\d+)?-?\s*Liter\b/i.test(t) ||
+            /\b\d+(?:\.\d+)?\s*L\b/i.test(t) ||
+            /\bV\d\b/i.test(t) ||
+            /\b[0-9,]{3,5}\s*cc\b/i.test(t) ||
+            /\b\d{2,3}\s*ci\b/i.test(t) ||
+            /\bcubic\s+inch\b/i.test(t) ||
+            /\bflat[-\s]?four\b/i.test(t) ||
+            /\bflat[-\s]?six\b/i.test(t) ||
+            /\binline[-\s]?(?:three|four|five|six)\b/i.test(t) ||
+            /\binline[-\s]?\d\b/i.test(t) ||
+            /\bv-?twin\b/i.test(t)
+          ) && !/exhaust|wheels|brakes/i.test(t);
+        if (looksLikeEngine) engine = t;
       }
       if (!exterior_color) {
         const paintMatch = t.match(/^(.+?)\s+Paint\b/i);
         if (paintMatch?.[1]) exterior_color = paintMatch[1].trim();
+        if (!exterior_color) {
+          const repMatch = t.match(/\bRepainted\s+in\s+(.+)\b/i);
+          if (repMatch?.[1] && repMatch[1].trim().length <= 60) exterior_color = repMatch[1].trim();
+        }
+        if (!exterior_color) {
+          const finMatch = t.match(/\bFinished\s+in\s+(.+)\b/i);
+          if (finMatch?.[1] && finMatch[1].trim().length <= 60) exterior_color = finMatch[1].trim();
+        }
       }
       if (!interior_color) {
         const upMatch = t.match(/^(.+?)\s+Upholstery\b/i);
@@ -418,10 +480,6 @@ function extractEssentials(html: string): {
       }
     }
   }
-
-  // Rough drivetrain detection (fallback)
-  const driveMatch = h.match(/\b(AWD|4WD|RWD|FWD|4x4)\b/i);
-  if (driveMatch?.[1]) drivetrain = driveMatch[1].toUpperCase();
 
   // Outcome-based reserve status (fallback)
   if (!reserve_status && hasGotAway) reserve_status = "reserve_not_met";
@@ -533,6 +591,106 @@ function normalizeDescriptionSummary(raw: string | null): string | null {
   return `${cleaned.slice(0, 480).trim()}…`;
 }
 
+async function trySaveExtractionMetadata(args: {
+  supabase: any;
+  vehicleId: string;
+  fieldName: string;
+  fieldValue: string;
+  sourceUrl: string;
+  extractionMethod: string;
+  scraperVersion: string;
+  confidenceScore: number; // 0..1
+  validationStatus: "unvalidated" | "valid" | "invalid" | "conflicting" | "low_confidence";
+  rawExtractionData?: Record<string, any>;
+}): Promise<void> {
+  try {
+    const v = String(args.fieldValue || "").trim();
+    if (!v) return;
+
+    // Deduplicate: if the latest row matches exactly, skip.
+    const { data: lastRow } = await args.supabase
+      .from("extraction_metadata")
+      .select("field_value, extracted_at")
+      .eq("vehicle_id", args.vehicleId)
+      .eq("field_name", args.fieldName)
+      .eq("source_url", args.sourceUrl)
+      .order("extracted_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    const lastVal = String((lastRow as any)?.field_value || "").trim();
+    if (lastVal && lastVal === v) return;
+
+    await args.supabase.from("extraction_metadata").insert({
+      vehicle_id: args.vehicleId,
+      field_name: args.fieldName,
+      field_value: v,
+      extraction_method: args.extractionMethod,
+      scraper_version: args.scraperVersion,
+      source_url: args.sourceUrl,
+      confidence_score: Math.max(0, Math.min(1, Number(args.confidenceScore) || 0)),
+      validation_status: args.validationStatus,
+      extracted_at: new Date().toISOString(),
+      raw_extraction_data: args.rawExtractionData || {},
+    });
+  } catch (e: any) {
+    console.warn(`extraction_metadata insert failed (non-fatal): ${e?.message || String(e)}`);
+  }
+}
+
+async function tryUpsertAuctionTimelineEvent(args: {
+  supabase: any;
+  vehicleId: string;
+  eventType: "auction_sold" | "auction_reserve_not_met" | "auction_ended";
+  eventDateYmd: string; // YYYY-MM-DD
+  title: string;
+  description?: string | null;
+  source: string;
+  sourceUrl: string;
+  costAmount?: number | null;
+  metadata?: Record<string, any>;
+}): Promise<void> {
+  try {
+    const ymd = String(args.eventDateYmd || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return;
+
+    // Idempotency: one auction result per (vehicle, source_url, event_type, event_date)
+    const { count } = await args.supabase
+      .from("timeline_events")
+      .select("id", { count: "exact", head: true })
+      .eq("vehicle_id", args.vehicleId)
+      .eq("event_type", args.eventType)
+      .eq("event_date", ymd)
+      .contains("metadata", { source_url: args.sourceUrl });
+
+    if ((count || 0) > 0) return;
+
+    await args.supabase.from("timeline_events").insert({
+      vehicle_id: args.vehicleId,
+      user_id: null,
+      event_type: args.eventType,
+      source: args.source,
+      title: args.title,
+      description: args.description || null,
+      event_date: ymd,
+      cost_amount: typeof args.costAmount === "number" && Number.isFinite(args.costAmount) ? args.costAmount : null,
+      cost_currency: typeof args.costAmount === "number" ? "USD" : null,
+      metadata: {
+        ...(args.metadata || {}),
+        source_url: args.sourceUrl,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      confidence_score: 85,
+      data_source: "extract-bat-core",
+      // Must satisfy timeline_events_source_type_check
+      source_type: "system",
+    });
+  } catch (e: any) {
+    console.warn(`timeline_events insert failed (non-fatal): ${e?.message || String(e)}`);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -611,7 +769,7 @@ serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description")
+        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, sale_price, high_bid, auction_end_date, reserve_status")
         .in("discovery_url", urlCandidates)
         .limit(1)
         .maybeSingle();
@@ -623,7 +781,7 @@ serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description")
+        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, sale_price, high_bid, auction_end_date, reserve_status")
         .in("bat_auction_url", urlCandidates)
         .limit(1)
         .maybeSingle();
@@ -690,7 +848,7 @@ serve(async (req) => {
       if (!existing) {
         const { data } = await supabase
           .from("vehicles")
-          .select("id, year, make, model, listing_title, bat_listing_title, vin, description")
+          .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, sale_price, high_bid, auction_end_date, reserve_status")
           .eq("id", vehicleId)
           .maybeSingle();
         existing = data || null;
@@ -711,6 +869,24 @@ serve(async (req) => {
         modelLower.includes("bring a trailer") ||
         modelLower.includes("|") ||
         modelLower.includes("auction preview");
+
+      const isPollutedSpec = (field: string, val: any): boolean => {
+        const t = String(val ?? "").trim().toLowerCase();
+        if (!t) return false;
+        if (t === "var" || t === "cycles") return true;
+        if (field === "transmission") {
+          if (t.startsWith(",") || t.includes("driving experien") || t.includes("for sale on bat auctions") || t.includes("bring a trailer")) {
+            return true;
+          }
+        }
+        if (field === "color") {
+          if (t === "var") return true;
+        }
+        if (field === "engine_size") {
+          if (t === "cycles") return true;
+        }
+        return false;
+      };
 
       if (
         !existing?.year ||
@@ -739,11 +915,20 @@ serve(async (req) => {
       if (!existing?.bat_lot_number && essentials.lot_number) updatePayload.bat_lot_number = essentials.lot_number;
 
       if (!existing?.mileage && essentials.mileage) updatePayload.mileage = essentials.mileage;
-      if (!existing?.color && essentials.exterior_color) updatePayload.color = essentials.exterior_color;
+      if ((!existing?.color || isPollutedSpec("color", existing?.color)) && essentials.exterior_color) {
+        updatePayload.color = essentials.exterior_color;
+        if (!existing?.color_source) updatePayload.color_source = "bring a trailer";
+      }
       if (!existing?.interior_color && essentials.interior_color) updatePayload.interior_color = essentials.interior_color;
-      if (!existing?.transmission && essentials.transmission) updatePayload.transmission = essentials.transmission;
+      if ((!existing?.transmission || isPollutedSpec("transmission", existing?.transmission)) && essentials.transmission) {
+        updatePayload.transmission = essentials.transmission;
+        if (!existing?.transmission_source) updatePayload.transmission_source = "bring a trailer";
+      }
       if (!existing?.drivetrain && essentials.drivetrain) updatePayload.drivetrain = essentials.drivetrain;
-      if (!existing?.engine_size && essentials.engine) updatePayload.engine_size = essentials.engine;
+      if ((!existing?.engine_size || isPollutedSpec("engine_size", existing?.engine_size)) && essentials.engine) {
+        updatePayload.engine_size = essentials.engine;
+        if (!existing?.engine_source) updatePayload.engine_source = "bring a trailer";
+      }
 
       // Auction outcomes / counters (set if missing)
       if (!existing?.sale_price && essentials.sale_price) updatePayload.sale_price = essentials.sale_price;
@@ -757,7 +942,44 @@ serve(async (req) => {
       if (!existing?.bat_comments && essentials.comment_count) updatePayload.bat_comments = essentials.comment_count;
 
       const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
-      if (error) throw new Error(`vehicles update failed: ${error.message}`);
+      if (error) {
+        const e: any = error;
+        const msg =
+          e?.message ? String(e.message) :
+          e?.details ? String(e.details) :
+          e?.hint ? String(e.hint) :
+          JSON.stringify(e);
+
+        // Common in a long-lived vehicle-first model: we may discover a VIN that already exists on
+        // another vehicle row (duplicate profile). VIN is unique, so skip setting it and still
+        // allow the rest of the repair (title/essentials/description/images/auction_events) to proceed.
+        const code = e?.code ? String(e.code) : "";
+        const isVinUniqueConflict =
+          Boolean(updatePayload?.vin) &&
+          (code === "23505" || msg.includes("vehicles_vin_unique_index"));
+
+        if (isVinUniqueConflict) {
+          console.warn(`VIN unique conflict for vehicle ${vehicleId} (vin=${String(updatePayload.vin)}). Retrying update without vin...`);
+          try {
+            delete updatePayload.vin;
+          } catch {
+            // ignore
+          }
+
+          const { error: retryErr } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
+          if (retryErr) {
+            const re: any = retryErr;
+            const rmsg =
+              re?.message ? String(re.message) :
+              re?.details ? String(re.details) :
+              re?.hint ? String(re.hint) :
+              JSON.stringify(re);
+            throw new Error(`vehicles update failed (after removing vin): ${rmsg}`);
+          }
+        } else {
+          throw new Error(`vehicles update failed: ${msg}`);
+        }
+      }
       updatedIds.push(vehicleId);
     }
 
@@ -847,6 +1069,72 @@ serve(async (req) => {
         }, { onConflict: "vehicle_id,source_url" });
 
       if (error) console.warn(`auction_events upsert failed (non-fatal): ${error.message}`);
+    }
+
+    // Save raw listing description history (for Description Entries UI)
+    if (vehicleId && descriptionRaw) {
+      await trySaveExtractionMetadata({
+        supabase,
+        vehicleId,
+        fieldName: "raw_listing_description",
+        fieldValue: String(descriptionRaw),
+        sourceUrl: listingUrlCanonical,
+        extractionMethod: "extract-bat-core",
+        scraperVersion: "v4",
+        confidenceScore: 0.9,
+        validationStatus: "unvalidated",
+        rawExtractionData: {
+          extractor: "extract-bat-core",
+          mode: "free",
+          listing_url: listingUrlCanonical,
+        },
+      });
+    }
+
+    // Persist an auction timeline event so timelines aren't empty for auction-origin vehicles.
+    if (vehicleId && essentials.auction_end_date) {
+      const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
+      const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
+      const eventType =
+        hasSale ? "auction_sold" :
+        (essentials.reserve_status === "reserve_not_met" ? "auction_reserve_not_met" : "auction_ended");
+
+      const amount = hasSale ? (essentials.sale_price || null) : (hasBid ? (essentials.high_bid || null) : null);
+      const amountText = typeof amount === "number" && amount > 0 ? `$${Math.round(amount).toLocaleString()}` : "";
+      const title =
+        eventType === "auction_sold"
+          ? `BaT sold${amountText ? ` for ${amountText}` : ""}`
+          : eventType === "auction_reserve_not_met"
+            ? `BaT ended (RNM)${amountText ? ` • bid to ${amountText}` : ""}`
+            : `BaT ended${amountText ? ` • bid to ${amountText}` : ""}`;
+
+      const descParts: string[] = [];
+      if (essentials.lot_number) descParts.push(`Lot #${essentials.lot_number}`);
+      if (essentials.bid_count) descParts.push(`${essentials.bid_count} bids`);
+      if (essentials.comment_count) descParts.push(`${essentials.comment_count} comments`);
+      const desc = descParts.length ? descParts.join(" • ") : null;
+
+      await tryUpsertAuctionTimelineEvent({
+        supabase,
+        vehicleId,
+        eventType,
+        eventDateYmd: essentials.auction_end_date,
+        title,
+        description: desc,
+        source: "bat",
+        sourceUrl: listingUrlCanonical,
+        costAmount: typeof amount === "number" ? amount : null,
+        metadata: {
+          reserve_status: essentials.reserve_status,
+          high_bid: essentials.high_bid,
+          sale_price: essentials.sale_price,
+          buyer_username: essentials.buyer_username,
+          seller_username: essentials.seller_username,
+          lot_number: essentials.lot_number,
+          bid_count: essentials.bid_count,
+          comment_count: essentials.comment_count,
+        },
+      });
     }
 
     return new Response(

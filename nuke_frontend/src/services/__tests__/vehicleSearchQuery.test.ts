@@ -20,9 +20,12 @@ describe('vehicle search query helpers', () => {
     expect(or).toBeTruthy();
     expect(or).not.toMatch(/::text/);
     expect(or).not.toMatch(/[\r\n]/);
-    // Commas are separators in PostgREST filter syntax; this ensures the *term* itself is safe.
-    expect(or).toContain('make.ilike.%Ford%');
-    expect(or).toContain('model.ilike.%F-150%');
+    // Multi-token input should narrow results (AND across tokens)
+    expect(or).toContain('and(');
+    expect(or).toContain('or(make.ilike.%Ford%');
+    expect(or).toContain('or(make.ilike.%F-150%');
+    // Commas are separators in PostgREST filter syntax; this ensures we didn't keep raw commas/newlines.
+    expect(or).not.toContain('\n');
   });
 
   it('extractYearFromTextSearch pulls a 4-digit year anywhere in the query', () => {

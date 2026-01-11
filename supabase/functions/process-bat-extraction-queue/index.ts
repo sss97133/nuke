@@ -26,9 +26,8 @@ serve(async (req) => {
 
     const { batchSize = 1, maxAttempts = 3 } = await req.json().catch(() => ({ batchSize: 1, maxAttempts: 3 }));
 
-    // Configurable batch size (default: 1 for accuracy, can be increased for speed)
-    // Recommended: Start with 1-5 for testing, then increase to 10-20 once stable
-    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 1, 50)); // Max 50 at a time
+    // SLOW AND ACCURATE: Process ONE at a time
+    const safeBatchSize = Math.max(1, Math.min(Number(batchSize) || 1, 1)); // Force to 1 for accuracy
     const safeMaxAttempts = Math.max(1, Math.min(Number(maxAttempts) || 3, 20));
     const workerId = `process-bat-extraction-queue:${crypto.randomUUID?.() || String(Date.now())}`;
 

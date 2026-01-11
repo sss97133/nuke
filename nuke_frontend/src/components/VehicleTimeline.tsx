@@ -277,7 +277,7 @@ const VehicleTimeline: React.FC<{
     const isPhotoEvent = ['inspection', 'documentation', 'pending_analysis'].includes(ev?.event_type);
     
     // For sale/auction events, use actual sale price, not calculated labor
-    const isSaleEvent = ['sale', 'auction_started', 'auction_listed', 'auction_bid_placed', 'auction_reserve_met', 'auction_ended'].includes(ev?.event_type);
+    const isSaleEvent = ['sale', 'auction_started', 'auction_listed', 'auction_bid_placed', 'auction_reserve_met', 'auction_ended', 'auction_sold', 'auction_reserve_not_met'].includes(ev?.event_type);
     
     let valueUSD = 0;
     let hours = 0;
@@ -359,6 +359,79 @@ const VehicleTimeline: React.FC<{
         .order('posted_at', { ascending: false })
         .limit(5000);
       const auctionData = auctionErr ? [] : (auctionDataRaw || []);
+
+      // Load auction events (ended/sold) and synthesize timeline entries so the timeline is never "empty"
+      // for auction-origin vehicles. We treat auctions as evidence about the vehicle.
+      let auctionTimelineEvents: any[] = [];
+      try {
+        const { data: aeRows, error: aeErr } = await supabase
+          .from('auction_events')
+          .select('id, source, source_url, outcome, auction_start_date, auction_end_date, high_bid, winning_bid, total_bids, comments_count, seller_name, winning_bidder, lot_number')
+          .eq('vehicle_id', vehicleId)
+          .order('auction_end_date', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(25);
+
+        if (!aeErr && Array.isArray(aeRows) && aeRows.length > 0) {
+          auctionTimelineEvents = aeRows
+            .filter((r: any) => Boolean(r?.auction_end_date || r?.auction_start_date))
+            .map((r: any) => {
+              const platform = String(r?.source || 'auction').toUpperCase();
+              const outcome = String(r?.outcome || '').toLowerCase();
+              const isSold = outcome === 'sold' || (typeof r?.winning_bid === 'number' && r.winning_bid > 0);
+              const isRNM = outcome === 'reserve_not_met' || outcome === 'no_sale';
+              const amount = isSold ? (r?.winning_bid ?? r?.high_bid ?? null) : (r?.high_bid ?? null);
+              const amountText = (typeof amount === 'number' && amount > 0) ? `$${Math.round(amount).toLocaleString()}` : null;
+
+              const endYmd = r?.auction_end_date ? toDateOnly(r.auction_end_date) : toDateOnly(r.auction_start_date);
+              const eventType =
+                isSold ? 'auction_sold' :
+                isRNM ? 'auction_reserve_not_met' :
+                'auction_ended';
+
+              const title =
+                isSold
+                  ? `${platform} sold${amountText ? ` for ${amountText}` : ''}`
+                  : isRNM
+                    ? `${platform} ended (RNM)${amountText ? ` • bid to ${amountText}` : ''}`
+                    : `${platform} ended${amountText ? ` • bid to ${amountText}` : ''}`;
+
+              const descParts: string[] = [];
+              if (r?.lot_number) descParts.push(`Lot #${r.lot_number}`);
+              if (typeof r?.total_bids === 'number') descParts.push(`${r.total_bids} bids`);
+              if (typeof r?.comments_count === 'number') descParts.push(`${r.comments_count} comments`);
+              const description = descParts.length ? descParts.join(' • ') : undefined;
+
+              return {
+                id: `auction-${r.id}`,
+                vehicle_id: vehicleId,
+                event_type: eventType,
+                event_date: endYmd,
+                title,
+                description,
+                created_at: new Date().toISOString(),
+                created_by: 'system',
+                image_urls: [],
+                metadata: {
+                  auction_event_id: r.id,
+                  platform: r.source,
+                  source_url: r.source_url,
+                  outcome,
+                  high_bid: r.high_bid,
+                  winning_bid: r.winning_bid,
+                  winning_bidder: r.winning_bidder,
+                  seller: r.seller_name,
+                  lot_number: r.lot_number,
+                  total_bids: r.total_bids,
+                  comments_count: r.comments_count,
+                },
+                __table: 'auction_events'
+              };
+            });
+        }
+      } catch (err) {
+        console.error('Error loading auction events:', err);
+      }
 
       // Load photo dates for calendar heatmap (photos ARE activity even if not events)
       const { data: imageData } = await supabase
@@ -529,10 +602,25 @@ const VehicleTimeline: React.FC<{
       if (timelineError) {
         console.error('Error loading timeline events:', timelineError);
         setError(timelineError?.message || 'Failed to load timeline events');
-        setEvents(futureAuctionEvents.length > 0 ? futureAuctionEvents : []);
+        const mergedFallback: any[] = [
+          ...(futureAuctionEvents || []),
+          ...(auctionTimelineEvents || []),
+        ];
+        setEvents(mergedFallback.length > 0 ? (mergedFallback as any) : []);
       } else {
         let merged: any[] = (timelineData || []).map((e: any) => ({ ...e, __table: 'timeline_events' }));
         
+        // Add ended auction events to the timeline (vehicle-first evidence)
+        if (auctionTimelineEvents.length > 0) {
+          merged = [...auctionTimelineEvents, ...merged];
+          for (const ev of auctionTimelineEvents) {
+            if (ev?.event_date) {
+              const dateKey = toDateOnly(ev.event_date);
+              activityDateMap.set(dateKey, (activityDateMap.get(dateKey) || 0) + 1);
+            }
+          }
+        }
+
         // Add future auction events to the timeline
         if (futureAuctionEvents.length > 0) {
           merged = [...futureAuctionEvents, ...merged];
@@ -548,6 +636,14 @@ const VehicleTimeline: React.FC<{
 
         // ✅ PHOTOS ARE NOT EVENTS
         // But photo dates ARE loaded separately for the calendar heatmap
+
+        // Stable sort: newest first
+        merged = merged.sort((a: any, b: any) => {
+          const da = new Date(a?.event_date || 0).getTime();
+          const db = new Date(b?.event_date || 0).getTime();
+          if (Number.isFinite(db) && Number.isFinite(da) && db !== da) return db - da;
+          return String(b?.id || '').localeCompare(String(a?.id || ''));
+        });
 
         console.log(`Loaded ${merged.length} timeline events`);
         setEvents(merged as any);

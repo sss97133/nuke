@@ -42,27 +42,42 @@ export const buildVehicleTextSearchOrFilter = (args: {
     .filter(Boolean)
     .slice(0, 6);
 
-  const partsSet = new Set<string>();
-  for (const token of tokens) {
+  const baseFieldsForToken = (token: string): string[] => {
     const term = escapePostgrestILike(token);
-    // Core vehicle fields (tokenized so "1998 Ford" still matches "Ford" even if the full phrase doesn't exist)
-    partsSet.add(`make.ilike.%${term}%`);
-    partsSet.add(`model.ilike.%${term}%`);
-    partsSet.add(`vin.ilike.%${term}%`);
-    partsSet.add(`color.ilike.%${term}%`);
+    // NOTE: keep this list conservative; any missing column breaks the query.
+    return [
+      `make.ilike.%${term}%`,
+      `model.ilike.%${term}%`,
+      `description.ilike.%${term}%`,
+      `notes.ilike.%${term}%`,
+      `vin.ilike.%${term}%`,
+      `color.ilike.%${term}%`,
+    ];
+  };
+
+  // If there's only one token, OR across fields (and optionally owner ids).
+  if (tokens.length <= 1) {
+    const token = tokens[0] || '';
+    const partsSet = new Set<string>(baseFieldsForToken(token));
+
+    // Optional: owner/user search (username/full name -> user ids)
+    const ids = (args.matchingUserIds || []).map(String).filter(Boolean);
+    if (ids.length > 0) {
+      const unique = Array.from(new Set(ids));
+      const inList = unique.join(',');
+      partsSet.add(`user_id.in.(${inList})`);
+      partsSet.add(`uploaded_by.in.(${inList})`);
+    }
+
+    // PostgREST expects comma-separated conditions; do not include whitespace/newlines.
+    return Array.from(partsSet).join(',');
   }
 
-  // Optional: owner/user search (username/full name -> user ids)
-  const ids = (args.matchingUserIds || []).map(String).filter(Boolean);
-  if (ids.length > 0) {
-    const unique = Array.from(new Set(ids));
-    const inList = unique.join(',');
-    partsSet.add(`user_id.in.(${inList})`);
-    partsSet.add(`uploaded_by.in.(${inList})`);
-  }
-
-  // PostgREST expects comma-separated conditions; do not include whitespace/newlines.
-  return Array.from(partsSet).join(',');
+  // Multi-token: AND across tokens, OR across fields within each token.
+  // Implemented as a single OR operand that is an `and(...)` expression:
+  //   or=(and(or(...token1...),or(...token2...)))
+  const tokenGroups = tokens.map((t) => `or(${baseFieldsForToken(t).join(',')})`);
+  return `and(${tokenGroups.join(',')})`;
 };
 
 export interface SearchFilters {

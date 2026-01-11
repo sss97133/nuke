@@ -63,6 +63,37 @@ const VehicleImageViewer: React.FC<VehicleImageViewerProps> = ({
   const [selectedImages, setSelectedImages] = React.useState<Set<string>>(new Set());
   const [uploadProgress, setUploadProgress] = React.useState<{total: number, completed: number, uploading: boolean}>({total: 0, completed: 0, uploading: false});
   
+  // Defensive UI de-dupe for legacy/variant URLs (e.g. BaT -scaled / -WxH variants)
+  const dedupeImageRows = React.useCallback((rows: any[]): ImageData[] => {
+    const normalizeUrlForKey = (u: string | null | undefined): string => {
+      const s = String(u || '').trim();
+      if (!s) return '';
+      return s
+        .replace(/&#038;/g, '&')
+        .replace(/&amp;/g, '&')
+        .split('#')[0]
+        .split('?')[0]
+        .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+        .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+        .replace(/-scaled\./g, '.')
+        .toLowerCase()
+        .trim();
+    };
+
+    const seen = new Set<string>();
+    const out: ImageData[] = [];
+    for (const r of (rows || [])) {
+      const url = String((r as any)?.image_url || '').trim();
+      if (!url) continue;
+      const k = normalizeUrlForKey(url);
+      if (!k) continue;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(r as ImageData);
+    }
+    return out;
+  }, []);
+
 
   const loadImages = React.useCallback(async () => {
     if (!vehicleId) {
@@ -118,7 +149,7 @@ const VehicleImageViewer: React.FC<VehicleImageViewerProps> = ({
     if (error) {
       console.error('Failed to load images:', error);
     } else if (data && data.length > 0) {
-      setLoadedImages(data);
+      setLoadedImages(dedupeImageRows(data));
     } else {
       // No DB rows: attempt storage fallback for historical paths
       try {
@@ -169,7 +200,7 @@ const VehicleImageViewer: React.FC<VehicleImageViewerProps> = ({
         }
 
         const uniqueUrls = Array.from(new Set(publicUrls));
-        setLoadedImages(uniqueUrls.map((url, i) => ({ id: `storage-${i}`, image_url: url })));
+        setLoadedImages(dedupeImageRows(uniqueUrls.map((url, i) => ({ id: `storage-${i}`, image_url: url }))));
       } catch (e) {
         console.error('Storage fallback failed:', e);
         setLoadedImages([]);
@@ -180,7 +211,7 @@ const VehicleImageViewer: React.FC<VehicleImageViewerProps> = ({
     } finally {
       (loadImages as any)._inflight = false;
     }
-  }, [vehicleId, stageFilter, roleFilter, areaFilter, partFilter, sortMode]);
+  }, [vehicleId, stageFilter, roleFilter, areaFilter, partFilter, sortMode, dedupeImageRows]);
 
   React.useEffect(() => {
     if (vehicleId) {
