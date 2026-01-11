@@ -1312,7 +1312,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const primaryPrice = getDisplayValue();
   const primaryAmount = typeof primaryPrice.amount === 'number' ? primaryPrice.amount : null;
   const primaryLabel = primaryPrice.label || 'Price pending';
-  const priceDescriptor = saleDate ? 'Sold price' : primaryLabel;
+  // "saleDate" may represent an auction close date for unsold auctions (e.g., RNM "bid to").
+  // Only label as "Sold price" when we have an explicit sold signal.
+  const vehicleOutcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
+  const vehicleSaleStatus = String((vehicle as any)?.sale_status || '').toLowerCase();
+  const pulseStatus = auctionPulse?.listing_url ? String(auctionPulse.listing_status || '').toLowerCase() : '';
+  const pulseFinal = parseMoneyNumber((auctionPulse as any)?.final_price);
+  const pulseSoldAt = (auctionPulse as any)?.sold_at ?? null;
+  const isSoldContext =
+    vehicleSaleStatus === 'sold' ||
+    vehicleOutcome === 'sold' ||
+    (pulseStatus === 'sold' && (pulseFinal !== null || !!pulseSoldAt));
+  const priceDescriptor = isSoldContext ? 'Sold price' : primaryLabel;
   
   // Calculate days since sale validation (sale date)
   const daysSinceSale = useMemo(() => {
@@ -1329,7 +1340,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   }, [saleDate]);
   
   // For RNM (Reserve Not Met), show blurred high bid instead of "Set a price"
-  const isRNM = (vehicle as any)?.auction_outcome === 'reserve_not_met';
+  const isRNM = (() => {
+    const outcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
+    if (outcome === 'reserve_not_met' || outcome === 'no_sale') return true;
+    const status = auctionPulse?.listing_url ? String(auctionPulse.listing_status || '').toLowerCase() : '';
+    return status === 'reserve_not_met' || status === 'no_sale';
+  })();
   const highBid = (vehicle as any)?.high_bid || (vehicle as any)?.winning_bid;
   const priceDisplay = useMemo(() => {
     // HIGHEST PRIORITY: If vehicle has a sale_price, always show it (overrides auction pulse)
@@ -1466,7 +1482,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     if (suppressExternalListing || hasClaim) {
       return { badge: null, link: null, outcome: null };
     }
-    const rawOutcome = (vehicle as any)?.auction_outcome;
+    const badges: Record<string, any> = {
+      sold: { text: 'SOLD', color: '#22c55e', bg: '#dcfce7' },
+      reserve_not_met: { text: 'RNM', color: '#f59e0b', bg: '#fef3c7' },
+      no_sale: { text: 'NO SALE', color: '#6b7280', bg: '#f3f4f6' },
+      pending: { text: 'LIVE', color: '#3b82f6', bg: '#dbeafe' }
+    };
+    
+    const rawOutcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
+    const saleStatus = String((vehicle as any)?.sale_status || '').toLowerCase();
     const batUrl = (vehicle as any)?.bat_auction_url || ((vehicle as any)?.discovery_url?.includes('bringatrailer') ? (vehicle as any)?.discovery_url : null);
     const kslUrl = (vehicle as any)?.discovery_url?.includes('ksl.com') ? (vehicle as any)?.discovery_url : null;
     const sourceUrl = batUrl || kslUrl || (vehicle as any)?.discovery_url;
@@ -1474,12 +1498,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     // Never allow conflicting states like "SOLD RNM".
     // Check auction_outcome FIRST - it's the most authoritative
     // RNM/No Sale takes precedence over sale_price (high bid != sold)
-    const vehicleOutcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
     const telemetryStatus = auctionPulse?.listing_url ? String(auctionPulse.listing_status || '').toLowerCase() : '';
     
-    // If auction_outcome explicitly says reserve_not_met or no_sale, use that (don't override with sale_price)
-    if (vehicleOutcome === 'reserve_not_met' || vehicleOutcome === 'no_sale') {
-      const outcome = vehicleOutcome;
+    // If either vehicle or telemetry explicitly says RNM/No Sale, use that (do NOT override with numeric prices)
+    const explicitUnsold =
+      telemetryStatus === 'reserve_not_met' || telemetryStatus === 'no_sale'
+        ? telemetryStatus
+        : (rawOutcome === 'reserve_not_met' || rawOutcome === 'no_sale')
+          ? rawOutcome
+          : null;
+    if (explicitUnsold) {
+      const outcome = explicitUnsold;
       return {
         badge: badges[outcome] || null,
         link: sourceUrl,
@@ -1487,21 +1516,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       };
     }
     
-    // SOLD wins if we have any sold signal (telemetry > canonical fields > legacy outcome)
+    // SOLD requires a real sold signal (status/outcome/sold_at), not merely a numeric price.
+    const pulseFinal = parseMoneyNumber((auctionPulse as any)?.final_price);
+    const pulseSoldAt = (auctionPulse as any)?.sold_at ?? null;
     const hasSoldSignal =
-      telemetryStatus === 'sold' ||
-      (vehicleOutcome === 'sold') ||
-      (typeof (auctionPulse as any)?.final_price === 'number' && Number.isFinite((auctionPulse as any).final_price) && (auctionPulse as any).final_price > 0) ||
-      (typeof (vehicle as any)?.sale_price === 'number' && Number.isFinite((vehicle as any).sale_price) && (vehicle as any).sale_price > 0 && vehicleOutcome !== 'reserve_not_met' && vehicleOutcome !== 'no_sale');
+      rawOutcome === 'sold' ||
+      saleStatus === 'sold' ||
+      (telemetryStatus === 'sold' && (pulseFinal !== null || !!pulseSoldAt));
 
-    const outcome = hasSoldSignal ? 'sold' : rawOutcome;
-
-    const badges: Record<string, any> = {
-      'sold': { text: 'SOLD', color: '#22c55e', bg: '#dcfce7' },
-      'reserve_not_met': { text: 'RNM', color: '#f59e0b', bg: '#fef3c7' },
-      'no_sale': { text: 'NO SALE', color: '#6b7280', bg: '#f3f4f6' },
-      'pending': { text: 'LIVE', color: '#3b82f6', bg: '#dbeafe' }
-    };
+    const outcome = hasSoldSignal ? 'sold' : (rawOutcome || null);
 
     // RNM is only valid once the auction has ended (or the platform explicitly reports RNM).
     // If an auction is still live/active, showing RNM is misleading.
@@ -1840,7 +1863,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         flex: '1 1 auto',
         minWidth: 0,
         height: '31px',
-        overflow: 'hidden',
+        // Allow dropdowns (location / claim) to render below the sticky header.
+        // Without this, the dropdown opens but is clipped, making the badge feel "unclickable".
+        overflow: (showLocationDropdown || showOwnerClaimDropdown) ? 'visible' : 'hidden',
         marginTop: 0,
         marginBottom: 0,
         paddingTop: 0,
@@ -1855,7 +1880,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </div>
 
         {/* 2. Badges Section */}
-        <div className="vehicle-header-badges" style={{ display: 'flex', flexWrap: 'nowrap', gap: 6, alignItems: 'center', flexShrink: 0, overflow: 'hidden', maxWidth: '100%' }}>
+        <div className="vehicle-header-badges" style={{ display: 'flex', flexWrap: 'nowrap', gap: 6, alignItems: 'center', flexShrink: 0, overflow: (showLocationDropdown || showOwnerClaimDropdown) ? 'visible' : 'hidden', maxWidth: '100%' }}>
           {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
             <div className="badge-priority-2">
             <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
@@ -1876,7 +1901,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowLocationDropdown(!showLocationDropdown);
+                  setShowLocationDropdown((prev) => !prev);
                 }}
                 style={{
                   fontSize: '9px',
@@ -2020,7 +2045,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowOwnerClaimDropdown(!showOwnerClaimDropdown);
+                  setShowOwnerClaimDropdown((prev) => !prev);
                 }}
                 style={{
                   fontSize: '9px',

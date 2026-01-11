@@ -287,9 +287,10 @@ const VehicleProfile: React.FC = () => {
     // Filter out stale "active" listings if vehicle is sold (check vehicle data if available)
     // This prevents showing old bid amounts when vehicle has been sold
     const vehicleData = (window as any).__vehicleProfileRpcData?.vehicle;
-    const vehicleIsSold = vehicleData?.sale_price > 0 || 
-                         vehicleData?.sale_status === 'sold' ||
-                         vehicleData?.auction_outcome === 'sold';
+    const vehicleOutcome = String(vehicleData?.auction_outcome || '').toLowerCase();
+    const vehicleSaleStatus = String(vehicleData?.sale_status || '').toLowerCase();
+    // IMPORTANT: sale_price alone is not a "sold" signal (it can be a high bid for RNM/no-sale auctions).
+    const vehicleIsSold = vehicleSaleStatus === 'sold' || vehicleOutcome === 'sold';
     
     if (vehicleIsSold) {
       // Remove "active" listings when vehicle is sold - they're stale
@@ -403,13 +404,25 @@ const VehicleProfile: React.FC = () => {
       const statuses = sorted.map((r) => toLower(r?.listing_status)).filter(Boolean);
       const hasActive = statuses.some((s) => s === 'active' || s === 'live');
       const hasSold = statuses.some((s) => s === 'sold');
+      const hasRNM = statuses.some((s) => s === 'reserve_not_met');
+      const hasNoSale = statuses.some((s) => s === 'no_sale');
+      const hasEnded = statuses.some((s) => s === 'ended' || s === 'expired' || s === 'cancelled');
       const mergedStatus = (() => {
-        // If any row has a sold marker + final_price, treat the group as sold.
         const anyFinal = maxNum(sorted.map((r) => r?.final_price));
-        if (typeof anyFinal === 'number' && anyFinal > 0) return 'sold';
+        const anySoldAt = sorted.some((r) => {
+          const t = parseTs(r?.sold_at);
+          return Number.isFinite(t);
+        });
+        // SOLD requires a real "sold" signal (status or sold_at), not merely a numeric final_price.
+        const soldEvidence = (hasSold && typeof anyFinal === 'number' && anyFinal > 0) || anySoldAt;
+        if (soldEvidence) return 'sold';
+        // Explicit unsold outcomes should override stale/ambiguous numeric prices.
+        if (hasRNM) return 'reserve_not_met';
+        if (hasNoSale) return 'no_sale';
         // Otherwise, keep active if we have active/live.
         if (hasActive) return 'active';
         if (hasSold) return 'sold';
+        if (hasEnded) return 'ended';
         return String(best.listing_status || '');
       })();
 
@@ -1623,9 +1636,10 @@ const VehicleProfile: React.FC = () => {
           }
         }
         // Filter out stale active listings if vehicle is sold
-        const vehicleIsSold = (vehicleData as any)?.sale_price > 0 || 
-                             (vehicleData as any)?.sale_status === 'sold' ||
-                             (vehicleData as any)?.auction_outcome === 'sold';
+        const vOutcome = String((vehicleData as any)?.auction_outcome || '').toLowerCase();
+        const vSaleStatus = String((vehicleData as any)?.sale_status || '').toLowerCase();
+        // IMPORTANT: sale_price alone is not a "sold" signal (it can be a high bid for RNM/no-sale auctions).
+        const vehicleIsSold = vSaleStatus === 'sold' || vOutcome === 'sold';
         if (vehicleIsSold) {
           arr = arr.filter((r: any) => {
             const status = String(r.listing_status || '').toLowerCase();
@@ -1643,12 +1657,12 @@ const VehicleProfile: React.FC = () => {
             ? String((vehicleData as any)?.discovery_url)
             : null);
 
-        // Determine listing_status from vehicle data - check sale_status, auction_outcome, or sale_price
-        const inferredStatus = 
-          String((vehicleData as any)?.sale_status || '').toLowerCase() === 'sold' ? 'sold' :
-          String((vehicleData as any)?.auction_outcome || '').toLowerCase() === 'sold' ? 'sold' :
-          (typeof (vehicleData as any)?.sale_price === 'number' && (vehicleData as any).sale_price > 0) ? 'sold' :
-          String((vehicleData as any)?.auction_outcome || 'unknown');
+        // Determine listing_status from vehicle data (fallback). DO NOT infer sold from sale_price alone.
+        const inferredStatus = (() => {
+          if (vOutcome === 'reserve_not_met' || vOutcome === 'no_sale') return vOutcome;
+          if (vSaleStatus === 'sold' || vOutcome === 'sold') return 'sold';
+          return vOutcome || 'unknown';
+        })();
 
         const effective = best?.listing_url && best?.platform
           ? best
@@ -1664,8 +1678,8 @@ const VehicleProfile: React.FC = () => {
                   watcher_count: null,
                   view_count: null,
                   comment_count: null,
-                  final_price: typeof (vehicleData as any)?.sale_price === 'number' ? (vehicleData as any).sale_price : null,
-                  sold_at: (vehicleData as any)?.sold_at || null,
+                  final_price: (inferredStatus === 'sold' && typeof (vehicleData as any)?.sale_price === 'number') ? (vehicleData as any).sale_price : null,
+                  sold_at: inferredStatus === 'sold' ? ((vehicleData as any)?.sold_at || null) : null,
                   updated_at: (vehicleData as any)?.updated_at || null,
                 } as any)
               : null);

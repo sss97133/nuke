@@ -1295,13 +1295,19 @@ const VehiclesInner: React.FC = () => {
       // Apply search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
+        const yearStr = vehicle.year != null ? String(vehicle.year) : '';
+        const makeStr = String(vehicle.make || '').toLowerCase();
+        const modelStr = String(vehicle.model || '').toLowerCase();
+        const vinStr = vehicle.vin ? String(vehicle.vin).toLowerCase() : '';
+        const colorStr = vehicle.color ? String(vehicle.color).toLowerCase() : '';
+        const roleStr = relationship.role ? String(relationship.role).toLowerCase() : '';
         const matchesSearch = (
-          vehicle.year.toString().includes(searchLower) ||
-          vehicle.make.toLowerCase().includes(searchLower) ||
-          vehicle.model.toLowerCase().includes(searchLower) ||
-          (vehicle.vin && vehicle.vin.toLowerCase().includes(searchLower)) ||
-          (vehicle.color && vehicle.color.toLowerCase().includes(searchLower)) ||
-          (relationship.role && relationship.role.toLowerCase().includes(searchLower))
+          yearStr.includes(searchLower) ||
+          makeStr.includes(searchLower) ||
+          modelStr.includes(searchLower) ||
+          vinStr.includes(searchLower) ||
+          colorStr.includes(searchLower) ||
+          roleStr.includes(searchLower)
         );
         if (!matchesSearch) return false;
       }
@@ -1320,7 +1326,7 @@ const VehiclesInner: React.FC = () => {
 
       switch (sortBy) {
         case 'year':
-          return bVehicle.year - aVehicle.year;
+          return (Number(bVehicle.year) || 0) - (Number(aVehicle.year) || 0);
         case 'make':
           return aVehicle.make.localeCompare(bVehicle.make);
         case 'model':

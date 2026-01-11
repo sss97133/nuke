@@ -45,16 +45,24 @@ const AllVehicles: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadInitialData();
-    
-    // Check for URL parameters and apply them as initial filters
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.toString()) {
-      const urlFilters = SearchHelpers.parseUrlFilters(urlParams);
-      if (Object.keys(urlFilters).length > 0) {
-        handleSearch(urlFilters);
+    let cancelled = false;
+    (async () => {
+      await loadInitialData();
+      if (cancelled) return;
+
+      // Check for URL parameters and apply them as initial filters (after the initial load to avoid race conditions)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.toString()) {
+        const urlFilters = SearchHelpers.parseUrlFilters(urlParams);
+        if (Object.keys(urlFilters).length > 0) {
+          await handleSearch(urlFilters);
+        }
       }
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const loadInitialData = async () => {

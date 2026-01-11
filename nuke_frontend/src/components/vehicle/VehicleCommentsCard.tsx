@@ -139,6 +139,15 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
       const allComments: Comment[] = [];
 
+      const normalizeExternalPlatform = (raw: any): string | null => {
+        if (!raw) return null;
+        const s = String(raw);
+        if (!s) return null;
+        if (s === 'bringatrailer') return 'bat';
+        if (s === 'carsandbids') return 'cars_and_bids';
+        return s;
+      };
+
       // Resolve auction platform per auction_event_id (auction_comments is multi-platform)
       const auctionEventIds = [...new Set((auctionCommentsResult.data || []).map((c: any) => c.auction_event_id).filter(Boolean))];
       const auctionEventPlatformMap = new Map<string, string>();
@@ -150,7 +159,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             .in('id', auctionEventIds);
           (evRows || []).forEach((r: any) => {
             const src = r?.source ? String(r.source) : null;
-            const mapped = src === 'carsandbids' ? 'cars_and_bids' : src;
+            const mapped = normalizeExternalPlatform(src);
             if (r?.id && mapped) auctionEventPlatformMap.set(String(r.id), mapped);
           });
         } catch {
@@ -204,7 +213,10 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         for (const c of auctionCommentsResult.data as any[]) {
           const handle = c.author_username;
           if (!handle) continue;
-          const eventPlatform = (c.platform ? String(c.platform) : null) || auctionEventPlatformMap.get(String(c.auction_event_id)) || null;
+          const eventPlatform =
+            normalizeExternalPlatform(c.platform ? String(c.platform) : null) ||
+            normalizeExternalPlatform(auctionEventPlatformMap.get(String(c.auction_event_id))) ||
+            null;
           const p = (eventPlatform || 'bat').toString();
           const set = platformHandles.get(p) || new Set<string>();
           set.add(handle);
@@ -226,7 +238,10 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         }
 
         for (const c of auctionCommentsResult.data) {
-          const auctionPlatform = ((c as any).platform ? String((c as any).platform) : null) || auctionEventPlatformMap.get(String((c as any).auction_event_id)) || null;
+          const auctionPlatform =
+            normalizeExternalPlatform((c as any).platform ? String((c as any).platform) : null) ||
+            normalizeExternalPlatform(auctionEventPlatformMap.get(String((c as any).auction_event_id))) ||
+            null;
 
           if (auctionPlatform === 'cars_and_bids' && isGarbageCarsAndBidsComment(String(c.comment_text || ''))) {
             continue;

@@ -35,10 +35,13 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim()
+    const serviceRoleKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '').trim()
+
+    if (!supabaseUrl) throw new Error('Missing SUPABASE_URL')
+    if (!serviceRoleKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     const { auction_url, auction_event_id, vehicle_id } = await req.json()
     if (!auction_url) throw new Error('Missing auction_url')
@@ -276,7 +279,8 @@ serve(async (req) => {
         comments.push({
           auction_event_id: eventId,
           vehicle_id: vehicleId,
-          platform: 'bringatrailer',
+          // Canonical platform key used across the DB is 'bat' (matches external_listings.platform, auction_events.source).
+          platform: platformGuess,
           source_url: String(auctionUrlNorm),
           content_hash,
           sequence_number: i + 1,
@@ -504,6 +508,36 @@ serve(async (req) => {
       external_identity_id: handleToExternalIdentityId.get(String(c.author_username)) || null,
     }))
 
+    // Store comments (canonical)
+    // Do this BEFORE any legacy BaT table writes so we never end up with partial state
+    // (e.g. bat_bids written but auction_comments missing).
+    if (comments.length > 0) {
+      console.log(`Attempting to upsert ${comments.length} comments...`)
+      const { data: inserted, error } = await supabase
+        .from('auction_comments')
+        .upsert(commentsWithIdentities, { onConflict: 'vehicle_id,content_hash' })
+        .select('id')
+      
+      if (error) {
+        const e: any = error
+        console.error('Upsert error:', e)
+        throw new Error(
+          [
+            'auction_comments upsert failed',
+            e?.message ? `message=${String(e.message)}` : null,
+            e?.code ? `code=${String(e.code)}` : null,
+            e?.details ? `details=${String(e.details)}` : null,
+            e?.hint ? `hint=${String(e.hint)}` : null,
+          ]
+            .filter(Boolean)
+            .join(' | ')
+        )
+      }
+      console.log(`Successfully saved ${inserted?.length || comments.length} comments`)
+    } else {
+      console.warn('No comments to save (comments array is empty)')
+    }
+
     let batListingId: string | null = null
     try {
       const nowIso = new Date().toISOString()
@@ -647,23 +681,6 @@ serve(async (req) => {
       console.warn('BaT table upserts failed (non-fatal):', e?.message || String(e))
     }
 
-    // Store comments
-    if (comments.length > 0) {
-      console.log(`Attempting to upsert ${comments.length} comments...`)
-      const { data: inserted, error } = await supabase
-        .from('auction_comments')
-        .upsert(commentsWithIdentities, { onConflict: 'vehicle_id,content_hash' })
-        .select('id')
-      
-      if (error) {
-        console.error('Upsert error:', error)
-        throw error
-      }
-      console.log(`Successfully saved ${inserted?.length || comments.length} comments`)
-    } else {
-      console.warn('No comments to save (comments array is empty)')
-    }
-
     // Trigger AI analysis on comments (async, don't wait)
     if (comments.length > 0) {
       const anonJwt = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('ANON_KEY') ?? ''
@@ -690,9 +707,47 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.error('Error:', message)
-    return new Response(JSON.stringify({ error: message }), {
+    const e: any = error
+    const message =
+      e instanceof Error
+        ? e.message
+        : typeof e?.message === 'string'
+          ? e.message
+          : (() => {
+              try {
+                return JSON.stringify(e)
+              } catch {
+                return String(e)
+              }
+            })()
+
+    const details =
+      typeof e?.details === 'string'
+        ? e.details
+        : (() => {
+            try {
+              return e?.details ? JSON.stringify(e.details) : null
+            } catch {
+              return null
+            }
+          })()
+
+    const hint =
+      typeof e?.hint === 'string'
+        ? e.hint
+        : (() => {
+            try {
+              return e?.hint ? JSON.stringify(e.hint) : null
+            } catch {
+              return null
+            }
+          })()
+
+    const code = typeof e?.code === 'string' ? e.code : null
+
+    console.error('Error:', { message, code, details, hint, raw: e })
+
+    return new Response(JSON.stringify({ error: message, code, details, hint }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

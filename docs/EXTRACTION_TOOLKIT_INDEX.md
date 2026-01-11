@@ -1,7 +1,7 @@
 ## Extraction toolkit index (canonical)
 
 **Status**: CANONICAL  
-**Last Verified**: 2026-01-10  
+**Last Verified**: 2026-01-11  
 
 ## Purpose
 
@@ -24,6 +24,11 @@ This document is the index for the scraping / extraction “toolkit” in this r
 - **Step 2 (comments/bids)**: `extract-auction-comments`
 
 Everything else in the repo that looks like a BaT extractor is either legacy, a one-off, or should be treated as deprecated unless it is explicitly listed in `supabase/functions/_shared/approved-extractors.ts`.
+
+### Smoke tests (run in minutes)
+
+- **BaT comments pipeline**: `npm run smoke:bat-comments -- --auction-url="https://bringatrailer.com/listing/..."`  
+  This validates the `extract-auction-comments` function can write to `auction_comments` (and catches DB trigger/RLS/schema breaks quickly).
 
 ### Canonical “entrypoints” that trigger BaT extraction
 
