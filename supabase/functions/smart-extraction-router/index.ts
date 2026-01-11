@@ -28,7 +28,7 @@ function determineOptimalExtractor(url: string): {
 } {
   const urlLower = url.toLowerCase();
 
-  // BaT - Use approved two-step workflow (extract-premium-auction + extract-auction-comments)
+  // BaT - Use approved two-step workflow (extract-bat-core + extract-auction-comments)
   // ⚠️ Do NOT use comprehensive-bat-extraction (deprecated)
   // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
   if (urlLower.includes('bringatrailer.com')) {

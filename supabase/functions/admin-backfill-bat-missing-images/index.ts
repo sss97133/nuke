@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       failed: 0,
       sample: [] as any[],
       note:
-        "Invokes approved BaT extraction workflow (extract-premium-auction) for BaT vehicles that currently have 0 rows in vehicle_images (fixes: UI shows images via fallback but DB is empty).",
+        "Invokes approved BaT core extraction (extract-bat-core) for BaT vehicles that currently have 0 usable rows in vehicle_images (fixes: UI shows images via fallback but DB is empty).",
     };
 
     for (const v of (vehicles || [])) {
@@ -68,13 +68,11 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Check for vehicles missing auto_approved images (not just any images)
+      // Check for vehicles with 0 usable images (ignore duplicates/docs)
       const { count, error: cErr } = await admin
         .from("vehicle_images")
         .select("id", { count: "exact", head: true })
         .eq("vehicle_id", v.id)
-        .eq("source", "bat_import")
-        .eq("approval_status", "auto_approved")
         .is("is_duplicate", false)
         .is("is_document", false);
       if (cErr) {
@@ -97,12 +95,12 @@ Deno.serve(async (req) => {
       }
 
       try {
-        // ✅ APPROVED WORKFLOW: Use extract-premium-auction (extracts images + core data)
+        // ✅ APPROVED WORKFLOW: Use extract-bat-core (extracts images + core data + HTML snapshot)
         // ⚠️ Do NOT use import-bat-listing (deprecated)
         // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
-        // Note: extract-premium-auction extracts images as part of its workflow
+        // Note: extract-bat-core extracts images as part of its workflow
         
-        const { data, error } = await admin.functions.invoke("extract-premium-auction", {
+        const { data, error } = await admin.functions.invoke("extract-bat-core", {
           body: {
             url,
             max_vehicles: 1,
@@ -115,7 +113,7 @@ Deno.serve(async (req) => {
           url, 
           invoked: true, 
           result: data || null,
-          workflow: 'approved-extract-premium-auction',
+          workflow: 'approved-extract-bat-core',
         });
       } catch (e: any) {
         out.failed++;

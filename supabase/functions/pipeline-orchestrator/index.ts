@@ -276,7 +276,7 @@ serve(async (req) => {
             } else if (functionName === 'process-bat-from-import-queue') {
               // ✅ APPROVED BaT WORKFLOW (DO NOT CHANGE)
               // This implements the mandatory two-step workflow:
-              // 1. extract-premium-auction (APPROVED_BAT_EXTRACTORS.CORE_DATA)
+              // 1. extract-bat-core (APPROVED_BAT_EXTRACTORS.CORE_DATA)
               // 2. extract-auction-comments (APPROVED_BAT_EXTRACTORS.COMMENTS)
               // 
               // ⚠️ Do NOT replace with deprecated functions:
@@ -289,7 +289,7 @@ serve(async (req) => {
               const batch = items.slice(0, 2); // Process max 2 per cycle (BaT extractions take 30-60s each)
               
               // Validate we're using approved extractors
-              const step1Function = APPROVED_BAT_EXTRACTORS.CORE_DATA; // 'extract-premium-auction'
+              const step1Function = APPROVED_BAT_EXTRACTORS.CORE_DATA; // 'extract-bat-core'
               const step2Function = APPROVED_BAT_EXTRACTORS.COMMENTS; // 'extract-auction-comments'
               
               if (!isApprovedBatExtractor(step1Function)) {
@@ -306,7 +306,7 @@ serve(async (req) => {
                   const listingUrl = item.listing_url;
                   
                   // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
-                  // ✅ Using APPROVED extractor: extract-premium-auction
+                  // ✅ Using APPROVED extractor: extract-bat-core
                   console.log(`   [async] BaT Step 1: ${step1Function} for ${listingUrl.substring(0, 60)}...`);
                   const step1Resp = await fetch(`${SUPABASE_URL}/functions/v1/${step1Function}`, {
                     method: 'POST',
@@ -427,31 +427,46 @@ serve(async (req) => {
       try {
         const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
         const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+        // process-bat-extraction-queue has verify_jwt=true, so we MUST invoke it with a JWT.
+        // Prefer INTERNAL_INVOKE_JWT, fall back to the legacy anon JWT if present.
+        const invokeJwt =
+          Deno.env.get('INTERNAL_INVOKE_JWT') ??
+          Deno.env.get('SUPABASE_ANON_KEY') ??
+          Deno.env.get('ANON_KEY') ??
+          '';
         
-        // Fire-and-forget: don't wait for bat_extraction_queue to finish (can take minutes)
-        fetch(`${SUPABASE_URL}/functions/v1/process-bat-extraction-queue`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SERVICE_KEY}`,
-          },
-          body: JSON.stringify({
-            batchSize: 3,
-            maxAttempts: 3,
-          }),
-        }).then(async (resp) => {
-          if (!resp.ok) {
-            console.error(`   [async] bat_extraction_queue HTTP ${resp.status}`);
-            return;
+        if (!invokeJwt) {
+          console.warn('   ⚠️  Missing INTERNAL_INVOKE_JWT/SUPABASE_ANON_KEY - cannot trigger process-bat-extraction-queue (verify_jwt=true).');
+        } else {
+          // Fire-and-forget fanout: keep worker itself slow (batchSize=1) but run a few in parallel per orchestrator run.
+          const batFanout = Math.max(1, Math.min(Number(body?.bat_queue_fanout || 3), 20));
+          for (let i = 0; i < batFanout; i++) {
+            fetch(`${SUPABASE_URL}/functions/v1/process-bat-extraction-queue`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${invokeJwt}`,
+                'apikey': invokeJwt,
+              },
+              body: JSON.stringify({
+                batchSize: 1,
+                maxAttempts: 3,
+              }),
+            }).then(async (resp) => {
+              if (!resp.ok) {
+                console.error(`   [async] bat_extraction_queue[${i + 1}/${batFanout}] HTTP ${resp.status}`);
+                return;
+              }
+              const res = await resp.json();
+              console.log(`   [async] bat_extraction_queue[${i + 1}/${batFanout}]: ${res.completed}/${res.processed} completed`);
+            }).catch(e => {
+              console.error(`   [async] bat_extraction_queue[${i + 1}/${batFanout}] error: ${e.message}`);
+            });
           }
-          const res = await resp.json();
-          console.log(`   [async] bat_extraction_queue: ${res.completed}/${res.processed} completed`);
-        }).catch(e => {
-          console.error(`   [async] bat_extraction_queue error: ${e.message}`);
-        });
-        
-        result.bat_queue_processed = -1; // -1 indicates async (result not known yet)
-        console.log(`   ✅ bat_extraction_queue triggered (async, batch_size=3)`);
+
+          result.bat_queue_processed = -1; // -1 indicates async (result not known yet)
+          console.log(`   ✅ bat_extraction_queue triggered (async fanout=${batFanout}, batch_size=1)`);
+        }
 
       } catch (e: any) {
         result.errors.push(`bat_extraction_queue trigger error: ${e.message}`);

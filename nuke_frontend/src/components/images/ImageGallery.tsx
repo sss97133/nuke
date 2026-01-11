@@ -495,10 +495,13 @@ const ImageGallery = ({
     const s = String(u || '').trim();
     if (!s) return '';
     return s
-      .split('#')[0]
-      .split('?')[0]
       .replace(/&#038;/g, '&')
       .replace(/&amp;/g, '&')
+      .split('#')[0]
+      .split('?')[0]
+      // BaT / WP variants
+      .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+      .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
       .replace(/-scaled\./g, '.')
       .trim();
   };
@@ -1065,6 +1068,25 @@ const ImageGallery = ({
              lower.includes('default-') ||
              lower.length < 20;
     };
+
+    // Normalize URL for dedupe keys:
+    // - strip query/hash
+    // - collapse WP variants (-scaled, -WxH)
+    // - decode common HTML entities
+    const normalizeUrlForKey = (u: string | null | undefined): string => {
+      const s = String(u || '').trim();
+      if (!s) return '';
+      return s
+        .replace(/&#038;/g, '&')
+        .replace(/&amp;/g, '&')
+        .split('#')[0]
+        .split('?')[0]
+        .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, '.$1')
+        .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, '.$1')
+        .replace(/-scaled\./g, '.')
+        .toLowerCase()
+        .trim();
+    };
     
     const keyFor = (img: any): string => {
       // Priority 0: Mecum/Cloudinary path (strips transformations/resolutions)
@@ -1091,12 +1113,14 @@ const ImageGallery = ({
       if (img?.variants?.full) {
         const hash = extractHashFromUrl(img.variants.full);
         if (hash) return `variant_full_hash:${hash}`;
-        return `variant_full:${String(img.variants.full).toLowerCase().split('?')[0]}`;
+        const normalized = normalizeUrlForKey(img.variants.full);
+        if (normalized) return `variant_full:${normalized}`;
       }
       if (img?.variants?.large) {
         const hash = extractHashFromUrl(img.variants.large);
         if (hash) return `variant_large_hash:${hash}`;
-        return `variant_large:${String(img.variants.large).toLowerCase().split('?')[0]}`;
+        const normalized = normalizeUrlForKey(img.variants.large);
+        if (normalized) return `variant_large:${normalized}`;
       }
       
       // Priority 5: image URLs (normalized, extract hash if possible)
@@ -1104,7 +1128,7 @@ const ImageGallery = ({
       for (const url of urls) {
         const hash = extractHashFromUrl(url);
         if (hash) return `url_hash:${hash}`;
-        const normalized = String(url).toLowerCase().split('?')[0].split('#')[0];
+        const normalized = normalizeUrlForKey(url);
         if (normalized && normalized.length > 20) return `url:${normalized}`;
       }
       

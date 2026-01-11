@@ -247,17 +247,17 @@ serve(async (req) => {
     }
 
     // Kick off deeper extraction (best-effort) using approved two-step workflow.
-    // ✅ APPROVED WORKFLOW: extract-premium-auction + extract-auction-comments
+    // ✅ APPROVED WORKFLOW: extract-bat-core + extract-auction-comments
     // ⚠️ Do NOT use comprehensive-bat-extraction (deprecated)
     // See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
     try {
       // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
-      const step1Result = await admin.functions.invoke("extract-premium-auction", {
+      const step1Result = await admin.functions.invoke("extract-bat-core", {
         body: { url: sourceUrl, max_vehicles: 1 },
       });
       
       if (step1Result.error) {
-        console.log(`extract-premium-auction invoke failed (non-fatal): ${step1Result.error.message}`);
+        console.log(`extract-bat-core invoke failed (non-fatal): ${step1Result.error.message}`);
       } else {
         const vehicleId = step1Result.data?.created_vehicle_ids?.[0] || 
                          step1Result.data?.updated_vehicle_ids?.[0] || 

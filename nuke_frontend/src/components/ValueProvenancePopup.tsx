@@ -14,7 +14,7 @@ import { FaviconIcon } from './common/FaviconIcon';
 
 interface ValueProvenancePopupProps {
   vehicleId: string;
-  field: 'current_value' | 'sale_price' | 'purchase_price' | 'asking_price';
+  field: 'current_value' | 'sale_price' | 'purchase_price' | 'asking_price' | 'high_bid';
   value: number;
   context?: {
     platform?: string | null;
@@ -183,11 +183,11 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         .eq('status', 'accepted')
         .order('created_at', { ascending: false });
       
-      // Check external_listings and auction_events for sale_price from auctions
+      // Check external_listings and auction_events for auction-derived price context (sold or bid-to)
       let auctionInfo: any = null;
       let auctionMetrics: { buyer_name?: string; seller_username?: string; seller_profile_url?: string; bid_count?: number; view_count?: number; watcher_count?: number } = {};
       
-      if (field === 'sale_price' && (vehicle?.bat_auction_url || vehicle?.discovery_url)) {
+      if ((field === 'sale_price' || field === 'high_bid') && (vehicle?.bat_auction_url || vehicle?.discovery_url)) {
         // Detect platform from discovery_url
         const discoveryUrl = vehicle?.discovery_url || vehicle?.bat_auction_url || '';
         let detectedPlatform = 'bat';
@@ -197,19 +197,20 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         else if (discoveryUrl.includes('bonhams.com')) detectedPlatform = 'bonhams';
         else if (discoveryUrl.includes('rmsothebys.com')) detectedPlatform = 'rmsothebys';
         
-        // Check auction_events first (most reliable source for lot numbers)
+        // Check auction_events first (most reliable source for outcomes + lot numbers)
         const { data: auctionEvent } = await supabase
           .from('auction_events')
-          .select('metadata, auction_end_at')
+          .select('id, source, source_url, lot_number, outcome, auction_start_date, auction_end_date, high_bid, winning_bid, winning_bidder, seller_name, total_bids, comments_count')
           .eq('vehicle_id', vehicleId)
-          .order('auction_end_at', { ascending: false, nullsFirst: false })
+          .order('auction_end_date', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
         
         // Check external_listings for comprehensive auction data
         const { data: listing } = await supabase
           .from('external_listings')
-          .select('platform, sold_at, metadata, bid_count, view_count, watcher_count, listing_url')
+          .select('platform, sold_at, end_date, metadata, bid_count, view_count, watcher_count, listing_url')
           .eq('vehicle_id', vehicleId)
           .order('sold_at', { ascending: false, nullsFirst: false })
           .limit(1)
@@ -228,7 +229,11 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           .limit(1)
           .maybeSingle();
         
-        const saleDate = listing?.sold_at || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date;
+        // For high-bid / RNM, prefer end_date (auction close) instead of sold_at.
+        const derivedDate =
+          field === 'high_bid'
+            ? (listing?.end_date || auctionEvent?.auction_end_date || vehicle?.auction_end_date || null)
+            : (listing?.sold_at || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date || null);
         
         // Extract lot number from URL for non-BaT platforms
         let lotNumberFromUrl: string | null = null;
@@ -247,7 +252,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         }
         
         // Extract lot number from multiple possible sources
-        const lotNumber = auctionEvent?.metadata?.lot_number ||
+        const lotNumber = (auctionEvent as any)?.lot_number ||
                          listing?.metadata?.lot_number || 
                          saleEvent?.metadata?.lot_number ||
                          lotNumberFromUrl ||
@@ -282,13 +287,13 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           'rmsothebys': 'RM Sotheby\'s',
         };
         
-        if (listing || saleEvent || saleDate) {
+        if (listing || saleEvent || derivedDate) {
           auctionInfo = {
             platform: platform,
             platform_name: platformNames[platform] || platform,
             url: listing?.listing_url || vehicle.bat_auction_url || vehicle?.discovery_url,
             lot_number: lotNumber,
-            sale_date: saleDate
+            sale_date: derivedDate
           };
           
           // Get actual bid count from bat_bids table (most accurate)
@@ -314,7 +319,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             watcher_count: (typeof context?.watcher_count === 'number' && context.watcher_count > 0) ? context.watcher_count : (listing?.watcher_count ?? null)
           };
           
-          // Check if buyer has linked N-Zero profile (only for BaT for now)
+          // Check if buyer has linked N-Zero profile (only for sold events)
           if (auctionMetrics.buyer_name && field === 'sale_price' && platform === 'bat') {
             const { data: buyerIdentity } = await supabase
               .from('external_identities')
@@ -364,7 +369,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       if (evidenceData && evidenceData.length > 0) {
         const latest = evidenceData[0];
         let sourceLabel = latest.source_type;
-        if (auctionInfo && field === 'sale_price') {
+        if (auctionInfo && (field === 'sale_price' || field === 'high_bid')) {
           sourceLabel = `${auctionInfo.platform_name}${auctionInfo.lot_number ? ` (Lot #${auctionInfo.lot_number})` : ''}`;
         }
         
@@ -387,7 +392,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           watcher_count: auctionMetrics.watcher_count
         });
         if (auctionInfo) setBatAuctionInfo(auctionInfo);
-      } else if (auctionInfo && field === 'sale_price') {
+      } else if (auctionInfo && (field === 'sale_price' || field === 'high_bid')) {
         // No evidence but we have auction info - use that as source
         setProvenance({
           source: `${auctionInfo.platform_name}${auctionInfo.lot_number ? ` (Lot #${auctionInfo.lot_number})` : ''}`,
@@ -498,13 +503,15 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
     const status = String(context?.listing_status || '').toLowerCase();
     const platform = String(context?.platform || '').toLowerCase();
     const hasFinal = typeof context?.final_price === 'number' && Number.isFinite(context.final_price) && context.final_price > 0;
-    if (field !== 'sale_price') return false;
+    if (field !== 'sale_price' && field !== 'high_bid') return false;
     // Only show "auction result" when the auction is actually final (blank is better than wrong).
     const outcomeIsFinal =
       status === 'sold' ||
       status === 'ended' ||
       status === 'reserve_not_met';
-    if (outcomeIsFinal && (hasFinal || (typeof context?.current_bid === 'number' && Number.isFinite(context.current_bid) && context.current_bid > 0))) {
+    const hasBid =
+      typeof context?.current_bid === 'number' && Number.isFinite(context.current_bid) && context.current_bid > 0;
+    if (outcomeIsFinal && (hasFinal || hasBid || (typeof value === 'number' && value > 0))) {
       return true;
     }
     // Fallback: BaT timeline-event-based sale price can be treated as an auction result only when there's an explicit "sold" marker.
@@ -537,8 +544,8 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   const headerPrefix = (() => {
     if (!isAuctionResultMode) return null;
     if (auctionStatus === 'sold') return 'SOLD';
-    if (auctionStatus === 'reserve_not_met') return 'WINNING BID (RNM)';
-    return 'WINNING BID';
+    if (auctionStatus === 'reserve_not_met') return field === 'high_bid' ? 'BID TO (RNM)' : 'WINNING BID (RNM)';
+    return field === 'high_bid' ? 'BID TO' : 'WINNING BID';
   })();
 
   const effectiveConfidence = (() => {
@@ -771,11 +778,11 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             </div>
           </div>
 
-          {/* Sale Date & Buyer (only for sale_price with BaT data) */}
-          {field === 'sale_price' && provenance?.sale_date && (
+          {/* Sale Date / Auction End */}
+          {(field === 'sale_price' || field === 'high_bid') && provenance?.sale_date && (
             <div style={{ marginBottom: '16px' }}>
               <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
-                Date Sold
+                {field === 'sale_price' ? 'Date Sold' : 'Auction Ended'}
               </div>
               <div style={{ fontSize: '9pt', fontWeight: 600 }}>
                 {new Date(provenance.sale_date).toLocaleDateString('en-US', { 
@@ -788,7 +795,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                   return timeSince ? ` (${timeSince} ago)` : '';
                 })()}
               </div>
-              {provenance.buyer_name && (
+              {field === 'sale_price' && provenance.buyer_name && (
                 <div style={{ fontSize: '9pt', marginTop: '4px', color: 'var(--text-muted)' }}>
                   To: {buyerProfileLink ? (
                     <a

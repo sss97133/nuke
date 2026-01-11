@@ -79,7 +79,7 @@ export function selectProcessor(item: QueueItem): ProcessorSelection {
         listing_url: item.listing_url,
         queue_id: item.id,
         // Orchestrator will call:
-        // 1. extract-premium-auction (APPROVED_BAT_EXTRACTORS.CORE_DATA)
+        // 1. extract-bat-core (APPROVED_BAT_EXTRACTORS.CORE_DATA)
         // 2. extract-auction-comments (APPROVED_BAT_EXTRACTORS.COMMENTS)
       },
       reason: `BaT approved workflow: ${APPROVED_BAT_EXTRACTORS.CORE_DATA} + ${APPROVED_BAT_EXTRACTORS.COMMENTS}`,

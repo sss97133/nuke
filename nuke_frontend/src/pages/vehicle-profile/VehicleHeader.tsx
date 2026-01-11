@@ -1308,7 +1308,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       .sort((a, b) => priority(a.id) - priority(b.id));
   }, [vehicle, valuation]);
 
-  const saleDate = (vehicle as any)?.sale_date || (vehicle as any)?.bat_sale_date || ((auctionPulse as any)?.sold_at ?? null);
+  // "saleDate" is used purely for the small "Xd ago" indicator.
+  // For unsold auctions (RNM / bid-to), we prefer the auction end date so the user still sees recency.
+  const saleDate = (() => {
+    const v: any = vehicle as any;
+    const explicit = v?.sale_date || v?.bat_sale_date || ((auctionPulse as any)?.sold_at ?? null);
+    if (explicit) return explicit;
+
+    const externalListing = v?.external_listings?.[0];
+    const activeListing: any = auctionPulse || externalListing;
+    const end = activeListing?.end_date || v?.auction_end_date || v?.origin_metadata?.auction_times?.auction_end_date || null;
+    if (!end) return null;
+    try {
+      const t = new Date(end).getTime();
+      if (Number.isFinite(t) && t <= Date.now()) return end;
+    } catch {}
+    return null;
+  })();
   const primaryPrice = getDisplayValue();
   const primaryAmount = typeof primaryPrice.amount === 'number' ? primaryPrice.amount : null;
   const primaryLabel = primaryPrice.label || 'Price pending';
@@ -1344,7 +1360,25 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     const outcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
     if (outcome === 'reserve_not_met' || outcome === 'no_sale') return true;
     const status = auctionPulse?.listing_url ? String(auctionPulse.listing_status || '').toLowerCase() : '';
-    return status === 'reserve_not_met' || status === 'no_sale';
+    if (status === 'reserve_not_met' || status === 'no_sale') return true;
+
+    // Fall back to reserve_status (vehicle + external listing metadata).
+    const reserve = String((vehicle as any)?.reserve_status || '').toLowerCase();
+    const extReserve = String(((vehicle as any)?.external_listings?.[0]?.metadata?.reserve_status) || '').toLowerCase();
+    const hasRNMFlag = reserve === 'reserve_not_met' || extReserve === 'reserve_not_met';
+    if (!hasRNMFlag) return false;
+
+    // Only show RNM once the auction has ended (avoid misleading RNM during a live auction).
+    const v: any = vehicle as any;
+    const externalListing = v?.external_listings?.[0];
+    const activeListing: any = auctionPulse || externalListing;
+    const endDate = activeListing?.end_date || v?.auction_end_date || null;
+    if (endDate) {
+      const end = new Date(endDate).getTime();
+      if (Number.isFinite(end)) return end <= Date.now();
+    }
+    // If we can't determine end date, be conservative.
+    return false;
   })();
   const highBid = (vehicle as any)?.high_bid || (vehicle as any)?.winning_bid;
   const priceDisplay = useMemo(() => {
@@ -1491,6 +1525,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     
     const rawOutcome = String((vehicle as any)?.auction_outcome || '').toLowerCase();
     const saleStatus = String((vehicle as any)?.sale_status || '').toLowerCase();
+    const reserveStatus = String((vehicle as any)?.reserve_status || '').toLowerCase();
+    const extReserveStatus = String(((vehicle as any)?.external_listings?.[0]?.metadata?.reserve_status) || '').toLowerCase();
     const batUrl = (vehicle as any)?.bat_auction_url || ((vehicle as any)?.discovery_url?.includes('bringatrailer') ? (vehicle as any)?.discovery_url : null);
     const kslUrl = (vehicle as any)?.discovery_url?.includes('ksl.com') ? (vehicle as any)?.discovery_url : null;
     const sourceUrl = batUrl || kslUrl || (vehicle as any)?.discovery_url;
@@ -1499,13 +1535,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     // Check auction_outcome FIRST - it's the most authoritative
     // RNM/No Sale takes precedence over sale_price (high bid != sold)
     const telemetryStatus = auctionPulse?.listing_url ? String(auctionPulse.listing_status || '').toLowerCase() : '';
+
+    const derivedOutcome =
+      rawOutcome ||
+      (telemetryStatus === 'reserve_not_met' || telemetryStatus === 'no_sale' ? telemetryStatus : '') ||
+      (extReserveStatus === 'reserve_not_met' ? 'reserve_not_met' : '') ||
+      (reserveStatus === 'reserve_not_met' ? 'reserve_not_met' : '') ||
+      '';
     
     // If either vehicle or telemetry explicitly says RNM/No Sale, use that (do NOT override with numeric prices)
     const explicitUnsold =
       telemetryStatus === 'reserve_not_met' || telemetryStatus === 'no_sale'
         ? telemetryStatus
-        : (rawOutcome === 'reserve_not_met' || rawOutcome === 'no_sale')
-          ? rawOutcome
+        : (derivedOutcome === 'reserve_not_met' || derivedOutcome === 'no_sale')
+          ? derivedOutcome
           : null;
     if (explicitUnsold) {
       const outcome = explicitUnsold;
@@ -1524,7 +1567,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       saleStatus === 'sold' ||
       (telemetryStatus === 'sold' && (pulseFinal !== null || !!pulseSoldAt));
 
-    const outcome = hasSoldSignal ? 'sold' : (rawOutcome || null);
+    const outcome = hasSoldSignal ? 'sold' : (derivedOutcome || null);
 
     // RNM is only valid once the auction has ended (or the platform explicitly reports RNM).
     // If an auction is still live/active, showing RNM is misleading.
@@ -3399,7 +3442,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               )}
               {daysSinceSale !== null && daysSinceSale >= 0 && (
                 <span style={{ fontSize: '7pt', color: mutedTextColor, fontWeight: 500, marginLeft: '4px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                  {daysSinceSale === 0 ? 'today' : `${daysSinceSale}d ago`}
+                  {(() => {
+                    if (daysSinceSale === 0) return 'today';
+                    if (daysSinceSale >= 365) return `${Math.floor(daysSinceSale / 365)}y ago`;
+                    if (daysSinceSale >= 30) return `${Math.floor(daysSinceSale / 30)}mo ago`;
+                    return `${daysSinceSale}d ago`;
+                  })()}
                 </span>
               )}
               
@@ -3659,6 +3707,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             if (primaryAmount === null) {
               return 'asking_price';
             }
+
+            // If we are displaying an RNM "bid to" amount, treat it as `high_bid` (auction evidence),
+            // not `current_value` or `sale_price`.
+            if (isRNM && typeof highBid === 'number' && Number.isFinite(highBid) && highBid > 0 && primaryAmount === highBid) {
+              return 'high_bid';
+            }
             // Determine which field is actually being displayed based on primaryPrice
             const displayModeValue = displayMode || 'auto';
             if (displayModeValue === 'sale' || primaryPrice.label?.includes('SOLD') || primaryPrice.label?.includes('Sold')) {
@@ -3678,12 +3732,46 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           })()}
           value={primaryAmount || 0}
           context={{
-            platform: auctionPulse?.platform ? String(auctionPulse.platform) : null,
-            listing_url: auctionPulse?.listing_url ? String(auctionPulse.listing_url) : null,
-            listing_status: auctionPulse?.listing_status ? String(auctionPulse.listing_status) : null,
-            final_price: typeof (auctionPulse as any)?.final_price === 'number' ? (auctionPulse as any).final_price : null,
-            current_bid: typeof auctionPulse?.current_bid === 'number' ? auctionPulse.current_bid : null,
-            bid_count: typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count : null,
+            platform: (() => {
+              const pulse = auctionPulse?.platform ? String(auctionPulse.platform) : null;
+              if (pulse) return pulse;
+              const u = String((vehicle as any)?.bat_auction_url || (vehicle as any)?.discovery_url || (vehicle as any)?.listing_url || '');
+              return u.includes('bringatrailer.com/listing/') ? 'bat' : null;
+            })(),
+            listing_url: (() => {
+              const pulseUrl = auctionPulse?.listing_url ? String(auctionPulse.listing_url) : null;
+              if (pulseUrl) return pulseUrl;
+              const u = String((vehicle as any)?.bat_auction_url || (vehicle as any)?.discovery_url || (vehicle as any)?.listing_url || '').trim();
+              return u || null;
+            })(),
+            listing_status: (() => {
+              const pulseStatus = auctionPulse?.listing_status ? String(auctionPulse.listing_status) : null;
+              if (pulseStatus) return pulseStatus;
+              if (isRNM) return 'reserve_not_met';
+              // If we have an explicit sold signal, treat as sold for provenance purposes.
+              if (isSoldContext) return 'sold';
+              return null;
+            })(),
+            final_price: (() => {
+              const pulseFinal = typeof (auctionPulse as any)?.final_price === 'number' ? (auctionPulse as any).final_price : null;
+              if (typeof pulseFinal === 'number' && Number.isFinite(pulseFinal) && pulseFinal > 0) return pulseFinal;
+              const vSale = typeof (vehicle as any)?.sale_price === 'number' ? (vehicle as any).sale_price : null;
+              if (typeof vSale === 'number' && Number.isFinite(vSale) && vSale > 0) return vSale;
+              return null;
+            })(),
+            current_bid: (() => {
+              const pulseBid = typeof auctionPulse?.current_bid === 'number' ? auctionPulse.current_bid : null;
+              if (typeof pulseBid === 'number' && Number.isFinite(pulseBid) && pulseBid > 0) return pulseBid;
+              if (isRNM && typeof highBid === 'number' && Number.isFinite(highBid) && highBid > 0) return highBid;
+              return null;
+            })(),
+            bid_count: (() => {
+              const pulse = typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count : null;
+              if (typeof pulse === 'number' && Number.isFinite(pulse) && pulse > 0) return pulse;
+              const v = (vehicle as any)?.bat_bids;
+              if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v;
+              return null;
+            })(),
             winner_name: (() => {
               const pulseWinner =
                 typeof (auctionPulse as any)?.winner_name === 'string' ? (auctionPulse as any).winner_name :
@@ -3693,12 +3781,28 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               const fallback = String((vehicle as any)?.origin_metadata?.bat_buyer || (vehicle as any)?.origin_metadata?.buyer || '').trim() || null;
               return (pulseWinner && String(pulseWinner).trim()) ? String(pulseWinner).trim() : fallback;
             })(),
-            inserted_by_name: auctionPulse?.listing_url ? 'System (auction telemetry)' : null,
+            inserted_by_name: (() => {
+              if (auctionPulse?.listing_url) return 'System (auction telemetry)';
+              // If this looks like a BaT-derived auction outcome/high-bid, treat as system-extracted.
+              const u = String((vehicle as any)?.bat_auction_url || (vehicle as any)?.discovery_url || '');
+              if (u.includes('bringatrailer.com/listing/') && (isRNM || isSoldContext)) return 'System (BaT extraction)';
+              return null;
+            })(),
             inserted_at: auctionPulse?.updated_at
               ? String(auctionPulse.updated_at as any)
               : (auctionPulse?.end_date ? String(auctionPulse.end_date as any) : null),
-            confidence: auctionPulse?.listing_url ? 100 : null,
-            evidence_url: auctionPulse?.listing_url ? String(auctionPulse.listing_url) : ((vehicle as any)?.discovery_url ? String((vehicle as any).discovery_url) : null),
+            confidence: (() => {
+              if (auctionPulse?.listing_url) return 100;
+              const u = String((vehicle as any)?.bat_auction_url || (vehicle as any)?.discovery_url || '');
+              if (u.includes('bringatrailer.com/listing/') && (isRNM || isSoldContext)) return 95;
+              return null;
+            })(),
+            evidence_url: (() => {
+              const pulseUrl = auctionPulse?.listing_url ? String(auctionPulse.listing_url) : null;
+              if (pulseUrl) return pulseUrl;
+              const u = String((vehicle as any)?.bat_auction_url || (vehicle as any)?.discovery_url || '').trim();
+              return u || null;
+            })(),
             trend_pct: typeof trendPct === 'number' ? trendPct : null,
             trend_period: trendPeriod || null
           }}
