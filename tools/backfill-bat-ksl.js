@@ -292,7 +292,7 @@ async function processBatch(source, limit = 50) {
           await supabase.from('auction_comments').delete().eq('source_url', row.discovery_url);
           const insertRows = comments.map((c, idx) => ({
             vehicle_id: row.id,
-            platform: 'bringatrailer',
+            platform: 'bat',
             source_url: row.discovery_url,
             comment_type: c.comment_type,
             posted_at: c.posted_at,

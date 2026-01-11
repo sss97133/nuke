@@ -1,5 +1,70 @@
 import { supabase } from '../lib/supabase';
 
+// PostgREST ILIKE uses % and _ wildcards; escape them so user input can't accidentally turn into a wildcard query.
+export const escapePostgrestILike = (value: string): string => String(value || '').replace(/([%_\\])/g, '\\$1');
+
+export const normalizeTextSearchInput = (value: string): string =>
+  String(value || '')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/,+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+export const extractYearFromTextSearch = (value: string): { year: number | null; rest: string } => {
+  const normalized = normalizeTextSearchInput(value);
+  if (!normalized) return { year: null, rest: '' };
+
+  const match = normalized.match(/\b(19|20)\d{2}\b/);
+  if (!match) return { year: null, rest: normalized };
+
+  const year = parseInt(match[0], 10);
+  const currentYear = new Date().getFullYear();
+  if (!Number.isFinite(year) || year < 1900 || year > currentYear + 1) {
+    return { year: null, rest: normalized };
+  }
+
+  const rest = normalizeTextSearchInput(normalized.replace(match[0], ' '));
+  return { year, rest };
+};
+
+export const buildVehicleTextSearchOrFilter = (args: {
+  /** Raw user input */
+  text: string;
+  /** Optional: user ids whose vehicles should match via user_id/uploaded_by */
+  matchingUserIds?: string[];
+}): string | null => {
+  const raw = normalizeTextSearchInput(args.text);
+  if (!raw) return null;
+
+  const tokens = raw
+    .split(' ')
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  const partsSet = new Set<string>();
+  for (const token of tokens) {
+    const term = escapePostgrestILike(token);
+    // Core vehicle fields (tokenized so "1998 Ford" still matches "Ford" even if the full phrase doesn't exist)
+    partsSet.add(`make.ilike.%${term}%`);
+    partsSet.add(`model.ilike.%${term}%`);
+    partsSet.add(`vin.ilike.%${term}%`);
+    partsSet.add(`color.ilike.%${term}%`);
+  }
+
+  // Optional: owner/user search (username/full name -> user ids)
+  const ids = (args.matchingUserIds || []).map(String).filter(Boolean);
+  if (ids.length > 0) {
+    const unique = Array.from(new Set(ids));
+    const inList = unique.join(',');
+    partsSet.add(`user_id.in.(${inList})`);
+    partsSet.add(`uploaded_by.in.(${inList})`);
+  }
+
+  // PostgREST expects comma-separated conditions; do not include whitespace/newlines.
+  return Array.from(partsSet).join(',');
+};
+
 export interface SearchFilters {
   yearFrom?: number;
   yearTo?: number;
@@ -67,6 +132,12 @@ export class VehicleSearchService {
         .eq('is_public', true)
         .neq('status', 'pending');
 
+      // Precompute zip coordinates if needed (used to avoid the broken "zip + radius" logic).
+      let zipCoords: { latitude: number; longitude: number } | null = null;
+      if (filters.zipCode && filters.radius) {
+        zipCoords = await this.getZipCodeCoordinates(filters.zipCode);
+      }
+
       // Apply filters
       if (filters.yearFrom) {
         query = query.gte('year', filters.yearFrom);
@@ -81,28 +152,88 @@ export class VehicleSearchService {
         query = query.ilike('model', filters.model);
       }
       if (filters.priceFrom) {
-        query = query.gte('asking_price', filters.priceFrom * 100); // Convert to cents
+        // Prices in `vehicles` are stored as DECIMAL(10,2) USD (not cents).
+        query = query.gte('asking_price', filters.priceFrom);
       }
       if (filters.priceTo) {
-        query = query.lte('asking_price', filters.priceTo * 100); // Convert to cents
+        // Prices in `vehicles` are stored as DECIMAL(10,2) USD (not cents).
+        query = query.lte('asking_price', filters.priceTo);
       }
       if (filters.forSale) {
         query = query.eq('is_for_sale', true);
       }
       if (filters.zipCode) {
-        query = query.eq('zip_code', filters.zipCode);
+        // If radius is provided and we have coordinates, do NOT restrict to the exact zip.
+        // Otherwise, fallback to exact zip match (best-effort without geocoding).
+        if (!filters.radius || !zipCoords) {
+          query = query.eq('zip_code', filters.zipCode);
+        }
       }
 
       // Text search across multiple fields
       if (filters.textSearch) {
-        const searchTerm = filters.textSearch.toLowerCase();
-        query = query.or(`
-          year::text.ilike.%${searchTerm}%,
-          make.ilike.%${searchTerm}%,
-          model.ilike.%${searchTerm}%,
-          vin.ilike.%${searchTerm}%,
-          color.ilike.%${searchTerm}%
-        `);
+        const normalized = normalizeTextSearchInput(filters.textSearch);
+        const extracted = extractYearFromTextSearch(normalized);
+
+        // If a year exists in the query (e.g. "1998 Ford"), treat it as a hard filter.
+        if (extracted.year) {
+          query = query.eq('year', extracted.year);
+        }
+
+        const raw = extracted.rest || '';
+        if (raw) {
+          // Optional: map owner search (username/full name) -> user ids
+          let matchingUserIds: string[] = [];
+          const term = escapePostgrestILike(raw);
+          const idSet = new Set<string>();
+          // Be resilient across environments where profiles.username may not exist.
+          try {
+            const { data: byUsername } = await supabase
+              .from('profiles')
+              .select('id')
+              .ilike('username', `%${term}%`)
+              .limit(25);
+            (byUsername || []).forEach((p: any) => {
+              if (p?.id) idSet.add(String(p.id));
+            });
+          } catch {
+            // ignore
+          }
+          try {
+            const { data: byName } = await supabase
+              .from('profiles')
+              .select('id')
+              .ilike('full_name', `%${term}%`)
+              .limit(25);
+            (byName || []).forEach((p: any) => {
+              if (p?.id) idSet.add(String(p.id));
+            });
+          } catch {
+            // ignore
+          }
+          matchingUserIds = Array.from(idSet);
+
+          const orFilter = buildVehicleTextSearchOrFilter({ text: raw, matchingUserIds });
+          if (orFilter) {
+            query = query.or(orFilter);
+          }
+        }
+      }
+
+      // Apply a rough bounding box filter for zip+radius searches (fast pre-filter); precise filtering happens later.
+      if (filters.zipCode && filters.radius && zipCoords) {
+        const radiusMiles = filters.radius;
+        const lat = zipCoords.latitude;
+        const lng = zipCoords.longitude;
+        const latDelta = radiusMiles / 69; // ~69 miles per degree latitude
+        const lngDelta = radiusMiles / (69 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+        query = query
+          .not('latitude', 'is', null)
+          .not('longitude', 'is', null)
+          .gte('latitude', lat - latDelta)
+          .lte('latitude', lat + latDelta)
+          .gte('longitude', lng - lngDelta)
+          .lte('longitude', lng + lngDelta);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -120,14 +251,26 @@ export class VehicleSearchService {
           new Set(results.map((v: any) => v.user_id).filter(Boolean))
         );
         if (userIds.length > 0) {
-          const { data: profilesData, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, username, full_name')
-            .in('id', userIds);
+          const trySelect = async (select: string) =>
+            supabase
+              .from('profiles')
+              .select(select)
+              .in('id', userIds);
+
+          // Prefer username if available, but fall back gracefully if the column doesn't exist.
+          let profilesData: any[] | null = null;
+          let profilesError: any = null;
+          ({ data: profilesData, error: profilesError } = await trySelect('id, username, full_name'));
+          if (profilesError) {
+            ({ data: profilesData, error: profilesError } = await trySelect('id, full_name'));
+          }
 
           if (!profilesError && profilesData) {
             const profileMap = new Map(
-              profilesData.map((p: any) => [p.id, { username: p.username ?? null, full_name: p.full_name ?? null }])
+              profilesData.map((p: any) => [
+                p.id,
+                { username: p.username ?? null, full_name: p.full_name ?? null },
+              ])
             );
             results = results.map((v: any) => ({
               ...v,
@@ -141,7 +284,7 @@ export class VehicleSearchService {
 
       // Handle location-based filtering with radius
       if (filters.zipCode && filters.radius) {
-        results = await this.filterByDistance(results, filters.zipCode, filters.radius);
+        results = await this.filterByDistance(results, filters.zipCode, filters.radius, zipCoords);
       }
 
       return results;
@@ -154,11 +297,12 @@ export class VehicleSearchService {
   static async filterByDistance(
     vehicles: VehicleSearchResult[], 
     zipCode: string, 
-    radiusMiles: number
+    radiusMiles: number,
+    zipCoords?: { latitude: number; longitude: number } | null
   ): Promise<VehicleSearchResult[]> {
     try {
       // Get coordinates for the search zip code
-      const searchCoords = await this.getZipCodeCoordinates(zipCode);
+      const searchCoords = zipCoords ?? (await this.getZipCodeCoordinates(zipCode));
       if (!searchCoords) {
         return vehicles; // Return all if we can't get coordinates
       }
@@ -281,9 +425,15 @@ export class VehicleSearchService {
     }
   }
 
-  static formatPrice(cents: number | null): string {
-    if (!cents) return 'Price not listed';
-    return `$${(cents / 100).toLocaleString()}`;
+  static formatPrice(value: number | string | null): string {
+    if (value == null) return 'Price not listed';
+    const num = typeof value === 'number' ? value : parseFloat(String(value));
+    if (!Number.isFinite(num) || num <= 0) return 'Price not listed';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(num);
   }
 
   static formatDistance(miles: number | null): string {

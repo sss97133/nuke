@@ -79,7 +79,7 @@ const VehicleRelationshipVerification: React.FC<Props> = ({
             .from('external_listings')
             .upsert({
               vehicle_id: vehicleId,
-              platform: 'bringatrailer',
+              platform: 'bat',
               listing_url: proofUrl,
               sold_at: new Date().toISOString()
             }, {
