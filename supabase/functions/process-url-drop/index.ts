@@ -247,7 +247,7 @@ async function processBaTListingURL(url: string, supabase: any) {
   }
 
   // ✅ Approved BaT workflow (do NOT use deprecated import-bat-listing/comprehensive-bat-extraction)
-  const { data: coreData, error: coreErr } = await supabase.functions.invoke('extract-premium-auction', {
+  const { data: coreData, error: coreErr } = await supabase.functions.invoke('extract-bat-core', {
     body: { url, max_vehicles: 1 }
   });
 

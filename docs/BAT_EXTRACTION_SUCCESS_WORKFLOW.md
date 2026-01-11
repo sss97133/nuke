@@ -1,28 +1,28 @@
-# ✅ BaT Extraction Success Workflow - THE DEFINITIVE GUIDE
+# BaT Extraction Success Workflow - THE DEFINITIVE GUIDE
 
-**⚠️ CRITICAL: This is the ONLY approved workflow for BaT extraction.**
+**CRITICAL: This is the ONLY approved workflow for BaT extraction.**
 
 **Last Updated:** 2026-01-07  
-**Status:** ✅ PRODUCTION - DO NOT DEVIATE
+**Status:** PRODUCTION - DO NOT DEVIATE
 
-## ⚠️ FOR ALL LLMs: READ THIS FIRST
+## For all LLMs: read this first
 
 If you are modifying BaT extraction code, you MUST use this workflow. 
 Do NOT use any other functions. They are deprecated and will be removed.
 
-### ✅ APPROVED TWO-STEP WORKFLOW (MANDATORY)
+### Approved two-step workflow (mandatory)
 
 **Step 1: Core Data Extraction**
-- Function: `extract-premium-auction`
-- What it does: Extracts VIN, specs, images, auction data
-- Creates: vehicles, external_listings, auction_events
+- Function: `extract-bat-core`
+- What it does: Free-mode BaT HTML fetch + evidence snapshot + clean title/year/make/model + BaT Essentials + images + auction metadata
+- Creates: vehicles, vehicle_images, external_listings, auction_events, listing_page_snapshots
 - Returns: `created_vehicle_ids` or `updated_vehicle_ids`
 
-**Step 2: Comments/Bids Extraction**  
+**Step 2: Comments/Bids Extraction**
 - Function: `extract-auction-comments`
-- What it does: Extracts ALL comments and bids via DOM parsing
+- What it does: Extracts ALL comments and bids from the listing HTML (free mode: direct fetch + embedded JSON extraction; DOM fallback best-effort)
 - Requires: `auction_event_id` and `vehicle_id` (can resolve from URL)
-- Creates: auction_comments, external_identities
+- Creates: `auction_comments`, `external_identities`, and stores HTML evidence in `listing_page_snapshots`
 
 ### ❌ DEPRECATED FUNCTIONS (DO NOT USE)
 
@@ -36,6 +36,14 @@ Do NOT use any other functions. They are deprecated and will be removed.
 
 ## Overview
 
+### Vehicle-first model (important)
+We are documenting the vehicle over time. Auctions are just convenient sources we ingest from.
+
+- A vehicle can be auctioned multiple times (including relists and cross-platform sales).
+- We store each auction as a separate `auction_events` row (keyed by `source` + `source_url`).
+- We store the conversation + bid stream as `auction_comments` linked to both `auction_event_id` and `vehicle_id`.
+- Missing data stays null. We only write what we can directly observe.
+
 This document describes the **proven, battle-tested workflow** for extracting complete data from Bring a Trailer listings. This workflow successfully extracts:
 - ✅ VIN, Mileage, Color, Transmission, Engine (from BaT Essentials section)
 - ✅ All high-resolution images (properly filtered, no contamination)
@@ -46,17 +54,18 @@ This document describes the **proven, battle-tested workflow** for extracting co
 ## The Two-Step Process
 
 ### Step 1: Extract Core Vehicle Data
-**Function**: `extract-premium-auction`  
+**Function**: `extract-bat-core`  
 **What it does**:
 - Extracts VIN, mileage, color, transmission, engine from BaT Essentials section
 - Extracts all high-resolution images from gallery JSON
 - Extracts auction metadata (prices, dates, seller, buyer)
 - Stores vehicle data in `vehicles` table
 - Stores images in `vehicle_images` table
+- Stores HTML evidence in `listing_page_snapshots` (so we can re-parse without re-scraping)
 
 **How to call**:
 ```bash
-curl -X POST "https://YOUR_PROJECT.supabase.co/functions/v1/extract-premium-auction" \
+curl -X POST "https://YOUR_PROJECT.supabase.co/functions/v1/extract-bat-core" \
   -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -85,11 +94,10 @@ curl -X POST "https://YOUR_PROJECT.supabase.co/functions/v1/extract-premium-auct
 ### Step 2: Extract Comments and Bids
 **Function**: `extract-auction-comments`  
 **What it does**:
-- Extracts all comments from BaT listing (requires JavaScript rendering)
-- Extracts all bids from comments and bid history
-- Stores comments in `auction_comments` table
-- Stores bids in `bat_bids` table
-- Updates `bat_listings` table with comment/bid counts
+- Free mode fetches listing HTML directly and extracts embedded JSON comments (best path when it works).
+- Stores external conversation and bids in `auction_comments` (canonical for auction-derived comments/bids).
+- Stores HTML evidence in `listing_page_snapshots` so we can re-parse later without re-scraping.
+- `bat_comments` / `bat_bids` / `bat_listings` are legacy/optional and should not be treated as canonical.
 
 **How to call**:
 ```bash
@@ -107,8 +115,8 @@ curl -X POST "https://YOUR_PROJECT.supabase.co/functions/v1/extract-auction-comm
 {
   "success": true,
   "comments_extracted": 41,
-  "bids_extracted": 19,
-  "bat_listing_updated": true
+  "auction_event_id": "UUID",
+  "vehicle_id": "UUID"
 }
 ```
 
@@ -125,7 +133,7 @@ SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
 SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
 
 echo "🚀 Step 1: Extracting core vehicle data..."
-EXTRACTION_RESULT=$(curl -s -X POST "${SUPABASE_URL}/functions/v1/extract-premium-auction" \
+EXTRACTION_RESULT=$(curl -s -X POST "${SUPABASE_URL}/functions/v1/extract-bat-core" \
   -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" \
   -H "Content-Type: application/json" \
   -d "{\"url\": \"${BAT_URL}\", \"max_vehicles\": 1}")
@@ -164,7 +172,7 @@ echo "✅ Complete! Vehicle extracted with all data."
 
 When a new BaT listing is discovered:
 
-1. **Call `extract-premium-auction`** first to get core vehicle data
+1. **Call `extract-bat-core`** first to get core vehicle data
 2. **Wait for completion** (or check vehicle_id from result)
 3. **Call `extract-auction-comments`** with the vehicle_id
 4. **Done!** Vehicle is fully extracted
@@ -174,7 +182,7 @@ When a new BaT listing is discovered:
 If a vehicle already exists but needs re-extraction:
 
 1. Get the `vehicle_id` and `discovery_url` from the `vehicles` table
-2. Call `extract-premium-auction` with the `discovery_url` (it will update existing vehicle)
+2. Call `extract-bat-core` with the `discovery_url` (it will update existing vehicle)
 3. Call `extract-auction-comments` with the `vehicle_id` and `discovery_url`
 
 ### Queue-Based Processing
@@ -218,6 +226,11 @@ The script automatically:
 - **Reliable**: Uses Firecrawl with proper DOM mapping
 - **Image filtering**: Properly filters out non-vehicle images
 
+### `extract-bat-core`
+- **Free mode by design**: Direct HTML fetch only (no Firecrawl), plus evidence snapshots
+- **Pollution-resistant**: Uses `<h1 class="post-title">` / `og:title` and cleans BaT SEO suffixes so we don’t contaminate `vehicles.model`
+- **Essentials-aware**: Extracts seller/location/lot + key specs from the BaT Essentials block
+
 ### `extract-auction-comments`
 - **JavaScript rendering**: Uses Firecrawl when available; in free/direct mode it may miss content that requires JS rendering
 - **Complete extraction**: Gets all comments and bids
@@ -234,7 +247,7 @@ The script automatically:
 - `bat-simple-extract` (incomplete)
 
 ✅ **Do use**:
-- `extract-premium-auction` (proven, battle-tested)
+- `extract-bat-core` (BaT core data in free mode)
 - `extract-auction-comments` (proven, works)
 
 ## Verification
@@ -250,7 +263,8 @@ SELECT
   v.transmission,
   (SELECT COUNT(*) FROM vehicle_images WHERE vehicle_id = v.id) as image_count,
   (SELECT COUNT(*) FROM auction_comments WHERE vehicle_id = v.id) as comment_count,
-  (SELECT COUNT(*) FROM bat_bids WHERE vehicle_id = v.id) as bid_count
+  (SELECT COUNT(*) FROM auction_comments WHERE vehicle_id = v.id AND comment_type = 'bid' AND bid_amount IS NOT NULL) as bid_count,
+  (SELECT COUNT(*) FROM listing_page_snapshots WHERE platform = 'bat' AND listing_url = v.discovery_url) as snapshots_for_listing_url
 FROM vehicles v
 WHERE v.discovery_url = 'YOUR_BAT_URL';
 ```
@@ -276,8 +290,10 @@ Expected results:
 
 ### If comments/bids are missing:
 - Ensure `extract-auction-comments` was called
-- Check that Firecrawl API key is set (required for JavaScript rendering)
-- Verify `auction_events` record exists (may be needed for some queries)
+- Check `listing_page_snapshots` for that listing URL:
+  - `success=true` means we got HTML evidence (good for later re-parsing).
+  - `success=false` means the direct fetch failed in free mode (we are intentionally not using Firecrawl).
+- Verify `auction_events` record exists (helps join history across auctions)
 
 ## Next Steps
 
