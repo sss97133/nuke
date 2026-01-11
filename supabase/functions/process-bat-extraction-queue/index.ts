@@ -76,7 +76,7 @@ serve(async (req) => {
         // SLOW & ACCURATE: Let it take as long as it needs (up to Edge Function limit)
         console.log(`  Step 1: Extracting core data (this may take 3-5 minutes, be patient)...`);
         
-        // Use anon key for function-to-function calls (extract-premium-auction has verify_jwt: true)
+        // Use anon key for function-to-function calls
         // Prefer INTERNAL_INVOKE_JWT, fall back to SUPABASE_ANON_KEY
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
         const invokeJwt = Deno.env.get('INTERNAL_INVOKE_JWT') ?? 
@@ -92,7 +92,7 @@ serve(async (req) => {
         
         try {
           const response = await fetch(
-            `${supabaseUrl}/functions/v1/extract-premium-auction`,
+            `${supabaseUrl}/functions/v1/extract-bat-core`,
             {
               method: 'POST',
               headers: {
@@ -123,13 +123,13 @@ serve(async (req) => {
           const errorMsg = coreError.message || String(coreError);
           if (errorMsg.includes('504') || errorMsg.includes('timeout') || errorMsg.includes('Gateway Timeout') || errorMsg.includes('non-2xx')) {
             // Timeout is expected for complex listings - retry with exponential backoff
-            throw new Error(`extract-premium-auction timed out (listing may be too complex). Will retry with backoff.`);
+            throw new Error(`extract-bat-core timed out (listing may be too complex). Will retry with backoff.`);
           }
-          throw new Error(`extract-premium-auction failed: ${errorMsg}`);
+          throw new Error(`extract-bat-core failed: ${errorMsg}`);
         }
 
         if (!coreResult || !coreResult.success) {
-          throw new Error(`extract-premium-auction returned failure: ${coreResult?.error || 'Unknown error'}`);
+          throw new Error(`extract-bat-core returned failure: ${coreResult?.error || 'Unknown error'}`);
         }
 
         // Get vehicle_id from result (may create new or update existing)

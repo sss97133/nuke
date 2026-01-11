@@ -7,7 +7,7 @@
  * This centralizes routing logic and makes it easy to add new sources.
  * 
  * ⚠️ FOR BaT: Always uses the approved two-step workflow:
- * 1. extract-premium-auction (core data)
+ * 1. extract-bat-core (core data, free mode, evidence-first)
  * 2. extract-auction-comments (comments/bids)
  * 
  * See: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md
@@ -67,7 +67,7 @@ export function selectProcessor(item: QueueItem): ProcessorSelection {
   // - bat-extract-complete-v*
   //
   // ✅ APPROVED WORKFLOW:
-  // Step 1: extract-premium-auction (core data + images + auction_events)
+  // Step 1: extract-bat-core (core data + images + auction_events + listing_page_snapshots)
   // Step 2: extract-auction-comments (comments + bids)
   //
   // Documentation: docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md

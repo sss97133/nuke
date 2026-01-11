@@ -3670,9 +3670,13 @@ async function storeVehiclesInDatabase(
           // Only high_bid/winning_bid go in vehicles table for auction outcomes
           // BaT-specific fields
           bat_seller: vehicle.seller || vehicle.seller_username || null,
+          bat_buyer: vehicle.buyer || vehicle.buyer_username || null,
           bat_location: vehicle.location || null,
+          bat_listing_title: title,
+          bat_lot_number: vehicle.lot_number || null,
           bat_bids: Number.isFinite(vehicle.bid_count) ? Math.trunc(vehicle.bid_count) : null,
           bat_views: Number.isFinite(vehicle.view_count) ? Math.trunc(vehicle.view_count) : null,
+          bat_watchers: Number.isFinite(vehicle.watcher_count) ? Math.trunc(vehicle.watcher_count) : null,
           bat_comments: Number.isFinite(vehicle.comment_count) ? Math.trunc(vehicle.comment_count) : null,
           is_public: true,
           discovery_source: `${source.toLowerCase()}_agent_extraction`,
@@ -6107,19 +6111,99 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     const specs: Record<string, any> = {};
     
     try {
-      // Extract title/year/make/model from page title or heading
-      const titleMatch = h.match(/<title[^>]*>([^<]+)<\/title>/i) || 
-                        h.match(/<h1[^>]*>([^<]+)<\/h1>/i) ||
-                        h.match(/"title"[:\s]*"([^"]+)"/i);
-      if (titleMatch?.[1]) {
-        specs.title = titleMatch[1].trim();
-        // Parse year/make/model from title (e.g., "1965 Chevrolet Corvette")
-        const titleParts = specs.title.match(/^(\d{4})\s+([A-Za-z][A-Za-z\s&]+?)\s+(.+?)(?:\s+on\s+Bring\s+a\s+Trailer|$)/i);
-        if (titleParts) {
-          specs.year = parseInt(titleParts[1], 10);
-          specs.make = titleParts[2].trim();
-          specs.model = titleParts[3].trim();
+      const decodeBasicEntities = (text: string): string => {
+        return String(text || '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&#038;/g, '&')
+          .replace(/&#039;/g, "'")
+          .replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"')
+          .replace(/&#(\d+);/g, (_m, code) => {
+            try { return String.fromCharCode(parseInt(String(code), 10)); } catch { return _m; }
+          })
+          .replace(/&#x([a-fA-F0-9]+);/g, (_m, code) => {
+            try { return String.fromCharCode(parseInt(String(code), 16)); } catch { return _m; }
+          });
+      };
+
+      const stripTags = (htmlText: string): string => {
+        return decodeBasicEntities(String(htmlText || '').replace(/<[^>]+>/g, ' '))
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const cleanBatTitle = (raw: string): string => {
+        let t = stripTags(raw);
+        // Remove BaT SEO chrome that contaminates model/title fields in the DB.
+        t = t
+          .replace(/\s+for sale on BaT Auctions.*$/i, '')
+          .replace(/\s+on BaT Auctions.*$/i, '')
+          .replace(/\s*\|.*Bring a Trailer.*$/i, '')
+          .replace(/\s*\(Lot #[\d,]+\).*$/i, '')
+          .trim();
+        return t;
+      };
+
+      const urlIdentity = parseBatIdentityFromUrl(normalizedUrl);
+
+      // Extract title/year/make/model from the listing heading first (NOT the <title> tag).
+      // The <title> tag often includes marketing suffixes like "for sale on BaT Auctions - sold for..."
+      // which polluted `vehicles.model` and `vehicles.listing_title`.
+      const h1PostTitle = h.match(/<h1[^>]*class=["'][^"']*post-title[^"']*["'][^>]*>([^<]+)<\/h1>/i);
+      const ogTitle = h.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+      const titleTag = h.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const jsonTitle = h.match(/"title"[:\s]*"([^"]+)"/i);
+
+      const rawTitle = (h1PostTitle?.[1] || ogTitle?.[1] || titleTag?.[1] || jsonTitle?.[1] || '').trim();
+      if (rawTitle) {
+        const cleanedTitle = cleanBatTitle(rawTitle);
+        if (cleanedTitle) {
+          specs.title = cleanedTitle;
+
+          // Parse year from anywhere in the title (handles prefixes like "No Reserve:")
+          const yearMatch = cleanedTitle.match(/\b(19|20)\d{2}\b/);
+          if (yearMatch?.[0]) {
+            const year = parseInt(yearMatch[0], 10);
+            if (Number.isFinite(year) && year > 1885 && year < new Date().getFullYear() + 2) {
+              specs.year = year;
+              const afterYear = cleanedTitle
+                .slice(cleanedTitle.indexOf(yearMatch[0]) + yearMatch[0].length)
+                .trim();
+
+              if (afterYear) {
+                const afterLower = afterYear.toLowerCase();
+                if (urlIdentity?.make && afterLower.startsWith(String(urlIdentity.make).toLowerCase())) {
+                  specs.make = urlIdentity.make;
+                  const afterMake = afterYear.slice(String(urlIdentity.make).length).trim();
+                  specs.model = afterMake || null;
+                } else {
+                  const parts = afterYear.split(/\s+/).filter(Boolean);
+                  const make = parts[0] ? titleCaseToken(parts[0]) : null;
+                  const model = parts.length > 1 ? parts.slice(1).join(' ').trim() : null;
+                  specs.make = make;
+                  specs.model = model;
+                }
+              }
+            }
+          }
         }
+      }
+
+      // Always ensure a baseline identity from the URL slug (prevents Unknown and avoids SEO/title chrome).
+      if ((!specs.year || !Number.isFinite(specs.year)) && urlIdentity?.year) specs.year = urlIdentity.year;
+      const makeLower = typeof specs.make === 'string' ? specs.make.toLowerCase() : '';
+      if ((!specs.make || makeLower === 'unknown') && urlIdentity?.make) specs.make = urlIdentity.make;
+      const modelLower = typeof specs.model === 'string' ? specs.model.toLowerCase() : '';
+      if ((!specs.model || modelLower === 'unknown') && urlIdentity?.model) specs.model = urlIdentity.model;
+
+      // Guard: never accept polluted title/model strings.
+      const titleLower = String(specs.title || '').toLowerCase();
+      if (titleLower.includes('for sale on bat auctions') || titleLower.includes('| bring a trailer')) {
+        specs.title = urlIdentity?.title || null;
+      }
+      const modelLower2 = String(specs.model || '').toLowerCase();
+      if (modelLower2.includes('for sale on bat auctions') || modelLower2.includes('bring a trailer') || modelLower2.includes('|')) {
+        specs.model = urlIdentity?.model || null;
       }
       
       // Extract from "essentials" or "listing-essentials" section
@@ -6244,6 +6328,159 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
         if (m?.[1] && m[1].length > 2 && m[1].length < 100) {
           specs.location = m[1].trim();
           break;
+        }
+      }
+
+      // BaT Essentials block (structured, avoids false positives from global regex scans)
+      try {
+        const essentialsIdx = h.indexOf('<div class="essentials"');
+        if (essentialsIdx >= 0) {
+          const win = h.slice(essentialsIdx, essentialsIdx + 300000);
+
+          // Seller username / handle
+          if (!specs.seller_username) {
+            const sellerMatch =
+              win.match(/<strong>Seller<\/strong>:\s*<a[^>]*href=["'][^"']*\/member\/([^"\/]+)\/?["'][^>]*>([^<]+)<\/a>/i) ||
+              win.match(/<strong>Seller<\/strong>:\s*<a[^>]*>([^<]+)<\/a>/i);
+            const sellerText = sellerMatch ? (sellerMatch[2] || sellerMatch[1]) : null;
+            const sellerClean = sellerText ? stripTags(String(sellerText)) : '';
+            if (sellerClean) specs.seller_username = sellerClean;
+          }
+
+          // Location (often more precise than generic regex)
+          if (!specs.location) {
+            const locMatch = win.match(/<strong>Location<\/strong>:\s*<a[^>]*>([^<]+)<\/a>/i);
+            const loc = locMatch?.[1] ? stripTags(locMatch[1]) : '';
+            if (loc) specs.location = loc;
+          }
+
+          // Lot number
+          if (!specs.lot_number) {
+            const lotMatch = win.match(/<strong>Lot<\/strong>\s*#([0-9,]+)/i);
+            if (lotMatch?.[1]) specs.lot_number = lotMatch[1].replace(/,/g, '').trim();
+          }
+
+          // Listing Details (contains many Essentials fields as list items)
+          const detailsUlMatch = win.match(/<strong>Listing Details<\/strong>[\s\S]*?<ul>([\s\S]*?)<\/ul>/i);
+          if (detailsUlMatch?.[1]) {
+            const ulHtml = detailsUlMatch[1];
+            const liRe = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+            const liTexts: string[] = [];
+            let m: RegExpExecArray | null;
+            while ((m = liRe.exec(ulHtml)) !== null) {
+              const t = stripTags(m[1]);
+              if (t) liTexts.push(t);
+            }
+
+            for (const item of liTexts) {
+              const t = String(item || '').trim();
+              if (!t) continue;
+
+              // VIN / Chassis
+              if (!specs.vin) {
+                const idMatch = t.match(/^(?:VIN|Chassis)\s*:\s*([A-HJ-NPR-Z0-9]{4,17})\b/i);
+                if (idMatch?.[1]) {
+                  const value = idMatch[1].toUpperCase().trim();
+                  if ((value.length === 17 && /^[A-HJ-NPR-Z0-9]{17}$/.test(value)) ||
+                      (value.length >= 4 && value.length <= 16 && /^[A-HJ-NPR-Z0-9]{4,16}$/.test(value))) {
+                    specs.vin = value;
+                  }
+                }
+              }
+
+              // Mileage (prefer explicit miles; fall back to "~650 Miles" style)
+              if (!specs.mileage) {
+                const milesMatch = t.match(/\b([0-9,]+)\s*Miles?\b/i) || t.match(/\b~\s*([0-9,]+)\s*Miles?\b/i);
+                if (milesMatch?.[1]) {
+                  const miles = parseInt(milesMatch[1].replace(/,/g, ''), 10);
+                  if (miles > 0 && miles < 10000000) specs.mileage = miles;
+                }
+              }
+
+              // Transmission
+              if (!specs.transmission && /transmission/i.test(t) && t.length >= 6 && t.length <= 80) {
+                specs.transmission = t;
+              }
+
+              // Engine (keep it conservative)
+              if (!specs.engine_size) {
+                if (/\b\d+(?:\.\d+)?-?\s*Liter\b/i.test(t) || /\b\d+(?:\.\d+)?\s*L\b/i.test(t) || /\bV\d\b/i.test(t)) {
+                  if (t.length >= 4 && t.length <= 100 && !/exhaust|wheels|brakes/i.test(t)) {
+                    specs.engine_size = t;
+                  }
+                }
+              }
+
+              // Exterior color (e.g., "Red Paint")
+              if (!specs.color) {
+                const paintMatch = t.match(/^(.+?)\s+Paint\b/i);
+                if (paintMatch?.[1]) {
+                  const c = paintMatch[1].trim();
+                  if (c.length >= 3 && c.length <= 40) specs.color = c;
+                }
+              }
+
+              // Interior color (e.g., "Biscuit Leather Upholstery")
+              if (!specs.interior_color) {
+                const upMatch = t.match(/^(.+?)\s+Upholstery\b/i);
+                if (upMatch?.[1]) {
+                  const c = upMatch[1].trim();
+                  if (c.length >= 3 && c.length <= 60) specs.interior_color = c;
+                }
+              }
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn('Error parsing BaT Essentials block:', e?.message || String(e));
+      }
+
+      // Buyer username (if sold)
+      if (!specs.buyer_username) {
+        const buyerMatch =
+          h.match(/Sold\s+to\s*<strong>([^<]+)<\/strong>/i) ||
+          h.match(/to\s*<strong>([^<]+)<\/strong>\s*for\s*(?:USD\s*)?\$?/i);
+        const buyer = buyerMatch?.[1] ? stripTags(buyerMatch[1]) : '';
+        if (buyer) specs.buyer_username = buyer;
+      }
+
+      // Views / watchers / comments count (used for external_listings + BaT badges)
+      if (!specs.view_count) {
+        const viewMatch = h.match(/data-stats-item="views">([0-9,]+)/i);
+        if (viewMatch?.[1]) {
+          const n = parseInt(viewMatch[1].replace(/,/g, ''), 10);
+          if (Number.isFinite(n) && n >= 0) specs.view_count = n;
+        }
+      }
+      if (!specs.watcher_count) {
+        const watcherMatch = h.match(/data-stats-item="watchers">([0-9,]+)/i);
+        if (watcherMatch?.[1]) {
+          const n = parseInt(watcherMatch[1].replace(/,/g, ''), 10);
+          if (Number.isFinite(n) && n >= 0) specs.watcher_count = n;
+        }
+      }
+      if (!specs.comment_count) {
+        const commentHeaderMatch = h.match(/<span class="info-value">(\d+)<\/span>\s*<span class="info-label">Comments<\/span>/i);
+        if (commentHeaderMatch?.[1]) {
+          const n = parseInt(commentHeaderMatch[1], 10);
+          if (Number.isFinite(n) && n >= 0) specs.comment_count = n;
+        }
+      }
+
+      // Description (free mode): use the excerpt/lead text as the raw listing description input.
+      if (!specs.description) {
+        const excerptMatch =
+          h.match(/<div[^>]*class=["'][^"']*post-excerpt[^"']*["'][^>]*>([\s\S]*?)<\/div>/i) ||
+          h.match(/<div[^>]*class=["'][^"']*post-content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+        if (excerptMatch?.[1]) {
+          const text = stripTags(excerptMatch[1]);
+          if (text && text.length > 40) specs.description = text;
+        } else {
+          const metaMatch =
+            h.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
+            h.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+          const text = metaMatch?.[1] ? stripTags(metaMatch[1]) : '';
+          if (text && text.length > 40) specs.description = text;
         }
       }
       
@@ -6420,6 +6657,51 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
     
     // BaT pages have all data embedded in HTML/JSON, so we parse directly
     // No need for Firecrawl or AI - everything is in the HTML
+
+    // Evidence-first: store raw HTML snapshot so we can re-parse later without re-scraping.
+    // Keep this non-fatal so ingestion never stops due to snapshot storage.
+    try {
+      const snapshotUrl = (() => {
+        try {
+          const u = new URL(normalizedUrl);
+          u.hash = '';
+          u.search = '';
+          if (!u.pathname.endsWith('/')) u.pathname = `${u.pathname}/`;
+          return u.toString();
+        } catch {
+          const base = String(normalizedUrl).split('#')[0].split('?')[0];
+          return base.endsWith('/') ? base : `${base}/`;
+        }
+      })();
+
+      const sb = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"));
+      const htmlSha = await sha256Hex(html);
+      const { error } = await sb
+        .from('listing_page_snapshots')
+        .insert({
+          platform: 'bat',
+          listing_url: snapshotUrl,
+          fetch_method: 'direct',
+          http_status: 200,
+          success: true,
+          error_message: null,
+          html,
+          html_sha256: htmlSha,
+          content_length: html.length,
+          metadata: {
+            extractor: 'extract-premium-auction',
+            mode: 'free',
+            source_url: snapshotUrl,
+          },
+        } as any);
+
+      // 23505 = unique_violation (duplicate snapshot); ignore.
+      if (error && String((error as any).code || '') !== '23505') {
+        console.warn(`listing_page_snapshots insert failed (non-fatal): ${error.message}`);
+      }
+    } catch (e: any) {
+      console.warn(`listing_page_snapshots save failed (non-fatal): ${e?.message || String(e)}`);
+    }
     
     // Extract high-res images from HTML gallery
     const images = extractBatGalleryImagesFromHtml(html);
@@ -6447,6 +6729,10 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       make: (htmlMakeValid ? htmlSpecs.make : null) || urlIdentity?.make || null,
       model: (htmlModelValid ? htmlSpecs.model : null) || urlIdentity?.model || null,
       trim: htmlSpecs.trim || null,
+      description: htmlSpecs.description || null,
+      seller_username: htmlSpecs.seller_username || null,
+      buyer_username: htmlSpecs.buyer_username || null,
+      lot_number: htmlSpecs.lot_number || null,
       vin: htmlSpecs.vin || null,
       mileage: htmlSpecs.mileage || null,
       color: htmlSpecs.color || null,
@@ -6463,6 +6749,9 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
       current_bid: htmlSpecs.current_bid || null,
       reserve_met: htmlSpecs.reserve_met ?? null,
       bid_count: htmlSpecs.bid_count || null,
+      view_count: htmlSpecs.view_count || null,
+      watcher_count: htmlSpecs.watcher_count || null,
+      comment_count: htmlSpecs.comment_count || null,
       images: images,
     };
 

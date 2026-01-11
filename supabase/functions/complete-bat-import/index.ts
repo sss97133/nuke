@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     }
 
     // ✅ Approved BaT workflow:
-    // 1) extract-premium-auction (core: VIN/specs/images/auction_events)
+    // 1) extract-bat-core (core: HTML snapshot + clean identity + essentials/images/auction_events)
     // 2) extract-auction-comments (comments/bids) (non-critical)
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
     // Step 1: core extraction
     const step1 = await postJson(
-      `${fnBase}/extract-premium-auction`,
+      `${fnBase}/extract-bat-core`,
       invokeHeaders,
       { url: batUrl, max_vehicles: 1 },
       120_000,
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     if (!step1.ok) {
       return json(step1.status, {
         success: false,
-        error: 'extract-premium-auction HTTP error',
+        error: 'extract-bat-core HTTP error',
         status: step1.status,
         details: step1.data ?? step1.text.slice(0, 500),
       });
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     if (!step1.data?.success) {
       return json(500, {
         success: false,
-        error: 'extract-premium-auction failed',
+        error: 'extract-bat-core failed',
         details: step1.data ?? null,
       });
     }

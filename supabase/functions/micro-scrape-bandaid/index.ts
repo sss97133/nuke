@@ -139,7 +139,7 @@ async function executeActions(
           if (vehicle.discovery_url?.includes('bringatrailer.com')) {
             try {
               // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
-              const step1Result = await supabase.functions.invoke('extract-premium-auction', {
+              const step1Result = await supabase.functions.invoke('extract-bat-core', {
                 body: {
                   url: vehicle.discovery_url,
                   max_vehicles: 1,

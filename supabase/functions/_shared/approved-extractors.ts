@@ -17,7 +17,8 @@
  */
 
 export const APPROVED_BAT_EXTRACTORS = {
-  CORE_DATA: 'extract-premium-auction',
+  // BaT-only core extractor (free mode, evidence-first, avoids polluted titles/models)
+  CORE_DATA: 'extract-bat-core',
   COMMENTS: 'extract-auction-comments',
 } as const;
 

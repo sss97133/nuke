@@ -31,6 +31,65 @@ function normalizeUrl(raw: string): string {
   }
 }
 
+async function trySaveHtmlSnapshot(args: {
+  supabase: any
+  platform: string
+  listingUrl: string
+  fetchMethod: string
+  httpStatus: number | null
+  success: boolean
+  errorMessage: string | null
+  html: string | null
+  metadata?: Record<string, unknown>
+}): Promise<void> {
+  const {
+    supabase,
+    platform,
+    listingUrl,
+    fetchMethod,
+    httpStatus,
+    success,
+    errorMessage,
+    html,
+    metadata,
+  } = args
+
+  try {
+    const htmlText = html ?? null
+    const htmlSha = htmlText ? await sha256Hex(htmlText) : null
+    const contentLength = htmlText ? htmlText.length : 0
+
+    const payload: any = {
+      platform,
+      listing_url: listingUrl,
+      fetch_method: fetchMethod,
+      http_status: httpStatus,
+      success,
+      error_message: errorMessage,
+      html: htmlText,
+      html_sha256: htmlSha,
+      content_length: contentLength,
+      metadata: metadata || {},
+    }
+
+    // Dedup is enforced by a PARTIAL unique index in SQL:
+    //   UNIQUE(platform, listing_url, html_sha256) WHERE html_sha256 IS NOT NULL
+    // Supabase/PostgREST upsert cannot express the partial-index predicate, so we use plain INSERT
+    // and treat unique-violation as a no-op.
+    const { error } = await supabase
+      .from('listing_page_snapshots')
+      .insert(payload)
+
+    if (error) {
+      // 23505 = unique_violation (duplicate snapshot); ignore.
+      if (String(error.code || '') === '23505') return
+      console.warn('listing_page_snapshots insert failed (non-fatal):', error?.message || String(error))
+    }
+  } catch (e: any) {
+    console.warn('listing_page_snapshots save failed (non-fatal):', e?.message || String(e))
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -112,7 +171,7 @@ serve(async (req) => {
 
     // ⚠️ FREE MODE: Direct HTML fetch (no Firecrawl due to budget constraints)
     // BaT comments may be in HTML or require JS rendering - try direct fetch first
-    console.log('🌐 Fetching BaT page HTML directly (free mode - no Firecrawl)...')
+    console.log('Fetching BaT page HTML directly (free mode - no Firecrawl)...')
     
     // User agent rotation for IP safety (avoids detection patterns)
     const userAgents = [
@@ -153,9 +212,52 @@ serve(async (req) => {
         throw new Error(`Direct fetch returned insufficient HTML (${html?.length || 0} chars)`)
       }
       
-      console.log(`✅ Direct fetch returned ${html.length} characters of HTML`)
+      console.log(`Direct fetch returned ${html.length} characters of HTML`)
+
+      // Evidence-first: store HTML snapshot so we can re-parse later without re-scraping.
+      // This is especially useful in free mode to reduce repeated site hits.
+      if (platformGuess === 'bat') {
+        await trySaveHtmlSnapshot({
+          supabase,
+          platform: 'bat',
+          listingUrl: auctionUrlNorm,
+          fetchMethod: 'direct',
+          httpStatus: response.status,
+          success: true,
+          errorMessage: null,
+          html,
+          metadata: {
+            extractor: 'extract-auction-comments',
+            mode: 'free',
+            user_agent: randomUserAgent,
+            vehicle_id: vehicleId,
+            auction_event_id: eventId,
+          },
+        })
+      }
     } catch (e: any) {
-      console.error(`❌ Direct fetch failed: ${e.message}`)
+      console.error(`Direct fetch failed: ${e.message}`)
+
+      if (platformGuess === 'bat') {
+        await trySaveHtmlSnapshot({
+          supabase,
+          platform: 'bat',
+          listingUrl: auctionUrlNorm,
+          fetchMethod: 'direct',
+          httpStatus: null,
+          success: false,
+          errorMessage: e?.message ? String(e.message) : 'Direct fetch failed',
+          html: null,
+          metadata: {
+            extractor: 'extract-auction-comments',
+            mode: 'free',
+            user_agent: randomUserAgent,
+            vehicle_id: vehicleId,
+            auction_event_id: eventId,
+          },
+        })
+      }
+
       throw new Error(`Direct HTML fetch failed: ${e.message}. BaT comments may require JavaScript rendering (Firecrawl needed).`)
     }
     
@@ -170,11 +272,11 @@ serve(async (req) => {
           const arrayContent = '[' + commentsMatch[1] + ']'
           const parsed = JSON.parse(arrayContent)
           if (Array.isArray(parsed) && parsed.length > 0) {
-            console.log(`✅ Found ${parsed.length} comments in embedded JSON array`)
+            console.log(`Found ${parsed.length} comments in embedded JSON array`)
             commentsFromJson = parsed
           }
         } catch (parseErr: any) {
-          console.warn(`⚠️ Failed to parse comments JSON array: ${parseErr?.message}`)
+          console.warn(`Failed to parse comments JSON array: ${parseErr?.message}`)
         }
       }
       
@@ -190,11 +292,11 @@ serve(async (req) => {
             const rawComments = pageData.comments || listing?.comments || []
             
             if (Array.isArray(rawComments) && rawComments.length > 0) {
-              console.log(`✅ Found ${rawComments.length} comments in __NEXT_DATA__`)
+              console.log(`Found ${rawComments.length} comments in __NEXT_DATA__`)
               commentsFromJson = rawComments
             }
           } catch (e: any) {
-            console.warn(`⚠️ Failed to parse __NEXT_DATA__ for comments: ${e?.message}`)
+            console.warn(`Failed to parse __NEXT_DATA__ for comments: ${e?.message}`)
           }
         }
       }
@@ -212,12 +314,12 @@ serve(async (req) => {
           } catch { /* skip malformed */ }
         }
         if (found.length > 0) {
-          console.log(`✅ Found ${found.length} comments from individual JSON objects`)
+          console.log(`Found ${found.length} comments from individual JSON objects`)
           commentsFromJson = found
         }
       }
     } catch (e: any) {
-      console.warn(`⚠️ Failed to extract comments from JSON: ${e?.message}`)
+      console.warn(`Failed to extract comments from JSON: ${e?.message}`)
     }
 
     const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -233,7 +335,7 @@ serve(async (req) => {
     
     // Process comments from embedded JSON (preferred method - FREE, no JS needed!)
     if (commentsFromJson.length > 0) {
-      console.log(`🔄 Processing ${commentsFromJson.length} comments from embedded JSON...`)
+      console.log(`Processing ${commentsFromJson.length} comments from embedded JSON...`)
       for (let i = 0; i < commentsFromJson.length; i++) {
         const c = commentsFromJson[i]
         const authorRaw = String(c?.authorName || c?.author || '').trim()
@@ -303,12 +405,12 @@ serve(async (req) => {
         }
       }
       
-      console.log(`✅ Successfully processed ${comments.length} comments from embedded JSON (FREE mode!)`)
+      console.log(`Successfully processed ${comments.length} comments from embedded JSON (free mode)`)
     }
     
     // Fallback: Try DOM parsing if JSON extraction had no comments
     if (comments.length === 0) {
-      console.log(`⚠️ No comments found in embedded JSON, trying DOM fallback (may not work without JS rendering)...`)
+      console.log(`No comments found in embedded JSON, trying DOM fallback (may not work without JS rendering)...`)
       // Extract all comments - try multiple selectors for robustness
       let commentElements = doc.querySelectorAll('.comment')
       if (commentElements.length === 0) {
