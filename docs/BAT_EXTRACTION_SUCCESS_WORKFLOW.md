@@ -185,9 +185,9 @@ For batch processing, use the `bat_extraction_queue` table:
 2. Call `process-bat-extraction-queue` (which should call both functions)
 3. Monitor queue status
 
-**⚠️ Important**: Currently `process-bat-extraction-queue` calls `comprehensive-bat-extraction`, which does NOT use the proven workflow. It uses a different extraction method that may not extract VIN/specs correctly.
+**⚠️ Important**: `process-bat-extraction-queue` is the canonical batch worker for `bat_extraction_queue` and should run the same two-step workflow described here.
 
-**Recommended**: Update `process-bat-extraction-queue` to call both `extract-premium-auction` and `extract-auction-comments` directly, or use the script below for individual extractions.
+**Recommended**: `process-bat-extraction-queue` should run the same two-step workflow as this doc. If comments/bids coverage is critical, verify Step 2 results explicitly; Step 2 may be best-effort depending on current fetch mode and site behavior.
 
 ### Using the Extraction Script
 
@@ -219,7 +219,7 @@ The script automatically:
 - **Image filtering**: Properly filters out non-vehicle images
 
 ### `extract-auction-comments`
-- **JavaScript rendering**: Uses Firecrawl to render BaT's dynamic comments
+- **JavaScript rendering**: Uses Firecrawl when available; in free/direct mode it may miss content that requires JS rendering
 - **Complete extraction**: Gets all comments and bids
 - **Proper storage**: Stores in correct tables (`auction_comments`, `bat_bids`)
 - **Updates metadata**: Updates `bat_listings` with counts

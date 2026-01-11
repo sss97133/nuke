@@ -37,6 +37,7 @@ docs/
 
 ## Key Documents
 
+- **[Extraction Toolkit Index](EXTRACTION_TOOLKIT_INDEX.md)** - Canonical map of scraping/extraction workflows, entrypoints, and “use this / don’t use this”
 - **[Reference Library Upload Guide](reference-system/REFERENCE_LIBRARY_UPLOAD_GUIDE.md)** - How to add reference data
 - **[Component Knowledge System](reference-system/COMPONENT_KNOWLEDGE_SYSTEM_COMPLETE.md)** - System overview
 - **[KSL Extraction Audit](ksl-scraper/KSL_EXTRACTION_AUDIT.md)** - Quality analysis

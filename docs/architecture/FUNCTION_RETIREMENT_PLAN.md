@@ -4,6 +4,14 @@
 > **Date Created**: 2026-01-07  
 > **Status**: Planning Phase
 
+## Status note (2026-01-10)
+
+Some statements in this document were written before newer routing/worker updates landed. Treat any references to routing BaT through `import-bat-listing` or `comprehensive-bat-extraction` as legacy; the canonical workflow is documented in:
+
+- `docs/BAT_EXTRACTION_SUCCESS_WORKFLOW.md`
+- `docs/ops/EDGE_FUNCTION_GOVERNANCE.md`
+- `docs/EXTRACTION_TOOLKIT_INDEX.md`
+
 ---
 
 ## Functions to Retire
@@ -22,7 +30,7 @@
 
 | Function | Status | Action | Notes |
 |----------|--------|---------|-------|
-| `process-bat-extraction-queue` | ⚠️ UPDATE | Update to call new functions | Currently calls `comprehensive-bat-extraction` |
+| `process-bat-extraction-queue` | ⚠️ REVIEW | Verify completion criteria | Current code calls `extract-premium-auction` + `extract-auction-comments` |
 | `bat-reextract` | ⚠️ REVIEW | Check if still needed | May be used for repair workflows |
 | `bat-batch-extract` | ⚠️ REVIEW | Check if still needed | May be used for batch operations |
 

@@ -2,10 +2,10 @@
 
 ## Current Limits
 
-**Default Timeout: 60 seconds**
-- Supabase Edge Functions have a hard limit of **60 seconds** execution time
-- This is a platform limit, not configurable on free/tier plans
-- Functions that exceed this limit return **504 Gateway Timeout**
+**Observed hard timeout: ~150 seconds**
+- In this environment, Edge Functions have consistently returned **504 Gateway Timeout** at roughly **150s wall-clock**.
+- Treat this as a hard limit and design for **well under the limit** (for example, <120s per invocation).
+- Supabase plan/runtime limits can change; verify against current logs if behavior differs.
 
 ## Why Timeouts Happen
 
