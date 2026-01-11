@@ -3,6 +3,15 @@
 **Date**: 2025-12-27  
 **Status**: Analysis Complete | Ready for Review
 
+## Status note (2026-01-10)
+
+This plan predates the current extraction allowlist/governance and contains several references that are now deprecated (notably `import-bat-listing`).
+
+For current guidance, start with:
+
+- `docs/ops/EDGE_FUNCTION_GOVERNANCE.md`
+- `docs/EXTRACTION_TOOLKIT_INDEX.md`
+
 ## Summary
 
 Out of **227 edge functions**, we've identified **65 candidates for deletion**:
