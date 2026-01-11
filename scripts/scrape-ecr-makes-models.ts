@@ -24,6 +24,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import * as cheerio from 'cheerio';
+import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 type EcrModel = {
   ecr_model_slug: string | null;
@@ -31,6 +33,7 @@ type EcrModel = {
   summary: string | null;
   variants_count: number | null;
   image_url: string | null;
+  model_url: string | null;
 };
 
 type EcrMake = {
@@ -68,6 +71,7 @@ type CliOptions = {
   maxRetries: number;
   retryBaseMs: number;
   retryJitterMs: number;
+  cacheTtlHours: number | null;
   includeModels: boolean;
   resume: boolean;
   writeEvery: number;
@@ -75,6 +79,7 @@ type CliOptions = {
   offsetMakes: number;
   limitMakes: number | null;
   verbose: boolean;
+  upsertSupabase: boolean;
 };
 
 type FetchPolicy = {
@@ -84,6 +89,8 @@ type FetchPolicy = {
   maxRetries: number;
   retryBaseMs: number;
   retryJitterMs: number;
+  cacheTtlMs: number | null;
+  noCache: boolean;
   throttle: () => Promise<void>;
 };
 
@@ -99,6 +106,7 @@ function parseArgs(argv: string[]): CliOptions {
     maxRetries: 6,
     retryBaseMs: 1000,
     retryJitterMs: 250,
+    cacheTtlHours: 24,
     includeModels: true,
     resume: false,
     writeEvery: 10,
@@ -106,6 +114,7 @@ function parseArgs(argv: string[]): CliOptions {
     offsetMakes: 0,
     limitMakes: null,
     verbose: false,
+    upsertSupabase: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -118,6 +127,8 @@ function parseArgs(argv: string[]): CliOptions {
     else if (a === '--max-retries') opts.maxRetries = Math.max(0, Number(argv[++i] || '0'));
     else if (a === '--retry-base-ms') opts.retryBaseMs = Math.max(0, Number(argv[++i] || '0'));
     else if (a === '--retry-jitter-ms') opts.retryJitterMs = Math.max(0, Number(argv[++i] || '0'));
+    else if (a === '--cache-ttl-hours') opts.cacheTtlHours = Math.max(0, Number(argv[++i] || '24'));
+    else if (a === '--no-cache') opts.cacheTtlHours = 0;
     else if (a === '--no-models') opts.includeModels = false;
     else if (a === '--resume') opts.resume = true;
     else if (a === '--write-every') opts.writeEvery = Math.max(1, Number(argv[++i] || '10'));
@@ -126,12 +137,15 @@ function parseArgs(argv: string[]): CliOptions {
     else if (a === '--limit-makes') opts.limitMakes = Math.max(0, Number(argv[++i] || '0')) || null;
     else if (a === '--base-url') opts.baseUrl = (argv[++i] || '').trim() || opts.baseUrl;
     else if (a === '--verbose') opts.verbose = true;
+    else if (a === '--upsert-supabase') opts.upsertSupabase = true;
     else if (a === '--help' || a === '-h') {
       console.log(`ECR make/model scraper
 
 Flags:
   --out <path>           Output JSON path (default: data/json/ecr_makes_models.json)
   --cache-dir <path>     Cache directory for fetched HTML (default: tmp/ecr/cache)
+  --cache-ttl-hours <n>  Cache TTL in hours (default: 24). Use 0 to always refresh.
+  --no-cache             Alias for --cache-ttl-hours 0
   --concurrency <n>      Max concurrent make-page fetches (default: 1)
   --delay-ms <n>         Minimum delay (ms) between network requests (default: 500)
   --timeout-ms <n>       Per-request timeout (ms) (default: 30000)
@@ -145,6 +159,7 @@ Flags:
   --offset-makes <n>     Start at make index N (after sorting) for batch runs (default: 0)
   --limit-makes <n>      Scrape only first N makes (for testing)
   --base-url <url>       Override base URL (default: https://exclusivecarregistry.com)
+  --upsert-supabase      Upsert into Supabase tables (requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)
   --verbose              More logging
 `);
       process.exit(0);
@@ -203,6 +218,34 @@ function parseIntOrNull(s: string | null | undefined): number | null {
   if (!s) return null;
   const n = Number(String(s).replace(/[^\d]/g, ''));
   return Number.isFinite(n) ? n : null;
+}
+
+function slugifyEcrFallback(input: string): string {
+  // ECR provides model slugs in `data-info`, but keep a defensive fallback for rare cases.
+  return String(input || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/--+/g, '-')
+    .slice(0, 120);
+}
+
+function decodeJwtRole(token: string | null | undefined): string | null {
+  const raw = String(token || '');
+  if (!raw.startsWith('eyJ')) return null; // Non-JWT or unknown format (e.g. sb_secret_*)
+  const parts = raw.split('.');
+  if (parts.length < 2) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1] || '', 'base64').toString('utf8'));
+    const direct = payload?.role;
+    const hasuraDefault = payload?.['https://hasura.io/jwt/claims']?.['x-hasura-default-role'];
+    return (direct || hasuraDefault || null) as string | null;
+  } catch {
+    return null;
+  }
 }
 
 function parseRetryAfterMs(retryAfterHeader: string | null): number | null {
@@ -274,8 +317,20 @@ async function fetchWithRetry(url: string, policy: FetchPolicy): Promise<Respons
 async function fetchHtml(url: string, policy: FetchPolicy): Promise<string> {
   ensureDir(policy.cacheDir);
   const cachePath = path.join(policy.cacheDir, `${sha1(url)}.html`);
-  if (fs.existsSync(cachePath)) {
-    return fs.readFileSync(cachePath, 'utf8');
+  if (!policy.noCache && fs.existsSync(cachePath)) {
+    const ttlMs = policy.cacheTtlMs;
+    if (ttlMs === null) {
+      return fs.readFileSync(cachePath, 'utf8');
+    }
+    try {
+      const st = fs.statSync(cachePath);
+      const ageMs = Date.now() - st.mtimeMs;
+      if (Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= ttlMs) {
+        return fs.readFileSync(cachePath, 'utf8');
+      }
+    } catch {
+      // fall through to refetch
+    }
   }
 
   const resp = await fetchWithRetry(url, policy);
@@ -365,7 +420,7 @@ function parseMakesList(html: string, baseUrl: string): EcrMake[] {
   return Array.from(bySlug.values()).sort((a, b) => a.make_name.localeCompare(b.make_name));
 }
 
-function parseMakeModels(html: string, baseUrl: string): EcrModel[] {
+function parseMakeModels(html: string, baseUrl: string, makeSlug: string): EcrModel[] {
   const $ = cheerio.load(html);
   const models: EcrModel[] = [];
 
@@ -376,6 +431,8 @@ function parseMakeModels(html: string, baseUrl: string): EcrModel[] {
     const summary = row.find('.summary_text_model').text().trim() || null;
     const variantsCount = parseIntOrNull(row.find('.info_production strong').text());
     const imageUrl = toAbsoluteUrl(baseUrl, row.find('.car_img img').attr('src'));
+    const modelSlug = (ecrModelSlug || slugifyEcrFallback(modelName)).trim() || null;
+    const modelUrl = modelSlug ? `${baseUrl.replace(/\/$/, '')}/model/${makeSlug}/${modelSlug}` : null;
 
     if (!modelName) return;
     models.push({
@@ -384,6 +441,7 @@ function parseMakeModels(html: string, baseUrl: string): EcrModel[] {
       summary,
       variants_count: variantsCount,
       image_url: imageUrl,
+      model_url: modelUrl,
     });
   });
 
@@ -399,10 +457,42 @@ function parseMakeModels(html: string, baseUrl: string): EcrModel[] {
   return deduped.sort((a, b) => a.model_name.localeCompare(b.model_name));
 }
 
+function loadEnv(): void {
+  const possiblePaths = [
+    path.resolve(process.cwd(), 'nuke_frontend/.env.local'),
+    path.resolve(process.cwd(), '.env.local'),
+    path.resolve(process.cwd(), '.env'),
+  ];
+  for (const p of possiblePaths) {
+    try {
+      if (fs.existsSync(p)) dotenv.config({ path: p, override: false });
+    } catch {
+      // ignore
+    }
+  }
+}
+
 async function main() {
+  loadEnv();
   const opts = parseArgs(process.argv.slice(2));
   ensureDir(path.dirname(opts.outPath));
   ensureDir(opts.cacheDir);
+
+  if (opts.upsertSupabase) {
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || null;
+    const SERVICE_ROLE =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || null;
+
+    if (!SUPABASE_URL) throw new Error('Missing SUPABASE_URL (or VITE_SUPABASE_URL) for --upsert-supabase');
+    if (!SERVICE_ROLE) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY for --upsert-supabase');
+
+    const role = decodeJwtRole(SERVICE_ROLE);
+    if (role && role !== 'service_role') {
+      throw new Error(
+        `--upsert-supabase requires a service role key (role=service_role). Your SUPABASE_SERVICE_ROLE_KEY decodes to role=${role}.`
+      );
+    }
+  }
 
   const makesUrl = `${opts.baseUrl.replace(/\/$/, '')}${opts.makesPath}`;
   const policy: FetchPolicy = {
@@ -412,6 +502,9 @@ async function main() {
     maxRetries: opts.maxRetries,
     retryBaseMs: opts.retryBaseMs,
     retryJitterMs: opts.retryJitterMs,
+    cacheTtlMs:
+      opts.cacheTtlHours === null ? null : Math.max(0, Math.floor(opts.cacheTtlHours * 60 * 60 * 1000)),
+    noCache: (opts.cacheTtlHours ?? 0) === 0,
     throttle: createThrottle(opts.delayMs),
   };
 
@@ -441,6 +534,10 @@ async function main() {
   console.log(`Timeout: ${opts.timeoutMs}ms`);
   console.log(`Max retries: ${opts.maxRetries}`);
   console.log(`Cache: ${opts.cacheDir}`);
+  console.log(
+    `Cache TTL: ${opts.cacheTtlHours === null ? 'infinite' : `${opts.cacheTtlHours}h`}${policy.noCache ? ' (refreshing)' : ''}`
+  );
+  if (opts.upsertSupabase) console.log(`Supabase upsert: enabled`);
   if (opts.resume) console.log(`Resume: enabled (${existingOut?.makes?.length || 0} existing makes in out file)`);
   console.log(`Write every: ${opts.writeEvery}`);
   console.log(`Offset: ${opts.offsetMakes}`);
@@ -478,7 +575,7 @@ async function main() {
     if (opts.concurrency === 1) {
       for (const m of work) {
         const html = await fetchHtml(m.make_url, policy);
-        const models = parseMakeModels(html, opts.baseUrl);
+        const models = parseMakeModels(html, opts.baseUrl, m.ecr_make_slug);
         makeMap.set(m.ecr_make_slug, { ...mergeMake(makeMap.get(m.ecr_make_slug), m), models });
         fetched++;
         if (fetched % opts.writeEvery === 0) {
@@ -489,7 +586,7 @@ async function main() {
     } else {
       const results = await mapLimit(work, opts.concurrency, async (m) => {
         const html = await fetchHtml(m.make_url, policy);
-        const models = parseMakeModels(html, opts.baseUrl);
+        const models = parseMakeModels(html, opts.baseUrl, m.ecr_make_slug);
         return { m, models };
       });
       for (const r of results) {
@@ -503,6 +600,62 @@ async function main() {
   const finalOut = readExistingOutput(opts.outPath);
   console.log(`Wrote: ${opts.outPath}`);
   console.log(`Totals: makes=${finalOut?.totals?.makes ?? '?'} models=${finalOut?.totals?.models ?? '?'}`);
+
+  if (opts.upsertSupabase) {
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || null;
+    const SERVICE_ROLE =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || null;
+
+    if (!SUPABASE_URL) throw new Error('Missing SUPABASE_URL (or VITE_SUPABASE_URL) for --upsert-supabase');
+    if (!SERVICE_ROLE) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY for --upsert-supabase');
+
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+    const nowIso = new Date().toISOString();
+
+    const mergedMakes = (finalOut?.makes || []) as EcrMake[];
+    const makeRows = mergedMakes.map((m) => ({
+      ecr_make_slug: m.ecr_make_slug,
+      make_name: m.make_name,
+      make_url: m.make_url,
+      logo_url: m.logo_url,
+      model_count: m.model_count,
+      car_count: m.car_count,
+      is_active: true,
+      last_seen_at: nowIso,
+    }));
+
+    const { error: makeErr } = await supabase.from('ecr_makes').upsert(makeRows, { onConflict: 'ecr_make_slug' });
+    if (makeErr) throw new Error(`Supabase upsert ecr_makes failed: ${makeErr.message}`);
+
+    const modelRows = mergedMakes.flatMap((m) =>
+      (m.models || []).flatMap((md) => {
+        const modelSlug = (md.ecr_model_slug || slugifyEcrFallback(md.model_name)).trim();
+        if (!modelSlug) return [];
+        return [
+          {
+            ecr_make_slug: m.ecr_make_slug,
+            ecr_model_slug: modelSlug,
+            model_name: md.model_name,
+            summary: md.summary,
+            variants_count: md.variants_count,
+            image_url: md.image_url,
+            model_url: md.model_url,
+            is_active: true,
+            last_seen_at: nowIso,
+          },
+        ];
+      })
+    );
+
+    if (modelRows.length > 0) {
+      const { error: modelErr } = await supabase
+        .from('ecr_models')
+        .upsert(modelRows, { onConflict: 'ecr_make_slug,ecr_model_slug' });
+      if (modelErr) throw new Error(`Supabase upsert ecr_models failed: ${modelErr.message}`);
+    }
+
+    console.log(`Upserted to Supabase: ecr_makes=${makeRows.length} ecr_models=${modelRows.length}`);
+  }
 }
 
 main().catch((err) => {
