@@ -19,9 +19,9 @@ N-Zero becomes the central hub for dealer inventory management with **two-way Ba
 
 ### Technical Implementation:
 ```typescript
-// Edge Function: import-bat-listing
-Input: { batUrl: string, organizationId: string }
-Output: { vehicleId, listing, action: 'created' | 'updated' }
+// Edge Function: complete-bat-import (approved BaT entrypoint)
+// Input: { bat_url: string, organization_id?: string }
+// Output: { success, vehicle_id, listing, core, comments, organization_link }
 
 Process:
 1. Fetch BaT listing HTML
@@ -29,8 +29,10 @@ Process:
 3. Parse buyer/seller from BaT History
 4. Find existing vehicle by VIN or fuzzy match
 5. Create/update vehicle with BaT metadata
-6. Update organization_vehicles (listing_status: 'sold')
-7. Insert data_validations (confidence_score: 100)
+6. Run approved two-step workflow:
+   - extract-premium-auction (core data + images + auction_events/external_listings)
+   - extract-auction-comments (comments/bids; best-effort)
+7. Optionally link to organization_vehicles if organization_id is provided
 ```
 
 ### User Flow:

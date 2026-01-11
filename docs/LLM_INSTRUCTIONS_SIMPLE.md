@@ -49,13 +49,12 @@ done
 
 ```sql
 -- 1. Add vehicles to queue
-INSERT INTO bat_extraction_queue (vehicle_id, bat_auction_url, status, priority)
+INSERT INTO bat_extraction_queue (vehicle_id, bat_url, status, priority)
 VALUES 
   ('vehicle-id-1', 'https://bringatrailer.com/listing/vehicle-1/', 'pending', 1),
   ('vehicle-id-2', 'https://bringatrailer.com/listing/vehicle-2/', 'pending', 1);
 
 -- 2. Process queue (call this function)
--- This needs to be UPDATED first (see below)
 ```
 
 Then call:
@@ -65,7 +64,7 @@ curl -X POST "https://qkgaybvrernstplzjaam.supabase.co/functions/v1/process-bat-
   -d '{"batchSize": 10}'
 ```
 
-**⚠️ IMPORTANT**: `process-bat-extraction-queue` currently calls old function. Must update it first (see Fix The Queue Processor below).
+`process-bat-extraction-queue` runs the approved two-step workflow (core data, then comments/bids).
 
 ## How to Verify Extraction Worked
 

@@ -1,7 +1,7 @@
 # BaT Repair Loop: Make Profiles Correct - Execution Plan
 
-**Status**: 🟢 **PRODUCTION READY**  
-**Last Updated**: 2025-01-XX  
+**Status**: **ACTIVE**  
+**Last Updated**: 2026-01-10  
 **Priority**: TOP PRIORITY
 
 ## Overview
@@ -10,7 +10,7 @@ This document tracks the end-to-end automation of the BaT "make profiles correct
 
 ---
 
-## ✅ COMPLETED WORK
+## Completed work
 
 ### 1. Core Infrastructure
 
@@ -41,10 +41,9 @@ This document tracks the end-to-end automation of the BaT "make profiles correct
   - Missing `listing_location`
   - 0 `auction_comments`
 - Rate limiting via `origin_metadata.bat_repair.last_attempt_at` (6-hour cooldown)
-- Re-invokes `import-bat-listing` which chains:
-  1. Image backfill
-  2. Comprehensive data extraction
-  3. Comment/bid history ingestion
+- Runs the approved two-step workflow:
+  1. `extract-premium-auction` (core profile: VIN/specs/images/auction_events)
+  2. `extract-auction-comments` (comments/bids; best-effort depending on current fetch mode)
 - Authorization: Service role OR admin user token
 - Batch processing: Configurable batch size (1-50, default 10)
 - Dry-run mode for testing
@@ -54,7 +53,7 @@ This document tracks the end-to-end automation of the BaT "make profiles correct
 ```typescript
 // Candidate pool: BaT vehicles older than min_vehicle_age_hours
 // Filters: incomplete based on cheap signals (image count, description length, etc.)
-// For each candidate: invokes import-bat-listing → triggers backfill-images → extract-auction-comments
+// For each candidate: invokes extract-premium-auction → extract-auction-comments
 ```
 
 ---
@@ -459,7 +458,7 @@ LIMIT 50;
 
 ---
 
-## 📝 NOTES
+## Notes
 
 ### Design Decisions
 
@@ -470,9 +469,9 @@ LIMIT 50;
 
 ### Dependencies
 
-- `import-bat-listing` Edge Function (must exist and work correctly)
+- `extract-premium-auction` Edge Function (core extraction)
 - `backfill-images` Edge Function (must write `position` field)
-- `extract-auction-comments` Edge Function (triggered by `import-bat-listing`)
+- `extract-auction-comments` Edge Function (comments/bids extraction)
 - `external_listings` table with RLS policy allowing public read
 - `vehicle_images` table with `position` column
 - `auction_comments` table for comment tracking
@@ -486,7 +485,7 @@ LIMIT 50;
 
 ---
 
-## ✅ CONCLUSION
+## Conclusion
 
 **The BaT repair loop is production-ready and fully functional.** All critical components are implemented, tested, and verified:
 
@@ -511,7 +510,7 @@ LIMIT 50;
 
 ---
 
-## 📚 RELATED DOCUMENTATION
+## Related documentation
 
 - **Monitoring Guide**: `docs/BAT_REPAIR_MONITORING.md` - Comprehensive monitoring queries and troubleshooting
 - **SQL Queries**: `database/queries/MONITOR_BAT_REPAIR_LOOP.sql` - 7 detailed monitoring queries

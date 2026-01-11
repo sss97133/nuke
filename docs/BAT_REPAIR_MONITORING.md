@@ -256,7 +256,7 @@ EXPLAIN ANALYZE SELECT ... FROM vehicles WHERE origin_metadata->'bat_repair' IS 
 ### "All repairs failing" 
 
 - Check: Are Edge Functions deployed?
-- Check: Is `import-bat-listing` function working?
+- Check: Are the approved BaT extractors working (`extract-premium-auction`, `extract-auction-comments`)?
 - Check: BaT site accessibility / bot protection
 - Check: Service role key is valid
 
