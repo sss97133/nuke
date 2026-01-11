@@ -1,5 +1,8 @@
 # Edge Function Governance (Stop Calling the Wrong Ones)
 
+**Status**: CANONICAL  
+**Last Verified**: 2026-01-10  
+
 ## Core rule
 
 Treat Edge Functions like a public API surface:

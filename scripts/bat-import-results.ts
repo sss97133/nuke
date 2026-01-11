@@ -3,7 +3,7 @@
  * Import BaT listings from the BaT "Results" pages by:
  * - Fetching results pages
  * - Enumerating /listing/ URLs
- * - Invoking the `import-bat-listing` Edge Function per URL
+ * - Invoking the `complete-bat-import` Edge Function per URL (approved workflow)
  *
  * This avoids `process-import-queue` (which can 504 on slow listings) and uses the BaT-native importer.
  *
@@ -232,7 +232,7 @@ async function main() {
   console.log(`BaT Results import`);
   console.log(`Pages: start=${opts.startPage} count=${opts.pages}`);
   console.log(`Concurrency: ${opts.concurrency}`);
-  console.log(`imageBatchSize: ${opts.imageBatchSize}`);
+  console.log(`imageBatchSize: ${opts.imageBatchSize} (legacy/no-op)`);
   console.log(`Mode: ${opts.dryRun ? 'dry-run' : 'execute'}`);
 
   // 1) Collect listing URLs
@@ -267,7 +267,7 @@ async function main() {
   console.log(`Using organizationId: ${organizationId}`);
 
   // 2) Import each listing via Edge Function
-  const endpoint = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/import-bat-listing`;
+  const endpoint = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/complete-bat-import`;
   let ok = 0;
   let fail = 0;
 
@@ -282,14 +282,8 @@ async function main() {
           'Authorization': `Bearer ${INVOKE_KEY}`,
         },
         body: JSON.stringify({
-          // Backwards/compat across deployed versions:
-          // - some versions expect listingUrl + organizationId
-          // - newer versions accept batUrl/url and organizationId optional
-          listingUrl: batUrl,
-          organizationId,
-          batUrl,
-          allowFuzzyMatch: false,
-          imageBatchSize: opts.imageBatchSize,
+          bat_url: batUrl,
+          organization_id: organizationId,
         }),
       });
       const text = await resp.text();

@@ -1,3 +1,8 @@
+## Extraction toolkit index (canonical)
+
+**Status**: CANONICAL  
+**Last Verified**: 2026-01-10  
+
 ## Purpose
 
 This document is the index for the scraping / extraction “toolkit” in this repo. It is meant to stop drift by pointing you to the few canonical workflows, entrypoints, and tables that are actually supposed to be used.
@@ -87,6 +92,13 @@ These documents contain useful context, but they do not match current codepaths 
   - Lists `import-bat-listing` as a frontend-called keep; in current system `import-bat-listing` is deprecated (410) and should not be used.
 - `docs/architecture/FUNCTION_RETIREMENT_PLAN.md`
   - Claims `process-bat-extraction-queue` calls `comprehensive-bat-extraction`; current code calls `extract-premium-auction` and `extract-auction-comments`.
+
+## Archive conventions (so old docs stop misleading us)
+
+- `docs/archive/extraction-legacy/`
+  - Old “how-to run it” docs and plans that reference deprecated entrypoints.
+- `docs/archive/extraction-analysis/`
+  - Historical analyses written against older extractor paths; kept for context but not active guidance.
 
 ## Migrations: current drift and “source of truth”
 

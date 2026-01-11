@@ -14,9 +14,8 @@
  *   - Loads the BaT member page `/member/<username>/` via Playwright
  *   - Clicks "Show more" until disabled (past listings)
  *   - Extracts all `/listing/.../` URLs
- *   - Invokes `import-bat-listing` Edge Function for each URL with:
- *     - `organizationId = businesses.id` (seller org)
- *     - `forceDealerLink = true` (ensure link even when seller type isn't parsed)
+ *   - Invokes `complete-bat-import` Edge Function for each URL with:
+ *     - `organization_id = businesses.id` (seller org link)
  *
  * Usage:
  *   tsx scripts/bat-import-local-partner-vehicles.ts --dry-run --limit-partners 5
@@ -367,13 +366,13 @@ async function main() {
   console.log(`Facilities in snapshot: ${facilitiesAll.length}`);
   console.log(`Processing partners: ${facilities.length}`);
   console.log(`Concurrency (listing imports): ${opts.concurrency}`);
-  console.log(`imageBatchSize: ${opts.imageBatchSize}`);
+  console.log(`imageBatchSize: ${opts.imageBatchSize} (legacy/no-op)`);
   console.log(`maxPages: ${opts.maxPages}`);
   console.log(`skipExistingLinked: ${opts.skipExistingLinked}`);
   console.log(`requireBusinessMatch: ${opts.requireBusinessMatch}`);
   console.log(`Mode: ${opts.dryRun ? 'dry-run' : 'execute'}`);
 
-  const endpoint = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/import-bat-listing`;
+  const endpoint = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/complete-bat-import`;
 
   const partnerSummaries: any[] = [];
 
@@ -471,15 +470,8 @@ async function main() {
               'Authorization': `Bearer ${INVOKE_KEY}`,
             },
             body: JSON.stringify({
-              // Backwards/compat across deployed versions:
-              // - some versions expect listingUrl + organizationId
-              // - newer versions accept batUrl/url and organizationId optional
-              listingUrl: batUrl,
-              batUrl,
-              organizationId,
-              forceDealerLink: true,
-              allowFuzzyMatch: false,
-              imageBatchSize: opts.imageBatchSize,
+              bat_url: batUrl,
+              organization_id: organizationId,
             }),
           });
           const text = await resp.text();

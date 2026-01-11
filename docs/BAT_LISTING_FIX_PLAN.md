@@ -105,7 +105,7 @@ Outputs:
 ### Phase 4: Auction Data Issues (MISSING_CURRENT_BID, MISSING_END_DATE)
 1. For active auctions:
    - Re-scrape using `extract-premium-auction`
-   - Or use `import-bat-listing` function
+   - Or use the monitoring sync path (`sync-active-auctions` → `sync-bat-listing`) if you only need live bid/end-date fields updated
    - Update external_listings with current_bid and end_date
 
 ## Automated Fix Script

@@ -28,7 +28,7 @@ The trigger fires when:
 
 ### BaT Import Flow
 
-1. **Bulk Import**: When you import BaT sales via `BaTBulkImporter`, the `import-bat-listing` edge function creates `external_listings` records with `listing_status = 'sold'`
+1. **Bulk Import**: When you import BaT sales via `BaTBulkImporter`, the `complete-bat-import` edge function (approved workflow) creates/updates `external_listings` records; sold listings are marked with `listing_status = 'sold'`
 2. **Trigger Fires**: The trigger automatically updates `organization_vehicles` and `vehicles`
 3. **Result**: Vehicles appear in "Sold Inventory" automatically
 

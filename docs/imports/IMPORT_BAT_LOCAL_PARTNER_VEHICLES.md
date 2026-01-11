@@ -35,7 +35,7 @@ npm run import:bat-local-partner-vehicles -- --concurrency 1
 - `--partner-key "<geographic_key>"`: run only one specific partner
 - `--listing-limit 50`: cap listings per partner (useful for staged rollouts)
 - `--max-pages 10`: cap pagination pages for BaT member pages (follows `rel="next"` / page-numbers)
-- `--image-batch-size 25`: controls `import-bat-listing` image backfill batching
+- `--image-batch-size 25`: legacy/no-op (kept for backwards compatibility; `complete-bat-import` is the approved entrypoint)
 - `--no-skip-existing`: do not skip BaT URLs that are already linked to the org (default skips already-linked URLs)
 - `--require-business-match`: fail/skip partners when `businesses.id` cannot be resolved by `geographic_key`
 - `--no-json`: skip writing `data/bat/bat_local_partner_vehicle_import_summary.json`

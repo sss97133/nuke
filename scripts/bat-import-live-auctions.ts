@@ -11,7 +11,7 @@
  * 1) Call `scrape-multi-source` on https://bringatrailer.com/auctions/ to enqueue /listing/ URLs into import_queue.
  *    (scrape-multi-source will use Firecrawl for this page even in cheap_mode if FIRECRAWL_API_KEY is configured
  *    on Supabase Edge Functions.)
- * 2) Read the queued URLs (by returned source_id) and invoke `import-bat-listing` for each.
+ * 2) Read the queued URLs (by returned source_id) and invoke `complete-bat-import` (approved workflow) for each.
  * 3) Mark queue items complete with vehicle_id to avoid reprocessing.
  */
 
@@ -103,7 +103,7 @@ async function main() {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   const scrapeMultiSourceUrl = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/scrape-multi-source`;
-  const importBatListingUrl = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/import-bat-listing`;
+  const completeBatImportUrl = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/complete-bat-import`;
 
   console.log(`BaT live auctions import`);
   console.log(`Index: https://bringatrailer.com/auctions/`);
@@ -192,11 +192,12 @@ async function main() {
         continue;
       }
 
-      // import-bat-listing is the canonical BaT deep extractor.
-      // It should write accurate auction fields (end date, bid count, current bid, etc).
-      // Images: keep ON by default (Classic baseline); can be disabled for emergency throughput.
-      const r = await postJson(importBatListingUrl, INVOKE_KEY, { url, skip_images: !opts.writeImages });
-      if (!r?.success) throw new Error(r?.error || 'import-bat-listing failed');
+      // complete-bat-import is the approved BaT entrypoint.
+      // It runs the two-step workflow:
+      // 1) extract-premium-auction (core data + images + auction_events/external_listings)
+      // 2) extract-auction-comments (best-effort comments/bids)
+      const r = await postJson(completeBatImportUrl, INVOKE_KEY, { bat_url: url });
+      if (!r?.success) throw new Error(r?.error || 'complete-bat-import failed');
 
       const vehicleId = r.vehicleId || r.vehicle_id || null;
       if (vehicleId) {
