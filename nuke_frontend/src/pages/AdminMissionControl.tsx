@@ -69,6 +69,11 @@ const AdminMissionControl: React.FC = () => {
   const [batRepairRunning, setBatRepairRunning] = useState(false);
   const [batRepairBatchSize, setBatRepairBatchSize] = useState(10);
   const [batRepairInvocation, setBatRepairInvocation] = useState<FunctionInvocation | null>(null);
+  const [batBaseCheckRunning, setBatBaseCheckRunning] = useState(false);
+  const [batBaseCheckBatchSize, setBatBaseCheckBatchSize] = useState(50);
+  const [batBaseCheckVehicleId, setBatBaseCheckVehicleId] = useState('');
+  const [batBaseCheckDryRun, setBatBaseCheckDryRun] = useState(false);
+  const [batBaseCheckInvocation, setBatBaseCheckInvocation] = useState<FunctionInvocation | null>(null);
   const [batCleanupRunning, setBatCleanupRunning] = useState(false);
   const [batCleanupBatchSize, setBatCleanupBatchSize] = useState(25);
   const [batCleanupInvocation, setBatCleanupInvocation] = useState<FunctionInvocation | null>(null);
@@ -549,6 +554,65 @@ const AdminMissionControl: React.FC = () => {
     }
   };
 
+  const runBatBaseDataCheckBatch = async () => {
+    setBatBaseCheckRunning(true);
+    const startTime = Date.now();
+    const requestBody = {
+      batch_size: batBaseCheckBatchSize,
+      dry_run: batBaseCheckDryRun,
+      min_vehicle_age_hours: 6,
+      vehicle_id: batBaseCheckVehicleId.trim() || undefined,
+      requeue: !batBaseCheckDryRun,
+      requeue_priority: 250,
+      requeue_cooldown_hours: 12,
+    };
+    
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) {
+        alert('You must be logged in to run BaT base checks.');
+        return;
+      }
+
+      const functionsUrl = getSupabaseFunctionsUrl();
+      const url = `${functionsUrl}/bat-base-data-check-runner`;
+
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const text = await resp.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { parsed = { raw: text }; }
+
+      const invocation = createInvocation('bat-base-data-check-runner', url, 'POST', requestBody, resp, parsed, startTime);
+      setBatBaseCheckInvocation(invocation);
+
+      if (!resp.ok || parsed?.success === false) {
+        console.error('BaT base check batch failed:', parsed);
+        alert(`BaT base check batch failed: ${parsed?.error || resp.status}`);
+        return;
+      }
+
+      alert(
+        batBaseCheckDryRun
+          ? `BaT base check dry-run complete. Scanned: ${parsed.scanned || 0}. Flagged: ${parsed.flagged || 0}. Cleared: ${parsed.cleared || 0}.`
+          : `BaT base check complete. Scanned: ${parsed.scanned || 0}. Flagged: ${parsed.flagged || 0}. Cleared: ${parsed.cleared || 0}. Requeued: ${parsed.requeued || 0}. Failed: ${parsed.failed || 0}.`
+      );
+      loadDashboard();
+    } catch (e: any) {
+      console.error('BaT base check batch error:', e);
+      alert('BaT base check batch failed.');
+    } finally {
+      setBatBaseCheckRunning(false);
+    }
+  };
+
   const runBatImageCleanup = async () => {
     setBatCleanupRunning(true);
     const startTime = Date.now();
@@ -900,6 +964,65 @@ const AdminMissionControl: React.FC = () => {
             invocation={batDomHealthInvocation}
             functionName="bat-dom-map-health-runner"
             isRunning={batDomHealthRunning}
+          />
+        </div>
+      </div>
+
+      {/* BaT BASE DATA CHECK (flag + requeue) */}
+      <div style={{ marginBottom: '24px' }} className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>BaT Base Data Check: flag missing base fields + requeue extraction (uses stored HTML snapshots when available)</span>
+          <button
+            className="button button-primary"
+            style={{ fontSize: '9pt' }}
+            disabled={batBaseCheckRunning}
+            onClick={runBatBaseDataCheckBatch}
+          >
+            {batBaseCheckRunning ? 'Running...' : (batBaseCheckDryRun ? 'Run Dry-Run' : 'Run Base Check')}
+          </button>
+        </div>
+        <div className="card-body">
+          <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+            Computes a strict BaT “base data” checklist (VIN/specs/location/colors/body_style/sale outcome), writes missing-field reasons into
+            <span style={{ fontFamily: 'monospace' }}> vehicles.origin_metadata.bat_base_check</span>, and re-queues
+            <span style={{ fontFamily: 'monospace' }}> bat_extraction_queue</span> even when status is “complete”.
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Batch size
+              <input
+                type="number"
+                value={batBaseCheckBatchSize}
+                min={1}
+                max={200}
+                onChange={(e) => setBatBaseCheckBatchSize(Number(e.target.value || 50))}
+                style={{ marginLeft: 8, width: 90, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+              Vehicle ID (optional)
+              <input
+                type="text"
+                value={batBaseCheckVehicleId}
+                placeholder="uuid"
+                onChange={(e) => setBatBaseCheckVehicleId(e.target.value)}
+                style={{ marginLeft: 8, width: 320, padding: '6px 8px', border: '1px solid var(--border)', fontSize: '9pt' }}
+              />
+            </label>
+            <label style={{ fontSize: '8pt', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={batBaseCheckDryRun}
+                onChange={(e) => setBatBaseCheckDryRun(e.target.checked)}
+              />
+              Dry run (no DB writes, no requeue)
+            </label>
+          </div>
+
+          <FunctionResultMonitor
+            invocation={batBaseCheckInvocation}
+            functionName="bat-base-data-check-runner"
+            isRunning={batBaseCheckRunning}
           />
         </div>
       </div>

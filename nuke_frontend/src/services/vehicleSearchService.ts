@@ -161,10 +161,20 @@ export class VehicleSearchService {
         query = query.lte('year', filters.yearTo);
       }
       if (filters.make) {
-        query = query.ilike('make', filters.make);
+        const raw = String(filters.make || '').trim();
+        if (raw) {
+          const term = escapePostgrestILike(raw);
+          // Prefer prefix match for make to avoid weird substring collisions (e.g. "Ford" matching "Oxford").
+          query = query.ilike('make', `${term}%`);
+        }
       }
       if (filters.model) {
-        query = query.ilike('model', filters.model);
+        const raw = String(filters.model || '').trim();
+        if (raw) {
+          const term = escapePostgrestILike(raw);
+          // Models are often stored with trims/variants (e.g. "911 Turbo"), so use contains match.
+          query = query.ilike('model', `%${term}%`);
+        }
       }
       if (filters.priceFrom) {
         // Prices in `vehicles` are stored as DECIMAL(10,2) USD (not cents).
