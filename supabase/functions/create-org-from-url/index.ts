@@ -35,9 +35,32 @@ function normalizeInputUrl(raw: string): string {
   return `https://${trimmed}`;
 }
 
-function canonicalizeWebsite(url: string): string {
+function canonicalizeDomain(url: string): string {
   const u = new URL(url);
-  return u.origin; // canonical: origin only (no path, no trailing slash)
+  return u.hostname.replace(/^www\./, "").toLowerCase();
+}
+
+function canonicalizeWebsite(url: string): string {
+  // Canonical website stored in DB: https + no www + origin-only.
+  // This reduces duplication (http vs https, www vs non-www, path noise).
+  const domain = canonicalizeDomain(url);
+  return `https://${domain}`;
+}
+
+function buildWebsiteVariants(canonicalDomain: string): string[] {
+  const d = canonicalDomain.replace(/^www\./, "").toLowerCase();
+  const w = `www.${d}`;
+  const variants = [
+    `https://${d}`,
+    `https://${d}/`,
+    `http://${d}`,
+    `http://${d}/`,
+    `https://${w}`,
+    `https://${w}/`,
+    `http://${w}`,
+    `http://${w}/`,
+  ];
+  return uniq(variants);
 }
 
 function inferNameFromDomain(domain: string): string {
@@ -141,8 +164,23 @@ async function fetchHtml(url: string): Promise<string> {
     },
     signal: AbortSignal.timeout(20000),
   });
-  if (!res.ok) throw new Error(`Failed to fetch URL: HTTP ${res.status}`);
-  return await res.text();
+  if (res.ok) return await res.text();
+
+  // Fallback: if https failed, try http for sites that don't support https.
+  if (url.startsWith("https://")) {
+    const httpUrl = url.replace(/^https:\/\//i, "http://");
+    const res2 = await fetch(httpUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NukeBot/1.0)",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (res2.ok) return await res2.text();
+    throw new Error(`Failed to fetch URL: HTTP ${res.status} (https) and HTTP ${res2.status} (http)`);
+  }
+
+  throw new Error(`Failed to fetch URL: HTTP ${res.status}`);
 }
 
 function textFromDoc(doc: any): string {
@@ -203,6 +241,22 @@ function extractOrgFromHtml(html: string, website: string): ExtractedOrg {
     "";
 
   if (!business_name) {
+    business_name = inferNameFromDomain(new URL(website).hostname);
+  }
+
+  // Slop guard: if the extracted name is too generic, prefer a domain-derived name.
+  const sloppyNames = new Set([
+    "home",
+    "welcome",
+    "shop",
+    "store",
+    "cart",
+    "checkout",
+    "about",
+    "contact",
+  ]);
+  const normalizedName = business_name.toLowerCase().trim();
+  if (!business_name || business_name.length < 3 || sloppyNames.has(normalizedName)) {
     business_name = inferNameFromDomain(new URL(website).hostname);
   }
 
@@ -337,7 +391,9 @@ serve(async (req) => {
       });
     }
 
+    const canonicalDomain = canonicalizeDomain(rawUrl);
     const website = canonicalizeWebsite(rawUrl);
+    const websiteVariants = buildWebsiteVariants(canonicalDomain);
 
     // Look for an existing org by website (exact origin, with or without trailing slash)
     let existing: any = null;
@@ -345,7 +401,7 @@ serve(async (req) => {
       const { data } = await supabase
         .from("businesses")
         .select("id, business_name, website, description, email, phone, address, city, state, zip_code, logo_url, metadata")
-        .or(`website.eq.${website},website.eq.${website}/`)
+        .in("website", websiteVariants)
         .limit(1)
         .maybeSingle();
       existing = data || null;
@@ -367,6 +423,9 @@ serve(async (req) => {
     let organizationId: string;
     let created = false;
     let updatedFields: string[] = [];
+    let merged = false;
+    let createdRowId: string | null = null;
+    let mergedIntoId: string | null = null;
 
     if (existing) {
       organizationId = existing.id;
@@ -449,6 +508,7 @@ serve(async (req) => {
 
       organizationId = org.id;
       created = true;
+      createdRowId = org.id;
 
       // Best-effort: create contributor record (so the creator has an org link)
       try {
@@ -487,6 +547,20 @@ serve(async (req) => {
       } catch {
         // ignore
       }
+
+      // Best-effort: auto-merge duplicates immediately (prevents visible duplicate orgs)
+      try {
+        const mergeResp = await safeInvokeInternal("auto-merge-duplicate-orgs", {
+          organizationId: organizationId,
+        });
+        if (mergeResp.ok && mergeResp.data?.merged && mergeResp.data?.targetId) {
+          merged = true;
+          mergedIntoId = String(mergeResp.data.targetId);
+          organizationId = mergedIntoId;
+        }
+      } catch {
+        // ignore
+      }
     }
 
     // Queue follow-up jobs (synopsis / mapping)
@@ -495,7 +569,20 @@ serve(async (req) => {
 
     if (queueSynopsis || queueSiteMapping) {
       const tasks: string[] = [];
-      if (queueSynopsis) tasks.push("org_due_diligence");
+      // Avoid job spam: if due diligence already exists, don't enqueue synopsis.
+      if (queueSynopsis) {
+        try {
+          const { data: orgRow } = await supabase
+            .from("businesses")
+            .select("metadata")
+            .eq("id", organizationId)
+            .maybeSingle();
+          const hasReport = !!orgRow?.metadata?.due_diligence_report;
+          if (!hasReport) tasks.push("org_due_diligence");
+        } catch {
+          tasks.push("org_due_diligence");
+        }
+      }
       if (queueSiteMapping) tasks.push("site_mapping");
 
       if (tasks.length > 0) {
@@ -540,6 +627,9 @@ serve(async (req) => {
           organization_id: organizationId,
           website,
           created,
+          merged,
+          created_row_id: createdRowId,
+          merged_into_id: mergedIntoId,
           extracted_fields: extractedFields,
           updated_fields: updatedFields,
           queued_tasks: queuedTasks,

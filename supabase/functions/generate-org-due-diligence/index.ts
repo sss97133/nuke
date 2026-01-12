@@ -743,16 +743,36 @@ serve(async (req) => {
     console.log(`✅ Generated due diligence report (confidence: ${report.confidence_score})`);
 
     // Update organization with report and extractable fields
+    //
+    // Slop guard: never overwrite a human/curated description by default.
+    // Only set businesses.description if it's currently empty OR it was previously set by this AI job.
+    const nowIso = new Date().toISOString();
     const updates: any = {
-      description: report.executive_summary || report.description, // Prefer executive summary, fallback to description
       metadata: {
         ...(org.metadata || {}),
         due_diligence_report: report,
-        due_diligence_generated_at: new Date().toISOString(),
+        due_diligence_generated_at: nowIso,
         due_diligence_website_url: url,
         missing_critical_fields: report.missing_critical_fields || []
       }
     };
+
+    const descriptionWasAi = org.metadata?.description_source === 'ai_due_diligence';
+    const shouldSetDescription = !org.description || descriptionWasAi;
+    if (shouldSetDescription) {
+      updates.description = report.executive_summary || report.description || null;
+      updates.metadata = {
+        ...updates.metadata,
+        description_source: 'ai_due_diligence',
+        ai_synopsis: report.executive_summary || report.description || null
+      };
+    } else {
+      // Still store a synopsis for the UI, but keep the curated description untouched.
+      updates.metadata = {
+        ...updates.metadata,
+        ai_synopsis: report.executive_summary || report.description || null
+      };
+    }
 
     // Populate database fields from the report (this is the structured data source)
     const dbFields = report.database_fields || {};

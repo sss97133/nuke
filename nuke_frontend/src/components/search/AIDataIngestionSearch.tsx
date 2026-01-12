@@ -61,7 +61,28 @@ function isLikelyVehicleListingUrl(url: string): boolean {
 
 function isLikelyOrgWebsiteUrl(url: string): boolean {
   if (isProbablyAssetOrDocumentUrl(url)) return false;
-  return !isLikelyVehicleListingUrl(url);
+  if (isLikelyVehicleListingUrl(url)) return false;
+
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/').filter(Boolean);
+    const path = u.pathname.toLowerCase();
+
+    // Root or single-level pages are usually "org-ish".
+    if (parts.length <= 1) return true;
+
+    // Common org-ish sections
+    if (
+      /\/(about|contact|inventory|vehicles|sold|current|auctions?|events?)\b/i.test(path)
+    ) {
+      return true;
+    }
+
+    // Otherwise: don't auto-create on paste (avoid slop from deep blog/article URLs).
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 interface ExtractionPreview {
@@ -933,7 +954,9 @@ export default function AIDataIngestionSearch() {
       setImagePreview(null);
 
       const created = !!data.created;
-      showToast(created ? 'Organization created' : 'Organization found', created ? 'success' : 'info');
+      const merged = !!data.merged;
+      const createdVisible = created && !merged;
+      showToast(createdVisible ? 'Organization created' : 'Organization found', createdVisible ? 'success' : 'info');
       navigate(`/org/${data.organization_id}`);
     } catch (err: any) {
       console.error('Create org from URL error:', err);
