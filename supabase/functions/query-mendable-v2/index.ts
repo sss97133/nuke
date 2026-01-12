@@ -1,16 +1,18 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 /**
- * query-mendable
+ * query-mendable-v2
  *
- * Minimal server-side bridge to Mendable's REST API.
- * - Reads `MENDABLE_API_KEY` from Supabase Edge Function secrets (or local env when running locally).
- * - Supports:
- *   - action: "chat" (default) -> POST https://api.mendable.ai/v1/chat
- *   - action: "getSources"     -> POST https://api.mendable.ai/v1/getSources
- *   - action: "newConversation"-> POST https://api.mendable.ai/v1/newConversation
+ * Newer Mendable bridge (kept separate because the older `query-mendable` function
+ * appears to be deployed from a legacy pipeline that may not accept updates).
  *
- * NOTE: We default to non-streaming responses (shouldStream=false) for easy consumption.
+ * This implementation is API-version tolerant:
+ * - Tries `POST https://api.mendable.ai/v1/chat` (api_key in JSON body)
+ * - Falls back to `POST https://api.mendable.ai/v1/newChat` (Bearer auth)
+ *
+ * For back-compat, it accepts both:
+ * - `{ question: string }`
+ * - `{ query: string }`
  */
 
 const corsHeaders = {
@@ -29,7 +31,6 @@ type MendableHistoryItem = {
 type ChatRequest = {
   action?: MendableAction;
   question?: string;
-  // Back-compat: older `query-mendable` accepted `{ query: string }`
   query?: string;
   history?: MendableHistoryItem[];
   conversation_id?: number;
@@ -53,7 +54,6 @@ function extractAnswerFromMendableResponse(body: unknown): string | null {
   if (!body || typeof body !== "object") return null;
 
   const b = body as any;
-
   const candidates = [
     b.answer,
     b.message,
@@ -82,8 +82,6 @@ async function mendablePost(path: string, payload: Record<string, unknown>) {
   });
 
   const text = await res.text();
-
-  // Mendable might return JSON or text errors. Parse when possible.
   let parsed: unknown = text;
   try {
     parsed = text ? JSON.parse(text) : null;
@@ -91,19 +89,8 @@ async function mendablePost(path: string, payload: Record<string, unknown>) {
     // keep as string
   }
 
-  if (!res.ok) {
-    return {
-      ok: false as const,
-      status: res.status,
-      body: parsed,
-    };
-  }
-
-  return {
-    ok: true as const,
-    status: res.status,
-    body: parsed,
-  };
+  if (!res.ok) return { ok: false as const, status: res.status, body: parsed };
+  return { ok: true as const, status: res.status, body: parsed };
 }
 
 async function mendablePostWithBearer(path: string, apiKey: string, payload: Record<string, unknown>) {
@@ -121,31 +108,16 @@ async function mendablePostWithBearer(path: string, apiKey: string, payload: Rec
     // keep as string
   }
 
-  if (!res.ok) {
-    return { ok: false as const, status: res.status, body: parsed };
-  }
-
+  if (!res.ok) return { ok: false as const, status: res.status, body: parsed };
   return { ok: true as const, status: res.status, body: parsed };
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  if (req.method !== "POST") {
-    return jsonResponse({ success: false, error: "POST required" }, 405);
-  }
+  if (req.method !== "POST") return jsonResponse({ success: false, error: "POST required" }, 405);
 
   const apiKey = Deno.env.get("MENDABLE_API_KEY") ?? "";
-  if (!apiKey) {
-    return jsonResponse(
-      {
-        success: false,
-        error:
-          "MENDABLE_API_KEY not configured. Set it in Supabase Dashboard → Edge Functions → Secrets (or local env for local runs).",
-      },
-      500,
-    );
-  }
+  if (!apiKey) return jsonResponse({ success: false, error: "MENDABLE_API_KEY not configured" }, 500);
 
   let payload: ChatRequest;
   try {
@@ -158,6 +130,11 @@ Deno.serve(async (req) => {
 
   if (action === "getSources") {
     const r = await mendablePost("/v1/getSources", { api_key: apiKey });
+    if (!r.ok && (r.status === 401 || r.status === 403 || r.status === 404)) {
+      const r2 = await mendablePostWithBearer("/v1/getSources", apiKey, {});
+      if (!r2.ok) return jsonResponse({ success: false, error: r2.body }, r2.status);
+      return jsonResponse({ success: true, result: r2.body });
+    }
     if (!r.ok) return jsonResponse({ success: false, error: r.body }, r.status);
     return jsonResponse({ success: true, result: r.body });
   }
@@ -168,11 +145,8 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: true, result: r.body });
   }
 
-  // action === "chat"
   const question = (payload.question ?? payload.query ?? "").trim();
-  if (!question) {
-    return jsonResponse({ success: false, error: "question is required" }, 400);
-  }
+  if (!question) return jsonResponse({ success: false, error: "question is required" }, 400);
 
   const shouldStream = payload.shouldStream ?? false;
 
@@ -188,13 +162,8 @@ Deno.serve(async (req) => {
   if (typeof payload.additional_context === "string") chatBody.additional_context = payload.additional_context;
   if (typeof payload.relevance_threshold === "number") chatBody.relevance_threshold = payload.relevance_threshold;
   if (payload.where && typeof payload.where === "object") chatBody.where = payload.where;
+  if (typeof payload.num_chunks === "number") chatBody.retriever_option = { num_chunks: payload.num_chunks };
 
-  if (typeof payload.num_chunks === "number") {
-    chatBody.retriever_option = { num_chunks: payload.num_chunks };
-  }
-
-  // Prefer modern API (`/v1/chat` with `api_key` in body). If it fails with a status that
-  // suggests a different API version, fall back to `/v1/newChat` (Bearer auth).
   let r = await mendablePost("/v1/chat", chatBody);
   if (!r.ok && (r.status === 404 || r.status === 401 || r.status === 403)) {
     r = await mendablePostWithBearer("/v1/newChat", apiKey, {
@@ -209,7 +178,6 @@ Deno.serve(async (req) => {
 
   return jsonResponse({
     success: true,
-    // Back-compat for existing callers expecting `{ answer: string }`
     answer: extractAnswerFromMendableResponse(r.body) ?? "No response from AI",
     result: r.body,
   });

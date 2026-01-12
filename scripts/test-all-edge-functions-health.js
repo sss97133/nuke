@@ -173,7 +173,7 @@ async function getAllFunctions() {
     // In production, you'd want to fetch this dynamically
     const knownFunctions = [
       'process-vin', 'search-vehicle-history', 'analyze-vehicle-data',
-      'crawl-market-data', 'search-local-garages', 'query-mendable',
+      'crawl-market-data', 'search-local-garages', 'query-mendable', 'query-mendable-v2',
       'analyze-inventory-image', 'search-garages', 'analyze-skills',
       'fetch-market-auctions', 'process-vehicle-import', 'seed-certifications',
       'get-mapbox-token', 'calculate-feed-relevance', 'analyze-vehicle-probability',

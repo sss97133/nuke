@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { FaviconIcon } from './common/FaviconIcon';
+import { getPlatformDisplayName, normalizePlatform } from '../services/platformNomenclature';
 
 interface ValueProvenancePopupProps {
   vehicleId: string;
@@ -193,7 +194,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         let detectedPlatform = 'bat';
         if (discoveryUrl.includes('mecum.com')) detectedPlatform = 'mecum';
         else if (discoveryUrl.includes('barrett-jackson')) detectedPlatform = 'barrett-jackson';
-        else if (discoveryUrl.includes('carsandbids.com')) detectedPlatform = 'carsandbids';
+        else if (discoveryUrl.includes('carsandbids.com')) detectedPlatform = 'cars_and_bids';
         else if (discoveryUrl.includes('bonhams.com')) detectedPlatform = 'bonhams';
         else if (discoveryUrl.includes('rmsothebys.com')) detectedPlatform = 'rmsothebys';
         
@@ -240,15 +241,6 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         if (platform === 'mecum') {
           const match = (listing?.listing_url || discoveryUrl).match(/\/lots\/(\d+)\//);
           lotNumberFromUrl = match ? match[1] : null;
-        } else if (platform === 'bat') {
-          // Check bat_listings table for lot_number
-          const { data: batListing } = await supabase
-            .from('bat_listings')
-            .select('lot_number')
-            .eq('vehicle_id', vehicleId)
-            .limit(1)
-            .maybeSingle();
-          if (batListing?.lot_number) lotNumberFromUrl = batListing.lot_number;
         }
         
         // Extract lot number from multiple possible sources
@@ -277,20 +269,13 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
              (vehicle as any)?.origin_metadata?.bat_seller_profile_url ||
              null);
         
-        // Platform display names
-        const platformNames: Record<string, string> = {
-          'bat': 'Bring a Trailer',
-          'mecum': 'Mecum Auctions',
-          'barrett-jackson': 'Barrett-Jackson',
-          'carsandbids': 'Cars & Bids',
-          'bonhams': 'Bonhams',
-          'rmsothebys': 'RM Sotheby\'s',
-        };
+        const platformKey = normalizePlatform(platform);
+        const platformName = getPlatformDisplayName(platformKey);
         
         if (listing || saleEvent || derivedDate) {
           auctionInfo = {
-            platform: platform,
-            platform_name: platformNames[platform] || platform,
+            platform: platformKey,
+            platform_name: platformName,
             url: listing?.listing_url || vehicle.bat_auction_url || vehicle?.discovery_url,
             lot_number: lotNumber,
             sale_date: derivedDate

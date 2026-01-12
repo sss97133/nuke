@@ -292,89 +292,60 @@ export class MyAuctionsService {
         }
       }
 
-      // 2c) Best-effort enrichment for BaT participants and corrected metrics
-      // We prefer `bat_listings` + `bat_users` when available, because it provides usernames and mapping to N-Zero users.
+      // 2c) Best-effort enrichment for auction participants + corrected metrics
+      // Use the platform-agnostic `auction_events` table (supports BaT, Cars & Bids, etc.)
       try {
-        const batVehicleIds = Array.from(
+        const externalVehicleIds = Array.from(
           new Set(
             listings
-              .filter((l) => l.listing_source === 'external' && l.platform === 'bat')
+              .filter((l) => l.listing_source === 'external' && typeof l.vehicle_id === 'string' && l.vehicle_id)
               .map((l) => l.vehicle_id)
               .filter(Boolean),
           ),
         );
 
-        if (batVehicleIds.length > 0) {
-          const { data: batListings, error: batListingsError } = await supabase
-            .from('bat_listings')
-            .select('vehicle_id, bat_listing_url, seller_username, buyer_username, seller_bat_user_id, buyer_bat_user_id, bid_count, view_count, final_bid, sale_date, sale_price, listing_status')
-            .in('vehicle_id', batVehicleIds);
+        if (externalVehicleIds.length > 0) {
+          const { data: events, error: eventsError } = await supabase
+            .from('auction_events')
+            .select('vehicle_id, source, source_url, outcome, high_bid, winning_bid, total_bids, page_views, watchers, comments_count, seller_name, winning_bidder, auction_end_date, auction_start_date, updated_at')
+            .in('vehicle_id', externalVehicleIds)
+            .order('updated_at', { ascending: false })
+            .limit(2000);
 
-          if (!batListingsError && batListings) {
-            const byVehicle = new Map<string, any>();
-            for (const row of batListings as any[]) {
-              // Prefer rows with the most data
-              const prev = byVehicle.get(row.vehicle_id);
-              if (!prev) {
-                byVehicle.set(row.vehicle_id, row);
-              } else {
-                const prevScore = (prev?.sale_price ? 2 : 0) + (prev?.buyer_username ? 1 : 0) + (prev?.view_count ? 1 : 0);
-                const rowScore = (row?.sale_price ? 2 : 0) + (row?.buyer_username ? 1 : 0) + (row?.view_count ? 1 : 0);
-                if (rowScore >= prevScore) byVehicle.set(row.vehicle_id, row);
-              }
-            }
-
-            const batUserIds = Array.from(
-              new Set(
-                (batListings as any[])
-                  .flatMap((r) => [r.seller_bat_user_id, r.buyer_bat_user_id])
-                  .filter(Boolean),
-              ),
-            );
-
-            const batUserById = new Map<string, any>();
-            if (batUserIds.length > 0) {
-              const { data: batUsers, error: batUsersError } = await supabase
-                .from('bat_users')
-                .select('id, bat_username, bat_profile_url, n_zero_user_id')
-                .in('id', batUserIds);
-
-              if (!batUsersError && batUsers) {
-                for (const u of batUsers as any[]) batUserById.set(u.id, u);
-              }
+          if (!eventsError && events) {
+            const bestByVehicleAndSource = new Map<string, any>();
+            for (const ev of events as any[]) {
+              const key = `${ev.vehicle_id}|${ev.source}`;
+              if (!bestByVehicleAndSource.has(key)) bestByVehicleAndSource.set(key, ev);
             }
 
             for (const l of listings) {
-              if (!(l.listing_source === 'external' && l.platform === 'bat')) continue;
-              const b = byVehicle.get(l.vehicle_id);
-              if (!b) continue;
+              if (l.listing_source !== 'external') continue;
+              const key = `${l.vehicle_id}|${l.platform}`;
+              const ev = bestByVehicleAndSource.get(key);
+              if (!ev) continue;
 
-              l.seller_username = l.seller_username || b.seller_username || l.metadata?.seller || undefined;
-              l.buyer_username = l.buyer_username || b.buyer_username || l.metadata?.buyer || undefined;
-              l.seller_bat_user_id = l.seller_bat_user_id || b.seller_bat_user_id || undefined;
-              l.buyer_bat_user_id = l.buyer_bat_user_id || b.buyer_bat_user_id || undefined;
-
-              const sellerUser = l.seller_bat_user_id ? batUserById.get(l.seller_bat_user_id) : null;
-              const buyerUser = l.buyer_bat_user_id ? batUserById.get(l.buyer_bat_user_id) : null;
-              l.seller_nzero_user_id = l.seller_nzero_user_id || sellerUser?.n_zero_user_id || undefined;
-              l.buyer_nzero_user_id = l.buyer_nzero_user_id || buyerUser?.n_zero_user_id || undefined;
+              // Participants (best-effort)
+              l.seller_username = l.seller_username || ev.seller_name || undefined;
+              l.buyer_username = l.buyer_username || ev.winning_bidder || undefined;
 
               // Prefer canonical listing URL
-              l.external_url = l.external_url || b.bat_listing_url || undefined;
+              l.external_url = l.external_url || ev.source_url || undefined;
 
-              // Prefer bat_listings metrics when external_listings didn't have them yet
-              if ((l.bid_count || 0) === 0 && typeof b.bid_count === 'number') l.bid_count = b.bid_count;
-              if ((l.view_count || 0) === 0 && typeof b.view_count === 'number') l.view_count = b.view_count;
+              // Prefer auction_events metrics when external_listings didn't have them yet
+              if ((l.bid_count || 0) === 0 && typeof ev.total_bids === 'number') l.bid_count = ev.total_bids;
+              if ((l.view_count || 0) === 0 && typeof ev.page_views === 'number') l.view_count = ev.page_views;
+              if ((l.watcher_count || 0) === 0 && typeof ev.watchers === 'number') l.watcher_count = ev.watchers;
 
-              // If sold, prefer sale_price/final_bid when missing
-              if (!l.final_price && (typeof b.sale_price === 'number' || typeof b.final_bid === 'number')) {
-                l.final_price = typeof b.sale_price === 'number' ? Number(b.sale_price) : Number(b.final_bid);
+              // If sold, prefer winning_bid when missing
+              if (!l.final_price && typeof ev.winning_bid === 'number' && ev.winning_bid > 0) {
+                l.final_price = Number(ev.winning_bid);
               }
             }
           }
         }
       } catch {
-        // non-fatal; some environments may not have bat_listings/bat_users deployed
+        // non-fatal; some environments may not have auction_events deployed
       }
 
       // 3. Export listings (from listing_exports table)

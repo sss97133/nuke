@@ -208,25 +208,25 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       ? v.asking_price
       : null;
 
-    // CORRECT PRIORITY ORDER:
-    // 1. Sale price (actual sold price)
-    // 2. Winning bid (auction result)
-    // 3. High bid (RNM auctions)
-    // 4. Live bid (from external_listings for active auctions)
-    // 5. Current bid (from vehicle, if no external listing)
-    // 6. Asking price (only if for sale)
-    // 7. Current value (estimated value - fallback for regular vehicles)
-    // 8. Purchase price (fallback)
-    // 9. MSRP (last resort)
+    // PRIORITY ORDER (pro semantics):
+    // 1. Sale price (executed transaction)
+    // 2. Live bid (active auction, from external_listings — freshest signal)
+    // 3. Winning bid (sold auction result) [fallback if sale_price missing]
+    // 4. High bid (ended / RNM auctions)
+    // 5. Current bid (legacy vehicle field fallback)
+    // 6. Asking price (only if explicitly for sale)
+    // 7. Current value (Nuke mark / estimate)
+    // 8. Purchase price (context)
+    // 9. MSRP (baseline)
     const currentValue = parseMoneyNumber(v.current_value);
     const purchasePrice = parseMoneyNumber(v.purchase_price);
     const msrp = parseMoneyNumber(v.msrp);
     
     const priceValue =
       salePrice ??
+      liveBid ??
       winningBid ??
       highBid ??
-      liveBid ??
       currentBid ??
       asking ??
       currentValue ??

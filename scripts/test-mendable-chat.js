@@ -9,12 +9,19 @@
  * - If you prefer, set MENDABLE_API_KEY in your shell env manager; do not commit it.
  */
 
-import { config } from "dotenv";
+// CommonJS on purpose (repo root `package.json` does not declare `"type": "module"`).
+const { config } = require("dotenv");
 
 config(); // loads .env if present (should be gitignored)
 
+if (typeof fetch !== "function") {
+  console.error("This script requires Node 18+ (global fetch).");
+  process.exit(1);
+}
+
 const apiKey = process.env.MENDABLE_API_KEY;
-const question = process.argv.slice(2).join(" ").trim() || "List a few of the sources you have indexed.";
+const question =
+  process.argv.slice(2).join(" ").trim() || "List a few of the sources you have indexed.";
 
 if (!apiKey) {
   console.error("Missing MENDABLE_API_KEY in environment.");
@@ -38,6 +45,29 @@ async function post(path, body) {
     const err = new Error(`HTTP ${res.status}`);
     // attach structured details for debugging without throwing raw text
     err.details = json;
+    err.status = res.status;
+    throw err;
+  }
+  return json;
+}
+
+async function postWithBearer(path, body) {
+  const res = await fetch(`https://api.mendable.ai${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = { raw: text };
+  }
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`);
+    err.details = json;
+    err.status = res.status;
     throw err;
   }
   return json;
@@ -45,18 +75,41 @@ async function post(path, body) {
 
 async function main() {
   // 1) getSources
-  const sources = await post("/v1/getSources", { api_key: apiKey });
+  let sources;
+  try {
+    sources = await post("/v1/getSources", { api_key: apiKey });
+  } catch (err) {
+    if ([401, 403, 404].includes(err.status)) {
+      sources = await postWithBearer("/v1/getSources", {});
+    } else {
+      throw err;
+    }
+  }
   const sourceList = Array.isArray(sources) ? sources : sources?.sources || sources?.data || sources;
   const sourceCount = Array.isArray(sourceList) ? sourceList.length : null;
   console.log(`getSources: ok${typeof sourceCount === "number" ? ` (${sourceCount} sources)` : ""}`);
 
   // 2) chat (non-streaming)
-  const chat = await post("/v1/chat", {
-    api_key: apiKey,
-    question,
-    shouldStream: false,
-    retriever_option: { num_chunks: 8 },
-  });
+  let chat;
+  try {
+    chat = await post("/v1/chat", {
+      api_key: apiKey,
+      question,
+      shouldStream: false,
+      retriever_option: { num_chunks: 8 },
+    });
+  } catch (err) {
+    if ([401, 403, 404].includes(err.status)) {
+      chat = await postWithBearer("/v1/newChat", {
+        messages: [{ role: "user", content: question }],
+        systemPrompt: "You are a helpful assistant providing automotive and vehicle related information.",
+        temperature: 0.7,
+        maxTokens: 750,
+      });
+    } else {
+      throw err;
+    }
+  }
 
   console.log("chat: ok");
   // Try to print a useful preview without assuming an exact schema.

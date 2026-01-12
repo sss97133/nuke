@@ -76,31 +76,6 @@ export class UnifiedPricingService {
     }
 
     try {
-      // 2) bat_listings (fallback)
-      const { data: bat } = await supabase
-        .from('bat_listings')
-        .select('bat_listing_url, listing_status, current_bid, final_bid, updated_at')
-        .eq('vehicle_id', vehicleId)
-        .in('listing_status', ['active', 'live'])
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const batBidRaw = (bat as any)?.current_bid ?? (bat as any)?.final_bid ?? 0;
-      const batBid = typeof batBidRaw === 'number' ? batBidRaw : Number(batBidRaw || 0);
-      if (Number.isFinite(batBid) && batBid > 0) {
-        return {
-          bid: batBid,
-          platform: 'bat',
-          url: (bat as any)?.bat_listing_url || undefined,
-          updated_at: (bat as any)?.updated_at || null,
-        };
-      }
-    } catch {
-      // ignore
-    }
-
-    try {
       // 3) native vehicle_listings (N-Zero) - cents column
       const { data: native } = await supabase
         .from('vehicle_listings')
