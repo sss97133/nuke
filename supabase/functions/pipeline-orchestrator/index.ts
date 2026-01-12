@@ -176,6 +176,8 @@ serve(async (req) => {
         // Individual auction scrapers (Mecum, Cars & Bids, Broad Arrow) have their own crons
         // that run less frequently - we don't need to duplicate that here
         { name: 'Orgs inventory', fn: 'extract-all-orgs-inventory', body: { limit: 5, min_vehicle_threshold: 10 } },
+        // Drain org intake jobs (synopsis, mapping, etc.) in tiny batches to control cost/time.
+        { name: 'Ingestion jobs', fn: 'process-ingestion-jobs', body: { batch_size: 1 } },
       ];
 
       for (const scraper of scrapers) {

@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import React, { useState } from 'react';
 import VehicleMakeModelInput from '../forms/VehicleMakeModelInput';
 
 interface SearchFilters {
@@ -42,7 +41,6 @@ const AdvancedVehicleSearch: React.FC<AdvancedVehicleSearchProps> = ({
 
   const handleReset = () => {
     setFilters({});
-    setAvailableModels([]);
     onReset();
   };
 

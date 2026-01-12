@@ -19,6 +19,40 @@ export default function CreateOrganization() {
   const [state, setState] = useState('');
   const [zipCode, setZipCode] = useState('');
 
+  const handleCreateFromUrl = async () => {
+    if (!website.trim()) {
+      alert('Website URL is required');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Authentication required');
+
+      const { data, error } = await supabase.functions.invoke('create-org-from-url', {
+        body: {
+          url: website.trim(),
+          queue_synopsis: true,
+          queue_site_mapping: false,
+        }
+      });
+
+      if (error) throw error;
+      if (!data?.success || !data?.organization_id) {
+        throw new Error(data?.error || 'Failed to create organization from URL');
+      }
+
+      navigate(`/org/${data.organization_id}`);
+    } catch (error: any) {
+      console.error('Error creating org from URL:', error);
+      alert(`Failed: ${error.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -230,6 +264,20 @@ export default function CreateOrganization() {
                     style={{ width: '100%', fontSize: '9pt' }}
                     placeholder="https://business.com"
                   />
+                  <div style={{ marginTop: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={handleCreateFromUrl}
+                      disabled={submitting || !website.trim()}
+                      className="button button-secondary"
+                      style={{ fontSize: '9pt' }}
+                    >
+                      {submitting ? 'Working...' : 'Create from URL'}
+                    </button>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                      Creates the org from the website and queues synopsis generation.
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -301,7 +349,7 @@ export default function CreateOrganization() {
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
                 <button
                   type="button"
-                  onClick={() => navigate('/vehicles')}
+                  onClick={() => navigate('/org')}
                   className="button button-secondary"
                   style={{ fontSize: '9pt' }}
                 >
@@ -321,7 +369,7 @@ export default function CreateOrganization() {
         </div>
 
         <div style={{ marginTop: '16px', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '8pt', color: 'var(--text-muted)' }}>
-          💡 <strong>Collaborative profiles</strong>: Like vehicles, any user can contribute to this organization profile. You'll be credited as the creator. To claim ownership, you'll need to submit business documents for verification.
+          <strong>Collaborative profiles</strong>: Like vehicles, any user can contribute to this organization profile. You'll be credited as the creator. To claim ownership, you'll need to submit business documents for verification.
         </div>
       </div>
     </div>

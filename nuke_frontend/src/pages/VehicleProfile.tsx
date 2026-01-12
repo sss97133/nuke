@@ -3590,6 +3590,42 @@ const VehicleProfile: React.FC = () => {
           />
         </React.Suspense>
 
+        {/* BaT base-data flag banner (persisted by bat-base-data-check-runner) */}
+        {vehicle && (() => {
+          const v: any = vehicle as any;
+          const bc = v?.origin_metadata?.bat_base_check;
+          const needsRepair = bc?.needs_repair === true;
+          if (!needsRepair) return null;
+          const missing = Array.isArray(bc?.missing_fields) ? bc.missing_fields.map((x: any) => String(x)) : [];
+          const checkedAtRaw = bc?.last_checked_at ? String(bc.last_checked_at) : null;
+          const checkedAt = checkedAtRaw ? new Date(checkedAtRaw) : null;
+          const checkedAtText = checkedAt && Number.isFinite(checkedAt.getTime()) ? checkedAt.toLocaleString() : null;
+
+          return (
+            <div style={{ padding: '0 var(--space-4)', maxWidth: '1600px', margin: 'var(--space-3) auto 0' }}>
+              <div className="card" style={{ border: '2px solid var(--warning)', background: 'var(--warning-dim)' }}>
+                <div className="card-body" style={{ fontSize: '9pt' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 800 }}>BaT base data incomplete</div>
+                    {checkedAtText && (
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Last check: {checkedAtText}</div>
+                    )}
+                  </div>
+                  {missing.length > 0 && (
+                    <div style={{ marginTop: 6 }}>
+                      <span style={{ fontWeight: 700 }}>Missing:</span>{' '}
+                      <span style={{ fontFamily: 'monospace' }}>{missing.join(', ')}</span>
+                    </div>
+                  )}
+                  <div style={{ marginTop: 6, fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    This vehicle is flagged for re-extraction from stored BaT HTML snapshots to fill missing base fields.
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Live Auction Banner - Show if vehicle has active auction */}
         {vehicle && (
           <LiveAuctionBanner vehicleId={vehicle.id} />
