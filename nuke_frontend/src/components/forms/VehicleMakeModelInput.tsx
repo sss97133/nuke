@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import VehicleMakeModelService from '../../services/vehicleMakeModelService';
-import type { VehicleMake, VehicleModel } from '../../services/vehicleMakeModelService';
-import { normalizeModelName } from '../../data/vehicleModelHierarchy';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../../lib/supabase';
 
 interface VehicleMakeModelInputProps {
   make: string;
@@ -12,6 +10,23 @@ interface VehicleMakeModelInputProps {
   required?: boolean;
   className?: string;
 }
+
+type EcrMake = {
+  ecr_make_slug: string;
+  make_name: string;
+  make_url?: string | null;
+  logo_url: string | null;
+  model_count: number | null;
+  car_count: number | null;
+};
+
+type EcrModel = {
+  ecr_make_slug: string;
+  ecr_model_slug: string;
+  model_name: string;
+  variants_count: number | null;
+  image_url: string | null;
+};
 
 const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
   make,
@@ -24,16 +39,54 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
 }) => {
   const [makeQuery, setMakeQuery] = useState(make);
   const [modelQuery, setModelQuery] = useState(model);
-  const [makeSuggestions, setMakeSuggestions] = useState<VehicleMake[]>([]);
-  const [modelSuggestions, setModelSuggestions] = useState<VehicleModel[]>([]);
+  const [allMakes, setAllMakes] = useState<EcrMake[]>([]);
+  const [makeSuggestions, setMakeSuggestions] = useState<EcrMake[]>([]);
+  const [modelsForMake, setModelsForMake] = useState<EcrModel[]>([]);
+  const [modelSuggestions, setModelSuggestions] = useState<EcrModel[]>([]);
   const [showMakeSuggestions, setShowMakeSuggestions] = useState(false);
   const [showModelSuggestions, setShowModelSuggestions] = useState(false);
-  const [selectedMake, setSelectedMake] = useState<VehicleMake | null>(null);
+  const [selectedMake, setSelectedMake] = useState<EcrMake | null>(null);
+  const [loadingMakes, setLoadingMakes] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   const makeInputRef = useRef<HTMLInputElement>(null);
   const modelInputRef = useRef<HTMLInputElement>(null);
   const makeSuggestionsRef = useRef<HTMLDivElement>(null);
   const modelSuggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Load all ECR makes (includes logo_url) once.
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoadingMakes(true);
+        const { data, error } = await supabase
+          .from('ecr_makes')
+          .select('ecr_make_slug, make_name, make_url, logo_url, model_count, car_count')
+          .eq('is_active', true)
+          .order('make_name', { ascending: true });
+
+        if (cancelled) return;
+        if (error) {
+          console.error('Failed to load ECR makes:', error);
+          setAllMakes([]);
+          return;
+        }
+
+        setAllMakes((data ?? []) as EcrMake[]);
+      } catch (err) {
+        console.error('Failed to load ECR makes:', err);
+        setAllMakes([]);
+      } finally {
+        if (!cancelled) setLoadingMakes(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Update internal state when props change
   useEffect(() => {
@@ -44,17 +97,93 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
     setModelQuery(model);
   }, [model]);
 
+  // Sync selectedMake from the provided make value (edit forms / URL-import fills).
+  useEffect(() => {
+    const makeValue = String(make || '').trim();
+    if (!makeValue || allMakes.length === 0) {
+      setSelectedMake(null);
+      return;
+    }
+
+    const exact = allMakes.find(
+      (m) => m.make_name.toLowerCase() === makeValue.toLowerCase()
+    );
+    setSelectedMake(exact ?? null);
+  }, [make, allMakes]);
+
+  // Load models for selected make.
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      if (!selectedMake) {
+        setModelsForMake([]);
+        return;
+      }
+
+      try {
+        setLoadingModels(true);
+        const { data, error } = await supabase
+          .from('ecr_models')
+          .select('ecr_make_slug, ecr_model_slug, model_name, variants_count, image_url')
+          .eq('ecr_make_slug', selectedMake.ecr_make_slug)
+          .eq('is_active', true)
+          .order('model_name', { ascending: true });
+
+        if (cancelled) return;
+        if (error) {
+          console.error('Failed to load ECR models:', error);
+          setModelsForMake([]);
+          return;
+        }
+
+        setModelsForMake((data ?? []) as EcrModel[]);
+      } catch (err) {
+        console.error('Failed to load ECR models:', err);
+        setModelsForMake([]);
+      } finally {
+        if (!cancelled) setLoadingModels(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMake?.ecr_make_slug]);
+
+  const getMakeSuggestions = (query: string): EcrMake[] => {
+    const q = query.trim().toLowerCase();
+    if (!q) return allMakes;
+    return allMakes.filter((m) => {
+      const name = m.make_name.toLowerCase();
+      const slug = m.ecr_make_slug.toLowerCase();
+      return name.includes(q) || slug.includes(q);
+    });
+  };
+
+  const getModelSuggestions = (query: string): EcrModel[] => {
+    if (!selectedMake) return [];
+    const q = query.trim().toLowerCase();
+    if (!q) return modelsForMake;
+    return modelsForMake.filter((m) => m.model_name.toLowerCase().includes(q));
+  };
+
   // Handle make input changes
   const handleMakeInputChange = (value: string) => {
     setMakeQuery(value);
-    
-    if (value.length >= 1) {
-      const suggestions = VehicleMakeModelService.searchMakes(value, 8);
-      setMakeSuggestions(suggestions);
+
+    // If the user cleared the field, immediately clear upstream make/model too.
+    if (!value.trim()) {
+      onMakeChange('');
+      setSelectedMake(null);
+      setModelsForMake([]);
+      setModelQuery('');
+      onModelChange('');
+      setMakeSuggestions(getMakeSuggestions(''));
       setShowMakeSuggestions(true);
-    } else {
-      setMakeSuggestions([]);
-      setShowMakeSuggestions(false);
+      setModelSuggestions([]);
+      setShowModelSuggestions(false);
+      return;
     }
 
     // Clear model when make changes
@@ -62,50 +191,54 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
       setModelQuery('');
       onModelChange('');
       setSelectedMake(null);
+      setModelsForMake([]);
       setModelSuggestions([]);
       setShowModelSuggestions(false);
     }
+
+    setMakeSuggestions(getMakeSuggestions(value));
+    setShowMakeSuggestions(true);
   };
 
   // Handle model input changes
   const handleModelInputChange = (value: string) => {
     setModelQuery(value);
     
-    if (selectedMake && value.length >= 1) {
-      const suggestions = VehicleMakeModelService.searchModels(selectedMake.id, value, 8);
-      setModelSuggestions(suggestions);
-      setShowModelSuggestions(true);
-    } else {
+    if (!selectedMake) {
       setModelSuggestions([]);
       setShowModelSuggestions(false);
+      return;
     }
+
+    setModelSuggestions(getModelSuggestions(value));
+    setShowModelSuggestions(true);
   };
 
   // Handle make selection
-  const handleMakeSelect = (selectedMake: VehicleMake) => {
-    setMakeQuery(selectedMake.name);
-    setSelectedMake(selectedMake);
-    onMakeChange(selectedMake.name);
+  const handleMakeSelect = (makeRow: EcrMake) => {
+    setMakeQuery(makeRow.make_name);
+    onMakeChange(makeRow.make_name);
+    setSelectedMake(makeRow);
     setShowMakeSuggestions(false);
+
+    // Clear model on make selection (model list is make-scoped).
+    setModelQuery('');
+    onModelChange('');
+    setModelsForMake([]);
+    setModelSuggestions([]);
+    setShowModelSuggestions(false);
     
     // Focus model input
     setTimeout(() => {
       modelInputRef.current?.focus();
     }, 100);
 
-    // Load models for selected make
-    const models = VehicleMakeModelService.getModelsForMake(selectedMake.id);
-    if (models.length > 0) {
-      setModelSuggestions(models.slice(0, 8));
-    }
   };
 
   // Handle model selection
-  const handleModelSelect = (selectedModel: VehicleModel) => {
-    // Normalize model name (remove series prefix like "K5" from "K5 Blazer")
-    const normalized = normalizeModelName(selectedModel.name);
-    setModelQuery(normalized);
-    onModelChange(normalized);
+  const handleModelSelect = (selectedModel: EcrModel) => {
+    setModelQuery(selectedModel.model_name);
+    onModelChange(selectedModel.model_name);
     setShowModelSuggestions(false);
   };
 
@@ -115,24 +248,32 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
       if (!makeSuggestionsRef.current?.contains(document.activeElement)) {
         setShowMakeSuggestions(false);
         
-        // Attempt to normalize the input
-        const normalized = VehicleMakeModelService.normalizeMake(makeQuery);
-        if (normalized && normalized !== makeQuery) {
-          setMakeQuery(normalized);
-          onMakeChange(normalized);
-          
-          // Find the make object
-          const makeObj = VehicleMakeModelService.getAllMakes().find(m => m.name === normalized);
-          if (makeObj) {
-            setSelectedMake(makeObj);
-          }
-        } else if (normalized) {
-          onMakeChange(makeQuery);
-          const makeObj = VehicleMakeModelService.getAllMakes().find(m => m.name === normalized);
-          if (makeObj) {
-            setSelectedMake(makeObj);
-          }
+        const value = makeQuery.trim();
+        if (!value) {
+          onMakeChange('');
+          setSelectedMake(null);
+          setModelsForMake([]);
+          setModelQuery('');
+          onModelChange('');
+          return;
         }
+
+        const exact = allMakes.find(
+          (m) => m.make_name.toLowerCase() === value.toLowerCase()
+        );
+
+        // Canonicalize case if we find an exact match.
+        if (exact) {
+          if (exact.make_name !== makeQuery) {
+            setMakeQuery(exact.make_name);
+          }
+          onMakeChange(exact.make_name);
+          setSelectedMake(exact);
+          return;
+        }
+
+        // Persist whatever user typed (custom make).
+        onMakeChange(value);
       }
     }, 150);
   };
@@ -143,11 +284,8 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
       if (!modelSuggestionsRef.current?.contains(document.activeElement)) {
         setShowModelSuggestions(false);
         
-        // Just save whatever the user typed - no auto-normalization
-        // Only normalize when user explicitly selects a suggestion
-        if (modelQuery && modelQuery !== model) {
-          onModelChange(modelQuery);
-        }
+        // Just save whatever the user typed.
+        if (modelQuery !== model) onModelChange(modelQuery);
       }
     }, 150);
   };
@@ -175,6 +313,16 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
     }
   };
 
+  const isMakeModelKnown = useMemo(() => {
+    const makeValue = makeQuery.trim();
+    const modelValue = modelQuery.trim();
+    if (!makeValue || !modelValue) return true; // no warning until both are present
+    const exactMake = allMakes.find((m) => m.make_name.toLowerCase() === makeValue.toLowerCase());
+    if (!exactMake) return false;
+    if (!selectedMake || selectedMake.ecr_make_slug !== exactMake.ecr_make_slug) return false;
+    return modelsForMake.some((m) => m.model_name.toLowerCase() === modelValue.toLowerCase());
+  }, [allMakes, makeQuery, modelQuery, modelsForMake, selectedMake]);
+
   return (
     <div className={`grid grid-cols-2 gap-4 ${className}`}>
       {/* Make Input */}
@@ -183,17 +331,30 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
           Make {required && <span className="text-red-500">*</span>}
         </label>
         <div className="relative">
+          {selectedMake?.logo_url && (
+            <img
+              src={selectedMake.logo_url}
+              alt={`${selectedMake.make_name} logo`}
+              className="absolute left-2 top-1/2 -translate-y-1/2 h-5 w-5 object-contain"
+              loading="lazy"
+            />
+          )}
           <input
             ref={makeInputRef}
             type="text"
             value={makeQuery}
             onChange={(e) => handleMakeInputChange(e.target.value)}
+            onFocus={() => {
+              if (disabled) return;
+              setMakeSuggestions(getMakeSuggestions(makeQuery));
+              setShowMakeSuggestions(true);
+            }}
             onBlur={handleMakeBlur}
             onKeyDown={(e) => handleKeyDown(e, 'make')}
             disabled={disabled}
             required={required}
             placeholder="e.g., Chevrolet, Ford, Toyota"
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${selectedMake?.logo_url ? 'pl-9' : ''}`}
           />
           
           {/* Make Suggestions Dropdown */}
@@ -204,22 +365,38 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
             >
               {makeSuggestions.map((make) => (
                 <button
-                  key={make.id}
+                  key={make.ecr_make_slug}
                   type="button"
                   onClick={() => handleMakeSelect(make)}
                   className="w-full text-left px-3 py-2 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-900">{make.name}</span>
-                    <span className="text-xs text-gray-500">{make.country}</span>
-                  </div>
-                  {make.aliases.length > 0 && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Also: {make.aliases.join(', ')}
+                  <div className="flex items-center gap-3">
+                    {make.logo_url ? (
+                      <img
+                        src={make.logo_url}
+                        alt={`${make.make_name} logo`}
+                        className="h-6 w-6 object-contain flex-shrink-0"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="h-6 w-6 bg-gray-100 border border-gray-200 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-900 truncate">{make.make_name}</div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {make.model_count != null ? `${make.model_count.toLocaleString()} models` : 'Models: —'}
+                        {make.car_count != null ? ` • ${make.car_count.toLocaleString()} cars` : ''}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </button>
               ))}
+            </div>
+          )}
+
+          {showMakeSuggestions && makeSuggestions.length === 0 && (
+            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3 text-xs text-gray-500">
+              {loadingMakes ? 'Loading makes…' : 'No makes found.'}
             </div>
           )}
         </div>
@@ -236,11 +413,17 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
             type="text"
             value={modelQuery}
             onChange={(e) => handleModelInputChange(e.target.value)}
+            onFocus={() => {
+              if (disabled) return;
+              if (!selectedMake) return;
+              setModelSuggestions(getModelSuggestions(modelQuery));
+              setShowModelSuggestions(true);
+            }}
             onBlur={handleModelBlur}
             onKeyDown={(e) => handleKeyDown(e, 'model')}
-            disabled={disabled || !selectedMake}
+            disabled={disabled || !makeQuery.trim()}
             required={required}
-            placeholder={selectedMake ? "e.g., Suburban, Corvette, F-150" : "Select make first"}
+            placeholder={selectedMake ? "e.g., Suburban, Corvette, F-150" : "Select make (or type one) first"}
             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500"
           />
           
@@ -252,34 +435,46 @@ const VehicleMakeModelInput: React.FC<VehicleMakeModelInputProps> = ({
             >
               {modelSuggestions.map((model) => (
                 <button
-                  key={model.id}
+                  key={`${model.ecr_make_slug}:${model.ecr_model_slug}`}
                   type="button"
                   onClick={() => handleModelSelect(model)}
                   className="w-full text-left px-3 py-2 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-b-0"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-900">{model.name}</span>
-                    <span className="text-xs text-gray-500">
-                      {model.years.start}{model.years.end ? `-${model.years.end}` : '+'}
-                    </span>
-                  </div>
-                  {model.aliases.length > 0 && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Also: {model.aliases.join(', ')}
+                  <div className="flex items-center gap-3">
+                    {model.image_url ? (
+                      <img
+                        src={model.image_url}
+                        alt=""
+                        className="h-8 w-10 object-cover border border-gray-200 flex-shrink-0"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="h-8 w-10 bg-gray-100 border border-gray-200 flex-shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-900 truncate">{model.model_name}</div>
+                      {model.variants_count != null && (
+                        <div className="text-xs text-gray-500 truncate">
+                          {model.variants_count.toLocaleString()} variant{model.variants_count === 1 ? '' : 's'}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <div className="text-xs text-gray-400 mt-1">
-                    {model.body_styles.join(', ')}
                   </div>
                 </button>
               ))}
+            </div>
+          )}
+
+          {showModelSuggestions && modelSuggestions.length === 0 && selectedMake && (
+            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg p-3 text-xs text-gray-500">
+              {loadingModels ? 'Loading models…' : 'No models found for this make.'}
             </div>
           )}
         </div>
       </div>
 
       {/* Validation Status - Only show warning, not success */}
-      {makeQuery && modelQuery && !VehicleMakeModelService.validateMakeModel(makeQuery, modelQuery) && (
+      {makeQuery && modelQuery && !isMakeModelKnown && (
         <div className="col-span-2 mt-1">
           <div className="text-xs text-amber-600 flex items-center">
             <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import VehicleMakeModelInput from '../forms/VehicleMakeModelInput';
 
 interface SearchFilters {
   yearFrom?: number;
@@ -14,12 +15,6 @@ interface SearchFilters {
   textSearch?: string;
 }
 
-interface VehicleData {
-  years: number[];
-  makes: string[];
-  models: { [make: string]: string[] };
-}
-
 interface AdvancedVehicleSearchProps {
   onSearch: (filters: SearchFilters) => void;
   onReset: () => void;
@@ -32,72 +27,7 @@ const AdvancedVehicleSearch: React.FC<AdvancedVehicleSearchProps> = ({
   loading = false
 }) => {
   const [filters, setFilters] = useState<SearchFilters>({});
-  const [vehicleData, setVehicleData] = useState<VehicleData>({
-    years: [],
-    makes: [],
-    models: {}
-  });
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
-
-  useEffect(() => {
-    loadVehicleData();
-  }, []);
-
-  useEffect(() => {
-    // Update available models when make changes
-    if (filters.make && vehicleData.models[filters.make]) {
-      setAvailableModels(vehicleData.models[filters.make]);
-    } else {
-      setAvailableModels([]);
-      // Clear model if make changes
-      if (filters.model) {
-        setFilters(prev => ({ ...prev, model: undefined }));
-      }
-    }
-  }, [filters.make, vehicleData.models]);
-
-  const loadVehicleData = async () => {
-    try {
-      // Get all unique years, makes, and models from the database
-      const { data: vehicles, error } = await supabase
-        .from('vehicles')
-        .select('year, make, model')
-        .eq('is_public', true)
-        .not('make', 'is', null)
-        .not('model', 'is', null);
-
-      if (error) {
-        console.error('Error loading vehicle data:', error);
-        return;
-      }
-
-      if (!vehicles) return;
-
-      // Process the data
-      const years = [...new Set(vehicles.map(v => v.year))].sort((a, b) => b - a);
-      const makes = [...new Set(vehicles.map(v => v.make))].sort();
-      
-      const models: { [make: string]: string[] } = {};
-      vehicles.forEach(vehicle => {
-        if (!models[vehicle.make]) {
-          models[vehicle.make] = [];
-        }
-        if (!models[vehicle.make].includes(vehicle.model)) {
-          models[vehicle.make].push(vehicle.model);
-        }
-      });
-
-      // Sort models for each make
-      Object.keys(models).forEach(make => {
-        models[make].sort();
-      });
-
-      setVehicleData({ years, makes, models });
-    } catch (error) {
-      console.error('Error in loadVehicleData:', error);
-    }
-  };
 
   const handleFilterChange = (key: keyof SearchFilters, value: any) => {
     setFilters(prev => ({
@@ -190,32 +120,14 @@ const AdvancedVehicleSearch: React.FC<AdvancedVehicleSearchProps> = ({
 
             {/* Make and Model */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-black mb-1">Make</label>
-                <select
-                  value={filters.make || ''}
-                  onChange={(e) => handleFilterChange('make', e.target.value)}
-                  className="form-select w-full"
-                >
-                  <option value="" className="text-xs">Any Make</option>
-                  {vehicleData.makes.map(make => (
-                    <option key={make} value={make}>{make}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-black mb-1">Model</label>
-                <select
-                  value={filters.model || ''}
-                  onChange={(e) => handleFilterChange('model', e.target.value)}
-                  className="form-select w-full"
-                  disabled={!filters.make}
-                >
-                  <option value="" className="text-xs">Any Model</option>
-                  {availableModels.map(model => (
-                    <option key={model} value={model}>{model}</option>
-                  ))}
-                </select>
+              <div className="md:col-span-2">
+                <VehicleMakeModelInput
+                  make={filters.make || ''}
+                  model={filters.model || ''}
+                  onMakeChange={(value) => handleFilterChange('make', value)}
+                  onModelChange={(value) => handleFilterChange('model', value)}
+                  disabled={loading}
+                />
               </div>
             </div>
 
