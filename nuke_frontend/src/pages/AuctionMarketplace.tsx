@@ -23,7 +23,7 @@ interface AuctionListing {
   vehicle_id: string;
   seller_id?: string;
   sale_type?: string;
-  source: 'native' | 'external' | 'bat';
+  source: 'native' | 'external';
   platform?: string;
   listing_url?: string;
   lead_image_url?: string | null;
@@ -59,7 +59,7 @@ export default function AuctionMarketplace() {
   // Default to including 0-bid auctions so marketplace doesn't look empty while bid_count backfills.
   const [includeNoBidAuctions, setIncludeNoBidAuctions] = useState(true);
   const [hiddenNoBidCount, setHiddenNoBidCount] = useState(0);
-  const [debugCounts, setDebugCounts] = useState<{ native: number; external: number; bat: number; total: number } | null>(null);
+  const [debugCounts, setDebugCounts] = useState<{ native: number; external: number; total: number } | null>(null);
 
   useEffect(() => {
     loadListings();
@@ -93,15 +93,6 @@ export default function AuctionMarketplace() {
           event: '*',
           schema: 'public',
           table: 'external_listings',
-        },
-        scheduleReload,
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bat_listings',
         },
         scheduleReload,
       )
@@ -303,82 +294,6 @@ export default function AuctionMarketplace() {
         }
       }
 
-      // 3. Load bat_listings (BaT-specific listings)
-      const today = now.split('T')[0];
-      let batQuery = supabase
-        .from('bat_listings')
-        .select(`
-          *,
-          vehicle:vehicles (
-            id,
-            year,
-            make,
-            model,
-            trim,
-            mileage,
-            primary_image_url
-          )
-        `)
-        // Some BaT ingests use 'live' for active auctions
-        .in('listing_status', ['active', 'live']);
-
-      const { data: batListings, error: batError } = await batQuery;
-
-      if (!batError && batListings) {
-        for (const listing of batListings) {
-          const currentHighBidCents = (listing.current_bid ?? listing.final_bid)
-            ? Math.round(Number(listing.current_bid ?? listing.final_bid) * 100)
-            : null;
-
-          // Marketplace rule: don't show auctions with no bids.
-          if (
-            !includeNoBidAuctions &&
-            !hasBidSignal({ bidCount: listing.bid_count, currentHighBidCents })
-          ) {
-            hiddenNoBids += 1;
-            continue;
-          }
-
-          // BaT rows are often missing auction_end_date; do not hide the auction just because end date is missing.
-          // If present but stale, treat as unknown end time.
-          let endDateTime: string | null = null;
-          if (listing.auction_end_date) {
-            const endDate = new Date(listing.auction_end_date);
-            endDate.setHours(23, 59, 59, 999);
-            const iso = endDate.toISOString();
-            if (new Date(iso) > new Date()) endDateTime = iso;
-          }
-
-          const fallbackTitle = (listing as any).bat_listing_title || (listing as any)?.raw_data?.bat_title || null;
-          const fallbackImageUrl =
-            (listing as any).image_url ||
-            (listing as any).primary_image_url ||
-            (listing as any)?.raw_data?.image_url ||
-            null;
-          const vehicle = normalizeVehicle({
-            vehicleId: listing.vehicle_id,
-            maybeVehicle: (listing as any).vehicle,
-            fallbackTitle,
-            fallbackImageUrl,
-          });
-          allListings.push({
-            id: listing.id,
-            vehicle_id: listing.vehicle_id,
-            source: 'bat',
-            platform: 'bat',
-            listing_url: listing.bat_listing_url,
-            lead_image_url: vehicle.primary_image_url || null,
-            current_high_bid_cents: currentHighBidCents,
-            reserve_price_cents: listing.reserve_price ? listing.reserve_price * 100 : null,
-            bid_count: listing.bid_count || 0,
-            auction_end_time: endDateTime,
-            status: listing.listing_status,
-            created_at: listing.created_at,
-            vehicle
-          });
-        }
-      }
-
       // Improve "No Image" cases using vehicle_images for vehicles without a primary image.
       const missingImageVehicleIds = Array.from(
         new Set(
@@ -460,11 +375,10 @@ export default function AuctionMarketplace() {
       setDebugCounts({
         native: nativeListings?.length || 0,
         external: externalListings?.length || 0,
-        bat: batListings?.length || 0,
         total: filtered.length,
       });
       console.log(
-        `Loaded ${filtered.length} active auction listings (${nativeListings?.length || 0} native, ${externalListings?.length || 0} external, ${batListings?.length || 0} BaT)`
+        `Loaded ${filtered.length} active auction listings (${nativeListings?.length || 0} native, ${externalListings?.length || 0} external)`
       );
     } catch (error) {
       console.error('Error loading listings:', error);

@@ -292,6 +292,7 @@ const POTENTIALLY_INTERNAL = [
   'vehicle-expert-agent',
   'query-wiring-needs',
   'query-mendable',
+  'query-mendable-v2',
   'search-vehicle-history',
   'search-bat-listings',
   'search-local-garages',
@@ -500,6 +501,7 @@ const POTENTIALLY_INTERNAL = [
   'vehicle-expert-agent',
   'query-wiring-needs',
   'query-mendable',
+  'query-mendable-v2',
   'search-vehicle-history',
   'search-bat-listings',
   'search-local-garages',
@@ -715,7 +717,7 @@ async function getAllFunctions() {
     // Get from MCP or use known list
     const knownFunctions = [
       'process-vin', 'search-vehicle-history', 'analyze-vehicle-data',
-      'crawl-market-data', 'search-local-garages', 'query-mendable',
+      'crawl-market-data', 'search-local-garages', 'query-mendable', 'query-mendable-v2',
       'analyze-inventory-image', 'search-garages', 'analyze-skills',
       'fetch-market-auctions', 'process-vehicle-import', 'seed-certifications',
       'get-mapbox-token', 'calculate-feed-relevance', 'analyze-vehicle-probability',

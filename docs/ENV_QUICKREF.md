@@ -75,6 +75,9 @@ Used by local Supabase config in `supabase/config.toml` and by Supabase Auth pro
   - `GEMINI_API_KEY`
 - Mendable (if used):
   - `MENDABLE_API_KEY`
+  - Used by: `supabase/functions/query-mendable` (server-side Mendable bridge)
+  - Production: `query-mendable-v2` is deployed (newer compatibility wrapper)
+  - Quick local check (never prints the key): `node scripts/test-mendable-chat.js "your question"`
 
 ### Vercel AI Gateway (frontend)
 

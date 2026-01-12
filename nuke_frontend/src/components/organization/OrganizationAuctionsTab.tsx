@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
 
-type AuctionSource = 'bat' | 'external';
+type AuctionSource = 'external';
 
 type ReserveFilter = 'all' | 'reserve' | 'no_reserve';
 type StatusFilter = 'live' | 'ended' | 'all';
@@ -143,49 +143,19 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
       try {
         const now = Date.now();
 
-        const [batRes, extRes] = await Promise.all([
-          supabase
-            .from('bat_listings')
-            .select(
-              'id, vehicle_id, bat_listing_url, bat_listing_title, listing_status, auction_end_date, final_bid, bid_count, comment_count, view_count, reserve_price'
-            )
-            .eq('organization_id', organizationId)
-            .order('auction_end_date', { ascending: false })
-            .limit(300),
-          supabase
-            .from('external_listings')
-            .select(
-              'id, vehicle_id, platform, listing_url, listing_status, end_date, current_bid, final_price, bid_count, view_count, watcher_count, reserve_price'
-            )
-            .eq('organization_id', organizationId)
-            .order('end_date', { ascending: false })
-            .limit(300),
-        ]);
-
-        const batRows: AuctionRow[] =
-          (batRes.data || []).map((r: any) => {
-            const endTime = typeof r.auction_end_date === 'string' ? endOfDayIso(r.auction_end_date) : null;
-            return {
-              id: r.id,
-              source: 'bat',
-              platform: 'bat',
-              vehicle_id: r.vehicle_id || null,
-              title: r.bat_listing_title || null,
-              url: r.bat_listing_url || null,
-              listing_status: r.listing_status || null,
-              end_time: endTime,
-              bid_count: Number(r.bid_count || 0),
-              comment_count: Number(r.comment_count || 0),
-              view_count: Number(r.view_count || 0),
-              watcher_count: 0,
-              current_bid_cents: null,
-              final_price_cents: typeof r.final_bid === 'number' ? r.final_bid * 100 : null,
-              reserve_price_cents: typeof r.reserve_price === 'number' ? r.reserve_price * 100 : null,
-            };
-          }) || [];
+        // Canonical source for *all* auction platforms (BaT, Cars & Bids, Mecum, etc.)
+        // NOTE: We keep bat_listings as an ingestion/detail table, but UI should prefer external_listings.
+        const extRes = await supabase
+          .from('external_listings')
+          .select(
+            'id, vehicle_id, platform, listing_url, listing_status, end_date, current_bid, final_price, bid_count, view_count, watcher_count, reserve_price'
+          )
+          .eq('organization_id', organizationId)
+          .order('end_date', { ascending: false })
+          .limit(600);
 
         const extRows: AuctionRow[] =
-          (extRes.data || []).map((r: any) => {
+          ((extRes as any)?.data || []).map((r: any) => {
             const endTime = typeof r.end_date === 'string' ? r.end_date : null;
             const currentBidCents =
               typeof r.current_bid === 'number' ? Math.round(r.current_bid * 100) : null;
@@ -212,7 +182,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
             };
           }) || [];
 
-        const merged = [...batRows, ...extRows]
+        const merged = [...extRows]
           .filter((r) => !!r.vehicle_id)
           .sort((a, b) => {
             const aEnd = a.end_time ? new Date(a.end_time).getTime() : 0;

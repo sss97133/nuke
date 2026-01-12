@@ -41,6 +41,7 @@ import { BATListingManager } from '../components/vehicle/BATListingManager';
 import VehicleDescriptionCard from '../components/vehicle/VehicleDescriptionCard';
 import VehicleCommentsCard from '../components/vehicle/VehicleCommentsCard';
 import VehicleROISummaryCard from '../components/vehicle/VehicleROISummaryCard';
+import { VehiclePricingValueCard } from '../components/vehicle/VehiclePricingValueCard';
 import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 import type { ContentActionEvent } from '../services/streamActionsService';
@@ -941,39 +942,6 @@ const VehicleProfile: React.FC = () => {
               // ignore
             }
           })();
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'bat_listings',
-          filter: `vehicle_id=eq.${vehicleIdForFilter}`,
-        },
-        (payload) => {
-          const row = (payload as any)?.new as any;
-          if (!row) return;
-          // Only apply BaT table updates when the pulse is already BaT (or not set yet).
-          if (auctionPulse?.platform && auctionPulse.platform !== 'bat') return;
-
-          setAuctionPulse((prev: any) => {
-            const p = prev || ({} as any);
-            return {
-              platform: 'bat',
-              listing_url: String(row?.bat_listing_url || p.listing_url || ''),
-              listing_status: String(row?.listing_status || p.listing_status || ''),
-              end_date: row?.auction_end_date ? new Date(row.auction_end_date).toISOString() : (p.end_date ?? null),
-              current_bid: typeof row?.current_bid === 'number' ? row.current_bid : (p.current_bid ?? null),
-              bid_count: typeof row?.bid_count === 'number' ? row.bid_count : (p.bid_count ?? null),
-              watcher_count: typeof row?.watcher_count === 'number' ? row.watcher_count : (p.watcher_count ?? null),
-              view_count: typeof row?.view_count === 'number' ? row.view_count : (p.view_count ?? null),
-              comment_count: typeof row?.comment_count === 'number' ? row.comment_count : (p.comment_count ?? null),
-              last_bid_at: p.last_bid_at ?? null,
-              last_comment_at: p.last_comment_at ?? null,
-              updated_at: row?.updated_at ?? p.updated_at ?? null,
-            };
-          });
         },
       )
       .on(
@@ -3476,6 +3444,14 @@ const VehicleProfile: React.FC = () => {
 
               {/* Investment Summary */}
               <VehicleROISummaryCard vehicleId={vehicle.id} />
+
+              {/* Pricing & Value (Market vs Nuke marks) */}
+              <VehiclePricingValueCard
+                vehicle={vehicle}
+                auctionPulse={auctionPulse}
+                valuationIntel={valuationIntel as any}
+                readinessSnapshot={readinessSnapshot as any}
+              />
               
               {/* Structured listing data (Options / Service records / etc.) */}
               <VehicleStructuredListingDataCard vehicle={vehicle} />
