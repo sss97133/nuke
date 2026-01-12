@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 
 /**
  * Monitor BAT Seller Profile for New Listings
@@ -219,6 +220,7 @@ Deno.serve(async (req: Request) => {
           );
 
         // Create external listing record
+        const listingUrlKey = normalizeListingUrlKey(listingUrl);
         const { data: externalListing, error: listingError } = await supabase
           .from('external_listings')
           .upsert({
@@ -226,6 +228,7 @@ Deno.serve(async (req: Request) => {
             organization_id: organizationId,
             platform: 'bat',
             listing_url: listingUrl,
+            listing_url_key: listingUrlKey,
             listing_id: listingUrl.match(/listing\/([^\/]+)/)?.[1] || null,
             listing_status: listingStatus,
             current_bid: currentBid,
@@ -236,7 +239,7 @@ Deno.serve(async (req: Request) => {
               discovered_via: 'seller_monitor'
             }
           }, {
-            onConflict: 'vehicle_id,platform,listing_id'
+            onConflict: 'platform,listing_url_key'
           })
           .select('id')
           .single();

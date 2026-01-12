@@ -7,6 +7,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -232,19 +233,14 @@ async function updateVehicle(vehicleId: string, batUrl: string): Promise<{ succe
     }
   }
   
-  // Update external_listings if exists, or create
-  const { data: existingListing } = await supabase
-    .from('external_listings')
-    .select('id')
-    .eq('vehicle_id', vehicleId)
-    .eq('platform', 'bat')
-    .maybeSingle();
-  
+  // Upsert external_listings (canonical landing pad)
+  const listingUrlKey = normalizeListingUrlKey(batUrl);
   const listingData = {
     vehicle_id: vehicleId,
     platform: 'bat',
     listing_url: batUrl,
-    listing_id: extracted.lot_number,
+    listing_url_key: listingUrlKey,
+    listing_id: extracted.lot_number || listingUrlKey,
     listing_status: extracted.sale_price ? 'sold' : 'ended',
     end_date: extracted.auction_end_date,
     final_price: extracted.sale_price,
@@ -258,20 +254,12 @@ async function updateVehicle(vehicleId: string, batUrl: string): Promise<{ succe
       buyer_username: extracted.buyer_username,
       reserve_status: extracted.reserve_status,
     },
+    updated_at: new Date().toISOString(),
   };
-  
-  if (existingListing) {
-    await supabase
-      .from('external_listings')
-      .update(listingData)
-      .eq('id', existingListing.id);
-    changes.push(`external_listings: updated`);
-  } else {
-    await supabase
-      .from('external_listings')
-      .insert(listingData);
-    changes.push(`external_listings: created`);
-  }
+  await supabase
+    .from('external_listings')
+    .upsert(listingData as any, { onConflict: 'platform,listing_url_key' });
+  changes.push(`external_listings: upserted`);
   
   return { success: true, changes };
 }

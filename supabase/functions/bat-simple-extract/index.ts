@@ -4,6 +4,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { fetchBatPage, logFetchCost, type FetchResult } from '../_shared/batFetcher.ts';
+import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -732,13 +733,19 @@ serve(async (req) => {
       
       // Create/update external_listings record for platform tracking
       if (extracted.vehicle_id) {
+        const listingUrlKey = normalizeListingUrlKey(extracted.url);
+        const listingIdFallback = (() => {
+          const trimmed = String(extracted.url || '').trim().replace(/\/+$/, '');
+          return trimmed.split('/').filter(Boolean).pop() || null;
+        })();
         const { error: listingError } = await supabase
           .from('external_listings')
           .upsert({
             vehicle_id: extracted.vehicle_id,
             platform: 'bat',
             listing_url: extracted.url,
-            listing_id: extracted.lot_number,
+            listing_url_key: listingUrlKey,
+            listing_id: extracted.lot_number || listingIdFallback || listingUrlKey,
             listing_status: extracted.sale_price ? 'sold' : 'ended',
             end_date: extracted.auction_end_date,
             final_price: extracted.sale_price,
@@ -753,7 +760,7 @@ serve(async (req) => {
               reserve_status: extracted.reserve_status,
             },
           }, {
-            onConflict: 'vehicle_id,platform'
+            onConflict: 'platform,listing_url_key'
           });
       
         if (listingError) {

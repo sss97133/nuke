@@ -16,7 +16,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onSync }) => {
   const platformNames: Record<string, string> = {
     nzero: 'n-zero',
     bat: 'Bring a Trailer',
-    ebay: 'eBay Motors',
+    ebay_motors: 'eBay Motors',
     cars_and_bids: 'Cars & Bids',
     hemmings: 'Hemmings',
     autotrader: 'AutoTrader',

@@ -3,6 +3,7 @@ import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { extractAndCacheFavicon } from '../_shared/extractFavicon.ts'
 import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts'
+import { normalizeListingUrlKey } from '../_shared/listingUrl.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -164,6 +165,7 @@ serve(async (req) => {
       if (!args.listing_url) return
       try {
         const url = String(args.listing_url)
+        const listingUrlKey = normalizeListingUrlKey(url)
         const listingId =
           url.match(/\/(\d+)\.html(?:$|\?)/)?.[1] ||
           url.match(/[?&]postingID=(\d+)/i)?.[1] ||
@@ -177,12 +179,13 @@ serve(async (req) => {
               organization_id: null,
               platform: 'craigslist',
               listing_url: args.listing_url,
-              listing_id: listingId,
+              listing_url_key: listingUrlKey,
+              listing_id: listingId || listingUrlKey,
               listing_status: args.listing_status,
               metadata: args.metadata ?? {},
               updated_at: new Date().toISOString(),
             } as any,
-            { onConflict: 'vehicle_id,platform,listing_id' }
+            { onConflict: 'platform,listing_url_key' }
           )
       } catch (e) {
         console.warn('external_listings upsert failed (non-fatal):', (e as any)?.message || e)

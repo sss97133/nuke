@@ -14,6 +14,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1216,6 +1217,7 @@ serve(async (req) => {
     if (vehicleId) {
       const listingStatus = essentials.sale_price ? "sold" : "ended";
       const endAtIso = essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null;
+      const listingUrlKey = normalizeListingUrlKey(listingUrlCanonical);
 
       const { error } = await supabase
         .from("external_listings")
@@ -1223,6 +1225,7 @@ serve(async (req) => {
           vehicle_id: vehicleId,
           platform: "bat",
           listing_url: listingUrlCanonical,
+          listing_url_key: listingUrlKey,
           listing_id: essentials.lot_number || listingUrlCanonical,
           listing_status: listingStatus,
           end_date: endAtIso,
@@ -1240,7 +1243,7 @@ serve(async (req) => {
             comment_count: essentials.comment_count,
           },
           updated_at: new Date().toISOString(),
-        }, { onConflict: "vehicle_id,platform,listing_id" });
+        }, { onConflict: "platform,listing_url_key" });
 
       if (error) console.warn(`external_listings upsert failed (non-fatal): ${error.message}`);
     }

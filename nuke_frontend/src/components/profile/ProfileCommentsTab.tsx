@@ -59,19 +59,22 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
     const platformColors: Record<string, string> = {
       'bat': 'var(--accent)',
       'cars_and_bids': '#4CAF50',
-      'ebay': '#E53238',
+      'ebay_motors': '#E53238',
+      'ebay': '#E53238', // legacy / user-provided strings
       'auction': 'var(--text-muted)',
     };
 
-    const displayName = platform === 'bat' ? 'BaT' : 
-                       platform === 'cars_and_bids' ? 'C&B' :
+    const p = platform.toLowerCase();
+    const displayName = p === 'bat' ? 'BaT' :
+                       p === 'cars_and_bids' ? 'C&B' :
+                       (p === 'ebay_motors' || p === 'ebay') ? 'eBay' :
                        platform.toUpperCase();
 
     return (
       <span style={{
         fontSize: '7pt',
         padding: '2px 6px',
-        background: platformColors[platform.toLowerCase()] || 'var(--text-muted)',
+        background: platformColors[p] || 'var(--text-muted)',
         color: 'var(--white)',
         borderRadius: '2px',
         fontWeight: 'bold',
