@@ -77,7 +77,7 @@ class AIDataIngestionService {
           return await this.extractFromVIN(textInput);
         
         case 'url':
-          return await this.extractFromURL(textInput, userId);
+          return await this.extractFromURL(this.normalizeUrl(textInput), userId);
         
         case 'org_search':
           // Return special result indicating this is an organization search query
@@ -133,7 +133,8 @@ class AIDataIngestionService {
     }
 
     // Check for URL
-    if (trimmed.match(/^https?:\/\//i) || trimmed.match(/^www\./i)) {
+    const looksLikeBareDomain = /^[a-z0-9.-]+\.[a-z]{2,}(?:[\/?#].*)?$/i.test(trimmed) && !/\s/.test(trimmed);
+    if (trimmed.match(/^https?:\/\//i) || trimmed.match(/^www\./i) || looksLikeBareDomain) {
       // Skip PDF/document URLs - these should be handled by AddBrochureUrl component
       if (trimmed.includes('.pdf') || 
           trimmed.includes('/pdf') || 
@@ -254,7 +255,7 @@ class AIDataIngestionService {
       const isOrgWebsite = this.isOrganizationWebsite(url);
       
       if (isOrgWebsite) {
-        return await this.handleOrganizationWebsite(url);
+        return await this.handleOrganizationWebsite(url, userId);
       }
 
       // Otherwise, treat as vehicle listing
@@ -344,8 +345,16 @@ class AIDataIngestionService {
   /**
    * Handle organization website URL
    */
-  private async handleOrganizationWebsite(url: string): Promise<ExtractionResult> {
+  private async handleOrganizationWebsite(url: string, userId?: string): Promise<ExtractionResult> {
     try {
+      if (!userId) {
+        return {
+          inputType: 'url',
+          confidence: 0,
+          errors: ['Please log in to create organizations from URLs'],
+        };
+      }
+
       // Normalize URL to base domain
       const urlObj = new URL(url);
       const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
@@ -382,75 +391,58 @@ class AIDataIngestionService {
         };
       }
 
-      // Organization doesn't exist - trigger creation/enrichment
-      // Use thorough-site-mapper or create directly
-      // First, try to create a basic organization, then enrich it
-      const domain = urlObj.hostname.replace(/^www\./, '');
-      const orgName = domain.split('.')[0].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      
-      // Create basic organization first
-      const { data: newOrg, error: createError } = await supabase
-        .from('businesses')
-        .insert({
-          business_name: orgName,
-          business_type: 'dealership', // Default, can be updated
-          website: normalizedUrl,
-          metadata: {
-            discovered_from: 'url_ingestion',
-            discovered_at: new Date().toISOString(),
-          },
-        })
-        .select('id, business_name')
-        .single();
-
-      if (createError) {
-        return {
-          inputType: 'url',
-          confidence: 0,
-          errors: [createError.message || 'Failed to create organization'],
-        };
-      }
-
-      // Auto-merge duplicates after creation
-      try {
-        await supabase.functions.invoke('auto-merge-duplicate-orgs', {
-          body: { organizationId: newOrg.id }
-        });
-      } catch (mergeError) {
-        console.warn('Auto-merge check failed (non-critical):', mergeError);
-      }
-
-      // Now enrich it with website data
-      const { data: enrichData, error: enrichError } = await supabase.functions.invoke('update-org-from-website', {
+      // Organization doesn't exist - create via the dedicated Edge Function.
+      // This path sets discovered_by/uploaded_by correctly and queues synopsis generation.
+      const { data: intakeData, error: intakeError } = await supabase.functions.invoke('create-org-from-url', {
         body: {
-          organizationId: newOrg.id,
-          websiteUrl: normalizedUrl,
-        },
+          url: normalizedUrl,
+          queue_synopsis: true,
+          queue_site_mapping: false,
+        }
       });
 
-      if (createError) {
+      if (intakeError) {
         return {
           inputType: 'url',
           confidence: 0,
-          errors: [createError.message || 'Failed to create organization'],
+          errors: [intakeError.message || 'Failed to create organization from URL'],
         };
       }
 
-      // Return the created organization info
+      const orgId = intakeData?.organization_id;
+      if (!orgId) {
+        return {
+          inputType: 'url',
+          confidence: 0,
+          errors: [intakeData?.error || 'Failed to create organization from URL'],
+        };
+      }
+
+      const { data: orgRow } = await supabase
+        .from('businesses')
+        .select('id, business_name, website, description')
+        .eq('id', orgId)
+        .maybeSingle();
+
+      const created = intakeData?.created === true;
+      const orgName = orgRow?.business_name || baseUrl;
+
       return {
         inputType: 'url',
-        confidence: 0.9,
-        source: 'organization_creation',
+        confidence: created ? 0.9 : 1.0,
+        source: created ? 'organization_creation' : 'organization_lookup',
         rawData: {
           organization: {
-            id: newOrg.id,
-            name: newOrg.business_name,
-            website: normalizedUrl,
-            description: enrichData?.description || undefined,
+            id: orgId,
+            name: orgName,
+            website: orgRow?.website || normalizedUrl,
+            description: orgRow?.description || undefined,
           },
-          exists: false,
-          message: `Organization "${newOrg.business_name}" has been created${enrichData?.success ? ' and enriched' : ''}.`,
-          enrichData,
+          exists: !created,
+          message: created
+            ? `Organization "${orgName}" has been created.`
+            : `Organization "${orgName}" already exists in the system.`,
+          intakeData,
         },
       };
     } catch (error: any) {
@@ -460,6 +452,17 @@ class AIDataIngestionService {
         errors: [error.message || 'Organization website handling failed'],
       };
     }
+  }
+
+  /**
+   * Normalize URL-like input into a valid absolute URL.
+   */
+  private normalizeUrl(raw: string): string {
+    const trimmed = String(raw || '').trim();
+    if (!trimmed) return trimmed;
+    if (trimmed.match(/^https?:\/\//i)) return trimmed;
+    if (trimmed.match(/^www\./i)) return `https://${trimmed}`;
+    return `https://${trimmed}`;
   }
 
   /**

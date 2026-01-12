@@ -8,6 +8,62 @@ import VehicleCritiqueMode from './VehicleCritiqueMode';
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
 import '../../design-system.css';
 
+function normalizeUrlInput(value: string): string | null {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  // Strip common wrapper characters from copy/paste.
+  const cleaned = raw.replace(/^[<(\[]+/, '').replace(/[>\])]+$/, '').trim();
+  if (!cleaned) return null;
+  if (/\s/.test(cleaned)) return null;
+
+  if (/^https?:\/\//i.test(cleaned)) return cleaned;
+  if (/^www\./i.test(cleaned)) return `https://${cleaned}`;
+
+  // Bare domains (e.g. ecpsgroup.com, ecpsgroup.com/contact)
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[\/?#].*)?$/i.test(cleaned)) {
+    return `https://${cleaned}`;
+  }
+
+  return null;
+}
+
+function isProbablyAssetOrDocumentUrl(url: string): boolean {
+  return /\.(pdf|png|jpe?g|gif|webp|svg)(?:$|[?#])/i.test(url);
+}
+
+function isLikelyVehicleListingUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (lower.includes('bringatrailer.com/listing/')) return true;
+
+  try {
+    const u = new URL(url);
+    const path = u.pathname.toLowerCase();
+    const q = u.search.toLowerCase();
+
+    if (/[?&](vin|id)=/.test(q)) return true;
+
+    const patterns = [
+      /\/vehicle\/[^/]+/i,
+      /\/inventory\/[^/]+/i,
+      /\/listing\/[^/]+/i,
+      /\/lot\/[^/]+/i,
+      /\/car\/[^/]+/i,
+      /\/auction\/[^/]+/i,
+      /\/bid\/[^/]+/i,
+    ];
+
+    return patterns.some((re) => re.test(path));
+  } catch {
+    return false;
+  }
+}
+
+function isLikelyOrgWebsiteUrl(url: string): boolean {
+  if (isProbablyAssetOrDocumentUrl(url)) return false;
+  return !isLikelyVehicleListingUrl(url);
+}
+
 interface ExtractionPreview {
   result: ExtractionResult;
   operationPlan?: DatabaseOperationPlan;
@@ -92,7 +148,7 @@ export default function AIDataIngestionSearch() {
     }
 
     // Check if it's a URL or VIN (don't autocomplete these)
-    const isURL = /^https?:\/\//i.test(trimmedInput) || /^www\./i.test(trimmedInput);
+    const isURL = !!normalizeUrlInput(trimmedInput);
     const isVIN = /^[A-HJ-NPR-Z0-9]{11,17}$/i.test(trimmedInput.replace(/[^A-Z0-9]/gi, ''));
     
     if (isURL || isVIN) {
@@ -409,17 +465,21 @@ export default function AIDataIngestionSearch() {
   };
 
   const processInput = async () => {
-    console.log('processInput called', { input: input.trim(), hasImage: !!attachedImage, isProcessing });
+    const rawText = input.trim();
+    const normalizedUrl = normalizeUrlInput(rawText);
+    const effectiveText = normalizedUrl || rawText;
+
+    console.log('processInput called', { input: effectiveText, hasImage: !!attachedImage, isProcessing });
     
-    if (!input.trim() && !attachedImage) {
+    if (!effectiveText && !attachedImage) {
       setError('Please enter text or attach an image');
       return;
     }
 
     // Wiring should be chat-driven and flexible: do NOT force users into a "query" UX.
     // If on a vehicle page and the message looks wiring-related, open the Wiring Workbench panel instead.
-    if (!attachedImage && currentVehicleData && isWiringIntent(input.trim())) {
-      const msg = input.trim();
+    if (!attachedImage && currentVehicleData && isWiringIntent(effectiveText)) {
+      const msg = effectiveText;
       setShowPreview(false);
       setExtractionPreview(null);
       setError(null);
@@ -430,14 +490,20 @@ export default function AIDataIngestionSearch() {
       return;
     }
 
-    if (!attachedImage && looksLikeNaturalLanguageSearch(input.trim())) {
-      const searchQuery = input.trim();
+    if (!attachedImage && looksLikeNaturalLanguageSearch(effectiveText)) {
+      const searchQuery = effectiveText;
       setInput('');
       setShowPreview(false);
       setExtractionPreview(null);
       setActionsOpen(false);
       setError(null);
       navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+      return;
+    }
+
+    // If this is an org website URL, do the fast path immediately (non-LLM intake + queued synopsis).
+    if (!attachedImage && normalizedUrl && isLikelyOrgWebsiteUrl(normalizedUrl)) {
+      await createOrgFromUrlAndNavigate(normalizedUrl);
       return;
     }
 
@@ -458,38 +524,41 @@ export default function AIDataIngestionSearch() {
       let extractionResult: ExtractionResult;
       if (attachedImage) {
         // Process image with optional text context
-        extractionResult = await aiDataIngestion.extractData(attachedImage, userId, input.trim() || undefined);
+        extractionResult = await aiDataIngestion.extractData(attachedImage, userId, rawText || undefined);
       } else {
         // Just text
-        extractionResult = await aiDataIngestion.extractData(input, userId);
+        extractionResult = await aiDataIngestion.extractData(effectiveText, userId);
       }
 
       // Handle organization website URLs
       if (extractionResult.inputType === 'url' && extractionResult.rawData?.organization) {
         const org = extractionResult.rawData.organization;
         const exists = extractionResult.rawData.exists;
+        const orgId = org?.id;
         
-        // Show preview with organization info
-        setExtractionPreview({
-          result: extractionResult,
-        });
-        setShowPreview(true);
-        setError(null);
-        setIsProcessing(false);
-        
-        // If organization exists, show message
-        if (exists) {
-          showToast(`Organization "${org.name}" already exists`, 'info');
-        } else {
-          showToast(`Organization "${org.name || 'Unknown'}" has been created`, 'success');
+        if (orgId) {
+          setInput('');
+          setShowPreview(false);
+          setExtractionPreview(null);
+          setActionsOpen(false);
+          setError(null);
+          setIsProcessing(false);
+
+          if (exists) {
+            showToast(`Organization "${org.name}" already exists`, 'info');
+          } else {
+            showToast(`Organization "${org.name || 'Unknown'}" has been created`, 'success');
+          }
+
+          navigate(`/org/${orgId}`);
+          return;
         }
-        return;
       }
 
       // Handle organization/garage search queries
       if (extractionResult.inputType === 'org_search') {
         // Navigate to unified search page with search query
-        const searchQuery = extractionResult.rawData?.query || input;
+        const searchQuery = extractionResult.rawData?.query || effectiveText;
         // Clear input and close preview
         setInput('');
         setShowPreview(false);
@@ -503,7 +572,7 @@ export default function AIDataIngestionSearch() {
       // Handle vehicle/image search queries differently
       if (extractionResult.inputType === 'search') {
         // Navigate to unified search page with search query
-        const searchQuery = extractionResult.rawData?.query || input;
+        const searchQuery = extractionResult.rawData?.query || effectiveText;
         // Clear input and close preview
         setInput('');
         setShowPreview(false);
@@ -540,7 +609,7 @@ export default function AIDataIngestionSearch() {
             
             const matchResult = await vehicleImageMatcher.matchListingToVehicle(
               matchingVehicleId,
-              input.trim(),
+              effectiveText,
               userId
             );
 
@@ -568,7 +637,7 @@ export default function AIDataIngestionSearch() {
                 userId,
                 {
                   source: extractionResult.source || 'url',
-                  listingUrl: input.trim(),
+                  listingUrl: effectiveText,
                   seller: extractionResult.rawData?.seller,
                   location: extractionResult.vehicleData.location
                 }
@@ -596,7 +665,7 @@ export default function AIDataIngestionSearch() {
             userId,
             {
               source: extractionResult.source || 'url',
-              listingUrl: input.trim(),
+              listingUrl: effectiveText,
               seller: extractionResult.rawData?.seller,
               location: extractionResult.vehicleData.location
             }
@@ -631,7 +700,7 @@ export default function AIDataIngestionSearch() {
           );
         } else {
           // If we don't have required fields, treat as search query instead
-          const searchQuery = input.trim();
+          const searchQuery = effectiveText;
           setInput('');
           setShowPreview(false);
           setExtractionPreview(null);
@@ -654,7 +723,7 @@ export default function AIDataIngestionSearch() {
       // If AI services are down (Gateway/edge function), still allow basic search for text-only input.
       // This keeps "header search" usable even when extraction is unavailable.
       if (!attachedImage && input.trim()) {
-        const searchQuery = input.trim();
+        const searchQuery = effectiveText;
         showToast('AI extraction unavailable. Running basic search instead.', 'warning');
         setInput('');
         setShowPreview(false);
@@ -785,12 +854,17 @@ export default function AIDataIngestionSearch() {
       console.log('Enter pressed, processing input', { showPreview, input: input.trim() });
       if (!showPreview) {
         const trimmedInput = input.trim();
+        const maybeUrl = normalizeUrlInput(trimmedInput);
         // If it's a simple text query (not VIN, not URL), navigate directly to search
-        if (trimmedInput && !trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !trimmedInput.match(/^https?:\/\//i)) {
+        if (trimmedInput && !trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
           // Simple text search - navigate immediately
           navigate(`/search?q=${encodeURIComponent(trimmedInput)}`);
           setInput('');
           return;
+        }
+        // Normalize URL-like inputs so the downstream extractor/router sees a real URL.
+        if (maybeUrl && maybeUrl !== trimmedInput) {
+          setInput(maybeUrl);
         }
         // Otherwise, process through AI extraction
         processInput();
@@ -814,11 +888,58 @@ export default function AIDataIngestionSearch() {
       navigate(`/vehicle/${result.id}`);
       setInput('');
     } else if (result.type === 'organization') {
-      navigate(`/organization/${result.id}`);
+      navigate(`/org/${result.id}`);
       setInput('');
     } else {
       // For VIN or URL, just set the input
       setInput(result.title);
+    }
+  };
+
+  const createOrgFromUrlAndNavigate = async (url: string) => {
+    // Guard against re-entry (paste can fire quickly)
+    if (isProcessing) return;
+
+    try {
+      setIsProcessing(true);
+      setError(null);
+      setShowAutocomplete(false);
+      setSelectedAutocompleteIndex(-1);
+      setActionsOpen(false);
+      setShowPreview(false);
+      setExtractionPreview(null);
+
+      const userId = await getCurrentUserId();
+      if (!userId) {
+        setError('Please log in to use this feature');
+        return;
+      }
+
+      const { data, error: fnError } = await supabase.functions.invoke('create-org-from-url', {
+        body: {
+          url,
+          queue_synopsis: true,
+          queue_site_mapping: false,
+        }
+      });
+
+      if (fnError) throw fnError;
+      if (!data?.success || !data?.organization_id) {
+        throw new Error(data?.error || 'Failed to create organization from URL');
+      }
+
+      setInput('');
+      setAttachedImage(null);
+      setImagePreview(null);
+
+      const created = !!data.created;
+      showToast(created ? 'Organization created' : 'Organization found', created ? 'success' : 'info');
+      navigate(`/org/${data.organization_id}`);
+    } catch (err: any) {
+      console.error('Create org from URL error:', err);
+      setError(err?.message || 'Failed to create organization from URL');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -864,6 +985,22 @@ export default function AIDataIngestionSearch() {
           onChange={(e) => {
             setInput(e.target.value);
             setShowAutocomplete(true);
+          }}
+          onPaste={(e) => {
+            const pasted = e.clipboardData?.getData('text') || '';
+            const normalized = normalizeUrlInput(pasted);
+            if (!normalized) return;
+
+            // Always normalize URL-like pastes to keep routing deterministic.
+            e.preventDefault();
+            setInput(normalized);
+            setShowAutocomplete(false);
+            setSelectedAutocompleteIndex(-1);
+
+            // If it's an org website URL, auto-create immediately (no extra click/enter).
+            if (!attachedImage && !showPreview && isLikelyOrgWebsiteUrl(normalized)) {
+              void createOrgFromUrlAndNavigate(normalized);
+            }
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
@@ -1202,7 +1339,7 @@ export default function AIDataIngestionSearch() {
           {extractionPreview.result.rawData?.organization && (
             <div style={{ marginBottom: '12px', fontSize: '8pt' }}>
               <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                {extractionPreview.result.rawData.exists ? '✅ Organization Found' : '🆕 Organization Created'}
+                {extractionPreview.result.rawData.exists ? 'Organization Found' : 'Organization Created'}
               </div>
               <div style={{ paddingLeft: '8px' }}>
                 <div style={{ fontWeight: 'bold' }}>
@@ -1223,7 +1360,7 @@ export default function AIDataIngestionSearch() {
                     <button
                       type="button"
                       onClick={() => {
-                        navigate(`/organization/${extractionPreview.result.rawData.organization.id}`);
+                        navigate(`/org/${extractionPreview.result.rawData.organization.id}`);
                         setShowPreview(false);
                         setInput('');
                       }}

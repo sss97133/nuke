@@ -26,6 +26,7 @@ const AllVehicles: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [currentFilters, setCurrentFilters] = useState<SearchFilters>({});
+  const [totalMatchingVehicles, setTotalMatchingVehicles] = useState<number | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [stats, setStats] = useState({
     totalVehicles: 0,
@@ -65,6 +66,50 @@ const AllVehicles: React.FC = () => {
     };
   }, []);
 
+  const canComputeTotalCountForFilters = (filters: SearchFilters) => {
+    // We currently compute totals only for make/model (plus "no filters").
+    // If other filters are active, the total count can diverge from visible results.
+    return !(
+      filters.yearFrom ||
+      filters.yearTo ||
+      filters.priceFrom ||
+      filters.priceTo ||
+      filters.zipCode ||
+      filters.radius ||
+      filters.forSale ||
+      filters.textSearch
+    );
+  };
+
+  const loadTotalCountForFilters = async (filters: SearchFilters) => {
+    if (!canComputeTotalCountForFilters(filters)) {
+      setTotalMatchingVehicles(null);
+      return;
+    }
+
+    try {
+      const makePrefix = filters.make ? String(filters.make).trim() : null;
+      const modelContains = filters.model ? String(filters.model).trim() : null;
+
+      const { data, error } = await supabase.rpc('get_total_vehicle_count', {
+        make_prefix: makePrefix && makePrefix.length > 0 ? makePrefix : null,
+        model_contains: modelContains && modelContains.length > 0 ? modelContains : null
+      });
+
+      if (error) {
+        console.warn('Failed to load total vehicle count:', error);
+        setTotalMatchingVehicles(null);
+        return;
+      }
+
+      const n = data == null ? null : Number(data);
+      setTotalMatchingVehicles(n != null && Number.isFinite(n) ? n : null);
+    } catch (e) {
+      console.warn('Failed to load total vehicle count:', e);
+      setTotalMatchingVehicles(null);
+    }
+  };
+
   const loadInitialData = async () => {
     try {
       setLoading(true);
@@ -73,6 +118,7 @@ const AllVehicles: React.FC = () => {
       const vehicles = await VehicleSearchService.searchVehicles({});
       setVehicles(vehicles);
       setFilteredVehicles(vehicles);
+      loadTotalCountForFilters({});
       
       // Load platform statistics
       await loadPlatformStats();
@@ -181,6 +227,7 @@ const AllVehicles: React.FC = () => {
       const results = await VehicleSearchService.searchVehicles(filters);
       setFilteredVehicles(results);
       setSearchSummary(SearchHelpers.formatSearchSummary(filters));
+      loadTotalCountForFilters(filters);
       
       // Update URL with search parameters for sharing
       const searchUrl = SearchHelpers.generateSearchUrl(filters);
@@ -197,6 +244,7 @@ const AllVehicles: React.FC = () => {
     setFilteredVehicles(vehicles);
     setSearchSummary('All vehicles');
     window.history.replaceState({}, '', '/all-vehicles');
+    loadTotalCountForFilters({});
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -301,7 +349,28 @@ const AllVehicles: React.FC = () => {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h2 className="text-xs font-semibold text-black">Search Results</h2>
-                  <p className="text-xs text-black mb-4">Found {filteredVehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''}</p>
+                  {(() => {
+                    const visible = filteredVehicles.length;
+                    const total = totalMatchingVehicles;
+                    const hidden = total != null ? Math.max(0, total - visible) : 0;
+                    const showTotal = total != null && total >= visible;
+                    return (
+                      <div className="mb-4">
+                        <p className="text-xs text-black">
+                          Found{' '}
+                          {showTotal
+                            ? `${visible.toLocaleString()} of ${total.toLocaleString()}`
+                            : visible.toLocaleString()}{' '}
+                          vehicle{(showTotal ? total : visible) !== 1 ? 's' : ''}
+                        </p>
+                        {hidden > 0 && (
+                          <p className="text-xs text-black mt-1">
+                            {hidden.toLocaleString()} private/non-public vehicle{hidden !== 1 ? 's' : ''} shown blurred
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <p className="text-xs text-black mt-1">
                     {searchSummary}
                   </p>
@@ -346,7 +415,12 @@ const AllVehicles: React.FC = () => {
               ) : (
                 <>
                   {/* Empty State */}
-                  {filteredVehicles.length === 0 ? (
+                  {(() => {
+                    const visible = filteredVehicles.length;
+                    const total = totalMatchingVehicles;
+                    const hidden = total != null ? Math.max(0, total - visible) : 0;
+                    return visible === 0 && hidden === 0;
+                  })() ? (
                     <div className="card">
                       <div className="card-body text-center py-12">
                         <div className="text-xs mb-4 text-black">No Results</div>
@@ -378,84 +452,232 @@ const AllVehicles: React.FC = () => {
                   ) : (
                     /* Vehicle Grid */
                     <div className="vehicle-grid">
-                      {filteredVehicles.map((vehicle) => (
-                        <div key={vehicle.id} className="vehicle-card vehicle-card-compact">
-                          <Link to={`/vehicle/${vehicle.id}`} className="vehicle-thumbnail-link">
-                            <VehicleThumbnail vehicleId={vehicle.id} />
-                            {/* Live Stream Status */}
-                            {vehicle.is_streaming && (
-                              <div className="live-indicator">
-                                <span className="live-dot"></span>
-                                LIVE
-                              </div>
-                            )}
-                          </Link>
+                      {(() => {
+                        const visible = filteredVehicles.length;
+                        const total = totalMatchingVehicles;
+                        const hidden = total != null ? Math.max(0, total - visible) : 0;
+                        const placeholderCap = 12;
+                        const placeholderCount = Math.min(hidden, placeholderCap);
+                        const remaining = Math.max(0, hidden - placeholderCount);
+                        const showLoginLink = !session;
 
-                          <div className="vehicle-info-compact">
-                            {/* YMM - Year Make Model (core info) - prefer normalized_model */}
-                            <h3 className="vehicle-title-compact">
-                              {vehicle.year} {vehicle.make} {vehicle.normalized_model || vehicle.model}
-                            </h3>
-
-                            {/* Owner (clickable), Price, Hype */}
-                            <div className="vehicle-meta-row">
-                              <Link
-                                to={`/profile/${vehicle.profiles?.username || vehicle.uploaded_by}`}
-                                className="owner-link"
-                                onClick={(e) => e.stopPropagation()}
+                        const PlaceholderCard = ({ idx }: { idx: number }) => (
+                          <div
+                            key={`private-placeholder-${idx}`}
+                            className="vehicle-card vehicle-card-compact"
+                            style={{ cursor: showLoginLink ? 'pointer' : 'default' }}
+                            onClick={() => {
+                              if (showLoginLink) navigate('/login');
+                            }}
+                            title={showLoginLink ? 'Sign in to request access' : 'Private vehicle'}
+                          >
+                            <div className="vehicle-thumbnail-link" style={{ position: 'relative' }}>
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  backgroundImage: 'url(/n-zero.png)',
+                                  backgroundSize: 'cover',
+                                  backgroundPosition: 'center',
+                                  filter: 'blur(18px)',
+                                  opacity: 0.45,
+                                }}
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  background: 'rgba(0,0,0,0.35)',
+                                }}
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'white',
+                                  fontWeight: 700,
+                                  fontSize: '10px',
+                                  letterSpacing: '0.04em',
+                                }}
                               >
-                                {getUserDisplay(vehicle)}
-                              </Link>
-
-                              {/* Price */}
-                              <span className="price-display">
-                                {(() => {
-                                  // Use proper price hierarchy: sale_price > asking_price > current_value > purchase_price > msrp
-                                  const price = vehicle.sale_price 
-                                    || (vehicle.is_for_sale && vehicle.asking_price)
-                                    || vehicle.current_value
-                                    || vehicle.purchase_price
-                                    || vehicle.msrp;
-                                  
-                                  if (price) {
-                                    return `$${price.toLocaleString()}`;
-                                  }
-                                  
-                                  if (vehicle.is_for_sale) {
-                                    return 'Price TBA';
-                                  }
-                                  
-                                  return '';
-                                })()}
-                              </span>
-                            </div>
-
-                            {/* Compact metrics row */}
-                            <div className="vehicle-metrics-compact">
-                              {/* Hype Meter */}
-                              <div className="hype-meter">
-                                <div
-                                  className="hype-bar"
-                                  style={{width: `${calculateHype(vehicle)}%`}}
-                                  title={`Hype: ${calculateHype(vehicle)}%`}
-                                ></div>
-                                <span className="hype-text">🔥</span>
+                                PRIVATE
                               </div>
-
-                              {/* Date (smart formatting) */}
-                              <span className="date-compact">
-                                {formatTimeAgo(vehicle.created_at)}
-                              </span>
-
-                              {/* Status badges */}
-                              <div className="status-badges">
-                                {vehicle.is_for_sale && <span className="status-sale">$</span>}
-                                {vehicle.ownership_verified && <span className="status-verified">✓</span>}
+                            </div>
+                            <div className="vehicle-info-compact">
+                              <h3 className="vehicle-title-compact" style={{ filter: 'blur(2px)', userSelect: 'none' }}>
+                                Private Vehicle
+                              </h3>
+                              <div className="text-xs text-black" style={{ opacity: 0.7 }}>
+                                {showLoginLink ? 'Sign in to unlock' : 'Access restricted'}
                               </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+
+                        const RemainingCard = () => (
+                          <div
+                            key="private-placeholder-remaining"
+                            className="vehicle-card vehicle-card-compact"
+                            style={{ cursor: 'default' }}
+                          >
+                            <div className="vehicle-thumbnail-link" style={{ position: 'relative' }}>
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  background: 'linear-gradient(135deg, rgba(0,0,0,0.75), rgba(0,0,0,0.35))',
+                                }}
+                              />
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'white',
+                                  fontWeight: 800,
+                                  fontSize: '10px',
+                                  letterSpacing: '0.04em',
+                                }}
+                              >
+                                +{remaining.toLocaleString()} MORE
+                              </div>
+                            </div>
+                            <div className="vehicle-info-compact">
+                              <h3 className="vehicle-title-compact" style={{ filter: 'blur(2px)', userSelect: 'none' }}>
+                                Private Vehicles
+                              </h3>
+                              <div className="text-xs text-black" style={{ opacity: 0.7 }}>
+                                Not shown individually
+                              </div>
+                            </div>
+                          </div>
+                        );
+
+                        return (
+                          <>
+                            {filteredVehicles.map((vehicle) => (
+                              <div key={vehicle.id} className="vehicle-card vehicle-card-compact">
+                                <Link to={`/vehicle/${vehicle.id}`} className="vehicle-thumbnail-link">
+                                  {/* Private vehicle thumbnail blur */}
+                                  <div
+                                    style={{
+                                      position: 'absolute',
+                                      inset: 0,
+                                      filter: vehicle.is_public === false ? 'blur(10px)' : undefined,
+                                      opacity: vehicle.is_public === false ? 0.8 : 1,
+                                    }}
+                                  >
+                                    <VehicleThumbnail vehicleId={vehicle.id} />
+                                  </div>
+
+                                  {vehicle.is_public === false && (
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        top: 4,
+                                        left: 4,
+                                        background: 'rgba(0,0,0,0.75)',
+                                        color: 'white',
+                                        padding: '2px 6px',
+                                        borderRadius: 2,
+                                        fontSize: 8,
+                                        fontWeight: 800,
+                                        letterSpacing: '0.04em',
+                                      }}
+                                    >
+                                      PRIVATE
+                                    </div>
+                                  )}
+
+                                  {/* Live Stream Status */}
+                                  {vehicle.is_streaming && (
+                                    <div className="live-indicator">
+                                      <span className="live-dot"></span>
+                                      LIVE
+                                    </div>
+                                  )}
+                                </Link>
+
+                                <div className="vehicle-info-compact">
+                                  {/* YMM - Year Make Model (core info) - prefer normalized_model */}
+                                  <h3 className="vehicle-title-compact">
+                                    {vehicle.year} {vehicle.make} {vehicle.normalized_model || vehicle.model}
+                                  </h3>
+
+                                  {/* Owner (clickable), Price, Hype */}
+                                  <div className="vehicle-meta-row">
+                                    <Link
+                                      to={`/profile/${vehicle.profiles?.username || vehicle.uploaded_by}`}
+                                      className="owner-link"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {getUserDisplay(vehicle)}
+                                    </Link>
+
+                                    {/* Price */}
+                                    <span className="price-display">
+                                      {(() => {
+                                        // Use proper price hierarchy: sale_price > asking_price > current_value > purchase_price > msrp
+                                        const price = vehicle.sale_price 
+                                          || (vehicle.is_for_sale && vehicle.asking_price)
+                                          || vehicle.current_value
+                                          || vehicle.purchase_price
+                                          || vehicle.msrp;
+                                        
+                                        if (price) {
+                                          return `$${price.toLocaleString()}`;
+                                        }
+                                        
+                                        if (vehicle.is_for_sale) {
+                                          return 'Price TBA';
+                                        }
+                                        
+                                        return '';
+                                      })()}
+                                    </span>
+                                  </div>
+
+                                  {/* Compact metrics row */}
+                                  <div className="vehicle-metrics-compact">
+                                    {/* Hype Meter */}
+                                    <div className="hype-meter">
+                                      <div
+                                        className="hype-bar"
+                                        style={{width: `${calculateHype(vehicle)}%`}}
+                                        title={`Hype: ${calculateHype(vehicle)}%`}
+                                      ></div>
+                                      <span className="hype-text">🔥</span>
+                                    </div>
+
+                                    {/* Date (smart formatting) */}
+                                    <span className="date-compact">
+                                      {formatTimeAgo(vehicle.created_at)}
+                                    </span>
+
+                                    {/* Status badges */}
+                                    <div className="status-badges">
+                                      {vehicle.is_for_sale && <span className="status-sale">$</span>}
+                                      {vehicle.ownership_verified && <span className="status-verified">✓</span>}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+
+                            {hidden > 0 &&
+                              Array.from({ length: placeholderCount }).map((_, i) => (
+                                <PlaceholderCard idx={i} key={`ph-${i}`} />
+                              ))}
+
+                            {remaining > 0 && <RemainingCard />}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
                 </>
