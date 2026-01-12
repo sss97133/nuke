@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -291,6 +292,7 @@ serve(async (req) => {
 
     // Upsert external listing for marketplace
     const listingId = extractListingId(u);
+    const listingUrlKey = normalizeListingUrlKey(url);
     const { data: ext, error: extErr } = await supabase
       .from('external_listings')
       .upsert(
@@ -299,6 +301,7 @@ serve(async (req) => {
           organization_id: organizationId,
           platform: 'classic_com',
           listing_url: url,
+          listing_url_key: listingUrlKey,
           listing_id: listingId,
           listing_status: listingStatus,
           end_date: endDateIso,
@@ -311,7 +314,7 @@ serve(async (req) => {
           },
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'vehicle_id,platform,listing_id' },
+        { onConflict: 'platform,listing_url_key' },
       )
       .select('id')
       .single();

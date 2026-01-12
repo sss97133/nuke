@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 import { normalizeListingLocation } from "../_shared/normalizeListingLocation.ts";
 import { extractGalleryImagesFromHtml } from "../_shared/batDomMap.ts";
+import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -3593,6 +3594,12 @@ serve(async (req) => {
             // Use the same organization_id as the vehicle
             const orgId = organizationId || null;
             
+            const listingUrlKey = normalizeListingUrlKey(item.listing_url);
+            const listingIdFallback = (() => {
+              const trimmed = String(item.listing_url || '').trim().replace(/\/+$/, '');
+              const last = trimmed.split('/').filter(Boolean).pop() || null;
+              return last;
+            })();
             const { error: externalListingError } = await supabase
               .from('external_listings')
               .upsert({
@@ -3600,7 +3607,8 @@ serve(async (req) => {
                 organization_id: orgId || null, // Can be null for imported BaT auctions
                 platform: 'bat',
                 listing_url: item.listing_url,
-                listing_id: lotNumber || item.listing_url.split('/').pop() || null,
+                listing_url_key: listingUrlKey,
+                listing_id: lotNumber || listingIdFallback || listingUrlKey || null,
                 listing_status: 'active',
                 start_date: startDate || new Date().toISOString(), // Use calculated start_date, fallback to now
                 end_date: scrapeData.data.auction_end_date,
@@ -3613,7 +3621,7 @@ serve(async (req) => {
                   is_live: true
                 }
               }, {
-                onConflict: 'vehicle_id,platform,listing_id'
+                onConflict: 'platform,listing_url_key'
               });
 
             if (externalListingError) {

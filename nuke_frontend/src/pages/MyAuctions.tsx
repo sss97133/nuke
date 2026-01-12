@@ -266,7 +266,7 @@ const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, type, listings
   const platformColors: Record<string, string> = {
     nzero: '#0000ff',
     bat: '#8b0000',
-    ebay: '#0064d2',
+    ebay_motors: '#0064d2',
     cars_and_bids: '#ff6b35',
     hemmings: '#000000',
     autotrader: '#00a0df',
@@ -927,7 +927,7 @@ const MyAuctions: React.FC = () => {
           <option value="all">All Platforms</option>
           <option value="nzero">n-zero</option>
           <option value="bat">Bring a Trailer</option>
-          <option value="ebay">eBay Motors</option>
+          <option value="ebay_motors">eBay Motors</option>
           <option value="cars_and_bids">Cars & Bids</option>
           <option value="hemmings">Hemmings</option>
           <option value="autotrader">AutoTrader</option>

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
+import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 
 /**
  * EXTRACT PREMIUM AUCTION - WORKING MULTI-SITE EXTRACTOR
@@ -4126,14 +4127,17 @@ async function storeVehiclesInDatabase(
               }
             }
             
-            // Determine listing status
-            let listingStatus = 'ended';
+            const listingUrlKey = normalizeListingUrlKey(listingUrl);
+            
+            // Determine listing status (external_listings has a strict CHECK constraint)
+            // Keep this generic. RNM/no-sale semantics belong in auction_events.outcome + metadata.reserve_status.
+            let listingStatus: 'pending' | 'active' | 'ended' | 'sold' | 'cancelled' = 'ended';
             if (endDateIso && new Date(endDateIso) > new Date()) {
               listingStatus = 'active';
             } else if (vehicle.sale_price || vehicle.final_bid) {
               listingStatus = 'sold';
-            } else if (vehicle.reserve_met === false) {
-              listingStatus = 'reserve_not_met';
+            } else {
+              listingStatus = 'ended';
             }
             
             // Determine final price (priority: sale_price > final_bid > current_bid > high_bid)
@@ -4145,13 +4149,14 @@ async function storeVehiclesInDatabase(
             // Store ALL extracted images in metadata for fallback display
             const extractedImages = Array.isArray(vehicle.images) ? vehicle.images : [];
 
-            const { data: existingListing } = await supabase
-              .from('external_listings')
-              .select('id,current_bid,final_price,bid_count,watcher_count,view_count,start_date,end_date,sold_at,metadata')
-              .eq('vehicle_id', data.id)
-              .eq('platform', platform)
-              .eq('listing_id', listingId)
-              .maybeSingle();
+            const { data: existingListing } = listingUrlKey
+              ? await supabase
+                  .from('external_listings')
+                  .select('id,vehicle_id,current_bid,final_price,bid_count,watcher_count,view_count,start_date,end_date,sold_at,metadata')
+                  .eq('platform', platform)
+                  .eq('listing_url_key', listingUrlKey)
+                  .maybeSingle()
+              : { data: null as any };
 
             const existingMeta = (existingListing?.metadata as any) || {};
             const existingImages = Array.isArray(existingMeta?.images) ? existingMeta.images : [];
@@ -4172,6 +4177,7 @@ async function storeVehiclesInDatabase(
                 organization_id: sourceOrgId,
                 platform: platform,
                 listing_url: listingUrl,
+                listing_url_key: listingUrlKey,
                 listing_status: listingStatus,
                 listing_id: listingId,
                 start_date: mergedStartDate,
@@ -4205,7 +4211,7 @@ async function storeVehiclesInDatabase(
                 },
                 updated_at: nowIso(),
               }, {
-                onConflict: 'vehicle_id,platform,listing_id',
+                onConflict: 'platform,listing_url_key',
               });
           } catch (e: any) {
             console.warn(`external_listings upsert failed (non-fatal): ${e?.message || String(e)}`);
