@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
     const cutoffIso = new Date(Date.now() - minAgeHours * 60 * 60 * 1000).toISOString();
     const { data: vehicles, error: vErr } = await admin
       .from("vehicles")
-      .select("id,created_at,updated_at,listing_url,discovery_url,bat_auction_url,profile_origin,discovery_source,description,listing_location,origin_metadata")
+      .select("id,created_at,updated_at,listing_url,discovery_url,bat_auction_url,profile_origin,discovery_source,description,listing_location,origin_metadata,sale_price,reserve_status,color,interior_color,body_style")
       .or(
         "profile_origin.eq.bat_import,discovery_source.eq.bat_import,listing_url.ilike.%bringatrailer.com/listing/%,discovery_url.ilike.%bringatrailer.com/listing/%,bat_auction_url.ilike.%bringatrailer.com/listing/%"
       )
@@ -135,6 +135,15 @@ Deno.serve(async (req) => {
 
       const descLen = String(v.description || "").trim().length;
       const hasLocation = String(v.listing_location || "").trim().length > 0;
+      const descLower = String(v.description || "").toLowerCase();
+      const mentionsNoReserve = descLower.includes("no reserve");
+      const salePriceNum = Number((v as any)?.sale_price || 0);
+      const hasSalePrice = Number.isFinite(salePriceNum) && salePriceNum > 0;
+      const needsNoReserveSaleFix = mentionsNoReserve && !hasSalePrice;
+
+      const hasColor = String((v as any)?.color || "").trim().length > 0;
+      const hasInteriorColor = String((v as any)?.interior_color || "").trim().length > 0;
+      const hasBodyStyle = String((v as any)?.body_style || "").trim().length > 0;
 
       const [{ count: imageCount }, { count: commentCount }] = await Promise.all([
         admin.from("vehicle_images").select("id", { count: "exact", head: true }).eq("vehicle_id", v.id),
@@ -145,7 +154,11 @@ Deno.serve(async (req) => {
         (imageCount || 0) === 0 ||
         descLen < 80 ||
         !hasLocation ||
-        (commentCount || 0) === 0;
+        (commentCount || 0) === 0 ||
+        needsNoReserveSaleFix ||
+        !hasColor ||
+        !hasInteriorColor ||
+        !hasBodyStyle;
 
       if (!needsRepair) {
         out.skipped++;
@@ -167,6 +180,10 @@ Deno.serve(async (req) => {
               description_len: descLen,
               has_location: hasLocation,
               auction_comments: commentCount || 0,
+              no_reserve_missing_sale_price: needsNoReserveSaleFix,
+              has_color: hasColor,
+              has_interior_color: hasInteriorColor,
+              has_body_style: hasBodyStyle,
             },
           });
         }
@@ -180,6 +197,16 @@ Deno.serve(async (req) => {
           ...((om as any)?.bat_repair || {}),
           last_attempt_at: safeNowIso(),
           attempts: Number((om as any)?.bat_repair?.attempts || 0) + 1,
+          last_reasons: {
+            images: imageCount || 0,
+            description_len: descLen,
+            has_location: hasLocation,
+            auction_comments: commentCount || 0,
+            no_reserve_missing_sale_price: needsNoReserveSaleFix,
+            has_color: hasColor,
+            has_interior_color: hasInteriorColor,
+            has_body_style: hasBodyStyle,
+          },
         },
       };
       await admin.from("vehicles").update({ origin_metadata: nextOmAttempt, updated_at: safeNowIso() }).eq("id", v.id).catch(() => null);

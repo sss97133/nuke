@@ -38,6 +38,18 @@ test.describe('Homepage filter bar', () => {
 
     await expect(vehicleLinks).toHaveCount(0, { timeout: 20000 });
 
+    // Collapse the filter panel, then ensure the minimized bar can reopen it.
+    const hideBtn = page.getByRole('button', { name: /^hide$/i }).first();
+    if (await hideBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await hideBtn.click();
+      const miniBar = page.locator('[title="Click to open filters"]').first();
+      await expect(miniBar).toBeVisible({ timeout: 10000 });
+
+      // Clicking the minimized bar should reopen filters.
+      await miniBar.click();
+      await expect(page.getByPlaceholder(/min year/i).first()).toBeVisible({ timeout: 20000 });
+    }
+
     // Reset should bring results back.
     const resetBtn = page.getByRole('button', { name: /^reset$/i }).first();
     await resetBtn.click();

@@ -2865,7 +2865,16 @@ const CursorHomepage: React.FC = () => {
         {filterBarMinimized && (
           <div
             onClick={openFiltersFromMiniBar}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openFiltersFromMiniBar();
+              }
+            }}
             title="Click to open filters"
+            role="button"
+            tabIndex={0}
+            aria-label="Open filters"
             style={{
             position: 'sticky',
             top: 'var(--header-height, 40px)',
@@ -2914,7 +2923,6 @@ const CursorHomepage: React.FC = () => {
 
             {/* Scrollable strip: selected filters + market pogs */}
             <div
-              onClick={(e) => e.stopPropagation()}
               style={{
                 flex: '1 1 auto',
                 minWidth: 0,

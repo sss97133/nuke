@@ -302,7 +302,9 @@ function extractEssentials(html: string): {
   const win = essentialsIdx >= 0 ? h.slice(essentialsIdx, essentialsIdx + 300000) : h;
   const winText = stripTags(win).replace(/\s+/g, " ").trim();
   const fullText = stripTags(h).replace(/\s+/g, " ").trim();
-  const text = winText || fullText;
+  // NOTE: Some outcome/price strings (e.g. "Sold for $X") can live outside the essentials block.
+  // Use a combined view to avoid misclassifying sold listings as RNM/ended.
+  const text = `${winText} ${fullText}`.replace(/\s+/g, " ").trim();
 
   const sellerMatch =
     win.match(/<strong>Seller<\/strong>:\s*<a[^>]*href=["'][^"']*\/member\/([^"\/]+)\/?["'][^>]*>([^<]+)<\/a>/i) ||
@@ -379,6 +381,17 @@ function extractEssentials(html: string): {
         break;
       }
     }
+  }
+
+  // If we have a sold price, this listing cannot be RNM.
+  // Prefer explicit "No Reserve" when present; otherwise treat as reserve met.
+  if (sale_price && reserve_status === "reserve_not_met") {
+    const hasNoReserve = h.includes("no-reserve") || /\bNo Reserve\b/i.test(h);
+    reserve_status = hasNoReserve ? "no_reserve" : "reserve_met";
+  }
+  if (sale_price && !reserve_status) {
+    const hasNoReserve = h.includes("no-reserve") || /\bNo Reserve\b/i.test(h);
+    reserve_status = hasNoReserve ? "no_reserve" : "reserve_met";
   }
 
   // Listing Details list items (VIN/chassis, mileage, colors, transmission, engine)
@@ -526,6 +539,78 @@ function extractDescription(html: string): string | null {
     if (t && t.length > 40) return t;
   }
   return null;
+}
+
+function titleCaseWords(raw: string): string {
+  const s = String(raw || "").trim();
+  if (!s) return s;
+  return s
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(titleCaseToken)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function inferBodyStyleFromTitle(title: string | null): string | null {
+  const t = String(title || "").toLowerCase();
+  if (!t) return null;
+  if (/\bcoupe\b|\bcoupé\b/.test(t)) return "Coupe";
+  if (/\bconvertible\b|\bcabriolet\b|\bcab\b/.test(t)) return "Convertible";
+  if (/\broadster\b/.test(t)) return "Roadster";
+  if (/\bsedan\b/.test(t)) return "Sedan";
+  if (/\bwagon\b|\bestate\b/.test(t)) return "Wagon";
+  if (/\bhatchback\b/.test(t)) return "Hatchback";
+  if (/\bpickup\b|\btruck\b/.test(t)) return "Truck";
+  if (/\bsuv\b/.test(t)) return "SUV";
+  if (/\bvan\b/.test(t)) return "Van";
+  return null;
+}
+
+function inferColorsFromDescription(desc: string | null): { exterior_color: string | null; interior_color: string | null } {
+  const d = String(desc || "").replace(/\s+/g, " ").trim();
+  if (!d) return { exterior_color: null, interior_color: null };
+
+  let exterior: string | null = null;
+  let interior: string | null = null;
+
+  // Exterior color heuristics
+  const exteriorPatterns: RegExp[] = [
+    /\brefinished\s+in\s+([A-Za-z][A-Za-z\s/-]{2,50}?)(?=\s+(?:over|with|and)\b|[.,;]|$)/i,
+    /\bfinished\s+in\s+([A-Za-z][A-Za-z\s/-]{2,50}?)(?=\s+(?:over|with|and)\b|[.,;]|$)/i,
+    /\brepainted\s+in\s+([A-Za-z][A-Za-z\s/-]{2,50}?)(?=\s+(?:over|with|and)\b|[.,;]|$)/i,
+    /\bpainted\s+(?:in\s+)?([A-Za-z][A-Za-z\s/-]{2,50}?)(?=\s+(?:over|with|and)\b|[.,;]|$)/i,
+  ];
+  for (const re of exteriorPatterns) {
+    const m = d.match(re);
+    if (m?.[1]) {
+      const v = m[1].trim();
+      if (v.length >= 2 && v.length <= 60) {
+        exterior = titleCaseWords(v);
+        break;
+      }
+    }
+  }
+
+  // Interior color heuristics
+  const interiorPatterns: RegExp[] = [
+    /\bover\s+(?:a\s+)?(?:refreshed|retrimmed|refurbished|reupholstered|redone|replacement)?\s*([A-Za-z][A-Za-z\s/-]{2,40}?)\s+(?:leather|vinyl|cloth|interior|upholstery)\b/i,
+    /\b([A-Za-z][A-Za-z\s/-]{2,40}?)\s+(?:leather|vinyl|cloth)\s+interior\b/i,
+    /\binterior\s+is\s+(?:trimmed|finished|upholstered)\s+in\s+([A-Za-z][A-Za-z\s/-]{2,40}?)(?=\s+(?:leather|vinyl|cloth|upholstery)\b|[.,;]|$)/i,
+  ];
+  for (const re of interiorPatterns) {
+    const m = d.match(re);
+    if (m?.[1]) {
+      const v = m[1].trim();
+      if (v.length >= 2 && v.length <= 60) {
+        interior = titleCaseWords(v);
+        break;
+      }
+    }
+  }
+
+  return { exterior_color: exterior, interior_color: interior };
 }
 
 function upgradeBatImageUrl(url: string): string {
@@ -793,6 +878,11 @@ serve(async (req) => {
     const descriptionRaw = extractDescription(html);
     const description = normalizeDescriptionSummary(descriptionRaw);
     const images = extractImages(html);
+    const inferredBodyStyle = inferBodyStyleFromTitle(identity.title);
+    const inferredColors = inferColorsFromDescription((descriptionRaw || description) ?? null);
+    const bestExteriorColor = essentials.exterior_color || inferredColors.exterior_color;
+    const bestInteriorColor = essentials.interior_color || inferredColors.interior_color;
+    const bestListingLocation = essentials.location || null;
 
     // Resolve existing vehicle
     let vehicleId: string | null = providedVehicleId;
@@ -800,7 +890,7 @@ serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, sale_price, high_bid, auction_end_date, reserve_status")
+        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status")
         .in("discovery_url", urlCandidates)
         .limit(1)
         .maybeSingle();
@@ -812,7 +902,7 @@ serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, sale_price, high_bid, auction_end_date, reserve_status")
+        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status")
         .in("bat_auction_url", urlCandidates)
         .limit(1)
         .maybeSingle();
@@ -853,6 +943,7 @@ serve(async (req) => {
         bat_seller: essentials.seller_username || null,
         bat_buyer: essentials.buyer_username || null,
         bat_location: essentials.location || null,
+        listing_location: bestListingLocation,
         bat_lot_number: essentials.lot_number || null,
         bat_bids: essentials.bid_count || 0,
         bat_comments: essentials.comment_count || 0,
@@ -863,11 +954,12 @@ serve(async (req) => {
         sale_price: essentials.sale_price || null,
         high_bid: essentials.high_bid || null,
         mileage: essentials.mileage || null,
-        color: essentials.exterior_color || null,
-        interior_color: essentials.interior_color || null,
+        color: bestExteriorColor || null,
+        interior_color: bestInteriorColor || null,
         transmission: essentials.transmission || null,
         drivetrain: essentials.drivetrain || null,
         engine_size: essentials.engine || null,
+        body_style: inferredBodyStyle || null,
       };
 
       const { data: inserted, error } = await supabase.from("vehicles").insert(insertPayload).select("id").single();
@@ -879,7 +971,7 @@ serve(async (req) => {
       if (!existing) {
         const { data } = await supabase
           .from("vehicles")
-          .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, sale_price, high_bid, auction_end_date, reserve_status")
+          .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status")
           .eq("id", vehicleId)
           .maybeSingle();
         existing = data || null;
@@ -1003,18 +1095,20 @@ serve(async (req) => {
       if (!existing?.bat_seller && essentials.seller_username) updatePayload.bat_seller = essentials.seller_username;
       if (!existing?.bat_buyer && essentials.buyer_username) updatePayload.bat_buyer = essentials.buyer_username;
       if (!existing?.bat_location && essentials.location) updatePayload.bat_location = essentials.location;
+      if (!existing?.listing_location && bestListingLocation) updatePayload.listing_location = bestListingLocation;
       if (!existing?.bat_lot_number && essentials.lot_number) updatePayload.bat_lot_number = essentials.lot_number;
+      if (!existing?.body_style && inferredBodyStyle) updatePayload.body_style = inferredBodyStyle;
 
       if (!existing?.mileage && essentials.mileage) updatePayload.mileage = essentials.mileage;
       const existingColorPolluted = isPollutedSpec("color", existing?.color);
-      if ((!existing?.color || existingColorPolluted) && essentials.exterior_color) {
-        updatePayload.color = essentials.exterior_color;
+      if ((!existing?.color || existingColorPolluted) && bestExteriorColor) {
+        updatePayload.color = bestExteriorColor;
         updatePayload.color_source = "bring a trailer";
-      } else if (existingColorPolluted && !essentials.exterior_color) {
+      } else if (existingColorPolluted && !bestExteriorColor) {
         updatePayload.color = null;
         updatePayload.color_source = null;
       }
-      if (!existing?.interior_color && essentials.interior_color) updatePayload.interior_color = essentials.interior_color;
+      if (!existing?.interior_color && bestInteriorColor) updatePayload.interior_color = bestInteriorColor;
       const existingTransmissionPolluted = isPollutedSpec("transmission", existing?.transmission);
       if ((!existing?.transmission || existingTransmissionPolluted) && essentials.transmission) {
         updatePayload.transmission = essentials.transmission;
