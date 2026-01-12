@@ -100,11 +100,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   // Derive current owner (best guess) from BaT data
   const ownerGuess = useMemo(() => {
     const v = vehicle as any;
-    // Don't mark as sold if reserve_not_met or no_sale
-    const auctionOutcome = String(v?.auction_outcome || '').toLowerCase();
-    const isRNM = auctionOutcome === 'reserve_not_met' || auctionOutcome === 'no_sale';
-    const isSold = !isRNM && (v?.sale_status === 'sold' || (v?.sale_price > 0 && auctionOutcome === 'sold') || auctionOutcome === 'sold');
-    
+
+    const rawOutcome = String(v?.auction_outcome || '').toLowerCase();
+    const saleStatus = String(v?.sale_status || '').toLowerCase();
+    const pulseStatus = auctionPulse?.listing_url ? String((auctionPulse as any)?.listing_status || '').toLowerCase() : '';
+
+    const pulseFinal = parseMoneyNumber((auctionPulse as any)?.final_price);
+    const pulseSoldAt = (auctionPulse as any)?.sold_at ?? null;
+    const telemetryUnsold = pulseStatus === 'reserve_not_met' || pulseStatus === 'no_sale';
+    const telemetrySold = pulseStatus === 'sold' && (pulseFinal !== null || !!pulseSoldAt);
+    const vehicleUnsold = rawOutcome === 'reserve_not_met' || rawOutcome === 'no_sale';
+    const vehicleSold = saleStatus === 'sold' || rawOutcome === 'sold';
+
+    // Precedence: telemetry overrides stale vehicle fields (fixes cases where vehicles.auction_outcome is wrong).
+    // - If telemetry says SOLD, trust it even if vehicle says RNM.
+    // - If telemetry says RNM/NO SALE, trust it even if vehicle says SOLD.
+    const hasSoldSignal = telemetrySold || (!telemetryUnsold && vehicleSold);
+
     // Filter out obviously invalid/useless usernames
     const isValidUsername = (username: string | null | undefined): boolean => {
       if (!username || typeof username !== 'string') return false;
@@ -113,24 +125,57 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       const invalid = ['everyone', 'unknown', 'n/a', 'none', 'null', 'undefined', 'seller', 'buyer', 'owner', 'user', 'admin'];
       return u.length > 0 && !invalid.includes(u) && u.length >= 2;
     };
-    
+
+    const normalizeHandle = (raw: string | null | undefined): string | null => {
+      const h = String(raw || '').trim();
+      if (!h) return null;
+      const handle = h
+        .replace(/^@/, '')
+        .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
+        .replace(/\/+$/, '')
+        .trim();
+      return handle || null;
+    };
+
+    const seller =
+      normalizeHandle(
+        (auctionPulse as any)?.seller_username ||
+          (auctionPulse as any)?.metadata?.seller_username ||
+          (auctionPulse as any)?.metadata?.seller ||
+          v?.bat_seller ||
+          v?.origin_metadata?.bat_seller ||
+          v?.origin_metadata?.seller ||
+          null
+      ) || null;
+
+    const buyer =
+      normalizeHandle(
+        (auctionPulse as any)?.winner_name ||
+          (auctionPulse as any)?.metadata?.buyer_username ||
+          (auctionPulse as any)?.metadata?.buyer ||
+          (auctionPulse as any)?.winning_bidder_name ||
+          (auctionPulse as any)?.winner_display_name ||
+          v?.bat_buyer ||
+          v?.origin_metadata?.bat_buyer ||
+          v?.origin_metadata?.buyer ||
+          null
+      ) || null;
+
     // If sold, buyer is current owner; otherwise seller owns it
-    if (isSold) {
-      const buyer = v?.bat_buyer?.trim();
-      const seller = v?.bat_seller?.trim();
+    if (hasSoldSignal) {
       if (buyer && isValidUsername(buyer)) {
-        return { username: buyer, from: seller, role: 'buyer' };
+        const fromSeller = seller && isValidUsername(seller) ? seller : null;
+        return { username: buyer, from: fromSeller, role: 'buyer' };
       }
       return null;
     }
     
     // Not sold - seller is current owner (consigning)
-    const seller = v?.bat_seller?.trim();
     if (seller && isValidUsername(seller)) {
       return { username: seller, from: null, role: 'seller' };
     }
     return null;
-  }, [(vehicle as any)?.bat_buyer, (vehicle as any)?.bat_seller, (vehicle as any)?.sale_status, (vehicle as any)?.sale_price, (vehicle as any)?.auction_outcome]);
+  }, [vehicle, auctionPulse]);
 
   // Derive location display - prefer city codes (ATL, LAX, NYC) or state abbrev
   const locationDisplay = useMemo(() => {
@@ -2160,7 +2205,18 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowOwnerClaimDropdown(false);
-                            navigate(`/org/${ownerGuess.from?.toLowerCase().replace(/\s+/g, '-')}`);
+                            const raw = String(ownerGuess.from || '').trim();
+                            const handle = raw
+                              .replace(/^@/, '')
+                              .replace(/^https?:\/\/bringatrailer\.com\/member\//i, '')
+                              .replace(/\/+$/, '')
+                              .trim();
+                            if (handle) {
+                              const proofUrl = `https://bringatrailer.com/member/${handle}/`;
+                              navigate(
+                                `/claim-identity?platform=bat&handle=${encodeURIComponent(handle)}&profileUrl=${encodeURIComponent(proofUrl)}`
+                              );
+                            }
                           }}
                           style={{
                             background: 'transparent',
