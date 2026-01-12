@@ -15,6 +15,7 @@ interface Comment {
   author_username?: string;
   likes_count?: number;
   bid_amount?: number;
+  contains_bid?: boolean;
   listing?: any;  // bat_listings
   auction?: any;  // auction_events
   vehicle?: any;
@@ -118,8 +119,13 @@ export const ProfileCommentsTab: React.FC<ProfileCommentsTabProps> = ({ comments
           : commentText;
 
         const timestamp = comment.comment_timestamp || comment.posted_at;
-        // Check if this is a bid - skip it if so
-        const isBid = comment.bid_amount !== null && comment.bid_amount !== undefined || comment.contains_bid;
+        const commentTextLower = String(commentText || '').toLowerCase();
+        const type = String(comment.comment_type || '').toLowerCase();
+        const looksLikeSold = type === 'sold' || /\bsold\s+for\s+\$?\s*[\d,]+/i.test(commentTextLower);
+
+        const hasBidAmount = comment.bid_amount !== null && comment.bid_amount !== undefined;
+        const hasContainsBid = Boolean(comment.contains_bid);
+        const isBid = !looksLikeSold && (hasBidAmount || hasContainsBid);
         
         // Skip bids - they should be in the Bids tab
         if (isBid) return null;

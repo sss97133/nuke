@@ -312,26 +312,37 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
 
         for (const c of batCommentsResult.data) {
           const identity = identityMap.get(c.bat_username) || (c.external_identity_id ? externalIds?.find(e => e.id === c.external_identity_id) : null);
-          
-          // Extract bid amount from comment text if contains_bid is true
-          let bidAmount: number | undefined = undefined;
-          if (c.contains_bid) {
-            const bidMatch = c.comment_text.match(/\$?([\d,]+)/);
+
+          const commentText = String(c.comment_text || '');
+          const soldMatch = commentText.match(/\bsold\s+for\s+\$?\s*([\d,]+)/i);
+
+          // BaT can set contains_bid=true for "Sold for $X" comments. Treat those as SOLD (not BID).
+          let commentType: 'comment' | 'bid' | 'sold' = 'comment';
+          let amount: number | undefined = undefined;
+
+          if (soldMatch) {
+            commentType = 'sold';
+            const n = Number(String(soldMatch[1] || '').replace(/,/g, ''));
+            if (!Number.isNaN(n) && n > 0) amount = n;
+          } else if (c.contains_bid) {
+            commentType = 'bid';
+            const bidMatch = commentText.match(/\$?\s*([\d,]+)/);
             if (bidMatch) {
-              bidAmount = Number(bidMatch[1].replace(/,/g, ''));
+              const n = Number(String(bidMatch[1] || '').replace(/,/g, ''));
+              if (!Number.isNaN(n) && n > 0) amount = n;
             }
           }
-          
+
           allComments.push({
             id: `bat-comment-${c.id}`,
             user_id: identity?.claimed_by_user_id || null,
             author_username: c.bat_username,
-            comment_text: c.comment_text,
+            comment_text: commentText,
             created_at: c.comment_timestamp,
             posted_at: c.comment_timestamp,
             user_name: c.bat_username,
-            comment_type: c.contains_bid ? 'bid' : 'comment',
-            bid_amount: bidAmount,
+            comment_type: commentType,
+            bid_amount: amount,
             is_seller: c.is_seller_comment,
             source: 'bat',
             external_identity_id: identity?.id || c.external_identity_id,
@@ -598,14 +609,16 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             {visibleComments.map((comment) => {
               const displayDate = comment.posted_at || comment.created_at;
               // Check if this is a bid - either comment_type is 'bid' OR bid_amount is set
+              const type = String(comment.comment_type || '').toLowerCase();
+              const isSoldComment = type === 'sold';
               const hasBidAmount = comment.bid_amount != null && (typeof comment.bid_amount === 'number' ? comment.bid_amount > 0 : Number(comment.bid_amount) > 0);
-              const isBid = comment.comment_type === 'bid' || hasBidAmount;
+              const isBid = type === 'bid' || (!isSoldComment && hasBidAmount);
               const isBaT = comment.source === 'bat';
               const isAuction = comment.source === 'auction';
               const auctionPlatform = (comment as any).auction_platform ? String((comment as any).auction_platform) : null;
               
-              // Get bid amount for display
-              const bidAmount = hasBidAmount ? (typeof comment.bid_amount === 'number' ? comment.bid_amount : Number(comment.bid_amount)) : null;
+              // Amount (bid or sold) for display
+              const amount = hasBidAmount ? (typeof comment.bid_amount === 'number' ? comment.bid_amount : Number(comment.bid_amount)) : null;
               
               return (
                 <div key={comment.id} style={{ 
@@ -679,7 +692,20 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                             Cars & Bids
                           </span>
                         )}
-                        {isBid && bidAmount && bidAmount > 0 && (
+                        {isSoldComment && (
+                          <span style={{
+                            fontSize: '8pt',
+                            fontWeight: 700,
+                            color: '#22c55e',
+                            backgroundColor: '#dcfce7',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            marginLeft: '4px'
+                          }}>
+                            {amount && amount > 0 ? `$${amount.toLocaleString()} SOLD` : 'SOLD'}
+                          </span>
+                        )}
+                        {isBid && amount && amount > 0 && (
                           <span style={{ 
                             fontSize: '8pt', 
                             fontWeight: 700, 
@@ -689,7 +715,7 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
                             borderRadius: '4px',
                             marginLeft: '4px'
                           }}>
-                            ${bidAmount.toLocaleString()} BID
+                            ${amount.toLocaleString()} BID
                           </span>
                         )}
                         {comment.is_seller && (

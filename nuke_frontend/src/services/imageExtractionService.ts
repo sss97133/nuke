@@ -282,7 +282,6 @@ export class ImageExtractionService {
           console.warn('Failed to parse AI response:', content);
         }
       }
-      }
     } catch (error) {
       console.error('AI vision analysis failed:', error);
     }
