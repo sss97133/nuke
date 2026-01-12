@@ -650,14 +650,20 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     
     const v = vehicle as any;
     
-    // 1. Sale price (actual sold price) - highest truth
+    // 1. Sale price / final bid
+    // NOTE: Many auction imports historically stored "Bid to" (RNM) into `vehicles.sale_price`.
+    // We must not label this as "Sold for" when reserve was not met.
     if (typeof vehicle.sale_price === 'number' && vehicle.sale_price > 0) {
-      const outcome = v.auction_outcome;
+      const outcome = String(v.auction_outcome || '').toLowerCase();
+      const reserveStatus = String(v.reserve_status || '').toLowerCase();
+      const isUnsold = reserveStatus === 'reserve_not_met' || reserveStatus === 'no_sale' || outcome === 'reserve_not_met' || outcome === 'no_sale';
+      if (isUnsold) {
+        return { amount: vehicle.sale_price, label: 'High Bid' };
+      }
       if (outcome === 'sold') {
         return { amount: vehicle.sale_price, label: 'SOLD FOR' };
-      } else {
-        return { amount: vehicle.sale_price, label: 'Sold for' };
       }
+      return { amount: vehicle.sale_price, label: 'Sold for' };
     }
     
     // 2. Winning bid (auction result)
@@ -779,13 +785,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           return { amount: null, label: '' };
         }
         
-        // Respect auction outcome for proper disclosure
-        if ((vehicle as any).auction_outcome === 'sold') {
+        // Respect auction outcome / reserve status for proper disclosure
+        const outcome = String((vehicle as any).auction_outcome || '').toLowerCase();
+        const reserveStatus = String((vehicle as any).reserve_status || '').toLowerCase();
+        if (outcome === 'sold') {
           return { amount: vehicle.sale_price, label: 'SOLD FOR' };
-        } else if ((vehicle as any).auction_outcome === 'reserve_not_met') {
+        } else if (outcome === 'reserve_not_met' || reserveStatus === 'reserve_not_met') {
           // Don't show high bid for RNM - user needs to click for details
           return { amount: null, label: 'Reserve Not Met' };
-        } else if ((vehicle as any).auction_outcome === 'no_sale') {
+        } else if (outcome === 'no_sale' || reserveStatus === 'no_sale') {
           return { amount: null, label: 'No Sale' };
         } else {
           return { amount: vehicle.sale_price, label: 'Sold for' };
