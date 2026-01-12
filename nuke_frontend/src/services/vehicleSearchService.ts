@@ -144,7 +144,6 @@ export class VehicleSearchService {
       let query = supabase
         .from('vehicles')
         .select('*')
-        .eq('is_public', true)
         .neq('status', 'pending');
 
       // Precompute zip coordinates if needed (used to avoid the broken "zip + radius" logic).

@@ -125,6 +125,7 @@ const AdvancedVehicleSearch: React.FC<AdvancedVehicleSearchProps> = ({
                   onMakeChange={(value) => handleFilterChange('make', value)}
                   onModelChange={(value) => handleFilterChange('model', value)}
                   disabled={loading}
+                  variant="buttons"
                 />
               </div>
             </div>
