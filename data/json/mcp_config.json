@@ -1,55 +1,61 @@
 {
   "mcpServers": {
     "anthropic-mcp": {
-      "command": "node",
       "args": [
         "./mcp/anthropic-mcp/index.js"
-      ]
-    },
-    "claude-direct": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-claude"
-      ]
-    },
-    "supabase": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@supabase/mcp-server-supabase@latest",
-        "--project-ref=qkgaybvrernstplzjaam"
       ],
-      "env": {
-        "supabase_access_token": "${SUPABASE_ACCESS_TOKEN}"
-      }
-    },
-    "playwright": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-playwright"
-      ]
+      "command": "node"
     },
     "browser": {
-      "command": "npx",
       "args": [
         "-y",
         "@modelcontextprotocol/server-browser"
-      ]
+      ],
+      "command": "npx"
+    },
+    "claude-direct": {
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-claude"
+      ],
+      "command": "npx"
     },
     "firecrawl-mcp": {
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
       "command": "npx",
-      "args": ["-y", "firecrawl-mcp"],
       "env": {
         "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
       }
     },
     "mendable-mcp": {
+      "args": [
+        "-y",
+        "mendable-mcp"
+      ],
       "command": "npx",
-      "args": ["-y", "mendable-mcp"],
       "env": {
-        "MENDABLE_API_KEY": "458e3dc5-e3a6-487c-bd8e-3c7f297b6020"
+        "MENDABLE_API_KEY": "${MENDABLE_API_KEY}"
+      }
+    },
+    "playwright": {
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-playwright"
+      ],
+      "command": "npx"
+    },
+    "supabase": {
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=qkgaybvrernstplzjaam"
+      ],
+      "command": "npx",
+      "env": {
+        "supabase_access_token": "${SUPABASE_ACCESS_TOKEN}"
       }
     }
   }
