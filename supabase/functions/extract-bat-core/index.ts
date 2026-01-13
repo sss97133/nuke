@@ -298,6 +298,18 @@ function extractEssentials(html: string): {
 } {
   const h = String(html || "");
 
+  // Highest-signal title strings (low noise vs full page text).
+  const titleText =
+    (() => {
+      const m = h.match(/<title[^>]*>([^<]+)<\/title>/i);
+      return m?.[1] ? stripTags(m[1]) : null;
+    })() ||
+    (() => {
+      const m = h.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+      return m?.[1] ? stripTags(m[1]) : null;
+    })() ||
+    null;
+
   // Seller (from essentials)
   const essentialsIdx = h.indexOf('<div class="essentials"');
   const win = essentialsIdx >= 0 ? h.slice(essentialsIdx, essentialsIdx + 300000) : h;
@@ -305,7 +317,7 @@ function extractEssentials(html: string): {
   const fullText = stripTags(h).replace(/\s+/g, " ").trim();
   // NOTE: Some outcome/price strings (e.g. "Sold for $X") can live outside the essentials block.
   // Use a combined view to avoid misclassifying sold listings as RNM/ended.
-  const text = `${winText} ${fullText}`.replace(/\s+/g, " ").trim();
+  const text = `${winText} ${fullText} ${titleText || ""}`.replace(/\s+/g, " ").trim();
 
   const sellerMatch =
     win.match(/<strong>Seller<\/strong>:\s*<a[^>]*href=["'][^"']*\/member\/([^"\/]+)\/?["'][^>]*>([^<]+)<\/a>/i) ||
@@ -313,10 +325,23 @@ function extractEssentials(html: string): {
   const seller_username = sellerMatch ? stripTags(String(sellerMatch[2] || sellerMatch[1] || "")) || null : null;
 
   // Buyer (sold to)
-  const buyerMatch =
+  const buyerHtmlMatch =
     h.match(/Sold\s+to\s*<strong>([^<]+)<\/strong>/i) ||
     h.match(/to\s*<strong>([^<]+)<\/strong>\s*for\s*(?:USD\s*)?\$?/i);
-  const buyer_username = buyerMatch?.[1] ? stripTags(buyerMatch[1]) : null;
+  let buyer_username = buyerHtmlMatch?.[1] ? stripTags(buyerHtmlMatch[1]) : null;
+
+  if (!buyer_username) {
+    const buyerTextMatch =
+      // Common on sold listings: "Winning Bid USD $76,500 by Shabam8790"
+      text.match(/\bWinning\s+Bid\b[\s\S]{0,80}?\bby\s+([A-Za-z0-9_]{2,})\b/i) ||
+      // "Sold on 2/3/22 for $76,500 to Shabam8790"
+      text.match(/\bSold\s+on\b[\s\S]{0,120}?\bto\s+([A-Za-z0-9_]{2,})\b/i) ||
+      // "This Listing Sold by FantasyJunction to Shabam8790 for USD $76,500.00"
+      text.match(/\bSold\b[\s\S]{0,120}?\bto\s+([A-Za-z0-9_]{2,})\b[\s\S]{0,120}?\bfor\b/i) ||
+      // "to Shabam8790 for USD $76,500"
+      text.match(/\bto\s+([A-Za-z0-9_]{2,})\b[\s\S]{0,80}?\bfor\s+(?:USD\s*)?\$?[\d,]+/i);
+    buyer_username = buyerTextMatch?.[1] ? String(buyerTextMatch[1]).trim() : null;
+  }
 
   // Location
   const locationMatch =
@@ -330,9 +355,12 @@ function extractEssentials(html: string): {
 
   // Reserve status
   let reserve_status: string | null = null;
-  if (h.includes("no-reserve") || /\bNo Reserve\b/i.test(h)) reserve_status = "no_reserve";
-  if (/\bReserve Not Met\b/i.test(h) || /reserve-not-met/i.test(h)) reserve_status = "reserve_not_met";
-  if (/\bReserve Met\b/i.test(h)) reserve_status = "reserve_met";
+  // IMPORTANT: Do NOT scan the entire page HTML for reserve phrases (sidebar/recommended auctions can contain
+  // "reserve not met" and pollute the result). Keep this scoped to essentials + title.
+  const reserveScope = `${winText} ${titleText || ""}`;
+  if (reserveScope.includes("no-reserve") || /\bNo Reserve\b/i.test(reserveScope)) reserve_status = "no_reserve";
+  if (/\bReserve Not Met\b/i.test(reserveScope) || /reserve-not-met/i.test(reserveScope)) reserve_status = "reserve_not_met";
+  if (/\bReserve Met\b/i.test(reserveScope)) reserve_status = "reserve_met";
 
   // Auction end date
   let auction_end_date: string | null = null;
@@ -358,7 +386,9 @@ function extractEssentials(html: string): {
   const watcher_count = watcherMatch?.[1] ? parseInt(watcherMatch[1].replace(/,/g, ""), 10) : 0;
 
   // Sale/high bid
-  const hasGotAway = /got\s+away|did\s+not\s+sell|no\s+sale|not\s+sold|reserve\s+not\s+met/i.test(h);
+  const hasGotAway = /got\s+away|did\s+not\s+sell|no\s+sale|not\s+sold|reserve\s+not\s+met/i.test(
+    `${winText} ${titleText || ""}`.toLowerCase()
+  );
   let sale_price: number | null = null;
   let high_bid: number | null = null;
 
@@ -368,18 +398,32 @@ function extractEssentials(html: string): {
     if (Number.isFinite(n) && n > 0) high_bid = n;
   }
 
-  const soldPatterns = [
-    /Sold\s+(?:for|to)\s+(?:USD\s*)?\$?([0-9,]+)/i,
-    /Sold\s+(?:USD\s*)?\$?([0-9,]+)\s+(?:on|for)/i,
-  ];
-  for (const p of soldPatterns) {
-    const m = text.match(p);
-    if (m?.[1]) {
-      const n = parseInt(m[1].replace(/,/g, ""), 10);
-      if (Number.isFinite(n) && n > 0) {
-        sale_price = n;
-        high_bid = high_bid || n;
-        break;
+  // SOLD signals (prefer title for low-noise extraction).
+  const titleSoldMatch = titleText ? titleText.match(/\bsold\s+(?:for|to)\s+\$?([0-9,]+)/i) : null;
+  if (titleSoldMatch?.[1]) {
+    const n = parseInt(titleSoldMatch[1].replace(/,/g, ""), 10);
+    if (Number.isFinite(n) && n > 0) {
+      sale_price = n;
+      high_bid = high_bid || n;
+    }
+  }
+
+  if (!sale_price) {
+    const soldPatterns = [
+      /Sold\s+(?:for|to)\s+(?:USD\s*)?\$?([0-9,]+)/i,
+      // "Sold on 2/3/22 for $76,500 to ..."
+      /Sold\s+on\b[\s\S]{0,120}?\bfor\s+(?:USD\s*)?\$?([0-9,]+)/i,
+      /Sold\s+(?:USD\s*)?\$?([0-9,]+)\s+(?:on|for)/i,
+    ];
+    for (const p of soldPatterns) {
+      const m = text.match(p);
+      if (m?.[1]) {
+        const n = parseInt(m[1].replace(/,/g, ""), 10);
+        if (Number.isFinite(n) && n > 0) {
+          sale_price = n;
+          high_bid = high_bid || n;
+          break;
+        }
       }
     }
   }
@@ -387,11 +431,11 @@ function extractEssentials(html: string): {
   // If we have a sold price, this listing cannot be RNM.
   // Prefer explicit "No Reserve" when present; otherwise treat as reserve met.
   if (sale_price && reserve_status === "reserve_not_met") {
-    const hasNoReserve = h.includes("no-reserve") || /\bNo Reserve\b/i.test(h);
+    const hasNoReserve = reserveScope.includes("no-reserve") || /\bNo Reserve\b/i.test(reserveScope);
     reserve_status = hasNoReserve ? "no_reserve" : "reserve_met";
   }
   if (sale_price && !reserve_status) {
-    const hasNoReserve = h.includes("no-reserve") || /\bNo Reserve\b/i.test(h);
+    const hasNoReserve = reserveScope.includes("no-reserve") || /\bNo Reserve\b/i.test(reserveScope);
     reserve_status = hasNoReserve ? "no_reserve" : "reserve_met";
   }
 
@@ -891,7 +935,7 @@ serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status")
+        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
         .in("discovery_url", urlCandidates)
         .limit(1)
         .maybeSingle();
@@ -903,7 +947,7 @@ serve(async (req) => {
     if (!vehicleId) {
       const { data } = await supabase
         .from("vehicles")
-        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status")
+        .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
         .in("bat_auction_url", urlCandidates)
         .limit(1)
         .maybeSingle();
@@ -972,7 +1016,7 @@ serve(async (req) => {
       if (!existing) {
         const { data } = await supabase
           .from("vehicles")
-          .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status")
+          .select("id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid")
           .eq("id", vehicleId)
           .maybeSingle();
         existing = data || null;
@@ -1129,10 +1173,82 @@ serve(async (req) => {
       }
 
       // Auction outcomes / counters (set if missing)
-      if (!existing?.sale_price && essentials.sale_price) updatePayload.sale_price = essentials.sale_price;
-      if (!existing?.high_bid && essentials.high_bid) updatePayload.high_bid = essentials.high_bid;
-      if (!existing?.auction_end_date && essentials.auction_end_date) updatePayload.auction_end_date = essentials.auction_end_date;
-      if (!existing?.reserve_status && essentials.reserve_status) updatePayload.reserve_status = essentials.reserve_status;
+      const existingReserve = String(existing?.reserve_status || "").toLowerCase();
+      const existingOutcome = String((existing as any)?.auction_outcome || "").toLowerCase();
+      const existingSaleStatus = String((existing as any)?.sale_status || "").toLowerCase();
+      const existingSalePrice = typeof (existing as any)?.sale_price === "number" ? (existing as any).sale_price : null;
+      const existingHighBid = typeof (existing as any)?.high_bid === "number" ? (existing as any).high_bid : null;
+
+      const extractedReserve = String(essentials.reserve_status || "").toLowerCase() || null;
+      const extractedSalePrice = essentials.sale_price;
+      const extractedHighBid = essentials.high_bid;
+      const extractedEndDate = essentials.auction_end_date || null;
+
+      const hasExtractedSale = typeof extractedSalePrice === "number" && Number.isFinite(extractedSalePrice) && extractedSalePrice > 0;
+      const hasExtractedBid = typeof extractedHighBid === "number" && Number.isFinite(extractedHighBid) && extractedHighBid > 0;
+
+      // Always keep auction_end_date in sync when we have it (it's used for auction state and display).
+      if (extractedEndDate && (!existing?.auction_end_date || existing?.auction_end_date !== extractedEndDate)) {
+        updatePayload.auction_end_date = extractedEndDate;
+      }
+
+      // Reserve status: if we have a confident extraction, allow overwriting stale/wrong values.
+      if (extractedReserve) {
+        if (!existing?.reserve_status || existingReserve !== extractedReserve) {
+          updatePayload.reserve_status = extractedReserve;
+        }
+      }
+
+      // SOLD: explicit "sold for $X" should override legacy RNM/high-bid pollution.
+      if (hasExtractedSale) {
+        // Sale price must be the sold price (not "Bid to").
+        if (!existingSalePrice || existingSalePrice !== extractedSalePrice) {
+          updatePayload.sale_price = extractedSalePrice;
+        }
+
+        // When sold, high_bid should equal the sold price.
+        if (!existingHighBid || existingHighBid !== extractedSalePrice) {
+          updatePayload.high_bid = extractedSalePrice;
+        }
+
+        // Make the vehicle row consistent (some UIs fall back to vehicles.* if external_listings is blocked by RLS).
+        updatePayload.sale_status = "sold";
+        updatePayload.auction_outcome = "sold";
+        if (extractedEndDate) updatePayload.sale_date = extractedEndDate;
+
+        // Buyer should be present on sold listings; overwrite if missing or clearly stale.
+        if (essentials.buyer_username && String((existing as any)?.bat_buyer || "").trim() !== String(essentials.buyer_username).trim()) {
+          updatePayload.bat_buyer = essentials.buyer_username;
+        }
+      } else if (hasExtractedBid && (extractedReserve === "reserve_not_met" || extractedReserve === "no_sale")) {
+        // UNSOLD: ensure we don't keep a polluted sale_price that actually represents "bid to".
+        const looksLikePollutedSale =
+          typeof existingSalePrice === "number" &&
+          existingSalePrice > 0 &&
+          ((typeof existingHighBid === "number" && existingHighBid > 0 && existingSalePrice === existingHighBid) ||
+            existingSalePrice === extractedHighBid);
+
+        const alreadySold =
+          existingSaleStatus === "sold" ||
+          existingOutcome === "sold";
+
+        if (!alreadySold && looksLikePollutedSale) {
+          updatePayload.sale_price = null;
+        }
+
+        // Keep high_bid aligned with extracted highest bid.
+        if (!existingHighBid || existingHighBid !== extractedHighBid) {
+          updatePayload.high_bid = extractedHighBid;
+        }
+
+        // Keep auction_outcome consistent (best-effort; depends on schema).
+        if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
+        if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+      } else {
+        // Fallback: fill missing numeric fields only.
+        if (!existingSalePrice && hasExtractedSale) updatePayload.sale_price = extractedSalePrice;
+        if (!existingHighBid && hasExtractedBid) updatePayload.high_bid = extractedHighBid;
+      }
 
       if (!existing?.bat_views && essentials.view_count) updatePayload.bat_views = essentials.view_count;
       if (!existing?.bat_watchers && essentials.watcher_count) updatePayload.bat_watchers = essentials.watcher_count;

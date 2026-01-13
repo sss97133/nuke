@@ -94,6 +94,7 @@ function buildBatSummary(batAudit) {
   const totalVehicles = toNumberOrNull(batAudit?.summary?.total_vehicles) ?? toNumberOrNull(batAudit?.summary?.total) ?? null;
   const vehiclesNeedingFix = toNumberOrNull(batAudit?.summary?.vehicles_needing_fix) ?? null;
   const missingFields = batAudit?.summary?.missing_fields ?? null;
+  const potentialVerification = batAudit?.summary?.potential_verification ?? null;
 
   const vehicles = Array.isArray(batAudit?.vehicles) ? batAudit.vehicles : [];
   const missingScores = vehicles.map(v => toNumberOrNull(v?.missing_score)).filter(n => n !== null);
@@ -121,7 +122,8 @@ function buildBatSummary(batAudit) {
       median: median(missingScores) !== null ? round(median(missingScores), 3) : null,
       max_possible: maxPossibleMissingScore,
       distribution: scoreDistribution
-    }
+    },
+    potential_verification: potentialVerification
   };
 }
 
@@ -249,6 +251,19 @@ function mergePerVehicle(batAudit, profileAudit) {
           comment_count: toNumberOrNull(v?.comment_count),
           image_count: toNumberOrNull(v?.image_count),
           has_auction_event: typeof v?.has_auction_event === 'boolean' ? v.has_auction_event : null
+        },
+
+        potential: {
+          score_0_100: toNumberOrNull(v?.potential_score),
+          timeline_event_count: toNumberOrNull(v?.timeline_event_count),
+          evidence_count: toNumberOrNull(v?.evidence_count)
+        },
+
+        verification: {
+          score_0_100: toNumberOrNull(v?.verification_score),
+          accepted_evidence_count: toNumberOrNull(v?.accepted_evidence_count),
+          provenance_field_count: toNumberOrNull(v?.provenance_field_count),
+          provenance_high_confidence_field_count: toNumberOrNull(v?.provenance_high_confidence_field_count)
         },
 
         extraction_accuracy: null
@@ -422,6 +437,63 @@ function formatMarkdown(report) {
       lines.push('- This audit artifact may have been generated with an older version of `scripts/audit-bat-missing-data.js` that did not enforce error checks or pagination on related-table fetches (comments/images/events/listings). If those queries failed or truncated, the audit can over-report missing related data. Treat related-table "missing" results as provisional until you re-run the audit with the hardened script.');
     }
     lines.push('');
+
+    // Potential vs Verification axis (provenance-first)
+    const pv = bat?.potential_verification;
+    const pvVehicles = Array.isArray(report?.vehicles)
+      ? report.vehicles
+          .filter(v => typeof v?.potential?.score_0_100 === 'number' && typeof v?.verification?.score_0_100 === 'number')
+      : [];
+    if (pv || pvVehicles.length > 0) {
+      lines.push('### Potential vs Verification (BaT cohort)');
+      lines.push('');
+      if (pv) {
+        const p = pv?.potential_score;
+        const v = pv?.verification_score;
+        if (p) lines.push(`- potential score (0-100): avg=${p.avg ?? 'n/a'}, median=${p.median ?? 'n/a'}, min=${p.min ?? 'n/a'}, max=${p.max ?? 'n/a'}`);
+        if (v) lines.push(`- verification score (0-100): avg=${v.avg ?? 'n/a'}, median=${v.median ?? 'n/a'}, min=${v.min ?? 'n/a'}, max=${v.max ?? 'n/a'}`);
+      }
+
+      // Quadrants (tunable thresholds)
+      const POTENTIAL_HIGH = 60;
+      const VERIFICATION_HIGH = 60;
+      const q = { hh: 0, hl: 0, lh: 0, ll: 0 };
+      for (const row of pvVehicles) {
+        const ps = row?.potential?.score_0_100;
+        const vs = row?.verification?.score_0_100;
+        if (typeof ps !== 'number' || typeof vs !== 'number') continue;
+        const pHigh = ps >= POTENTIAL_HIGH;
+        const vHigh = vs >= VERIFICATION_HIGH;
+        if (pHigh && vHigh) q.hh += 1;
+        else if (pHigh && !vHigh) q.hl += 1;
+        else if (!pHigh && vHigh) q.lh += 1;
+        else q.ll += 1;
+      }
+      if (pvVehicles.length > 0) {
+        lines.push(`- quadrant counts (thresholds: potential>=${POTENTIAL_HIGH}, verification>=${VERIFICATION_HIGH}): HH=${q.hh}, HL=${q.hl}, LH=${q.lh}, LL=${q.ll}`);
+      }
+      lines.push('');
+
+      // Top lists
+      const topPotential = pvVehicles.slice().sort((a, b) => (b.potential.score_0_100 ?? 0) - (a.potential.score_0_100 ?? 0)).slice(0, 10);
+      const topVerification = pvVehicles.slice().sort((a, b) => (b.verification.score_0_100 ?? 0) - (a.verification.score_0_100 ?? 0)).slice(0, 10);
+
+      lines.push('#### High Potential (top 10)');
+      lines.push('');
+      for (const row of topPotential) {
+        const url = row?.source_url ? ` (\`${row.source_url}\`)` : '';
+        lines.push(`- ${row.identity || row.vehicle_id}${url} :: potential=${row.potential.score_0_100}, verification=${row.verification.score_0_100}`);
+      }
+      lines.push('');
+
+      lines.push('#### High Verification (top 10)');
+      lines.push('');
+      for (const row of topVerification) {
+        const url = row?.source_url ? ` (\`${row.source_url}\`)` : '';
+        lines.push(`- ${row.identity || row.vehicle_id}${url} :: verification=${row.verification.score_0_100}, potential=${row.potential.score_0_100}`);
+      }
+      lines.push('');
+    }
   }
 
   if (prof) {
@@ -433,17 +505,25 @@ function formatMarkdown(report) {
     lines.push(`- accuracy avg (checked only): ${prof?.accuracy?.avg_checked_only ?? 'n/a'}`);
     lines.push('');
 
-    lines.push('#### Fetch failures by domain (top 10)');
+    lines.push('#### Domain reliability (top 15 by volume)');
     lines.push('');
     const domainRows = Object.entries(prof.by_domain || {});
-    domainRows.sort((a, b) => (b[1]?.fetch_failures || 0) - (a[1]?.fetch_failures || 0));
-    for (const [domain, stats] of domainRows.slice(0, 10)) {
-      if (!stats?.fetch_failures) continue;
-      const failureRate = safePercent(stats.fetch_failures, stats.total);
-      lines.push(`- ${domain}: failures=${stats.fetch_failures}/${stats.total} (${failureRate !== null ? round(failureRate, 1) : 'n/a'}%)`);
-    }
-    if (!domainRows.some(([, s]) => (s?.fetch_failures || 0) > 0)) {
-      lines.push('- (none recorded)');
+    domainRows.sort((a, b) => (b[1]?.total || 0) - (a[1]?.total || 0));
+    const topDomains = domainRows.slice(0, 15);
+    for (const [domain, stats] of topDomains) {
+      const total = stats?.total ?? 0;
+      const checked = stats?.checked ?? 0;
+      const failures = stats?.fetch_failures ?? 0;
+      const failureRate = safePercent(failures, total);
+      const avgAcc = stats?.avg_accuracy ?? null;
+
+      let tier = 'unknown';
+      if (failureRate !== null && failureRate >= 50) tier = 'blocked';
+      else if (typeof avgAcc === 'number' && avgAcc >= 0.6) tier = 'high';
+      else if (typeof avgAcc === 'number' && avgAcc >= 0.3) tier = 'medium';
+      else if (typeof avgAcc === 'number') tier = 'low';
+
+      lines.push(`- ${domain}: total=${total}, checked=${checked}, failures=${failures} (${failureRate !== null ? round(failureRate, 1) : 'n/a'}%), avg_accuracy_checked=${avgAcc !== null ? round(avgAcc, 3) : 'n/a'}, tier=${tier}`);
     }
     lines.push('');
   }
@@ -467,10 +547,10 @@ function formatMarkdown(report) {
 
   lines.push('### Top fix levers (highest ROI)');
   lines.push('');
-  lines.push('- If your BaT audit is old: re-run `scripts/audit-bat-missing-data.js` (audit_version>=2) so related-table completeness (comments/images/events/listings) is measured reliably (chunked, paginated, fails on errors).');
-  lines.push('- For BaT completeness: prioritize backfilling `vin`, `trim`, `engine_size`, `drivetrain`, `location`, and `sale_info` because those are the most frequent/high-impact missing fields in the BaT audit.');
-  lines.push('- For auction linkage: ensure BaT vehicles reliably create `auction_events` rows (source=\'bat\') and associated `external_listings` records so downstream comments/bids/images attach to a stable event identity.');
-  lines.push('- For source verifiability: stop relying on direct HTML fetch for sources that rate-limit/block (e.g., Cars & Bids 403). Use a crawler service, caching, and/or an ingestion path that does not depend on scraping protected pages.');
+  lines.push('- If your BaT audit is old: re-run `scripts/audit-bat-missing-data.js` (audit_version>=2) so related-table counts (comments/images/events/listings) are measured reliably (chunked, paginated, fails on errors).');
+  lines.push('- For **Potential**: add “treasure map” leads first (images, timeline events, citations/URLs, notes). These raise the potential score without pretending the profile is verified.');
+  lines.push('- For **Verification**: submit high-trust proof (auction results, titles, receipts, factory docs) so consensus can safely assign values and close gaps (instead of writing raw values).');
+  lines.push('- For **platform reliability**: treat blocked/low-reliability domains as “needs ingestion strategy” (crawler/caching/API) rather than “bad data”; otherwise verifiability will stay low even if potential is high.');
   lines.push('');
 
   return lines.join('\n');

@@ -645,9 +645,11 @@ serve(async (req) => {
       const nowIso = new Date().toISOString()
       const { data: extListing } = await supabase
         .from('external_listings')
-        .select('final_price, current_bid, listing_status, end_date, sold_at, listing_id')
+        .select('id, final_price, current_bid, listing_status, end_date, sold_at, listing_id, metadata')
         .eq('vehicle_id', vehicleId)
         .eq('platform', 'bat')
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
       const inferredHighBid = commentsWithIdentities
@@ -655,10 +657,37 @@ serve(async (req) => {
         .filter((n: any) => typeof n === 'number')
         .reduce((acc: number, n: number) => (n > acc ? n : acc), 0)
 
+      // Safety net: If the core extractor didn't set final_price, infer it from the SOLD system comment.
+      const soldCommentText =
+        commentsWithIdentities.find((c: any) => String(c?.comment_type || '').toLowerCase() === 'sold')?.comment_text ||
+        commentsWithIdentities.find((c: any) => /\bsold\s+on\b|\bsold\s+for\b/i.test(String(c?.comment_text || '')))?.comment_text ||
+        null
+
+      const parseMoney = (raw: string | null): number | null => {
+        const m = String(raw || '').match(/\$([0-9,]+)/)
+        if (!m?.[1]) return null
+        const n = Number(String(m[1]).replace(/,/g, ''))
+        return Number.isFinite(n) && n > 0 ? Math.floor(n) : null
+      }
+
+      const inferredSoldPriceFromComment =
+        soldCommentText
+          ? (
+              parseMoney(String(soldCommentText).match(/\bfor\s+(?:USD\s*)?\$[0-9,]+/i)?.[0] || soldCommentText) ||
+              parseMoney(soldCommentText)
+            )
+          : null
+
+      const inferredBuyerFromComment = (() => {
+        if (!soldCommentText) return null
+        const m = String(soldCommentText).match(/\bto\s+([A-Za-z0-9_]{2,})\b/i)
+        return m?.[1] ? String(m[1]).trim() : null
+      })()
+
       const inferredFinalPrice =
         (typeof extListing?.final_price === 'number' && Number.isFinite(extListing.final_price) && extListing.final_price > 0)
           ? Math.floor(extListing.final_price)
-          : null
+          : (inferredSoldPriceFromComment || null)
 
       const inferredSaleDate = (() => {
         const t = extListing?.sold_at || extListing?.end_date || null
@@ -673,8 +702,39 @@ serve(async (req) => {
         if (s === 'sold') return 'sold'
         if (s === 'active' || s === 'live') return 'active'
         if (s === 'ended' || s === 'complete' || s === 'completed') return 'ended'
+        // If we inferred a sold price from comments, treat as sold.
+        if (inferredFinalPrice && inferredFinalPrice > 0) return 'sold'
         return null
       })()
+
+      // If we inferred SOLD from the system comment, persist it back into external_listings so
+      // the rest of the system (auctionPulse, header owner guess, etc.) becomes consistent.
+      if (
+        extListing?.id &&
+        inferredFinalPrice &&
+        inferredFinalPrice > 0 &&
+        String(extListing?.listing_status || '').toLowerCase() !== 'sold'
+      ) {
+        const existingMeta = (extListing as any)?.metadata && typeof (extListing as any).metadata === 'object' ? (extListing as any).metadata : {}
+        const reserveFromHtml =
+          html.includes('no-reserve') || /\bNo Reserve\b/i.test(html) ? 'no_reserve' : null
+
+        await supabase
+          .from('external_listings')
+          .update({
+            listing_status: 'sold',
+            final_price: inferredFinalPrice,
+            sold_at: extListing?.sold_at || extListing?.end_date || nowIso,
+            metadata: {
+              ...existingMeta,
+              ...(inferredBuyerFromComment ? { buyer_username: inferredBuyerFromComment } : {}),
+              ...(reserveFromHtml ? { reserve_status: reserveFromHtml } : {}),
+              source: existingMeta?.source || 'extract-auction-comments',
+            },
+            updated_at: nowIso,
+          })
+          .eq('id', extListing.id)
+      }
 
       const listingPayload: any = {
         vehicle_id: vehicleId,

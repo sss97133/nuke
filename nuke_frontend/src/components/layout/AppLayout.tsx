@@ -378,6 +378,19 @@ const AppLayoutInner: React.FC<AppLayoutProps> = ({
                       Organizations
                     </Link>
                     <Link
+                      to="/invoices"
+                      className={`nav-link ${isActivePage('/invoices') ? 'active' : ''}`}
+                      style={{
+                        display: 'block',
+                        padding: '8px 12px',
+                        textDecoration: 'none',
+                        borderBottom: '1px solid var(--border)'
+                      }}
+                      onClick={() => setNZeroMenuOpen(false)}
+                    >
+                      Invoices
+                    </Link>
+                    <Link
                       to="/market"
                       className={`nav-link ${isActivePage('/market') ? 'active' : ''}`}
                       style={{

@@ -7,7 +7,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  * appears to be deployed from a legacy pipeline that may not accept updates).
  *
  * This implementation is API-version tolerant:
- * - Tries `POST https://api.mendable.ai/v1/chat` (api_key in JSON body)
+ * - Tries `POST https://api.mendable.ai/v1/mendableChat` (api_key in JSON body)
+ * - Falls back to `POST https://api.mendable.ai/v1/chat` (legacy)
  * - Falls back to `POST https://api.mendable.ai/v1/newChat` (Bearer auth)
  *
  * For back-compat, it accepts both:
@@ -154,9 +155,10 @@ Deno.serve(async (req) => {
     api_key: apiKey,
     question,
     shouldStream,
+    // Mendable's /v1/mendableChat expects history (can be empty).
+    history: Array.isArray(payload.history) ? payload.history : [],
   };
 
-  if (payload.history) chatBody.history = payload.history;
   if (typeof payload.conversation_id === "number") chatBody.conversation_id = payload.conversation_id;
   if (typeof payload.temperature === "number") chatBody.temperature = payload.temperature;
   if (typeof payload.additional_context === "string") chatBody.additional_context = payload.additional_context;
@@ -164,7 +166,10 @@ Deno.serve(async (req) => {
   if (payload.where && typeof payload.where === "object") chatBody.where = payload.where;
   if (typeof payload.num_chunks === "number") chatBody.retriever_option = { num_chunks: payload.num_chunks };
 
-  let r = await mendablePost("/v1/chat", chatBody);
+  let r = await mendablePost("/v1/mendableChat", chatBody);
+  if (!r.ok && (r.status === 404 || r.status === 401 || r.status === 403)) {
+    r = await mendablePost("/v1/chat", chatBody);
+  }
   if (!r.ok && (r.status === 404 || r.status === 401 || r.status === 403)) {
     r = await mendablePostWithBearer("/v1/newChat", apiKey, {
       messages: [{ role: "user", content: question }],

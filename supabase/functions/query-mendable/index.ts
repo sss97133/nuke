@@ -6,7 +6,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  * Minimal server-side bridge to Mendable's REST API.
  * - Reads `MENDABLE_API_KEY` from Supabase Edge Function secrets (or local env when running locally).
  * - Supports:
- *   - action: "chat" (default) -> POST https://api.mendable.ai/v1/chat
+ *   - action: "chat" (default) -> POST https://api.mendable.ai/v1/mendableChat (preferred)
+ *                                (falls back to /v1/chat, then /v1/newChat when needed)
  *   - action: "getSources"     -> POST https://api.mendable.ai/v1/getSources
  *   - action: "newConversation"-> POST https://api.mendable.ai/v1/newConversation
  *
@@ -180,9 +181,10 @@ Deno.serve(async (req) => {
     api_key: apiKey,
     question,
     shouldStream,
+    // Mendable's /v1/mendableChat expects history (can be empty).
+    history: Array.isArray(payload.history) ? payload.history : [],
   };
 
-  if (payload.history) chatBody.history = payload.history;
   if (typeof payload.conversation_id === "number") chatBody.conversation_id = payload.conversation_id;
   if (typeof payload.temperature === "number") chatBody.temperature = payload.temperature;
   if (typeof payload.additional_context === "string") chatBody.additional_context = payload.additional_context;
@@ -193,9 +195,13 @@ Deno.serve(async (req) => {
     chatBody.retriever_option = { num_chunks: payload.num_chunks };
   }
 
-  // Prefer modern API (`/v1/chat` with `api_key` in body). If it fails with a status that
-  // suggests a different API version, fall back to `/v1/newChat` (Bearer auth).
-  let r = await mendablePost("/v1/chat", chatBody);
+  // Prefer current docs API (`/v1/mendableChat` with `api_key` in body).
+  // If it fails with a status that suggests a different API version, fall back to `/v1/chat`,
+  // then `/v1/newChat` (Bearer auth).
+  let r = await mendablePost("/v1/mendableChat", chatBody);
+  if (!r.ok && (r.status === 404 || r.status === 401 || r.status === 403)) {
+    r = await mendablePost("/v1/chat", chatBody);
+  }
   if (!r.ok && (r.status === 404 || r.status === 401 || r.status === 403)) {
     r = await mendablePostWithBearer("/v1/newChat", apiKey, {
       messages: [{ role: "user", content: question }],

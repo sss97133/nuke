@@ -30,6 +30,7 @@ const AuctionMarketplace = React.lazy(() => import('../pages/AuctionMarketplace'
 const Notifications = React.lazy(() => import('../pages/Notifications'));
 const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIdentity'));
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
+const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const Search = React.lazy(() => import('../pages/Search').catch((error) => {
   console.error('Failed to load Search component:', error);
   // Return a fallback component
@@ -79,6 +80,7 @@ export const DomainRoutes = () => {
         <Route path="/capsule" element={<Capsule />} />
         <Route path="/library" element={<Library />} />
         <Route path="/auctions" element={<AuctionMarketplace />} />
+        <Route path="/invoices" element={<InvoiceManager />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/claim-identity" element={<ClaimExternalIdentity />} />
         <Route path="/bat-members" element={<BaTMembers />} />

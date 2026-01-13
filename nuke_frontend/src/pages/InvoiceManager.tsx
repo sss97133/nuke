@@ -22,6 +22,17 @@ interface Invoice {
   payment_status: string;
   status: string;
   html_content: string | null;
+  cashflow?: {
+    status: 'ok' | 'missing' | 'pending' | 'error' | 'unknown';
+    event_count: number;
+    total_cents: number;
+    last_occurred_at: string | null;
+    unprocessed_count: number;
+    error_count: number;
+    payout_count: number;
+    payout_pending_count: number;
+    payout_paid_count: number;
+  };
 }
 
 const InvoiceManager: React.FC = () => {
@@ -77,7 +88,7 @@ const InvoiceManager: React.FC = () => {
 
       if (error) throw error;
 
-      const formatted = (data || []).map((inv: any) => ({
+      const formatted: Invoice[] = (data || []).map((inv: any) => ({
         id: inv.id,
         invoice_number: inv.invoice_number,
         invoice_date: inv.invoice_date,
@@ -98,8 +109,104 @@ const InvoiceManager: React.FC = () => {
         amount_due: parseFloat(inv.amount_due || 0),
         payment_status: inv.payment_status,
         status: inv.status,
-        html_content: inv.html_content
+        html_content: inv.html_content,
+        cashflow: undefined
       }));
+
+      // Best-effort: attach cashflow health to each invoice (invoice_payment events + payouts)
+      try {
+        const invoiceIds = formatted.map((i) => i.id).filter(Boolean);
+        if (invoiceIds.length > 0) {
+          const { data: events, error: evErr } = await supabase
+            .from('cashflow_events')
+            .select('id, source_ref, amount_cents, occurred_at, processed_at, processing_error')
+            .eq('source_type', 'invoice_payment')
+            .in('source_ref', invoiceIds)
+            .order('occurred_at', { ascending: false });
+
+          if (!evErr && Array.isArray(events) && events.length > 0) {
+            const eventIds = events.map((e: any) => e.id).filter(Boolean);
+            let payouts: any[] = [];
+            if (eventIds.length > 0) {
+              const { data: p, error: pErr } = await supabase
+                .from('cashflow_payouts')
+                .select('id, event_id, status')
+                .in('event_id', eventIds);
+              if (!pErr && Array.isArray(p)) payouts = p;
+            }
+
+            const byInvoice: Record<string, Invoice['cashflow']> = {};
+            for (const inv of formatted) {
+              byInvoice[inv.id] = {
+                status: 'unknown',
+                event_count: 0,
+                total_cents: 0,
+                last_occurred_at: null,
+                unprocessed_count: 0,
+                error_count: 0,
+                payout_count: 0,
+                payout_pending_count: 0,
+                payout_paid_count: 0,
+              };
+            }
+
+            for (const e of events as any[]) {
+              const invoiceId = String(e.source_ref || '').trim();
+              if (!invoiceId || !byInvoice[invoiceId]) continue;
+
+              const c = byInvoice[invoiceId]!;
+              c.event_count += 1;
+              c.total_cents += Number(e.amount_cents || 0);
+              const occurred = e.occurred_at ? String(e.occurred_at) : null;
+              if (!c.last_occurred_at || (occurred && occurred > c.last_occurred_at)) c.last_occurred_at = occurred;
+              if (!e.processed_at) c.unprocessed_count += 1;
+              if (e.processing_error) c.error_count += 1;
+            }
+
+            if (payouts.length > 0) {
+              const payoutByEventId: Record<string, { pending: number; paid: number; total: number }> = {};
+              for (const p of payouts) {
+                const eventId = String(p.event_id || '').trim();
+                if (!eventId) continue;
+                payoutByEventId[eventId] ??= { pending: 0, paid: 0, total: 0 };
+                payoutByEventId[eventId].total += 1;
+                if (p.status === 'paid') payoutByEventId[eventId].paid += 1;
+                if (p.status === 'pending' || p.status === 'partially_paid') payoutByEventId[eventId].pending += 1;
+              }
+
+              // Attribute payouts to invoice via the event list (event.source_ref == invoice id)
+              for (const e of events as any[]) {
+                const invoiceId = String(e.source_ref || '').trim();
+                const eventId = String(e.id || '').trim();
+                const stats = payoutByEventId[eventId];
+                if (!invoiceId || !stats || !byInvoice[invoiceId]) continue;
+                byInvoice[invoiceId]!.payout_count += stats.total;
+                byInvoice[invoiceId]!.payout_pending_count += stats.pending;
+                byInvoice[invoiceId]!.payout_paid_count += stats.paid;
+              }
+            }
+
+            const withCashflow = formatted.map((inv) => {
+              const c = byInvoice[inv.id];
+              if (!c) return inv;
+
+              let status: Invoice['cashflow']['status'] = 'unknown';
+              if (c.error_count > 0) status = 'error';
+              else if (c.unprocessed_count > 0) status = 'pending';
+              else if (inv.amount_paid > 0 && c.event_count === 0) status = 'missing';
+              else if (c.event_count > 0) status = 'ok';
+              c.status = status;
+
+              return { ...inv, cashflow: c };
+            });
+
+            setInvoices(withCashflow);
+            return;
+          }
+        }
+      } catch {
+        // ignore (cashflow tables may not exist in some deployments)
+      }
 
       setInvoices(formatted);
     } catch (error) {
@@ -163,6 +270,18 @@ const InvoiceManager: React.FC = () => {
       case 'overdue': return 'var(--error)';
       case 'sent': return 'var(--text)';
       default: return 'var(--text-secondary)';
+    }
+  };
+
+  const getCashflowColor = (status: Invoice['cashflow']['status'] | undefined) => {
+    switch (status) {
+      case 'ok': return 'var(--success)';
+      case 'pending': return 'var(--warning)';
+      case 'missing':
+      case 'error':
+        return 'var(--error)';
+      default:
+        return 'var(--text-secondary)';
     }
   };
 
@@ -304,6 +423,20 @@ const InvoiceManager: React.FC = () => {
                   }}>
                     {invoice.payment_status}
                   </div>
+                  {invoice.cashflow && invoice.amount_paid > 0 && (
+                    <div
+                      style={{
+                        fontSize: '8px',
+                        marginTop: '2px',
+                        color: getCashflowColor(invoice.cashflow.status),
+                        fontWeight: 600,
+                        textTransform: 'uppercase'
+                      }}
+                      title={`cashflow_events=${invoice.cashflow.event_count} unprocessed=${invoice.cashflow.unprocessed_count} errors=${invoice.cashflow.error_count} payouts=${invoice.cashflow.payout_count}`}
+                    >
+                      cashflow: {invoice.cashflow.status}
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}
