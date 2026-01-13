@@ -256,6 +256,7 @@ const ImageGallery = ({
   const [imagesPerRow, setImagesPerRow] = useState(3); // 1-16
   const [preserveAspectRatio, setPreserveAspectRatio] = useState(false); // Original image ratio
   const [auctionStartDate, setAuctionStartDate] = useState<string | null>(null); // For date calculations
+  const [batListingMetaByUrl, setBatListingMetaByUrl] = useState<Record<string, { end_date: string | null; sold_at: string | null; lot_number: string | null }>>({});
   const [autoLoad, setAutoLoad] = useState(false);
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{total: number, completed: number, uploading: boolean}>({total: 0, completed: 0, uploading: false});
@@ -338,6 +339,7 @@ const ImageGallery = ({
           .select('start_date, end_date')
           .eq('vehicle_id', vehicleId)
           .eq('platform', 'bat')
+          .order('end_date', { ascending: false, nullsFirst: false })
           .maybeSingle();
         
         if (listing?.start_date) {
@@ -353,6 +355,51 @@ const ImageGallery = ({
         }
       } catch {
         setAuctionStartDate(null);
+      }
+    })();
+  }, [vehicleId]);
+
+  const normalizeListingUrlForKey = (u: string | null | undefined): string => {
+    const s = String(u || '').trim();
+    if (!s) return '';
+    try {
+      const url = new URL(s);
+      url.hash = '';
+      url.search = '';
+      const out = url.toString();
+      return out.endsWith('/') ? out.slice(0, -1) : out;
+    } catch {
+      return s.split('#')[0].split('?')[0].replace(/\/+$/, '').trim();
+    }
+  };
+
+  // For multi-auction BaT vehicles: keep a small lookup of listing_url -> {lot/date}
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!vehicleId) { setBatListingMetaByUrl({}); return; }
+        const { data: rows } = await supabase
+          .from('external_listings')
+          .select('listing_url, end_date, sold_at, metadata')
+          .eq('vehicle_id', vehicleId)
+          .eq('platform', 'bat')
+          .order('end_date', { ascending: false, nullsFirst: false })
+          .limit(20);
+
+        const next: Record<string, { end_date: string | null; sold_at: string | null; lot_number: string | null }> = {};
+        for (const r of (rows || [])) {
+          const k = normalizeListingUrlForKey((r as any)?.listing_url);
+          if (!k) continue;
+          const lot = (r as any)?.metadata?.lot_number ? String((r as any).metadata.lot_number) : null;
+          next[k] = {
+            end_date: (r as any)?.end_date ? String((r as any).end_date) : null,
+            sold_at: (r as any)?.sold_at ? String((r as any).sold_at) : null,
+            lot_number: lot,
+          };
+        }
+        setBatListingMetaByUrl(next);
+      } catch {
+        setBatListingMetaByUrl({});
       }
     })();
   }, [vehicleId]);
@@ -910,19 +957,20 @@ const ImageGallery = ({
     
     // Apply grouping by source if enabled
     if (groupBySource) {
-      const grouped = new Map<string, any[]>();
+      const grouped = new Map<string, { baseType: string; source: ReturnType<typeof getImageSource>; sourceUrl: string | null; images: any[] }>();
       for (const img of sorted) {
         const source = getImageSource(img);
-        const key = source.type;
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped.get(key)!.push(img);
+        const sourceUrl = source.type === 'bat' ? normalizeListingUrlForKey((img as any)?.source_url) : '';
+        const key = (source.type === 'bat' && sourceUrl) ? `bat:${sourceUrl}` : source.type;
+        if (!grouped.has(key)) grouped.set(key, { baseType: source.type, source, sourceUrl: sourceUrl || null, images: [] });
+        grouped.get(key)!.images.push(img);
       }
       
       // Within each group, sort chronologically if enabled
       const dir = chronologicalMode === 'off' ? 0 : (chronologicalMode === 'asc' ? 1 : -1);
       if (dir !== 0) {
-        for (const [sourceType, images] of grouped.entries()) {
-          images.sort((a, b) => {
+        for (const group of grouped.values()) {
+          group.images.sort((a, b) => {
             const effA = getEffectiveImageDate(a, auctionStartDate);
             const effB = getEffectiveImageDate(b, auctionStartDate);
             const dateA = effA.iso ? new Date(effA.iso).getTime() : 0;
@@ -943,11 +991,12 @@ const ImageGallery = ({
       };
       sorted = Array.from(grouped.entries())
         .sort((a, b) => {
-          const priA = sourcePriority[a[0]] || 10;
-          const priB = sourcePriority[b[0]] || 10;
-          return priB - priA;
+          const priA = sourcePriority[a[1].baseType] || 10;
+          const priB = sourcePriority[b[1].baseType] || 10;
+          if (priA !== priB) return priB - priA;
+          return a[0].localeCompare(b[0]); // stable within same baseType
         })
-        .flatMap(([_, images]) => images);
+        .flatMap(([_, group]) => group.images);
     }
     // Apply grouping by category if enabled (and not grouping by source)
     else if (groupByCategory) {
@@ -2217,7 +2266,7 @@ const ImageGallery = ({
               }}
               title="Group images by source (User, Import Queue, Organization, BaT, External)"
             >
-              By Source
+              Source
             </button>
             {/* Groups Toggle */}
             <button
@@ -2236,7 +2285,7 @@ const ImageGallery = ({
               }}
               title="Group images by category"
             >
-              By Category
+              Category
             </button>
             
             {/* Chronological Toggle (3-state: off -> asc -> desc -> off) */}
@@ -2271,12 +2320,6 @@ const ImageGallery = ({
               maxWidth: '200px',
               flexShrink: 1
             }}>
-              <span style={{ 
-                fontSize: '7pt', 
-                color: 'var(--text-muted)', 
-                whiteSpace: 'nowrap',
-                flexShrink: 0
-              }}>{imagesPerRow}/row</span>
               <input
                 type="range"
                 min="1"
@@ -2289,23 +2332,6 @@ const ImageGallery = ({
               />
             </div>
           )}
-
-          {/* Original Ratio Toggle */}
-          <button
-            onClick={() => setPreserveAspectRatio(!preserveAspectRatio)}
-            className={preserveAspectRatio ? 'button button-primary' : 'button'}
-            style={{ 
-              fontSize: '8pt', 
-              padding: '4px 8px', 
-              height: '24px', 
-              minHeight: '24px',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}
-            title="Preserve original image aspect ratio"
-          >
-            Original Ratio
-          </button>
 
           {/* Upload Button */}
           {queueStats && (queueStats.pending > 0 || queueStats.failed > 0) && session?.user?.id && (
@@ -2381,16 +2407,20 @@ const ImageGallery = ({
           {(() => {
             // If grouping by source, add section headers
             if (groupBySource) {
-              const grouped: Array<{ source: ReturnType<typeof getImageSource>; images: any[] }> = [];
-              const currentGroup: { source: ReturnType<typeof getImageSource> | null; images: any[] } = { source: null, images: [] };
+              const grouped: Array<{ key: string; source: ReturnType<typeof getImageSource>; sourceUrl: string | null; images: any[] }> = [];
+              const currentGroup: { key: string | null; source: ReturnType<typeof getImageSource> | null; sourceUrl: string | null; images: any[] } = { key: null, source: null, sourceUrl: null, images: [] };
               
               displayedImages.forEach((image) => {
                 const source = getImageSource(image);
-                if (!currentGroup.source || currentGroup.source.type !== source.type) {
+                const sourceUrl = source.type === 'bat' ? (normalizeListingUrlForKey((image as any)?.source_url) || null) : null;
+                const key = (source.type === 'bat' && sourceUrl) ? `bat:${sourceUrl}` : source.type;
+                if (!currentGroup.key || currentGroup.key !== key) {
                   if (currentGroup.source && currentGroup.images.length > 0) {
-                    grouped.push({ source: currentGroup.source, images: [...currentGroup.images] });
+                    grouped.push({ key: currentGroup.key || currentGroup.source.type, source: currentGroup.source, sourceUrl: currentGroup.sourceUrl, images: [...currentGroup.images] });
                   }
+                  currentGroup.key = key;
                   currentGroup.source = source;
+                  currentGroup.sourceUrl = sourceUrl;
                   currentGroup.images = [image];
                 } else {
                   currentGroup.images.push(image);
@@ -2398,11 +2428,11 @@ const ImageGallery = ({
               });
               
               if (currentGroup.source && currentGroup.images.length > 0) {
-                grouped.push({ source: currentGroup.source, images: currentGroup.images });
+                grouped.push({ key: currentGroup.key || currentGroup.source.type, source: currentGroup.source, sourceUrl: currentGroup.sourceUrl, images: currentGroup.images });
               }
               
               return grouped.map((group, groupIndex) => (
-                <div key={group.source.type}>
+                <div key={group.key}>
                   {/* Section Header */}
                   <div style={{
                     padding: 'var(--space-3) var(--space-2)',
@@ -2424,7 +2454,26 @@ const ImageGallery = ({
                       color: 'var(--text)',
                       textTransform: 'uppercase'
                     }}>
-                      {group.source.label} ({group.images.length})
+                      {(() => {
+                        // For BaT sources, split by auction/listing URL so relists appear as separate groups.
+                        if (group.source.type === 'bat' && group.sourceUrl) {
+                          const meta = batListingMetaByUrl[group.sourceUrl];
+                          const lot = meta?.lot_number ? `Lot #${meta.lot_number}` : null;
+                          const dt = meta?.end_date || meta?.sold_at;
+                          const dateLabel = dt ? (() => {
+                            try {
+                              const d = new Date(dt);
+                              if (!Number.isFinite(d.getTime())) return null;
+                              return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                            } catch {
+                              return null;
+                            }
+                          })() : null;
+                          const label = ['BaT', lot, dateLabel].filter(Boolean).join(' • ') || 'BaT';
+                          return `${label} (${group.images.length})`;
+                        }
+                        return `${group.source.label} (${group.images.length})`;
+                      })()}
                     </span>
                   </div>
                   

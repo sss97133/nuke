@@ -515,11 +515,13 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         }
 
         // Fetch price history
+        // Trend is intended to reflect the internal price signal (not auction outcomes).
+        // Auction prices (sale/high_bid) are provenance-backed separately in the value popup.
         const { data, error } = await supabase
           .from('vehicle_price_history')
           .select('price_type,value,as_of')
           .eq('vehicle_id', vehicle.id)
-          .in('price_type', ['current','asking','sale'])
+          .eq('price_type', 'current')
           .order('as_of', { ascending: false })
           .limit(100); // Fetch more for longer periods
 
@@ -2141,7 +2143,42 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowOwnerClaimDropdown((prev) => !prev);
+                  // Shift+Click opens the claim/help dropdown. Normal click navigates to the owner identity/profile.
+                  if (e.shiftKey) {
+                    setShowOwnerClaimDropdown((prev) => !prev);
+                    return;
+                  }
+
+                  (async () => {
+                    try {
+                      const raw = String(ownerGuess.username || '').trim();
+                      const handle = raw.replace(/^@/, '').trim();
+                      if (!handle) return;
+
+                      const proofUrl = `https://bringatrailer.com/member/${handle}/`;
+                      const { data: identity } = await supabase
+                        .from('external_identities')
+                        .select('id, claimed_by_user_id, profile_url')
+                        .eq('platform', 'bat')
+                        .eq('handle', handle)
+                        .maybeSingle();
+
+                      if (identity?.claimed_by_user_id) {
+                        navigate(`/profile/${identity.claimed_by_user_id}`);
+                        return;
+                      }
+                      if (identity?.id) {
+                        navigate(`/profile/external/${identity.id}`);
+                        return;
+                      }
+
+                      navigate(
+                        `/claim-identity?platform=bat&handle=${encodeURIComponent(handle)}&profileUrl=${encodeURIComponent(identity?.profile_url || proofUrl)}`,
+                      );
+                    } catch (err) {
+                      console.warn('Owner identity navigation failed:', err);
+                    }
+                  })();
                 }}
                 style={{
                   fontSize: '9px',
@@ -2156,7 +2193,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                   color: 'var(--text-muted)',
                   height: '100%',
                 }}
-                title={`Owner (unverified): @${ownerGuess.username}`}
+                title={`Owner (unverified): @${ownerGuess.username} (Click to view profile. Shift+Click for claim details)`}
               >
                 @{ownerGuess.username}<sup style={{ fontSize: '6px', color: 'var(--warning)', marginLeft: '1px' }}>*</sup>
               </button>
