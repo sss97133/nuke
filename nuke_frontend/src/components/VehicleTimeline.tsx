@@ -89,6 +89,8 @@ const VehicleTimeline: React.FC<{
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [selectedDayEvents, setSelectedDayEvents] = useState<TimelineEvent[]>([]);
   const [showDayPopup, setShowDayPopup] = useState(false);
+  const [dayInvoicesByEventId, setDayInvoicesByEventId] = useState<Record<string, any>>({});
+  const [dayInvoicesLoading, setDayInvoicesLoading] = useState(false);
   const [creatingWorkSession, setCreatingWorkSession] = useState(false);
   const [popupImageUrl, setPopupImageUrl] = useState<string | null>(null);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<string | null>(null);
@@ -302,6 +304,57 @@ const VehicleTimeline: React.FC<{
     const ts = (ev?.metadata?.when?.photo_taken || ev?.metadata?.when?.uploaded || ev?.created_at || ev?.event_date);
     return { hours, valueUSD, anchor, pct, ts };
   };
+
+  const isUuid = (v: any): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || '').trim());
+
+  // When a day receipt is open, load invoices for all events on that day (best-effort).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (!showDayPopup || !Array.isArray(selectedDayEvents) || selectedDayEvents.length === 0) {
+          setDayInvoicesByEventId({});
+          setDayInvoicesLoading(false);
+          return;
+        }
+
+        const uniqueEvents = (selectedDayEvents || []).filter((ev, idx, arr) =>
+          arr.findIndex((e: any) => e.id === ev.id || (e.title === ev.title && e.event_date === ev.event_date)) === idx
+        );
+        const ids = uniqueEvents.map((e: any) => String(e.id || '').trim()).filter(isUuid);
+        if (ids.length === 0) {
+          setDayInvoicesByEventId({});
+          setDayInvoicesLoading(false);
+          return;
+        }
+
+        setDayInvoicesLoading(true);
+        const { data, error } = await supabase
+          .from('generated_invoices')
+          .select('id,event_id,invoice_number,total_amount,status,payment_status')
+          .in('event_id', ids);
+
+        if (cancelled) return;
+        if (error) throw error;
+
+        const by: Record<string, any> = {};
+        for (const row of (data || []) as any[]) {
+          const eid = String(row.event_id || '').trim();
+          if (!eid) continue;
+          by[eid] = row;
+        }
+        setDayInvoicesByEventId(by);
+      } catch (e) {
+        if (!cancelled) setDayInvoicesByEventId({});
+      } finally {
+        if (!cancelled) setDayInvoicesLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showDayPopup, selectedDayEvents]);
 
   // Group photo_added events in a single day into one evidence set
   const groupDayEvents = (dayEvents: TimelineEvent[]): TimelineEvent[] => {
@@ -996,10 +1049,10 @@ const VehicleTimeline: React.FC<{
                                           if (onDateClick) {
                                             onDateClick(dayYmd, dayEvents);
                                           } else {
-                                            // If day has events, open the first event's receipt directly
+                                            // Day receipt: show the day popup (with totals + event list), then allow drilling into receipts.
                                             if (dayEvents.length > 0) {
-                                              // Open receipt for the first event
-                                              setSelectedEventForDetail(dayEvents[0].id);
+                                              setSelectedDayEvents(dayEvents as any);
+                                              setShowDayPopup(true);
                                             } else if (activityCount > 0) {
                                               // If day has activity but no events, get photos and auction activity for that date
                                               const dayStart = ymdToUtcStart(dayYmd);
@@ -1555,10 +1608,18 @@ const VehicleTimeline: React.FC<{
                 let totalCost = 0;
                 let totalHours = 0;
                 let photoCount = 0;
+                let invoiceCount = 0;
                 
                 uniqueEvents.forEach(ev => {
                   const impact = calcEventImpact(ev);
-                  totalCost += impact.valueUSD || 0;
+                  const inv = dayInvoicesByEventId?.[String((ev as any)?.id || '').trim()];
+                  const invTotal = inv?.total_amount != null ? Number(inv.total_amount) : null;
+                  if (typeof invTotal === 'number' && Number.isFinite(invTotal) && invTotal > 0) {
+                    totalCost += invTotal;
+                    invoiceCount += 1;
+                  } else {
+                    totalCost += impact.valueUSD || 0;
+                  }
                   totalHours += impact.hours || 0;
                   const urls = Array.isArray(ev.image_urls) ? ev.image_urls : [];
                   photoCount += urls.length;
@@ -1579,7 +1640,10 @@ const VehicleTimeline: React.FC<{
                         {totalCost > 0 && (
                           <div>
                             <div style={{ fontSize: '9pt', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL COST</div>
-                            <div style={{ fontSize: '16pt', fontWeight: 700 }}>${totalCost.toLocaleString()}</div>
+                            <div style={{ fontSize: '16pt', fontWeight: 700 }}>${Math.round(totalCost).toLocaleString()}</div>
+                            <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 2 }}>
+                              {dayInvoicesLoading ? 'Loading invoices…' : invoiceCount > 0 ? `From ${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} (fallback: estimate)` : 'Estimated (no invoices yet)'}
+                            </div>
                           </div>
                         )}
                         {totalHours > 0 && (
@@ -1829,7 +1893,21 @@ const VehicleTimeline: React.FC<{
                                 {(() => {
                                   const met = calcEventImpact(ev);
                                   const tags: React.ReactNode[] = [];
-                                  if (met.valueUSD > 0) tags.push(<span key="val" className="badge">${Math.round(met.valueUSD).toLocaleString()}</span>);
+                                  const inv = dayInvoicesByEventId?.[String((ev as any)?.id || '').trim()];
+                                  const invTotal = inv?.total_amount != null ? Number(inv.total_amount) : null;
+                                  if (typeof invTotal === 'number' && Number.isFinite(invTotal) && invTotal > 0) {
+                                    tags.push(
+                                      <span
+                                        key="inv"
+                                        className="badge badge-success"
+                                        title={`Invoice ${String(inv?.invoice_number || '').trim() || ''}`.trim()}
+                                      >
+                                        INV ${Math.round(invTotal).toLocaleString()}
+                                      </span>
+                                    );
+                                  } else if (met.valueUSD > 0) {
+                                    tags.push(<span key="val" className="badge">${Math.round(met.valueUSD).toLocaleString()}</span>);
+                                  }
                                   if (met.hours > 0) tags.push(<span key="hrs" className="badge">{met.hours.toFixed(1)}h</span>);
                                   if (shown.length > 1) tags.push(<span key="cnt" className="badge">{shown.length} photos</span>);
                                   return <>{tags}</>;
