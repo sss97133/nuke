@@ -35,7 +35,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
   const [category, setCategory] = useState<DocCategory>('receipt');
   const [doc, setDoc] = useState<UploadableDoc | null>(null);
   const [parsed, setParsed] = useState<ParsedReceipt | null>(null);
-  const [status, setStatus] = useState<'idle'|'uploading'|'parsing'|'preview'|'saving'|'success'|'error'>('idle');
+  const [status, setStatus] = useState<'idle'|'uploading'|'parsing'|'preview'|'saving'|'analyzing'|'success'|'error'>('idle');
   const [message, setMessage] = useState<string>('');
   const [valueDelta, setValueDelta] = useState<{ delta: number; newValue: number; confidence: number } | null>(null);
 
@@ -274,6 +274,8 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Authentication required');
 
+      const currency = parsed.currency || 'USD';
+
       // Get valuation before
       const before = await VehicleValuationService.calculateValuation(vehicleId);
 
@@ -286,16 +288,12 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
           document_type: category,
           title: doc.fileName || category.charAt(0).toUpperCase() + category.slice(1),
           description: parsed.vendor_name || category,
-          document_date: parsed.receipt_date || null,
           file_url: doc.prepared.publicUrl,
-          file_name: doc.fileName || 'document',
           file_type: doc.mimeType || 'application/octet-stream',
-          file_size: doc.file?.size || null,
           privacy_level: 'owner_only',
-          contains_pii: true,
           vendor_name: parsed.vendor_name || null,
           amount: typeof parsed.total === 'number' ? parsed.total : null,
-          currency: 'USD'
+          currency
         })
         .select()
         .single();
@@ -321,6 +319,16 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
       }
 
       // Create timeline event (now without circular dependency)
+      const kindLabel =
+        category === 'receipt'
+          ? 'Receipt'
+          : category === 'invoice'
+            ? 'Invoice'
+            : category === 'service_record'
+              ? 'Service Record'
+              : 'Document';
+      const safeEventDate = (parsed.receipt_date && String(parsed.receipt_date).slice(0, 10)) || new Date().toISOString().split('T')[0];
+
       const { data: eventData, error: eventError } = await supabase
         .from('timeline_events')
         .insert({
@@ -328,17 +336,19 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
           user_id: user.id,
           event_type: category === 'service_record' ? 'maintenance' : 'purchase',
           event_category: 'maintenance',
-          title: `${category === 'receipt' ? 'Receipt' : category === 'invoice' ? 'Invoice' : 'Service Record'}: ${parsed.vendor_name || 'Document'}`,
+          title: `${kindLabel}: ${parsed.vendor_name || 'Document'}`,
           description: `${parsed.items?.length || 0} items for ${parsed.total ? `$${parsed.total}` : 'unknown amount'}`,
-          event_date: parsed.receipt_date || new Date().toISOString().split('T')[0],
+          event_date: safeEventDate,
           source_type: 'receipt',
-          receipt_amount: typeof parsed.total === 'number' ? parsed.total : null,
-          receipt_currency: 'USD',
-          affects_value: true,
+          cost_amount: typeof parsed.total === 'number' ? parsed.total : null,
+          cost_currency: currency,
+          invoice_number: parsed.invoice_number || null,
+          receipt_data: parsed as any,
           metadata: {
             document_id: (docData as any).id,
             vendor: parsed.vendor_name,
-            item_count: parsed.items?.length || 0
+            item_count: parsed.items?.length || 0,
+            source: 'smart_invoice_uploader'
           }
         })
         .select()

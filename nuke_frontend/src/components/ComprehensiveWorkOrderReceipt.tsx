@@ -139,6 +139,42 @@ interface Evidence {
   id: string;
   image_url: string;
   taken_at?: string;
+  created_at?: string;
+}
+
+interface EventDocument {
+  document_id: string;
+  document_type: string | null;
+  file_url: string | null;
+  vendor_name: string | null;
+  amount: number | null;
+}
+
+interface ReceiptHeader {
+  id: string;
+  vendor_name: string | null;
+  receipt_date: string | null;
+  currency: string | null;
+  subtotal: number | null;
+  tax: number | null;
+  total: number | null;
+  invoice_number: string | null;
+  purchase_order: string | null;
+  status: string | null;
+  source_document_id: string | null;
+}
+
+interface ReceiptItemRow {
+  id: string;
+  receipt_id: string;
+  line_number: number | null;
+  description: string | null;
+  part_number: string | null;
+  vendor_sku: string | null;
+  category: string | null;
+  quantity: number | null;
+  unit_price: number | null;
+  total_price: number | null;
 }
 
 export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderReceiptProps> = ({ eventId, onClose, onNavigate }) => {
@@ -147,6 +183,12 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [deviceAttribution, setDeviceAttribution] = useState<DeviceAttribution[]>([]);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
+  const [eventDocuments, setEventDocuments] = useState<EventDocument[]>([]);
+  const [receiptHeaders, setReceiptHeaders] = useState<ReceiptHeader[]>([]);
+  const [receiptItems, setReceiptItems] = useState<ReceiptItemRow[]>([]);
+  const [baseEvent, setBaseEvent] = useState<any>(null);
+  const [runningContextual, setRunningContextual] = useState(false);
+  const [contextualError, setContextualError] = useState<string | null>(null);
   const [costBreakdown, setCostBreakdown] = useState<{
     parts: { items: Part[], total: number },
     labor: { tasks: LaborTask[], total: number, hours: number },
@@ -173,9 +215,15 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
 
   const loadData = async () => {
     setLoading(true);
+    setContextualError(null);
+    setEventDocuments([]);
+    setReceiptHeaders([]);
+    setReceiptItems([]);
+    setBaseEvent(null);
     try {
       // 1. Try comprehensive view first, fallback to timeline_events
       let wo: WorkOrder | null = null;
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
       
       const { data: viewData, error: viewError } = await supabase
         .from('work_order_comprehensive_receipt')
@@ -233,6 +281,20 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
       
       setWorkOrder(wo);
 
+      // 1a. Load base event metadata for contextual analysis + receipt totals (best-effort)
+      if (isUuid) {
+        try {
+          const { data: evRow, error: evErr } = await supabase
+            .from('timeline_events')
+            .select('id, vehicle_id, event_date, metadata, contextual_analysis_status, receipt_amount, receipt_currency')
+            .eq('id', eventId)
+            .maybeSingle();
+          if (!evErr && evRow) setBaseEvent(evRow);
+        } catch {
+          // ignore
+        }
+      }
+
       // 1b. Extract auction data if this is an auction_sold event
       if (wo.event_type === 'auction_sold' || wo.title?.includes('sold') || wo.title?.includes('Auction')) {
         const metadata = wo.calculation_metadata || (wo as any).metadata;
@@ -286,6 +348,44 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
         setParticipants(partsData);
       }
 
+      // 2b. Load event-linked documents + receipt ledger (best-effort)
+      if (isUuid) {
+        try {
+          const { data: docs } = await supabase.rpc('get_event_documents', { p_event_id: eventId });
+          const docRows = (docs || []) as EventDocument[];
+          setEventDocuments(docRows);
+
+          const docIds = docRows.map(d => d.document_id).filter(Boolean);
+          if (docIds.length > 0) {
+            const { data: recs, error: recErr } = await supabase
+              .from('receipts')
+              .select('id,vendor_name,receipt_date,currency,subtotal,tax,total,invoice_number,purchase_order,status,source_document_id')
+              .eq('source_document_table', 'vehicle_documents')
+              .in('source_document_id', docIds);
+
+            if (!recErr && Array.isArray(recs) && recs.length > 0) {
+              const receiptRows = recs as ReceiptHeader[];
+              setReceiptHeaders(receiptRows);
+
+              const receiptIds = receiptRows.map(r => r.id).filter(Boolean);
+              if (receiptIds.length > 0) {
+                const { data: items, error: itemsErr } = await supabase
+                  .from('receipt_items')
+                  .select('id,receipt_id,line_number,description,part_number,vendor_sku,category,quantity,unit_price,total_price')
+                  .in('receipt_id', receiptIds)
+                  .order('receipt_id', { ascending: true })
+                  .order('line_number', { ascending: true });
+                if (!itemsErr && Array.isArray(items)) {
+                  setReceiptItems(items as ReceiptItemRow[]);
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore receipt/doc loading failures (RLS, missing schema, etc.)
+        }
+      }
+
       // 3. Get device attribution
       if (wo?.vehicle_id && wo?.event_date) {
         const { data: devData } = await supabase
@@ -317,16 +417,56 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
       }
 
       // 5. Get evidence (photos)
-      if (wo?.vehicle_id && wo?.event_date) {
-        const { data: imgs } = await supabase
-          .from('vehicle_images')
-          .select('id, image_url, taken_at')
-          .eq('vehicle_id', wo.vehicle_id)
-          .gte('taken_at', new Date(wo.event_date).toISOString().split('T')[0])
-          .lte('taken_at', new Date(new Date(wo.event_date).getTime() + 24*60*60*1000).toISOString().split('T')[0])
-          .order('taken_at', { ascending: true });
-        
-        setEvidence(imgs || []);
+      if (wo?.vehicle_id) {
+        let imgs: Evidence[] = [];
+
+        // Prefer explicit image->event links (supports evidence-set invoices)
+        if (isUuid) {
+          const { data: linked } = await supabase
+            .from('vehicle_images')
+            .select('id, image_url, taken_at, created_at')
+            .eq('vehicle_id', wo.vehicle_id)
+            .eq('timeline_event_id', eventId)
+            .order('taken_at', { ascending: true });
+          if (Array.isArray(linked) && linked.length > 0) {
+            imgs = linked as Evidence[];
+          }
+        }
+
+        // Fallback: day-range by taken_at / created_at
+        if (imgs.length === 0 && wo?.event_date) {
+          const startIso = new Date(`${String(wo.event_date).slice(0, 10)}T00:00:00.000Z`).toISOString();
+          const endIso = new Date(new Date(startIso).getTime() + 24 * 60 * 60 * 1000).toISOString();
+
+          const byTaken = await supabase
+            .from('vehicle_images')
+            .select('id, image_url, taken_at, created_at')
+            .eq('vehicle_id', wo.vehicle_id)
+            .gte('taken_at', startIso)
+            .lt('taken_at', endIso)
+            .order('taken_at', { ascending: true });
+
+          const byCreated = await supabase
+            .from('vehicle_images')
+            .select('id, image_url, taken_at, created_at')
+            .eq('vehicle_id', wo.vehicle_id)
+            .gte('created_at', startIso)
+            .lt('created_at', endIso)
+            .order('created_at', { ascending: true });
+
+          const seen = new Set<string>();
+          const merged: Evidence[] = [];
+          for (const row of [...(byTaken.data || []), ...(byCreated.data || [])] as Evidence[]) {
+            if (!row?.id) continue;
+            if (seen.has(row.id)) continue;
+            seen.add(row.id);
+            merged.push(row);
+          }
+
+          imgs = merged;
+        }
+
+        setEvidence(imgs);
       }
 
       // 5. Get comprehensive cost breakdown
@@ -341,6 +481,41 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
       console.error('Error loading work order:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const runContextualBatchAnalysis = async () => {
+    try {
+      setContextualError(null);
+      setRunningContextual(true);
+
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
+      if (!isUuid) throw new Error('This event cannot be analyzed (not a database event).');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Authentication required');
+
+      const vehicleId = workOrder?.vehicle_id || baseEvent?.vehicle_id;
+      if (!vehicleId) throw new Error('Missing vehicle context');
+
+      const imageIds = (evidence || []).map((e) => e.id).filter(Boolean).slice(0, 20);
+      if (imageIds.length === 0) throw new Error('No evidence images linked to this event');
+
+      const { error } = await supabase.functions.invoke('analyze-batch-contextual', {
+        body: {
+          event_id: eventId,
+          vehicle_id: vehicleId,
+          user_id: user.id,
+          image_ids: imageIds
+        }
+      });
+
+      if (error) throw error;
+      await loadData();
+    } catch (e: any) {
+      setContextualError(e?.message || 'Failed to run analysis');
+    } finally {
+      setRunningContextual(false);
     }
   };
 
@@ -700,19 +875,45 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 alignItems: 'center',
                 gap: '4px'
               }}>
-                {workOrder.ai_confidence_score ? (
-                  <>
-                    <span>✓</span>
-                    <span>Analyzed</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Processing</span>
-                    <span>AI pending</span>
-                  </>
-                )}
+                {(() => {
+                  const status = (baseEvent as any)?.contextual_analysis_status;
+                  const has = Boolean((baseEvent as any)?.metadata?.contextual_analysis);
+                  const done = status === 'completed' || has;
+
+                  return (
+                    <>
+                      <span>{done ? 'Analyzed' : 'AI pending'}</span>
+                      {!done && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); runContextualBatchAnalysis(); }}
+                          disabled={runningContextual}
+                          style={{
+                            marginLeft: '8px',
+                            padding: '2px 6px',
+                            fontSize: '7pt',
+                            fontWeight: 'bold',
+                            border: '1px solid #000',
+                            background: runningContextual ? '#f0f0f0' : '#fff',
+                            cursor: runningContextual ? 'not-allowed' : 'pointer',
+                            textTransform: 'uppercase',
+                            color: '#000'
+                          }}
+                          title="Run AI analysis on this evidence set"
+                        >
+                          {runningContextual ? 'Analyzing…' : 'Analyze'}
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
+            {contextualError && (
+              <div style={{ marginTop: '8px', fontSize: '7pt', color: '#a00' }}>
+                {contextualError}
+              </div>
+            )}
             <div style={{ 
               display: 'grid', 
               gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
@@ -772,6 +973,63 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             </div>
           )}
         </div>
+
+        {/* CONTEXTUAL ANALYSIS (5 W's) */}
+        {(() => {
+          const ca = (baseEvent as any)?.metadata?.contextual_analysis;
+          if (!ca) return null;
+
+          const totalValue = typeof ca?.value_assessment?.total_event_value === 'number' ? ca.value_assessment.total_event_value : null;
+          const valueConf = typeof ca?.value_assessment?.value_confidence === 'number' ? ca.value_assessment.value_confidence : null;
+          const estHours =
+            typeof ca?.when?.estimated_duration_hours === 'number' ? ca.when.estimated_duration_hours :
+            typeof ca?.value_assessment?.labor_value?.estimated_hours === 'number' ? ca.value_assessment.labor_value.estimated_hours :
+            null;
+
+          return (
+            <div style={{ padding: '12px', borderBottom: '2px solid #000', background: 'var(--bg)' }}>
+              <div style={{
+                fontSize: '8pt',
+                fontWeight: 'bold',
+                marginBottom: '8px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                CONTEXTUAL ANALYSIS
+              </div>
+
+              <div style={{ fontSize: '8pt', lineHeight: 1.5 }}>
+                {ca?.who?.primary_actor && (
+                  <div><strong>WHO:</strong> {String(ca.who.primary_actor)}{ca?.who?.skill_level ? ` (${String(ca.who.skill_level)})` : ''}</div>
+                )}
+                {ca?.what?.work_performed && (
+                  <div><strong>WHAT:</strong> {String(ca.what.work_performed)}</div>
+                )}
+                {(ca?.where?.work_location || ca?.where?.environment_quality) && (
+                  <div><strong>WHERE:</strong> {[ca?.where?.work_location, ca?.where?.environment_quality].filter(Boolean).join(' • ')}</div>
+                )}
+                {(ca?.why?.primary_motivation || ca?.why?.preventive_vs_reactive) && (
+                  <div><strong>WHY:</strong> {[ca?.why?.primary_motivation, ca?.why?.preventive_vs_reactive].filter(Boolean).join(' • ')}</div>
+                )}
+                {(estHours != null || totalValue != null) && (
+                  <div style={{ marginTop: '6px' }}>
+                    <strong>VALUE:</strong>{' '}
+                    {estHours != null ? `${estHours.toFixed(1)}h` : ''}
+                    {estHours != null && totalValue != null ? ' • ' : ''}
+                    {totalValue != null ? `${formatCurrency(totalValue)}` : ''}
+                    {valueConf != null ? ` • confidence ${Math.round(valueConf)}%` : ''}
+                  </div>
+                )}
+              </div>
+
+              {ca?.narrative_summary && (
+                <div style={{ marginTop: '8px', fontSize: '8pt', color: '#666', lineHeight: 1.5 }}>
+                  {String(ca.narrative_summary)}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* AUCTION RECEIPT FORMAT - Special format for auction_sold events */}
         {((workOrder.event_type === 'auction_sold' || workOrder.event_type === 'sale') && auctionData?.sale_price) ? (
@@ -1244,6 +1502,114 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
           </div>
         )}
 
+        {/* RECEIPT / INVOICE LINE ITEMS (uploaded documents) */}
+        {receiptHeaders.length > 0 && (
+          <div style={{ padding: '16px', borderBottom: '1px solid #ddd' }}>
+            <div style={{
+              fontSize: '9pt',
+              fontWeight: 'bold',
+              marginBottom: '8px',
+              borderBottom: '1px solid #000',
+              paddingBottom: '4px'
+            }}>
+              UPLOADED RECEIPTS / INVOICES
+            </div>
+
+            {receiptHeaders.map((r) => {
+              const items = receiptItems.filter((it) => it.receipt_id === r.id);
+              const doc = eventDocuments.find((d) => d.document_id === (r.source_document_id || ''));
+              const toNum = (v: any) => (typeof v === 'number' ? v : (v ? Number(v) : 0));
+              const itemsTotal = items.reduce((sum, it) => sum + toNum(it.total_price), 0);
+              const headerTotal = toNum(r.total) > 0 ? toNum(r.total) : itemsTotal;
+
+              return (
+                <div key={r.id} style={{ marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '8pt', fontWeight: 'bold' }}>
+                    <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.vendor_name || 'Receipt'}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>{formatCurrency(headerTotal)}</div>
+                  </div>
+
+                  <div style={{ fontSize: '7pt', color: '#666', marginTop: '2px', lineHeight: 1.4 }}>
+                    {[r.receipt_date ? `Date ${r.receipt_date}` : null, r.invoice_number ? `Invoice #${r.invoice_number}` : null].filter(Boolean).join(' • ')}
+                    {doc?.file_url ? (
+                      <>
+                        {' • '}
+                        <a href={doc.file_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+                          View document
+                        </a>
+                      </>
+                    ) : null}
+                  </div>
+
+                  {items.length > 0 && (
+                    <div style={{ marginTop: '8px' }}>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '2fr 60px 80px 100px',
+                        gap: '8px',
+                        paddingBottom: '4px',
+                        borderBottom: '1px solid #000',
+                        fontSize: '7pt',
+                        fontWeight: 'bold',
+                        marginBottom: '4px'
+                      }}>
+                        <div>Item</div>
+                        <div style={{ textAlign: 'right' }}>Qty</div>
+                        <div style={{ textAlign: 'right' }}>Unit</div>
+                        <div style={{ textAlign: 'right' }}>Total</div>
+                      </div>
+
+                      {items.map((it) => (
+                        <div
+                          key={it.id}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '2fr 60px 80px 100px',
+                            gap: '8px',
+                            padding: '4px 0',
+                            fontSize: '8pt',
+                            borderBottom: '1px dotted #ddd'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 'bold' }}>{it.description || 'Line item'}</div>
+                            {(it.category || it.part_number) && (
+                              <div style={{ fontSize: '6pt', color: '#666' }}>
+                                {[it.category, it.part_number ? `#${it.part_number}` : null].filter(Boolean).join(' ')}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: 'right' }}>{it.quantity ?? '-'}</div>
+                          <div style={{ textAlign: 'right' }}>{it.unit_price != null ? formatCurrency(Number(it.unit_price)) : '-'}</div>
+                          <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{it.total_price != null ? formatCurrency(Number(it.total_price)) : '-'}</div>
+                        </div>
+                      ))}
+
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '2fr 60px 80px 100px',
+                        gap: '8px',
+                        paddingTop: '8px',
+                        marginTop: '8px',
+                        borderTop: '2px solid #000',
+                        fontSize: '9pt',
+                        fontWeight: 'bold'
+                      }}>
+                        <div>SUBTOTAL (Receipt)</div>
+                        <div></div>
+                        <div></div>
+                        <div style={{ textAlign: 'right' }}>{formatCurrency(headerTotal)}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* TOTAL */}
         <div style={{ padding: '16px', borderBottom: '2px solid #000', backgroundColor: 'var(--bg)' }}>
           <div style={{ 
@@ -1253,8 +1619,47 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             fontWeight: 'bold'
           }}>
             <div>TOTAL:</div>
-            <div>{formatCurrency(workOrder.calculated_total)}</div>
+            {(() => {
+              const toNum = (v: any) => (typeof v === 'number' ? v : (v ? Number(v) : 0));
+              const estimateTotal = toNum(costBreakdown?.calculated_total) || toNum(workOrder.cost_amount) || toNum(workOrder.calculated_total);
+              const ledgerTotal = receiptHeaders.reduce((sum, r) => {
+                const t = toNum((r as any).total);
+                if (t > 0) return sum + t;
+                const itemsFor = receiptItems.filter((it) => it.receipt_id === r.id);
+                const itemsTotal = itemsFor.reduce((s, it) => s + toNum((it as any).total_price), 0);
+                return sum + itemsTotal;
+              }, 0);
+              const eventReceiptTotal = toNum((baseEvent as any)?.receipt_amount);
+              const actualTotal = ledgerTotal > 0 ? ledgerTotal : eventReceiptTotal;
+              const primary = actualTotal > 0 ? actualTotal : estimateTotal;
+              return <div>{formatCurrency(primary)}</div>;
+            })()}
           </div>
+          {(() => {
+            const toNum = (v: any) => (typeof v === 'number' ? v : (v ? Number(v) : 0));
+            const estimateTotal = toNum(costBreakdown?.calculated_total) || toNum(workOrder.cost_amount) || toNum(workOrder.calculated_total);
+            const ledgerTotal = receiptHeaders.reduce((sum, r) => {
+              const t = toNum((r as any).total);
+              if (t > 0) return sum + t;
+              const itemsFor = receiptItems.filter((it) => it.receipt_id === r.id);
+              const itemsTotal = itemsFor.reduce((s, it) => s + toNum((it as any).total_price), 0);
+              return sum + itemsTotal;
+            }, 0);
+            const eventReceiptTotal = toNum((baseEvent as any)?.receipt_amount);
+            const actualTotal = ledgerTotal > 0 ? ledgerTotal : eventReceiptTotal;
+            if (estimateTotal <= 0 && actualTotal <= 0) return null;
+
+            const hasBoth = estimateTotal > 0 && actualTotal > 0;
+            const delta = hasBoth ? (actualTotal - estimateTotal) : 0;
+
+            return (
+              <div style={{ marginTop: '6px', fontSize: '7pt', color: '#666', textAlign: 'right', lineHeight: 1.5 }}>
+                {estimateTotal > 0 && <div>Estimate: {formatCurrency(estimateTotal)}</div>}
+                {actualTotal > 0 && <div>Actual: {formatCurrency(actualTotal)}</div>}
+                {hasBoth && delta !== 0 && <div>Delta: {formatCurrency(delta)}</div>}
+              </div>
+            );
+          })()}
           {workOrder.ai_confidence_score && (
             <div style={{ fontSize: '7pt', color: '#666', marginTop: '4px', textAlign: 'right' }}>
               Confidence: {(workOrder.ai_confidence_score * 100).toFixed(0)}%
@@ -1303,7 +1708,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               paddingBottom: '4px',
               color: '#856404'
             }}>
-              ⚠ CONCERNS FLAGGED
+              CONCERNS FLAGGED
             </div>
             {workOrder.concerns.map((concern, idx) => (
               <div key={idx} style={{ fontSize: '8pt', marginBottom: '4px', color: '#856404' }}>

@@ -140,7 +140,7 @@ serve(async (req) => {
         const extractedMileage = coreResult.debug_extraction?.mileage || null;
         
         console.log(`  Step 1 complete: Vehicle ID ${vehicleId}`);
-        console.log(`  Extraction quality: ${extractedImages} images, VIN: ${extractedVin ? '✅' : '❌'}, Mileage: ${extractedMileage ? '✅' : '❌'}`);
+        console.log(`  Extraction quality: ${extractedImages} images, VIN: ${extractedVin ? 'yes' : 'no'}, Mileage: ${extractedMileage ? 'yes' : 'no'}`);
 
         // Step 2: Extract comments and bids
         if (vehicleId) {
@@ -175,9 +175,43 @@ serve(async (req) => {
           }
         }
 
+        // Step 3: Multisignal postprocess (repairs + provenance helpers)
+        // Non-critical: if it fails we still keep the core extraction results.
+        if (vehicleId) {
+          console.log(`  Step 3: Multisignal postprocess (repairs/provenance)...`);
+          try {
+            const postResponse = await fetch(
+              `${supabaseUrl}/functions/v1/bat-multisignal-postprocess`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${invokeJwt}`,
+                  'apikey': invokeJwt,
+                },
+                body: JSON.stringify({
+                  listing_url: item.bat_url,
+                  vehicle_id: vehicleId,
+                }),
+              }
+            );
+
+            if (!postResponse.ok) {
+              const errorText = await postResponse.text().catch(() => 'Unknown error');
+              console.warn(`  Step 3 warning: bat-multisignal-postprocess failed: HTTP ${postResponse.status}: ${errorText}`);
+            } else {
+              const postResult = await postResponse.json().catch(() => null);
+              const repairsCreated = postResult?.created?.repairs ?? 0;
+              console.log(`  Step 3 complete: created ${repairsCreated} repair events`);
+            }
+          } catch (e: any) {
+            console.warn(`  Step 3 warning: bat-multisignal-postprocess exception: ${e.message}`);
+          }
+        }
+
         const extractionResult = { success: true, vehicle_id: vehicleId };
 
-        // ✅ VALIDATION: Check if extraction was actually complete (not partial)
+        // Validation: Check if extraction was actually complete (not partial)
         // Verify critical data was extracted AND stored: images, VIN, specs
         const { data: vehicle, error: vehicleError } = await supabase
           .from('vehicles')
@@ -200,7 +234,7 @@ serve(async (req) => {
         const hasImages = (imageCount || 0) > 0;
         const hasCriticalData = hasVin || hasSpecs;
 
-        // ⚠️ CRITICAL: Images are REQUIRED for BaT listings (should have 50-200 images)
+        // Critical: Images are REQUIRED for BaT listings (should have 50-200 images)
         // If extraction said it found images but none were stored, that's a storage failure
         const extractionSaidImages = extractedImages > 0;
         const imagesActuallyStored = hasImages;
@@ -239,7 +273,7 @@ serve(async (req) => {
               .eq('id', item.id);
             
             results.failed++;
-            console.warn(`⚠️ Partial extraction for vehicle ${item.vehicle_id}: Missing ${missingData.join(', ')}`);
+            console.warn(`WARN: Partial extraction for vehicle ${item.vehicle_id}: Missing ${missingData.join(', ')}`);
           } else {
             // Retry with backoff
             const baseSeconds = 5 * 60;
@@ -258,10 +292,10 @@ serve(async (req) => {
               })
               .eq('id', item.id);
 
-            console.warn(`⚠️ Partial extraction for vehicle ${item.vehicle_id}: Missing ${missingData.join(', ')}. Retrying in ${delaySeconds / 60} minutes.`);
+            console.warn(`WARN: Partial extraction for vehicle ${item.vehicle_id}: Missing ${missingData.join(', ')}. Retrying in ${delaySeconds / 60} minutes.`);
           }
         } else {
-          // ✅ Complete extraction - all critical data present
+          // Complete extraction - all critical data present
           await supabase
             .from('bat_extraction_queue')
             .update({
@@ -276,7 +310,7 @@ serve(async (req) => {
             .eq('id', item.id);
 
           results.completed++;
-          console.log(`✅ Complete extraction for vehicle ${item.vehicle_id}: ${imageCount || 0} images, VIN: ${hasVin ? '✅' : 'N/A'}, Specs: ${hasSpecs ? '✅' : 'N/A'}`);
+          console.log(`Complete extraction for vehicle ${item.vehicle_id}: ${imageCount || 0} images, VIN: ${hasVin ? 'yes' : 'no'}, Specs: ${hasSpecs ? 'yes' : 'no'}`);
         }
 
       } catch (error: any) {
