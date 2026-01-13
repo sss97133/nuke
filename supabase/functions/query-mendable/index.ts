@@ -20,6 +20,7 @@ const corsHeaders = {
 };
 
 type MendableAction = "chat" | "getSources" | "newConversation";
+type MendableConversationId = string | number;
 
 type MendableHistoryItem = {
   prompt: string;
@@ -33,7 +34,7 @@ type ChatRequest = {
   // Back-compat: older `query-mendable` accepted `{ query: string }`
   query?: string;
   history?: MendableHistoryItem[];
-  conversation_id?: number;
+  conversation_id?: MendableConversationId;
   temperature?: number;
   additional_context?: string;
   relevance_threshold?: number;
@@ -49,6 +50,28 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function isConversationId(v: unknown): v is MendableConversationId {
+  return typeof v === "string" || typeof v === "number";
+}
+
+function extractConversationIdFromMendableResponse(body: unknown): MendableConversationId | null {
+  if (!body || typeof body !== "object") return null;
+  const b = body as any;
+  const candidates = [
+    b.conversation_id,
+    b.conversationId,
+    b.result?.conversation_id,
+    b.result?.conversationId,
+    b.data?.conversation_id,
+    b.data?.conversationId,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "number") return c;
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return null;
+}
+
 function extractAnswerFromMendableResponse(body: unknown): string | null {
   if (typeof body === "string") return body;
   if (!body || typeof body !== "object") return null;
@@ -57,10 +80,14 @@ function extractAnswerFromMendableResponse(body: unknown): string | null {
 
   const candidates = [
     b.answer,
+    b.answer?.text,
+    b.answer?.content,
     b.message,
     b.response,
     b.result,
     b.data?.answer,
+    b.data?.answer?.text,
+    b.data?.answer?.content,
     b.data?.message,
     b.data?.response,
     b.data?.result,
@@ -85,6 +112,36 @@ async function mendablePost(path: string, payload: Record<string, unknown>) {
   const text = await res.text();
 
   // Mendable might return JSON or text errors. Parse when possible.
+  let parsed: unknown = text;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    // keep as string
+  }
+
+  if (!res.ok) {
+    return {
+      ok: false as const,
+      status: res.status,
+      body: parsed,
+    };
+  }
+
+  return {
+    ok: true as const,
+    status: res.status,
+    body: parsed,
+  };
+}
+
+async function mendablePostWithApiKeyHeader(path: string, apiKey: string, payload: Record<string, unknown>) {
+  const res = await fetch(`https://api.mendable.ai${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "api-key": apiKey },
+    body: JSON.stringify(payload),
+  });
+
+  const text = await res.text();
   let parsed: unknown = text;
   try {
     parsed = text ? JSON.parse(text) : null;
@@ -158,15 +215,40 @@ Deno.serve(async (req) => {
   const action: MendableAction = payload.action ?? "chat";
 
   if (action === "getSources") {
-    const r = await mendablePost("/v1/getSources", { api_key: apiKey });
+    let r = await mendablePost("/v1/getSources", { api_key: apiKey });
+    if (!r.ok && (r.status === 401 || r.status === 403 || r.status === 404)) {
+      const rHeader = await mendablePostWithApiKeyHeader("/v1/getSources", apiKey, {});
+      if (rHeader.ok) return jsonResponse({ success: true, result: rHeader.body });
+      if (rHeader.status === 401 || rHeader.status === 403 || rHeader.status === 404) {
+        const rBearer = await mendablePostWithBearer("/v1/getSources", apiKey, {});
+        if (!rBearer.ok) return jsonResponse({ success: false, error: rBearer.body }, rBearer.status);
+        return jsonResponse({ success: true, result: rBearer.body });
+      }
+      return jsonResponse({ success: false, error: rHeader.body }, rHeader.status);
+    }
     if (!r.ok) return jsonResponse({ success: false, error: r.body }, r.status);
     return jsonResponse({ success: true, result: r.body });
   }
 
   if (action === "newConversation") {
-    const r = await mendablePost("/v1/newConversation", { api_key: apiKey });
+    let r = await mendablePost("/v1/newConversation", { api_key: apiKey });
+    if (!r.ok && (r.status === 401 || r.status === 403 || r.status === 404)) {
+      const rHeader = await mendablePostWithApiKeyHeader("/v1/newConversation", apiKey, {});
+      if (rHeader.ok) {
+        const convId = extractConversationIdFromMendableResponse(rHeader.body);
+        return jsonResponse({ success: true, conversation_id: convId ?? undefined, result: rHeader.body });
+      }
+      if (rHeader.status === 401 || rHeader.status === 403 || rHeader.status === 404) {
+        const rBearer = await mendablePostWithBearer("/v1/newConversation", apiKey, {});
+        if (!rBearer.ok) return jsonResponse({ success: false, error: rBearer.body }, rBearer.status);
+        const convId = extractConversationIdFromMendableResponse(rBearer.body);
+        return jsonResponse({ success: true, conversation_id: convId ?? undefined, result: rBearer.body });
+      }
+      return jsonResponse({ success: false, error: rHeader.body }, rHeader.status);
+    }
     if (!r.ok) return jsonResponse({ success: false, error: r.body }, r.status);
-    return jsonResponse({ success: true, result: r.body });
+    const convId = extractConversationIdFromMendableResponse(r.body);
+    return jsonResponse({ success: true, conversation_id: convId ?? undefined, result: r.body });
   }
 
   // action === "chat"
@@ -185,7 +267,7 @@ Deno.serve(async (req) => {
     history: Array.isArray(payload.history) ? payload.history : [],
   };
 
-  if (typeof payload.conversation_id === "number") chatBody.conversation_id = payload.conversation_id;
+  if (isConversationId(payload.conversation_id)) chatBody.conversation_id = payload.conversation_id;
   if (typeof payload.temperature === "number") chatBody.temperature = payload.temperature;
   if (typeof payload.additional_context === "string") chatBody.additional_context = payload.additional_context;
   if (typeof payload.relevance_threshold === "number") chatBody.relevance_threshold = payload.relevance_threshold;
@@ -195,10 +277,37 @@ Deno.serve(async (req) => {
     chatBody.retriever_option = { num_chunks: payload.num_chunks };
   }
 
+  // Mendable's `/v1/mendableChat` often requires a `conversation_id`. If the caller didn't provide one,
+  // create a new conversation automatically.
+  if (!isConversationId((chatBody as any).conversation_id)) {
+    let conv = await mendablePost("/v1/newConversation", { api_key: apiKey });
+    if (!conv.ok && (conv.status === 401 || conv.status === 403 || conv.status === 404)) {
+      conv = await mendablePostWithApiKeyHeader("/v1/newConversation", apiKey, {});
+    }
+    if (!conv.ok && (conv.status === 401 || conv.status === 403 || conv.status === 404)) {
+      conv = await mendablePostWithBearer("/v1/newConversation", apiKey, {});
+    }
+    if (conv.ok) {
+      const convId = extractConversationIdFromMendableResponse(conv.body);
+      if (isConversationId(convId)) (chatBody as any).conversation_id = convId;
+    }
+  }
+
   // Prefer current docs API (`/v1/mendableChat` with `api_key` in body).
   // If it fails with a status that suggests a different API version, fall back to `/v1/chat`,
   // then `/v1/newChat` (Bearer auth).
   let r = await mendablePost("/v1/mendableChat", chatBody);
+  // If Mendable complains about missing required params, it's usually missing conversation_id. Retry once.
+  if (!r.ok && r.status === 400 && !isConversationId((chatBody as any).conversation_id)) {
+    const conv = await mendablePost("/v1/newConversation", { api_key: apiKey });
+    if (conv.ok) {
+      const convId = extractConversationIdFromMendableResponse(conv.body);
+      if (isConversationId(convId)) {
+        (chatBody as any).conversation_id = convId;
+        r = await mendablePost("/v1/mendableChat", chatBody);
+      }
+    }
+  }
   if (!r.ok && (r.status === 404 || r.status === 401 || r.status === 403)) {
     r = await mendablePost("/v1/chat", chatBody);
   }
@@ -213,9 +322,11 @@ Deno.serve(async (req) => {
 
   if (!r.ok) return jsonResponse({ success: false, error: r.body }, r.status);
 
+  const conversationIdOut = (chatBody as any).conversation_id;
   return jsonResponse({
     success: true,
     // Back-compat for existing callers expecting `{ answer: string }`
+    conversation_id: isConversationId(conversationIdOut) ? conversationIdOut : undefined,
     answer: extractAnswerFromMendableResponse(r.body) ?? "No response from AI",
     result: r.body,
   });

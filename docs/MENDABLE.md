@@ -39,6 +39,20 @@ The function prefers the current docs endpoint and falls back automatically:
 - `POST https://api.mendable.ai/v1/chat` (legacy fallback)
 - `POST https://api.mendable.ai/v1/newChat` (Bearer fallback)
 
+### Local smoke test (recommended: via Supabase Edge Function)
+
+This is the preferred way to test if you want to keep `MENDABLE_API_KEY` **server-side** (Supabase secrets):
+
+```bash
+SUPABASE_URL=... SUPABASE_ANON_KEY=... node scripts/test-mendable-chat.js "your question"
+```
+
+The script will call `query-mendable-v2` (and fall back to `query-mendable`) and print:
+
+- `getSources: ok (N sources)` (when Mendable returns a list)
+- a short answer
+- a few source URLs (when present)
+
 ### Local smoke test (direct Mendable API)
 
 This repo includes a tiny connectivity check that **never prints the key**:
@@ -47,13 +61,23 @@ This repo includes a tiny connectivity check that **never prints the key**:
 MENDABLE_API_KEY=... node scripts/test-mendable-chat.js "your question"
 ```
 
+It also accepts `VITE_MENDABLE_API_KEY` for convenience, but **do not** ship Mendable keys to the browser in production.
+
 If you want an automated agent (like Cursor) to run this, set `MENDABLE_API_KEY` in the agent/runtime environment (not in chat).
 
 ## Troubleshooting
 
 ### 400 errors on `/v1/mendableChat`
 
-Mendable’s `mendableChat` endpoint expects `history` (can be `[]`). The Edge Function now always includes it.
+Mendable’s `mendableChat` endpoint expects:
+
+- `history` (can be `[]`)
+- often a `conversation_id` (string or number depending on Mendable version)
+
+The Edge Functions (`query-mendable-v2` and `query-mendable`) now:
+
+- always send `history: []` by default
+- auto-create a conversation when `conversation_id` is missing
 
 ### “MENDABLE_API_KEY not configured”
 

@@ -46,6 +46,19 @@ async function canSplitVehicle(admin: any, vehicleId: string, userId: string): P
   // - approved ownership verification
   // - active contributor
   // - explicit owner/co_owner permission record
+  // - org-based access (board_member/manager/etc) via organization_vehicles + organization_contributors
+
+  // Prefer the canonical, DB-backed permission check if present (keeps Edge logic aligned with the app).
+  try {
+    const { data: hasAccess, error } = await admin.rpc("vehicle_user_has_access", {
+      p_vehicle_id: vehicleId,
+      p_user_id: userId,
+    });
+    if (!error && hasAccess === true) return true;
+  } catch {
+    // Fall back to legacy checks below.
+  }
+
   const { data: vehicle } = await admin
     .from("vehicles")
     .select("uploaded_by, user_id")
@@ -83,6 +96,53 @@ async function canSplitVehicle(admin: any, vehicleId: string, userId: string): P
   if ((ver || []).length > 0) return true;
   if ((contrib || []).length > 0) return true;
   if ((perm || []).length > 0) return true;
+
+  // Org-based access (matches frontend OwnershipService behavior)
+  try {
+    const { data: orgVehicles } = await admin
+      .from("organization_vehicles")
+      .select("organization_id, start_date, end_date, status")
+      .eq("vehicle_id", vehicleId)
+      .eq("status", "active");
+
+    const links = Array.isArray(orgVehicles) ? orgVehicles : [];
+    if (links.length > 0) {
+      const now = new Date();
+      for (const link of links) {
+        const orgId = link?.organization_id;
+        if (!orgId) continue;
+
+        const { data: orgMember } = await admin
+          .from("organization_contributors")
+          .select("role, status, start_date, end_date")
+          .eq("organization_id", orgId)
+          .eq("user_id", userId)
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (!orgMember?.role) continue;
+
+        const vehicleStart = link?.start_date ? new Date(link.start_date) : null;
+        const vehicleEnd = link?.end_date ? new Date(link.end_date) : null;
+        const memberStart = orgMember?.start_date ? new Date(orgMember.start_date) : null;
+        const memberEnd = orgMember?.end_date ? new Date(orgMember.end_date) : null;
+
+        const nowInMemberTenure = (!memberStart || now >= memberStart) && (!memberEnd || now <= memberEnd);
+        const vehicleInMemberTenure = (!vehicleStart || !vehicleEnd)
+          ? nowInMemberTenure
+          : (!memberStart || vehicleEnd >= memberStart) && (!memberEnd || vehicleStart <= memberEnd);
+
+        const role = String(orgMember.role);
+        const elevated = ["board_member", "owner", "co_founder", "manager", "moderator"].includes(role);
+        const canAccess = nowInMemberTenure || vehicleInMemberTenure || (elevated && !memberEnd);
+
+        if (canAccess) return true;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
   return false;
 }
 

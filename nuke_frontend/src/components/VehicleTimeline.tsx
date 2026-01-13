@@ -89,6 +89,7 @@ const VehicleTimeline: React.FC<{
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [selectedDayEvents, setSelectedDayEvents] = useState<TimelineEvent[]>([]);
   const [showDayPopup, setShowDayPopup] = useState(false);
+  const [creatingWorkSession, setCreatingWorkSession] = useState(false);
   const [popupImageUrl, setPopupImageUrl] = useState<string | null>(null);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -1075,6 +1076,7 @@ const VehicleTimeline: React.FC<{
                                                   metadata: {
                                                     photo_date: photoCount > 0,
                                                     photo_count: photoCount,
+                                                    image_ids: dayImages?.map((img: any) => img.id).filter(Boolean) || [],
                                                     auction_activity: auctionCount > 0,
                                                     auction_count: auctionCount,
                                                     auction_data: dayAuction
@@ -1665,16 +1667,21 @@ const VehicleTimeline: React.FC<{
                   const isEditing = editingEvent === ev.id;
                   const isAuctionEvent = String(ev.event_type || '').toLowerCase().startsWith('auction_');
                   const isFutureAuction = ev.event_type === 'scheduled_auction' || ev.metadata?.is_future === true;
+                  const isActivityEvent = String(ev.id || '').startsWith('activity-');
+                  const mdAny = (ev?.metadata || {}) as any;
+                  const activityImageIds: string[] = Array.isArray(mdAny?.image_ids) ? mdAny.image_ids.map((x: any) => String(x)).filter(Boolean) : [];
+                  const canCreateWorkSession = isActivityEvent && activityImageIds.length > 0 && mdAny?.auction_activity !== true;
                   
                   return (
                     <div key={ev.id} className="alert alert-default" style={{ 
-                      cursor: 'pointer',
+                      cursor: canCreateWorkSession ? 'default' : 'pointer',
                       ...(isFutureAuction ? {
                         borderStyle: 'dashed',
                         borderColor: '#3b82f6',
                         background: 'var(--blue-50, #eff6ff)',
                       } : {})
                     }} onClick={() => {
+                      if (canCreateWorkSession) return;
                       // Open receipt directly, not image popup
                       setSelectedEventForDetail(ev.id);
                     }}>
@@ -1691,6 +1698,7 @@ const VehicleTimeline: React.FC<{
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (canCreateWorkSession) return;
                               // Don't open image popup - open receipt instead
                               setSelectedEventForDetail(ev.id);
                             }}
@@ -1753,6 +1761,40 @@ const VehicleTimeline: React.FC<{
                                 );
                               })()}
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
+                                {canCreateWorkSession && (
+                                  <button
+                                    className="button button-primary button-small"
+                                    disabled={creatingWorkSession}
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        setCreatingWorkSession(true);
+                                        const ymd = String(ev.event_date || '').slice(0, 10);
+                                        const { data, error } = await supabase.functions.invoke('create-work-session-from-evidence', {
+                                          body: {
+                                            vehicle_id: vehicleId,
+                                            event_date: ymd,
+                                            image_ids: activityImageIds
+                                          }
+                                        });
+                                        if (error) throw error;
+                                        const newId = (data as any)?.event_id;
+                                        if (!newId) throw new Error('No event_id returned');
+                                        setShowDayPopup(false);
+                                        await loadTimelineEvents();
+                                        setSelectedEventForDetail(String(newId));
+                                      } catch (err: any) {
+                                        console.error('Failed to create work session:', err);
+                                        alert(err?.message || 'Failed to create work session');
+                                      } finally {
+                                        setCreatingWorkSession(false);
+                                      }
+                                    }}
+                                    title="Create a work session event from these photos"
+                                  >
+                                    {creatingWorkSession ? 'Creating...' : 'Create work session'}
+                                  </button>
+                                )}
                                 <span className="badge badge-secondary">
                                   {String(ev.event_type || 'event').replace('_', ' ')}
                                 </span>
