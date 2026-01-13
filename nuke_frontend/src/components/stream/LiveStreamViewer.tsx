@@ -6,6 +6,7 @@ import StreamActionPanel from './StreamActionPanel';
 import type { StreamActionEvent } from '../../services/streamActionsService';
 import StreamTipOverlay, { type StreamTipEvent } from './StreamTipOverlay';
 import { StreamTipService } from '../../services/streamTipService';
+import { CashflowDealsService, type CashflowDealSummary, type CashflowDealType } from '../../services/cashflowDealsService';
 import '../../design-system.css';
 
 interface LiveStream {
@@ -14,6 +15,7 @@ interface LiveStream {
   description: string;
   stream_type: string;
   status: string;
+  streamer_id: string;
   streamer_name: string;
   streamer_avatar: string;
   viewer_count: number;
@@ -55,6 +57,12 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
   const [tipAmount, setTipAmount] = useState<string>('1.00');
   const [tipMessage, setTipMessage] = useState<string>('');
   const [tipping, setTipping] = useState(false);
+  const [investmentDeals, setInvestmentDeals] = useState<CashflowDealSummary[]>([]);
+  const [loadingDeals, setLoadingDeals] = useState(false);
+  const [dealError, setDealError] = useState<string | null>(null);
+  const [investAmounts, setInvestAmounts] = useState<Record<string, string>>({});
+  const [investingDealId, setInvestingDealId] = useState<string | null>(null);
+  const [creatingDeal, setCreatingDeal] = useState(false);
 
   useEffect(() => {
     loadStream();
@@ -106,6 +114,11 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
       leaveStream();
     };
   }, [streamId]);
+
+  useEffect(() => {
+    if (!stream?.streamer_id) return;
+    loadInvestmentDeals(stream.streamer_id);
+  }, [stream?.streamer_id]);
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -241,6 +254,83 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
     const v = Number(tipAmount);
     if (!Number.isFinite(v) || v <= 0) return null;
     return Math.round(v * 100);
+  };
+
+  const loadInvestmentDeals = async (streamerId: string) => {
+    try {
+      setLoadingDeals(true);
+      setDealError(null);
+      const deals = await CashflowDealsService.listPublicDealsForUser(streamerId);
+      setInvestmentDeals(deals);
+    } catch (e: any) {
+      console.error('Failed to load investment deals:', e);
+      setDealError(e?.message || 'Failed to load deals');
+      setInvestmentDeals([]);
+    } finally {
+      setLoadingDeals(false);
+    }
+  };
+
+  const investInDeal = async (dealId: string) => {
+    if (!user) {
+      alert('Please sign in to invest');
+      return;
+    }
+
+    const raw = (investAmounts[dealId] || '').trim() || '25.00';
+    const dollars = Number(raw);
+    if (!Number.isFinite(dollars) || dollars <= 0) {
+      alert('Enter a valid amount');
+      return;
+    }
+
+    const cents = Math.round(dollars * 100);
+
+    try {
+      setInvestingDealId(dealId);
+      await CashflowDealsService.fundDeal(dealId, cents);
+      alert('Investment submitted');
+    } catch (e: any) {
+      console.error('Investment failed:', e);
+      alert(e?.message || 'Investment failed');
+    } finally {
+      setInvestingDealId(null);
+    }
+  };
+
+  const createDefaultDeal = async (dealType: CashflowDealType) => {
+    if (!user || !stream) return;
+    if (user.id !== stream.streamer_id) return;
+
+    try {
+      setCreatingDeal(true);
+      if (dealType === 'advance') {
+        await CashflowDealsService.createUserDeal({
+          subjectUserId: stream.streamer_id,
+          dealType: 'advance',
+          title: 'Advance (Recoupable)',
+          rateBps: 2000, // 20%
+          capMultipleBps: 13000, // 1.30x
+          isPublic: true,
+        });
+      } else {
+        await CashflowDealsService.createUserDeal({
+          subjectUserId: stream.streamer_id,
+          dealType: 'revenue_share',
+          title: 'Revenue Share',
+          rateBps: 1000, // 10%
+          capMultipleBps: null,
+          isPublic: true,
+        });
+      }
+
+      await loadInvestmentDeals(stream.streamer_id);
+    } catch (e: any) {
+      console.error('Failed to create deal:', e);
+      alert(e?.message || 'Failed to create deal');
+    } finally {
+      setCreatingDeal(false);
+    }
   };
 
   const toggleFollow = async () => {
@@ -532,6 +622,126 @@ const LiveStreamViewer = ({ streamId }: LiveStreamViewerProps) => {
                     >
                       {tipping ? 'SENDING...' : 'SEND'}
                     </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Invest Panel */}
+            <div style={{ borderTop: '1px solid #bdbdbd', padding: '8px', fontSize: '8pt' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 6 }}>INVEST</div>
+              {loadingDeals && <div style={{ color: '#757575' }}>Loading deals...</div>}
+              {dealError && <div style={{ color: '#b91c1c' }}>{dealError}</div>}
+
+              {!loadingDeals && !dealError && investmentDeals.length === 0 && (
+                <div style={{ color: '#757575' }}>No public deals.</div>
+              )}
+
+              {investmentDeals.map((d) => {
+                const ratePct = (Number(d.rate_bps || 0) / 100);
+                const capMult = d.cap_multiple_bps ? (Number(d.cap_multiple_bps) / 10000).toFixed(2) : null;
+                const amount = investAmounts[d.id] ?? '25.00';
+                const investing = investingDealId === d.id;
+                const typeLabel = d.deal_type === 'advance' ? 'ADVANCE' : 'REV SHARE';
+
+                return (
+                  <div
+                    key={d.id}
+                    style={{
+                      border: '1px solid #bdbdbd',
+                      padding: '6px',
+                      marginBottom: '6px',
+                      background: 'transparent'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ fontWeight: 'bold' }}>{d.title}</div>
+                      <div style={{ fontSize: '7pt', color: '#6b7280', fontWeight: 'bold' }}>{typeLabel}</div>
+                    </div>
+                    <div style={{ fontSize: '7pt', color: '#6b7280', marginTop: 2 }}>
+                      Rate: {ratePct.toFixed(2)}%
+                      {capMult ? ` • Cap: ${capMult}x` : ''}
+                      {d.term_end_at ? ` • Ends: ${new Date(d.term_end_at).toLocaleDateString()}` : ''}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={amount}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setInvestAmounts((prev) => ({ ...prev, [d.id]: v }));
+                        }}
+                        disabled={!user || investing}
+                        style={{
+                          width: 110,
+                          padding: '4px',
+                          border: '1px solid #bdbdbd',
+                          borderRadius: '0px',
+                          fontSize: '8pt',
+                        }}
+                      />
+                      <button
+                        onClick={() => investInDeal(d.id)}
+                        disabled={!user || investing}
+                        style={{
+                          padding: '4px 8px',
+                          fontSize: '8pt',
+                          border: '1px solid #bdbdbd',
+                          background: '#111827',
+                          color: 'white',
+                          borderRadius: '0px',
+                          cursor: 'pointer',
+                          opacity: !user || investing ? 0.7 : 1,
+                        }}
+                      >
+                        {investing ? 'INVESTING...' : 'INVEST'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {user && stream && user.id === stream.streamer_id && (
+                <div style={{ marginTop: 8, borderTop: '1px solid #e0e0e0', paddingTop: 8 }}>
+                  <div style={{ fontWeight: 'bold', marginBottom: 6 }}>CREATE DEAL</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => createDefaultDeal('advance')}
+                      disabled={creatingDeal}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '8pt',
+                        border: '1px solid #bdbdbd',
+                        background: '#111827',
+                        color: 'white',
+                        borderRadius: '0px',
+                        cursor: 'pointer',
+                        opacity: creatingDeal ? 0.7 : 1,
+                      }}
+                    >
+                      {creatingDeal ? 'CREATING...' : 'CREATE ADVANCE'}
+                    </button>
+                    <button
+                      onClick={() => createDefaultDeal('revenue_share')}
+                      disabled={creatingDeal}
+                      style={{
+                        padding: '4px 8px',
+                        fontSize: '8pt',
+                        border: '1px solid #bdbdbd',
+                        background: '#111827',
+                        color: 'white',
+                        borderRadius: '0px',
+                        cursor: 'pointer',
+                        opacity: creatingDeal ? 0.7 : 1,
+                      }}
+                    >
+                      {creatingDeal ? 'CREATING...' : 'CREATE REV SHARE'}
+                    </button>
+                  </div>
+                  <div style={{ color: '#757575', fontSize: '7pt', marginTop: 6 }}>
+                    Tips create cashflow events and auto-sweep payouts when deals are active.
                   </div>
                 </div>
               )}
