@@ -40,11 +40,44 @@ const InvoiceManager: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'unpaid' | 'paid'>('all');
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
+  const [myVehicles, setMyVehicles] = useState<Array<{ id: string; year: number | null; make: string | null; model: string | null; trim: string | null }>>([]);
+  const [draftVehicleId, setDraftVehicleId] = useState<string>('');
+  const [draftLimit, setDraftLimit] = useState<number>(5);
+  const [draftBusy, setDraftBusy] = useState<boolean>(false);
+  const [draftMessage, setDraftMessage] = useState<string>('');
   const navigate = useNavigate();
 
   useEffect(() => {
     loadInvoices();
   }, [filter]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('vehicles')
+          .select('id, year, make, model, trim, created_at')
+          .or(`owner_id.eq.${user.id},user_id.eq.${user.id}`)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (error) return;
+        const rows = (data || []).map((v: any) => ({
+          id: String(v.id),
+          year: typeof v.year === 'number' ? v.year : null,
+          make: v.make ?? null,
+          model: v.model ?? null,
+          trim: v.trim ?? null,
+        }));
+        setMyVehicles(rows);
+        if (!draftVehicleId && rows.length > 0) setDraftVehicleId(rows[0].id);
+      } catch {
+        // ignore
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadInvoices = async () => {
     setLoading(true);
@@ -216,6 +249,36 @@ const InvoiceManager: React.FC = () => {
     }
   };
 
+  const generateDraftInvoices = async (mode: 'dry_run' | 'create') => {
+    if (!draftVehicleId) {
+      setDraftMessage('Pick a vehicle first.');
+      return;
+    }
+    setDraftBusy(true);
+    setDraftMessage(mode === 'dry_run' ? 'Running dry-run…' : 'Generating draft invoices…');
+    try {
+      const { data, error } = await supabase.functions.invoke('backfill-invoice-drafts', {
+        body: {
+          vehicle_id: draftVehicleId,
+          limit: draftLimit,
+          dry_run: mode === 'dry_run',
+        }
+      });
+      if (error) throw error;
+      const created = Number((data as any)?.created || 0);
+      const considered = Number((data as any)?.considered || 0);
+      setDraftMessage(mode === 'dry_run'
+        ? `Dry-run ok: would consider ${considered} events.`
+        : `Created ${created} draft invoice(s) from ${considered} event(s).`
+      );
+      if (mode === 'create') await loadInvoices();
+    } catch (e: any) {
+      setDraftMessage(e?.message || 'Failed to generate drafts');
+    } finally {
+      setDraftBusy(false);
+    }
+  };
+
   const markAsSent = async (invoiceId: string) => {
     try {
       const { error } = await supabase
@@ -330,6 +393,95 @@ const InvoiceManager: React.FC = () => {
                 {f}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Draft generator (deterministic, no LLM) */}
+        <div style={{
+          background: 'var(--surface)',
+          border: '2px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          padding: 'var(--space-3)',
+          marginBottom: 'var(--space-3)'
+        }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, marginBottom: '6px' }}>
+            Generate draft invoices from timeline evidence (deterministic)
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <select
+              value={draftVehicleId}
+              onChange={(e) => setDraftVehicleId(e.target.value)}
+              style={{
+                padding: '4px 6px',
+                border: '2px solid var(--border)',
+                background: 'var(--surface)',
+                fontSize: '9px',
+                minWidth: '240px'
+              }}
+            >
+              {myVehicles.length === 0 ? (
+                <option value="">(no vehicles found)</option>
+              ) : myVehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {(v.year ? `${v.year} ` : '') + (v.make || '') + (v.make ? ' ' : '') + (v.model || '') + (v.trim ? ` ${v.trim}` : '')}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={draftLimit}
+              onChange={(e) => setDraftLimit(Math.max(1, Math.min(50, Number(e.target.value || 5))))}
+              style={{
+                width: '70px',
+                padding: '4px 6px',
+                border: '2px solid var(--border)',
+                background: 'var(--surface)',
+                fontSize: '9px'
+              }}
+              title="How many events to consider"
+            />
+
+            <button
+              onClick={() => generateDraftInvoices('dry_run')}
+              disabled={draftBusy || !draftVehicleId}
+              style={{
+                padding: '4px 10px',
+                border: '2px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--text)',
+                fontSize: '9px',
+                fontWeight: 700,
+                cursor: draftBusy ? 'not-allowed' : 'pointer',
+                borderRadius: 'var(--radius)',
+              }}
+            >
+              DRY RUN
+            </button>
+            <button
+              onClick={() => generateDraftInvoices('create')}
+              disabled={draftBusy || !draftVehicleId}
+              style={{
+                padding: '4px 10px',
+                border: '2px solid var(--text)',
+                background: 'var(--text)',
+                color: 'var(--surface)',
+                fontSize: '9px',
+                fontWeight: 800,
+                cursor: draftBusy ? 'not-allowed' : 'pointer',
+                borderRadius: 'var(--radius)',
+              }}
+            >
+              {draftBusy ? 'WORKING…' : 'GENERATE DRAFTS'}
+            </button>
+
+            {draftMessage && (
+              <div style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>
+                {draftMessage}
+              </div>
+            )}
           </div>
         </div>
 

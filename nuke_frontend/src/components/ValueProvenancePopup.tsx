@@ -57,6 +57,24 @@ interface Provenance {
   watcher_count?: number;
 }
 
+type AuctionSource = {
+  platform: string;
+  platform_name: string;
+  url: string;
+  lot_number: string | null;
+  auction_end_date: string | null;
+  outcome: string | null;
+  winning_bid: number | null;
+  high_bid: number | null;
+  bid_count: number | null;
+  total_bids: number | null;
+  comments_count: number | null;
+  view_count: number | null;
+  watcher_count: number | null;
+  seller_name: string | null;
+  winning_bidder: string | null;
+};
+
 export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   vehicleId,
   field,
@@ -71,6 +89,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   const [editing, setEditing] = useState(false);
   const [newValue, setNewValue] = useState(value);
   const [evidence, setEvidence] = useState<any[]>([]);
+  const [auctionSources, setAuctionSources] = useState<AuctionSource[]>([]);
   const [batAuctionInfo, setBatAuctionInfo] = useState<{ platform?: string; platform_name?: string; url?: string; lot_number?: string; sale_date?: string } | null>(null);
   const [buyerProfileLink, setBuyerProfileLink] = useState<{ url: string; isExternal: boolean } | null>(null);
   const [sellerProfileLink, setSellerProfileLink] = useState<{ url: string; isExternal: boolean } | null>(null);
@@ -187,6 +206,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       // Check external_listings and auction_events for auction-derived price context (sold or bid-to)
       let auctionInfo: any = null;
       let auctionMetrics: { buyer_name?: string; seller_username?: string; seller_profile_url?: string; bid_count?: number; view_count?: number; watcher_count?: number } = {};
+      let auctionHistory: AuctionSource[] = [];
       
       if ((field === 'sale_price' || field === 'high_bid') && (vehicle?.bat_auction_url || vehicle?.discovery_url)) {
         // Detect platform from discovery_url
@@ -198,27 +218,90 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         else if (discoveryUrl.includes('bonhams.com')) detectedPlatform = 'bonhams';
         else if (discoveryUrl.includes('rmsothebys.com')) detectedPlatform = 'rmsothebys';
         
-        // Check auction_events first (most reliable source for outcomes + lot numbers)
-        const { data: auctionEvent } = await supabase
+        const platform = normalizePlatform(detectedPlatform);
+
+        const normalizeUrlLoose = (u: string | null | undefined): string => {
+          const s = String(u || '').trim();
+          if (!s) return '';
+          try {
+            const url = new URL(s);
+            url.hash = '';
+            url.search = '';
+            // normalize trailing slash differences
+            const out = url.toString();
+            return out.endsWith('/') ? out.slice(0, -1) : out;
+          } catch {
+            const out = s.split('#')[0].split('?')[0].trim();
+            return out.endsWith('/') ? out.slice(0, -1) : out;
+          }
+        };
+
+        const urlCandidates = Array.from(new Set([
+          context?.listing_url,
+          context?.evidence_url,
+          vehicle?.bat_auction_url,
+          vehicle?.discovery_url,
+        ].map((u) => normalizeUrlLoose(u)).filter(Boolean)));
+
+        // Load ALL auction events for this vehicle/platform (multi-auction aware)
+        const { data: auctionEvents } = await supabase
           .from('auction_events')
-          .select('id, source, source_url, lot_number, outcome, auction_start_date, auction_end_date, high_bid, winning_bid, winning_bidder, seller_name, total_bids, comments_count')
+          .select('source, source_url, lot_number, outcome, auction_start_date, auction_end_date, high_bid, winning_bid, winning_bidder, seller_name, total_bids, comments_count, page_views, watchers')
           .eq('vehicle_id', vehicleId)
+          .eq('source', platform)
           .order('auction_end_date', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        // Check external_listings for comprehensive auction data
-        const { data: listing } = await supabase
+          .limit(20);
+
+        // Load ALL external listings for this vehicle/platform
+        const { data: listings } = await supabase
           .from('external_listings')
           .select('platform, sold_at, end_date, metadata, bid_count, view_count, watcher_count, listing_url')
           .eq('vehicle_id', vehicleId)
+          .eq('platform', platform)
           .order('sold_at', { ascending: false, nullsFirst: false })
-          .limit(1)
-          .maybeSingle();
-        
-        // Use listing platform if available, otherwise use detected
-        const platform = listing?.platform || detectedPlatform;
+          .order('end_date', { ascending: false, nullsFirst: false })
+          .limit(20);
+
+        const listingByUrl = new Map<string, any>();
+        for (const l of (listings || [])) {
+          const k = normalizeUrlLoose(l?.listing_url);
+          if (k) listingByUrl.set(k, l);
+        }
+
+        const platformKey = normalizePlatform(platform);
+        const platformName = getPlatformDisplayName(platformKey);
+
+        auctionHistory = (auctionEvents || [])
+          .map((ev: any) => {
+            const url = normalizeUrlLoose(ev?.source_url);
+            if (!url) return null;
+            const listing = listingByUrl.get(url) || null;
+            return {
+              platform: platformKey,
+              platform_name: platformName,
+              url,
+              lot_number: ev?.lot_number ? String(ev.lot_number) : (listing?.metadata?.lot_number ? String(listing.metadata.lot_number) : null),
+              auction_end_date: ev?.auction_end_date ? String(ev.auction_end_date) : null,
+              outcome: ev?.outcome ? String(ev.outcome) : null,
+              winning_bid: typeof ev?.winning_bid === 'number' ? ev.winning_bid : (typeof ev?.winning_bid === 'string' ? Number(ev.winning_bid) : null),
+              high_bid: typeof ev?.high_bid === 'number' ? ev.high_bid : (typeof ev?.high_bid === 'string' ? Number(ev.high_bid) : null),
+              bid_count: (typeof listing?.bid_count === 'number' ? listing.bid_count : (typeof ev?.total_bids === 'number' ? ev.total_bids : null)),
+              total_bids: typeof ev?.total_bids === 'number' ? ev.total_bids : null,
+              comments_count: typeof ev?.comments_count === 'number' ? ev.comments_count : null,
+              view_count: (typeof listing?.view_count === 'number' ? listing.view_count : (typeof ev?.page_views === 'number' ? ev.page_views : null)),
+              watcher_count: (typeof listing?.watcher_count === 'number' ? listing.watcher_count : (typeof ev?.watchers === 'number' ? ev.watchers : null)),
+              seller_name: ev?.seller_name ? String(ev.seller_name) : (listing?.metadata?.seller_username ? String(listing.metadata.seller_username) : null),
+              winning_bidder: ev?.winning_bidder ? String(ev.winning_bidder) : (listing?.metadata?.buyer_username ? String(listing.metadata.buyer_username) : null),
+            } as AuctionSource;
+          })
+          .filter((x: any): x is AuctionSource => Boolean(x && x.url));
+
+        setAuctionSources(auctionHistory);
+
+        const selectedAuction =
+          (auctionHistory.find((a) => urlCandidates.includes(normalizeUrlLoose(a.url))) || auctionHistory[0] || null);
+        const selectedListing = selectedAuction ? (listingByUrl.get(normalizeUrlLoose(selectedAuction.url)) || null) : null;
         
         // Also check timeline_events for sale event
         const { data: saleEvent } = await supabase
@@ -233,19 +316,19 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         // For high-bid / RNM, prefer end_date (auction close) instead of sold_at.
         const derivedDate =
           field === 'high_bid'
-            ? (listing?.end_date || auctionEvent?.auction_end_date || vehicle?.auction_end_date || null)
-            : (listing?.sold_at || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date || null);
+            ? (selectedListing?.end_date || selectedAuction?.auction_end_date || (vehicle as any)?.auction_end_date || null)
+            : (selectedListing?.sold_at || selectedAuction?.auction_end_date || saleEvent?.event_date || vehicle.bat_sale_date || vehicle.sale_date || null);
         
         // Extract lot number from URL for non-BaT platforms
         let lotNumberFromUrl: string | null = null;
         if (platform === 'mecum') {
-          const match = (listing?.listing_url || discoveryUrl).match(/\/lots\/(\d+)\//);
+          const match = (selectedListing?.listing_url || discoveryUrl).match(/\/lots\/(\d+)\//);
           lotNumberFromUrl = match ? match[1] : null;
         }
         
         // Extract lot number from multiple possible sources
-        const lotNumber = (auctionEvent as any)?.lot_number ||
-                         listing?.metadata?.lot_number || 
+        const lotNumber = selectedAuction?.lot_number ||
+                         selectedListing?.metadata?.lot_number || 
                          saleEvent?.metadata?.lot_number ||
                          lotNumberFromUrl ||
                          (vehicle as any)?.origin_metadata?.lot_number ||
@@ -253,8 +336,9 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                          null;
         
         // Extract seller username from multiple sources
-        const sellerUsername = listing?.metadata?.seller_username || 
-                              listing?.metadata?.seller ||
+        const sellerUsername = selectedAuction?.seller_name ||
+                              selectedListing?.metadata?.seller_username || 
+                              selectedListing?.metadata?.seller ||
                               saleEvent?.metadata?.seller_username ||
                               saleEvent?.metadata?.seller ||
                               (vehicle as any)?.origin_metadata?.bat_seller_username ||
@@ -264,44 +348,34 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
         // Construct seller profile URL based on platform
         const sellerProfileUrl = platform === 'bat' && sellerUsername
           ? `https://bringatrailer.com/member/${sellerUsername}/`
-          : (listing?.metadata?.seller_profile_url || 
+          : (selectedListing?.metadata?.seller_profile_url || 
              saleEvent?.metadata?.seller_profile_url ||
              (vehicle as any)?.origin_metadata?.bat_seller_profile_url ||
              null);
         
-        const platformKey = normalizePlatform(platform);
-        const platformName = getPlatformDisplayName(platformKey);
-        
-        if (listing || saleEvent || derivedDate) {
+        if (selectedListing || saleEvent || derivedDate || selectedAuction) {
           auctionInfo = {
             platform: platformKey,
             platform_name: platformName,
-            url: listing?.listing_url || vehicle.bat_auction_url || vehicle?.discovery_url,
+            url: (selectedListing?.listing_url || selectedAuction?.url || vehicle.bat_auction_url || vehicle?.discovery_url),
             lot_number: lotNumber,
             sale_date: derivedDate
           };
           
-          // Get actual bid count from bat_bids table (most accurate)
-          let actualBidCount: number | null = null;
-          if (platform === 'bat') {
-            const { count: bidCount } = await supabase
-              .from('bat_bids')
-              .select('*', { count: 'exact', head: true })
-              .eq('vehicle_id', vehicleId);
-            actualBidCount = bidCount ?? null;
-          }
-          
           // Extract buyer name and seller info from metadata
-          // Prefer context values (from live auction pulse) over database values (may be stale)
+          // For SOLD results, do NOT prefer context values (context can be mixed across multiple auctions).
+          const isFinalStatus = String(context?.listing_status || '').toLowerCase() === 'sold';
           auctionMetrics = {
-            buyer_name: listing?.metadata?.buyer || saleEvent?.metadata?.buyer || saleEvent?.metadata?.buyer_username,
+            buyer_name: selectedAuction?.winning_bidder || selectedListing?.metadata?.buyer_username || selectedListing?.metadata?.buyer || saleEvent?.metadata?.buyer || saleEvent?.metadata?.buyer_username,
             seller_username: sellerUsername,
             seller_profile_url: sellerProfileUrl,
-            bid_count: (typeof context?.bid_count === 'number' && context.bid_count > 0) 
-              ? context.bid_count 
-              : (actualBidCount !== null ? actualBidCount : (listing?.bid_count ?? null)),
-            view_count: (typeof context?.view_count === 'number' && context.view_count > 0) ? context.view_count : (listing?.view_count ?? null),
-            watcher_count: (typeof context?.watcher_count === 'number' && context.watcher_count > 0) ? context.watcher_count : (listing?.watcher_count ?? null)
+            bid_count: (isFinalStatus ? null : ((typeof context?.bid_count === 'number' && context.bid_count > 0) ? context.bid_count : null))
+              ?? (typeof selectedListing?.bid_count === 'number' ? selectedListing.bid_count : null)
+              ?? (typeof selectedAuction?.total_bids === 'number' ? selectedAuction.total_bids : null),
+            view_count: (isFinalStatus ? null : ((typeof context?.view_count === 'number' && context.view_count > 0) ? context.view_count : null))
+              ?? (typeof selectedListing?.view_count === 'number' ? selectedListing.view_count : null),
+            watcher_count: (isFinalStatus ? null : ((typeof context?.watcher_count === 'number' && context.watcher_count > 0) ? context.watcher_count : null))
+              ?? (typeof selectedListing?.watcher_count === 'number' ? selectedListing.watcher_count : null)
           };
           
           // Check if buyer has linked N-Zero profile (only for sold events)
@@ -316,7 +390,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             if (buyerIdentity?.claimed_by_user_id) {
               setBuyerProfileLink({ url: `/profile/${buyerIdentity.claimed_by_user_id}`, isExternal: false });
             } else if (buyerIdentity?.id) {
-              setBuyerProfileLink({ url: `/external-identity/${buyerIdentity.id}`, isExternal: false });
+              setBuyerProfileLink({ url: `/profile/external/${buyerIdentity.id}`, isExternal: false });
             } else {
               const batProfileUrl = buyerIdentity?.profile_url || `https://bringatrailer.com/member/${auctionMetrics.buyer_name}/`;
               const internal = `/claim-identity?platform=bat&handle=${encodeURIComponent(auctionMetrics.buyer_name)}&profileUrl=${encodeURIComponent(batProfileUrl)}`;
@@ -338,7 +412,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
             if (sellerIdentity?.claimed_by_user_id) {
               setSellerProfileLink({ url: `/profile/${sellerIdentity.claimed_by_user_id}`, isExternal: false });
             } else if (sellerIdentity?.id) {
-              setSellerProfileLink({ url: `/external-identity/${sellerIdentity.id}`, isExternal: false });
+              setSellerProfileLink({ url: `/profile/external/${sellerIdentity.id}`, isExternal: false });
             } else {
               const proofUrl = auctionMetrics.seller_profile_url || `https://bringatrailer.com/member/${auctionMetrics.seller_username}/`;
               setSellerProfileLink({ url: `/claim-identity?platform=bat&handle=${encodeURIComponent(auctionMetrics.seller_username)}&profileUrl=${encodeURIComponent(proofUrl)}`, isExternal: false });
@@ -398,14 +472,30 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
           watcher_count: auctionMetrics.watcher_count
         });
         setBatAuctionInfo(auctionInfo);
-        // Add auction info as evidence
-        setEvidence([{
-          source_type: `${auctionInfo.platform}_auction`,
-          proposed_value: value.toString(),
+        // Add auction history as evidence (multi-auction aware)
+        const auctionEvidence = (auctionHistory.length > 0 ? auctionHistory : [{
+          platform: auctionInfo.platform,
+          platform_name: auctionInfo.platform_name,
+          url: auctionInfo.url,
+          lot_number: auctionInfo.lot_number || null,
+          auction_end_date: auctionInfo.sale_date || null,
+          outcome: String(context?.listing_status || '').toLowerCase() || null,
+          winning_bid: value,
+          high_bid: value,
+          total_bids: null,
+          comments_count: null,
+          view_count: null,
+          watcher_count: null,
+          seller_name: auctionMetrics.seller_username || null,
+          winning_bidder: auctionMetrics.buyer_name || null,
+        } as any]).map((a: any) => ({
+          source_type: `${a.platform}_auction`,
+          proposed_value: String((field === 'sale_price' ? (a.winning_bid ?? value) : (a.high_bid ?? value)) ?? value),
           source_confidence: 100,
-          extraction_context: `Auction URL: ${auctionInfo.url}`,
-          created_at: auctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString()
-        }]);
+          extraction_context: `Auction URL: ${a.url}`,
+          created_at: a.auction_end_date || auctionInfo.sale_date || vehicle?.updated_at || new Date().toISOString(),
+        }));
+        setEvidence(auctionEvidence);
       } else {
         // No evidence - check who last updated vehicle
         setProvenance({
@@ -553,6 +643,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       'vin_checksum_valid': 'VIN Decode (Authoritative)',
       'nhtsa_vin_decode': 'NHTSA Official Data',
       'auction_result_bat': 'BaT Auction Result',
+      'bat_auction': 'BaT Auction Result',
       'scraped_listing': 'Scraped Listing',
       'build_estimate_csv': 'Build Estimate CSV',
       'user_input_verified': 'User Entry',
@@ -727,6 +818,63 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
               </div>
             )}
           </div>
+
+          {/* Auction history (multi-auction provenance) */}
+          {(field === 'sale_price' || field === 'high_bid') && auctionSources.length > 1 && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '7pt', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px', letterSpacing: '0.6px', fontWeight: 700 }}>
+                Auction history
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
+                {auctionSources.map((a) => {
+                  const d = a.auction_end_date ? new Date(a.auction_end_date) : null;
+                  const dLabel = d && Number.isFinite(d.getTime())
+                    ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'Date unknown';
+
+                  const amount = field === 'high_bid'
+                    ? (a.high_bid ?? a.winning_bid)
+                    : (a.winning_bid ?? a.high_bid);
+
+                  const amountLabel = (typeof amount === 'number' && Number.isFinite(amount) && amount > 0)
+                    ? amount.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+                    : '—';
+
+                  const outcome = String(a.outcome || '').trim() || '—';
+                  const bids = (typeof a.bid_count === 'number' && Number.isFinite(a.bid_count) && a.bid_count > 0) ? `${a.bid_count.toLocaleString()} bids` : null;
+                  const views = (typeof a.view_count === 'number' && Number.isFinite(a.view_count) && a.view_count > 0) ? `${a.view_count.toLocaleString()} views` : null;
+                  const watchers = (typeof a.watcher_count === 'number' && Number.isFinite(a.watcher_count) && a.watcher_count > 0) ? `${a.watcher_count.toLocaleString()} watchers` : null;
+                  const metaBits = [bids, views, watchers].filter(Boolean).join(' • ');
+
+                  return (
+                    <div
+                      key={a.url}
+                      style={{
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        background: 'var(--bg)',
+                        padding: '8px 10px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+                        <div style={{ fontSize: '8pt', fontWeight: 800, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {a.platform_name}{a.lot_number ? ` (Lot #${a.lot_number})` : ''}
+                        </div>
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{dLabel}</div>
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: '8pt', display: 'flex', gap: 10, flexWrap: 'wrap', color: 'var(--text-muted)' }}>
+                        <span style={{ color: 'var(--text)', fontWeight: 700 }}>{amountLabel}</span>
+                        <span>{outcome}</span>
+                        {a.seller_name ? <span>Seller: {a.seller_name}</span> : null}
+                        {a.winning_bidder ? <span>Buyer: {a.winning_bidder}</span> : null}
+                        {metaBits ? <span>{metaBits}</span> : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Confidence */}
           <div style={{ marginBottom: '16px' }}>

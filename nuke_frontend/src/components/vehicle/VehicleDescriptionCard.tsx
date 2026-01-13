@@ -21,7 +21,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
   const [saving, setSaving] = useState(false);
   const [isAIGenerated, setIsAIGenerated] = useState(false);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [rawListingDescriptions, setRawListingDescriptions] = useState<Array<{ text: string; extracted_at: string | null; source_url: string | null }>>([]);
+  const [rawListingDescriptions, setRawListingDescriptions] = useState<Array<{ text: string; extracted_at: string | null; source_url: string | null; event_date: string | null }>>([]);
   const [generating, setGenerating] = useState(false);
   const [sourceInfo, setSourceInfo] = useState<{
     url?: string;
@@ -100,6 +100,35 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
 
     // Raw listing description history (provenance-backed)
     try {
+      const normalizeUrlLoose = (u: string | null | undefined): string => {
+        const s = String(u || '').trim();
+        if (!s) return '';
+        try {
+          const url = new URL(s);
+          url.hash = '';
+          url.search = '';
+          const out = url.toString();
+          return out.endsWith('/') ? out.slice(0, -1) : out;
+        } catch {
+          return s.split('#')[0].split('?')[0].replace(/\/+$/, '').trim();
+        }
+      };
+
+      // Map listing URL -> auction end date (so we can display provenance by event date, not extraction run date)
+      const { data: auctionEvents } = await supabase
+        .from('auction_events')
+        .select('source_url, auction_end_date')
+        .eq('vehicle_id', vehicleId)
+        .order('auction_end_date', { ascending: false, nullsFirst: false })
+        .limit(20);
+
+      const endDateByUrl = new Map<string, string>();
+      for (const ev of (auctionEvents || [])) {
+        const u = normalizeUrlLoose((ev as any)?.source_url);
+        const d = (ev as any)?.auction_end_date ? String((ev as any).auction_end_date) : '';
+        if (u && d && !endDateByUrl.has(u)) endDateByUrl.set(u, d);
+      }
+
       const { data: rows } = await supabase
         .from('extraction_metadata')
         .select('field_value, extracted_at, source_url')
@@ -112,7 +141,11 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
         .map((r: any) => ({
           text: (r?.field_value || '').toString(),
           extracted_at: r?.extracted_at ? String(r.extracted_at) : null,
-          source_url: r?.source_url ? String(r.source_url) : null
+          source_url: r?.source_url ? String(r.source_url) : null,
+          event_date: (() => {
+            const u = normalizeUrlLoose(r?.source_url ? String(r.source_url) : '');
+            return u ? (endDateByUrl.get(u) || null) : null;
+          })()
         }))
         .filter((r: any) => r.text && r.text.trim().length > 0);
 
@@ -144,7 +177,11 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
             mapped.unshift({
               text: batText,
               extracted_at: batListing.created_at ? String(batListing.created_at) : null,
-              source_url: batListing.bat_listing_url || null
+              source_url: batListing.bat_listing_url || null,
+              event_date: (() => {
+                const u = normalizeUrlLoose(batListing.bat_listing_url || '');
+                return u ? (endDateByUrl.get(u) || null) : null;
+              })()
             });
           }
         }
@@ -160,7 +197,14 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
         return firstMatch === idx;
       });
 
-      setRawListingDescriptions(deduplicated);
+      // Prefer auction event date ordering if available, otherwise fall back to extracted_at.
+      const sorted = [...deduplicated].sort((a: any, b: any) => {
+        const aTs = a.event_date ? new Date(a.event_date).getTime() : (a.extracted_at ? new Date(a.extracted_at).getTime() : 0);
+        const bTs = b.event_date ? new Date(b.event_date).getTime() : (b.extracted_at ? new Date(b.extracted_at).getTime() : 0);
+        return (bTs || 0) - (aTs || 0);
+      });
+
+      setRawListingDescriptions(sorted);
     } catch (err) {
       // Non-fatal if table missing in some environments
       setRawListingDescriptions([]);
@@ -342,7 +386,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {rawListingDescriptions.map((row, idx) => {
                     const domain = getSourceDomain(row.source_url);
-                    const dateLabel = formatEntryDate(row.extracted_at);
+                    const dateLabel = formatEntryDate(row.event_date || row.extracted_at);
                     const linkLabel = domain ? `${domain} listing` : 'Source listing';
                     return (
                       <details
@@ -369,7 +413,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                             {row.source_url ? <FaviconIcon url={row.source_url} matchTextSize={true} textSize={8} /> : null}
                             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              Imported listing description
+                              Listing description
                               {domain ? ` • ${domain}` : ''}
                             </span>
                           </span>
