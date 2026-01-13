@@ -59,9 +59,11 @@ function errorToMessage(err) {
 async function buildVehicleIdSet({
   table,
   vehicleIds,
+  vehicleIdColumn = 'vehicle_id',
   chunkSize = DEFAULT_CHUNK_SIZE,
   pageSize = DEFAULT_PAGE_SIZE,
   applyFilters,
+  secondaryOrderColumn = 'id',
 }) {
   const result = new Set();
   for (const chunk of chunkArray(vehicleIds, chunkSize)) {
@@ -69,16 +71,19 @@ async function buildVehicleIdSet({
     // Offset pagination is not ideal, but is reliable and simple for audits.
     // We order deterministically to avoid page drift.
     while (true) {
-      let query = supabase.from(table).select('vehicle_id').in('vehicle_id', chunk);
+      let query = supabase.from(table).select(vehicleIdColumn).in(vehicleIdColumn, chunk);
       if (typeof applyFilters === 'function') query = applyFilters(query);
-      query = query.order('vehicle_id', { ascending: true }).order('id', { ascending: true }).range(offset, offset + pageSize - 1);
+      query = query.order(vehicleIdColumn, { ascending: true });
+      if (secondaryOrderColumn) query = query.order(secondaryOrderColumn, { ascending: true });
+      query = query.range(offset, offset + pageSize - 1);
 
       const { data, error } = await query;
       if (error) throw new Error(`Supabase error while reading ${table}: ${errorToMessage(error)}`);
 
       const rows = Array.isArray(data) ? data : [];
       for (const row of rows) {
-        if (row?.vehicle_id) result.add(row.vehicle_id);
+        const id = row?.[vehicleIdColumn];
+        if (id) result.add(id);
       }
 
       if (rows.length < pageSize) break;
@@ -96,25 +101,30 @@ async function buildVehicleIdSet({
 async function buildVehicleIdCounts({
   table,
   vehicleIds,
+  vehicleIdColumn = 'vehicle_id',
   chunkSize = DEFAULT_CHUNK_SIZE,
   pageSize = DEFAULT_PAGE_SIZE,
   applyFilters,
+  secondaryOrderColumn = 'id',
 }) {
   const counts = {};
   for (const chunk of chunkArray(vehicleIds, chunkSize)) {
     let offset = 0;
     while (true) {
-      let query = supabase.from(table).select('vehicle_id').in('vehicle_id', chunk);
+      let query = supabase.from(table).select(vehicleIdColumn).in(vehicleIdColumn, chunk);
       if (typeof applyFilters === 'function') query = applyFilters(query);
-      query = query.order('vehicle_id', { ascending: true }).order('id', { ascending: true }).range(offset, offset + pageSize - 1);
+      query = query.order(vehicleIdColumn, { ascending: true });
+      if (secondaryOrderColumn) query = query.order(secondaryOrderColumn, { ascending: true });
+      query = query.range(offset, offset + pageSize - 1);
 
       const { data, error } = await query;
       if (error) throw new Error(`Supabase error while reading ${table}: ${errorToMessage(error)}`);
 
       const rows = Array.isArray(data) ? data : [];
       for (const row of rows) {
-        if (!row?.vehicle_id) continue;
-        counts[row.vehicle_id] = (counts[row.vehicle_id] || 0) + 1;
+        const id = row?.[vehicleIdColumn];
+        if (!id) continue;
+        counts[id] = (counts[id] || 0) + 1;
       }
 
       if (rows.length < pageSize) break;
@@ -126,6 +136,53 @@ async function buildVehicleIdCounts({
     }
   }
   return counts;
+}
+
+function clamp01(n) {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function cap01(value, cap) {
+  const v = Number(value) || 0;
+  const c = Number(cap) || 1;
+  if (c <= 0) return 0;
+  return clamp01(v / c);
+}
+
+function median(nums) {
+  const values = (Array.isArray(nums) ? nums : []).filter(n => typeof n === 'number' && Number.isFinite(n)).slice().sort((a, b) => a - b);
+  if (values.length === 0) return null;
+  const mid = Math.floor(values.length / 2);
+  if (values.length % 2 === 1) return values[mid];
+  return (values[mid - 1] + values[mid]) / 2;
+}
+
+function computePotentialScore({ commentCount, imageCount, descriptionLen, evidenceCount, timelineEventCount }) {
+  // "Potential" = richness of leads (not "completeness").
+  // Caps prevent mega-auctions from dominating the scale.
+  const cComments = cap01(commentCount, 400);
+  const cImages = cap01(imageCount, 40);
+  const cDesc = cap01(descriptionLen, 2000);
+  const cTimeline = cap01(timelineEventCount, 30);
+  const cEvidence = cap01(evidenceCount, 25);
+
+  const score =
+    (0.30 * cComments) +
+    (0.25 * cImages) +
+    (0.20 * cDesc) +
+    (0.15 * cTimeline) +
+    (0.10 * cEvidence);
+
+  return Math.round(100 * score);
+}
+
+function computeVerificationScore({ acceptedEvidenceCount, highConfidenceProvenanceFields }) {
+  // "Verification" = evidence that survived consensus + high-confidence provenance coverage.
+  const cAccepted = cap01(acceptedEvidenceCount, 20);
+  const cHighConf = cap01(highConfidenceProvenanceFields, 20);
+  const score = (0.60 * cHighConf) + (0.40 * cAccepted);
+  return Math.round(100 * score);
 }
 
 async function auditMissingData() {
@@ -178,6 +235,47 @@ async function auditMissingData() {
     vehicleIds,
     applyFilters: q => q.eq('platform', 'bat'),
   });
+
+  // Potential vs Verification signals (provenance-first)
+  let evidenceCounts = {};
+  let acceptedEvidenceCounts = {};
+  let provenanceCounts = {};
+  let provenanceHighConfidenceCounts = {};
+  let timelineEventCounts = {};
+
+  try {
+    evidenceCounts = await buildVehicleIdCounts({
+      table: 'field_evidence',
+      vehicleIds,
+    });
+
+    acceptedEvidenceCounts = await buildVehicleIdCounts({
+      table: 'field_evidence',
+      vehicleIds,
+      applyFilters: q => q.eq('status', 'accepted'),
+    });
+
+    // vehicle_field_provenance uses (vehicle_id, field_name) PK (no `id`)
+    provenanceCounts = await buildVehicleIdCounts({
+      table: 'vehicle_field_provenance',
+      vehicleIds,
+      secondaryOrderColumn: 'field_name',
+    });
+
+    provenanceHighConfidenceCounts = await buildVehicleIdCounts({
+      table: 'vehicle_field_provenance',
+      vehicleIds,
+      secondaryOrderColumn: 'field_name',
+      applyFilters: q => q.gte('total_confidence', 80),
+    });
+
+    timelineEventCounts = await buildVehicleIdCounts({
+      table: 'timeline_events',
+      vehicleIds,
+    });
+  } catch (err) {
+    console.warn(`WARN: Unable to compute Potential/Verification signals: ${errorToMessage(err)}`);
+  }
   
   // Analyze missing data
   const stats = {
@@ -196,7 +294,9 @@ async function auditMissingData() {
     missing_comments: 0,
     missing_images: 0,
     missing_external_listing: 0,
-    vehicles_needing_fix: []
+    vehicles_needing_fix: [],
+    potential_scores: [],
+    verification_scores: []
   };
   
   vehicles.forEach(vehicle => {
@@ -291,6 +391,25 @@ async function auditMissingData() {
       issues.push('external_listing');
       missingScore += 1;
     }
+
+    const descriptionLen = typeof vehicle.description === 'string' ? vehicle.description.length : 0;
+    const evidenceCount = evidenceCounts[vehicle.id] || 0;
+    const acceptedEvidenceCount = acceptedEvidenceCounts[vehicle.id] || 0;
+    const provenanceFieldCount = provenanceCounts[vehicle.id] || 0;
+    const provenanceHighConfidenceFieldCount = provenanceHighConfidenceCounts[vehicle.id] || 0;
+    const timelineEventCount = timelineEventCounts[vehicle.id] || 0;
+
+    const potentialScore = computePotentialScore({
+      commentCount,
+      imageCount,
+      descriptionLen,
+      evidenceCount,
+      timelineEventCount
+    });
+    const verificationScore = computeVerificationScore({
+      acceptedEvidenceCount,
+      highConfidenceProvenanceFields: provenanceHighConfidenceFieldCount
+    });
     
     if (issues.length > 0) {
       stats.vehicles_needing_fix.push({
@@ -301,8 +420,20 @@ async function auditMissingData() {
         issues: issues,
         comment_count: commentCount,
         image_count: imageCount,
-        has_auction_event: vehiclesWithAuctionEvents.has(vehicle.id)
+        has_auction_event: vehiclesWithAuctionEvents.has(vehicle.id),
+
+        // Potential vs Verification axis signals
+        timeline_event_count: timelineEventCount,
+        evidence_count: evidenceCount,
+        accepted_evidence_count: acceptedEvidenceCount,
+        provenance_field_count: provenanceFieldCount,
+        provenance_high_confidence_field_count: provenanceHighConfidenceFieldCount,
+        potential_score: potentialScore,
+        verification_score: verificationScore
       });
+
+      stats.potential_scores.push(potentialScore);
+      stats.verification_scores.push(verificationScore);
     }
   });
   
@@ -372,9 +503,17 @@ async function auditMissingData() {
   console.log('');
   
   // Save detailed report to file
+  const avg = (arr) => {
+    const nums = (Array.isArray(arr) ? arr : []).filter(n => typeof n === 'number' && Number.isFinite(n));
+    if (nums.length === 0) return null;
+    return nums.reduce((a, b) => a + b, 0) / nums.length;
+  };
+  const potentialScores = stats.potential_scores;
+  const verificationScores = stats.verification_scores;
+
   const report = {
     audit_date: new Date().toISOString(),
-    audit_version: 2,
+    audit_version: 3,
     generator: 'scripts/audit-bat-missing-data.js',
     summary: {
       total_vehicles: stats.total,
@@ -394,6 +533,21 @@ async function auditMissingData() {
         comments: stats.missing_comments,
         images: stats.missing_images,
         external_listing: stats.missing_external_listing
+      },
+      potential_verification: {
+        vehicles_scored: stats.vehicles_needing_fix.length,
+        potential_score: {
+          avg: avg(potentialScores),
+          median: median(potentialScores),
+          min: potentialScores.length ? Math.min(...potentialScores) : null,
+          max: potentialScores.length ? Math.max(...potentialScores) : null
+        },
+        verification_score: {
+          avg: avg(verificationScores),
+          median: median(verificationScores),
+          min: verificationScores.length ? Math.min(...verificationScores) : null,
+          max: verificationScores.length ? Math.max(...verificationScores) : null
+        }
       }
     },
     vehicles: stats.vehicles_needing_fix

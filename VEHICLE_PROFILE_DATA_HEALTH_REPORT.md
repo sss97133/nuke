@@ -1,6 +1,6 @@
 ## Vehicle Profile Data Health Report
 
-Generated: 2026-01-12T10:05:27.798Z
+Generated: 2026-01-13T14:28:26.337Z
 
 ### Inputs
 
@@ -47,11 +47,13 @@ Generated: 2026-01-12T10:05:27.798Z
 - accuracy avg (all): 0.158
 - accuracy avg (checked only): 0.25
 
-#### Fetch failures by domain (top 10)
+#### Domain reliability (top 15 by volume)
 
-- carsandbids.com: failures=80/80 (100%)
-- velocityrestorations.com: failures=7/7 (100%)
-- broadarrowauctions.com: failures=1/44 (2.3%)
+- mecum.com: total=90, checked=90, failures=0 (0%), avg_accuracy_checked=0.389, tier=medium
+- carsandbids.com: total=80, checked=0, failures=80 (100%), avg_accuracy_checked=n/a, tier=blocked
+- broadarrowauctions.com: total=44, checked=43, failures=1 (2.3%), avg_accuracy_checked=0, tier=low
+- bringatrailer.com: total=19, checked=19, failures=0 (0%), avg_accuracy_checked=0.158, tier=low
+- velocityrestorations.com: total=7, checked=0, failures=7 (100%), avg_accuracy_checked=n/a, tier=blocked
 
 ### Worst offenders (top 25)
 
@@ -83,7 +85,7 @@ Generated: 2026-01-12T10:05:27.798Z
 
 ### Top fix levers (highest ROI)
 
-- If your BaT audit is old: re-run `scripts/audit-bat-missing-data.js` (audit_version>=2) so related-table completeness (comments/images/events/listings) is measured reliably (chunked, paginated, fails on errors).
-- For BaT completeness: prioritize backfilling `vin`, `trim`, `engine_size`, `drivetrain`, `location`, and `sale_info` because those are the most frequent/high-impact missing fields in the BaT audit.
-- For auction linkage: ensure BaT vehicles reliably create `auction_events` rows (source='bat') and associated `external_listings` records so downstream comments/bids/images attach to a stable event identity.
-- For source verifiability: stop relying on direct HTML fetch for sources that rate-limit/block (e.g., Cars & Bids 403). Use a crawler service, caching, and/or an ingestion path that does not depend on scraping protected pages.
+- If your BaT audit is old: re-run `scripts/audit-bat-missing-data.js` (audit_version>=2) so related-table counts (comments/images/events/listings) are measured reliably (chunked, paginated, fails on errors).
+- For **Potential**: add “treasure map” leads first (images, timeline events, citations/URLs, notes). These raise the potential score without pretending the profile is verified.
+- For **Verification**: submit high-trust proof (auction results, titles, receipts, factory docs) so consensus can safely assign values and close gaps (instead of writing raw values).
+- For **platform reliability**: treat blocked/low-reliability domains as “needs ingestion strategy” (crawler/caching/API) rather than “bad data”; otherwise verifiability will stay low even if potential is high.

@@ -55,6 +55,7 @@ import VehicleOwnershipPanel from '../components/ownership/VehicleOwnershipPanel
 import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import ImageGallery from '../components/images/ImageGallery';
+import { VehicleDataGapsCard } from '../components/vehicle/VehicleDataGapsCard';
 
 const WORKSPACE_TABS = [
   { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
@@ -3409,6 +3410,9 @@ const VehicleProfile: React.FC = () => {
                   onEditClick={handleEditClick}
                 />
               </React.Suspense>
+
+              {/* Proof tasks / public scrutiny (data gaps) */}
+              <VehicleDataGapsCard vehicleId={vehicle.id} />
 
               {/* Investment Summary */}
               <VehicleROISummaryCard vehicleId={vehicle.id} />

@@ -146,6 +146,18 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   const { showToast } = useToast();
   const { isVerifiedOwner, hasContributorAccess, contributorRole } = permissions;
   const canEdit = isVerifiedOwner || hasContributorAccess;
+  const scrollToProofTasks = React.useCallback((e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    try {
+      const el = typeof document !== 'undefined' ? document.getElementById('vehicle-proof-tasks') : null;
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
+      // ignore
+    }
+  }, []);
   const [collapsed, setCollapsed] = React.useState(false); // Always expanded - user preference
   const [showClaimCard, setShowClaimCard] = React.useState(false);
 
@@ -516,10 +528,21 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              {vehicle.vin || vinFromImages || 'Not provided'}
-              {vinFromImages && !vehicle.vin && (
-                <span style={{ fontSize: '6pt', color: 'var(--text-muted)', marginLeft: '4px', fontStyle: 'italic' }}>
-                  (from image analysis*)
+              {vehicle.vin || vinFromImages ? (
+                <>
+                  {vehicle.vin || vinFromImages}
+                  {vinFromImages && !vehicle.vin && (
+                    <span style={{ fontSize: '6pt', color: 'var(--text-muted)', marginLeft: '4px', fontStyle: 'italic' }}>
+                      (from image analysis*)
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span className="badge badge-danger">MISSING</span>
+                  <button className="button button-small button-secondary" onClick={scrollToProofTasks}>
+                    Add proof
+                  </button>
                 </span>
               )}
             </span>
@@ -564,7 +587,16 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
                 handleDataPointClick(e, 'year', vehicle.year?.toString() || '', 'Year');
               }}
             >
-              {vehicle.year}
+              {typeof vehicle.year === 'number' && Number.isFinite(vehicle.year) ? (
+                vehicle.year
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span className="badge badge-danger">MISSING</span>
+                  <button className="button button-small button-secondary" onClick={scrollToProofTasks}>
+                    Add proof
+                  </button>
+                </span>
+              )}
             </span>
           </div>
           <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
@@ -624,22 +656,29 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               </span>
             </div>
           )}
-          {vehicle.transmission && (
-            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
-              <span>Transmission</span>
-              <span
-                className="commentable"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleDataPointClick(e, 'transmission', vehicle.transmission || '', 'Transmission');
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                {vehicle.transmission}
-              </span>
-            </div>
-          )}
+          <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
+            <span>Transmission</span>
+            <span
+              className="commentable"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleDataPointClick(e, 'transmission', vehicle.transmission || '', 'Transmission');
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              {vehicle.transmission ? (
+                vehicle.transmission
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span className="badge badge-danger">MISSING</span>
+                  <button className="button button-small button-secondary" onClick={scrollToProofTasks}>
+                    Add proof
+                  </button>
+                </span>
+              )}
+            </span>
+          </div>
           <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0 }}>
             <span>Mileage</span>
             <span
@@ -651,7 +690,16 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
               }}
               style={{ cursor: 'pointer' }}
             >
-              {vehicle.mileage ? `${vehicle.mileage.toLocaleString()} miles` : 'Not specified'}
+              {typeof vehicle.mileage === 'number' && Number.isFinite(vehicle.mileage) && vehicle.mileage > 0 ? (
+                `${vehicle.mileage.toLocaleString()} miles`
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span className="badge badge-danger">MISSING</span>
+                  <button className="button button-small button-secondary" onClick={scrollToProofTasks}>
+                    Add proof
+                  </button>
+                </span>
+              )}
             </span>
           </div>
 
