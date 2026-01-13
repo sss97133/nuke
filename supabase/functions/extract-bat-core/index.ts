@@ -85,6 +85,19 @@ function decodeBasicEntities(text: string): string {
     });
 }
 
+function normalizeBatImageUrl(raw: string): string {
+  const s = decodeBasicEntities(String(raw || "").trim());
+  if (!s) return "";
+  return s
+    .split("#")[0]
+    .split("?")[0]
+    // BaT / WP variants
+    .replace(/-scaled\.(jpg|jpeg|png|webp)$/i, ".$1")
+    .replace(/-\d+x\d+\.(jpg|jpeg|png|webp)$/i, ".$1")
+    .replace(/-scaled\./g, ".")
+    .trim();
+}
+
 function stripTags(htmlText: string): string {
   return decodeBasicEntities(String(htmlText || "").replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
@@ -289,6 +302,7 @@ function extractEssentials(html: string): {
   body_style: string | null;
   reserve_status: string | null;
   auction_end_date: string | null; // YYYY-MM-DD
+  auction_end_at: string | null; // ISO timestamp (UTC) when available
   bid_count: number;
   comment_count: number;
   view_count: number;
@@ -319,6 +333,67 @@ function extractEssentials(html: string): {
   // Use a combined view to avoid misclassifying sold listings as RNM/ended.
   const text = `${winText} ${fullText} ${titleText || ""}`.replace(/\s+/g, " ").trim();
 
+  // Parse the "Auction Result" table (listing stats). This is the highest-signal source for:
+  // - Sold vs Reserve Not Met
+  // - Winning bid / sold price
+  // - Buyer username ("Sold to <a...>user</a>" or "by <a...>user</a>")
+  const listingStatsHtml = (() => {
+    const m =
+      h.match(/<table[^>]*id=["']listing-bid["'][^>]*>[\s\S]*?<\/table>/i) ||
+      h.match(/<table[^>]*class=["'][^"']*listing-stats[^"']*["'][^>]*>[\s\S]*?<\/table>/i);
+    return m?.[0] ? String(m[0]) : "";
+  })();
+
+  const pickRowHtml = (labelRe: string): string | null => {
+    if (!listingStatsHtml) return null;
+    const re = new RegExp(
+      `<tr[^>]*>[\\s\\S]*?<td[^>]*listing-stats-label[^>]*>\\s*${labelRe}\\s*<\\/td>[\\s\\S]*?<\\/tr>`,
+      "i",
+    );
+    const m = listingStatsHtml.match(re);
+    return m?.[0] ? String(m[0]) : null;
+  };
+
+  const parseMoney = (raw: string | null): number | null => {
+    const s = String(raw || "").replace(/,/g, "").trim();
+    if (!s) return null;
+    const n = parseInt(s, 10);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return n;
+  };
+
+  const parseMoneyFromRow = (rowHtml: string | null): number | null => {
+    if (!rowHtml) return null;
+    const strong = rowHtml.match(/<strong>\s*(?:USD\s*)?\$?\s*([0-9,]+)\s*<\/strong>/i);
+    if (strong?.[1]) return parseMoney(strong[1]);
+    const anyDollar = rowHtml.match(/\$\s*([0-9,]+)/);
+    if (anyDollar?.[1]) return parseMoney(anyDollar[1]);
+    return null;
+  };
+
+  const parseBuyerFromRow = (rowHtml: string | null): string | null => {
+    if (!rowHtml) return null;
+    const soldTo = rowHtml.match(/Sold\s+to\s*<a[^>]*\/member\/[^"'>]+\/?["'][^>]*>([^<]+)<\/a>/i);
+    if (soldTo?.[1]) return stripTags(soldTo[1]) || null;
+    const byUser = rowHtml.match(/\bby\s*<a[^>]*\/member\/[^"'>]+\/?["'][^>]*>([^<]+)<\/a>/i);
+    if (byUser?.[1]) return stripTags(byUser[1]) || null;
+    return null;
+  };
+
+  const soldRow = pickRowHtml("Sold");
+  const winningBidRow = pickRowHtml("Winning\\s+Bid");
+  const highBidRow = pickRowHtml("High\\s+Bid");
+  const currentBidRow =
+    (listingStatsHtml.match(/<tr[^>]*id=["']current-bid-row["'][^>]*>[\s\S]*?<\/tr>/i)?.[0] ?? null) ||
+    pickRowHtml("Current\\s+Bid");
+
+  const soldPriceFromStats = parseMoneyFromRow(soldRow) || parseMoneyFromRow(winningBidRow);
+  const buyerFromStats = parseBuyerFromRow(soldRow) || parseBuyerFromRow(winningBidRow);
+  const bidFromStats = parseMoneyFromRow(highBidRow) || parseMoneyFromRow(currentBidRow);
+  const statsHasReserveNotMet =
+    /\bReserve\s+Not\s+Met\b/i.test(String(highBidRow || "")) ||
+    /\(\s*Reserve\s+Not\s+Met\s*\)/i.test(String(highBidRow || ""));
+
   const sellerMatch =
     win.match(/<strong>Seller<\/strong>:\s*<a[^>]*href=["'][^"']*\/member\/([^"\/]+)\/?["'][^>]*>([^<]+)<\/a>/i) ||
     win.match(/<strong>Seller<\/strong>:\s*<a[^>]*>([^<]+)<\/a>/i);
@@ -328,7 +403,7 @@ function extractEssentials(html: string): {
   const buyerHtmlMatch =
     h.match(/Sold\s+to\s*<strong>([^<]+)<\/strong>/i) ||
     h.match(/to\s*<strong>([^<]+)<\/strong>\s*for\s*(?:USD\s*)?\$?/i);
-  let buyer_username = buyerHtmlMatch?.[1] ? stripTags(buyerHtmlMatch[1]) : null;
+  let buyer_username = buyerFromStats || (buyerHtmlMatch?.[1] ? stripTags(buyerHtmlMatch[1]) : null);
 
   if (!buyer_username) {
     const buyerTextMatch =
@@ -361,15 +436,24 @@ function extractEssentials(html: string): {
   if (reserveScope.includes("no-reserve") || /\bNo Reserve\b/i.test(reserveScope)) reserve_status = "no_reserve";
   if (/\bReserve Not Met\b/i.test(reserveScope) || /reserve-not-met/i.test(reserveScope)) reserve_status = "reserve_not_met";
   if (/\bReserve Met\b/i.test(reserveScope)) reserve_status = "reserve_met";
+  if (statsHasReserveNotMet) reserve_status = "reserve_not_met";
 
   // Auction end date
   let auction_end_date: string | null = null;
+  let auction_end_at: string | null = null;
   const endsMatch = h.match(/data-ends="(\d+)"/i);
   if (endsMatch?.[1]) {
     const ts = parseInt(endsMatch[1], 10);
     if (Number.isFinite(ts) && ts > 0) {
-      auction_end_date = new Date(ts * 1000).toISOString().split("T")[0];
+      const dt = new Date(ts * 1000);
+      auction_end_at = dt.toISOString();
+      auction_end_date = auction_end_at.split("T")[0];
     }
+  }
+  if (!auction_end_date) {
+    // Active listings often expose a countdown date string like "2025-12-16-19-08-57".
+    const m = h.match(/data-auction-ends="(\d{4}-\d{2}-\d{2})-\d{2}-\d{2}-\d{2}"/i);
+    if (m?.[1]) auction_end_date = String(m[1]);
   }
 
   // Bid/comment/view/watcher counts
@@ -392,15 +476,23 @@ function extractEssentials(html: string): {
   let sale_price: number | null = null;
   let high_bid: number | null = null;
 
+  // Highest-signal: the Auction Result table.
+  if (soldPriceFromStats) {
+    sale_price = soldPriceFromStats;
+    high_bid = soldPriceFromStats;
+  } else if (bidFromStats) {
+    high_bid = bidFromStats;
+  }
+
   const bidToMatch = text.match(/Bid\s+to\s+(?:USD\s*)?\$?([0-9,]+)/i);
-  if (bidToMatch?.[1]) {
+  if (!sale_price && bidToMatch?.[1]) {
     const n = parseInt(bidToMatch[1].replace(/,/g, ""), 10);
     if (Number.isFinite(n) && n > 0) high_bid = n;
   }
 
   // SOLD signals (prefer title for low-noise extraction).
   const titleSoldMatch = titleText ? titleText.match(/\bsold\s+(?:for|to)\s+\$?([0-9,]+)/i) : null;
-  if (titleSoldMatch?.[1]) {
+  if (!sale_price && titleSoldMatch?.[1]) {
     const n = parseInt(titleSoldMatch[1].replace(/,/g, ""), 10);
     if (Number.isFinite(n) && n > 0) {
       sale_price = n;
@@ -575,6 +667,7 @@ function extractEssentials(html: string): {
     body_style,
     reserve_status,
     auction_end_date,
+    auction_end_at,
     bid_count,
     comment_count,
     view_count,
@@ -1430,54 +1523,273 @@ serve(async (req) => {
 
     // Save images (external URLs only)
     if (vehicleId && images.length > 0) {
-      const imageRows = images.map((img, idx) => ({
-        vehicle_id: vehicleId,
-        image_url: img,
-        position: idx,
-        source: "bat_core",
-        is_external: true,
-      }));
+      const nowIso = new Date().toISOString();
 
-      const { error } = await supabase
-        .from("vehicle_images")
-        .upsert(imageRows, { onConflict: "vehicle_id,image_url", ignoreDuplicates: true });
+      // Keep order but de-dupe + normalize BaT URLs
+      const cleanedImages: string[] = [];
+      const seen = new Set<string>();
+      for (const raw of images) {
+        const u = normalizeBatImageUrl(raw);
+        if (!u || !u.startsWith("http")) continue;
+        const k = u.toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        cleanedImages.push(u);
+      }
 
-      if (error) console.warn(`vehicle_images upsert failed (non-fatal): ${error.message}`);
+      if (cleanedImages.length > 0) {
+        try {
+          const { data: existingRows, error: existingErr } = await supabase
+            .from("vehicle_images")
+            .select("id, image_url, source_url, exif_data, is_primary, is_document, is_duplicate")
+            .eq("vehicle_id", vehicleId)
+            // Keep parity with gallery filters
+            .not("is_document", "is", true)
+            .not("is_duplicate", "is", true)
+            .limit(5000);
+
+          if (existingErr) throw existingErr;
+
+          const existing = Array.isArray(existingRows) ? existingRows : [];
+          const hasPrimaryAlready = existing.some((r: any) => Boolean(r?.is_primary));
+
+          const keyFromRow = (r: any): string => {
+            const exif = (r?.exif_data && typeof r.exif_data === "object") ? r.exif_data : {};
+            const candidates = [
+              r?.source_url, // canonical for imported images
+              exif?.original_url,
+              r?.image_url,
+            ];
+            for (const c of candidates) {
+              const u = normalizeBatImageUrl(String(c || ""));
+              if (u) return u.toLowerCase();
+            }
+            return "";
+          };
+
+          const byKey = new Map<string, any>();
+          for (const r of existing) {
+            const k = keyFromRow(r);
+            if (!k) continue;
+            if (!byKey.has(k)) byKey.set(k, r);
+          }
+
+          const updates: any[] = [];
+          const inserts: any[] = [];
+          let canSetPrimary = !hasPrimaryAlready;
+
+          for (let idx = 0; idx < cleanedImages.length; idx++) {
+            const imgUrl = cleanedImages[idx];
+            const k = imgUrl.toLowerCase();
+            const row = byKey.get(k);
+
+            if (row?.id) {
+              const exifRaw = (row?.exif_data && typeof row.exif_data === "object") ? row.exif_data : {};
+              const existingSingleListing =
+                (typeof exifRaw?.source_url === "string" && String(exifRaw.source_url).includes("bringatrailer.com/listing/"))
+                  ? String(exifRaw.source_url)
+                  : null;
+
+              const baseListingUrls: string[] =
+                Array.isArray(exifRaw?.listing_urls)
+                  ? (exifRaw.listing_urls as any[]).map((u: any) => String(u)).filter(Boolean)
+                  : (existingSingleListing ? [existingSingleListing] : []);
+
+              const nextListingUrls = Array.from(new Set([...baseListingUrls, listingUrlCanonical].filter(Boolean)));
+
+              const positionsRaw =
+                (exifRaw?.listing_positions && typeof exifRaw.listing_positions === "object")
+                  ? exifRaw.listing_positions
+                  : {};
+              const nextPositions = { ...(positionsRaw as any), [listingUrlCanonical]: idx };
+
+              const needsAddListing = !baseListingUrls.some((u) => u === listingUrlCanonical);
+              const needsPos = String((positionsRaw as any)?.[listingUrlCanonical] ?? "") !== String(idx);
+              const needsBasics = !exifRaw?.discovery_url || !exifRaw?.imported_from;
+
+              if (needsAddListing || needsPos || needsBasics) {
+                const mergedExif = {
+                  ...(exifRaw as any),
+                  original_url: (exifRaw as any)?.original_url || imgUrl,
+                  // Preserve the original single-listing source_url if present; otherwise set it.
+                  source_url: (exifRaw as any)?.source_url || listingUrlCanonical,
+                  discovery_url: (exifRaw as any)?.discovery_url || listingUrlCanonical,
+                  imported_from: (exifRaw as any)?.imported_from || "Bring a Trailer",
+                  listing_urls: nextListingUrls,
+                  listing_positions: nextPositions,
+                };
+
+                updates.push({
+                  id: row.id,
+                  exif_data: mergedExif,
+                  updated_at: nowIso,
+                });
+              }
+              continue;
+            }
+
+            const makePrimary = canSetPrimary && idx === 0;
+            if (makePrimary) canSetPrimary = false;
+
+            // IMPORTANT: production DB requires attribution for imported images.
+            // Use source='bat_import' to satisfy vehicle_images_attribution_check.
+            inserts.push({
+              vehicle_id: vehicleId,
+              user_id: null,
+              image_url: imgUrl,
+              source: "bat_import",
+              source_url: imgUrl,
+              is_external: true,
+              approval_status: "auto_approved",
+              is_approved: true,
+              redaction_level: "none",
+              position: idx,
+              display_order: idx,
+              is_primary: makePrimary,
+              taken_at: nowIso,
+              exif_data: {
+                original_url: imgUrl,
+                source_url: listingUrlCanonical,
+                discovery_url: listingUrlCanonical,
+                imported_from: "Bring a Trailer",
+                imported_at: nowIso,
+                listing_urls: [listingUrlCanonical],
+                listing_positions: { [listingUrlCanonical]: idx },
+              },
+              created_at: nowIso,
+              updated_at: nowIso,
+            });
+          }
+
+          if (updates.length > 0) {
+            const { error: upErr } = await supabase
+              .from("vehicle_images")
+              .upsert(updates, { onConflict: "id" });
+            if (upErr) console.warn(`vehicle_images provenance upsert failed (non-fatal): ${upErr.message}`);
+          }
+
+          if (inserts.length > 0) {
+            const { error: insErr } = await supabase
+              .from("vehicle_images")
+              .insert(inserts);
+            if (insErr) console.warn(`vehicle_images insert failed (non-fatal): ${insErr.message}`);
+          }
+        } catch (e: any) {
+          console.warn(`vehicle_images save failed (non-fatal): ${e?.message || String(e)}`);
+        }
+      }
     }
 
     // external_listings (platform tracking)
     if (vehicleId) {
-      const listingStatus = essentials.sale_price ? "sold" : "ended";
-      const endAtIso = essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null;
+      const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
+      const endAtIso = essentials.auction_end_at ||
+        (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
+      const endMs = endAtIso ? new Date(endAtIso).getTime() : NaN;
+      const listingStatus = hasSale
+        ? "sold"
+        : (endAtIso && Number.isFinite(endMs) && endMs > Date.now() ? "active" : "ended");
       const listingUrlKey = normalizeListingUrlKey(listingUrlCanonical);
+      const currentBidValue = listingStatus === "sold" ? essentials.sale_price : (essentials.high_bid || null);
+      const listingImageUrls = (() => {
+        const out: string[] = [];
+        const seen = new Set<string>();
+        for (const raw of images || []) {
+          const u = normalizeBatImageUrl(raw);
+          if (!u || !u.startsWith("http")) continue;
+          const k = u.toLowerCase();
+          if (seen.has(k)) continue;
+          seen.add(k);
+          out.push(u);
+        }
+        return out;
+      })();
 
-      const { error } = await supabase
-        .from("external_listings")
-        .upsert({
-          vehicle_id: vehicleId,
-          platform: "bat",
-          listing_url: listingUrlCanonical,
-          listing_url_key: listingUrlKey,
-          listing_id: essentials.lot_number || listingUrlCanonical,
-          listing_status: listingStatus,
-          end_date: endAtIso,
-          sold_at: essentials.sale_price ? endAtIso : null,
-          final_price: essentials.sale_price,
-          bid_count: essentials.bid_count,
-          view_count: essentials.view_count,
-          watcher_count: essentials.watcher_count,
-          metadata: {
-            source: "extract-bat-core",
-            lot_number: essentials.lot_number,
-            seller_username: essentials.seller_username,
-            buyer_username: essentials.buyer_username,
-            reserve_status: essentials.reserve_status,
-            comment_count: essentials.comment_count,
-          },
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "platform,listing_url_key" });
+      // IMPORTANT:
+      // `external_listings` has a *partial* unique index:
+      //   uq_external_listings_platform_url_key ON (platform, listing_url_key) WHERE listing_url_key IS NOT NULL
+      // Postgres requires `ON CONFLICT ... WHERE ...` to target a partial index, but PostgREST/supabase-js
+      // can't express that predicate via the upsert API.
+      //
+      // So we implement a safe "manual upsert":
+      // - update-by-(platform, listing_url_key)
+      // - if 0 rows updated, insert
+      // - if insert hits unique violation (race), retry update
+      const listingPayload: any = {
+        vehicle_id: vehicleId,
+        platform: "bat",
+        listing_url: listingUrlCanonical,
+        listing_url_key: listingUrlKey,
+        listing_id: essentials.lot_number || listingUrlCanonical,
+        listing_status: listingStatus,
+        end_date: endAtIso,
+        sold_at: hasSale ? endAtIso : null,
+        current_bid: currentBidValue,
+        final_price: hasSale ? essentials.sale_price : null,
+        bid_count: essentials.bid_count,
+        view_count: essentials.view_count,
+        watcher_count: essentials.watcher_count,
+        metadata: {
+          source: "extract-bat-core",
+          lot_number: essentials.lot_number,
+          seller_username: essentials.seller_username,
+          buyer_username: essentials.buyer_username,
+          reserve_status: essentials.reserve_status,
+          comment_count: essentials.comment_count,
+          images: listingImageUrls,
+          image_urls: listingImageUrls,
+          image_count: listingImageUrls.length,
+        },
+        updated_at: new Date().toISOString(),
+      };
 
-      if (error) console.warn(`external_listings upsert failed (non-fatal): ${error.message}`);
+      try {
+        let didUpdate = false;
+
+        if (listingUrlKey) {
+          const { data: updatedRows, error: updErr } = await supabase
+            .from("external_listings")
+            .update(listingPayload)
+            .eq("platform", "bat")
+            .eq("listing_url_key", listingUrlKey)
+            .select("id")
+            .limit(1);
+
+          if (updErr) {
+            console.warn(`external_listings update failed (non-fatal): ${updErr.message}`);
+          } else if (Array.isArray(updatedRows) && updatedRows.length > 0) {
+            didUpdate = true;
+          }
+        }
+
+        if (!didUpdate) {
+          const { error: insErr } = await supabase
+            .from("external_listings")
+            .insert(listingPayload);
+
+          if (insErr) {
+            const code = String((insErr as any)?.code || "");
+            const msg = String((insErr as any)?.message || "");
+            const isDup =
+              code === "23505" ||
+              msg.includes("uq_external_listings_platform_url_key") ||
+              msg.includes("external_listings_platform_url_key");
+
+            if (isDup && listingUrlKey) {
+              const { error: retryErr } = await supabase
+                .from("external_listings")
+                .update(listingPayload)
+                .eq("platform", "bat")
+                .eq("listing_url_key", listingUrlKey);
+              if (retryErr) console.warn(`external_listings retry update failed (non-fatal): ${retryErr.message}`);
+            } else {
+              console.warn(`external_listings insert failed (non-fatal): ${insErr.message}`);
+            }
+          }
+        }
+      } catch (e: any) {
+        console.warn(`external_listings write failed (non-fatal): ${e?.message || String(e)}`);
+      }
     }
 
     // auction_events (multi-auction history per vehicle)
@@ -1488,7 +1800,8 @@ serve(async (req) => {
         ? "sold"
         : (essentials.reserve_status === "reserve_not_met" ? "reserve_not_met" : (hasBid ? "bid_to" : "no_sale"));
 
-      const endAt = essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null;
+      const endAt = essentials.auction_end_at ||
+        (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
 
       const { error } = await supabase
         .from("auction_events")

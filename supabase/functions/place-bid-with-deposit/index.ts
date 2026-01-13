@@ -5,6 +5,12 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
 });
@@ -14,12 +20,17 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 serve(async (req) => {
   try {
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders });
+    }
+
     // Get auth token
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
         JSON.stringify({ success: false, error: 'No authorization header' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -38,7 +49,7 @@ serve(async (req) => {
     if (userError || !user) {
       return new Response(
         JSON.stringify({ success: false, error: 'Unauthorized' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -49,7 +60,7 @@ serve(async (req) => {
     if (!listing_id || !bid_amount_cents || !proxy_max_bid_cents) {
       return new Response(
         JSON.stringify({ success: false, error: 'Missing required fields' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -63,7 +74,7 @@ serve(async (req) => {
     if (listingError || !listing) {
       return new Response(
         JSON.stringify({ success: false, error: 'Listing not found' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -80,7 +91,7 @@ serve(async (req) => {
           success: false,
           error: 'No payment method on file. Please add a payment method first.',
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -115,15 +126,25 @@ serve(async (req) => {
           success: false,
           error: 'Failed to authorize payment. Please check your payment method.',
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Get client IP (best-effort) for audit; only pass values Postgres can cast to INET.
+    const rawClientIP =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('x-real-ip')?.trim() ||
+      '';
+    const clientIP =
+      rawClientIP && (rawClientIP.includes(':') || /^\d{1,3}(\.\d{1,3}){3}$/.test(rawClientIP))
+        ? rawClientIP
+        : null;
 
     // Place the bid using existing function
     const { data: bidResult, error: bidError } = await supabase.rpc('place_auction_bid', {
       p_listing_id: listing_id,
       p_proxy_max_bid_cents: proxy_max_bid_cents,
-      p_ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
+      p_ip_address: clientIP,
       p_user_agent: req.headers.get('user-agent'),
       p_bid_source: 'web',
     });
@@ -137,7 +158,7 @@ serve(async (req) => {
           success: false,
           error: bidResult.error || bidError?.message || 'Failed to place bid',
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -179,7 +200,7 @@ serve(async (req) => {
         displayed_bid_cents: bidResult.displayed_bid_cents,
         auction_extended: bidResult.auction_extended,
       }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Error in place-bid-with-deposit:', error);
@@ -188,7 +209,7 @@ serve(async (req) => {
         success: false,
         error: error.message || 'Internal server error',
       }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

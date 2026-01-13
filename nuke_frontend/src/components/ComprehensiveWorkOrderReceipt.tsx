@@ -167,14 +167,14 @@ interface ReceiptHeader {
 interface ReceiptItemRow {
   id: string;
   receipt_id: string;
-  line_number: number | null;
   description: string | null;
   part_number: string | null;
-  vendor_sku: string | null;
+  sku: string | null;
   category: string | null;
   quantity: number | null;
   unit_price: number | null;
-  total_price: number | null;
+  line_total: number | null;
+  created_at?: string | null;
 }
 
 interface InvoiceDraft {
@@ -404,10 +404,10 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               if (receiptIds.length > 0) {
                 const { data: items, error: itemsErr } = await supabase
                   .from('receipt_items')
-                  .select('id,receipt_id,line_number,description,part_number,vendor_sku,category,quantity,unit_price,total_price')
+                  .select('id,receipt_id,description,part_number,sku,category,quantity,unit_price,line_total,created_at')
                   .in('receipt_id', receiptIds)
                   .order('receipt_id', { ascending: true })
-                  .order('line_number', { ascending: true });
+                  .order('created_at', { ascending: true });
                 if (!itemsErr && Array.isArray(items)) {
                   setReceiptItems(items as ReceiptItemRow[]);
                 }
@@ -1676,7 +1676,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               const items = receiptItems.filter((it) => it.receipt_id === r.id);
               const doc = eventDocuments.find((d) => d.document_id === (r.source_document_id || ''));
               const toNum = (v: any) => (typeof v === 'number' ? v : (v ? Number(v) : 0));
-              const itemsTotal = items.reduce((sum, it) => sum + toNum(it.total_price), 0);
+              const itemsTotal = items.reduce((sum, it) => sum + toNum(it.line_total), 0);
               const headerTotal = toNum(r.total) > 0 ? toNum(r.total) : itemsTotal;
 
               return (
@@ -1732,15 +1732,15 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                         >
                           <div>
                             <div style={{ fontWeight: 'bold' }}>{it.description || 'Line item'}</div>
-                            {(it.category || it.part_number) && (
+                            {(it.category || it.part_number || it.sku) && (
                               <div style={{ fontSize: '6pt', color: '#666' }}>
-                                {[it.category, it.part_number ? `#${it.part_number}` : null].filter(Boolean).join(' ')}
+                                {[it.category, it.part_number ? `#${it.part_number}` : null, it.sku ? `SKU ${it.sku}` : null].filter(Boolean).join(' ')}
                               </div>
                             )}
                           </div>
                           <div style={{ textAlign: 'right' }}>{it.quantity ?? '-'}</div>
                           <div style={{ textAlign: 'right' }}>{it.unit_price != null ? formatCurrency(Number(it.unit_price)) : '-'}</div>
-                          <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{it.total_price != null ? formatCurrency(Number(it.total_price)) : '-'}</div>
+                          <div style={{ textAlign: 'right', fontWeight: 'bold' }}>{it.line_total != null ? formatCurrency(Number(it.line_total)) : '-'}</div>
                         </div>
                       ))}
 
@@ -1783,7 +1783,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
                 const t = toNum((r as any).total);
                 if (t > 0) return sum + t;
                 const itemsFor = receiptItems.filter((it) => it.receipt_id === r.id);
-                const itemsTotal = itemsFor.reduce((s, it) => s + toNum((it as any).total_price), 0);
+                const itemsTotal = itemsFor.reduce((s, it) => s + toNum((it as any).line_total), 0);
                 return sum + itemsTotal;
               }, 0);
               const eventReceiptTotal = toNum((baseEvent as any)?.receipt_amount);
@@ -1799,7 +1799,7 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
               const t = toNum((r as any).total);
               if (t > 0) return sum + t;
               const itemsFor = receiptItems.filter((it) => it.receipt_id === r.id);
-              const itemsTotal = itemsFor.reduce((s, it) => s + toNum((it as any).total_price), 0);
+              const itemsTotal = itemsFor.reduce((s, it) => s + toNum((it as any).line_total), 0);
               return sum + itemsTotal;
             }, 0);
             const eventReceiptTotal = toNum((baseEvent as any)?.receipt_amount);

@@ -31,6 +31,7 @@ export default function CreateAuctionListing() {
   // Step 2: Auction Type & Timing
   const [saleType, setSaleType] = useState<'auction' | 'live_auction'>('auction');
   const [auctionDuration, setAuctionDuration] = useState(7); // days
+  const [liveAuctionMinutes, setLiveAuctionMinutes] = useState(5); // minutes
   const [startImmediately, setStartImmediately] = useState(true);
   const [scheduledStartDate, setScheduledStartDate] = useState('');
   const [scheduledStartTime, setScheduledStartTime] = useState('');
@@ -56,7 +57,9 @@ export default function CreateAuctionListing() {
     const { data, error } = await supabase
       .from('vehicles')
       .select('id, year, make, model, trim, primary_image_url')
-      .eq('owner_id', user.id)
+      // Some deployments store ownership on vehicles.user_id, others on vehicles.owner_id.
+      // Support both so the listing flow doesn't appear empty.
+      .or(`owner_id.eq.${user.id},user_id.eq.${user.id}`)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
@@ -123,8 +126,8 @@ export default function CreateAuctionListing() {
         auctionStartTime = startDateTime.toISOString();
       }
 
-      const durationMinutes = saleType === 'live_auction' 
-        ? 5 
+      const durationMinutes = saleType === 'live_auction'
+        ? liveAuctionMinutes
         : auctionDuration * 24 * 60;
 
       const auctionEndTime = new Date(
@@ -145,13 +148,19 @@ export default function CreateAuctionListing() {
           auction_end_time: auctionEndTime,
           auction_duration_minutes: durationMinutes,
           sniping_protection_minutes: 2,
-          status: startImmediately ? 'active' : 'draft',
+          // Auto-start: if user chose "start immediately" or a scheduled time, the scheduler will activate it.
+          // The scheduler runs a readiness scan first and will refuse to start if required fields are missing.
+          auto_start_enabled: true,
+          auto_start_armed_at: new Date().toISOString(),
+          // Always start as draft so the owner explicitly triggers the timer (with readiness scan).
+          status: 'draft',
           description,
           metadata: {
             has_buy_now: hasBuyNow,
             buy_now_price_cents: hasBuyNow && buyNowPrice 
               ? Math.floor(parseFloat(buyNowPrice) * 100) 
               : null,
+            start_immediately: startImmediately,
             created_via: 'create_auction_wizard'
           }
         })
@@ -160,8 +169,8 @@ export default function CreateAuctionListing() {
 
       if (error) throw error;
 
-      alert('Auction listing created successfully!');
-      navigate(`/vehicle/${selectedVehicleId}`);
+      alert('Auction listing created in draft. Start it when you are ready.');
+      navigate(`/listings/${data.id}`);
     } catch (error) {
       console.error('Error creating listing:', error);
       alert('Failed to create listing');
@@ -296,7 +305,7 @@ export default function CreateAuctionListing() {
                 >
                   <h3 className="font-bold mb-1">Live Auction</h3>
                   <p className="text-sm text-gray-600">
-                    Fast-paced 5-minute auction
+                    Fast-paced live auction
                   </p>
                 </button>
               </div>
@@ -319,6 +328,26 @@ export default function CreateAuctionListing() {
                   <option value="10">10 days</option>
                   <option value="14">14 days</option>
                 </select>
+              </div>
+            )}
+
+            {saleType === 'live_auction' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Live Auction Duration
+                </label>
+                <select
+                  value={liveAuctionMinutes}
+                  onChange={(e) => setLiveAuctionMinutes(parseInt(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="2">2 minutes (experimental)</option>
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Live auctions are server-timed. If your browser reloads, bids and timer remain authoritative.
+                </p>
               </div>
             )}
 
@@ -508,7 +537,7 @@ export default function CreateAuctionListing() {
                 {hasReserve && ' (Reserve)'}
               </p>
               <p className="text-sm text-gray-600">
-                {saleType === 'live_auction' ? '5 minute' : `${auctionDuration} day`} auction
+                {saleType === 'live_auction' ? `${liveAuctionMinutes} minute` : `${auctionDuration} day`} auction
               </p>
             </div>
           )}

@@ -83,15 +83,15 @@ export default function AuctionSuggestionCard({ suggestion, onResponse }: Auctio
   const getOpportunityIcon = () => {
     switch (suggestion.opportunity_type) {
       case 'scheduled_lot':
-        return '📅';
+        return 'SCHEDULED';
       case 'trending_category':
-        return '🔥';
+        return 'TRENDING';
       case 'similar_sold':
-        return '💰';
+        return 'COMPS';
       case 'price_match':
-        return '📈';
+        return 'MATCH';
       default:
-        return '💡';
+        return 'IDEA';
     }
   };
 
@@ -114,7 +114,7 @@ export default function AuctionSuggestionCard({ suggestion, onResponse }: Auctio
           <div>
             <p className="text-sm text-gray-600">{suggestion.pitch_message}</p>
             <p className="text-xs text-gray-500 mt-1">
-              {suggestion.status === 'accepted' ? '✓ Accepted' : '✗ Declined'}
+              {suggestion.status === 'accepted' ? 'Accepted' : 'Declined'}
             </p>
           </div>
         </div>
@@ -127,7 +127,20 @@ export default function AuctionSuggestionCard({ suggestion, onResponse }: Auctio
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">{getOpportunityIcon()}</span>
+            <span
+              className="text-xs"
+              style={{
+                padding: '4px 8px',
+                borderRadius: 999,
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                background: 'rgba(59, 130, 246, 0.10)',
+                color: '#1d4ed8',
+                fontWeight: 800,
+                letterSpacing: '0.02em',
+              }}
+            >
+              {getOpportunityIcon()}
+            </span>
           <div>
             <h3 className="font-semibold text-lg">Auction Opportunity</h3>
             <p className="text-sm text-gray-600">

@@ -14,6 +14,7 @@ export interface AuctionListing {
   vehicle_id: string;
   seller_id: string;
   sale_type: 'auction' | 'live_auction';
+  list_price_cents?: number | null;
   current_high_bid_cents: number | null;
   current_high_bidder_id: string | null;
   bid_count: number;
@@ -211,17 +212,26 @@ export class AuctionService {
     if (!listing) return null;
 
     const currentBid = listing.current_high_bid_cents || 0;
-    
-    // Calculate increment based on current bid
-    let increment = 50; // Default
-    if (currentBid >= 50000) increment = 5000;
-    else if (currentBid >= 10000) increment = 2500;
-    else if (currentBid >= 5000) increment = 1000;
-    else if (currentBid >= 1000) increment = 500;
-    else if (currentBid >= 500) increment = 250;
-    else if (currentBid >= 100) increment = 100;
 
-    return currentBid + increment;
+    // Mirrors DB calculate_bid_increment() semantics (cents).
+    const calculateIncrementCents = (bidCents: number) => {
+      if (bidCents < 100000) return 5000;     // < $1,000 -> $50
+      if (bidCents < 500000) return 10000;    // < $5,000 -> $100
+      if (bidCents < 1000000) return 25000;   // < $10,000 -> $250
+      if (bidCents < 5000000) return 50000;   // < $50,000 -> $500
+      if (bidCents < 10000000) return 100000; // < $100,000 -> $1,000
+      if (bidCents < 25000000) return 250000; // < $250,000 -> $2,500
+      return 500000;                          // $250,000+ -> $5,000
+    };
+
+    // No bids yet: enforce starting bid if set.
+    const startingBid = (listing as any)?.list_price_cents;
+    if (!currentBid || currentBid <= 0) {
+      const start = typeof startingBid === 'number' && startingBid > 0 ? startingBid : 0;
+      return start > 0 ? start : calculateIncrementCents(0);
+    }
+
+    return currentBid + calculateIncrementCents(currentBid);
   }
 }
 

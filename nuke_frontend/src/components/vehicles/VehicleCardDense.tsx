@@ -494,10 +494,29 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     (vehicle.all_images?.find((img) => img?.is_primary && img?.url)?.url) ||
     (vehicle.all_images?.[0]?.url) ||
     null;
-  const effectiveSourceStampUrl =
-    sourceStampUrl ||
-    (vehicle.discovery_url ? String(vehicle.discovery_url) : '') ||
-    '';
+  const normalizeStampHost = (raw: unknown): string => {
+    const s = String(raw ?? '').trim();
+    if (!s) return '';
+    try {
+      return new URL(s).hostname.toLowerCase();
+    } catch {
+      return s.toLowerCase();
+    }
+  };
+
+  // Two-stamp support:
+  // - Source stamp: discovery/listing domain (BaT, Craigslist, etc.)
+  // - Org stamp: the associated organization website (dealer/shop) if provided and different.
+  const sourceFaviconUrl =
+    (vehicle.discovery_url ? String(vehicle.discovery_url).trim() : '') ||
+    (sourceStampUrl ? String(sourceStampUrl).trim() : '');
+  const orgFaviconUrl = (() => {
+    const disc = vehicle.discovery_url ? String(vehicle.discovery_url).trim() : '';
+    const org = sourceStampUrl ? String(sourceStampUrl).trim() : '';
+    if (!disc || !org) return '';
+    if (normalizeStampHost(disc) === normalizeStampHost(org)) return '';
+    return org;
+  })();
 
   // STATE-BASED: Is this vehicle in an ACTIVE AUCTION right now?
   // Uses unified auction state service - treats auction as temporary mode, not permanent state
@@ -717,6 +736,27 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }, [isAuctionSource, vehicle, auctionEndedDaysAgo]);
 
   const badgeStyle = React.useMemo((): React.CSSProperties => {
+    // Provide subtle, deterministic status differentiation (SOLD vs RESULT) via border color.
+    // This keeps the badge readable on mixed imagery while reducing "everything is the same black pill".
+    const v: any = vehicle as any;
+    const outcome = String(v?.auction_outcome || '').toLowerCase();
+    const saleStatus = String(v?.sale_status || '').toLowerCase();
+    const externalListing = v?.external_listings?.[0];
+    const externalStatus = externalListing ? String(externalListing?.listing_status || '').toLowerCase() : '';
+    const hasFinalPrice = externalListing?.final_price || null;
+    const hasSoldAt = externalListing?.sold_at || null;
+    const isSoldLike =
+      outcome === 'sold' ||
+      saleStatus === 'sold' ||
+      (externalStatus === 'sold' && (hasFinalPrice || hasSoldAt));
+    const isResultLike =
+      outcome === 'reserve_not_met' ||
+      outcome === 'ended' ||
+      outcome === 'no_sale' ||
+      externalStatus === 'ended';
+    const statusBorderColor = isSoldLike ? '#10b981' : isResultLike ? '#f59e0b' : undefined;
+    const borderColor = thermalPriceColor || statusBorderColor;
+
     const base: React.CSSProperties = {
       position: 'absolute',
       top: '6px',
@@ -730,7 +770,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       alignItems: 'center',
       gap: '6px',
       maxWidth: '85%',
-      border: thermalPriceColor ? `1px solid ${thermalPriceColor}80` : '1px solid rgba(255,255,255,0.18)',
+      border: borderColor ? `1px solid ${borderColor}80` : '1px solid rgba(255,255,255,0.18)',
       transformOrigin: 'center',
       transition: 'opacity 0.3s ease',
     };
@@ -890,6 +930,15 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return displayPrice; // Will be "—" if nothing found
   }, [isActiveAuction, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost, isSold, shouldShowSoldBadge]);
 
+  const badgeParts = React.useMemo(() => {
+    const raw = String(badgeMainText || '').trim();
+    const up = raw.toUpperCase();
+    if (up.startsWith('SOLD ')) return { label: 'SOLD', value: raw.slice(5).trim() || null };
+    if (up.startsWith('RESULT ')) return { label: 'RESULT', value: raw.slice(7).trim() || null };
+    if (up === 'ENDED') return { label: 'ENDED', value: null as string | null };
+    return { label: null as string | null, value: raw || null };
+  }, [badgeMainText]);
+
   // LIST VIEW: Cursor-style - compact, dense, single row
   if (viewMode === 'list') {
     return (
@@ -979,7 +1028,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             '—'
           )}
           {vehicle.condition_rating && ` • C:${vehicle.condition_rating}`}
-          {vehicle.vin && ` • ${vehicle.vin.slice(-4)}`}
+          {vehicle.vin && ` • VIN ${vehicle.vin.slice(-4)}`}
         </div>
         
         {/* Counts */}
@@ -1176,33 +1225,39 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     ) : null;
                   })()}
                 </div>
-              ) : auctionBidderDisplay ? (
-                <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '220px' }}>
+              ) : badgeParts.label ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
                   <div
                     style={{
-                      display: 'flex',
-                      width: '200%',
-                      animation: 'nuke-badge-ticker 6s ease-in-out infinite',
+                      fontSize: '6.5pt',
+                      fontWeight: 800,
+                      lineHeight: 1,
+                      color:
+                        badgeParts.label === 'SOLD'
+                          ? '#10b981'
+                          : badgeParts.label === 'RESULT'
+                          ? '#f59e0b'
+                          : 'rgba(255,255,255,0.92)',
                     }}
                   >
-                    <div style={{ width: '50%', paddingRight: '10px', fontSize: '9pt', fontWeight: 800 }}>
-                      {badgeMainText}
-                    </div>
-                    <div style={{ width: '50%', paddingRight: '10px', fontSize: '8pt', fontWeight: 700, opacity: 0.95 }}>
-                      {auctionBidderDisplay}
-                    </div>
+                    {badgeParts.label}
                   </div>
+                  {badgeParts.value ? (
+                    <div style={{ fontSize: '9pt', fontWeight: 800, lineHeight: 1 }}>
+                      {badgeParts.value}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div style={{ fontSize: '9pt', fontWeight: 800 }}>
-                  {badgeMainText}
+                  {badgeParts.value || badgeMainText}
                 </div>
               )}
             </div>
           )}
 
           {/* Favicon in bottom-left corner (positioned relative to card, above overlay) */}
-          {effectiveSourceStampUrl && (
+          {sourceFaviconUrl && (
             <div style={{
               position: 'absolute',
               bottom: showDetailOverlay ? '52px' : '8px', // Above detail overlay if visible
@@ -1210,13 +1265,15 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               background: 'transparent',
               padding: 0,
               borderRadius: 0,
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: '6px',
               border: 'none',
               zIndex: 10,
             }}>
-              <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} />
+              <FaviconIcon url={sourceFaviconUrl} size={14} preserveAspectRatio={true} />
+              {orgFaviconUrl ? <FaviconIcon url={orgFaviconUrl} size={14} preserveAspectRatio={true} /> : null}
             </div>
           )}
 
@@ -1540,7 +1597,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         color: 'inherit',
         transition: 'all 0.12s ease',
         cursor: 'pointer',
-        position: 'relative'
+        position: 'relative',
+        // Huge perf win on large grids: let the browser skip offscreen card rendering.
+        contentVisibility: 'auto',
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.opacity = '0.85';
@@ -1717,9 +1776,32 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   ) : null;
                 })()}
               </div>
+            ) : badgeParts.label ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    fontSize: '6.5pt',
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    color:
+                      badgeParts.label === 'SOLD'
+                        ? '#10b981'
+                        : badgeParts.label === 'RESULT'
+                        ? '#f59e0b'
+                        : 'rgba(255,255,255,0.92)',
+                  }}
+                >
+                  {badgeParts.label}
+                </div>
+                {badgeParts.value ? (
+                  <div style={{ fontSize: gridTypography.badge, fontWeight: 800, lineHeight: 1 }}>
+                    {badgeParts.value}
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <div style={{ fontSize: gridTypography.badge, fontWeight: 800 }}>
-                {badgeMainText}
+                {badgeParts.value || badgeMainText}
               </div>
             )}
           </div>
@@ -1728,7 +1810,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       </div>
 
       {/* Favicon in bottom-left corner (positioned relative to card, above overlay) */}
-      {effectiveSourceStampUrl && (
+      {sourceFaviconUrl && (
         <div style={{
           position: 'absolute',
           bottom: showDetailOverlay ? '52px' : '8px', // Above detail overlay if visible
@@ -1736,13 +1818,15 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           background: 'transparent',
           padding: 0,
           borderRadius: 0,
-          display: 'flex',
+          display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: '6px',
           border: 'none',
           zIndex: 10,
         }}>
-          <FaviconIcon url={effectiveSourceStampUrl} size={14} preserveAspectRatio={true} />
+          <FaviconIcon url={sourceFaviconUrl} size={14} preserveAspectRatio={true} />
+          {orgFaviconUrl ? <FaviconIcon url={orgFaviconUrl} size={14} preserveAspectRatio={true} /> : null}
         </div>
       )}
       
@@ -1933,7 +2017,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 fontSize: '8pt'
               }}>
                 {/* Current Value / Sale Price */}
-                {currentValue && (
+                {currentValue && !showPriceOverlay && (
                   <div style={{ fontWeight: 700, fontSize: '9pt' }}>
                     {isSold ? 'SOLD ' : ''}{new Intl.NumberFormat('en-US', { 
                       style: 'currency', 
@@ -2002,7 +2086,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     <span>{Math.floor(vehicle.mileage).toLocaleString()} mi</span>
                   )}
                   {vehicle.vin && (
-                    <span style={{ fontFamily: 'monospace' }}>{vehicle.vin.slice(-4)}</span>
+                    <span style={{ fontFamily: 'monospace' }}>VIN {vehicle.vin.slice(-4)}</span>
                   )}
                   {vehicle.location && (
                     <span>{vehicle.location}</span>

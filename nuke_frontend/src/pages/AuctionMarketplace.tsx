@@ -462,7 +462,7 @@ export default function AuctionMarketplace() {
               </div>
               {user && (
                 <button
-                  onClick={() => navigate('/list-vehicle')}
+                  onClick={() => navigate('/auctions/create')}
                   className="button button-primary"
                   style={{ fontSize: '9pt' }}
                 >
@@ -582,7 +582,7 @@ export default function AuctionMarketplace() {
                   </div>
                   {user && (
                     <button
-                      onClick={() => navigate('/list-vehicle')}
+                      onClick={() => navigate('/auctions/create')}
                       className="button button-primary"
                       style={{ fontSize: '9pt' }}
                     >

@@ -142,7 +142,7 @@ export class VehicleValuationService {
         if (receiptIds.length > 0) {
           const { data: receiptItems } = await supabase
             .from('receipt_items')
-            .select('receipt_id, description, total_price, category')
+            .select('receipt_id, description, line_total, category')
             .in('receipt_id', receiptIds);
 
           if (receiptItems && receiptItems.length > 0) {
@@ -150,7 +150,7 @@ export class VehicleValuationService {
             const partsMap = new Map<string, number>();
             receiptItems.forEach((it: any) => {
               const key = (it.description || 'Unknown').trim();
-              const amt = it.total_price || 0;
+              const amt = it.line_total || 0;
               partsMap.set(key, (partsMap.get(key) || 0) + amt);
             });
 
@@ -215,8 +215,8 @@ export class VehicleValuationService {
             receiptItems.forEach((it: any) => {
               const cat = inferCategory(it.description, it.category);
               if (!byCategory[cat]) byCategory[cat] = { invested: 0, marketValue: 0 };
-              byCategory[cat].invested += it.total_price || 0;
-              byCategory[cat].marketValue += (it.total_price || 0) * 1.15;
+              byCategory[cat].invested += it.line_total || 0;
+              byCategory[cat].marketValue += (it.line_total || 0) * 1.15;
             });
             valuation.categoryBreakdown = Object.entries(byCategory).map(([category, v]) => ({ category, invested: v.invested, marketValue: v.marketValue }));
           }

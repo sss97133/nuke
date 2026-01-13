@@ -27,6 +27,8 @@ const Capture = React.lazy(() => import('../pages/Capture'));
 const Capsule = React.lazy(() => import('../pages/Capsule'));
 const Library = React.lazy(() => import('../pages/Library'));
 const AuctionMarketplace = React.lazy(() => import('../pages/AuctionMarketplace'));
+const CreateAuctionListing = React.lazy(() => import('../components/auction/CreateAuctionListing'));
+const AuctionListing = React.lazy(() => import('../pages/AuctionListing'));
 const Notifications = React.lazy(() => import('../pages/Notifications'));
 const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIdentity'));
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
@@ -80,6 +82,12 @@ export const DomainRoutes = () => {
         <Route path="/capsule" element={<Capsule />} />
         <Route path="/library" element={<Library />} />
         <Route path="/auctions" element={<AuctionMarketplace />} />
+        <Route path="/auctions/create" element={<CreateAuctionListing />} />
+        {/* Legacy shim: some pages still navigate to /list-vehicle */}
+        <Route path="/list-vehicle" element={<CreateAuctionListing />} />
+        {/* Auction listing detail (internal/native) */}
+        <Route path="/auction/:listingId" element={<AuctionListing />} />
+        <Route path="/listings/:listingId" element={<AuctionListing />} />
         <Route path="/invoices" element={<InvoiceManager />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/claim-identity" element={<ClaimExternalIdentity />} />
