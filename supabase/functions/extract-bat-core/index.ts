@@ -501,7 +501,24 @@ function extractEssentials(html: string): {
       }
       if (!drivetrain) {
         const dm = t.match(/\b(AWD|4WD|RWD|FWD|4x4)\b/i);
-        if (dm?.[1]) drivetrain = dm[1].toUpperCase();
+        if (dm?.[1]) {
+          const raw = dm[1].toUpperCase();
+          drivetrain = raw === "4X4" ? "4WD" : raw;
+        } else {
+          const s = t.toLowerCase();
+          if (s.includes("rear-wheel drive") || s.includes("rear wheel drive")) drivetrain = "RWD";
+          else if (s.includes("front-wheel drive") || s.includes("front wheel drive")) drivetrain = "FWD";
+          else if (s.includes("all-wheel drive") || s.includes("all wheel drive")) drivetrain = "AWD";
+          else if (
+            s.includes("four-wheel drive") ||
+            s.includes("four wheel drive") ||
+            s.includes("4-wheel drive") ||
+            s.includes("4 wheel drive") ||
+            s.includes("4x4")
+          ) {
+            drivetrain = "4WD";
+          }
+        }
       }
       if (!engine) {
         const looksLikeEngine =
