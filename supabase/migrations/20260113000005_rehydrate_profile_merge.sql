@@ -19,7 +19,8 @@ begin;
 create or replace function public.rehydrate_profile_merge(
   p_primary_vehicle_id uuid,
   p_merge_event_id uuid,
-  p_execute boolean default false
+  p_execute boolean default false,
+  p_actor_user_id uuid default null
 )
 returns jsonb
 language plpgsql
@@ -27,7 +28,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_user_id uuid := auth.uid();
+  v_user_id uuid := coalesce(auth.uid(), p_actor_user_id);
   v_primary record;
   v_merge_event record;
   v_duplicate_vehicle_id uuid;
@@ -288,8 +289,8 @@ exception when others then
 end;
 $$;
 
-revoke all on function public.rehydrate_profile_merge(uuid, uuid, boolean) from public;
-grant execute on function public.rehydrate_profile_merge(uuid, uuid, boolean) to authenticated, service_role;
+revoke all on function public.rehydrate_profile_merge(uuid, uuid, boolean, uuid) from public;
+grant execute on function public.rehydrate_profile_merge(uuid, uuid, boolean, uuid) to authenticated, service_role;
 
 commit;
 

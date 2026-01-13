@@ -78,8 +78,10 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const [trendPeriod, setTrendPeriod] = useState<'live' | '1w' | '30d' | '6m' | '1y' | '5y'>('30d');
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showOwnerClaimDropdown, setShowOwnerClaimDropdown] = useState(false);
+  const [showAccessInfo, setShowAccessInfo] = useState(false);
   const locationRef = useRef<HTMLDivElement>(null);
   const ownerClaimRef = useRef<HTMLDivElement>(null);
+  const accessRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -90,12 +92,15 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       if (ownerClaimRef.current && !ownerClaimRef.current.contains(e.target as Node)) {
         setShowOwnerClaimDropdown(false);
       }
+      if (accessRef.current && !accessRef.current.contains(e.target as Node)) {
+        setShowAccessInfo(false);
+      }
     };
-    if (showLocationDropdown || showOwnerClaimDropdown) {
+    if (showLocationDropdown || showOwnerClaimDropdown || showAccessInfo) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLocationDropdown, showOwnerClaimDropdown]);
+  }, [showLocationDropdown, showOwnerClaimDropdown, showAccessInfo]);
 
   // Derive current owner (best guess) from BaT data
   const ownerGuess = useMemo(() => {
@@ -1963,7 +1968,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         height: '31px',
         // Allow dropdowns (location / claim) to render below the sticky header.
         // Without this, the dropdown opens but is clipped, making the badge feel "unclickable".
-        overflow: (showLocationDropdown || showOwnerClaimDropdown) ? 'visible' : 'hidden',
+        overflow: (showLocationDropdown || showOwnerClaimDropdown || showAccessInfo) ? 'visible' : 'hidden',
         marginTop: 0,
         marginBottom: 0,
         paddingTop: 0,
@@ -1978,7 +1983,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </div>
 
         {/* 2. Badges Section */}
-        <div className="vehicle-header-badges" style={{ display: 'flex', flexWrap: 'nowrap', gap: 6, alignItems: 'center', flexShrink: 0, overflow: (showLocationDropdown || showOwnerClaimDropdown) ? 'visible' : 'hidden', maxWidth: '100%' }}>
+        <div className="vehicle-header-badges" style={{ display: 'flex', flexWrap: 'nowrap', gap: 6, alignItems: 'center', flexShrink: 0, overflow: (showLocationDropdown || showOwnerClaimDropdown || showAccessInfo) ? 'visible' : 'hidden', maxWidth: '100%' }}>
           {typeof derivedMileage === 'number' && derivedMileage > 0 ? (
             <div className="badge-priority-2">
             <OdometerBadge mileage={derivedMileage} year={vehicle?.year ?? null} isExact={mileageIsExact} />
@@ -1991,6 +1996,82 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               <MemeDropBadge vehicleId={vehicle.id} compact />
             </div>
           )}
+
+          {/* Access badge: explain why owners/responsible parties see extra tools */}
+          {(() => {
+            const isOwnerish = Boolean(permissions?.isVerifiedOwner || isOwner);
+            const isResponsible = Boolean(!isOwnerish && permissions?.hasContributorAccess);
+            const label = isOwnerish ? 'OWNER' : isResponsible ? 'RESP' : null;
+            if (!label) return null;
+
+            return (
+              <div ref={accessRef} className="badge-priority-3" style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAccessInfo((prev) => !prev);
+                  }}
+                  style={{
+                    fontSize: '9px',
+                    fontWeight: 800,
+                    fontFamily: 'monospace',
+                    letterSpacing: '0.5px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: '2px 4px',
+                    color: label === 'OWNER' ? '#15803d' : '#1d4ed8',
+                    textTransform: 'uppercase'
+                  }}
+                  title="Why does this vehicle profile look different?"
+                >
+                  {label}
+                  <span style={{ marginLeft: 4, fontSize: '8px', color: 'var(--text-muted)', fontWeight: 700 }}>?</span>
+                </button>
+
+                {showAccessInfo && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      zIndex: 1000,
+                      background: 'var(--bg)',
+                      border: '2px solid var(--border)',
+                      padding: '10px 12px',
+                      width: '280px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                      marginTop: '4px',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ fontWeight: 800, fontSize: '9pt', marginBottom: 6 }}>
+                      Why does this profile look different?
+                    </div>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                      You’re seeing extra tools because you’re a <strong>{label === 'OWNER' ? 'verified owner' : 'responsible party'}</strong> on this vehicle.
+                      <div style={{ marginTop: 6 }}>
+                        Examples: Proof tasks, uploading receipts, generating draft invoices, editing timeline/work.
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                      <button
+                        type="button"
+                        className="button button-secondary button-small"
+                        onClick={() => setShowAccessInfo(false)}
+                        style={{ fontSize: '9px', fontWeight: 700 }}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Location Badge with Dropdown */}
           {locationDisplay && locationDisplay.short && locationDisplay.short.trim().length > 0 && locationDisplay.short !== ':' && (

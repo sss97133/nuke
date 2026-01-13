@@ -312,12 +312,33 @@ Deno.serve(async (req) => {
     r = await mendablePost("/v1/chat", chatBody);
   }
   if (!r.ok && (r.status === 404 || r.status === 401 || r.status === 403)) {
-    r = await mendablePostWithBearer("/v1/newChat", apiKey, {
-      messages: [{ role: "user", content: question }],
-      systemPrompt: "You are a helpful assistant providing automotive and vehicle related information.",
-      temperature: typeof payload.temperature === "number" ? payload.temperature : 0.7,
-      maxTokens: 750,
-    });
+    const conversationId = (chatBody as any).conversation_id;
+    const newChatBody: Record<string, unknown> = {
+      question,
+      shouldStream,
+      history: Array.isArray(payload.history) ? payload.history : [],
+    };
+
+    if (isConversationId(conversationId)) newChatBody.conversation_id = conversationId;
+    if (typeof payload.temperature === "number") newChatBody.temperature = payload.temperature;
+    if (typeof payload.additional_context === "string") newChatBody.additional_context = payload.additional_context;
+    if (typeof payload.relevance_threshold === "number") newChatBody.relevance_threshold = payload.relevance_threshold;
+    if (payload.where && typeof payload.where === "object") newChatBody.where = payload.where;
+    if (typeof payload.num_chunks === "number") newChatBody.retriever_option = { num_chunks: payload.num_chunks };
+
+    // Prefer a question-style payload (closest to mendableChat). If the API expects an OpenAI-style
+    // messages payload, retry once.
+    r = await mendablePostWithBearer("/v1/newChat", apiKey, newChatBody);
+    if (!r.ok && r.status === 400) {
+      const openAiStyleBody: Record<string, unknown> = {
+        messages: [{ role: "user", content: question }],
+        systemPrompt: "You are a helpful assistant providing automotive and vehicle related information.",
+        temperature: typeof payload.temperature === "number" ? payload.temperature : 0.7,
+        maxTokens: 750,
+      };
+      if (isConversationId(conversationId)) openAiStyleBody.conversation_id = conversationId;
+      r = await mendablePostWithBearer("/v1/newChat", apiKey, openAiStyleBody);
+    }
   }
 
   if (!r.ok) return jsonResponse({ success: false, error: r.body }, r.status);

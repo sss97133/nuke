@@ -287,12 +287,35 @@ async function main() {
         });
       } catch (err2) {
         if ([401, 403, 404].includes(err2.status)) {
-          chat = await postWithBearer("/v1/newChat", {
-            messages: [{ role: "user", content: question }],
-            systemPrompt: "You are a helpful assistant providing automotive and vehicle related information.",
-            temperature: 0.7,
-            maxTokens: 750,
-          });
+          // Prefer a question-style payload (closest to mendableChat). If the API expects an OpenAI-style
+          // messages payload, retry once.
+          try {
+            chat = await postWithBearer("/v1/newChat", {
+              question,
+              conversation_id:
+                typeof conversationId === "number" || typeof conversationId === "string"
+                  ? conversationId
+                  : undefined,
+              history: [],
+              shouldStream: false,
+              retriever_option: { num_chunks: 8 },
+            });
+          } catch (err3) {
+            if (err3?.status === 400) {
+              chat = await postWithBearer("/v1/newChat", {
+                messages: [{ role: "user", content: question }],
+                systemPrompt: "You are a helpful assistant providing automotive and vehicle related information.",
+                temperature: 0.7,
+                maxTokens: 750,
+                conversation_id:
+                  typeof conversationId === "number" || typeof conversationId === "string"
+                    ? conversationId
+                    : undefined,
+              });
+            } else {
+              throw err3;
+            }
+          }
         } else {
           throw err2;
         }

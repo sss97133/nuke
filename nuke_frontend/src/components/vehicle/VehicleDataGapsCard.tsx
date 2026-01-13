@@ -46,6 +46,7 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
   const [context, setContext] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<any | null>(null);
+  const [showWhy, setShowWhy] = useState(false);
 
   const sortedGaps = useMemo(() => {
     const order: Record<FieldPriority, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -133,11 +134,41 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
   return (
     <div id="vehicle-proof-tasks" className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>Proof tasks</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span>Proof tasks</span>
+          <button
+            type="button"
+            className="button-win95"
+            onClick={() => setShowWhy((v) => !v)}
+            title="Why am I seeing this?"
+            style={{
+              padding: '1px 6px',
+              fontSize: '8pt',
+              height: '18px',
+              minWidth: '18px',
+              lineHeight: 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            ?
+          </button>
+        </span>
         <span className="badge badge-secondary">{sortedGaps.length}</span>
       </div>
 
       <div className="card-body">
+        {showWhy && (
+          <div style={{ border: '1px solid var(--border-light)', borderRadius: 6, padding: 10, background: 'var(--grey-50)', marginBottom: 12 }}>
+            <div style={{ fontWeight: 800, fontSize: '9pt', marginBottom: 4 }}>
+              Why does this panel show up sometimes?
+            </div>
+            <div className="text-small text-muted" style={{ lineHeight: 1.4 }}>
+              This is a <strong>proof/verification tool</strong>. Owners and “responsible parties” often see extra panels like this because they can submit evidence that updates the profile once confidence is high.
+            </div>
+          </div>
+        )}
         <div className="text-small text-muted" style={{ marginBottom: '12px' }}>
           Missing or low-trust fields. Submit proof; the system only writes to the profile when confidence is high.
         </div>

@@ -5,6 +5,14 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overlayNode }) => {
   const [showGallery, setShowGallery] = useState(false);
+  const [fitMode, setFitMode] = useState<'cover' | 'contain'>(() => {
+    try {
+      const v = window.localStorage.getItem('n_zero_hero_image_fit_mode');
+      return v === 'contain' ? 'contain' : 'cover';
+    } catch {
+      return 'cover';
+    }
+  });
   const isMobile = useIsMobile();
   
   const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality: number = 90): string | null => {
@@ -59,11 +67,40 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ leadImageUrl, overl
             overflow: 'hidden',
             backgroundColor: 'var(--bg)', // Fallback background
             backgroundImage: backgroundImageCss,
-            backgroundSize: 'cover',
+            backgroundSize: fitMode,
             backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
           }}
         >
+          {/* Fit/Cover toggle (prevents “bad crop” when you want the full frame) */}
+          <button
+            type="button"
+            className="button-win95"
+            onClick={(e) => {
+              e.stopPropagation();
+              setFitMode((prev) => {
+                const next = prev === 'cover' ? 'contain' : 'cover';
+                try { window.localStorage.setItem('n_zero_hero_image_fit_mode', next); } catch {}
+                return next;
+              });
+            }}
+            style={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 2,
+              padding: '2px 6px',
+              fontSize: '8pt',
+              height: 20,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: 0.95
+            }}
+            title={fitMode === 'cover' ? 'Switch to FIT (show full image)' : 'Switch to COVER (fill frame)'}
+          >
+            {fitMode === 'cover' ? 'FIT' : 'COVER'}
+          </button>
           {overlayNode ? <div style={{ position: 'relative', zIndex: 1 }}>{overlayNode}</div> : null}
         </div>
       </div>

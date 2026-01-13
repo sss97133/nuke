@@ -177,6 +177,18 @@ interface ReceiptItemRow {
   total_price: number | null;
 }
 
+interface InvoiceDraft {
+  id: string;
+  event_id: string;
+  invoice_number: string;
+  invoice_date: string | null;
+  due_date: string | null;
+  total_amount: number | null;
+  status: string | null;
+  payment_status: string | null;
+  html_content: string | null;
+}
+
 export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderReceiptProps> = ({ eventId, onClose, onNavigate }) => {
   const [loading, setLoading] = useState(true);
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
@@ -186,6 +198,10 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
   const [eventDocuments, setEventDocuments] = useState<EventDocument[]>([]);
   const [receiptHeaders, setReceiptHeaders] = useState<ReceiptHeader[]>([]);
   const [receiptItems, setReceiptItems] = useState<ReceiptItemRow[]>([]);
+  const [invoiceDraft, setInvoiceDraft] = useState<InvoiceDraft | null>(null);
+  const [showInvoiceHtml, setShowInvoiceHtml] = useState(false);
+  const [generatingInvoice, setGeneratingInvoice] = useState(false);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [baseEvent, setBaseEvent] = useState<any>(null);
   const [runningContextual, setRunningContextual] = useState(false);
   const [contextualError, setContextualError] = useState<string | null>(null);
@@ -219,6 +235,9 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
     setEventDocuments([]);
     setReceiptHeaders([]);
     setReceiptItems([]);
+    setInvoiceDraft(null);
+    setShowInvoiceHtml(false);
+    setInvoiceError(null);
     setBaseEvent(null);
     try {
       // 1. Try comprehensive view first, fallback to timeline_events
@@ -290,6 +309,20 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             .eq('id', eventId)
             .maybeSingle();
           if (!evErr && evRow) setBaseEvent(evRow);
+        } catch {
+          // ignore
+        }
+      }
+
+      // 1c. Load generated invoice draft (best-effort)
+      if (isUuid) {
+        try {
+          const { data: inv, error: invErr } = await supabase
+            .from('generated_invoices')
+            .select('id,event_id,invoice_number,invoice_date,due_date,total_amount,status,payment_status,html_content')
+            .eq('event_id', eventId)
+            .maybeSingle();
+          if (!invErr && inv) setInvoiceDraft(inv as any);
         } catch {
           // ignore
         }
@@ -516,6 +549,28 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
       setContextualError(e?.message || 'Failed to run analysis');
     } finally {
       setRunningContextual(false);
+    }
+  };
+
+  const generateDraftInvoice = async () => {
+    try {
+      setInvoiceError(null);
+      setGeneratingInvoice(true);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventId);
+      if (!isUuid) throw new Error('This event cannot generate an invoice (not a database event).');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Authentication required');
+
+      const { error } = await supabase.functions.invoke('backfill-invoice-drafts', {
+        body: { event_id: eventId, dry_run: false }
+      });
+      if (error) throw error;
+
+      await loadData();
+    } catch (e: any) {
+      setInvoiceError(e?.message || 'Failed to generate invoice draft');
+    } finally {
+      setGeneratingInvoice(false);
     }
   };
 
@@ -1501,6 +1556,108 @@ export const ComprehensiveWorkOrderReceipt: React.FC<ComprehensiveWorkOrderRecei
             </div>
           </div>
         )}
+
+        {/* GENERATED INVOICE (drafts) */}
+        <div style={{ padding: '16px', borderBottom: '1px solid #ddd', background: 'var(--bg)' }}>
+          <div style={{
+            fontSize: '9pt',
+            fontWeight: 'bold',
+            marginBottom: '8px',
+            borderBottom: '1px solid #000',
+            paddingBottom: '4px'
+          }}>
+            INVOICE (Draft)
+          </div>
+
+          {invoiceDraft ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', fontSize: '8pt' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 800 }}>{invoiceDraft.invoice_number}</div>
+                  <div style={{ fontSize: '7pt', color: '#666', marginTop: 2 }}>
+                    {invoiceDraft.invoice_date ? `Date ${String(invoiceDraft.invoice_date).slice(0, 10)}` : 'Date unknown'}
+                    {invoiceDraft.status ? ` • ${invoiceDraft.status}` : ''}
+                    {invoiceDraft.payment_status ? ` • ${invoiceDraft.payment_status}` : ''}
+                  </div>
+                </div>
+                <div style={{ fontWeight: 800, textAlign: 'right' }}>
+                  {typeof (invoiceDraft as any).total_amount === 'number'
+                    ? formatCurrency((invoiceDraft as any).total_amount)
+                    : formatCurrency(invoiceDraft.total_amount as any)}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowInvoiceHtml((v) => !v); }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '8pt',
+                    fontWeight: 'bold',
+                    border: '1px solid #000',
+                    background: '#fff',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {showInvoiceHtml ? 'Hide preview' : 'Preview'}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open('/invoices', '_blank', 'noopener,noreferrer'); }}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '8pt',
+                    fontWeight: 'bold',
+                    border: '1px solid #000',
+                    background: '#fff',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Open Invoice Manager
+                </button>
+              </div>
+
+              {showInvoiceHtml && (
+                <div style={{ marginTop: 12, border: '1px solid #ddd', background: '#fff', padding: 12 }}>
+                  {invoiceDraft.html_content ? (
+                    <div dangerouslySetInnerHTML={{ __html: invoiceDraft.html_content }} />
+                  ) : (
+                    <div style={{ fontSize: '8pt', color: '#666' }}>No HTML content generated yet.</div>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: '8pt', color: '#666' }}>
+                No invoice draft exists for this event yet.
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); generateDraftInvoice(); }}
+                  disabled={generatingInvoice}
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: '8pt',
+                    fontWeight: 'bold',
+                    border: '1px solid #000',
+                    background: generatingInvoice ? '#f0f0f0' : '#fff',
+                    cursor: generatingInvoice ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {generatingInvoice ? 'Generating…' : 'Generate draft invoice (deterministic)'}
+                </button>
+              </div>
+              {invoiceError && (
+                <div style={{ marginTop: 8, fontSize: '7pt', color: '#a00' }}>
+                  {invoiceError}
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         {/* RECEIPT / INVOICE LINE ITEMS (uploaded documents) */}
         {receiptHeaders.length > 0 && (

@@ -47,10 +47,19 @@ begin
     raise exception 'user is required';
   end if;
 
-  -- Require access to BOTH vehicles
+  -- Require access to BOTH vehicles (canonical permission model when available; fall back to legacy ownership)
   if to_regprocedure('public.vehicle_user_has_access(uuid,uuid)') is not null then
     if public.vehicle_user_has_access(p_primary_id, p_user_id) is not true
        or public.vehicle_user_has_access(p_duplicate_id, p_user_id) is not true then
+      raise exception 'You do not have permission to merge these vehicles';
+    end if;
+  else
+    if not exists (
+      select 1
+      from public.vehicles
+      where id in (p_primary_id, p_duplicate_id)
+        and (user_id = p_user_id or uploaded_by = p_user_id)
+    ) then
       raise exception 'You do not have permission to merge these vehicles';
     end if;
   end if;
