@@ -16,6 +16,7 @@ export default function AuctionBiddingInterface({
   onBidPlaced,
 }: AuctionBiddingInterfaceProps) {
   const { user } = useAuth();
+  const paymentsEnabled = !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
   const [maxBid, setMaxBid] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,16 +37,21 @@ export default function AuctionBiddingInterface({
 
   useEffect(() => {
     loadMinimumBid();
-    if (user) {
+    if (user && paymentsEnabled) {
       checkPaymentMethod();
     }
-  }, [listingId, currentHighBid, user]);
+    if (!paymentsEnabled) {
+      setHasPaymentMethod(false);
+      setShowPaymentSetup(false);
+      setDepositAmount(0);
+    }
+  }, [listingId, currentHighBid, user, paymentsEnabled]);
 
   useEffect(() => {
-    if (maxBid && listingId) {
+    if (paymentsEnabled && maxBid && listingId) {
       calculateDeposit();
     }
-  }, [maxBid, listingId]);
+  }, [maxBid, listingId, paymentsEnabled]);
 
   const loadMinimumBid = async () => {
     const min = await AuctionService.getMinimumBid(listingId);
@@ -74,8 +80,8 @@ export default function AuctionBiddingInterface({
       return;
     }
 
-    // Check if payment method is set up
-    if (!hasPaymentMethod) {
+    // If payments are enabled, require payment method setup first.
+    if (paymentsEnabled && !hasPaymentMethod) {
       setShowPaymentSetup(true);
       return;
     }
@@ -96,11 +102,15 @@ export default function AuctionBiddingInterface({
     setSuccess(false);
 
     try {
-      const result = await AuctionPaymentService.placeBidWithDeposit(
-        listingId,
-        Math.floor(bidAmount * 100),
-        Math.floor(bidAmount * 100) // Using same amount for proxy max for simplicity
-      );
+      const bidCents = Math.floor(bidAmount * 100);
+
+      const result = paymentsEnabled
+        ? await AuctionPaymentService.placeBidWithDeposit(
+            listingId,
+            bidCents,
+            bidCents // Using same amount for proxy max for simplicity
+          )
+        : await AuctionService.placeBid(listingId, bidCents, 'web');
 
       if (result.success) {
         setSuccess(true);
@@ -220,7 +230,7 @@ export default function AuctionBiddingInterface({
               Minimum bid: {formatCurrency(minimumBid)}
             </p>
           )}
-          {depositAmount > 0 && (
+          {paymentsEnabled && depositAmount > 0 && (
             <p className="text-xs text-blue-600 mt-1 font-medium">
               Deposit hold: {formatCurrency(depositAmount)} 
               ({AuctionPaymentService.calculateDepositPercentage(parseFloat(maxBid) * 100, depositAmount)}% - refunded if outbid)
@@ -245,7 +255,11 @@ export default function AuctionBiddingInterface({
           disabled={loading || !maxBid}
           className="w-full px-6 py-3 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
-          {loading ? 'Placing Bid...' : hasPaymentMethod ? 'Place Bid' : 'Add Payment & Bid'}
+          {loading
+            ? 'Placing Bid...'
+            : paymentsEnabled
+              ? (hasPaymentMethod ? 'Place Bid' : 'Add Payment & Bid')
+              : 'Place Bid'}
         </button>
       </div>
 
@@ -261,7 +275,7 @@ export default function AuctionBiddingInterface({
       </div>
 
       {/* Deposit Info */}
-      {depositAmount > 0 && (
+      {paymentsEnabled && depositAmount > 0 && (
         <div className="p-4 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
           <p className="font-medium mb-1">About Bid Deposits:</p>
           <ul className="list-disc list-inside space-y-1 text-xs">

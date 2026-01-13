@@ -380,6 +380,9 @@ const CursorHomepage: React.FC = () => {
     }
   });
   const [debouncedSearchText, setDebouncedSearchText] = useState<string>('');
+  const DEFAULT_FILTERED_RENDER_LIMIT = 400;
+  const FILTERED_RENDER_STEP = 400;
+  const [filteredRenderLimit, setFilteredRenderLimit] = useState<number>(DEFAULT_FILTERED_RENDER_LIMIT);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [infoDense, setInfoDense] = useState<boolean>(false);
   
@@ -516,6 +519,18 @@ const CursorHomepage: React.FC = () => {
     return result;
   }, [filters]);
 
+  const vehiclesToRender = useMemo(() => {
+    // When searching / filtering, cap how many cards we paint at once to avoid UI stutter.
+    // Users can opt-in to render more via "Show more".
+    if (hasActiveFilters || debouncedSearchText) {
+      return filteredVehicles.slice(0, Math.max(0, filteredRenderLimit));
+    }
+    return filteredVehicles;
+  }, [filteredVehicles, hasActiveFilters, debouncedSearchText, filteredRenderLimit]);
+
+  const isRenderTruncated =
+    (hasActiveFilters || debouncedSearchText) && vehiclesToRender.length < filteredVehicles.length;
+
 
   useEffect(() => {
     loadSession();
@@ -574,14 +589,25 @@ const CursorHomepage: React.FC = () => {
     const loadFilterOptions = async () => {
       try {
         const normalizeMake = (raw: unknown): string | null => {
-          const s = String(raw ?? '').trim();
+          let s = String(raw ?? '').trim();
           if (!s) return null;
 
           // Reject extreme lengths (garbage blobs / truncated scrape junk)
           if (s.length < 2 || s.length > 30) return null;
 
-          // Reject anything with digits (kills "2017", "320i", etc.)
-          if (/\d/.test(s)) return null;
+          // If digits exist, the make field is often polluted with model/trim (e.g., "GMC K10", "AM General M35A2").
+          // Salvage the leading alphabetic portion up to (but not including) the first token containing digits.
+          if (/\d/.test(s)) {
+            const parts = s.split(/\s+/).filter(Boolean);
+            const keep: string[] = [];
+            for (const p of parts) {
+              if (/\d/.test(p)) break;
+              keep.push(p);
+            }
+            const candidate = keep.join(' ').trim();
+            if (!candidate) return null; // Pure numeric / model-only junk
+            s = candidate;
+          }
 
           // Reject emoji / special unicode ranges commonly seen in corrupted fields
           if (/[\u{1F300}-\u{1F9FF}]/u.test(s)) return null;
@@ -779,6 +805,11 @@ const CursorHomepage: React.FC = () => {
     const t = window.setTimeout(() => setDebouncedSearchText(searchText.trim()), 150);
     return () => window.clearTimeout(t);
   }, [searchText]);
+
+  // When filters/search change, reset the render window so we don't try to paint thousands of cards at once.
+  useEffect(() => {
+    setFilteredRenderLimit(DEFAULT_FILTERED_RENDER_LIMIT);
+  }, [debouncedSearchText, filters]);
 
   // Keyboard shortcut: "/" focuses search when not typing in an input already.
   useEffect(() => {
@@ -1201,7 +1232,8 @@ const CursorHomepage: React.FC = () => {
       // Build query with filters applied
       let query = supabase
         .from('vehicles')
-        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, sale_date, discovery_url, discovery_source, profile_origin, year, make, model, title, vin', { count: 'exact' })
+        // Keep this payload lean: this query runs as you type/search and shouldn't pull display-only fields.
+        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, sale_date', { count: 'exact' })
         .eq('is_public', true)
         .neq('status', 'pending');
 
@@ -2250,6 +2282,80 @@ const CursorHomepage: React.FC = () => {
         if (!imageUrl) return false; // No image at all
         return !isPoorQualityImage(imageUrl); // Must be good quality
       });
+
+      // Dedupe by canonical listing URL to reduce "same car, multiple rows" spam in the feed.
+      // Keep the first-seen ordering (newest-first) but swap-in the "best" record for that listing.
+      const normalizeListingKey = (raw: unknown): string | null => {
+        const s = String(raw ?? '').trim();
+        if (!s) return null;
+        if (!/^https?:\/\//i.test(s)) return null;
+        try {
+          const u = new URL(s);
+          u.hash = '';
+          u.search = '';
+          return u.toString().toLowerCase();
+        } catch {
+          // Fall back to a naive strip (still useful for most listing URLs)
+          return s.split('#')[0].split('?')[0].toLowerCase();
+        }
+      };
+
+      const getDedupeKey = (row: any): string | null => {
+        if (!row) return null;
+        const direct = normalizeListingKey(row.discovery_url);
+        if (direct) return direct;
+        const fromListing = normalizeListingKey(row?.external_listings?.[0]?.listing_url);
+        if (fromListing) return fromListing;
+        return null;
+      };
+
+      const scoreForDedupe = (row: any): number => {
+        if (!row) return 0;
+        let score = 0;
+        if (row.vin) score += 10;
+        if (row.make) score += 2;
+        if (row.model) score += 2;
+        if (row.title) score += 1;
+        if (row.sale_price || row.winning_bid || row.high_bid || row.asking_price || row.display_price) score += 3;
+        if (Array.isArray(row.external_listings) && row.external_listings.length > 0) score += 2;
+        if (row.primary_image_url || row.image_url) score += 1;
+        try {
+          const ts = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+          if (Number.isFinite(ts) && ts > 0) score += Math.min(1, ts / 1e13);
+        } catch {
+          // ignore
+        }
+        return score;
+      };
+
+      const dedupeVehicles = (items: any[]) => {
+        const byKey = new Map<string, { idx: number; best: any; score: number }>();
+        const order: string[] = [];
+        const passthrough: any[] = [];
+
+        for (let i = 0; i < (items || []).length; i++) {
+          const it = items[i];
+          const key = getDedupeKey(it);
+          if (!key) {
+            passthrough.push(it);
+            continue;
+          }
+          const s = scoreForDedupe(it);
+          const existing = byKey.get(key);
+          if (!existing) {
+            byKey.set(key, { idx: i, best: it, score: s });
+            order.push(key);
+          } else if (s > existing.score) {
+            byKey.set(key, { ...existing, best: it, score: s });
+          }
+        }
+
+        // Merge: preserve listing order, then append non-dedupable items (rare; usually user uploads).
+        const deduped = order.map((k) => byKey.get(k)!.best);
+        return [...deduped, ...passthrough];
+      };
+
+      const dedupedSorted = dedupeVehicles(sorted);
       
       setHasMore((vehicles || []).length >= PAGE_SIZE);
       setPage(pageNum);
@@ -2259,13 +2365,20 @@ const CursorHomepage: React.FC = () => {
         // This prevents jumping as new vehicles load
         setFeedVehicles((prev) => {
           const existingIds = new Set(prev.map((v: any) => String(v?.id || '')));
-          const newVehicles = sorted.filter((v: any) => !existingIds.has(String(v?.id || '')));
+          const existingKeys = new Set(prev.map((v: any) => getDedupeKey(v)).filter(Boolean) as string[]);
+          const newVehicles = dedupedSorted.filter((v: any) => {
+            const id = String(v?.id || '');
+            if (id && existingIds.has(id)) return false;
+            const key = getDedupeKey(v);
+            if (key && existingKeys.has(key)) return false;
+            return true;
+          });
           // Maintain insertion order - existing vehicles stay in place, new ones append
           return [...prev, ...newVehicles];
         });
       } else {
         // Initial load - set fresh
-        setFeedVehicles(sorted);
+        setFeedVehicles(dedupedSorted);
       }
 
       // Batch-load organization websites for favicon stamps (no per-card calls).
@@ -4865,7 +4978,7 @@ const CursorHomepage: React.FC = () => {
           flexDirection: 'column',
             gap: '4px'
           }}>
-            {filteredVehicles.map((vehicle) => (
+            {vehiclesToRender.map((vehicle) => (
                 <VehicleCardDense
                   key={vehicle.id}
                   vehicle={vehicle}
@@ -4874,8 +4987,8 @@ const CursorHomepage: React.FC = () => {
                   viewerUserId={session?.user?.id}
                   thermalPricing={false} // ARCHIVED: Always disabled
                   sourceStampUrl={
-                    (vehicle as any)?.discovery_url ||
-                    ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
+                    ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined) ||
+                    (vehicle as any)?.discovery_url
                   }
                 />
             ))}
@@ -4889,7 +5002,7 @@ const CursorHomepage: React.FC = () => {
             gridTemplateColumns: `repeat(${Math.max(1, Math.min(16, cardsPerRow))}, minmax(0, 1fr))`,
             gap: '8px'
         }}>
-            {filteredVehicles.map((vehicle) => (
+            {vehiclesToRender.map((vehicle) => (
               <VehicleCardDense
                 key={vehicle.id}
                 vehicle={vehicle}
@@ -4901,12 +5014,24 @@ const CursorHomepage: React.FC = () => {
                 thermalPricing={thermalPricing}
                 thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}
                 sourceStampUrl={
-                  (vehicle as any)?.discovery_url ||
-                  ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined)
+                  ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined) ||
+                  (vehicle as any)?.discovery_url
                 }
               />
             ))}
         </div>
+        )}
+
+        {isRenderTruncated && (viewMode === 'grid' || viewMode === 'gallery') && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
+            <button
+              type="button"
+              className="button-win95"
+              onClick={() => setFilteredRenderLimit((prev) => prev + FILTERED_RENDER_STEP)}
+            >
+              Show more ({Math.max(0, filteredVehicles.length - vehiclesToRender.length)} more)
+            </button>
+          </div>
         )}
 
         {/* Infinite scroll sentinel */}

@@ -373,6 +373,55 @@ const ImageGallery = ({
     }
   };
 
+  const getBatListingUrlsForImage = (img: any): string[] => {
+    try {
+      const out: string[] = [];
+      const seen = new Set<string>();
+
+      const push = (raw: any) => {
+        const s = typeof raw === 'string' ? raw.trim() : '';
+        if (!s) return;
+        if (!s.includes('bringatrailer.com/listing/')) return;
+        const key = normalizeListingUrlForKey(s);
+        if (!key) return;
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(key);
+      };
+
+      const exif = (img?.exif_data && typeof img.exif_data === 'object') ? img.exif_data : {};
+      const listingUrls = (exif as any)?.listing_urls;
+      if (Array.isArray(listingUrls)) {
+        for (const u of listingUrls) push(String(u || ''));
+      }
+
+      // Back-compat: older imports store the listing URL here.
+      push((exif as any)?.source_url);
+      push((exif as any)?.discovery_url);
+      // Rare: some imports may have written listing URL to `source_url` directly.
+      push((img as any)?.source_url);
+
+      return out;
+    } catch {
+      return [];
+    }
+  };
+
+  const getBatListingPosition = (img: any, listingUrlKey: string): number | null => {
+    try {
+      const exif = (img?.exif_data && typeof img.exif_data === 'object') ? img.exif_data : {};
+      const positions = (exif as any)?.listing_positions;
+      if (positions && typeof positions === 'object') {
+        const raw = (positions as any)[listingUrlKey];
+        const n = typeof raw === 'number' ? raw : Number(raw);
+        if (Number.isFinite(n)) return n;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
   // For multi-auction BaT vehicles: keep a small lookup of listing_url -> {lot/date}
   useEffect(() => {
     (async () => {
@@ -557,6 +606,11 @@ const ImageGallery = ({
     const m = meta || vehicleMeta;
     if (!m) return rows;
 
+    // If this vehicle has multiple BaT listings, do not collapse the gallery to a single canonical list.
+    // We want to preserve per-auction differences and rely on per-image listing provenance instead.
+    const hasMultipleBatListings = Object.keys(batListingMetaByUrl || {}).length > 1;
+    if (hasMultipleBatListings) return rows;
+
     const po = String(m?.profile_origin || '').toLowerCase();
     const du = String(m?.discovery_url || '').toLowerCase();
     const bu = String((m as any)?.bat_auction_url || '').toLowerCase();
@@ -613,6 +667,10 @@ const ImageGallery = ({
   const filterBatNoiseRows = (rows: any[], meta: any = vehicleMeta): any[] => {
     if (!rows || rows.length === 0) return rows;
     
+    // Multi-auction BaT vehicles legitimately have multiple date buckets and/or distinct galleries.
+    // Do NOT collapse to a single dominant bucket in that case, or we erase the differences between relists.
+    const hasMultipleBatListings = Object.keys(batListingMetaByUrl || {}).length > 1;
+
     // Filter out icon/logo images first
     const withoutIcons = (rows || []).filter((img: any) => {
       const url = String(img?.image_url || '');
@@ -684,7 +742,8 @@ const ImageGallery = ({
     }
     
     // Third: Date bucket clustering
-    if (filtered.length > 0) {
+    // Only apply for single-listing BaT vehicles; multi-auction should keep multiple buckets intact.
+    if (!hasMultipleBatListings && filtered.length > 0) {
       const bucketKey = (url: string) => {
         const m = url.match(/\/wp-content\/uploads\/(\d{4})\/(\d{2})\//);
         return m ? `${m[1]}/${m[2]}` : '';
@@ -960,7 +1019,8 @@ const ImageGallery = ({
       const grouped = new Map<string, { baseType: string; source: ReturnType<typeof getImageSource>; sourceUrl: string | null; images: any[] }>();
       for (const img of sorted) {
         const source = getImageSource(img);
-        const sourceUrl = source.type === 'bat' ? normalizeListingUrlForKey((img as any)?.source_url) : '';
+        const batListingUrls = source.type === 'bat' ? getBatListingUrlsForImage(img) : [];
+        const sourceUrl = (source.type === 'bat' && batListingUrls.length > 0) ? batListingUrls[0] : '';
         const key = (source.type === 'bat' && sourceUrl) ? `bat:${sourceUrl}` : source.type;
         if (!grouped.has(key)) grouped.set(key, { baseType: source.type, source, sourceUrl: sourceUrl || null, images: [] });
         grouped.get(key)!.images.push(img);
@@ -1464,7 +1524,7 @@ const ImageGallery = ({
     };
 
     fetchImages();
-  }, [vehicleId, fallbackLabel, JSON.stringify((fallbackImageUrls || []).slice(0, 50))]);
+  }, [vehicleId, fallbackLabel, JSON.stringify((fallbackImageUrls || []).slice(0, 50)), Object.keys(batListingMetaByUrl || {}).length]);
 
   // Listen for image processing completion events to refresh gallery
   useEffect(() => {
@@ -2252,8 +2312,21 @@ const ImageGallery = ({
             {/* Group by Source Toggle */}
             <button
               onClick={() => {
-                setGroupBySource(!groupBySource);
-                if (!groupBySource) setGroupByCategory(false); // Disable category grouping when enabling source
+                const next = !groupBySource;
+                setGroupBySource(next);
+                if (next) {
+                  setGroupByCategory(false); // Disable category grouping when enabling source
+                  // Grouping is a "holistic" view: ensure we have the full in-memory list loaded.
+                  // This avoids confusing cases where only the first page renders and other source groups appear missing.
+                  setShowImages(true);
+                  try {
+                    const sortedAll = sortRows(allImages || [], sortBy);
+                    setDisplayedImages(sortedAll);
+                    setAutoLoad(false);
+                  } catch {
+                    // non-fatal
+                  }
+                }
               }}
               className={groupBySource ? 'button button-primary' : 'button'}
               style={{ 
@@ -2407,31 +2480,65 @@ const ImageGallery = ({
           {(() => {
             // If grouping by source, add section headers
             if (groupBySource) {
-              const grouped: Array<{ key: string; source: ReturnType<typeof getImageSource>; sourceUrl: string | null; images: any[] }> = [];
-              const currentGroup: { key: string | null; source: ReturnType<typeof getImageSource> | null; sourceUrl: string | null; images: any[] } = { key: null, source: null, sourceUrl: null, images: [] };
-              
-              displayedImages.forEach((image) => {
-                const source = getImageSource(image);
-                const sourceUrl = source.type === 'bat' ? (normalizeListingUrlForKey((image as any)?.source_url) || null) : null;
-                const key = (source.type === 'bat' && sourceUrl) ? `bat:${sourceUrl}` : source.type;
-                if (!currentGroup.key || currentGroup.key !== key) {
-                  if (currentGroup.source && currentGroup.images.length > 0) {
-                    grouped.push({ key: currentGroup.key || currentGroup.source.type, source: currentGroup.source, sourceUrl: currentGroup.sourceUrl, images: [...currentGroup.images] });
-                  }
-                  currentGroup.key = key;
-                  currentGroup.source = source;
-                  currentGroup.sourceUrl = sourceUrl;
-                  currentGroup.images = [image];
-                } else {
-                  currentGroup.images.push(image);
+              // Important: BaT image rows store the listing URL in exif_data.source_url, and may include
+              // an array of listing memberships in exif_data.listing_urls. In multi-auction cases, a single
+              // image can belong to multiple listings; we render it in each relevant group.
+              const groupedMap = new Map<string, { key: string; source: ReturnType<typeof getImageSource>; sourceUrl: string | null; images: any[]; _seenIds: Set<string> }>();
+
+              const addToGroup = (key: string, source: ReturnType<typeof getImageSource>, sourceUrl: string | null, image: any) => {
+                if (!groupedMap.has(key)) {
+                  groupedMap.set(key, { key, source, sourceUrl, images: [], _seenIds: new Set<string>() });
                 }
-              });
-              
-              if (currentGroup.source && currentGroup.images.length > 0) {
-                grouped.push({ key: currentGroup.key || currentGroup.source.type, source: currentGroup.source, sourceUrl: currentGroup.sourceUrl, images: currentGroup.images });
+                const g = groupedMap.get(key)!;
+                const id = String(image?.id || '');
+                if (id && g._seenIds.has(id)) return;
+                if (id) g._seenIds.add(id);
+                g.images.push(image);
+              };
+
+              for (const image of displayedImages) {
+                const source = getImageSource(image);
+                if (source.type === 'bat') {
+                  const listingUrls = getBatListingUrlsForImage(image);
+                  if (listingUrls.length > 0) {
+                    for (const lu of listingUrls) addToGroup(`bat:${lu}`, source, lu, image);
+                  } else {
+                    addToGroup('bat', source, null, image);
+                  }
+                } else {
+                  addToGroup(source.type, source, null, image);
+                }
               }
-              
-              return grouped.map((group, groupIndex) => (
+
+              const sourcePriority: Record<string, number> = {
+                user: 100,
+                queue: 80,
+                org: 60,
+                bat: 40,
+                external: 20
+              };
+
+              const groups = Array.from(groupedMap.values()).sort((a, b) => {
+                const priA = sourcePriority[a.source.type] || 10;
+                const priB = sourcePriority[b.source.type] || 10;
+                if (priA !== priB) return priB - priA;
+
+                // For BaT listing groups, prefer newest listing first (end_date/sold_at)
+                if (a.source.type === 'bat' && b.source.type === 'bat') {
+                  const metaA = a.sourceUrl ? batListingMetaByUrl[a.sourceUrl] : null;
+                  const metaB = b.sourceUrl ? batListingMetaByUrl[b.sourceUrl] : null;
+                  const dtA = metaA?.end_date || metaA?.sold_at || null;
+                  const dtB = metaB?.end_date || metaB?.sold_at || null;
+                  const msA = dtA ? new Date(dtA).getTime() : 0;
+                  const msB = dtB ? new Date(dtB).getTime() : 0;
+                  if (msA !== msB) return msB - msA;
+                  return String(a.sourceUrl || '').localeCompare(String(b.sourceUrl || ''));
+                }
+
+                return a.key.localeCompare(b.key);
+              });
+
+              return groups.map((group) => (
                 <div key={group.key}>
                   {/* Section Header */}
                   <div style={{
@@ -2479,13 +2586,35 @@ const ImageGallery = ({
                   
                   {/* Images in this group */}
                   <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: 0 }}>
-                    {group.images.map((image, imgIndex) => {
+                    {(() => {
+                      const imagesInGroup = (() => {
+                        if (group.source.type === 'bat' && group.sourceUrl) {
+                          return [...group.images].sort((a, b) => {
+                            const pa = getBatListingPosition(a, group.sourceUrl!);
+                            const pb = getBatListingPosition(b, group.sourceUrl!);
+                            if (pa !== null && pb !== null && pa !== pb) return pa - pb;
+                            if (pa !== null && pb === null) return -1;
+                            if (pa === null && pb !== null) return 1;
+
+                            const posA = (typeof a?.position === 'number' && Number.isFinite(a.position)) ? a.position : null;
+                            const posB = (typeof b?.position === 'number' && Number.isFinite(b.position)) ? b.position : null;
+                            if (posA !== null && posB !== null && posA !== posB) return posA - posB;
+                            if (posA !== null && posB === null) return -1;
+                            if (posA === null && posB !== null) return 1;
+
+                            return String(a?.id || '').localeCompare(String(b?.id || ''));
+                          });
+                        }
+                        return group.images;
+                      })();
+
+                      return imagesInGroup.map((image, imgIndex) => {
                       const isSelected = selectMode && selectedImages?.has(image.id);
                       const globalIndex = displayedImages.indexOf(image);
                       const source = getImageSource(image);
                       return (
                         <div
-                          key={image.id}
+                          key={`${group.key}:${String(image.id || '')}`}
                           style={{ 
                             cursor: 'pointer', 
                             position: 'relative', 
@@ -2634,7 +2763,8 @@ const ImageGallery = ({
                           )}
                         </div>
                       );
-                    })}
+                      });
+                    })()}
                   </div>
                 </div>
               ));

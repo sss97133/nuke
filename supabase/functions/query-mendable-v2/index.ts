@@ -21,7 +21,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-type MendableAction = "chat" | "getSources" | "newConversation";
+type MendableAction =
+  | "chat"
+  | "getSources"
+  | "newConversation"
+  | "ingestData"
+  | "ingestDocuments"
+  | "ingestionStatus";
 type MendableConversationId = string | number;
 
 type MendableHistoryItem = {
@@ -42,6 +48,11 @@ type ChatRequest = {
   where?: Record<string, unknown>;
   num_chunks?: number;
   shouldStream?: boolean;
+  /**
+   * Generic passthrough params for non-chat actions (ingestion, status checks, etc).
+   * These are forwarded to the Mendable REST API alongside the server-side api_key.
+   */
+  params?: Record<string, unknown>;
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -210,6 +221,40 @@ Deno.serve(async (req) => {
     if (!r.ok) return jsonResponse({ success: false, error: r.body }, r.status);
     const convId = extractConversationIdFromMendableResponse(r.body);
     return jsonResponse({ success: true, conversation_id: convId ?? undefined, result: r.body });
+  }
+
+  if (action === "ingestData" || action === "ingestDocuments" || action === "ingestionStatus") {
+    const params = payload.params;
+    if (!params || typeof params !== "object") {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "Missing params object. Example: { action: 'ingestData', params: { /* Mendable ingestData fields */ } }",
+        },
+        400,
+      );
+    }
+
+    const path =
+      action === "ingestData"
+        ? "/v1/ingestData"
+        : action === "ingestDocuments"
+          ? "/v1/ingestDocuments"
+          : "/v1/ingestionStatus";
+
+    let r = await mendablePost(path, { api_key: apiKey, ...params });
+    if (!r.ok && (r.status === 401 || r.status === 403 || r.status === 404)) {
+      // Retry with API key header style (and without api_key in body).
+      r = await mendablePostWithApiKeyHeader(path, apiKey, { ...params });
+    }
+    if (!r.ok && (r.status === 401 || r.status === 403 || r.status === 404)) {
+      // Retry with Bearer style (and without api_key in body).
+      r = await mendablePostWithBearer(path, apiKey, { ...params });
+    }
+
+    if (!r.ok) return jsonResponse({ success: false, error: r.body }, r.status);
+    return jsonResponse({ success: true, result: r.body });
   }
 
   const question = (payload.question ?? payload.query ?? "").trim();

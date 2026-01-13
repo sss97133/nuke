@@ -61,15 +61,33 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
 
   const handleStartAuction = async () => {
     if (!listing) return;
-    
-    const { success, error: updateError } = await AuctionService.updateListing(listingId, {
-      status: 'active',
-    });
 
-    if (success) {
-      setListing({ ...listing, status: 'active' });
-    } else {
-      setError(updateError || 'Failed to start auction');
+    if (!confirm('Start this auction now?')) return;
+
+    try {
+      setError(null);
+      const { data, error: rpcError } = await supabase.rpc('activate_auction_listing', {
+        p_listing_id: listingId,
+        p_use_scheduled_time: false,
+      });
+
+      if (rpcError) throw rpcError;
+
+      if (data?.success) {
+        await loadAuctionData();
+      } else {
+        const readinessIssues = Array.isArray(data?.readiness?.issues) ? data.readiness.issues : [];
+        const issueSummary = readinessIssues
+          .filter((i: any) => String(i?.severity || '') === 'error')
+          .map((i: any) => String(i?.message || ''))
+          .filter(Boolean)
+          .slice(0, 5)
+          .join(' · ');
+        setError(data?.error || issueSummary || 'Failed to start auction');
+      }
+    } catch (err) {
+      console.error('Error starting auction:', err);
+      setError(err instanceof Error ? err.message : 'Failed to start auction');
     }
   };
 
