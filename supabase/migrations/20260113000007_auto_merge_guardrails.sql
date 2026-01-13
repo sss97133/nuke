@@ -135,14 +135,17 @@ begin
       loop
         insert into public.user_notifications (
           user_id,
-          channel_type,
-          notification_title,
-          notification_body,
+          type,
+          notification_type,
+          title,
+          message,
+          vehicle_id,
           action_url,
           metadata
         ) values (
           v_user_id,
-          'in_app',
+          'vehicle_merged',
+          'vehicle_merged',
           'Vehicle Profiles Merged',
           format(
             'Your %s %s %s profile was automatically merged with a duplicate. All data has been consolidated into the main profile.',
@@ -150,6 +153,7 @@ begin
             v_primary.make,
             v_primary.model
           ),
+          p_primary_vehicle_id,
           format('/vehicle/%s', p_primary_vehicle_id),
           jsonb_build_object(
             'type', 'vehicle_merged',

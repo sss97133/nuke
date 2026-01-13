@@ -821,6 +821,55 @@ async function tryUpsertAuctionTimelineEvent(args: {
   }
 }
 
+async function tryUpsertMileageTimelineEvent(args: {
+  supabase: any;
+  vehicleId: string;
+  eventDateYmd: string; // YYYY-MM-DD
+  mileage: number;
+  source: string;
+  sourceUrl: string;
+  metadata?: Record<string, any>;
+}): Promise<void> {
+  try {
+    const ymd = String(args.eventDateYmd || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return;
+    if (!Number.isFinite(args.mileage) || args.mileage <= 0) return;
+
+    const { count } = await args.supabase
+      .from("timeline_events")
+      .select("id", { count: "exact", head: true })
+      .eq("vehicle_id", args.vehicleId)
+      .eq("event_type", "mileage_reading")
+      .eq("event_date", ymd)
+      .contains("metadata", { source_url: args.sourceUrl });
+
+    if ((count || 0) > 0) return;
+
+    await args.supabase.from("timeline_events").insert({
+      vehicle_id: args.vehicleId,
+      user_id: null,
+      event_type: "mileage_reading",
+      source: args.source,
+      title: `Mileage: ${Math.round(args.mileage).toLocaleString()} miles`,
+      description: "Odometer reading captured from listing details.",
+      event_date: ymd,
+      mileage_at_event: Math.round(args.mileage),
+      metadata: {
+        ...(args.metadata || {}),
+        source_url: args.sourceUrl,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      confidence_score: 90,
+      data_source: "extract-bat-core",
+      // Must satisfy timeline_events_source_type_check
+      source_type: "system",
+    });
+  } catch (e: any) {
+    console.warn(`timeline_events mileage insert failed (non-fatal): ${e?.message || String(e)}`);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -1137,14 +1186,45 @@ serve(async (req) => {
       if (!existing?.description_source && description) updatePayload.description_source = "source_imported";
 
       // BaT fields / essentials (fill if missing)
-      if (!existing?.bat_seller && essentials.seller_username) updatePayload.bat_seller = essentials.seller_username;
-      if (!existing?.bat_buyer && essentials.buyer_username) updatePayload.bat_buyer = essentials.buyer_username;
-      if (!existing?.bat_location && essentials.location) updatePayload.bat_location = essentials.location;
-      if (!existing?.listing_location && bestListingLocation) updatePayload.listing_location = bestListingLocation;
-      if (!existing?.bat_lot_number && essentials.lot_number) updatePayload.bat_lot_number = essentials.lot_number;
+      // NOTE: `vehicles.bat_*` is a "latest auction summary" cache. Older auctions are stored in
+      // `auction_events` + `external_listings` and should not overwrite the vehicle row.
+      const extractedEndYmd = essentials.auction_end_date ? String(essentials.auction_end_date).slice(0, 10) : null;
+      const existingLatestYmd = (() => {
+        const sd = existing?.sale_date ? String(existing.sale_date).slice(0, 10) : "";
+        const bd = existing?.bat_sale_date ? String(existing.bat_sale_date).slice(0, 10) : "";
+        const ad = existing?.auction_end_date ? String(existing.auction_end_date).slice(0, 10) : "";
+        return (sd || bd || ad) ? (sd || bd || ad) : null;
+      })();
+      const listingIsLatestOrEqual = extractedEndYmd ? (!existingLatestYmd || extractedEndYmd >= existingLatestYmd) : false;
+
+      if ((!existing?.bat_seller || listingIsLatestOrEqual) && essentials.seller_username) updatePayload.bat_seller = essentials.seller_username;
+      if ((!existing?.bat_buyer || listingIsLatestOrEqual) && essentials.buyer_username) updatePayload.bat_buyer = essentials.buyer_username;
+      if ((!existing?.bat_location || listingIsLatestOrEqual) && essentials.location) updatePayload.bat_location = essentials.location;
+      if ((!existing?.listing_location || listingIsLatestOrEqual) && bestListingLocation) updatePayload.listing_location = bestListingLocation;
+      if ((!existing?.bat_lot_number || listingIsLatestOrEqual) && essentials.lot_number) updatePayload.bat_lot_number = essentials.lot_number;
       if (!existing?.body_style && inferredBodyStyle) updatePayload.body_style = inferredBodyStyle;
 
-      if (!existing?.mileage && essentials.mileage) updatePayload.mileage = essentials.mileage;
+      // Mileage: allow BaT to overwrite stale/unattributed mileage on the latest listing.
+      const mileageFromBat = essentials.mileage;
+      const existingMileage = (typeof (existing as any)?.mileage === "number" && Number.isFinite((existing as any).mileage))
+        ? Number((existing as any).mileage)
+        : null;
+      const existingMileageSource = String((existing as any)?.mileage_source || "").trim().toLowerCase();
+      const mileageIsUserLocked = Boolean(existingMileageSource) && !existingMileageSource.includes("bring a trailer") && !existingMileageSource.includes("bat") && !existingMileageSource.includes("source_import");
+      const mileageLooksPolluted = existingMileage !== null && existingMileage > 0 && existingMileage % 1000 === 0 && existingMileage >= 250000 && !existingMileageSource;
+      if (
+        typeof mileageFromBat === "number" &&
+        Number.isFinite(mileageFromBat) &&
+        mileageFromBat > 0 &&
+        mileageFromBat < 10000000 &&
+        (
+          existingMileage === null ||
+          (!mileageIsUserLocked && (listingIsLatestOrEqual || mileageLooksPolluted))
+        )
+      ) {
+        updatePayload.mileage = Math.round(mileageFromBat);
+        updatePayload.mileage_source = "bring a trailer";
+      }
       const existingColorPolluted = isPollutedSpec("color", existing?.color);
       if ((!existing?.color || existingColorPolluted) && bestExteriorColor) {
         updatePayload.color = bestExteriorColor;
@@ -1162,7 +1242,16 @@ serve(async (req) => {
         updatePayload.transmission = null;
         updatePayload.transmission_source = null;
       }
-      if (!existing?.drivetrain && essentials.drivetrain) updatePayload.drivetrain = essentials.drivetrain;
+      // Drivetrain: treat BaT listing details as authoritative for BaT-origin vehicles (latest listing only).
+      if (
+        essentials.drivetrain &&
+        (
+          !existing?.drivetrain ||
+          (listingIsLatestOrEqual && String(existing?.listing_source || "").toLowerCase() === "bat")
+        )
+      ) {
+        updatePayload.drivetrain = essentials.drivetrain;
+      }
       const existingEnginePolluted = isPollutedSpec("engine_size", existing?.engine_size);
       if ((!existing?.engine_size || existingEnginePolluted) && essentials.engine) {
         updatePayload.engine_size = essentials.engine;
@@ -1188,12 +1277,12 @@ serve(async (req) => {
       const hasExtractedBid = typeof extractedHighBid === "number" && Number.isFinite(extractedHighBid) && extractedHighBid > 0;
 
       // Always keep auction_end_date in sync when we have it (it's used for auction state and display).
-      if (extractedEndDate && (!existing?.auction_end_date || existing?.auction_end_date !== extractedEndDate)) {
+      if (extractedEndDate && listingIsLatestOrEqual && (!existing?.auction_end_date || existing?.auction_end_date !== extractedEndDate)) {
         updatePayload.auction_end_date = extractedEndDate;
       }
 
       // Reserve status: if we have a confident extraction, allow overwriting stale/wrong values.
-      if (extractedReserve) {
+      if (extractedReserve && listingIsLatestOrEqual) {
         if (!existing?.reserve_status || existingReserve !== extractedReserve) {
           updatePayload.reserve_status = extractedReserve;
         }
@@ -1201,6 +1290,9 @@ serve(async (req) => {
 
       // SOLD: explicit "sold for $X" should override legacy RNM/high-bid pollution.
       if (hasExtractedSale) {
+        if (!listingIsLatestOrEqual) {
+          // Older sold auctions should not overwrite the vehicle-level sold cache.
+        } else {
         // Sale price must be the sold price (not "Bid to").
         if (!existingSalePrice || existingSalePrice !== extractedSalePrice) {
           updatePayload.sale_price = extractedSalePrice;
@@ -1220,7 +1312,11 @@ serve(async (req) => {
         if (essentials.buyer_username && String((existing as any)?.bat_buyer || "").trim() !== String(essentials.buyer_username).trim()) {
           updatePayload.bat_buyer = essentials.buyer_username;
         }
+        }
       } else if (hasExtractedBid && (extractedReserve === "reserve_not_met" || extractedReserve === "no_sale")) {
+        if (!listingIsLatestOrEqual) {
+          // Older RNM/bid-to states should not overwrite the vehicle-level cache.
+        } else {
         // UNSOLD: ensure we don't keep a polluted sale_price that actually represents "bid to".
         const looksLikePollutedSale =
           typeof existingSalePrice === "number" &&
@@ -1244,10 +1340,13 @@ serve(async (req) => {
         // Keep auction_outcome consistent (best-effort; depends on schema).
         if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
         if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+        }
       } else {
-        // Fallback: fill missing numeric fields only.
-        if (!existingSalePrice && hasExtractedSale) updatePayload.sale_price = extractedSalePrice;
-        if (!existingHighBid && hasExtractedBid) updatePayload.high_bid = extractedHighBid;
+        if (listingIsLatestOrEqual) {
+          // Fallback: fill missing numeric fields only (latest listing only).
+          if (!existingSalePrice && hasExtractedSale) updatePayload.sale_price = extractedSalePrice;
+          if (!existingHighBid && hasExtractedBid) updatePayload.high_bid = extractedHighBid;
+        }
       }
 
       if (!existing?.bat_views && essentials.view_count) updatePayload.bat_views = essentials.view_count;
@@ -1396,6 +1495,16 @@ serve(async (req) => {
           raw_data: {
             extractor: "extract-bat-core",
             listing_url: listingUrlCanonical,
+            listing_details: {
+              vin: essentials.vin,
+              mileage: essentials.mileage,
+              drivetrain: essentials.drivetrain,
+              transmission: essentials.transmission,
+              engine: essentials.engine,
+              exterior_color: bestExteriorColor,
+              interior_color: bestInteriorColor,
+              body_style: inferredBodyStyle,
+            },
           },
         }, { onConflict: "vehicle_id,source_url" });
 
@@ -1420,6 +1529,46 @@ serve(async (req) => {
           listing_url: listingUrlCanonical,
         },
       });
+    }
+
+    // Save structured listing detail signals (multi-auction provenance)
+    if (vehicleId) {
+      if (typeof essentials.mileage === "number" && Number.isFinite(essentials.mileage) && essentials.mileage > 0) {
+        await trySaveExtractionMetadata({
+          supabase,
+          vehicleId,
+          fieldName: "auction_mileage",
+          fieldValue: String(Math.round(essentials.mileage)),
+          sourceUrl: listingUrlCanonical,
+          extractionMethod: "extract-bat-core",
+          scraperVersion: "v4",
+          confidenceScore: 0.95,
+          validationStatus: "valid",
+          rawExtractionData: {
+            extractor: "extract-bat-core",
+            listing_url: listingUrlCanonical,
+            field: "mileage",
+          },
+        });
+      }
+      if (essentials.drivetrain) {
+        await trySaveExtractionMetadata({
+          supabase,
+          vehicleId,
+          fieldName: "auction_drivetrain",
+          fieldValue: String(essentials.drivetrain),
+          sourceUrl: listingUrlCanonical,
+          extractionMethod: "extract-bat-core",
+          scraperVersion: "v4",
+          confidenceScore: 0.9,
+          validationStatus: "valid",
+          rawExtractionData: {
+            extractor: "extract-bat-core",
+            listing_url: listingUrlCanonical,
+            field: "drivetrain",
+          },
+        });
+      }
     }
 
     // Persist an auction timeline event so timelines aren't empty for auction-origin vehicles.
@@ -1466,6 +1615,22 @@ serve(async (req) => {
           comment_count: essentials.comment_count,
         },
       });
+
+      // Mileage reading timeline event (per auction)
+      if (typeof essentials.mileage === "number" && Number.isFinite(essentials.mileage) && essentials.mileage > 0) {
+        await tryUpsertMileageTimelineEvent({
+          supabase,
+          vehicleId,
+          eventDateYmd: essentials.auction_end_date,
+          mileage: essentials.mileage,
+          source: "bat",
+          sourceUrl: listingUrlCanonical,
+          metadata: {
+            lot_number: essentials.lot_number,
+            auction_event: true,
+          },
+        });
+      }
     }
 
     return new Response(
