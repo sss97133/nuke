@@ -1028,7 +1028,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             '—'
           )}
           {vehicle.condition_rating && ` • C:${vehicle.condition_rating}`}
-          {vehicle.vin && ` • VIN ${vehicle.vin.slice(-4)}`}
         </div>
         
         {/* Counts */}
@@ -2084,9 +2083,6 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 }}>
                   {vehicle.mileage && vehicle.mileage > 0 && (
                     <span>{Math.floor(vehicle.mileage).toLocaleString()} mi</span>
-                  )}
-                  {vehicle.vin && (
-                    <span style={{ fontFamily: 'monospace' }}>VIN {vehicle.vin.slice(-4)}</span>
                   )}
                   {vehicle.location && (
                     <span>{vehicle.location}</span>

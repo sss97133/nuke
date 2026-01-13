@@ -113,7 +113,10 @@ serve(async (req: Request) => {
     const provider = (Deno.env.get('RECEIPT_PROVIDER') || '').toLowerCase();
     const awsEndpoint = Deno.env.get('AWS_RECEIPT_ENDPOINT');
     const awsApiKey = Deno.env.get('AWS_RECEIPT_API_KEY');
-    const openaiKey = Deno.env.get('openai_api_key');
+    const openaiKey =
+      Deno.env.get('OPENAI_API_KEY') ||
+      Deno.env.get('OPEN_AI_API_KEY') ||
+      Deno.env.get('openai_api_key');
 
     // Prefer AWS API Gateway if configured
     if (provider === 'aws' || awsEndpoint) {
@@ -141,14 +144,33 @@ serve(async (req: Request) => {
         });
         const text = await resp.text();
         if (!resp.ok) throw new Error(`AWS gateway error ${resp.status}: ${text}`);
-        return new Response(text, { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+
+        // Validate that the gateway actually returned the expected JSON object.
+        // We've seen misconfigured endpoints return `"Hello from Lambda!"` (a JSON string),
+        // which would silently bypass our OpenAI/Azure fallbacks.
+        let parsed: any = null;
+        try {
+          parsed = text ? JSON.parse(text) : null;
+        } catch {
+          throw new Error(`AWS gateway returned non-JSON (first 200 chars): ${text.slice(0, 200)}`);
+        }
+
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error(`AWS gateway returned unexpected payload type: ${typeof parsed}`);
+        }
+        if (parsed?.error) {
+          throw new Error(`AWS gateway returned error: ${String(parsed.error)}`);
+        }
+
+        return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       } catch (awsError) {
         console.log('AWS parsing failed, falling back to OpenAI:', awsError);
       }
     }
 
     // Fallback to OpenAI if Azure/AWS not configured
-    if (openaiKey) {
+    // NOTE: PDFs should still return useful text/amounts even when OpenAI is not configured.
+    if (openaiKey || mimeType === 'application/pdf') {
       let fileUrl = url;
       if (!fileUrl && bucket && path) {
         const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -162,12 +184,11 @@ serve(async (req: Request) => {
           const pdfResp = await fetch(fileUrl);
           const pdfBytes = await pdfResp.arrayBuffer();
           
-          // Import PDF parsing library
-          const { getDocument, GlobalWorkerOptions } = await import('https://esm.sh/pdfjs-dist@3.11.174');
-          GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+          // Import PDF parsing library (use the ESM build) and disable workers for Edge runtime.
+          const pdfjs: any = await import('https://esm.sh/pdfjs-dist@3.11.174/build/pdf.mjs');
           
-          // Parse PDF
-          const loadingTask = getDocument({ data: new Uint8Array(pdfBytes) });
+          // Parse PDF (disableWorker avoids needing GlobalWorkerOptions.workerSrc in Edge runtime)
+          const loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfBytes), disableWorker: true });
           const pdf = await loadingTask.promise;
           
           let fullText = '';
@@ -178,33 +199,79 @@ serve(async (req: Request) => {
             fullText += pageText + '\n';
           }
           
-          // Use OpenAI to parse the extracted text
-          const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${openaiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o',
-              messages: [{
-                role: 'user',
-                content: `Extract invoice/receipt data from this text. Return JSON with: vendor_name, receipt_date, subtotal, tax, total, items array (each with: description, quantity, unit_price, total_price, part_number if available). If field not found, use null.\n\nText:\n${fullText.slice(0, 8000)}`
-              }],
-              response_format: { type: 'json_object' },
-              max_tokens: 2000
-            })
-          });
-          
-          if (openaiResp.ok) {
-            const data = await openaiResp.json();
-            const content = data.choices[0].message.content;
-            const parsed = JSON.parse(content);
-            return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+          if (openaiKey) {
+            // Use OpenAI to parse the extracted text
+            const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${openaiKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: [{
+                  role: 'user',
+                  content: `Extract invoice/receipt data from this text. Return JSON with: vendor_name, receipt_date, subtotal, tax, total, items array (each with: description, quantity, unit_price, total_price, part_number if available). If field not found, use null.\n\nText:\n${fullText.slice(0, 8000)}`
+                }],
+                response_format: { type: 'json_object' },
+                max_tokens: 2000
+              })
+            });
+            
+            if (openaiResp.ok) {
+              const data = await openaiResp.json();
+              const content = data.choices[0].message.content;
+              const parsed = JSON.parse(content);
+              return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+            }
           }
-        } catch (pdfError) {
+
+          // Deterministic fallback: best-effort totals + raw text so PDF ledgers work without any API keys.
+          const money = (s: string) => {
+            const n = Number(String(s).replace(/,/g, ''));
+            return Number.isFinite(n) ? n : null;
+          };
+          const findMoney = (re: RegExp) => {
+            const m = fullText.match(re);
+            return m?.[1] ? money(m[1]) : null;
+          };
+
+          const vendorName =
+            /\bebay\b/i.test(fullText) ? 'eBay' :
+            /\bpaypal\b/i.test(fullText) ? 'PayPal' :
+            null;
+
+          const total =
+            findMoney(/(?:order\s+total)\s*[:\-]?\s*\$?\s*([0-9,]+\.[0-9]{2})/i) ??
+            findMoney(/(?:\btotal\b)\s*[:\-]?\s*\$?\s*([0-9,]+\.[0-9]{2})/i);
+
+          const tax = findMoney(/(?:\btax\b)\s*(?:\([^)]*\))?\s*[:\-]?\s*\$?\s*([0-9,]+\.[0-9]{2})/i);
+          const subtotal = findMoney(/(?:\bsubtotal\b)\s*[:\-]?\s*\$?\s*([0-9,]+\.[0-9]{2})/i);
+
+          const parsed = {
+            vendor_name: vendorName,
+            receipt_date: null,
+            currency: 'USD',
+            subtotal,
+            tax,
+            total,
+            items: [],
+            confidence: 0.35,
+            parser: 'pdf_text_regex_v1',
+            raw_text: fullText.slice(0, 12000)
+          };
+
+          return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        } catch (pdfError: any) {
           console.error('PDF parsing failed:', pdfError);
-          // Continue to Azure fallback
+          // Don't fall through to Azure when it's not configured; surface the real PDF error instead.
+          return new Response(
+            JSON.stringify({
+              error: 'pdf_text_extraction_failed',
+              details: pdfError?.message || String(pdfError)
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
         }
       } else {
         // For images, use Vision API

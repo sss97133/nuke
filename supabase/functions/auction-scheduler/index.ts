@@ -21,6 +21,20 @@ const jsonHeaders = { "Content-Type": "application/json" };
 
 const safeIso = () => new Date().toISOString();
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    let payload = parts[1];
+    payload = payload.replace(/-/g, "+").replace(/_/g, "/");
+    // Pad base64 string
+    while (payload.length % 4 !== 0) payload += "=";
+    return JSON.parse(atob(payload)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   const startedAt = Date.now();
   const result: SchedulerResult = {
@@ -34,21 +48,46 @@ Deno.serve(async (req) => {
   };
 
   try {
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ success: false, error: "Method not allowed" }), {
+        status: 405,
+        headers: jsonHeaders,
+      });
+    }
+
     const body = (await req.json().catch(() => ({}))) as SchedulerRequest;
     const startBatchSize = Math.max(1, Math.min(200, Number(body.start_batch_size || 50)));
     const endBatchSize = Math.max(1, Math.min(200, Number(body.end_batch_size || 50)));
     const dryRun = body.dry_run === true;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    if (!supabaseUrl || !serviceRoleKey) {
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    if (!supabaseUrl || !supabaseAnonKey) {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }),
+        JSON.stringify({ success: false, error: "Missing SUPABASE_URL or SUPABASE_ANON_KEY" }),
         { status: 500, headers: jsonHeaders }
       );
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    // This endpoint must only be callable by the scheduler/cron using the service role JWT.
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : "";
+    const payload = token ? decodeJwtPayload(token) : null;
+    if (!payload || payload.role !== "service_role") {
+      return new Response(JSON.stringify({ success: false, error: "Not authorized" }), {
+        status: 403,
+        headers: jsonHeaders,
+      });
+    }
+
+    // Use the incoming Authorization header (service role) for server-only RPCs.
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    });
     const nowIso = safeIso();
 
     // -------------------------
