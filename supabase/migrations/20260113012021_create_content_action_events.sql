@@ -1,12 +1,16 @@
 -- =====================================================
 -- CONTENT ACTION EVENTS (MEME DROPS ON VEHICLES / CONTENT)
 -- =====================================================
--- Foundation: a cheap, logged, realtime "meme overlay" system for arbitrary content targets.
--- MVP target_key format:
---   - vehicle:<vehicle_uuid>
+-- Ensures the content meme-drop system exists across deployments.
+-- Key properties:
+-- - Table: public.content_action_events
+-- - RLS policy for SELECT (sender sees own, public vehicles, and owner vehicles)
+-- - RPC: public.send_content_action(...)
+-- - PostgREST stability: explicit GRANT SELECT to anon/authenticated
+-- - Optional: enable postgres_changes via supabase_realtime publication
 --
--- This migration is idempotent + safe for db reset.
--- Date: 2025-12-15
+-- Date: 2026-01-13
+-- Version: 20260113012021
 
 BEGIN;
 
@@ -79,8 +83,6 @@ CREATE POLICY "content_action_events_read" ON public.content_action_events
       )
     )
   );
-
--- No direct insert; use RPC
 
 -- 4) RPC: send_content_action (validates ownership + cooldown + charges per-use)
 CREATE OR REPLACE FUNCTION public.send_content_action(
@@ -270,11 +272,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.send_content_action(TEXT, UUID) TO authenticated;
 
--- PostgREST will return 404 for tables the current role cannot access, even if the table exists.
--- Explicit grants keep the API route stable across deployments.
+-- PostgREST will 404 if the role lacks privileges, even if the table exists.
 GRANT SELECT ON public.content_action_events TO anon, authenticated;
 
--- Optional: enable postgres_changes realtime for this table (safe if publication/table already configured).
+-- Optional: enable realtime postgres_changes for this table.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
@@ -288,5 +289,4 @@ END
 $$;
 
 COMMIT;
-
 
