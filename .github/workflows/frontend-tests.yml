@@ -1,0 +1,36 @@
+name: Frontend Tests (Vitest)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 7 * * *' # daily
+
+jobs:
+  vitest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: nuke_frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./nuke_frontend
+        run: npm ci
+
+      - name: Run Vitest
+        working-directory: ./nuke_frontend
+        run: npm run test
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'placeholder-key' }}
+

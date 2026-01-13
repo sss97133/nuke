@@ -1,5 +1,43 @@
 import { supabase } from '../lib/supabase';
 
+// Some deployments may not have the stream/content actions system fully migrated yet.
+// PostgREST commonly surfaces this as a 404 (missing table/view OR missing GRANTs, so it's not in schema cache).
+const FEATURE_CONTENT_ACTION_EVENTS_UNAVAILABLE_KEY = 'featureContentActionEventsUnavailable';
+
+function safeGetLocalStorageFlag(key: string): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage?.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function safeSetLocalStorageFlag(key: string): void {
+  try {
+    if (typeof window === 'undefined') return;
+    window.localStorage?.setItem(key, '1');
+  } catch {
+    // ignore
+  }
+}
+
+function isMissingResourceError(err: any): boolean {
+  const status = err?.status ?? err?.statusCode;
+  const code = String(err?.code ?? '').toUpperCase();
+  const msg = String(err?.message ?? '').toLowerCase();
+
+  // PostgREST missing table/view often manifests as 404.
+  if (status === 404) return true;
+
+  // Common postgres + PostgREST codes for missing resources.
+  if (code === '42P01') return true; // relation does not exist
+  if (code === 'PGRST205' || code === 'PGRST204' || code === 'PGRST200' || code === 'PGRST202') return true;
+
+  if (msg.includes('does not exist') || msg.includes('not found')) return true;
+  return false;
+}
+
 export type StreamActionPack = {
   id: string;
   slug: string;
@@ -144,13 +182,20 @@ export const StreamActionsService = {
   },
 
   async listMyContentActions(userId: string, limit = 100): Promise<ContentActionEvent[]> {
+    if (safeGetLocalStorageFlag(FEATURE_CONTENT_ACTION_EVENTS_UNAVAILABLE_KEY)) return [];
     const { data, error } = await supabase
       .from('content_action_events')
       .select('id, target_key, vehicle_id, action_id, sender_id, kind, title, render_text, image_url, sound_key, duration_ms, cost_cents, created_at')
       .eq('sender_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
-    if (error) throw error;
+    if (error) {
+      if (isMissingResourceError(error)) {
+        safeSetLocalStorageFlag(FEATURE_CONTENT_ACTION_EVENTS_UNAVAILABLE_KEY);
+        return [];
+      }
+      throw error;
+    }
     return (data || []) as ContentActionEvent[];
   },
 
@@ -170,6 +215,9 @@ export const StreamActionsService = {
     topMeme: { title: string; count: number } | null;
     recentDrops: ContentActionEvent[];
   }> {
+    if (safeGetLocalStorageFlag(FEATURE_CONTENT_ACTION_EVENTS_UNAVAILABLE_KEY)) {
+      return { totalDrops: 0, uniqueMemers: 0, topMeme: null, recentDrops: [] };
+    }
     try {
       // Get all drops for this vehicle
       const { data, error } = await supabase
@@ -179,7 +227,18 @@ export const StreamActionsService = {
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (error) throw error;
+      if (error) {
+        if (isMissingResourceError(error)) {
+          safeSetLocalStorageFlag(FEATURE_CONTENT_ACTION_EVENTS_UNAVAILABLE_KEY);
+          return {
+            totalDrops: 0,
+            uniqueMemers: 0,
+            topMeme: null,
+            recentDrops: [],
+          };
+        }
+        throw error;
+      }
       
       const drops = data || [];
       const totalDrops = drops.length;
@@ -215,13 +274,17 @@ export const StreamActionsService = {
   },
 
   async getVehicleDropCount(vehicleId: string): Promise<number> {
+    if (safeGetLocalStorageFlag(FEATURE_CONTENT_ACTION_EVENTS_UNAVAILABLE_KEY)) return 0;
     try {
       const { count, error } = await supabase
         .from('content_action_events')
         .select('id', { count: 'exact', head: true })
         .eq('vehicle_id', vehicleId);
       
-      if (error) return 0;
+      if (error) {
+        if (isMissingResourceError(error)) safeSetLocalStorageFlag(FEATURE_CONTENT_ACTION_EVENTS_UNAVAILABLE_KEY);
+        return 0;
+      }
       return count || 0;
     } catch {
       return 0;

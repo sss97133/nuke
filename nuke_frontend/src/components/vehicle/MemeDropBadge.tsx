@@ -57,7 +57,7 @@ export default function MemeDropBadge({ vehicleId, compact = false }: MemeDropBa
           fontWeight: 600,
         }}
       >
-        <span>🔥</span>
+        <span style={{ fontSize: '9px', letterSpacing: '0.5px' }}>DROPS</span>
         <span>{count}</span>
       </span>
     );
@@ -77,7 +77,6 @@ export default function MemeDropBadge({ vehicleId, compact = false }: MemeDropBa
         color: '#a5b4fc',
       }}
     >
-      <span style={{ fontSize: '14px' }}>🔥</span>
       <span>
         <strong>{count}</strong> meme drop{count !== 1 ? 's' : ''}
       </span>
