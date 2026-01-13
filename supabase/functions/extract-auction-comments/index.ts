@@ -707,33 +707,49 @@ serve(async (req) => {
         return null
       })()
 
-      // If we inferred SOLD from the system comment, persist it back into external_listings so
-      // the rest of the system (auctionPulse, header owner guess, etc.) becomes consistent.
-      if (
-        extListing?.id &&
-        inferredFinalPrice &&
-        inferredFinalPrice > 0 &&
-        String(extListing?.listing_status || '').toLowerCase() !== 'sold'
-      ) {
-        const existingMeta = (extListing as any)?.metadata && typeof (extListing as any).metadata === 'object' ? (extListing as any).metadata : {}
-        const reserveFromHtml =
-          html.includes('no-reserve') || /\bNo Reserve\b/i.test(html) ? 'no_reserve' : null
+      // If we inferred SOLD (either from the system comment or from an existing external_listings.final_price),
+      // persist it back into external_listings so the rest of the system (auctionPulse, header owner guess, etc.)
+      // becomes consistent. Also ensure `current_bid` matches `final_price` for sold listings.
+      if (extListing?.id && inferredFinalPrice && inferredFinalPrice > 0) {
+        const existingStatus = String(extListing?.listing_status || '').toLowerCase()
+        const existingFinal =
+          (typeof extListing?.final_price === 'number' && Number.isFinite(extListing.final_price) && extListing.final_price > 0)
+            ? Math.floor(extListing.final_price)
+            : null
+        const existingCurrent =
+          (typeof extListing?.current_bid === 'number' && Number.isFinite(extListing.current_bid) && extListing.current_bid > 0)
+            ? Math.floor(extListing.current_bid)
+            : null
 
-        await supabase
-          .from('external_listings')
-          .update({
-            listing_status: 'sold',
-            final_price: inferredFinalPrice,
-            sold_at: extListing?.sold_at || extListing?.end_date || nowIso,
-            metadata: {
-              ...existingMeta,
-              ...(inferredBuyerFromComment ? { buyer_username: inferredBuyerFromComment } : {}),
-              ...(reserveFromHtml ? { reserve_status: reserveFromHtml } : {}),
-              source: existingMeta?.source || 'extract-auction-comments',
-            },
-            updated_at: nowIso,
-          })
-          .eq('id', extListing.id)
+        const needsSync =
+          existingStatus !== 'sold' ||
+          existingFinal !== inferredFinalPrice ||
+          existingCurrent !== inferredFinalPrice
+
+        if (needsSync) {
+          const existingMeta = (extListing as any)?.metadata && typeof (extListing as any).metadata === 'object'
+            ? (extListing as any).metadata
+            : {}
+          const reserveFromHtml =
+            html.includes('no-reserve') || /\bNo Reserve\b/i.test(html) ? 'no_reserve' : null
+
+          await supabase
+            .from('external_listings')
+            .update({
+              listing_status: 'sold',
+              final_price: inferredFinalPrice,
+              current_bid: inferredFinalPrice,
+              sold_at: extListing?.sold_at || extListing?.end_date || nowIso,
+              metadata: {
+                ...existingMeta,
+                ...(inferredBuyerFromComment ? { buyer_username: inferredBuyerFromComment } : {}),
+                ...(reserveFromHtml ? { reserve_status: reserveFromHtml } : {}),
+                source: existingMeta?.source || 'extract-auction-comments',
+              },
+              updated_at: nowIso,
+            })
+            .eq('id', extListing.id)
+        }
       }
 
       const listingPayload: any = {

@@ -14,6 +14,8 @@ BEGIN
   -- vehicle_listings: scheduler + readiness + premium rails
   IF to_regclass('public.vehicle_listings') IS NOT NULL THEN
     ALTER TABLE public.vehicle_listings
+      -- Some parts of the app assume this exists; if missing, it breaks listing creation + readiness checks.
+      ADD COLUMN IF NOT EXISTS auction_duration_minutes integer,
       ADD COLUMN IF NOT EXISTS auto_start_enabled boolean DEFAULT false,
       ADD COLUMN IF NOT EXISTS auto_start_armed_at timestamptz,
       ADD COLUMN IF NOT EXISTS auto_start_last_attempt_at timestamptz,
@@ -25,6 +27,21 @@ BEGIN
       ADD COLUMN IF NOT EXISTS premium_priority integer DEFAULT 0,
       ADD COLUMN IF NOT EXISTS readiness_last_checked_at timestamptz,
       ADD COLUMN IF NOT EXISTS readiness_last_result jsonb DEFAULT '{}'::jsonb;
+
+    -- Backfill duration for existing listings (best-effort; OK if columns are missing in older schemas)
+    BEGIN
+      UPDATE public.vehicle_listings
+      SET auction_duration_minutes =
+        GREATEST(
+          1,
+          floor(extract(epoch from (auction_end_time - auction_start_time)) / 60)::int
+        )
+      WHERE auction_duration_minutes IS NULL
+        AND auction_start_time IS NOT NULL
+        AND auction_end_time IS NOT NULL;
+    EXCEPTION WHEN OTHERS THEN
+      NULL;
+    END;
 
     -- Best-effort constraint shims (do not fail migration if these already exist under different names)
     BEGIN
@@ -83,7 +100,7 @@ CREATE OR REPLACE FUNCTION public.check_auction_readiness(p_listing_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
   v_listing record;
@@ -93,6 +110,7 @@ DECLARE
   v_has_title boolean := false;
   v_issues jsonb := '[]'::jsonb;
   v_has_errors boolean := false;
+  v_duration_minutes integer := null;
 BEGIN
   SELECT *
   INTO v_listing
@@ -157,16 +175,28 @@ BEGIN
   END IF;
 
   -- Auction timing sanity
+  -- For manual starts, start time can be set at activation time, so don't hard-fail if missing.
   IF v_listing.auction_start_time IS NULL THEN
-    v_has_errors := true;
     v_issues := v_issues || jsonb_build_array(jsonb_build_object(
-      'severity', 'error',
+      'severity', 'warning',
       'code', 'missing_start_time',
-      'message', 'Auction start time must be set'
+      'message', 'Auction start time is not set yet (will be set when started)'
     ));
   END IF;
 
-  IF COALESCE(v_listing.auction_duration_minutes, 0) <= 0 THEN
+  v_duration_minutes := COALESCE(
+    v_listing.auction_duration_minutes,
+    CASE
+      WHEN v_listing.auction_start_time IS NOT NULL AND v_listing.auction_end_time IS NOT NULL THEN
+        GREATEST(
+          1,
+          floor(extract(epoch from (v_listing.auction_end_time - v_listing.auction_start_time)) / 60)::int
+        )
+      ELSE NULL
+    END
+  );
+
+  IF COALESCE(v_duration_minutes, 0) <= 0 THEN
     v_has_errors := true;
     v_issues := v_issues || jsonb_build_array(jsonb_build_object(
       'severity', 'error',
@@ -223,7 +253,7 @@ CREATE OR REPLACE FUNCTION public.activate_auction_listing(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
   v_listing record;
@@ -276,7 +306,17 @@ BEGIN
     );
   END IF;
 
-  v_duration_minutes := COALESCE(v_listing.auction_duration_minutes, 7 * 24 * 60);
+  v_duration_minutes := COALESCE(
+    v_listing.auction_duration_minutes,
+    CASE
+      WHEN v_listing.auction_start_time IS NOT NULL AND v_listing.auction_end_time IS NOT NULL THEN
+        GREATEST(
+          1,
+          floor(extract(epoch from (v_listing.auction_end_time - v_listing.auction_start_time)) / 60)::int
+        )
+      ELSE 7 * 24 * 60
+    END
+  );
   IF v_duration_minutes <= 0 THEN
     RETURN jsonb_build_object('success', false, 'error', 'Invalid auction duration');
   END IF;
@@ -293,6 +333,7 @@ BEGIN
     status = 'active',
     auction_start_time = v_start_time,
     auction_end_time = v_end_time,
+    auction_duration_minutes = v_duration_minutes,
     auto_start_last_error = null,
     -- Once started, disable auto-start so it doesn't re-trigger
     auto_start_enabled = false,
@@ -317,7 +358,7 @@ CREATE OR REPLACE FUNCTION public.get_due_auction_starts(p_limit integer DEFAULT
 RETURNS TABLE (listing_id uuid)
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
@@ -341,7 +382,7 @@ CREATE OR REPLACE FUNCTION public.get_due_auction_ends(p_limit integer DEFAULT 5
 RETURNS TABLE (listing_id uuid)
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 BEGIN
   RETURN QUERY
@@ -356,8 +397,10 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_due_auction_starts(integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_due_auction_ends(integer) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.get_due_auction_starts(integer) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.get_due_auction_ends(integer) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.get_due_auction_starts(integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_due_auction_ends(integer) TO service_role;
 
 -- -----------------------------------------------------------------------------
 -- place_auction_bid(): align with auction_bids schema and soft-close logic
@@ -543,7 +586,7 @@ CREATE OR REPLACE FUNCTION public.process_auction_end(p_listing_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
   v_listing record;
@@ -586,7 +629,7 @@ BEGIN
     SET
       status = 'sold',
       sold_at = now(),
-      sold_price_cents = v_listing.current_high_bid_cents,
+      final_price_cents = v_listing.current_high_bid_cents,
       buyer_id = v_listing.current_high_bidder_id,
       updated_at = now()
     WHERE id = p_listing_id;
@@ -627,10 +670,11 @@ CREATE OR REPLACE FUNCTION public.purchase_auction_premium_timing(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
 DECLARE
   v_listing record;
+  v_has_cash_deduct boolean := false;
 BEGIN
   IF p_budget_cents IS NULL OR p_budget_cents <= 0 THEN
     RETURN jsonb_build_object('success', false, 'error', 'Budget must be > 0');
@@ -650,22 +694,45 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Not authorized');
   END IF;
 
-  -- Deduct from user's cash balance (throws on insufficient funds)
-  PERFORM public.deduct_cash_from_user(
-    auth.uid(),
-    p_budget_cents,
-    'auction_premium_timing',
-    p_listing_id,
-    NULL,
-    jsonb_build_object('listing_id', p_listing_id)
-  );
+  -- Optional cash-balance integration: some deployments don't have this yet.
+  v_has_cash_deduct := to_regprocedure('public.deduct_cash_from_user(uuid,bigint,text,uuid,uuid,jsonb)') IS NOT NULL;
 
+  IF v_has_cash_deduct THEN
+    -- Deduct from user's cash balance (throws on insufficient funds)
+    EXECUTE 'select public.deduct_cash_from_user($1,$2,$3,$4,$5,$6)'
+      USING
+        auth.uid(),
+        p_budget_cents,
+        'auction_premium_timing',
+        p_listing_id,
+        NULL::uuid,
+        jsonb_build_object('listing_id', p_listing_id);
+
+    UPDATE public.vehicle_listings
+    SET
+      schedule_strategy = 'premium',
+      premium_status = 'paid',
+      premium_budget_cents = p_budget_cents,
+      premium_paid_at = now(),
+      premium_priority = GREATEST(COALESCE(premium_priority, 0), LEAST(1000000, (p_budget_cents / 1000)::int)),
+      updated_at = now()
+    WHERE id = p_listing_id;
+
+    RETURN jsonb_build_object(
+      'success', true,
+      'listing_id', p_listing_id,
+      'premium_budget_cents', p_budget_cents,
+      'premium_status', 'paid'
+    );
+  END IF;
+
+  -- No cash system yet: record intent so the app can route to Stripe later.
   UPDATE public.vehicle_listings
   SET
     schedule_strategy = 'premium',
-    premium_status = 'paid',
+    premium_status = 'pending_payment',
     premium_budget_cents = p_budget_cents,
-    premium_paid_at = now(),
+    premium_paid_at = null,
     premium_priority = GREATEST(COALESCE(premium_priority, 0), LEAST(1000000, (p_budget_cents / 1000)::int)),
     updated_at = now()
   WHERE id = p_listing_id;
@@ -674,7 +741,8 @@ BEGIN
     'success', true,
     'listing_id', p_listing_id,
     'premium_budget_cents', p_budget_cents,
-    'premium_status', 'paid'
+    'premium_status', 'pending_payment',
+    'note', 'Cash balance system not installed; payment required'
   );
 EXCEPTION
   WHEN OTHERS THEN
