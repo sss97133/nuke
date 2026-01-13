@@ -33,6 +33,11 @@ interface ValueProvenancePopupProps {
     evidence_url?: string | null;
     trend_pct?: number | null;
     trend_period?: string | null;
+    trend_price_type?: string | null;
+    trend_baseline_value?: number | null;
+    trend_baseline_as_of?: string | null;
+    trend_baseline_source?: string | null;
+    trend_outlier_count?: number | null;
   };
   onClose: () => void;
   onUpdate?: (newValue: number) => void;
@@ -735,8 +740,24 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
                 {context.trend_pct >= 0 ? 'UP' : 'DOWN'} {Math.abs(context.trend_pct).toFixed(1)}% {context.trend_period ? String(context.trend_period).toUpperCase() : ''}
               </div>
               <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: 4 }}>
-                Based on internal price signal. Open price timeline for details.
+                {(() => {
+                  const t = String(context?.trend_price_type || '').toLowerCase();
+                  if (t === 'sale') return 'Based on sale price history (filtered for outliers).';
+                  if (t === 'asking') return 'Based on asking price history (filtered for outliers).';
+                  if (t === 'current') return 'Based on internal estimate history (filtered for outliers).';
+                  return 'Based on price history (filtered for outliers).';
+                })()}
               </div>
+              {(typeof context?.trend_baseline_value === 'number' && Number.isFinite(context.trend_baseline_value) && context?.trend_baseline_as_of) ? (
+                <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 6 }}>
+                  Baseline: {context.trend_baseline_value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}{' '}
+                  on {new Date(String(context.trend_baseline_as_of)).toLocaleDateString()}{' '}
+                  ({String(context.trend_baseline_source || 'auto').toUpperCase()})
+                  {typeof context?.trend_outlier_count === 'number' && context.trend_outlier_count > 0 ? (
+                    <> • filtered {context.trend_outlier_count} outlier{context.trend_outlier_count === 1 ? '' : 's'}</>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : null}
 

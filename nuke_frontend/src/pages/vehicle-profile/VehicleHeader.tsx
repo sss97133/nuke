@@ -75,9 +75,28 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   const claimNeedsId = hasClaim && !claimHasId;
   const [rpcSignal, setRpcSignal] = useState<any | null>(initialPriceSignal || null);
   const [trendPct, setTrendPct] = useState<number | null>(null);
+  const [trendPriceType, setTrendPriceType] = useState<string | null>(null);
+  const [trendBaselineValue, setTrendBaselineValue] = useState<number | null>(null);
+  const [trendBaselineAsOf, setTrendBaselineAsOf] = useState<string | null>(null);
+  const [trendBaselineSource, setTrendBaselineSource] = useState<string | null>(null);
+  const [trendOutlierCount, setTrendOutlierCount] = useState<number | null>(null);
   const [trendPeriod, setTrendPeriod] = useState<'live' | '1w' | '30d' | '6m' | '1y' | '5y'>('30d');
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [showOwnerClaimDropdown, setShowOwnerClaimDropdown] = useState(false);
+  const [showOwnerPopover, setShowOwnerPopover] = useState(false);
+  const [ownerPopoverLoading, setOwnerPopoverLoading] = useState(false);
+  const [ownerPopoverError, setOwnerPopoverError] = useState<string | null>(null);
+  const [ownerPopoverData, setOwnerPopoverData] = useState<{
+    identityId: string | null;
+    claimedByUserId: string | null;
+    profileUrl: string | null;
+    auctionsWon: number;
+    auctionsSold: number;
+    commentCount: number;
+    lastCommentAt: string | null;
+    firstSeenAt: string | null;
+    lastSeenAt: string | null;
+  } | null>(null);
   const [showAccessInfo, setShowAccessInfo] = useState(false);
   const locationRef = useRef<HTMLDivElement>(null);
   const ownerClaimRef = useRef<HTMLDivElement>(null);
@@ -91,16 +110,17 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
       }
       if (ownerClaimRef.current && !ownerClaimRef.current.contains(e.target as Node)) {
         setShowOwnerClaimDropdown(false);
+        setShowOwnerPopover(false);
       }
       if (accessRef.current && !accessRef.current.contains(e.target as Node)) {
         setShowAccessInfo(false);
       }
     };
-    if (showLocationDropdown || showOwnerClaimDropdown || showAccessInfo) {
+    if (showLocationDropdown || showOwnerClaimDropdown || showOwnerPopover || showAccessInfo) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showLocationDropdown, showOwnerClaimDropdown, showAccessInfo]);
+  }, [showLocationDropdown, showOwnerClaimDropdown, showOwnerPopover, showAccessInfo]);
 
   // Derive current owner (best guess) from BaT data
   const ownerGuess = useMemo(() => {
@@ -181,6 +201,108 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     }
     return null;
   }, [vehicle, auctionPulse]);
+
+  // Load partner signals for the @handle popover (unverified owner guess)
+  useEffect(() => {
+    if (!showOwnerPopover) return;
+    const raw = String(ownerGuess?.username || '').trim();
+    const handle = raw.replace(/^@/, '').trim();
+    if (!handle) return;
+
+    let cancelled = false;
+    setOwnerPopoverLoading(true);
+    setOwnerPopoverError(null);
+
+    (async () => {
+      try {
+        const proofUrl = `https://bringatrailer.com/member/${handle}/`;
+        const { data: identity, error: idErr } = await supabase
+          .from('external_identities')
+          .select('id, claimed_by_user_id, profile_url, first_seen_at, last_seen_at')
+          .eq('platform', 'bat')
+          .eq('handle', handle)
+          .maybeSingle();
+
+        if (idErr) {
+          // Non-fatal: we can still show partial signals using handle matching.
+          console.warn('Owner popover identity lookup failed:', idErr);
+        }
+
+        const identityId = identity?.id ? String(identity.id) : null;
+        const claimedByUserId = identity?.claimed_by_user_id ? String(identity.claimed_by_user_id) : null;
+        const profileUrl = String((identity as any)?.profile_url || proofUrl).trim() || proofUrl;
+        const firstSeenAt = (identity as any)?.first_seen_at ? String((identity as any).first_seen_at) : null;
+        const lastSeenAt = (identity as any)?.last_seen_at ? String((identity as any).last_seen_at) : null;
+
+        const winsQ = supabase
+          .from('auction_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('source', 'bat')
+          .ilike('winning_bidder', handle);
+
+        const soldQ = supabase
+          .from('auction_events')
+          .select('id', { count: 'exact', head: true })
+          .eq('source', 'bat')
+          .ilike('seller_name', handle);
+
+        const commentsBase = supabase
+          .from('auction_comments')
+          .select('id', { count: 'exact', head: true })
+          .eq('platform', 'bat')
+          .is('bid_amount', null);
+
+        const lastCommentBase = supabase
+          .from('auction_comments')
+          .select('posted_at')
+          .eq('platform', 'bat')
+          .is('bid_amount', null)
+          .order('posted_at', { ascending: false })
+          .limit(1);
+
+        const commentsQ = identityId
+          ? commentsBase.eq('external_identity_id', identityId)
+          : commentsBase.ilike('author_username', handle);
+
+        const lastCommentQ = identityId
+          ? lastCommentBase.eq('external_identity_id', identityId)
+          : lastCommentBase.ilike('author_username', handle);
+
+        const [winsRes, soldRes, commentsRes, lastCommentRes] = await Promise.all([
+          winsQ,
+          soldQ,
+          commentsQ,
+          lastCommentQ,
+        ]);
+
+        const lastCommentRow = Array.isArray((lastCommentRes as any)?.data) ? (lastCommentRes as any).data[0] : null;
+        const lastCommentAt = lastCommentRow?.posted_at ? String(lastCommentRow.posted_at) : null;
+
+        if (cancelled) return;
+        setOwnerPopoverData({
+          identityId,
+          claimedByUserId,
+          profileUrl,
+          auctionsWon: (winsRes as any)?.count || 0,
+          auctionsSold: (soldRes as any)?.count || 0,
+          commentCount: (commentsRes as any)?.count || 0,
+          lastCommentAt,
+          firstSeenAt,
+          lastSeenAt,
+        });
+      } catch (e: any) {
+        if (cancelled) return;
+        setOwnerPopoverData(null);
+        setOwnerPopoverError(e?.message || 'Failed to load partner signals');
+      } finally {
+        if (!cancelled) setOwnerPopoverLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showOwnerPopover, ownerGuess?.username]);
 
   // Derive location display - prefer city codes (ATL, LAX, NYC) or state abbrev
   const locationDisplay = useMemo(() => {
@@ -492,95 +614,136 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
     })();
   }, [vehicle?.id]);
 
-  // Load trend based on selected period
+  // Load trend based on selected period (baseline + outlier filtering from DB)
   useEffect(() => {
     (async () => {
       try {
-        if (!vehicle?.id) { setTrendPct(null); return; }
-        
+        if (!vehicle?.id) {
+          setTrendPct(null);
+          setTrendPriceType(null);
+          setTrendBaselineValue(null);
+          setTrendBaselineAsOf(null);
+          setTrendBaselineSource(null);
+          setTrendOutlierCount(null);
+          return;
+        }
+
         // Don't show trend if price was auto-corrected (e.g., $15 -> $15,000)
         // The "trend" would be the correction, not real market movement
         if ((vehicle as any)?.origin_metadata?.price_corrected === true ||
             (vehicle as any)?.origin_metadata?.price_was_corrected === true) {
           setTrendPct(null);
-          return;
-        }
-
-        // Calculate start date based on period
-        const now = Date.now();
-        let since = now;
-        
-        switch (trendPeriod) {
-          case 'live': since = now - 24 * 60 * 60 * 1000; break; // Last 24h
-          case '1w': since = now - 7 * 24 * 60 * 60 * 1000; break;
-          case '30d': since = now - 30 * 24 * 60 * 60 * 1000; break;
-          case '6m': since = now - 180 * 24 * 60 * 60 * 1000; break;
-          case '1y': since = now - 365 * 24 * 60 * 60 * 1000; break;
-          case '5y': since = now - 5 * 365 * 24 * 60 * 60 * 1000; break;
-        }
-
-        // Fetch price history
-        // Trend is intended to reflect the internal price signal (not auction outcomes).
-        // Auction prices (sale/high_bid) are provenance-backed separately in the value popup.
-        const { data, error } = await supabase
-          .from('vehicle_price_history')
-          .select('price_type,value,as_of')
-          .eq('vehicle_id', vehicle.id)
-          .eq('price_type', 'current')
-          .order('as_of', { ascending: false })
-          .limit(100); // Fetch more for longer periods
-
-        if (error || !Array.isArray(data) || data.length < 2) {
-          setTrendPct(null);
+          setTrendPriceType(null);
+          setTrendBaselineValue(null);
+          setTrendBaselineAsOf(null);
+          setTrendBaselineSource(null);
+          setTrendOutlierCount(null);
           return;
         }
 
         // For 'live', we also check builds/receipts for active investment
         if (trendPeriod === 'live') {
-          // Get build IDs for this vehicle first
-          const { data: builds } = await supabase
-            .from('vehicle_builds')
-            .select('id')
-            .eq('vehicle_id', vehicle.id);
-            
-          let recentInvestment = 0;
-          
-          if (builds && builds.length > 0) {
-            const buildIds = builds.map(b => b.id);
-            // Check for recent build items
-            const { data: recentItems } = await supabase
-              .from('build_line_items')
-              .select('total_price')
-              .in('build_id', buildIds)
-              .gte('created_at', new Date(since).toISOString());
-              
-            recentInvestment = recentItems?.reduce((sum, item) => sum + (item.total_price || 0), 0) || 0;
-          }
-          
-          // If there's investment today, show positive trend
-          if (recentInvestment > 0) {
-             const currentValue = vehicle.current_value || vehicle.purchase_price || 10000; // fallback base
-             const pct = (recentInvestment / currentValue) * 100;
-             setTrendPct(pct);
-             return;
+          try {
+            const since = Date.now() - 24 * 60 * 60 * 1000;
+            const { data: builds } = await supabase
+              .from('vehicle_builds')
+              .select('id')
+              .eq('vehicle_id', vehicle.id);
+
+            let recentInvestment = 0;
+            if (builds && builds.length > 0) {
+              const buildIds = builds.map(b => b.id);
+              const { data: recentItems } = await supabase
+                .from('build_line_items')
+                .select('total_price')
+                .in('build_id', buildIds)
+                .gte('created_at', new Date(since).toISOString());
+
+              recentInvestment = recentItems?.reduce((sum, item) => sum + (item.total_price || 0), 0) || 0;
+            }
+
+            if (recentInvestment > 0) {
+              const currentValue = (vehicle as any).current_value || (vehicle as any).purchase_price || 10000;
+              const pct = (recentInvestment / currentValue) * 100;
+              setTrendPct(pct);
+              setTrendPriceType('current');
+              setTrendBaselineValue(null);
+              setTrendBaselineAsOf(null);
+              setTrendBaselineSource('auto');
+              setTrendOutlierCount(null);
+              return;
+            }
+          } catch {
+            // fall through to baseline trend
           }
         }
 
-        const withinPeriod = (data as any[]).filter(d => new Date(d.as_of).getTime() >= since);
-        // Need at least start and end points, or fallback to closest outside range if needed
-        const arr = withinPeriod.length >= 2 ? withinPeriod : (data as any[]);
-        
-        if (arr.length < 2) { setTrendPct(null); return; }
-        
-        const latest = arr[0];
-        const baseline = arr[arr.length - 1]; // Earliest point in the period (or closest available)
-        
-        if (!latest?.value || !baseline?.value || baseline.value === 0) { setTrendPct(null); return; }
-        
-        const pct = ((latest.value - baseline.value) / baseline.value) * 100;
-        setTrendPct(pct);
+        const v: any = vehicle as any;
+        const rawOutcome = String(v?.auction_outcome || '').toLowerCase();
+        const saleStatus = String(v?.sale_status || '').toLowerCase();
+        const isSold = saleStatus === 'sold' || rawOutcome === 'sold';
+
+        let priceType: 'sale' | 'asking' | 'current' | 'purchase' | 'msrp' = 'current';
+        if (isSold && typeof v?.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0) {
+          priceType = 'sale';
+        } else if (!isSold && typeof v?.asking_price === 'number' && Number.isFinite(v.asking_price) && v.asking_price > 0) {
+          priceType = 'asking';
+        } else if (typeof v?.current_value === 'number' && Number.isFinite(v.current_value) && v.current_value > 0) {
+          priceType = 'current';
+        } else if (typeof v?.purchase_price === 'number' && Number.isFinite(v.purchase_price) && v.purchase_price > 0) {
+          priceType = 'purchase';
+        } else if (typeof v?.msrp === 'number' && Number.isFinite(v.msrp) && v.msrp > 0) {
+          priceType = 'msrp';
+        }
+
+        setTrendPriceType(priceType);
+
+        const periodForRpc = trendPeriod === 'live' ? '1w' : trendPeriod;
+        const { data, error } = await supabase.rpc('get_vehicle_price_trend', {
+          p_vehicle_id: vehicle.id,
+          p_price_type: priceType,
+          p_period: periodForRpc,
+        });
+
+        if (error) {
+          setTrendPct(null);
+          setTrendBaselineValue(null);
+          setTrendBaselineAsOf(null);
+          setTrendBaselineSource(null);
+          setTrendOutlierCount(null);
+          return;
+        }
+
+        const row: any = Array.isArray(data) ? data[0] : data;
+        if (!row) {
+          setTrendPct(null);
+          setTrendBaselineValue(null);
+          setTrendBaselineAsOf(null);
+          setTrendBaselineSource(null);
+          setTrendOutlierCount(null);
+          return;
+        }
+
+        const pctRaw = row?.delta_pct;
+        const pct = typeof pctRaw === 'number' ? pctRaw : (pctRaw != null ? parseFloat(String(pctRaw)) : null);
+        setTrendPct(Number.isFinite(pct as any) ? (pct as number) : null);
+
+        const baseRaw = row?.baseline_value;
+        const base = typeof baseRaw === 'number' ? baseRaw : (baseRaw != null ? parseFloat(String(baseRaw)) : null);
+        setTrendBaselineValue(Number.isFinite(base as any) ? (base as number) : null);
+        setTrendBaselineAsOf(row?.baseline_as_of ? String(row.baseline_as_of) : null);
+        setTrendBaselineSource(row?.baseline_source ? String(row.baseline_source) : null);
+
+        const outRaw = row?.outlier_count;
+        const out = typeof outRaw === 'number' ? outRaw : (outRaw != null ? parseInt(String(outRaw), 10) : null);
+        setTrendOutlierCount(Number.isFinite(out as any) ? (out as number) : null);
       } catch {
         setTrendPct(null);
+        setTrendPriceType(null);
+        setTrendBaselineValue(null);
+        setTrendBaselineAsOf(null);
+        setTrendBaselineSource(null);
+        setTrendOutlierCount(null);
       }
     })();
   }, [vehicle?.id, trendPeriod]);
@@ -1869,11 +2032,23 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         };
     
     const periodLabel = trendPeriod.toUpperCase();
+    const baselineLabel =
+      (typeof trendBaselineValue === 'number' && Number.isFinite(trendBaselineValue) && trendBaselineAsOf)
+        ? `Baseline: ${trendBaselineValue.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} on ${new Date(String(trendBaselineAsOf)).toLocaleDateString()} (${String(trendBaselineSource || 'auto').toUpperCase()})`
+        : null;
+    const outlierLabel =
+      (typeof trendOutlierCount === 'number' && trendOutlierCount > 0)
+        ? `Filtered ${trendOutlierCount} outlier${trendOutlierCount === 1 ? '' : 's'}`
+        : null;
     
     return (
       <span 
         onClick={toggleTrendPeriod}
-        title={`Click to toggle period (Current: ${periodLabel})`}
+        title={[
+          `Click to toggle period (Current: ${periodLabel})`,
+          baselineLabel,
+          outlierLabel,
+        ].filter(Boolean).join(' • ')}
         style={{ 
           display: 'inline-flex', 
           alignItems: 'center', 
@@ -1891,7 +2066,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
         </span>
       </span>
     );
-  }, [trendPct, trendPeriod]);
+  }, [trendPct, trendPeriod, trendBaselineValue, trendBaselineAsOf, trendBaselineSource, trendOutlierCount]);
 
   const handleViewValuation = () => {
     setPriceMenuOpen(false);
@@ -2224,42 +2399,14 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  // Shift+Click opens the claim/help dropdown. Normal click navigates to the owner identity/profile.
+                  // Shift+Click opens the claim/help dropdown. Normal click opens the partner card popover.
                   if (e.shiftKey) {
                     setShowOwnerClaimDropdown((prev) => !prev);
+                    setShowOwnerPopover(false);
                     return;
                   }
-
-                  (async () => {
-                    try {
-                      const raw = String(ownerGuess.username || '').trim();
-                      const handle = raw.replace(/^@/, '').trim();
-                      if (!handle) return;
-
-                      const proofUrl = `https://bringatrailer.com/member/${handle}/`;
-                      const { data: identity } = await supabase
-                        .from('external_identities')
-                        .select('id, claimed_by_user_id, profile_url')
-                        .eq('platform', 'bat')
-                        .eq('handle', handle)
-                        .maybeSingle();
-
-                      if (identity?.claimed_by_user_id) {
-                        navigate(`/profile/${identity.claimed_by_user_id}`);
-                        return;
-                      }
-                      if (identity?.id) {
-                        navigate(`/profile/external/${identity.id}`);
-                        return;
-                      }
-
-                      navigate(
-                        `/claim-identity?platform=bat&handle=${encodeURIComponent(handle)}&profileUrl=${encodeURIComponent(identity?.profile_url || proofUrl)}`,
-                      );
-                    } catch (err) {
-                      console.warn('Owner identity navigation failed:', err);
-                    }
-                  })();
+                  setShowOwnerPopover((prev) => !prev);
+                  setShowOwnerClaimDropdown(false);
                 }}
                 style={{
                   fontSize: '9px',
@@ -2278,6 +2425,186 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               >
                 @{ownerGuess.username}<sup style={{ fontSize: '6px', color: 'var(--warning)', marginLeft: '1px' }}>*</sup>
               </button>
+
+              {/* Owner Partner Card Popover */}
+              {showOwnerPopover && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    zIndex: 1000,
+                    background: 'var(--bg)',
+                    border: '2px solid var(--primary)',
+                    padding: '12px',
+                    width: '320px',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    marginTop: '4px',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '8px',
+                    borderBottom: '1px solid var(--border)',
+                    paddingBottom: '6px'
+                  }}>
+                    <div style={{ fontWeight: 'bold', fontSize: '9pt' }}>Partner card</div>
+                    <button
+                      type="button"
+                      onClick={() => setShowOwnerPopover(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '12pt',
+                        color: 'var(--text-muted)',
+                      }}
+                      aria-label="Close"
+                      title="Close"
+                    >
+                      x
+                    </button>
+                  </div>
+
+                  <div style={{ fontSize: '7pt', color: 'var(--text)', lineHeight: 1.4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ fontFamily: 'monospace', fontWeight: 800 }}>@{ownerGuess.username}</div>
+                      <div style={{ color: 'var(--text-muted)' }}>
+                        {ownerGuess.role === 'buyer' ? 'Role: buyer' : ownerGuess.role === 'seller' ? 'Role: seller' : 'Role: unknown'}
+                      </div>
+                    </div>
+
+                    {ownerGuess.from ? (
+                      <div style={{ marginTop: 6, color: 'var(--text-muted)' }}>
+                        Prior seller: <span style={{ fontFamily: 'monospace' }}>@{ownerGuess.from}</span>
+                      </div>
+                    ) : null}
+
+                    {ownerPopoverLoading ? (
+                      <div style={{ marginTop: 10, color: 'var(--text-muted)' }}>Loading partner signals...</div>
+                    ) : ownerPopoverError ? (
+                      <div style={{ marginTop: 10, color: 'var(--error-text, #dc2626)' }}>{ownerPopoverError}</div>
+                    ) : ownerPopoverData ? (
+                      <>
+                        <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                          <div style={{ fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6 }}>ACTIVITY</div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Auctions won</span>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{ownerPopoverData.auctionsWon}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Auctions sold</span>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{ownerPopoverData.auctionsSold}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Comments</span>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{ownerPopoverData.commentCount}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Last comment</span>
+                              <span style={{ fontFamily: 'monospace' }}>
+                                {ownerPopoverData.lastCommentAt ? new Date(ownerPopoverData.lastCommentAt).toLocaleDateString() : '—'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                          <div style={{ fontWeight: 800, color: 'var(--text-muted)', marginBottom: 6 }}>TRUST</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Claimed</span>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                              {ownerPopoverData.claimedByUserId ? 'yes' : 'no'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>First seen</span>
+                            <span style={{ fontFamily: 'monospace' }}>
+                              {ownerPopoverData.firstSeenAt ? new Date(ownerPopoverData.firstSeenAt).toLocaleDateString() : '—'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Last seen</span>
+                            <span style={{ fontFamily: 'monospace' }}>
+                              {ownerPopoverData.lastSeenAt ? new Date(ownerPopoverData.lastSeenAt).toLocaleDateString() : '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: 10, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="button button-small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              (async () => {
+                                try {
+                                  const raw = String(ownerGuess.username || '').trim();
+                                  const handle = raw.replace(/^@/, '').trim();
+                                  if (!handle) return;
+
+                                  const proofUrl = `https://bringatrailer.com/member/${handle}/`;
+                                  const { data: identity } = await supabase
+                                    .from('external_identities')
+                                    .select('id, claimed_by_user_id, profile_url')
+                                    .eq('platform', 'bat')
+                                    .eq('handle', handle)
+                                    .maybeSingle();
+
+                                  setShowOwnerPopover(false);
+                                  if (identity?.claimed_by_user_id) {
+                                    navigate(`/profile/${identity.claimed_by_user_id}`);
+                                    return;
+                                  }
+                                  if (identity?.id) {
+                                    navigate(`/profile/external/${identity.id}`);
+                                    return;
+                                  }
+
+                                  navigate(
+                                    `/claim-identity?platform=bat&handle=${encodeURIComponent(handle)}&profileUrl=${encodeURIComponent(identity?.profile_url || proofUrl)}`,
+                                  );
+                                } catch (err) {
+                                  console.warn('Owner identity navigation failed:', err);
+                                }
+                              })();
+                            }}
+                            style={{ fontSize: '7pt' }}
+                          >
+                            View details
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const raw = String(ownerGuess.username || '').trim();
+                              const handle = raw.replace(/^@/, '').trim();
+                              if (!handle) return;
+                              const proofUrl = `https://bringatrailer.com/member/${handle}/`;
+                              setShowOwnerPopover(false);
+                              navigate(
+                                `/claim-identity?platform=bat&handle=${encodeURIComponent(handle)}&profileUrl=${encodeURIComponent(proofUrl)}`
+                              );
+                            }}
+                            style={{ fontSize: '7pt' }}
+                          >
+                            Claim identity
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ marginTop: 10, color: 'var(--text-muted)' }}>
+                        No partner signals available yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {/* Owner Claim Dropdown */}
               {showOwnerClaimDropdown && (
@@ -3986,7 +4313,12 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
               return u || null;
             })(),
             trend_pct: typeof trendPct === 'number' ? trendPct : null,
-            trend_period: trendPeriod || null
+            trend_period: trendPeriod || null,
+            trend_price_type: trendPriceType || null,
+            trend_baseline_value: typeof trendBaselineValue === 'number' ? trendBaselineValue : null,
+            trend_baseline_as_of: trendBaselineAsOf || null,
+            trend_baseline_source: trendBaselineSource || null,
+            trend_outlier_count: typeof trendOutlierCount === 'number' ? trendOutlierCount : null,
           }}
           onClose={() => setShowProvenancePopup(false)}
           onUpdate={(newValue) => {
