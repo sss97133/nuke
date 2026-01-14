@@ -290,7 +290,8 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
           description: parsed.vendor_name || category,
           file_url: doc.prepared.publicUrl,
           file_type: doc.mimeType || 'application/octet-stream',
-          privacy_level: 'owner_only',
+          // DB constraint expects: private | organization | public
+          privacy_level: 'private',
           vendor_name: parsed.vendor_name || null,
           amount: typeof parsed.total === 'number' ? parsed.total : null,
           currency

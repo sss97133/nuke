@@ -45,6 +45,7 @@ import VehicleROISummaryCard from '../components/vehicle/VehicleROISummaryCard';
 import { VehiclePricingValueCard } from '../components/vehicle/VehiclePricingValueCard';
 import { VehicleStructuredListingDataCard } from './vehicle-profile/VehicleStructuredListingDataCard';
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
+import VehicleAuctionQuickStartCard from '../components/auction/VehicleAuctionQuickStartCard';
 // Lazy load heavy components to avoid circular dependencies
 const MergeProposalsPanel = React.lazy(() => import('../components/vehicle/MergeProposalsPanel'));
 // VehicleProfileTabs removed - using curated layout instead
@@ -3423,6 +3424,18 @@ const VehicleProfile: React.FC = () => {
                 auctionPulse={auctionPulse}
                 valuationIntel={valuationIntel as any}
                 readinessSnapshot={readinessSnapshot as any}
+              />
+
+              <VehicleAuctionQuickStartCard
+                vehicle={{
+                  id: vehicle.id,
+                  year: vehicle.year,
+                  make: vehicle.make,
+                  model: vehicle.model,
+                  trim: (vehicle as any)?.trim ?? null,
+                  mileage: (vehicle as any)?.mileage ?? null,
+                }}
+                canManage={Boolean(isRowOwner || isVerifiedOwner)}
               />
               
               {/* Structured listing data (Options / Service records / etc.) */}

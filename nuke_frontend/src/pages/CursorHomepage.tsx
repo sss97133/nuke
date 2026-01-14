@@ -10,6 +10,14 @@ interface HypeVehicle {
   year?: number;
   make?: string;
   model?: string;
+  series?: string | null;
+  trim?: string | null;
+  engine?: string | null;
+  transmission?: string | null;
+  transmission_model?: string | null;
+  drivetrain?: string | null;
+  body_style?: string | null;
+  fuel_type?: string | null;
   current_value?: number;
   purchase_price?: number;
   sale_price?: number;
@@ -1920,7 +1928,9 @@ const CursorHomepage: React.FC = () => {
       const { data: vehicles, error } = await supabase
         .from('vehicles')
         .select(`
-          id, year, make, model, normalized_model, series, trim, transmission, transmission_model, title, vin, created_at, updated_at,
+          id, year, make, model, normalized_model, series, trim,
+          engine, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          title, vin, created_at, updated_at,
           sale_price, current_value, purchase_price, asking_price,
           sale_date, sale_status,
           auction_outcome, high_bid, winning_bid, bid_count,
@@ -5031,7 +5041,7 @@ const CursorHomepage: React.FC = () => {
             >
               Show more ({Math.max(0, filteredVehicles.length - vehiclesToRender.length)} more)
             </button>
-          </div>
+        </div>
         )}
 
         {/* Infinite scroll sentinel */}

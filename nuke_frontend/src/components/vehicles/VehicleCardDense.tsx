@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FaviconIcon } from '../common/FaviconIcon';
 import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
 import { UserInteractionService } from '../../services/userInteractionService';
+import { getEngineDefinition, getTransmissionDefinition, type PowertrainSpecDefinition } from '../../services/powertrainDefinitionService';
 import ResilientImage from '../images/ResilientImage';
 import { OdometerBadge } from '../vehicle/OdometerBadge';
 import { useVehicleImages } from '../../hooks/useVehicleImages';
@@ -111,6 +112,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const [touchStart, setTouchStart] = React.useState(0);
   const [auctionNow, setAuctionNow] = React.useState(() => Date.now());
   const [showOwnershipPopup, setShowOwnershipPopup] = React.useState(false);
+  const [specPopover, setSpecPopover] = React.useState<{
+    def: PowertrainSpecDefinition;
+    position: { x: number; y: number };
+  } | null>(null);
 
   // Local CSS for badge animations. We scope keyframes to avoid collisions
   // (the design system defines multiple `@keyframes pulse` variations).
@@ -930,6 +935,34 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     return displayPrice; // Will be "—" if nothing found
   }, [isActiveAuction, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost, isSold, shouldShowSoldBadge]);
 
+  const closeSpecPopover = React.useCallback(() => setSpecPopover(null), []);
+
+  React.useEffect(() => {
+    if (!specPopover) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeSpecPopover();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [specPopover, closeSpecPopover]);
+
+  const openSpecPopover = React.useCallback(
+    (e: React.MouseEvent, kind: 'engine' | 'transmission', raw: unknown) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const def =
+        kind === 'engine'
+          ? getEngineDefinition(raw)
+          : getTransmissionDefinition(raw);
+      if (!def) return;
+      setSpecPopover({
+        def,
+        position: { x: e.clientX, y: e.clientY },
+      });
+    },
+    []
+  );
+
   const badgeParts = React.useMemo(() => {
     const raw = String(badgeMainText || '').trim();
     const up = raw.toUpperCase();
@@ -1240,7 +1273,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     }}
                   >
                     {badgeParts.label}
-                  </div>
+                    </div>
                   {badgeParts.value ? (
                     <div style={{ fontSize: '9pt', fontWeight: 800, lineHeight: 1 }}>
                       {badgeParts.value}
@@ -1987,123 +2020,204 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             {vehicleTitle}
           </div>
 
-          {/* Investment Metrics Row */}
+          {/* Key feature tokens (BaT-title-style): transmission / engine / trim / config / type */}
           {(() => {
             const v: any = vehicle as any;
-            const purchasePrice = v.cost_basis || v.purchase_price || null;
-            const currentValue = v.current_value || v.sale_price || v.asking_price || null;
-            const roiPct = v.roi_pct || null;
-            const priceChange = v.price_change || null;
-            const saleStatus = String(v.sale_status || '').toLowerCase();
-            const auctionOutcome = String(v.auction_outcome || '').toLowerCase();
-            const externalListing = v?.external_listings?.[0];
-            const externalStatus = externalListing ? String(externalListing.listing_status || '').toLowerCase() : '';
-            const isSold = saleStatus === 'sold' || auctionOutcome === 'sold' || (externalStatus === 'sold' && (externalListing?.final_price || externalListing?.sold_at));
-            
-            // Calculate profit/loss
-            let profitLoss = null;
-            let profitLossPct = null;
-            if (currentValue && purchasePrice && purchasePrice > 0) {
-              profitLoss = currentValue - purchasePrice;
-              profitLossPct = ((currentValue / purchasePrice - 1) * 100);
+            const tokens: Array<{
+              kind: 'transmission' | 'engine' | 'trim' | 'config' | 'type';
+              label: string;
+              raw: any;
+              clickable: boolean;
+            }> = [];
+
+            const transmissionRaw = (v?.transmission_model || v?.transmission || '').toString().trim();
+            if (transmissionRaw) {
+              const def = getTransmissionDefinition(transmissionRaw);
+              tokens.push({
+                kind: 'transmission',
+                label: def?.label || transmissionRaw,
+                raw: transmissionRaw,
+                clickable: true,
+              });
             }
 
+            const engineRaw = (v?.engine || v?.engine_size || '').toString().trim();
+            if (engineRaw) {
+              const def = getEngineDefinition(engineRaw);
+              tokens.push({
+                kind: 'engine',
+                label: def?.label || engineRaw,
+                raw: engineRaw,
+                clickable: true,
+              });
+            }
+
+            const trimRaw = (v?.trim || v?.series || '').toString().trim();
+            if (trimRaw) {
+              tokens.push({
+                kind: 'trim',
+                label: trimRaw.length > 26 ? `${trimRaw.slice(0, 26)}…` : trimRaw,
+                raw: trimRaw,
+                clickable: false,
+              });
+            }
+
+            const drivetrainRaw = (v?.drivetrain || '').toString().trim();
+            const drive = drivetrainRaw.toLowerCase();
+            const configLabel =
+              drive.includes('4x4') || drive.includes('4wd') ? '4x4' :
+              (drive.includes('awd') ? 'AWD' :
+              (drive.includes('fwd') ? 'FWD' :
+              (drive.includes('rwd') ? 'RWD' :
+              (drive.includes('2wd') ? '2WD' : ''))));
+            if (configLabel) {
+              tokens.push({ kind: 'config', label: configLabel, raw: configLabel, clickable: false });
+            }
+
+            const bodyStyleRaw = (v?.body_style || '').toString().trim();
+            if (bodyStyleRaw) {
+              const short = bodyStyleRaw.replace(/\s+/g, ' ').trim();
+              tokens.push({
+                kind: 'type',
+                label: short.length > 18 ? `${short.slice(0, 18)}…` : short,
+                raw: short,
+                clickable: false,
+              });
+            }
+
+            // Cap visible tokens to keep the card clean.
+            const visible = tokens.filter(t => t.label).slice(0, 4);
+            if (visible.length === 0) return null;
+
+            const tokenStyleBase: React.CSSProperties = {
+              display: 'inline-flex',
+              alignItems: 'center',
+              height: 18,
+              padding: '0 6px',
+              borderRadius: 4,
+              border: '1px solid var(--border)',
+              background: 'var(--grey-50)',
+              color: 'var(--text)',
+              fontSize: '7pt',
+              fontWeight: 700,
+              lineHeight: 1,
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            };
+
             return (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-                fontSize: '8pt'
-              }}>
-                {/* Current Value / Sale Price */}
-                {currentValue && !showPriceOverlay && (
-                  <div style={{ fontWeight: 700, fontSize: '9pt' }}>
-                    {isSold ? 'SOLD ' : ''}{new Intl.NumberFormat('en-US', { 
-                      style: 'currency', 
-                      currency: 'USD', 
-                      maximumFractionDigits: 0 
-                    }).format(currentValue)}
-                  </div>
-                )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {visible.map((t, idx) => {
+                  const isClickable = t.clickable && (t.kind === 'engine' || t.kind === 'transmission');
+                  const commonProps = {
+                    key: `${t.kind}-${idx}-${t.label}`,
+                    title: t.raw ? String(t.raw) : t.label,
+                    style: {
+                      ...tokenStyleBase,
+                      cursor: isClickable ? 'pointer' : 'default',
+                      background: isClickable ? 'var(--surface)' : 'var(--grey-50)',
+                    } as React.CSSProperties,
+                  };
 
-                {/* Profit/Loss Badge */}
-                {profitLoss !== null && (
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    background: profitLoss > 0 
-                      ? 'rgba(16, 185, 129, 0.15)' 
-                      : profitLoss < 0 
-                        ? 'rgba(239, 68, 68, 0.15)' 
-                        : 'rgba(156, 163, 175, 0.15)',
-                    color: profitLoss > 0 
-                      ? '#10b981' 
-                      : profitLoss < 0 
-                        ? '#ef4444' 
-                        : 'var(--text-muted)',
-                    fontWeight: 700,
-                    fontSize: '8pt',
-                    width: 'fit-content'
-                  }}>
-                    {profitLoss > 0 ? '+' : ''}
-                    {new Intl.NumberFormat('en-US', { 
-                      style: 'currency', 
-                      currency: 'USD', 
-                      maximumFractionDigits: 0 
-                    }).format(profitLoss)}
-                    {profitLossPct !== null && (
-                      <span style={{ opacity: 0.8 }}>
-                        ({profitLossPct > 0 ? '+' : ''}{profitLossPct.toFixed(1)}%)
-                      </span>
-                    )}
-                  </div>
-                )}
+                  if (!isClickable) {
+                    return <span {...commonProps}>{t.label}</span>;
+                  }
 
-                {/* ROI % if available and no profit/loss calculated */}
-                {roiPct !== null && profitLoss === null && (
-                  <div style={{
-                    color: roiPct > 0 ? '#10b981' : roiPct < 0 ? '#ef4444' : 'var(--text-muted)',
-                    fontWeight: 600
-                  }}>
-                    ROI: {roiPct > 0 ? '+' : ''}{roiPct.toFixed(1)}%
-                  </div>
-                )}
-
-                {/* Key Stats Row */}
-                <div style={{
-                  display: 'flex',
-                  gap: '8px',
-                  flexWrap: 'wrap',
-                  fontSize: '7pt',
-                  color: 'var(--text-muted)',
-                  alignItems: 'center'
-                }}>
-                  {vehicle.mileage && vehicle.mileage > 0 && (
-                    <span>{Math.floor(vehicle.mileage).toLocaleString()} mi</span>
-                  )}
-                  {vehicle.location && (
-                    <span>{vehicle.location}</span>
-                  )}
-                  {/* Auction stats for live auctions */}
-                  {isActiveAuction && (() => {
-                    const bidCount = v?.external_listings?.[0]?.bid_count ?? v?.bid_count ?? null;
-                    const watcherCount = v?.external_listings?.[0]?.watcher_count ?? null;
-                    const commentCount = v?.external_listings?.[0]?.comment_count ?? v?.comment_count ?? null;
-                    return (
-                      <>
-                        {bidCount !== null && <span>{bidCount} {bidCount === 1 ? 'bid' : 'bids'}</span>}
-                        {watcherCount !== null && <span>{watcherCount} watching</span>}
-                        {commentCount !== null && <span>{commentCount} {commentCount === 1 ? 'comment' : 'comments'}</span>}
-                      </>
-                    );
-                  })()}
-                </div>
+                  return (
+                    <button
+                      type="button"
+                      {...commonProps}
+                      onClick={(e) => openSpecPopover(e, t.kind as any, t.raw)}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* Engine/Transmission definition popover */}
+      {specPopover && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.35)',
+            zIndex: 10000,
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeSpecPopover();
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            style={{
+              position: 'fixed',
+              left: specPopover.position.x,
+              top: specPopover.position.y,
+              transform: 'translate(-50%, 12px)',
+              width: 'min(360px, calc(100vw - 24px))',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              boxShadow: '2px 2px 10px rgba(0,0,0,0.25)',
+              padding: '10px',
+              borderRadius: 6,
+              color: 'var(--text)',
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ fontSize: '8pt', fontWeight: 800 }}>
+                  {specPopover.def.kind === 'engine' ? 'ENGINE' : 'TRANSMISSION'}
+                </div>
+                <div style={{ fontSize: '10pt', fontWeight: 800, lineHeight: 1.1 }}>
+                  {specPopover.def.title}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="button-win95"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  closeSpecPopover();
+                }}
+                style={{ height: 22, padding: '0 8px', fontSize: '8pt' }}
+              >
+                CLOSE
+              </button>
+            </div>
+
+            <div style={{ marginTop: '8px', fontSize: '9pt', lineHeight: 1.25 }}>
+              {specPopover.def.summary}
+            </div>
+
+            {Array.isArray(specPopover.def.details) && specPopover.def.details.length > 0 && (
+              <ul style={{ margin: '8px 0 0 16px', padding: 0, fontSize: '8.5pt', lineHeight: 1.25 }}>
+                {specPopover.def.details.slice(0, 6).map((d, i) => (
+                  <li key={i} style={{ marginBottom: '4px' }}>{d}</li>
+                ))}
+              </ul>
+            )}
+
+            {!specPopover.def.known && (
+              <div style={{ marginTop: '8px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                Not mapped yet. As we expand canonical tables and field sources, this panel will become authoritative.
+              </div>
+            )}
+          </div>
         </div>
       )}
 
