@@ -1,0 +1,59 @@
+name: Scrape Quality Monitor (Import Queue → Vehicles)
+
+on:
+  schedule:
+    # Daily at 08:15 UTC
+    - cron: '15 8 * * *'
+  workflow_dispatch:
+    inputs:
+      since_hours:
+        description: 'How far back to evaluate completed import_queue items'
+        required: false
+        default: '24'
+      domain:
+        description: 'Optional: filter to a single listing domain (e.g. exclusivemotorclub.com)'
+        required: false
+        default: ''
+      fail_on_any_bad:
+        description: 'Fail workflow if any bad outcomes are found'
+        required: false
+        default: 'true'
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run scrape quality monitor
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SINCE_HOURS: ${{ github.event.inputs.since_hours || '24' }}
+          DOMAIN: ${{ github.event.inputs.domain || '' }}
+          FAIL_ON_ANY_BAD: ${{ github.event.inputs.fail_on_any_bad || 'true' }}
+        run: |
+          args="--since-hours ${SINCE_HOURS}"
+          if [ -n "${DOMAIN}" ]; then args="$args --domain ${DOMAIN}"; fi
+          if [ "${FAIL_ON_ANY_BAD}" = "true" ]; then args="$args --fail-on-any-bad"; fi
+          echo "Running: npm run monitor:scrape-quality -- $args"
+          npm run monitor:scrape-quality -- $args
+
+      - name: Upload report artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-quality-report
+          path: reports/scrape-quality/
+          retention-days: 30
+

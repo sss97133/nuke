@@ -133,6 +133,27 @@ export default function VehicleAuctionQuickStartCard(props: {
     navigate(`/auction/${listingId}`);
   };
 
+  const openModalWithDefaults = () => {
+    setSubmitError(null);
+    setReadinessIssues(null);
+
+    // Defaults for quick-start: 2-minute live auction with a sane starting bid.
+    setSaleType('live_auction');
+    setStartingBidUsd('1000');
+    setHasReserve(false);
+    setReserveUsd('');
+    setDurationDays(7);
+    setDurationMinutes(2);
+    setStartMode('now');
+
+    // If the user switches to scheduling, default to ~1 hour from now.
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    setScheduledDate(getLocalDateInputValue(d));
+    setScheduledTime(getLocalTimeInputValue(d));
+
+    setShowModal(true);
+  };
+
   const handleStartExistingDraft = async () => {
     if (!listing?.id) return;
     setSubmitting(true);
@@ -217,7 +238,31 @@ export default function VehicleAuctionQuickStartCard(props: {
         .select('id')
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        const status = (insertError as any)?.status;
+        const code = String((insertError as any)?.code || '');
+        // Unique violation (e.g. draft already exists). Open the existing draft/active listing instead of failing.
+        if (status === 409 || code === '23505') {
+          const { data: existing, error: qErr } = await supabase
+            .from('vehicle_listings')
+            .select('id, status')
+            .eq('vehicle_id', vehicle.id)
+            .in('status', ['draft', 'active'])
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (!qErr) {
+            const row = Array.isArray(existing) && existing.length > 0 ? (existing[0] as any) : null;
+            const existingId = String(row?.id || '');
+            if (existingId) {
+              setShowModal(false);
+              await loadLatestListing();
+              openListing(existingId);
+              return;
+            }
+          }
+        }
+        throw insertError;
+      }
       const listingId = String((inserted as any)?.id || '');
       if (!listingId) throw new Error('Failed to create listing');
 
@@ -252,6 +297,7 @@ export default function VehicleAuctionQuickStartCard(props: {
   const canOpen = Boolean(listing?.id);
   const isDraft = listing?.status === 'draft';
   const isActive = listing?.status === 'active';
+  const canCreateNew = !isDraft && !isActive;
 
   const modalNode = showModal ? (
     // Render the modal in a portal to avoid "position: fixed" being scoped by transformed ancestors,
@@ -494,11 +540,13 @@ export default function VehicleAuctionQuickStartCard(props: {
                 <button
                   className="button"
                   style={{ fontSize: '9pt' }}
-                  onClick={() => {
-                    setSubmitError(null);
-                    setReadinessIssues(null);
-                    setShowModal(true);
-                  }}
+                  disabled={!canCreateNew}
+                  title={
+                    canCreateNew
+                      ? 'Create a new auction'
+                      : 'You already have a draft or active auction. Open it (or cancel it) before creating a new one.'
+                  }
+                  onClick={() => canCreateNew && openModalWithDefaults()}
                 >
                   New Auction
                 </button>
@@ -516,9 +564,7 @@ export default function VehicleAuctionQuickStartCard(props: {
                 className="button button-primary"
                 style={{ fontSize: '9pt', width: 'fit-content' }}
                 onClick={() => {
-                  setSubmitError(null);
-                  setReadinessIssues(null);
-                  setShowModal(true);
+                  openModalWithDefaults();
                 }}
               >
                 Auction This Vehicle

@@ -9,6 +9,54 @@ import type { VehicleBasicInfoProps} from './types';
 import { useToast } from '../../components/ui/Toast';
 import { supabase } from '../../lib/supabase';
 
+async function getEdgeFunctionErrorMessage(err: any): Promise<string> {
+  try {
+    const fallback =
+      (typeof err?.message === 'string' && err.message.trim()) ||
+      (typeof err?.details === 'string' && err.details.trim()) ||
+      'Request failed';
+
+    // Supabase FunctionsHttpError: error.context is typically a fetch Response.
+    const ctx: any = err?.context;
+    if (ctx && typeof ctx.clone === 'function') {
+      const res: any = ctx;
+      const status = typeof res.status === 'number' ? res.status : null;
+
+      try {
+        const json = await res.clone().json();
+        if (typeof json === 'string' && json.trim()) return status ? `${status}: ${json}` : json;
+        if (json && typeof json === 'object') {
+          const msg =
+            (typeof (json as any).error === 'string' && (json as any).error.trim()) ||
+            (typeof (json as any).message === 'string' && (json as any).message.trim()) ||
+            (typeof (json as any).details === 'string' && (json as any).details.trim()) ||
+            '';
+          if (msg) return status ? `${status}: ${msg}` : msg;
+          try {
+            const s = JSON.stringify(json);
+            if (s && s !== '{}' && s !== 'null') return status ? `${status}: ${s}` : s;
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        // ignore and try text() fallback below
+      }
+
+      try {
+        const text = await res.clone().text();
+        if (typeof text === 'string' && text.trim()) return status ? `${status}: ${text.trim()}` : text.trim();
+      } catch {
+        // ignore
+      }
+    }
+
+    return fallback;
+  } catch {
+    return (typeof err?.message === 'string' && err.message.trim()) || 'Request failed';
+  }
+}
+
 const CRAIGSLIST_FIELD_KEYS = new Set([
   'fuel_type',
   'drivetrain',
@@ -275,7 +323,8 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
       navigate(`/vehicle/${newVehicleId}`);
     } catch (err: any) {
       console.error('Split failed:', err);
-      showToast(err?.message || 'Failed to split vehicle from listing', 'error', 4200);
+      const msg = await getEdgeFunctionErrorMessage(err);
+      showToast(msg || 'Failed to split vehicle from listing', 'error', 5200);
     }
   }, [canEdit, listingUrl, navigate, showToast, vehicle?.id]);
 
