@@ -64,6 +64,8 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
   onClaimClick,
   userOwnershipClaim,
   suppressExternalListing = false,
+  leadImageUrl = null,
+  liveSession = null,
   auctionPulse = null
 }) => {
   const navigate = useNavigate();
@@ -4129,6 +4131,202 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
           )}
         </div>
       </div>
+
+      {/* Sticky live auction rail: keep comments + car view in-frame */}
+      {(() => {
+        const v: any = vehicle as any;
+        const streamUrl = liveSession?.stream_url ? String(liveSession.stream_url).trim() : '';
+        const hasStream = Boolean(streamUrl);
+
+        const pulseUrl = auctionPulse?.listing_url ? String(auctionPulse.listing_url).trim() : '';
+        const fallbackListingUrl = String(v?.bat_auction_url || v?.discovery_url || v?.listing_url || '').trim();
+        const listingUrl = pulseUrl || fallbackListingUrl;
+        const showAuctionRail = Boolean(isAuctionLive && listingUrl);
+
+        if (!showAuctionRail && !hasStream) return null;
+
+        const currentBid =
+          auctionPulse && typeof auctionPulse.current_bid === 'number' && Number.isFinite(auctionPulse.current_bid) && auctionPulse.current_bid > 0
+            ? auctionPulse.current_bid
+            : null;
+
+        const commentCount =
+          auctionPulse && typeof auctionPulse.comment_count === 'number' && Number.isFinite(auctionPulse.comment_count) && auctionPulse.comment_count >= 0
+            ? auctionPulse.comment_count
+            : null;
+
+        const lastCommentAt = auctionPulse?.last_comment_at ? String(auctionPulse.last_comment_at) : null;
+        const lastCommentMs = lastCommentAt ? new Date(lastCommentAt).getTime() : NaN;
+        const hasFreshComment =
+          Number.isFinite(lastCommentMs) && auctionNow - lastCommentMs >= 0 && auctionNow - lastCommentMs < 5 * 60 * 1000;
+
+        const thumbRaw = leadImageUrl ? String(leadImageUrl).trim() : '';
+        const thumbSrc = thumbRaw && thumbRaw !== 'undefined' && thumbRaw !== 'null' ? thumbRaw : null;
+
+        return (
+          <div
+            style={{
+              flex: '0 0 100%',
+              width: '100%',
+              borderTop: '1px solid var(--border)',
+              padding: '4px 0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+              boxSizing: 'border-box',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: '1 1 auto' }}>
+              {thumbSrc ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const el = document.getElementById('vehicle-hero');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  title="Jump to vehicle photos"
+                  aria-label="Jump to vehicle photos"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 3,
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg)',
+                    padding: 0,
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <img
+                    src={thumbSrc}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                </button>
+              ) : null}
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, minWidth: 0, fontSize: '8pt' }}>
+                {showAuctionRail ? (
+                  <>
+                    <span
+                      className={isAuctionLive ? 'auction-live-dot' : undefined}
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 999,
+                        background: isAuctionLive ? '#dc2626' : '#94a3b8',
+                        display: 'inline-block',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontWeight: 800, fontFamily: 'monospace' }}>LIVE AUCTION</span>
+                    {timerEndDate ? (
+                      <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                        {formatCountdownClock(timerEndDate, true) || formatRemaining(timerEndDate) || '—'}
+                      </span>
+                    ) : null}
+                    {typeof currentBid === 'number' ? <span style={{ fontWeight: 800 }}>Bid {formatCurrency(currentBid)}</span> : null}
+                    {typeof commentCount === 'number' ? (
+                      <span style={{ color: 'var(--text-muted)' }}>{commentCount} comments</span>
+                    ) : null}
+                    {lastCommentAt ? (
+                      <span style={{ color: 'var(--text-muted)' }}>last {formatAge(lastCommentAt) || '—'} ago</span>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 999,
+                        background: '#dc2626',
+                        display: 'inline-block',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontWeight: 800, fontFamily: 'monospace' }}>LIVE</span>
+                    {liveSession?.title ? (
+                      <span style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {String(liveSession.title)}
+                      </span>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {hasStream ? (
+                <a
+                  href={streamUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button button-small"
+                  style={{ fontSize: '8pt', fontWeight: 800, fontFamily: 'monospace', whiteSpace: 'nowrap' }}
+                  title={liveSession?.platform ? `Watch live (${liveSession.platform})` : 'Watch live'}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  WATCH
+                </a>
+              ) : null}
+
+              {showAuctionRail && listingUrl ? (
+                <a
+                  href={listingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button button-small"
+                  style={{ fontSize: '8pt', fontWeight: 800, fontFamily: 'monospace', whiteSpace: 'nowrap' }}
+                  title="Open live auction on platform"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  BID
+                </a>
+              ) : null}
+
+              <button
+                type="button"
+                className="button button-small"
+                style={{
+                  fontSize: '8pt',
+                  fontWeight: 800,
+                  fontFamily: 'monospace',
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const el = document.getElementById('vehicle-comments');
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                title="Jump to comments & bids"
+              >
+                {hasFreshComment ? (
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 999,
+                      background: '#dc2626',
+                      display: 'inline-block',
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : null}
+                COMMENTS{typeof commentCount === 'number' ? ` (${commentCount})` : ''}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {showTrade && (
         <div

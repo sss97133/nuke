@@ -120,6 +120,15 @@ export interface VehicleHeaderProps {
   } | null;
   suppressExternalListing?: boolean;
   /**
+   * Optional lead image URL so the sticky header can keep a live "car view" in-frame.
+   * Prefer passing the already-resolved hero image URL (includes fallbacks).
+   */
+  leadImageUrl?: string | null;
+  /**
+   * Optional live streaming session for the vehicle, if active.
+   */
+  liveSession?: LiveSession | null;
+  /**
    * Optional, derived "bustling auction" snapshot for the header.
    * When present, the header can deprioritize claim CTAs and instead show live auction telemetry.
    */
