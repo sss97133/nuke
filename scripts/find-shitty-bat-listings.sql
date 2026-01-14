@@ -42,9 +42,8 @@ external_listing_stats AS (
   SELECT
     el.vehicle_id,
     COUNT(*) as external_listing_count,
-    MAX(el.current_bid) as max_current_bid,
-    MAX(el.end_date) as max_end_date,
-    MAX(el.listing_status) as listing_status,
+    MAX(el.current_bid) FILTER (WHERE el.listing_status = 'active' OR el.listing_status = 'live') as active_current_bid,
+    MAX(el.end_date) FILTER (WHERE el.listing_status = 'active' OR el.listing_status = 'live') as active_end_date,
     BOOL_OR(el.listing_status = 'active') as has_active_listing
   FROM external_listings el
   WHERE el.vehicle_id IN (SELECT vehicle_id FROM bat_vehicles)
@@ -63,8 +62,8 @@ SELECT
   COALESCE(img.low_res_images, 0) as low_res_count,
   COALESCE(img.bat_hosted_images, 0) as bat_hosted_count,
   COALESCE(ext.external_listing_count, 0) as external_listing_count,
-  ext.max_current_bid,
-  ext.max_end_date,
+  ext.active_current_bid,
+  ext.active_end_date,
   ext.has_active_listing,
   -- Issue flags
   CASE 
@@ -73,8 +72,8 @@ SELECT
     WHEN COALESCE(img.queue_images, 0) > 0 THEN 'QUEUE_BADGES'
     WHEN COALESCE(img.low_res_images, 0) > 0 THEN 'LOW_RES_IMAGES'
     WHEN COALESCE(ext.external_listing_count, 0) = 0 AND bv.current_bid IS NULL THEN 'MISSING_AUCTION_DATA'
-    WHEN ext.max_current_bid IS NULL AND ext.has_active_listing THEN 'MISSING_CURRENT_BID'
-    WHEN ext.max_end_date IS NULL AND ext.has_active_listing THEN 'MISSING_END_DATE'
+    WHEN ext.active_current_bid IS NULL AND ext.has_active_listing THEN 'MISSING_CURRENT_BID'
+    WHEN ext.active_end_date IS NULL AND ext.has_active_listing THEN 'MISSING_END_DATE'
     ELSE 'OK'
   END as primary_issue,
   -- All issues as array
@@ -85,8 +84,8 @@ SELECT
     CASE WHEN COALESCE(img.low_res_images, 0) > 0 THEN 'LOW_RES_IMAGES' END,
     CASE WHEN COALESCE(img.bat_import_images, 0) = 0 AND COALESCE(img.total_images, 0) > 0 THEN 'WRONG_SOURCE' END,
     CASE WHEN COALESCE(ext.external_listing_count, 0) = 0 AND bv.current_bid IS NULL THEN 'MISSING_AUCTION_DATA' END,
-    CASE WHEN ext.max_current_bid IS NULL AND ext.has_active_listing THEN 'MISSING_CURRENT_BID' END,
-    CASE WHEN ext.max_end_date IS NULL AND ext.has_active_listing THEN 'MISSING_END_DATE' END
+    CASE WHEN ext.active_current_bid IS NULL AND ext.has_active_listing THEN 'MISSING_CURRENT_BID' END,
+    CASE WHEN ext.active_end_date IS NULL AND ext.has_active_listing THEN 'MISSING_END_DATE' END
   ], NULL) as all_issues,
   bv.created_at
 FROM bat_vehicles bv

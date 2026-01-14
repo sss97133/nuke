@@ -286,25 +286,9 @@ const VehicleProfile: React.FC = () => {
   const buildAuctionPulseFromExternalListings = useCallback((rows: any[], vehicleIdForRows: string) => {
     let arr = Array.isArray(rows) ? rows.filter((r) => r && r.listing_url && r.platform) : [];
     if (arr.length === 0) return null;
-    
-    // Filter out stale "active" listings if vehicle is sold (check vehicle data if available)
-    // This prevents showing old bid amounts when vehicle has been sold
-    const vehicleData = (window as any).__vehicleProfileRpcData?.vehicle;
-    const vehicleOutcome = String(vehicleData?.auction_outcome || '').toLowerCase();
-    const vehicleSaleStatus = String(vehicleData?.sale_status || '').toLowerCase();
-    // IMPORTANT: sale_price alone is not a "sold" signal (it can be a high bid for RNM/no-sale auctions).
-    const vehicleIsSold = vehicleSaleStatus === 'sold' || vehicleOutcome === 'sold';
-    
-    if (vehicleIsSold) {
-      // Remove "active" listings when vehicle is sold - they're stale
-      const filtered = arr.filter(r => {
-        const status = String(r.listing_status || '').toLowerCase();
-        return status !== 'active' && status !== 'live';
-      });
-      if (filtered.length > 0) {
-        arr = filtered;
-      }
-    }
+    // NOTE: We intentionally do NOT globally drop active listings when a vehicle has a historical sale.
+    // Relists exist (e.g. BaT "-2" URLs), and we want the pulse to reflect the current live auction when present.
+    // Duplicate rows for the *same* listing URL are merged below.
 
     const now = Date.now();
     const toLower = (v: any) => String(v || '').toLowerCase();
@@ -502,16 +486,51 @@ const VehicleProfile: React.FC = () => {
     const mergedGroups = Array.from(byUrl.values()).map(mergeGroup).filter(Boolean) as any[];
     if (mergedGroups.length === 0) return null;
 
+    // Selection rules:
+    // - Prefer a *real* active auction (future end_date within platform horizon)
+    // - Else prefer the most recent SOLD by sold_at (handles relists cleanly)
+    // - Else fall back to freshest updated_at
+    const activeCandidates = mergedGroups.filter((g) => {
+      const status = toLower(g?.listing_status);
+      if (status !== 'active' && status !== 'live') return false;
+      const end = parseTs(g?.end_date);
+      return Number.isFinite(end) && end > now;
+    });
+
+    if (activeCandidates.length > 0) {
+      activeCandidates.sort((a, b) => {
+        const ae = parseTs(a?.end_date);
+        const be = parseTs(b?.end_date);
+        if (Number.isFinite(ae) && Number.isFinite(be) && ae !== be) return ae - be; // soonest-ending first
+        const au = parseTs(a?.updated_at);
+        const bu = parseTs(b?.updated_at);
+        if (Number.isFinite(au) && Number.isFinite(bu) && au !== bu) return bu - au;
+        return 0;
+      });
+      return activeCandidates[0] || null;
+    }
+
+    const soldCandidates = mergedGroups.filter((g) => {
+      const status = toLower(g?.listing_status);
+      const final = typeof g?.final_price === 'number' ? g.final_price : Number.NaN;
+      const soldAt = parseTs(g?.sold_at);
+      return status === 'sold' && ((Number.isFinite(final) && final > 0) || Number.isFinite(soldAt));
+    });
+
+    if (soldCandidates.length > 0) {
+      soldCandidates.sort((a, b) => {
+        const as = parseTs(a?.sold_at);
+        const bs = parseTs(b?.sold_at);
+        if (Number.isFinite(as) && Number.isFinite(bs) && as !== bs) return bs - as; // newest sale first
+        const au = parseTs(a?.updated_at);
+        const bu = parseTs(b?.updated_at);
+        if (Number.isFinite(au) && Number.isFinite(bu) && au !== bu) return bu - au;
+        return 0;
+      });
+      return soldCandidates[0] || null;
+    }
+
     mergedGroups.sort((a, b) => {
-      const as = scoreRow(a);
-      const bs = scoreRow(b);
-      if (as !== bs) return bs - as;
-      const ae = parseTs(a?.end_date);
-      const be = parseTs(b?.end_date);
-      const aFuture = Number.isFinite(ae) ? ae > now : false;
-      const bFuture = Number.isFinite(be) ? be > now : false;
-      if (aFuture !== bFuture) return aFuture ? -1 : 1;
-      if (aFuture && bFuture && ae !== be) return ae - be;
       const au = parseTs(a?.updated_at);
       const bu = parseTs(b?.updated_at);
       if (Number.isFinite(au) && Number.isFinite(bu) && au !== bu) return bu - au;
@@ -3425,6 +3444,9 @@ const VehicleProfile: React.FC = () => {
                 valuationIntel={valuationIntel as any}
                 readinessSnapshot={readinessSnapshot as any}
               />
+
+              {/* Auction history / external listings (supports relists like BaT "-2") */}
+              <ExternalListingCard vehicleId={vehicle.id} />
 
               <VehicleAuctionQuickStartCard
                 vehicle={{

@@ -45,7 +45,16 @@ SELECT
   el.current_bid,
   el.bid_count
 FROM vehicles v
-LEFT JOIN external_listings el ON el.vehicle_id = v.id
+LEFT JOIN LATERAL (
+  SELECT
+    el.listing_url,
+    el.current_bid,
+    el.bid_count
+  FROM external_listings el
+  WHERE el.vehicle_id = v.id
+  ORDER BY COALESCE(el.sold_at, el.end_date, el.updated_at) DESC NULLS LAST, el.updated_at DESC
+  LIMIT 1
+) el ON true
 WHERE v.created_at > NOW() - INTERVAL '1 hour'
    OR v.updated_at > NOW() - INTERVAL '1 hour'
 ORDER BY v.created_at DESC, v.updated_at DESC

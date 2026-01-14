@@ -59,7 +59,7 @@ SELECT
   
   -- External listing URL (if exists)
   COALESCE(
-    (SELECT listing_url FROM external_listings el WHERE el.vehicle_id = v.id LIMIT 1),
+    (SELECT listing_url FROM external_listings el WHERE el.vehicle_id = v.id ORDER BY COALESCE(el.sold_at, el.end_date, el.updated_at) DESC NULLS LAST, el.updated_at DESC LIMIT 1),
     (SELECT url FROM vehicle_listings vl WHERE vl.vehicle_id = v.id LIMIT 1),
     v.source_url
   ) as external_url,
