@@ -102,6 +102,15 @@ function mapAzureToParsed(result: any) {
   return parsed;
 }
 
+async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
+  // Use pdf-parse (works in non-DOM runtimes) instead of pdfjs-dist workers.
+  const mod: any = await import('https://cdn.skypack.dev/pdf-parse@1.1.1');
+  const pdfParse: any = mod?.default ?? mod;
+  if (typeof pdfParse !== 'function') throw new Error('pdf-parse import failed');
+  const data: any = await pdfParse(bytes);
+  return String(data?.text || '');
+}
+
 function parseMoneyText(input: string | null | undefined): number | null {
   if (!input) return null;
   const s = String(input).trim();
@@ -125,6 +134,51 @@ function normalizeDateString(input: string | null | undefined): string | null {
     return `${y}-${mm}-${dd}`;
   }
   return s;
+}
+
+function parsePdfTextDeterministic(fullText: string) {
+  const findMoney = (re: RegExp) => {
+    const m = fullText.match(re);
+    return m?.[1] ? parseMoneyText(m[1]) : null;
+  };
+
+  const vendorName =
+    /\bebay\b/i.test(fullText) ? 'eBay' :
+    /\bpaypal\b/i.test(fullText) ? 'PayPal' :
+    /\bamazon\b/i.test(fullText) ? 'Amazon' :
+    null;
+
+  const receiptDateRaw =
+    (fullText.match(/\b(?:order\s+placed|date)\s*[:\-]?\s*([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4})/i)?.[1] ?? null) ||
+    (fullText.match(/\b([0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4})\b/)?.[1] ?? null);
+  const receiptDate = normalizeDateString(receiptDateRaw);
+
+  const shipping =
+    findMoney(/(?:\bshipping\b)\s*[:\-]?\s*\$?\s*([0-9,]+\.[0-9]{2})/i);
+
+  const tax =
+    findMoney(/(?:\btax\b)\s*(?:\([^)]*\))?\s*[:\-]?\s*\$?\s*([0-9,]+\.[0-9]{2})/i);
+
+  const subtotal =
+    findMoney(/(?:\bsubtotal\b)\s*[:\-]?\s*\$?\s*([0-9,]+\.[0-9]{2})/i);
+
+  const total =
+    findMoney(/(?:order\s+total)\s*[:\-]?\s*\$?\s*([0-9,]+\.[0-9]{2})/i) ??
+    findMoney(/(?:\btotal\b)\s*[:\-]?\s*\$?\s*([0-9,]+\.[0-9]{2})/i);
+
+  return {
+    vendor_name: vendorName,
+    receipt_date: receiptDate,
+    currency: 'USD',
+    subtotal,
+    shipping,
+    tax,
+    total,
+    items: [],
+    confidence: 0.35,
+    parser: 'pdf_parse_regex_v1',
+    raw_text: fullText.slice(0, 12000)
+  };
 }
 
 async function analyzeWithAwsTextractExpense(bytes: Uint8Array) {
@@ -232,6 +286,7 @@ serve(async (req: Request) => {
       Deno.env.get('OPEN_AI_API_KEY') ||
       Deno.env.get('openai_api_key');
     const hasAzure = Boolean(Deno.env.get('AZURE_FORM_RECOGNIZER_ENDPOINT') && Deno.env.get('AZURE_FORM_RECOGNIZER_KEY'));
+    const isPdf = String(mimeType || '').toLowerCase() === 'application/pdf';
 
     // Prefer AWS API Gateway if configured
     if (provider === 'aws' || awsEndpoint) {
@@ -295,6 +350,53 @@ serve(async (req: Request) => {
         throw new Error('AWS gateway failed for all candidate endpoints');
       } catch (awsError) {
         console.log('AWS parsing failed, falling back to OpenAI:', awsError);
+      }
+    }
+
+    // PDF text extraction (no DOM / worker required). This is the primary fix for "document is not defined".
+    if (isPdf) {
+      try {
+        const bytes = await fetchFileBytes({ url, bucket, path });
+        const fullText = await extractTextFromPdf(bytes);
+        const hasText = fullText.trim().length >= 40;
+        if (hasText) {
+          if (openaiKey) {
+            try {
+              const openaiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${openaiKey}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model: 'gpt-4o',
+                  messages: [{
+                    role: 'user',
+                    content: `Extract invoice/receipt data from this text. Return JSON with: vendor_name, receipt_date (YYYY-MM-DD), subtotal, tax, shipping, total, items array (each with: description, quantity, unit_price, total_price, part_number if available). If field not found, use null.\n\nText:\n${fullText.slice(0, 8000)}`
+                  }],
+                  response_format: { type: 'json_object' },
+                  max_tokens: 2000
+                })
+              });
+              if (openaiResp.ok) {
+                const data = await openaiResp.json();
+                const content = data.choices?.[0]?.message?.content;
+                if (content) {
+                  const parsed = JSON.parse(content);
+                  return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+                }
+              }
+            } catch (e) {
+              console.log('[receipt-extract] OpenAI PDF parse failed; falling back to regex:', e);
+            }
+          }
+
+          const parsed = parsePdfTextDeterministic(fullText);
+          return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
+      } catch (e: any) {
+        console.log('[receipt-extract] PDF text extraction failed:', e?.message || String(e));
+        // continue to Textract/Azure fallbacks (useful for scanned PDFs)
       }
     }
 

@@ -185,63 +185,7 @@ export const SmartInvoiceUploader: React.FC<SmartInvoiceUploaderProps> = ({ vehi
       // 1. Try Azure Form Recognizer (fast, structured)
       tasks.push(receiptExtractionService.extract({ url: prepared.publicUrl, mimeType: mimeType || 'application/octet-stream' }).catch(() => undefined));
 
-      // 2. For PDFs: Try OpenAI Vision (best for scanned documents/appraisals)
-      if (mimeType && /application\/pdf/.test(mimeType)) {
-        setMessage('Analyzing PDF with GPT-4 Vision...');
-        tasks.push((async () => {
-          try {
-            // Convert first page of PDF to image
-            const pdfjs = await import('pdfjs-dist');
-            pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-            const pdf = await pdfjs.getDocument(prepared.publicUrl).promise;
-            const page = await pdf.getPage(1);
-            const viewport = page.getViewport({ scale: 2.0 });
-            const canvas = document.createElement('canvas');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            const ctx = canvas.getContext('2d')!;
-            await page.render({ canvasContext: ctx, viewport }).promise;
-            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-
-            // Send to OpenAI Vision
-            const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
-            if (!openaiKey) throw new Error('OpenAI API key not configured');
-            
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${openaiKey}`
-              },
-              body: JSON.stringify({
-                model: 'gpt-4-vision-preview',
-                messages: [{
-                  role: 'user',
-                  content: [
-                    { type: 'text', text: 'Extract receipt/invoice data from this document. Return JSON with: vendor_name, receipt_date (YYYY-MM-DD), total, tax, subtotal, items (array of {description, quantity, unit_price, total_price}). For appraisals, treat appraised value as total.' },
-                    { type: 'image_url', image_url: { url: imageDataUrl } }
-                  ]
-                }],
-                max_tokens: 1000
-              })
-            });
-
-            if (!response.ok) throw new Error('OpenAI Vision failed');
-            const result = await response.json();
-            const content = result.choices?.[0]?.message?.content || '';
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              const parsed = JSON.parse(jsonMatch[0]);
-              return parsed as ParsedReceipt;
-            }
-          } catch (err) {
-            console.warn('PDF Vision parse failed:', err);
-          }
-          return undefined;
-        })());
-      }
-
-      // 3. For images: Try Tesseract OCR
+      // 2. For images: Try Tesseract OCR (fallback when server-side extraction fails)
       if (mimeType && /image\//.test(mimeType)) {
         setMessage('Running OCR...');
         const Tesseract = (await import('tesseract.js')).default as any;
