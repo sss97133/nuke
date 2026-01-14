@@ -4,6 +4,7 @@ import { supabase, SUPABASE_URL } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { UserInteractionService } from '../services/userInteractionService';
 import { usePageTitle } from '../hooks/usePageTitle';
+import { getCanonicalBodyStyle } from '../services/bodyStyleTaxonomy';
 
 interface HypeVehicle {
   id: string;
@@ -986,9 +987,12 @@ const CursorHomepage: React.FC = () => {
     }
     // Body style filter (car type)
     if (filters.bodyStyles.length > 0) {
+      const selectedCanon = filters.bodyStyles
+        .map((bs) => getCanonicalBodyStyle(bs))
+        .filter(Boolean) as any[];
       result = result.filter(v => {
-        const bodyStyle = ((v as any).body_style || '').toLowerCase();
-        return filters.bodyStyles.some(bs => bodyStyle.includes(bs.toLowerCase()));
+        const canon = getCanonicalBodyStyle((v as any).canonical_body_style || (v as any).body_style);
+        return canon ? selectedCanon.includes(canon) : false;
       });
     }
     // 4x4/4WD/AWD filter
@@ -4116,6 +4120,10 @@ const CursorHomepage: React.FC = () => {
                       { label: 'Truck', values: ['Pickup', 'Truck'] },
                       { label: 'SUV', values: ['SUV'] },
                       { label: 'Van', values: ['Van', 'Minivan'] },
+                      { label: 'Motorcycle', values: ['Motorcycle'] },
+                      { label: 'RV', values: ['RV'] },
+                      { label: 'Trailer', values: ['Trailer'] },
+                      { label: 'Boat', values: ['Boat'] },
                     ].map(({ label, values }) => {
                       const isSelected = values.some(v => filters.bodyStyles.includes(v));
                       return (
@@ -4166,7 +4174,7 @@ const CursorHomepage: React.FC = () => {
                   </div>
                   {/* Specific body styles */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {['Coupe', 'Sedan', 'Convertible', 'Wagon', 'Pickup', 'SUV', 'Roadster', 'Fastback'].map((style) => (
+                    {['Coupe', 'Sedan', 'Convertible', 'Wagon', 'Hatchback', 'Fastback', 'Roadster', 'Pickup', 'SUV', 'Van', 'Minivan', 'Motorcycle', 'RV', 'Trailer', 'Boat'].map((style) => (
                       <button
                         key={style}
                         onClick={() => {

@@ -4,6 +4,7 @@ import { FaviconIcon } from '../common/FaviconIcon';
 import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
 import { UserInteractionService } from '../../services/userInteractionService';
 import { getEngineDefinition, getTransmissionDefinition, type PowertrainSpecDefinition } from '../../services/powertrainDefinitionService';
+import { getBodyStyleDisplay } from '../../services/bodyStyleTaxonomy';
 import ResilientImage from '../images/ResilientImage';
 import { OdometerBadge } from '../vehicle/OdometerBadge';
 import { useVehicleImages } from '../../hooks/useVehicleImages';
@@ -2064,23 +2065,21 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
             const drivetrainRaw = (v?.drivetrain || '').toString().trim();
             const drive = drivetrainRaw.toLowerCase();
+            // Keep the token row niche-first: only show drivetrain/config when it is high-signal.
+            // (Trucks/SUVs: 4x4/AWD is meaningful; cars: RWD/FWD usually isn’t.)
             const configLabel =
-              drive.includes('4x4') || drive.includes('4wd') ? '4x4' :
-              (drive.includes('awd') ? 'AWD' :
-              (drive.includes('fwd') ? 'FWD' :
-              (drive.includes('rwd') ? 'RWD' :
-              (drive.includes('2wd') ? '2WD' : ''))));
-            if (configLabel) {
-              tokens.push({ kind: 'config', label: configLabel, raw: configLabel, clickable: false });
-            }
+              (drive.includes('4x4') || drive.includes('4wd')) ? '4x4' :
+              (drive.includes('awd') ? 'AWD' : '');
+            if (configLabel) tokens.push({ kind: 'config', label: configLabel, raw: configLabel, clickable: false });
 
             const bodyStyleRaw = (v?.body_style || '').toString().trim();
             if (bodyStyleRaw) {
+              const display = getBodyStyleDisplay(bodyStyleRaw) || bodyStyleRaw;
               const short = bodyStyleRaw.replace(/\s+/g, ' ').trim();
               tokens.push({
                 kind: 'type',
-                label: short.length > 18 ? `${short.slice(0, 18)}…` : short,
-                raw: short,
+                label: display.length > 18 ? `${display.slice(0, 18)}…` : display,
+                raw: display,
                 clickable: false,
               });
             }

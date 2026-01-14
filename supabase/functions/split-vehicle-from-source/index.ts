@@ -17,6 +17,20 @@ function isBaT(url: string) {
   return url.toLowerCase().includes("bringatrailer.com");
 }
 
+function normalizeUrl(url: string) {
+  // Normalize trailing slashes so DB joins are consistent (BaT uses both forms).
+  return url.replace(/\/+$/, "");
+}
+
+function normalizeVin(raw: string) {
+  // VINs (esp. pre-1981 chassis numbers) can be non-17-digit; normalize to alnum.
+  return (raw || "")
+    .toString()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .trim();
+}
+
 function safeJsonError(message: string, status = 400) {
   return new Response(JSON.stringify({ success: false, error: message }), {
     status,
@@ -173,10 +187,36 @@ async function scrapeBasicBaT(batUrl: string): Promise<{
     }
   }
 
-  const vinMatch =
+  // VIN extraction: BaT often uses "Chassis:" for classic cars with non‑17‑digit VINs.
+  // We do a lightweight HTML->text pass to make this resilient to markup changes.
+  const textOnly = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const vinCandidates: string[] = [];
+  const structuredMatch =
+    html.match(/<li>\s*(?:VIN|Chassis)\s*:\s*(?:<a[^>]*>)?\s*([A-Za-z0-9\-]{5,25})/i) ||
+    textOnly.match(/\b(?:VIN|Chassis)(?:\s*(?:Number|No\.|#))?\s*:\s*([A-Za-z0-9\-]{5,25})\b/i);
+
+  if (structuredMatch?.[1]) {
+    const normalized = normalizeVin(structuredMatch[1]);
+    if (normalized.length >= 5 && normalized.length <= 25) vinCandidates.push(normalized);
+  }
+
+  // Back-compat: older logic for 17-digit VINs (still useful).
+  const strict17 =
     html.match(/(?:VIN|Chassis)[:\s]+([A-HJ-NPR-Z0-9]{17})/i) ||
     html.match(/<li>Chassis:\s*<a[^>]*>([A-HJ-NPR-Z0-9]{17})<\/a><\/li>/i);
-  const vin = vinMatch ? vinMatch[1].toUpperCase() : undefined;
+  if (strict17?.[1]) {
+    const normalized = normalizeVin(strict17[1]);
+    if (normalized.length === 17) vinCandidates.push(normalized);
+  }
+
+  // Prefer 17-digit VIN when present, otherwise take the first candidate.
+  const vin = vinCandidates.find((v) => v.length === 17) ?? vinCandidates[0];
 
   return { year, make, model, vin, title };
 }
@@ -192,7 +232,8 @@ serve(async (req) => {
     const { vehicleId, sourceUrl, reason, force } = body || ({} as any);
 
     if (!vehicleId || !sourceUrl) return safeJsonError("vehicleId and sourceUrl are required", 400);
-    if (!isBaT(sourceUrl)) return safeJsonError("Only Bring a Trailer URLs are supported for split right now", 400);
+    const canonicalSourceUrl = normalizeUrl(sourceUrl);
+    if (!isBaT(canonicalSourceUrl)) return safeJsonError("Only Bring a Trailer URLs are supported for split right now", 400);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -208,40 +249,38 @@ serve(async (req) => {
     // Load current vehicle VIN (anchor VIN). Treat VIVA-* as unknown placeholder.
     const { data: currentVehicle, error: curErr } = await admin
       .from("vehicles")
-      .select("id, vin")
+      .select(
+        "id, vin, origin_metadata, listing_url, discovery_url, listing_source, discovery_source, bat_auction_url"
+      )
       .eq("id", vehicleId)
       .single();
     if (curErr) throw curErr;
 
-    // Scrape enough to create a decent seed profile.
-    const scraped = await scrapeBasicBaT(sourceUrl);
+    // Idempotency: if we already created a split vehicle for this source+parent, return it.
+    // This avoids duplicate split vehicles when users click multiple times.
+    const { data: existingSplit } = await admin
+      .from("vehicles")
+      .select("id")
+      .in("listing_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`])
+      .contains("origin_metadata", { split_from_vehicle_id: vehicleId })
+      .maybeSingle();
 
-    // SAFETY: Only split when we have a proven VIN conflict.
-    // This prevents accidental splits caused by ambiguous URLs or missing VINs.
-    if (force !== true) {
-      const currentVinRaw = (currentVehicle?.vin || "").toString().trim();
-      const currentVin = currentVinRaw.startsWith("VIVA-") ? "" : currentVinRaw.toUpperCase();
-      const sourceVin = (scraped.vin || "").toString().trim().toUpperCase();
-
-      if (!currentVin) {
-        return safeJsonError(
-          "Split blocked: current vehicle VIN is missing/placeholder. Add/verify VIN first (or use Detach).",
-          409,
-        );
-      }
-      if (!sourceVin) {
-        return safeJsonError(
-          "Split blocked: listing VIN could not be extracted from the Source URL.",
-          409,
-        );
-      }
-      if (currentVin === sourceVin) {
-        return safeJsonError(
-          "Split blocked: VINs match (no conflict detected). Detach is the appropriate action if the URL is still wrong.",
-          409,
-        );
-      }
+    if (existingSplit?.id) {
+      return new Response(JSON.stringify({ success: true, newVehicleId: existingSplit.id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    // Scrape enough to create a decent seed profile.
+    const scraped = await scrapeBasicBaT(canonicalSourceUrl);
+
+    // NOTE: This is a manual, editor-triggered decontamination action.
+    // We allow the split even when VINs are missing or match; the user is explicitly choosing to unmerge.
+    const currentVinRaw = (currentVehicle?.vin || "").toString().trim();
+    const currentVinNormalized = currentVinRaw.startsWith("VIVA-") ? "" : normalizeVin(currentVinRaw);
+    const sourceVinNormalized = normalizeVin(scraped.vin || "");
+    const vinConflictDetected =
+      !!currentVinNormalized && !!sourceVinNormalized && currentVinNormalized !== sourceVinNormalized;
 
     // Create a new vehicle explicitly (no matching) to prevent cross-contamination.
     const { data: newVehicle, error: createErr } = await admin
@@ -251,16 +290,20 @@ serve(async (req) => {
         make: scraped.make ?? null,
         model: scraped.model ?? null,
         vin: scraped.vin ?? null,
-        listing_url: sourceUrl,
-        discovery_url: sourceUrl,
+        listing_url: canonicalSourceUrl,
+        discovery_url: canonicalSourceUrl,
         discovery_source: "split_from_source",
         profile_origin: "bat_import",
-        bat_auction_url: sourceUrl,
+        bat_auction_url: canonicalSourceUrl,
         origin_metadata: {
           import_source: "split_from_source",
           split_from_vehicle_id: vehicleId,
           split_reason: reason ?? "Source URL conflicts with existing evidence",
-          source_url: sourceUrl,
+          source_url: canonicalSourceUrl,
+          current_vehicle_vin: currentVinNormalized || null,
+          source_vin: sourceVinNormalized || null,
+          vin_conflict_detected: vinConflictDetected,
+          forced: force === true,
           created_at: new Date().toISOString(),
         },
         // Keep attribution with the user performing the split.
@@ -271,6 +314,95 @@ serve(async (req) => {
 
     if (createErr) throw createErr;
 
+    // Unmerge: detach BaT listing linkage + move BaT auction data to the new vehicle.
+    // Best-effort; the split vehicle remains even if unmerge steps partially fail.
+    try {
+      const nowIso = new Date().toISOString();
+      const existingMeta =
+        currentVehicle && typeof (currentVehicle as any).origin_metadata === "object" && (currentVehicle as any).origin_metadata
+          ? (currentVehicle as any).origin_metadata
+          : {};
+
+      const nextMeta = {
+        ...existingMeta,
+        split_out: {
+          at: nowIso,
+          source_url: canonicalSourceUrl,
+          new_vehicle_id: newVehicle.id,
+          forced: force === true,
+        },
+      };
+
+      // 1) Move auction tables tied to the source URL
+      await admin
+        .from("auction_events")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .in("source_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
+
+      await admin
+        .from("auction_comments")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .eq("platform", "bat")
+        .in("source_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
+
+      // 2) Move timeline auction events (these often lack source_url, so use event_type prefix)
+      await admin
+        .from("timeline_events")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .like("event_type", "auction_%");
+
+      // 3) Detach listing URL + clear BaT-derived summary fields on the original vehicle
+      // (Only do this if the current listing/discovery URLs match the split source.)
+      const listingMatches =
+        normalizeUrl((currentVehicle as any)?.listing_url || "") === canonicalSourceUrl ||
+        normalizeUrl((currentVehicle as any)?.discovery_url || "") === canonicalSourceUrl ||
+        normalizeUrl((currentVehicle as any)?.bat_auction_url || "") === canonicalSourceUrl;
+
+      if (listingMatches) {
+        await admin
+          .from("vehicles")
+          .update({
+            listing_url: null,
+            listing_source: null,
+            discovery_url: null,
+            bat_auction_url: null,
+            auction_source: null,
+            sale_price: null,
+            auction_end_date: null,
+            bid_count: null,
+            view_count: null,
+            sale_status: null,
+            sale_date: null,
+            auction_outcome: null,
+            high_bid: null,
+            winning_bid: null,
+            // BaT summary fields
+            bat_sold_price: null,
+            bat_sale_date: null,
+            bat_bid_count: null,
+            bat_view_count: null,
+            bat_listing_title: null,
+            bat_bids: null,
+            bat_comments: null,
+            bat_views: null,
+            bat_location: null,
+            bat_seller: null,
+            bat_buyer: null,
+            bat_lot_number: null,
+            bat_watchers: null,
+            reserve_status: null,
+            origin_metadata: nextMeta,
+            updated_at: nowIso,
+          } as any)
+          .eq("id", vehicleId);
+      }
+    } catch (e: any) {
+      console.log("Unmerge steps failed (non-fatal):", e?.message || String(e));
+    }
+
     // Add a timeline note to the original vehicle for auditability (best-effort).
     try {
       const { data: existing } = await admin
@@ -280,7 +412,7 @@ serve(async (req) => {
         .eq("source", "split_from_source")
         .eq("event_type", "other")
         .eq("metadata->>action", "split")
-        .eq("metadata->>source_url", sourceUrl)
+        .eq("metadata->>source_url", canonicalSourceUrl)
         .eq("metadata->>new_vehicle_id", newVehicle.id)
         .limit(1)
         .maybeSingle();
@@ -296,7 +428,7 @@ serve(async (req) => {
         description: `Created a new vehicle profile from Source URL to prevent cross-contamination.\n\nSource: ${sourceUrl}\nNew vehicle: ${newVehicle.id}`,
         metadata: {
           action: "split",
-          source_url: sourceUrl,
+          source_url: canonicalSourceUrl,
           new_vehicle_id: newVehicle.id,
           reason: reason ?? null,
         },
@@ -313,7 +445,7 @@ serve(async (req) => {
     try {
       // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
       const step1Result = await admin.functions.invoke("extract-bat-core", {
-        body: { url: sourceUrl, max_vehicles: 1 },
+        body: { url: canonicalSourceUrl, max_vehicles: 1 },
       });
       
       if (step1Result.error) {
@@ -325,7 +457,7 @@ serve(async (req) => {
         
         // Step 2: Extract comments and bids (non-critical, fire-and-forget)
         admin.functions.invoke("extract-auction-comments", {
-          body: { auction_url: sourceUrl, vehicle_id: vehicleId },
+          body: { auction_url: canonicalSourceUrl, vehicle_id: vehicleId },
         }).catch((e: any) => {
           console.log(`extract-auction-comments invoke failed (non-fatal): ${e?.message || String(e)}`);
         });
