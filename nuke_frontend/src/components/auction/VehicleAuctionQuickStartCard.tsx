@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import '../../design-system.css';
@@ -86,6 +87,17 @@ export default function VehicleAuctionQuickStartCard(props: {
   const [readinessIssues, setReadinessIssues] = useState<Array<{ severity?: string; message?: string; code?: string }> | null>(null);
 
   const defaultDescription = useMemo(() => buildDefaultAuctionDescription(vehicle), [vehicle]);
+
+  // Prevent background scroll while modal is open.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!showModal) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showModal]);
 
   const loadLatestListing = useCallback(async () => {
     if (!vehicle?.id) return;
@@ -241,6 +253,192 @@ export default function VehicleAuctionQuickStartCard(props: {
   const isDraft = listing?.status === 'draft';
   const isActive = listing?.status === 'active';
 
+  const modalNode = showModal ? (
+    // Render the modal in a portal to avoid "position: fixed" being scoped by transformed ancestors,
+    // which can cause major flicker/clipping on complex pages.
+    <div
+      className="modal-overlay"
+      style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0, 0, 0, 0.35)' }}
+      onClick={() => !submitting && setShowModal(false)}
+    >
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">Start Auction</div>
+        </div>
+        <div className="modal-body">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div className="vehicle-detail">
+              <span>Auction Type</span>
+              <select
+                value={saleType}
+                onChange={(e) => setSaleType(e.target.value as SaleType)}
+                style={{ padding: '6px', fontSize: '9pt' }}
+                disabled={submitting}
+              >
+                <option value="auction">Standard auction (days)</option>
+                <option value="live_auction">Live auction (minutes)</option>
+              </select>
+            </div>
+
+            <div className="vehicle-detail">
+              <span>Starting Bid (USD)</span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={startingBidUsd}
+                onChange={(e) => setStartingBidUsd(e.target.value)}
+                placeholder="1000"
+                disabled={submitting}
+                style={{ padding: '6px', fontSize: '9pt' }}
+              />
+            </div>
+
+            <div className="vehicle-detail">
+              <span>Reserve</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  checked={hasReserve}
+                  onChange={(e) => setHasReserve(e.target.checked)}
+                  disabled={submitting}
+                />
+                <span className="text text-muted" style={{ fontSize: '9pt' }}>
+                  Enable reserve
+                </span>
+              </label>
+            </div>
+
+            {hasReserve ? (
+              <div className="vehicle-detail">
+                <span>Reserve Price (USD)</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={reserveUsd}
+                  onChange={(e) => setReserveUsd(e.target.value)}
+                  placeholder="25000"
+                  disabled={submitting}
+                  style={{ padding: '6px', fontSize: '9pt' }}
+                />
+              </div>
+            ) : null}
+
+            {saleType === 'live_auction' ? (
+              <div className="vehicle-detail">
+                <span>Duration (minutes)</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={durationMinutes}
+                  onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                  disabled={submitting}
+                  style={{ padding: '6px', fontSize: '9pt' }}
+                />
+              </div>
+            ) : (
+              <div className="vehicle-detail">
+                <span>Duration (days)</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={durationDays}
+                  onChange={(e) => setDurationDays(Number(e.target.value))}
+                  disabled={submitting}
+                  style={{ padding: '6px', fontSize: '9pt' }}
+                />
+              </div>
+            )}
+
+            <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 10 }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="radio"
+                    name="startMode"
+                    checked={startMode === 'now'}
+                    onChange={() => setStartMode('now')}
+                    disabled={submitting}
+                  />
+                  <span style={{ fontSize: '9pt' }}>Start now</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="radio"
+                    name="startMode"
+                    checked={startMode === 'schedule'}
+                    onChange={() => setStartMode('schedule')}
+                    disabled={submitting}
+                  />
+                  <span style={{ fontSize: '9pt' }}>Schedule</span>
+                </label>
+              </div>
+
+              {startMode === 'schedule' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+                  <div>
+                    <div className="text text-muted" style={{ fontSize: '9pt', marginBottom: 4 }}>Date</div>
+                    <input
+                      type="date"
+                      value={scheduledDate}
+                      onChange={(e) => setScheduledDate(e.target.value)}
+                      disabled={submitting}
+                      style={{ padding: '6px', fontSize: '9pt', width: '100%' }}
+                    />
+                  </div>
+                  <div>
+                    <div className="text text-muted" style={{ fontSize: '9pt', marginBottom: 4 }}>Time</div>
+                    <input
+                      type="time"
+                      value={scheduledTime}
+                      onChange={(e) => setScheduledTime(e.target.value)}
+                      disabled={submitting}
+                      style={{ padding: '6px', fontSize: '9pt', width: '100%' }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {submitError ? (
+              <div className="text" style={{ fontSize: '9pt', color: 'var(--error-text, #dc2626)' }}>
+                {submitError}
+              </div>
+            ) : null}
+
+            {readinessIssues && readinessIssues.length > 0 ? (
+              <div style={{ border: '1px solid var(--border-light)', padding: 10, background: 'var(--grey-50)' }}>
+                <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 6 }}>Readiness issues</div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: '9pt' }}>
+                  {readinessIssues.slice(0, 6).map((i, idx) => (
+                    <li key={idx}>
+                      <span style={{ fontWeight: 700 }}>{String(i?.severity || 'info').toUpperCase()}:</span>{' '}
+                      {String(i?.message || i?.code || '')}
+                    </li>
+                  ))}
+                </ul>
+                <div className="text text-muted" style={{ fontSize: '9pt', marginTop: 6 }}>
+                  Fix the profile data gaps (images, description, etc.) and try again.
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="button" disabled={submitting} onClick={() => setShowModal(false)}>
+            Cancel
+          </button>
+          <button className="button button-primary" disabled={submitting} onClick={handleCreateAndMaybeStart}>
+            {submitting ? 'Working...' : startMode === 'schedule' ? 'Schedule Auction' : 'Start Auction'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="card">
       <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -333,185 +531,7 @@ export default function VehicleAuctionQuickStartCard(props: {
           </div>
         )}
 
-        {showModal ? (
-          <div className="modal-overlay" onClick={() => !submitting && setShowModal(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <div className="modal-title">Start Auction</div>
-              </div>
-              <div className="modal-body">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div className="vehicle-detail">
-                    <span>Auction Type</span>
-                    <select
-                      value={saleType}
-                      onChange={(e) => setSaleType(e.target.value as SaleType)}
-                      style={{ padding: '6px', fontSize: '9pt' }}
-                      disabled={submitting}
-                    >
-                      <option value="auction">Standard auction (days)</option>
-                      <option value="live_auction">Live auction (minutes)</option>
-                    </select>
-                  </div>
-
-                  <div className="vehicle-detail">
-                    <span>Starting Bid (USD)</span>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={startingBidUsd}
-                      onChange={(e) => setStartingBidUsd(e.target.value)}
-                      placeholder="1000"
-                      disabled={submitting}
-                      style={{ padding: '6px', fontSize: '9pt' }}
-                    />
-                  </div>
-
-                  <div className="vehicle-detail">
-                    <span>Reserve</span>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input
-                        type="checkbox"
-                        checked={hasReserve}
-                        onChange={(e) => setHasReserve(e.target.checked)}
-                        disabled={submitting}
-                      />
-                      <span className="text text-muted" style={{ fontSize: '9pt' }}>
-                        Enable reserve
-                      </span>
-                    </label>
-                  </div>
-
-                  {hasReserve ? (
-                    <div className="vehicle-detail">
-                      <span>Reserve Price (USD)</span>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={reserveUsd}
-                        onChange={(e) => setReserveUsd(e.target.value)}
-                        placeholder="25000"
-                        disabled={submitting}
-                        style={{ padding: '6px', fontSize: '9pt' }}
-                      />
-                    </div>
-                  ) : null}
-
-                  {saleType === 'live_auction' ? (
-                    <div className="vehicle-detail">
-                      <span>Duration (minutes)</span>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={durationMinutes}
-                        onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                        disabled={submitting}
-                        style={{ padding: '6px', fontSize: '9pt' }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="vehicle-detail">
-                      <span>Duration (days)</span>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={durationDays}
-                        onChange={(e) => setDurationDays(Number(e.target.value))}
-                        disabled={submitting}
-                        style={{ padding: '6px', fontSize: '9pt' }}
-                      />
-                    </div>
-                  )}
-
-                  <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 10 }}>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input
-                          type="radio"
-                          name="startMode"
-                          checked={startMode === 'now'}
-                          onChange={() => setStartMode('now')}
-                          disabled={submitting}
-                        />
-                        <span style={{ fontSize: '9pt' }}>Start now</span>
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input
-                          type="radio"
-                          name="startMode"
-                          checked={startMode === 'schedule'}
-                          onChange={() => setStartMode('schedule')}
-                          disabled={submitting}
-                        />
-                        <span style={{ fontSize: '9pt' }}>Schedule</span>
-                      </label>
-                    </div>
-
-                    {startMode === 'schedule' ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-                        <div>
-                          <div className="text text-muted" style={{ fontSize: '9pt', marginBottom: 4 }}>Date</div>
-                          <input
-                            type="date"
-                            value={scheduledDate}
-                            onChange={(e) => setScheduledDate(e.target.value)}
-                            disabled={submitting}
-                            style={{ padding: '6px', fontSize: '9pt', width: '100%' }}
-                          />
-                        </div>
-                        <div>
-                          <div className="text text-muted" style={{ fontSize: '9pt', marginBottom: 4 }}>Time</div>
-                          <input
-                            type="time"
-                            value={scheduledTime}
-                            onChange={(e) => setScheduledTime(e.target.value)}
-                            disabled={submitting}
-                            style={{ padding: '6px', fontSize: '9pt', width: '100%' }}
-                          />
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {submitError ? (
-                    <div className="text" style={{ fontSize: '9pt', color: 'var(--error-text, #dc2626)' }}>
-                      {submitError}
-                    </div>
-                  ) : null}
-
-                  {readinessIssues && readinessIssues.length > 0 ? (
-                    <div style={{ border: '1px solid var(--border-light)', padding: 10, background: 'var(--grey-50)' }}>
-                      <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: 6 }}>Readiness issues</div>
-                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: '9pt' }}>
-                        {readinessIssues.slice(0, 6).map((i, idx) => (
-                          <li key={idx}>
-                            <span style={{ fontWeight: 700 }}>{String(i?.severity || 'info').toUpperCase()}:</span>{' '}
-                            {String(i?.message || i?.code || '')}
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="text text-muted" style={{ fontSize: '9pt', marginTop: 6 }}>
-                        Fix the profile data gaps (images, description, etc.) and try again.
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="button" disabled={submitting} onClick={() => setShowModal(false)}>
-                  Cancel
-                </button>
-                <button className="button button-primary" disabled={submitting} onClick={handleCreateAndMaybeStart}>
-                  {submitting ? 'Working...' : startMode === 'schedule' ? 'Schedule Auction' : 'Start Auction'}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {typeof document !== 'undefined' && modalNode ? createPortal(modalNode, document.body) : null}
       </div>
     </div>
   );
