@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
@@ -16,6 +16,7 @@ interface AuctionListing {
   bid_count: number;
   auction_end_time: string | null;
   reserve_price_cents: number | null;
+  final_price_cents?: number | null;
   auction_start_time: string | null;
 }
 
@@ -26,6 +27,12 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
   const [loading, setLoading] = useState(true);
   const [showBidInterface, setShowBidInterface] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const endRefreshTriggeredRef = useRef(false);
+
+  useEffect(() => {
+    // Reset end-of-auction refresh guard when listing changes
+    endRefreshTriggeredRef.current = false;
+  }, [listing?.id, listing?.auction_end_time]);
 
   useEffect(() => {
     loadActiveListing();
@@ -41,6 +48,14 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
 
       if (diff <= 0) {
         setTimeRemaining('Ended');
+        // The UI countdown ended; re-fetch to let the backend settlement hide this banner
+        // (status will flip to sold/expired via scheduler).
+        if (!endRefreshTriggeredRef.current) {
+          endRefreshTriggeredRef.current = true;
+          window.setTimeout(() => {
+            try { loadActiveListing(); } catch {}
+          }, 1500);
+        }
         return;
       }
 
@@ -122,6 +137,8 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
   const isLive = listing.auction_start_time 
     ? new Date(listing.auction_start_time) <= new Date()
     : true;
+  const isEnded = timeRemaining === 'Ended';
+  const finalPrice = typeof (listing as any)?.final_price_cents === 'number' ? (listing as any).final_price_cents : null;
 
   return (
     <>
@@ -143,42 +160,53 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
                 width: '6px',
                 height: '6px',
                 borderRadius: '50%',
-                background: '#dc2626',
+                background: isEnded ? '#94a3b8' : '#dc2626',
                 flexShrink: 0
               }}
             />
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Live Auction</span>
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>{isEnded ? 'Auction Ended' : 'Live Auction'}</span>
             <span style={{ color: 'var(--text-muted)' }}>•</span>
             <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace' }}>
               {timeRemaining || 'Loading...'}
             </span>
           </div>
-          <button
-            onClick={handleBidNow}
-            style={{
-              padding: '4px 12px',
-              background: 'var(--primary)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '3px',
-              fontSize: '8pt',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.12s ease',
-              whiteSpace: 'nowrap'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.9';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1';
-            }}
-          >
-            BID NOW
-          </button>
+          {!isEnded ? (
+            <button
+              onClick={handleBidNow}
+              style={{
+                padding: '4px 12px',
+                background: 'var(--primary)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '3px',
+                fontSize: '8pt',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.12s ease',
+                whiteSpace: 'nowrap'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '0.9';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '1';
+              }}
+            >
+              BID NOW
+            </button>
+          ) : (
+            <span style={{ fontSize: '8pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+              settling…
+            </span>
+          )}
         </div>
         
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '8pt', color: 'var(--text-muted)' }}>
+          {isEnded && typeof finalPrice === 'number' && finalPrice > 0 ? (
+            <span>
+              <strong style={{ color: 'var(--text)' }}>Final:</strong> {formatCurrency(finalPrice)}
+            </span>
+          ) : null}
           <span>
             <strong style={{ color: 'var(--text)' }}>Bid:</strong> {formatCurrency(listing.current_high_bid_cents)}
           </span>

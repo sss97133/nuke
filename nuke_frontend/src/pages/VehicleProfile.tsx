@@ -3523,12 +3523,14 @@ const VehicleProfile: React.FC = () => {
               />
 
               {/* Comments & Bids */}
-              <VehicleCommentsCard
-                vehicleId={vehicle.id}
-                session={session}
-                collapsed={false}
-                maxVisible={50}
-              />
+              <div id="vehicle-comments" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 112px)' }}>
+                <VehicleCommentsCard
+                  vehicleId={vehicle.id}
+                  session={session}
+                  collapsed={isMobile}
+                  maxVisible={isMobile ? 6 : 50}
+                />
+              </div>
 
               {/* Privacy Settings */}
               {!vehicle.isAnonymous && session && (
@@ -3604,6 +3606,8 @@ const VehicleProfile: React.FC = () => {
             onClaimClick={() => setShowOwnershipClaim(true)}
             userOwnershipClaim={userOwnershipClaim as any}
             suppressExternalListing={!!userOwnershipClaim}
+            leadImageUrl={leadImageUrl}
+            liveSession={liveSession}
             auctionPulse={auctionPulse}
           />
         </React.Suspense>
@@ -3674,12 +3678,14 @@ const VehicleProfile: React.FC = () => {
         {/* Live Stats Bar (MVP: hidden to reduce clutter) */}
 
         {/* Hero Image Section */}
-        <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
-          <VehicleHeroImage
-            leadImageUrl={leadImageUrl}
-            overlayNode={<VehicleMemeOverlay lastEvent={lastMemeDrop} />}
-          />
-        </React.Suspense>
+        <div id="vehicle-hero" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 88px)' }}>
+          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading hero image...</div>}>
+            <VehicleHeroImage
+              leadImageUrl={leadImageUrl}
+              overlayNode={<VehicleMemeOverlay lastEvent={lastMemeDrop} />}
+            />
+          </React.Suspense>
+        </div>
 
 
         {/* Add Organization Relationship Modal */}

@@ -261,6 +261,10 @@ const ImageGallery = ({
   const [infiniteScrollEnabled, setInfiniteScrollEnabled] = useState(true);
   const [uploadProgress, setUploadProgress] = useState<{total: number, completed: number, uploading: boolean}>({total: 0, completed: 0, uploading: false});
   const [queueStats, setQueueStats] = useState<{pending: number, failed: number} | null>(null);
+  const [uploadNotice, setUploadNotice] = useState<{ kind: 'success' | 'error'; message: string; details?: string[] } | null>(null);
+  const [showUploadNoticeDetails, setShowUploadNoticeDetails] = useState(false);
+  const [recentUploadIds, setRecentUploadIds] = useState<string[]>([]);
+  const recentUploadSet = useMemo(() => new Set(recentUploadIds), [recentUploadIds]);
   const [imageCommentCounts, setImageCommentCounts] = useState<Record<string, number>>({});
   const [imageUploaderNames, setImageUploaderNames] = useState<Record<string, string>>({});
   const [imageTagTextsById, setImageTagTextsById] = useState<Record<string, string[]>>({});
@@ -283,7 +287,17 @@ const ImageGallery = ({
     setUsingFallback(false);
     setError(null);
     setLoading(true);
+    setRecentUploadIds([]);
+    setUploadNotice(null);
+    setShowUploadNoticeDetails(false);
   }, [vehicleId]);
+
+  // Auto-clear "recent upload" highlighting after a short window.
+  useEffect(() => {
+    if (recentUploadIds.length === 0) return;
+    const t = window.setTimeout(() => setRecentUploadIds([]), 15_000);
+    return () => window.clearTimeout(t);
+  }, [recentUploadIds]);
 
   // Vehicle meta (used to suppress "BaT homepage noise" images that were mistakenly attached to some vehicles)
   const [vehicleMeta, setVehicleMeta] = useState<any | null>(null);
@@ -1667,6 +1681,10 @@ const ImageGallery = ({
       return;
     }
 
+    // Reset any prior upload notice (fresh run)
+    setUploadNotice(null);
+    setShowUploadNoticeDetails(false);
+
     const fileArray = Array.from(files);
     
     // Get existing images for deduplication check
@@ -1753,10 +1771,14 @@ const ImageGallery = ({
         globalUploadStatusService.createProcessingJob(vehicleId, uploadedImageIds);
       }
 
+      // For discoverability, default to newest-first after an upload.
+      const sortAfterUpload: 'quality' | 'date_desc' | 'date_asc' = 'date_desc';
+      setSortBy(sortAfterUpload);
+
       // Refresh images and notify parent
       const { data: refreshedImages } = await supabase
         .from('vehicle_images')
-        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, is_document, document_category')
+        .select('id, image_url, thumbnail_url, medium_url, large_url, variants, is_primary, position, caption, created_at, taken_at, exif_data, source, source_url, user_id, is_sensitive, sensitive_type, is_document, document_category, ai_scan_metadata, ai_last_scanned, angle, category, storage_path, file_hash')
         .eq('vehicle_id', vehicleId)
         // Filter out documents (treat NULL as false)
         .not('is_document', 'is', true)
@@ -1774,11 +1796,34 @@ const ImageGallery = ({
       setShowImages(true);
       
       // Refresh displayed images with the new uploads
-      const sortedImages = sortRows(refreshedFiltered || [], sortBy);
+      const sortedImages = sortRows(refreshedFiltered || [], sortAfterUpload);
       
       setDisplayedImages(sortedImages.slice(0, Math.max(displayedImages.length, imagesPerPage)));
       
       onImagesUpdated?.();
+
+      // Highlight freshly uploaded images briefly so users can find them.
+      if (uploadedImageIds.length > 0) {
+        setRecentUploadIds(uploadedImageIds);
+      }
+
+      // Surface a clear result message (so "where did it go?" has an answer).
+      setShowUploadNoticeDetails(false);
+      if (errors.length > 0) {
+        const uploaded = uploadedImageIds.length;
+        const failed = errors.length;
+        const message =
+          uploaded > 0
+            ? `Upload finished: ${uploaded} uploaded, ${failed} failed.`
+            : `Upload failed: ${failed} ${failed === 1 ? 'file' : 'files'}.`;
+        setUploadNotice({ kind: 'error', message, details: errors });
+      } else if (uploadedImageIds.length > 0) {
+        const uploaded = uploadedImageIds.length;
+        setUploadNotice({
+          kind: 'success',
+          message: `Upload complete: ${uploaded} ${uploaded === 1 ? 'image' : 'images'} added.`
+        });
+      }
       
       // Clear completed files from queue
       await uploadQueueService.clearCompleted(vehicleId);
@@ -1829,14 +1874,14 @@ const ImageGallery = ({
 
   const getDisplayDate = (image: any) => {
     const eff = getEffectiveImageDate(image, auctionStartDate);
-    if (!eff.iso) return 'No date';
+    if (!eff.iso) return '';
     try {
       const date = new Date(eff.iso);
-      if (isNaN(date.getTime())) return 'Invalid date';
+      if (isNaN(date.getTime())) return '';
       const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       return formatted + (eff.label || '');
     } catch (e) {
-      return 'Invalid date';
+      return '';
     }
   };
 
@@ -2212,6 +2257,74 @@ const ImageGallery = ({
                 backgroundColor: 'var(--grey-600)'
               }}></div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Result Notice (answers "where did it go?" and surfaces failures) */}
+      {uploadNotice && !uploadProgress.uploading && (
+        <div className="card" style={{ marginBottom: 'var(--space-3)' }}>
+          <div className="card-body" style={{ fontSize: '8pt' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ fontWeight: 800, color: uploadNotice.kind === 'error' ? 'var(--warning-dark)' : 'var(--text)' }}>
+                {uploadNotice.message}
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {recentUploadIds.length > 0 && (
+                  <button
+                    className="button button-secondary"
+                    style={{ fontSize: '8pt', padding: '4px 10px' }}
+                    onClick={() => {
+                      const nextSort: 'quality' | 'date_desc' | 'date_asc' = 'date_desc';
+                      setSortBy(nextSort);
+                      setChronologicalMode('off');
+                      setGroupByCategory(false);
+                      setGroupBySource(false);
+                      setShowImages(true);
+                      try {
+                        const sortedAll = sortRows(allImages || [], nextSort);
+                        setDisplayedImages(sortedAll.slice(0, Math.max(displayedImages.length || imagesPerPage, imagesPerPage)));
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  >
+                    Show newest
+                  </button>
+                )}
+                {uploadNotice.details && uploadNotice.details.length > 0 && (
+                  <button
+                    className="button"
+                    style={{ fontSize: '8pt', padding: '4px 10px' }}
+                    onClick={() => setShowUploadNoticeDetails((v) => !v)}
+                  >
+                    {showUploadNoticeDetails ? 'Hide details' : 'Details'}
+                  </button>
+                )}
+                <button
+                  className="button"
+                  style={{ fontSize: '8pt', padding: '4px 10px' }}
+                  onClick={() => {
+                    setUploadNotice(null);
+                    setShowUploadNoticeDetails(false);
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+
+            {showUploadNoticeDetails && uploadNotice.details && uploadNotice.details.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {uploadNotice.details.slice(0, 10).map((d, idx) => (
+                    <li key={idx} style={{ marginBottom: 4, color: 'var(--text-muted)' }}>
+                      {d}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2612,6 +2725,7 @@ const ImageGallery = ({
                       const isSelected = selectMode && selectedImages?.has(image.id);
                       const globalIndex = displayedImages.indexOf(image);
                       const source = getImageSource(image);
+                      const isRecentUpload = recentUploadSet.has(String(image?.id || ''));
                       return (
                         <div
                           key={`${group.key}:${String(image.id || '')}`}
@@ -2622,6 +2736,7 @@ const ImageGallery = ({
                             backgroundColor: 'var(--grey-100)',
                             aspectRatio: preserveAspectRatio ? undefined : '1 / 1',
                             border: 'none',
+                            boxShadow: isRecentUpload ? 'inset 0 0 0 3px var(--warning)' : undefined,
                             ...(preserveAspectRatio ? { height: 'auto' } : {})
                           }}
                           onClick={(e) => {
@@ -2775,6 +2890,7 @@ const ImageGallery = ({
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${imagesPerRow}, 1fr)`, gap: 0 }}>
                 {displayedImages.map((image, index) => {
                   const isSelected = selectMode && selectedImages?.has(image.id);
+                  const isRecentUpload = recentUploadSet.has(String(image?.id || ''));
                   return (
                     <div
                       key={image.id}
@@ -2785,6 +2901,7 @@ const ImageGallery = ({
                         backgroundColor: 'var(--grey-100)',
                         aspectRatio: preserveAspectRatio ? undefined : '1 / 1',
                         border: 'none',
+                        boxShadow: isRecentUpload ? 'inset 0 0 0 3px var(--warning)' : undefined,
                         ...(preserveAspectRatio ? { height: 'auto' } : {})
                       }}
                       onClick={(e) => {
@@ -3177,7 +3294,7 @@ const ImageGallery = ({
                 {image.caption && (
                   <p className="text" style={{ color: 'var(--white)', fontSize: '7pt', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
                 )}
-                <p className="text" style={{ color: 'var(--surface-glass)', fontSize: '6pt', marginTop: '2px' }}>
+                <p className="text" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '6pt', marginTop: '2px' }}>
                   {getDisplayDate(image)}
                   {imageTagCounts[image.id] && ` • ${imageTagCounts[image.id]} tags`}
                   {showSetCount && imageSetCounts[image.id] && ` • ${imageSetCounts[image.id]} sets`}
@@ -3223,6 +3340,7 @@ const ImageGallery = ({
                 position: 'relative', 
                 overflow: 'hidden', 
                 backgroundColor: 'var(--grey-100)',
+                boxShadow: recentUploadSet.has(String(image?.id || '')) ? 'inset 0 0 0 3px var(--warning)' : undefined,
                 width: '100%'
               }}
               onClick={() => openLightbox(index)}
@@ -3325,7 +3443,7 @@ const ImageGallery = ({
                 {image.caption && (
                   <p className="text" style={{ color: 'var(--white)', fontSize: '7pt', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{image.caption}</p>
                 )}
-                <p className="text" style={{ color: 'var(--surface-glass)', fontSize: '6pt', marginTop: '2px' }}>
+                <p className="text" style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '6pt', marginTop: '2px' }}>
                   {getDisplayDate(image)}
                   {(() => {
                     const metadata = image.ai_scan_metadata;
