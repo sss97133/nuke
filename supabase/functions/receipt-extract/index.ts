@@ -103,12 +103,178 @@ function mapAzureToParsed(result: any) {
 }
 
 async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
-  // Use pdf-parse (works in non-DOM runtimes) instead of pdfjs-dist workers.
-  const mod: any = await import('https://cdn.skypack.dev/pdf-parse@1.1.1');
-  const pdfParse: any = mod?.default ?? mod;
-  if (typeof pdfParse !== 'function') throw new Error('pdf-parse import failed');
-  const data: any = await pdfParse(bytes);
-  return String(data?.text || '');
+  // Minimal PDF text extraction for Edge runtime (no workers, no Node fs).
+  // This is not a full PDF parser; it's tuned for invoices/receipts with extractable text.
+  const tdLatin1 = new TextDecoder('latin1');
+
+  const ascii = (s: string) => new TextEncoder().encode(s);
+
+  const indexOfSubarray = (haystack: Uint8Array, needle: Uint8Array, start: number) => {
+    outer: for (let i = start; i <= haystack.length - needle.length; i++) {
+      for (let j = 0; j < needle.length; j++) {
+        if (haystack[i + j] !== needle[j]) continue outer;
+      }
+      return i;
+    }
+    return -1;
+  };
+
+  const inflateZlib = async (data: Uint8Array): Promise<Uint8Array> => {
+    // Try Web DecompressionStream first (fast), fallback to pako.
+    try {
+      const DS: any = (globalThis as any).DecompressionStream;
+      if (typeof DS === 'function') {
+        const ds = new DS('deflate');
+        const stream = new Response(data).body!.pipeThrough(ds);
+        const ab = await new Response(stream).arrayBuffer();
+        return new Uint8Array(ab);
+      }
+    } catch {
+      // ignore
+    }
+
+    const mod: any = await import('https://esm.sh/pako@2.1.0?target=deno');
+    const inflate: any = mod?.inflate ?? mod?.default?.inflate;
+    if (typeof inflate !== 'function') throw new Error('pako inflate unavailable');
+    const out: any = inflate(data);
+    return out instanceof Uint8Array ? out : new Uint8Array(out);
+  };
+
+  const extractLiteralStrings = (content: string): string[] => {
+    const out: string[] = [];
+    const isOct = (ch: string) => ch >= '0' && ch <= '7';
+
+    for (let i = 0; i < content.length; i++) {
+      if (content[i] !== '(') continue;
+
+      let depth = 1;
+      let j = i + 1;
+      let s = '';
+
+      while (j < content.length && depth > 0) {
+        const ch = content[j];
+
+        if (ch === '\\') {
+          const next = content[j + 1] ?? '';
+          if (next === '') break;
+
+          // Line continuation
+          if (next === '\n' || next === '\r') {
+            j += 2;
+            continue;
+          }
+
+          // Octal escape
+          if (isOct(next)) {
+            let oct = next;
+            let k = j + 2;
+            while (k < content.length && oct.length < 3 && isOct(content[k])) {
+              oct += content[k];
+              k++;
+            }
+            s += String.fromCharCode(parseInt(oct, 8));
+            j = k;
+            continue;
+          }
+
+          const map: Record<string, string> = {
+            n: '\n',
+            r: '\r',
+            t: '\t',
+            b: '\b',
+            f: '\f',
+            '(': '(',
+            ')': ')',
+            '\\': '\\',
+          };
+          s += map[next] ?? next;
+          j += 2;
+          continue;
+        }
+
+        if (ch === '(') {
+          depth++;
+          s += ch;
+          j++;
+          continue;
+        }
+
+        if (ch === ')') {
+          depth--;
+          if (depth > 0) s += ch;
+          j++;
+          continue;
+        }
+
+        s += ch;
+        j++;
+      }
+
+      if (depth === 0) {
+        const cleaned = s.replace(/\s+/g, ' ').trim();
+        if (cleaned && /[A-Za-z0-9]/.test(cleaned)) out.push(cleaned);
+        i = j - 1;
+      } else {
+        // Unbalanced; skip forward
+        i = j;
+      }
+    }
+
+    return out;
+  };
+
+  const streamNeedle = ascii('stream');
+  const endstreamNeedle = ascii('endstream');
+
+  const pieces: string[] = [];
+  let cursor = 0;
+  let streamCount = 0;
+
+  while (cursor < bytes.length && streamCount < 200) {
+    const si = indexOfSubarray(bytes, streamNeedle, cursor);
+    if (si < 0) break;
+
+    let start = si + streamNeedle.length;
+    // Skip to start-of-data (usually newline)
+    if (bytes[start] === 0x0D && bytes[start + 1] === 0x0A) start += 2;
+    else if (bytes[start] === 0x0A || bytes[start] === 0x0D) start += 1;
+
+    const ei = indexOfSubarray(bytes, endstreamNeedle, start);
+    if (ei < 0) break;
+
+    const raw = bytes.slice(start, ei);
+
+    const dictSnippet = tdLatin1.decode(bytes.slice(Math.max(0, si - 2048), si));
+    const isFlate = dictSnippet.includes('/FlateDecode');
+
+    let decodedStreamText = '';
+    try {
+      const data = isFlate ? await inflateZlib(raw) : raw;
+      decodedStreamText = tdLatin1.decode(data);
+    } catch {
+      decodedStreamText = '';
+    }
+
+    if (decodedStreamText) {
+      const strs = extractLiteralStrings(decodedStreamText);
+      if (strs.length > 0) pieces.push(...strs);
+    }
+
+    streamCount++;
+    cursor = ei + endstreamNeedle.length;
+  }
+
+  // Deduplicate while preserving order; cap output size
+  const seen = new Set<string>();
+  const uniq: string[] = [];
+  for (const p of pieces) {
+    if (seen.has(p)) continue;
+    seen.add(p);
+    uniq.push(p);
+    if (uniq.length >= 2000) break;
+  }
+
+  return uniq.join('\n');
 }
 
 function parseMoneyText(input: string | null | undefined): number | null {
@@ -353,6 +519,8 @@ serve(async (req: Request) => {
       }
     }
 
+    let pdfTextError: string | null = null;
+
     // PDF text extraction (no DOM / worker required). This is the primary fix for "document is not defined".
     if (isPdf) {
       try {
@@ -395,7 +563,8 @@ serve(async (req: Request) => {
           return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
       } catch (e: any) {
-        console.log('[receipt-extract] PDF text extraction failed:', e?.message || String(e));
+        pdfTextError = e?.message || String(e);
+        console.log('[receipt-extract] PDF text extraction failed:', pdfTextError);
         // continue to Textract/Azure fallbacks (useful for scanned PDFs)
       }
     }
@@ -455,11 +624,28 @@ serve(async (req: Request) => {
       throw textractError;
     }
 
-    // Last resort: Azure Form Recognizer (requires env vars set)
-    const bytes = await fetchFileBytes({ url, bucket, path });
-    const azure = await analyzeWithAzureReceipt(bytes);
-    const parsed = mapAzureToParsed(azure);
-    return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    // Last resort: Azure Form Recognizer (only if configured)
+    if (hasAzure) {
+      const bytes = await fetchFileBytes({ url, bucket, path });
+      const azure = await analyzeWithAzureReceipt(bytes);
+      const parsed = mapAzureToParsed(azure);
+      return new Response(JSON.stringify(parsed), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    }
+
+    // No provider left: return a structured error payload (HTTP 200 so callers can store it in receipts.extraction_errors)
+    return new Response(
+      JSON.stringify({
+        error: isPdf ? 'pdf_text_extraction_failed_or_requires_ocr' : 'no_receipt_provider_available',
+        details: {
+          pdf_text_error: pdfTextError,
+          textract_error: textractError?.message || String(textractError || '') || null,
+          openai_available: Boolean(openaiKey),
+          aws_gateway_configured: Boolean(provider === 'aws' || awsEndpoint),
+          azure_configured: hasAzure
+        }
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
   } catch (e) {
     return new Response(JSON.stringify({ error: e?.message || 'failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
