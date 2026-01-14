@@ -153,7 +153,7 @@ serve(async (req) => {
     // Load existing receipts for these docs
     const { data: existingReceipts, error: receiptsErr } = await supabase
       .from("receipts")
-      .select("id,source_document_id,processing_status")
+      .select("id,source_document_id,processing_status,updated_at,created_at")
       .eq("source_document_table", "vehicle_documents")
       .eq("scope_type", "vehicle")
       .eq("scope_id", vehicleId)
@@ -168,6 +168,9 @@ serve(async (req) => {
     const remainingDocs = docList.filter((d) => {
       const rec = receiptByDocId.get(String(d?.id || ""));
       if (!rec) return true;
+      // If a receipt exists but is still stuck in "processing", treat it as incomplete and re-run.
+      // This unblocks cases where a previous worker crashed mid-flight.
+      if (String(rec.processing_status || "").toLowerCase() === "processing") return true;
       if (retryFailed && String(rec.processing_status || "").toLowerCase() === "failed") return true;
       return false;
     });

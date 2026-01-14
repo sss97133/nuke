@@ -118,6 +118,12 @@ export default function CreateAuctionListing() {
     setLoading(true);
 
     try {
+      const startingBidValue = Number(startingBid);
+      if (!Number.isFinite(startingBidValue) || startingBidValue <= 0) {
+        alert('Starting bid is required.');
+        return;
+      }
+
       let auctionStartTime: string;
       if (startImmediately) {
         auctionStartTime = new Date().toISOString();
@@ -140,7 +146,7 @@ export default function CreateAuctionListing() {
           vehicle_id: selectedVehicleId,
           seller_id: user.id,
           sale_type: saleType,
-          list_price_cents: startingBid ? Math.floor(parseFloat(startingBid) * 100) : null,
+          list_price_cents: Math.floor(startingBidValue * 100),
           reserve_price_cents: hasReserve && reservePrice 
             ? Math.floor(parseFloat(reservePrice) * 100) 
             : null,
@@ -170,7 +176,7 @@ export default function CreateAuctionListing() {
       if (error) throw error;
 
       alert('Auction listing created in draft. Start it when you are ready.');
-      navigate(`/listings/${data.id}`);
+      navigate(`/auction/${data.id}`);
     } catch (error) {
       console.error('Error creating listing:', error);
       alert('Failed to create listing');

@@ -108,17 +108,29 @@ export function VehicleLedgerDocumentsCard(props: {
 
   const totals = useMemo(() => {
     const totalDocs = docs.length;
-    let processed = 0;
+    let parsed = 0;
+    let processing = 0;
     let failed = 0;
     let spent = 0;
     for (const d of docs) {
       const r = receiptByDocId.get(String(d.id));
-      if (r) processed++;
       const st = String(r?.processing_status || '').toLowerCase();
-      if (st === 'failed') failed++;
+      if (!r) continue;
+      if (st === 'processing') {
+        processing++;
+        continue;
+      }
+      if (st === 'failed') {
+        failed++;
+        continue;
+      }
+      // Treat any other status as "parsed enough to use"
+      parsed++;
       if (typeof r?.total === 'number') spent += r.total;
     }
-    return { totalDocs, processed, failed, spent, remaining: Math.max(0, totalDocs - processed) };
+    const pending = Math.max(0, totalDocs - (parsed + processing + failed));
+    const remaining = pending + processing; // things that still need a successful parse
+    return { totalDocs, parsed, processing, failed, spent, pending, remaining };
   }, [docs, receiptByDocId]);
 
   const runAll = async () => {
@@ -205,7 +217,8 @@ export function VehicleLedgerDocumentsCard(props: {
           <>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: '8pt' }}>
               <div><strong>Total docs:</strong> {totals.totalDocs}</div>
-              <div><strong>Analyzed:</strong> {totals.processed}</div>
+              <div><strong>Analyzed:</strong> {totals.parsed}</div>
+              <div><strong>Processing:</strong> {totals.processing}</div>
               <div><strong>Failed:</strong> {totals.failed}</div>
               <div><strong>Remaining:</strong> {totals.remaining}</div>
               <div><strong>Total spend (from extracted receipts):</strong> {formatUsd(totals.spent)}</div>
