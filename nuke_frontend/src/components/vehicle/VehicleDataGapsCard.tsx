@@ -135,24 +135,26 @@ export function VehicleDataGapsCard({ vehicleId, limit = 8 }: { vehicleId: strin
     <div id="vehicle-proof-tasks" className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span>Proof tasks</span>
           <button
             type="button"
-            className="button-win95"
-            onClick={() => setShowWhy((v) => !v)}
-            title="Why am I seeing this?"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowWhy((v) => !v);
+            }}
+            title={showWhy ? 'Hide explanation' : 'Why am I seeing this?'}
             style={{
-              padding: '1px 6px',
-              fontSize: '8pt',
-              height: '18px',
-              minWidth: '18px',
-              lineHeight: 1,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              margin: 0,
+              fontSize: 'inherit',
+              fontWeight: 800,
+              cursor: 'pointer',
+              color: 'inherit',
             }}
           >
-            ?
+            Proof tasks
           </button>
         </span>
         <span className="badge badge-secondary">{sortedGaps.length}</span>

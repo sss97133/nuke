@@ -555,6 +555,45 @@ const VehicleProfile: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Left column: make all cards collapsible by clicking the header bar.
+  // This avoids rewriting every individual card component while keeping behavior consistent.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!vehicle?.id) return;
+
+    const container = document.querySelector('.vehicle-profile-left-column');
+    if (!container) return;
+
+    const onClick = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // Don't collapse when interacting with controls in the header (buttons, links, inputs, etc.).
+      if (target.closest('button, a, input, select, textarea, label, [role="button"]')) return;
+
+      const header = target.closest('.card-header') as HTMLElement | null;
+      if (!header) return;
+
+      const card = header.closest('.card') as HTMLElement | null;
+      if (!card) return;
+
+      // Only collapse top-level cards in the left column (ignore nested cards inside a card body).
+      let p: HTMLElement | null = card.parentElement;
+      while (p && p !== container) {
+        if (p.classList.contains('card')) return;
+        p = p.parentElement;
+      }
+      if (p !== container) return;
+
+      card.classList.toggle('is-collapsed');
+    };
+
+    container.addEventListener('click', onClick);
+    return () => {
+      container.removeEventListener('click', onClick);
+    };
+  }, [vehicle?.id]);
+
   // PAGE TITLE MANAGEMENT
   usePageTitle(() => getVehicleTitle(vehicle));
 
