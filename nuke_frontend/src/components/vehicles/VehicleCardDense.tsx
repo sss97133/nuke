@@ -4,7 +4,7 @@ import { FaviconIcon } from '../common/FaviconIcon';
 import { getVehicleIdentityTokens } from '../../utils/vehicleIdentity';
 import { UserInteractionService } from '../../services/userInteractionService';
 import { getEngineDefinition, getTransmissionDefinition, type PowertrainSpecDefinition } from '../../services/powertrainDefinitionService';
-import { getBodyStyleDisplay } from '../../services/bodyStyleTaxonomy';
+import { getBodyStyleDisplay, getBodyStylePopoverDefinition, type BodyStylePopoverDefinition } from '../../services/bodyStyleTaxonomy';
 import ResilientImage from '../images/ResilientImage';
 import { OdometerBadge } from '../vehicle/OdometerBadge';
 import { useVehicleImages } from '../../hooks/useVehicleImages';
@@ -114,7 +114,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const [auctionNow, setAuctionNow] = React.useState(() => Date.now());
   const [showOwnershipPopup, setShowOwnershipPopup] = React.useState(false);
   const [specPopover, setSpecPopover] = React.useState<{
-    def: PowertrainSpecDefinition;
+    def: PowertrainSpecDefinition | BodyStylePopoverDefinition;
     position: { x: number; y: number };
   } | null>(null);
 
@@ -948,13 +948,15 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   }, [specPopover, closeSpecPopover]);
 
   const openSpecPopover = React.useCallback(
-    (e: React.MouseEvent, kind: 'engine' | 'transmission', raw: unknown) => {
+    (e: React.MouseEvent, kind: 'engine' | 'transmission' | 'body_style', raw: unknown) => {
       e.preventDefault();
       e.stopPropagation();
       const def =
         kind === 'engine'
           ? getEngineDefinition(raw)
-          : getTransmissionDefinition(raw);
+          : kind === 'transmission'
+            ? getTransmissionDefinition(raw)
+            : getBodyStylePopoverDefinition(raw);
       if (!def) return;
       setSpecPopover({
         def,
@@ -2072,15 +2074,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               (drive.includes('awd') ? 'AWD' : '');
             if (configLabel) tokens.push({ kind: 'config', label: configLabel, raw: configLabel, clickable: false });
 
-            const bodyStyleRaw = (v?.body_style || '').toString().trim();
+            const bodyStyleRaw = (v?.canonical_body_style || v?.body_style || '').toString().trim();
             if (bodyStyleRaw) {
               const display = getBodyStyleDisplay(bodyStyleRaw) || bodyStyleRaw;
-              const short = bodyStyleRaw.replace(/\s+/g, ' ').trim();
               tokens.push({
                 kind: 'type',
                 label: display.length > 18 ? `${display.slice(0, 18)}…` : display,
                 raw: display,
-                clickable: false,
+                clickable: true,
               });
             }
 
@@ -2109,7 +2110,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             return (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {visible.map((t, idx) => {
-                  const isClickable = t.clickable && (t.kind === 'engine' || t.kind === 'transmission');
+                  const isClickable = t.clickable && (t.kind === 'engine' || t.kind === 'transmission' || t.kind === 'type');
                   const commonProps = {
                     key: `${t.kind}-${idx}-${t.label}`,
                     title: t.raw ? String(t.raw) : t.label,
@@ -2128,7 +2129,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     <button
                       type="button"
                       {...commonProps}
-                      onClick={(e) => openSpecPopover(e, t.kind as any, t.raw)}
+                      onClick={(e) => openSpecPopover(e, (t.kind === 'type' ? 'body_style' : (t.kind as any)), t.raw)}
                     >
                       {t.label}
                     </button>
@@ -2140,7 +2141,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
         </div>
       )}
 
-      {/* Engine/Transmission definition popover */}
+      {/* Definition popover (engine/transmission/body style) */}
       {specPopover && (
         <div
           style={{
@@ -2179,7 +2180,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div style={{ fontSize: '8pt', fontWeight: 800 }}>
-                  {specPopover.def.kind === 'engine' ? 'ENGINE' : 'TRANSMISSION'}
+                  {specPopover.def.kind === 'engine'
+                    ? 'ENGINE'
+                    : specPopover.def.kind === 'transmission'
+                      ? 'TRANSMISSION'
+                      : 'BODY STYLE'}
                 </div>
                 <div style={{ fontSize: '10pt', fontWeight: 800, lineHeight: 1.1 }}>
                   {specPopover.def.title}

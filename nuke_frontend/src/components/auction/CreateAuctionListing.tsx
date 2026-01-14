@@ -173,7 +173,30 @@ export default function CreateAuctionListing() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        const status = (error as any)?.status;
+        const code = String((error as any)?.code || '');
+        // Unique violation (e.g. a draft/active listing already exists for this vehicle).
+        if (status === 409 || code === '23505') {
+          const { data: existing, error: qErr } = await supabase
+            .from('vehicle_listings')
+            .select('id, status')
+            .eq('vehicle_id', selectedVehicleId)
+            .in('status', ['draft', 'active'])
+            .order('created_at', { ascending: false })
+            .limit(1);
+          if (!qErr) {
+            const row = Array.isArray(existing) && existing.length > 0 ? (existing[0] as any) : null;
+            const existingId = String(row?.id || '');
+            if (existingId) {
+              alert('An auction listing already exists for this vehicle. Opening it now.');
+              navigate(`/auction/${existingId}`);
+              return;
+            }
+          }
+        }
+        throw error;
+      }
 
       alert('Auction listing created in draft. Start it when you are ready.');
       navigate(`/auction/${data.id}`);

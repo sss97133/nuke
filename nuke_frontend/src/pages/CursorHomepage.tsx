@@ -5,6 +5,7 @@ import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { UserInteractionService } from '../services/userInteractionService';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { getCanonicalBodyStyle } from '../services/bodyStyleTaxonomy';
+import { getBodyStyleDisplay } from '../services/bodyStyleTaxonomy';
 
 interface HypeVehicle {
   id: string;
@@ -18,6 +19,8 @@ interface HypeVehicle {
   transmission_model?: string | null;
   drivetrain?: string | null;
   body_style?: string | null;
+  canonical_body_style?: string | null;
+  canonical_vehicle_type?: string | null;
   fuel_type?: string | null;
   current_value?: number;
   purchase_price?: number;
@@ -692,19 +695,60 @@ const CursorHomepage: React.FC = () => {
         uniqueMakes.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
         setAvailableMakes(uniqueMakes);
 
-        // Load distinct body styles
+        // Prefer canonical body styles if the taxonomy tables are present.
+        // This keeps filter UI stable even when `vehicles.body_style` is polluted.
+        const canonicalBodyStyles: string[] = [];
+        try {
+          const { data: canonBody, error: canonBodyErr } = await supabase
+            .from('canonical_body_styles')
+            .select('display_name, canonical_name, is_active')
+            .eq('is_active', true)
+            .limit(5000);
+          if (!canonBodyErr && Array.isArray(canonBody)) {
+            for (const row of canonBody as any[]) {
+              const display = String(row?.display_name || '').trim();
+              const canon = String(row?.canonical_name || '').trim();
+              const name = display || canon;
+              if (name) canonicalBodyStyles.push(name);
+            }
+          }
+        } catch {
+          // ignore: canonical tables may not exist in some environments
+        }
+
+        // Fallback: load raw body_style values from vehicles and normalize to display buckets.
         const { data: bodyData } = await supabase
           .from('vehicles')
           .select('body_style')
           .eq('is_public', true)
           .not('body_style', 'is', null)
           .limit(5000);
-        
-        if (bodyData) {
-          const uniqueStyles = [...new Set(bodyData.map(v => v.body_style).filter(Boolean))]
-            .sort((a, b) => a.localeCompare(b));
-          setAvailableBodyStyles(uniqueStyles);
+
+        const counts = new Map<string, number>();
+        for (const row of (bodyData || []) as any[]) {
+          const raw = row?.body_style;
+          const display = getBodyStyleDisplay(raw) || String(raw || '').trim();
+          if (!display) continue;
+          counts.set(display, (counts.get(display) || 0) + 1);
         }
+        const frequentVehicleBodyStyles = Array.from(counts.entries())
+          .filter(([, ct]) => ct >= 2)
+          .map(([name]) => name);
+
+        // Merge canonical + frequent, case-insensitive.
+        const mergedBody = [...canonicalBodyStyles, ...frequentVehicleBodyStyles];
+        const seenBody = new Set<string>();
+        const uniqueBody: string[] = [];
+        for (const s of mergedBody) {
+          const cleaned = String(s || '').trim();
+          if (!cleaned) continue;
+          const key = cleaned.toLowerCase();
+          if (seenBody.has(key)) continue;
+          seenBody.add(key);
+          uniqueBody.push(cleaned);
+        }
+        uniqueBody.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        setAvailableBodyStyles(uniqueBody);
       } catch (err) {
         console.error('Error loading filter options:', err);
       }
@@ -1928,10 +1972,9 @@ const CursorHomepage: React.FC = () => {
       // Get vehicles for feed (keep payload small; avoid heavy origin_metadata + bulk image joins here).
       // NOTE: Do NOT select `listing_start_date` here. It is not a real column in the DB and will cause
       // PostgREST 400 errors if included in the `select()` list.
-      // Simple query: most recent vehicles first, no filters
-      const { data: vehicles, error } = await supabase
-        .from('vehicles')
-        .select(`
+      // Simple query: most recent vehicles first, no filters.
+      // Try to include canonical taxonomy columns if present; fallback gracefully if migration not applied yet.
+      const selectV1 = `
           id, year, make, model, normalized_model, series, trim,
           engine, transmission, transmission_model, drivetrain, body_style, fuel_type,
           title, vin, created_at, updated_at,
@@ -1941,11 +1984,48 @@ const CursorHomepage: React.FC = () => {
           auction_end_date,
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin
-        `)
-        .eq('is_public', true)
-        .neq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .range(offset, offset + PAGE_SIZE - 1);
+        `;
+      const selectV2 = `
+          id, year, make, model, normalized_model, series, trim,
+          engine, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          canonical_vehicle_type, canonical_body_style,
+          title, vin, created_at, updated_at,
+          sale_price, current_value, purchase_price, asking_price,
+          sale_date, sale_status,
+          auction_outcome, high_bid, winning_bid, bid_count,
+          auction_end_date,
+          is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
+          discovery_url, discovery_source, profile_origin
+        `;
+
+      let vehicles: any[] | null = null;
+      let error: any = null;
+      try {
+        const r2 = await supabase
+          .from('vehicles')
+          .select(selectV2)
+          .eq('is_public', true)
+          .neq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
+        vehicles = r2.data as any[] | null;
+        error = r2.error;
+      } catch (e) {
+        vehicles = null;
+        error = e as any;
+      }
+
+      if (error && String(error?.message || '').includes('canonical_')) {
+        const r1 = await supabase
+          .from('vehicles')
+          .select(selectV1)
+          .eq('is_public', true)
+          .neq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1);
+        vehicles = r1.data as any[] | null;
+        error = r1.error;
+      }
 
       if (error) {
         // Supabase/PostgREST errors often include a useful `details` / `hint` payload.
@@ -4124,6 +4204,7 @@ const CursorHomepage: React.FC = () => {
                       { label: 'RV', values: ['RV'] },
                       { label: 'Trailer', values: ['Trailer'] },
                       { label: 'Boat', values: ['Boat'] },
+                      { label: 'Powersports', values: ['ATV', 'UTV', 'Snowmobile'] },
                     ].map(({ label, values }) => {
                       const isSelected = values.some(v => filters.bodyStyles.includes(v));
                       return (
@@ -4174,7 +4255,11 @@ const CursorHomepage: React.FC = () => {
                   </div>
                   {/* Specific body styles */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {['Coupe', 'Sedan', 'Convertible', 'Wagon', 'Hatchback', 'Fastback', 'Roadster', 'Pickup', 'SUV', 'Van', 'Minivan', 'Motorcycle', 'RV', 'Trailer', 'Boat'].map((style) => (
+                    {(
+                      (availableBodyStyles && availableBodyStyles.length > 0)
+                        ? availableBodyStyles.slice(0, 30)
+                        : ['Coupe', 'Sedan', 'Convertible', 'Wagon', 'Hatchback', 'Fastback', 'Roadster', 'Pickup', 'SUV', 'Van', 'Minivan', 'Motorcycle', 'RV', 'Trailer', 'Boat', 'ATV', 'UTV', 'Snowmobile']
+                    ).map((style) => (
                       <button
                         key={style}
                         onClick={() => {

@@ -57,6 +57,7 @@ import OrphanedVehicleBanner from '../components/vehicle/OrphanedVehicleBanner';
 import { AdminNotificationService } from '../services/adminNotificationService';
 import ImageGallery from '../components/images/ImageGallery';
 import { VehicleDataGapsCard } from '../components/vehicle/VehicleDataGapsCard';
+import { VehicleLedgerDocumentsCard } from '../components/vehicle/VehicleLedgerDocumentsCard';
 
 const WORKSPACE_TABS = [
   { id: 'evidence', label: 'Evidence', helper: 'Timeline, gallery, intake' },
@@ -3377,49 +3378,11 @@ const VehicleProfile: React.FC = () => {
           />
         </section>
 
-        {/* Wiring Query Context Bar & AI Parts Quote Generator */}
-        {(isRowOwner || isVerifiedOwner) && (
-          <section className="section">
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ 
-                fontSize: '10pt', 
-                fontWeight: 'bold', 
-                marginBottom: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                WIRING PLAN
-              </div>
-              <WiringQueryContextBar
-                vehicleId={vehicle.id}
-                vehicleInfo={{
-                  year: vehicle.year,
-                  make: vehicle.make,
-                  model: vehicle.model
-                }}
-                onQuoteGenerated={(quote) => {
-                  // Quote will be displayed in PartsQuoteGenerator
-                  console.log('Quote generated:', quote)
-                }}
-              />
-            </div>
-            <PartsQuoteGenerator 
-              vehicleId={vehicle.id}
-              vehicleInfo={{
-                year: vehicle.year,
-                make: vehicle.make,
-                model: vehicle.model
-              }}
-            />
-          </section>
-        )}
-
         {/* Two Column Layout: Left (vehicle info, investment, ref docs, description, comments & bids, privacy) | Right (image gallery) */}
         <section className="section">
           <div className="vehicle-profile-two-column">
             {/* Left Column */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <div className="vehicle-profile-left-column" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               {/* Vehicle Info */}
               <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading basic info...</div>}>
                 <VehicleBasicInfo
@@ -3430,6 +3393,39 @@ const VehicleProfile: React.FC = () => {
                   onEditClick={handleEditClick}
                 />
               </React.Suspense>
+
+              {/* Investment ledger documents */}
+              {(isVerifiedOwner || hasContributorAccess) && (
+                <VehicleLedgerDocumentsCard vehicleId={vehicle.id} canManage={Boolean(isVerifiedOwner || hasContributorAccess)} />
+              )}
+
+              {/* Wiring plan + parts quote generator */}
+              {(isRowOwner || isVerifiedOwner) && (
+                <>
+                  <div className="card">
+                    <div className="card-header">WIRING PLAN</div>
+                    <div className="card-body">
+                      <WiringQueryContextBar
+                        vehicleId={vehicle.id}
+                        vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
+                        onQuoteGenerated={() => {
+                          // Quote will be displayed in PartsQuoteGenerator (owned by that component)
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="card-header">AI PARTS QUOTE GENERATOR</div>
+                    <div className="card-body">
+                      <PartsQuoteGenerator
+                        vehicleId={vehicle.id}
+                        vehicleInfo={{ year: vehicle.year, make: vehicle.make, model: vehicle.model }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Proof tasks / public scrutiny (data gaps) */}
               <VehicleDataGapsCard vehicleId={vehicle.id} />

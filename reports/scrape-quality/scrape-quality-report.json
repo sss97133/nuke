@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-01-14T12:31:12.601Z",
+  "scope": {
+    "since_hours": 24,
+    "limit": 1000,
+    "queue_id": "6aab9951-d9b9-4a15-b48e-c896f1a61a83",
+    "vehicle_id": null,
+    "listing_url_filter": null,
+    "domain_filter": null
+  },
+  "summary": {
+    "total": 1,
+    "bad": 0,
+    "warn": 0,
+    "bad_rate": 0,
+    "warn_rate": 0
+  },
+  "domains": [],
+  "worst_offenders": []
+}

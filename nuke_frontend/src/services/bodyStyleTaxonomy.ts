@@ -47,6 +47,16 @@ export type BodyStyleDefinition = {
   aliases: string[];
 };
 
+export type BodyStylePopoverDefinition = {
+  kind: 'body_style';
+  key: string;
+  label: string;
+  title: string;
+  summary: string;
+  details?: string[];
+  known: boolean;
+};
+
 const defs: BodyStyleDefinition[] = [
   { canonical: 'COUPE', display: 'Coupe', vehicleType: 'CAR', summary: 'Two-door car body style.', aliases: ['coupe', '2dr', 'two door', 'two-door'] },
   { canonical: 'SEDAN', display: 'Sedan', vehicleType: 'CAR', summary: 'Four-door car body style.', aliases: ['sedan', '4dr', 'four door', 'four-door'] },
@@ -77,6 +87,11 @@ const canonToDef = new Map<CanonicalBodyStyle, BodyStyleDefinition>(defs.map((d)
 const normalize = (raw: unknown): string => {
   const s = String(raw ?? '').trim().toLowerCase();
   return s.replace(/\s+/g, ' ');
+};
+
+const normalizeKey = (raw: unknown): string => {
+  const s = String(raw ?? '').trim().toUpperCase();
+  return s.replace(/[^A-Z0-9]/g, '');
 };
 
 export function getCanonicalBodyStyle(raw: unknown): CanonicalBodyStyle | null {
@@ -123,5 +138,35 @@ export function getBodyStyleDisplay(raw: unknown): string | null {
   if (def) return def.display;
   const s = String(raw ?? '').trim();
   return s ? s : null;
+}
+
+export function getBodyStylePopoverDefinition(raw: unknown): BodyStylePopoverDefinition | null {
+  const s = String(raw ?? '').trim();
+  if (!s) return null;
+
+  const canon = getCanonicalBodyStyle(s);
+  if (canon) {
+    const def = canonToDef.get(canon);
+    if (def) {
+      return {
+        kind: 'body_style',
+        key: canon,
+        label: def.display,
+        title: def.display,
+        summary: def.summary,
+        details: [`Vehicle type: ${def.vehicleType}`],
+        known: true,
+      };
+    }
+  }
+
+  return {
+    kind: 'body_style',
+    key: normalizeKey(s) || 'UNKNOWN',
+    label: s.length > 24 ? `${s.slice(0, 24)}...` : s,
+    title: s,
+    summary: 'Definition not mapped yet. Click-through exists so we can expand canonical body styles and vehicle types over time.',
+    known: false,
+  };
 }
 

@@ -2756,57 +2756,9 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
             
             // If we have a matching org, show circular favicon icon
             if (sellerOrg) {
-              const orgWebsiteUrl = sellerOrg.website || sellerOrg.business_website;
-              const isBatOrg = String(sellerOrg.business_name || '').toLowerCase().includes('bring a trailer') || 
-                              String(sellerOrg.business_name || '').toLowerCase().includes('bat');
-              
-              return (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (sellerOrg.organization_id) {
-                      window.location.href = `/org/${sellerOrg.organization_id}`;
-                    } else if ((sellerBadge as any)?.href) {
-                      window.location.href = String((sellerBadge as any).href);
-                    }
-                  }}
-                  title={`${sellerOrg.business_name} (${formatRelationship(sellerOrg.relationship_type)}) - Click to view profile`}
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 999,
-                    border: '1px solid var(--border)',
-                    background: 'var(--surface)',
-                    padding: 0,
-                    margin: 0,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxSizing: 'border-box',
-                  }}
-              >
-                  {isBatOrg ? (
-                    <img src="/vendor/bat/favicon.ico" alt="Bring a Trailer" style={{ width: '14px', height: '14px', objectFit: 'contain' }} />
-                  ) : sellerOrg.logo_url ? (
-                    <CircularAvatar
-                      src={sellerOrg.logo_url}
-                      alt={sellerOrg.business_name}
-                      size={14}
-                      fallback={sellerOrg.business_name?.charAt(0)?.toUpperCase() || '?'}
-                    />
-                  ) : orgWebsiteUrl ? (
-                    <FaviconIcon url={orgWebsiteUrl} size={14} style={{ margin: 0 }} />
-                  ) : (
-                    <CircularAvatar
-                      size={14}
-                      fallback={sellerOrg.business_name?.charAt(0)?.toUpperCase() || '?'}
-                    />
-                  )}
-                </button>
-              );
+              // Avoid duplicate org bubbles: the seller org is already rendered in the org icon cluster (badge-priority-1),
+              // which opens the investment/details card (and that card links to /org/:id).
+              return null;
             }
             
             // Fallback: If seller badge has href (BaT user), show circular favicon

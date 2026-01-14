@@ -236,7 +236,7 @@ serve(async (req) => {
     if (!isBaT(canonicalSourceUrl)) return safeJsonError("Only Bring a Trailer URLs are supported for split right now", 400);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
     if (!supabaseUrl || !serviceKey) return safeJsonError("Server not configured", 500);
 
     const admin = createClient(supabaseUrl, serviceKey, {
@@ -250,11 +250,18 @@ serve(async (req) => {
     const { data: currentVehicle, error: curErr } = await admin
       .from("vehicles")
       .select(
-        "id, vin, origin_metadata, listing_url, discovery_url, listing_source, discovery_source, bat_auction_url"
+        "id, vin, origin_metadata, listing_url, discovery_url, listing_source, discovery_source, bat_auction_url, description, description_source, description_generated_at"
       )
       .eq("id", vehicleId)
       .single();
     if (curErr) throw curErr;
+
+    // Does the current vehicle actually point at this source URL?
+    // (We only detach fields from the old vehicle when the source matches, so editors can split additional URLs safely.)
+    const listingMatches =
+      normalizeUrl((currentVehicle as any)?.listing_url || "") === canonicalSourceUrl ||
+      normalizeUrl((currentVehicle as any)?.discovery_url || "") === canonicalSourceUrl ||
+      normalizeUrl((currentVehicle as any)?.bat_auction_url || "") === canonicalSourceUrl;
 
     // Idempotency: if we already created a split vehicle for this source+parent, return it.
     // This avoids duplicate split vehicles when users click multiple times.
@@ -282,37 +289,69 @@ serve(async (req) => {
     const vinConflictDetected =
       !!currentVinNormalized && !!sourceVinNormalized && currentVinNormalized !== sourceVinNormalized;
 
-    // Create a new vehicle explicitly (no matching) to prevent cross-contamination.
-    const { data: newVehicle, error: createErr } = await admin
-      .from("vehicles")
-      .insert({
-        year: scraped.year ?? null,
-        make: scraped.make ?? null,
-        model: scraped.model ?? null,
-        vin: scraped.vin ?? null,
-        listing_url: canonicalSourceUrl,
-        discovery_url: canonicalSourceUrl,
-        discovery_source: "split_from_source",
-        profile_origin: "bat_import",
-        bat_auction_url: canonicalSourceUrl,
-        origin_metadata: {
-          import_source: "split_from_source",
-          split_from_vehicle_id: vehicleId,
-          split_reason: reason ?? "Source URL conflicts with existing evidence",
-          source_url: canonicalSourceUrl,
-          current_vehicle_vin: currentVinNormalized || null,
-          source_vin: sourceVinNormalized || null,
-          vin_conflict_detected: vinConflictDetected,
-          forced: force === true,
-          created_at: new Date().toISOString(),
-        },
-        // Keep attribution with the user performing the split.
-        uploaded_by: user.id,
-      } as any)
-      .select("id")
-      .single();
+    // Avoid violating unique constraints during split:
+    // - vehicles.discovery_url is UNIQUE (non-null). If the old vehicle already owns this URL,
+    //   we stage the new vehicle without discovery_url and set it after detaching the old.
+    // - vehicles.vin is UNIQUE (non-null). If it conflicts, we still allow the split and
+    //   store the scraped VIN in origin_metadata; the new row's vin stays null.
+    const stagedDiscoveryUrl: string | null = listingMatches ? null : canonicalSourceUrl;
 
-    if (createErr) throw createErr;
+    // Create a new vehicle explicitly (no matching) to prevent cross-contamination.
+    const baseInsertPayload: any = {
+      year: scraped.year ?? null,
+      make: scraped.make ?? null,
+      model: scraped.model ?? null,
+      vin: scraped.vin ?? null,
+      listing_url: canonicalSourceUrl,
+      discovery_url: stagedDiscoveryUrl,
+      discovery_source: stagedDiscoveryUrl ? "split_from_source" : null,
+      profile_origin: "bat_import",
+      bat_auction_url: canonicalSourceUrl,
+      origin_metadata: {
+        import_source: "split_from_source",
+        split_from_vehicle_id: vehicleId,
+        split_reason: reason ?? "Source URL conflicts with existing evidence",
+        source_url: canonicalSourceUrl,
+        current_vehicle_vin: currentVinNormalized || null,
+        source_vin: sourceVinNormalized || null,
+        vin_conflict_detected: vinConflictDetected,
+        forced: force === true,
+        created_at: new Date().toISOString(),
+      },
+      // Keep attribution with the user performing the split.
+      uploaded_by: user.id,
+    };
+
+    let newVehicle: any = null;
+    {
+      const attempt = await admin.from("vehicles").insert(baseInsertPayload).select("id").single();
+      if (!attempt.error) {
+        newVehicle = attempt.data;
+      } else {
+        const e: any = attempt.error;
+        const code = String(e?.code || "");
+        const msg = String(e?.message || e?.details || "");
+
+        const isUnique = code === "23505";
+        const vinUnique = isUnique && (msg.includes("vehicles_vin_unique_index") || msg.toLowerCase().includes("vin"));
+        const discoveryUnique = isUnique && (msg.includes("vehicles_discovery_url_unique") || msg.toLowerCase().includes("discovery_url"));
+
+        // Retry without the conflicting field(s).
+        if (vinUnique || discoveryUnique) {
+          const retryPayload = { ...baseInsertPayload };
+          if (vinUnique) retryPayload.vin = null;
+          if (discoveryUnique) {
+            retryPayload.discovery_url = null;
+            retryPayload.discovery_source = null;
+          }
+          const retry = await admin.from("vehicles").insert(retryPayload).select("id").single();
+          if (retry.error) throw retry.error;
+          newVehicle = retry.data;
+        } else {
+          throw attempt.error;
+        }
+      }
+    }
 
     // Unmerge: detach BaT listing linkage + move BaT auction data to the new vehicle.
     // Best-effort; the split vehicle remains even if unmerge steps partially fail.
@@ -333,7 +372,7 @@ serve(async (req) => {
         },
       };
 
-      // 1) Move auction tables tied to the source URL
+      // 1) Move auction + listing tables tied to the source URL
       await admin
         .from("auction_events")
         .update({ vehicle_id: newVehicle.id } as any)
@@ -347,57 +386,158 @@ serve(async (req) => {
         .eq("platform", "bat")
         .in("source_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
 
-      // 2) Move timeline auction events (these often lack source_url, so use event_type prefix)
+      // external_listings drives UI "listings" panels; move it too.
+      await admin
+        .from("external_listings")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .eq("platform", "bat")
+        .in("listing_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
+
+      // Legacy BaT tables (still queried by the UI)
+      const { data: batListingRows } = await admin
+        .from("bat_listings")
+        .select("id")
+        .eq("vehicle_id", vehicleId)
+        .in("bat_listing_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
+
+      const batListingIds = (Array.isArray(batListingRows) ? batListingRows : [])
+        .map((r: any) => r?.id)
+        .filter(Boolean);
+
+      await admin
+        .from("bat_listings")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .in("bat_listing_url", [canonicalSourceUrl, `${canonicalSourceUrl}/`]);
+
+      if (batListingIds.length > 0) {
+        await admin
+          .from("bat_comments")
+          .update({ vehicle_id: newVehicle.id } as any)
+          .eq("vehicle_id", vehicleId)
+          .in("bat_listing_id", batListingIds);
+      }
+
+      const urlVariants = [canonicalSourceUrl, `${canonicalSourceUrl}/`];
+
+      // 2) Move provenance rows tied to this listing URL (so description/history panels follow the split)
+      await admin
+        .from("extraction_metadata")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .in("source_url", urlVariants);
+
+      await admin
+        .from("vehicle_field_sources")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .in("source_url", urlVariants);
+
+      // 3) Move timeline events tied to this listing (multiple historical schemas exist)
+      // Newer BaT extractors store source_url in metadata + source='bat'
       await admin
         .from("timeline_events")
         .update({ vehicle_id: newVehicle.id } as any)
         .eq("vehicle_id", vehicleId)
-        .like("event_type", "auction_%");
+        .eq("source", "bat")
+        .contains("metadata", { source_url: canonicalSourceUrl });
 
-      // 3) Detach listing URL + clear BaT-derived summary fields on the original vehicle
+      // Legacy/older extractors store listing URL under different metadata keys
+      await admin
+        .from("timeline_events")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .like("event_type", "auction_%")
+        .in("metadata->>listing_url", urlVariants);
+
+      await admin
+        .from("timeline_events")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .like("event_type", "auction_%")
+        .in("metadata->>bat_listing_url", urlVariants);
+
+      await admin
+        .from("timeline_events")
+        .update({ vehicle_id: newVehicle.id } as any)
+        .eq("vehicle_id", vehicleId)
+        .like("event_type", "auction_%")
+        .in("metadata->>discovery_url", urlVariants);
+
+      // 4) Detach listing URL + clear BaT-derived summary fields on the original vehicle
       // (Only do this if the current listing/discovery URLs match the split source.)
-      const listingMatches =
-        normalizeUrl((currentVehicle as any)?.listing_url || "") === canonicalSourceUrl ||
-        normalizeUrl((currentVehicle as any)?.discovery_url || "") === canonicalSourceUrl ||
-        normalizeUrl((currentVehicle as any)?.bat_auction_url || "") === canonicalSourceUrl;
-
       if (listingMatches) {
+        const descSource = String((currentVehicle as any)?.description_source || "").toLowerCase();
+        const originMeta =
+          currentVehicle && typeof (currentVehicle as any).origin_metadata === "object" && (currentVehicle as any).origin_metadata
+            ? (currentVehicle as any).origin_metadata
+            : {};
+        const descFromListing =
+          ["source_imported", "craigslist_listing", "bat_listing", "bat_import"].includes(descSource) ||
+          String((originMeta as any)?.backfill_source || "") === "bat_profile_scrape" ||
+          normalizeUrl(String((originMeta as any)?.listing_url || "")) === canonicalSourceUrl;
+        const shouldClearDescription = descFromListing && descSource !== "user_input" && descSource !== "ai_generated";
+
+        const detachPayload: any = {
+          listing_url: null,
+          listing_source: null,
+          discovery_url: null,
+          discovery_source: null,
+          bat_auction_url: null,
+          auction_source: null,
+          sale_price: null,
+          auction_end_date: null,
+          bid_count: null,
+          view_count: null,
+          sale_status: null,
+          sale_date: null,
+          auction_outcome: null,
+          high_bid: null,
+          winning_bid: null,
+          // BaT summary fields
+          bat_sold_price: null,
+          bat_sale_date: null,
+          bat_bid_count: null,
+          bat_view_count: null,
+          bat_listing_title: null,
+          bat_bids: null,
+          bat_comments: null,
+          bat_views: null,
+          bat_location: null,
+          bat_seller: null,
+          bat_buyer: null,
+          bat_lot_number: null,
+          bat_watchers: null,
+          reserve_status: null,
+          origin_metadata: nextMeta,
+          updated_at: nowIso,
+        };
+
+        // If the old description came from the listing, clear it as part of decontamination.
+        if (shouldClearDescription) {
+          detachPayload.description = null;
+          detachPayload.description_source = null;
+          detachPayload.description_generated_at = null;
+        }
+
         await admin
           .from("vehicles")
-          .update({
-            listing_url: null,
-            listing_source: null,
-            discovery_url: null,
-            bat_auction_url: null,
-            auction_source: null,
-            sale_price: null,
-            auction_end_date: null,
-            bid_count: null,
-            view_count: null,
-            sale_status: null,
-            sale_date: null,
-            auction_outcome: null,
-            high_bid: null,
-            winning_bid: null,
-            // BaT summary fields
-            bat_sold_price: null,
-            bat_sale_date: null,
-            bat_bid_count: null,
-            bat_view_count: null,
-            bat_listing_title: null,
-            bat_bids: null,
-            bat_comments: null,
-            bat_views: null,
-            bat_location: null,
-            bat_seller: null,
-            bat_buyer: null,
-            bat_lot_number: null,
-            bat_watchers: null,
-            reserve_status: null,
-            origin_metadata: nextMeta,
-            updated_at: nowIso,
-          } as any)
+          .update(detachPayload as any)
           .eq("id", vehicleId);
+
+        // If we staged the new vehicle without discovery_url due to a uniqueness collision,
+        // set it now that the old vehicle has been detached.
+        if (!stagedDiscoveryUrl) {
+          await admin
+            .from("vehicles")
+            .update({
+              discovery_url: canonicalSourceUrl,
+              discovery_source: "split_from_source",
+              updated_at: nowIso,
+            } as any)
+            .eq("id", newVehicle.id);
+        }
       }
     } catch (e: any) {
       console.log("Unmerge steps failed (non-fatal):", e?.message || String(e));
@@ -445,16 +585,14 @@ serve(async (req) => {
     try {
       // Step 1: Extract core vehicle data (VIN, specs, images, auction_events)
       const step1Result = await admin.functions.invoke("extract-bat-core", {
-        body: { url: canonicalSourceUrl, max_vehicles: 1 },
+        body: { url: canonicalSourceUrl, max_vehicles: 1, vehicle_id: newVehicle.id },
       });
       
       if (step1Result.error) {
         console.log(`extract-bat-core invoke failed (non-fatal): ${step1Result.error.message}`);
       } else {
-        const vehicleId = step1Result.data?.created_vehicle_ids?.[0] || 
-                         step1Result.data?.updated_vehicle_ids?.[0] || 
-                         newVehicle.id;
-        
+        const vehicleId = newVehicle.id;
+
         // Step 2: Extract comments and bids (non-critical, fire-and-forget)
         admin.functions.invoke("extract-auction-comments", {
           body: { auction_url: canonicalSourceUrl, vehicle_id: vehicleId },
