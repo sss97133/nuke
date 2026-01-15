@@ -31,6 +31,7 @@ import AdminPendingVehicles from '../../../pages/AdminPendingVehicles';
 import HoverCardDemo from '../../../pages/admin/HoverCardDemo';
 import VehicleMakeLogosCatalog from '../../../pages/admin/VehicleMakeLogosCatalog';
 import MarketDataTools from '../../../pages/MarketDataTools';
+import BotTestDashboard from '../../../pages/admin/BotTestDashboard';
 
 const AdminModuleRoutes = () => {
   return (
@@ -73,6 +74,7 @@ const AdminModuleRoutes = () => {
         <Route path="data-diagnostic" element={<DataDiagnostic />} />
         <Route path="test-contributions" element={<TestContributions />} />
         <Route path="hover-demo" element={<HoverCardDemo />} />
+        <Route path="bot-testing" element={<BotTestDashboard />} />
       </Route>
     </Routes>
   );
