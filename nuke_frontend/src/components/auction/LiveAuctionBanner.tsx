@@ -27,7 +27,9 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
   const [loading, setLoading] = useState(true);
   const [showBidInterface, setShowBidInterface] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
+  const [timerExtension, setTimerExtension] = useState<{ seconds: number; visible: boolean } | null>(null);
   const endRefreshTriggeredRef = useRef(false);
+  const previousEndTimeRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Reset end-of-auction refresh guard when listing changes
@@ -51,6 +53,26 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
         (payload) => {
           const row = (payload as any)?.new as any;
           if (!row) return;
+          
+          // Detect timer extension: if end_time moved forward, show indicator
+          const prevEndTime = previousEndTimeRef.current;
+          const newEndTime = row.auction_end_time;
+          if (prevEndTime && newEndTime && prevEndTime !== newEndTime) {
+            const prevTime = new Date(prevEndTime).getTime();
+            const newTime = new Date(newEndTime).getTime();
+            if (newTime > prevTime) {
+              const extensionSeconds = Math.floor((newTime - prevTime) / 1000);
+              if (extensionSeconds > 0) {
+                setTimerExtension({ seconds: extensionSeconds, visible: true });
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                  setTimerExtension((prev) => prev ? { ...prev, visible: false } : null);
+                }, 5000);
+              }
+            }
+          }
+          previousEndTimeRef.current = newEndTime;
+          
           // If listing still visible to this user, update our snapshot immediately.
           setListing((prev) => {
             if (!prev) return row as any;
@@ -67,6 +89,13 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
       } catch {}
     };
   }, [listing?.id]);
+
+  // Track previous end time to detect extensions
+  useEffect(() => {
+    if (listing?.auction_end_time) {
+      previousEndTimeRef.current = listing.auction_end_time;
+    }
+  }, [listing?.auction_end_time]);
 
   useEffect(() => {
     if (!listing?.auction_end_time) return;
@@ -174,8 +203,40 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
   const isEnded = timeRemaining === 'Ended';
   const finalPrice = typeof (listing as any)?.final_price_cents === 'number' ? (listing as any).final_price_cents : null;
 
+  const formatExtensionTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+  };
+
   return (
     <>
+      {/* Timer Extension Indicator */}
+      {timerExtension?.visible && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+            color: 'white',
+            padding: '8px 12px',
+            marginBottom: '8px',
+            borderRadius: '4px',
+            fontSize: '9pt',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+            animation: 'slideDown 0.3s ease-out',
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>⏱️</span>
+          <span>
+            Timer extended by <strong>+{formatExtensionTime(timerExtension.seconds)}</strong>
+          </span>
+        </div>
+      )}
+
       <div
         style={{
           background: 'var(--surface)',

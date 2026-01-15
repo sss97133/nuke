@@ -89,15 +89,17 @@ async function fetchVehiclesMissingMake(
   supabaseUrl: string,
   key: string,
   excludeMerged: boolean,
-  limit: number
-): Promise<any[]> {
+  limit: number,
+  offset: number = 0
+): Promise<{ vehicles: any[]; hasMore: boolean }> {
   // Build filter using PostgREST query syntax
   const statusFilter = excludeMerged ? `status=neq.merged&` : ``;
-  const limitParam = limit > 0 ? `limit=${limit}` : `limit=1000`;
+  const batchSize = 1000; // PostgREST max per request
+  const limitParam = limit > 0 ? Math.min(limit, batchSize) : batchSize;
   const selectFields = `select=id,make,model,listing_title,bat_listing_title,discovery_url,listing_url,bat_auction_url,platform_url`;
 
-  // Use PostgREST to query vehicles missing make
-  const filter = `or=(make.is.null,make.eq.)&order=created_at.desc&${statusFilter}${limitParam}`;
+  // Use PostgREST to query vehicles missing make with pagination
+  const filter = `or=(make.is.null,make.eq.)&order=created_at.desc&${statusFilter}limit=${limitParam}&offset=${offset}`;
 
   const resp = await fetch(
     `${supabaseUrl.replace(/\/$/, "")}/rest/v1/vehicles?${selectFields}&${filter}`,
@@ -107,6 +109,7 @@ async function fetchVehiclesMissingMake(
         Accept: "application/json",
         apikey: key,
         Authorization: `Bearer ${key}`,
+        Range: `${offset}-${offset + limitParam - 1}`,
       },
     }
   );
@@ -120,7 +123,13 @@ async function fetchVehiclesMissingMake(
   if (data && typeof data === "object" && !Array.isArray(data) && data.error) {
     throw new Error(String(data.error));
   }
-  return Array.isArray(data) ? data : [];
+  const vehicles = Array.isArray(data) ? data : [];
+  
+  // Check if there are more results
+  const contentRange = resp.headers.get("content-range");
+  const hasMore = vehicles.length === limitParam && (limit <= 0 || offset + vehicles.length < limit);
+  
+  return { vehicles, hasMore };
 }
 
 async function execUpdate(
@@ -347,18 +356,53 @@ async function main(): Promise<void> {
   ]);
 
   if (opts.verbose) console.log("Fetching vehicles missing make...");
-  const vehicles = await fetchVehiclesMissingMake(
-    supabaseUrl,
-    key,
-    opts.excludeMerged,
-    opts.limit
-  );
+  
+  let allVehicles: any[] = [];
+  let offset = 0;
+  let hasMore = true;
+  const batchSize = 1000;
+  
+  // Fetch all vehicles in batches
+  while (hasMore && (opts.limit <= 0 || allVehicles.length < opts.limit)) {
+    const remainingLimit = opts.limit > 0 ? opts.limit - allVehicles.length : 0;
+    const { vehicles, hasMore: more } = await fetchVehiclesMissingMake(
+      supabaseUrl,
+      key,
+      opts.excludeMerged,
+      remainingLimit > 0 ? remainingLimit : batchSize,
+      offset
+    );
+    
+    // Filter out vehicles that have non-empty make (PostgREST filter doesn't handle empty string perfectly)
+    const missingMake = vehicles.filter((v) => !v.make || v.make.trim() === "");
+    allVehicles.push(...missingMake);
+    
+    // Update hasMore: continue if we got a full batch and haven't hit the limit
+    hasMore = vehicles.length === batchSize && (opts.limit <= 0 || allVehicles.length < opts.limit);
+    offset += vehicles.length;
+    
+    if (opts.verbose && allVehicles.length % 1000 === 0) {
+      console.log(`Fetched ${allVehicles.length} vehicles so far...`);
+    }
+    
+    if (opts.limit > 0 && allVehicles.length >= opts.limit) {
+      allVehicles = allVehicles.slice(0, opts.limit);
+      break;
+    }
+    
+    // Stop if we got fewer vehicles than requested (end of results)
+    if (vehicles.length < batchSize) {
+      hasMore = false;
+      break;
+    }
+    
+    // Small delay to avoid rate limiting
+    if (hasMore) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
 
-  // Filter out vehicles that have non-empty make after fetching (PostgREST or filter doesn't handle empty string well)
-  const vehiclesMissingMake = vehicles.filter(
-    (v) => !v.make || v.make.trim() === ""
-  );
-
+  const vehiclesMissingMake = allVehicles;
   console.log(`Found ${vehiclesMissingMake.length} vehicles missing make`);
 
   const results = {

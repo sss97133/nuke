@@ -11,6 +11,9 @@ import { useVehicleImages } from '../../hooks/useVehicleImages';
 import { LotBadge } from '../auction/LotBadge';
 import { getAuctionMode, isActiveAuction as isInActiveAuction, getAuctionStateInfo } from '../../services/unifiedAuctionStateService';
 import { OwnershipDetailsPopup } from './OwnershipDetailsPopup';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
+import { useVehicleFollow } from '../../hooks/useVehicleFollow';
 
 const parseMoneyNumber = (val: any): number | null => {
   if (val === null || val === undefined) return null;
@@ -93,6 +96,23 @@ interface VehicleCardDenseProps {
   thermalPricing?: boolean;
   /** Thumbnail fit mode for the card image (square crop vs original letterbox). */
   thumbnailFit?: 'cover' | 'contain';
+  // ===== NEW FEATURE VISIBILITY PROPS =====
+  /** Show follow/bookmark button (uses user_subscriptions) */
+  showFollowButton?: boolean;
+  /** Show relationship badge (owned/contributing/interested/etc.) */
+  showRelationshipBadge?: boolean;
+  /** Relationship type to display if showRelationshipBadge is true */
+  relationshipType?: 'owned' | 'contributing' | 'interested' | 'discovered' | 'curated' | 'consigned' | 'previously_owned';
+  /** Show metrics (image count, event count, etc.) */
+  showMetrics?: boolean;
+  /** Show status badges (discovery status, verification, etc.) */
+  showStatusBadges?: boolean;
+  /** Responsive sizing: auto-adjust based on container width */
+  responsive?: boolean;
+  /** Minimum card width in grid mode (default: 200px) */
+  minCardWidth?: number;
+  /** Maximum card width in grid mode (default: 400px) */
+  maxCardWidth?: number;
 }
 
 const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
@@ -107,7 +127,16 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   viewerUserId,
   cardSizePx,
   thermalPricing = false,
-  thumbnailFit = 'contain'
+  thumbnailFit = 'contain',
+  // New props
+  showFollowButton = false,
+  showRelationshipBadge = false,
+  relationshipType,
+  showMetrics = false,
+  showStatusBadges = false,
+  responsive = true,
+  minCardWidth = 200,
+  maxCardWidth = 400,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [touchStart, setTouchStart] = React.useState(0);
@@ -117,6 +146,13 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     def: PowertrainSpecDefinition | BodyStylePopoverDefinition;
     position: { x: number; y: number };
   } | null>(null);
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  const [computedCardSize, setComputedCardSize] = React.useState(cardSizePx || 200);
+  
+  // Follow system with ROI tracking
+  const { isFollowing, isLoading: followLoading, followROI, toggleFollow } = useVehicleFollow(
+    showFollowButton ? vehicle.id : ''
+  );
 
   // Local CSS for badge animations. We scope keyframes to avoid collisions
   // (the design system defines multiple `@keyframes pulse` variations).
@@ -1864,6 +1900,75 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           <FaviconIcon url={sourceFaviconUrl} size={12} preserveAspectRatio={true} />
           {orgFaviconUrl ? <FaviconIcon url={orgFaviconUrl} size={12} preserveAspectRatio={true} /> : null}
         </div>
+      )}
+
+      {/* Follow Button with ROI - top-right corner */}
+      {showFollowButton && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleFollow();
+          }}
+          disabled={followLoading}
+          style={{
+            position: 'absolute',
+            top: '6px',
+            right: '6px',
+            background: isFollowing 
+              ? 'rgba(59, 130, 246, 0.9)' 
+              : 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(4px)',
+            border: isFollowing 
+              ? '1px solid rgba(59, 130, 246, 0.5)' 
+              : '1px solid rgba(255,255,255,0.2)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '7pt',
+            fontWeight: 700,
+            cursor: followLoading ? 'wait' : 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            zIndex: 10,
+            transition: 'all 0.12s ease',
+          }}
+          onMouseEnter={(e) => {
+            if (!followLoading) {
+              e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
+          title={
+            isFollowing && followROI
+              ? `Following since ${followROI.days_following} days ago. If you invested $${followROI.price_at_follow?.toLocaleString()} when you started following, you'd have ${followROI.hypothetical_roi_pct && followROI.hypothetical_roi_pct > 0 ? '+' : ''}${followROI.hypothetical_roi_pct?.toFixed(1)}% return (${followROI.hypothetical_gain && followROI.hypothetical_gain > 0 ? '+' : ''}$${followROI.hypothetical_gain?.toLocaleString()})`
+              : 'Follow this vehicle to track hypothetical ROI'
+          }
+        >
+          {followLoading ? (
+            '...'
+          ) : isFollowing ? (
+            <>
+              <span>⭐</span>
+              {followROI && followROI.hypothetical_roi_pct !== null && (
+                <span style={{
+                  color: followROI.hypothetical_roi_pct > 0 ? '#10b981' : followROI.hypothetical_roi_pct < 0 ? '#ef4444' : 'inherit',
+                  fontWeight: 800,
+                }}>
+                  {followROI.hypothetical_roi_pct > 0 ? '+' : ''}{followROI.hypothetical_roi_pct.toFixed(1)}%
+                </span>
+              )}
+            </>
+          ) : (
+            '⭐ Follow'
+          )}
+        </button>
       )}
       
       {/* Detail overlay on image instead of separate panel */}
