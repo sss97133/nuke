@@ -30,10 +30,14 @@ interface AuctionListing {
   current_high_bid_cents: number | null;
   reserve_price_cents: number | null;
   bid_count: number;
+  auction_start_time?: string | null;
   auction_end_time: string | null;
   status: string;
   description?: string;
   created_at: string;
+  updated_at?: string | null;
+  telemetry_stale?: boolean;
+  is_flash?: boolean;
   vehicle: {
     id: string;
     year: number;
@@ -45,7 +49,7 @@ interface AuctionListing {
   };
 }
 
-type FilterType = 'all' | 'ending_soon' | 'no_reserve' | 'new_listings';
+type FilterType = 'all' | 'ending_now' | 'ending_soon' | 'flash' | 'no_reserve' | 'new_listings';
 type SortType = 'ending_soon' | 'bid_count' | 'price_low' | 'price_high' | 'newest';
 
 export default function AuctionMarketplace() {
@@ -56,10 +60,14 @@ export default function AuctionMarketplace() {
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('ending_soon');
   const [searchQuery, setSearchQuery] = useState('');
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
   // Default to including 0-bid auctions so marketplace doesn't look empty while bid_count backfills.
   const [includeNoBidAuctions, setIncludeNoBidAuctions] = useState(true);
   const [hiddenNoBidCount, setHiddenNoBidCount] = useState(0);
   const [debugCounts, setDebugCounts] = useState<{ native: number; external: number; total: number } | null>(null);
+  const endingNowWindowMs = 15 * 60 * 1000;
+  const endingSoonWindowMs = 2 * 60 * 60 * 1000;
+  const nowMs = nowTick;
 
   useEffect(() => {
     loadListings();
@@ -102,6 +110,12 @@ export default function AuctionMarketplace() {
       channel.unsubscribe();
     };
   }, [filter, sort, includeNoBidAuctions]);
+
+  // Refresh time-left labels + "ending soon" buckets.
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 30000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const loadListings = async () => {
     setLoading(true);

@@ -3,12 +3,12 @@
  * Report make/model statistics from the Supabase/Postgres database.
  *
  * Outputs:
- *  1) Vehicle counts per make+model (includes zero-count models when the ECR catalog exists)
- *  2) All models per make (from the ECR catalog)
+ *  1) Vehicle counts per make+model (from `public.vehicles`)
+ *  2) All models per make (from `public.vehicles`)
  *
- * This repo commonly exposes a PostgREST RPC named `exec_sql` for running ad-hoc SQL. This script
- * uses it (service role recommended). If `exec_sql` is missing/unavailable, the script will fail
- * with a helpful error.
+ * Notes:
+ * - This script uses an admin-style PostgREST RPC for ad-hoc SELECT queries (commonly `execute_sql` or `exec_sql`).
+ * - It normalizes blank make/model to "[unknown]" so you can spot data-quality issues quickly.
  *
  * Usage:
  *   tsx scripts/report-make-model-stats.ts
@@ -89,9 +89,10 @@ function requireAnyEnv(names: string[]): string {
 async function postExecSql(
   supabaseUrl: string,
   key: string,
+  rpcName: "exec_sql" | "execute_sql",
   payload: Record<string, unknown>
 ): Promise<{ ok: true; data: unknown } | { ok: false; status: number; body: string }> {
-  const resp = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/exec_sql`, {
+  const resp = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${rpcName}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -121,6 +122,8 @@ function unwrapExecSqlResult(raw: unknown): any[] {
   if (Array.isArray(raw)) return raw as any[];
   if (raw && typeof raw === "object") {
     const r: any = raw;
+    // Some implementations return { error: "..." } with HTTP 200
+    if (typeof r.error === "string" && r.error.trim()) return [];
     if (Array.isArray(r.data)) return r.data;
     if (Array.isArray(r.result)) return r.result;
     if (Array.isArray(r.rows)) return r.rows;
@@ -128,29 +131,56 @@ function unwrapExecSqlResult(raw: unknown): any[] {
   return [];
 }
 
+function extractExecSqlError(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r: any = raw;
+  if (typeof r.error === "string" && r.error.trim()) return r.error.trim();
+  if (typeof r.message === "string" && r.message.trim()) return r.message.trim();
+  return null;
+}
+
 async function execSql(supabaseUrl: string, key: string, sql: string, verbose: boolean): Promise<any[]> {
-  const normalized = sql.trim().endsWith(";") ? sql.trim() : `${sql.trim()};`;
+  const trimmed = sql.trim();
+  const normalizedWithSemicolon = trimmed.endsWith(";") ? trimmed : `${trimmed};`;
+  const normalizedWithoutSemicolon = normalizedWithSemicolon.replace(/;\s*$/, "");
   const attempts: Array<{ label: string; payload: Record<string, unknown> }> = [
-    { label: "{sql}", payload: { sql: normalized } },
-    { label: "{sql_query}", payload: { sql_query: normalized } },
-    { label: "{query}", payload: { query: normalized } },
+    { label: "{sql}", payload: { sql: normalizedWithSemicolon } },
+    { label: "{sql_query}", payload: { sql_query: normalizedWithSemicolon } },
+    { label: "{query}", payload: { query: normalizedWithSemicolon } },
   ];
 
+  const rpcNames: Array<"exec_sql" | "execute_sql"> = ["exec_sql", "execute_sql"];
+
   const errors: string[] = [];
-  for (const a of attempts) {
-    const res = await postExecSql(supabaseUrl, key, a.payload);
-    if (res.ok) {
-      const rows = unwrapExecSqlResult(res.data);
-      if (verbose) console.log(`exec_sql ok using payload ${a.label} (rows=${rows.length})`);
-      return rows;
+  for (const rpcName of rpcNames) {
+    for (const a of attempts) {
+      const payload =
+        rpcName === "execute_sql" && "query" in a.payload
+          ? { ...a.payload, query: normalizedWithoutSemicolon }
+          : a.payload;
+
+      const res = await postExecSql(supabaseUrl, key, rpcName, payload);
+      if (res.ok) {
+        const maybeErr = extractExecSqlError(res.data);
+        if (maybeErr) {
+          const msg = `${rpcName} returned error using payload ${a.label}: ${maybeErr}`;
+          errors.push(msg);
+          if (verbose) console.log(msg);
+          continue;
+        }
+        const rows = unwrapExecSqlResult(res.data);
+        if (verbose) console.log(`${rpcName} ok using payload ${a.label} (rows=${rows.length})`);
+        return rows;
+      }
+      const msg = `${rpcName} failed using payload ${a.label}: HTTP ${res.status} ${res.body?.slice(0, 300) || ""}`;
+      errors.push(msg);
+      if (verbose) console.log(msg);
     }
-    const msg = `exec_sql failed using payload ${a.label}: HTTP ${res.status} ${res.body?.slice(0, 300) || ""}`;
-    errors.push(msg);
-    if (verbose) console.log(msg);
   }
 
   throw new Error(
-    `Could not execute SQL via rpc/exec_sql. Tried payload keys: sql, sql_query, query.\n\n` + errors.join("\n")
+    `Could not execute SQL via PostgREST RPC. Tried function names: exec_sql, execute_sql.\nTried payload keys: sql, sql_query, query.\n\n` +
+      errors.join("\n")
   );
 }
 
@@ -177,47 +207,54 @@ async function main(): Promise<void> {
     );
   }
 
-  const vehicleWhere = opts.excludeMerged ? `WHERE v.status IS DISTINCT FROM 'merged'` : ``;
+  const vehicleWhere = opts.excludeMerged ? `v.status IS DISTINCT FROM 'merged'` : `TRUE`;
 
-  // Query 1: vehicle counts per make+model, including zero-count models via ECR catalog.
-  const productionCountsSql = `
-WITH vehicle_counts AS (
-  SELECT
-    lower(v.make) AS make_lc,
-    lower(v.model) AS model_lc,
-    count(*)::int AS vehicle_count
-  FROM public.vehicles v
-  ${vehicleWhere}
-  GROUP BY 1, 2
-)
+  const diagnosticsSql = `
 SELECT
-  em.ecr_make_slug,
-  em.make_name AS make,
-  ecm.ecr_model_slug,
-  ecm.model_name AS model,
-  coalesce(vc.vehicle_count, 0)::int AS vehicle_count
-FROM public.ecr_makes em
-JOIN public.ecr_models ecm
-  ON ecm.ecr_make_slug = em.ecr_make_slug
-LEFT JOIN vehicle_counts vc
-  ON vc.make_lc = lower(em.make_name)
- AND vc.model_lc = lower(ecm.model_name)
-ORDER BY em.make_name, ecm.model_name
+  (SELECT COUNT(*)::int FROM public.vehicles v WHERE ${vehicleWhere}) AS total_vehicles,
+  (SELECT COUNT(*)::int FROM public.vehicles v WHERE ${vehicleWhere} AND btrim(coalesce(v.make, '')) = '') AS vehicles_missing_make,
+  (SELECT COUNT(*)::int FROM public.vehicles v WHERE ${vehicleWhere} AND btrim(coalesce(v.model, '')) = '') AS vehicles_missing_model,
+  (SELECT COUNT(DISTINCT COALESCE(NULLIF(btrim(v.make), ''), '[unknown]'))::int FROM public.vehicles v WHERE ${vehicleWhere}) AS distinct_makes,
+  (SELECT COUNT(*)::int
+   FROM (
+     SELECT 1
+     FROM public.vehicles v
+     WHERE ${vehicleWhere}
+     GROUP BY
+       COALESCE(NULLIF(btrim(v.make), ''), '[unknown]'),
+       COALESCE(NULLIF(btrim(v.model), ''), '[unknown]')
+   ) t
+  ) AS distinct_make_model_pairs
 `;
 
-  // Query 2: all models per make (ECR catalog).
+  const productionCountsSql = `
+SELECT
+  COALESCE(NULLIF(btrim(v.make), ''), '[unknown]') AS make,
+  COALESCE(NULLIF(btrim(v.model), ''), '[unknown]') AS model,
+  COUNT(*)::int AS vehicle_count
+FROM public.vehicles v
+WHERE ${vehicleWhere}
+GROUP BY 1, 2
+ORDER BY 1, 2
+`;
+
   const modelsByMakeSql = `
 SELECT
-  em.ecr_make_slug,
-  em.make_name AS make,
-  count(ecm.ecr_model_slug)::int AS model_count,
-  array_agg(ecm.model_name ORDER BY ecm.model_name) AS models
-FROM public.ecr_makes em
-JOIN public.ecr_models ecm
-  ON ecm.ecr_make_slug = em.ecr_make_slug
-GROUP BY em.ecr_make_slug, em.make_name
-ORDER BY em.make_name
+  COALESCE(NULLIF(btrim(v.make), ''), '[unknown]') AS make,
+  COUNT(DISTINCT COALESCE(NULLIF(btrim(v.model), ''), '[unknown]'))::int AS model_count,
+  ARRAY_AGG(
+    DISTINCT COALESCE(NULLIF(btrim(v.model), ''), '[unknown]')
+    ORDER BY COALESCE(NULLIF(btrim(v.model), ''), '[unknown]')
+  ) AS models
+FROM public.vehicles v
+WHERE ${vehicleWhere}
+GROUP BY 1
+ORDER BY 1
 `;
+
+  if (opts.verbose) console.log("Running diagnostics query...");
+  const diagnosticsRows = await execSql(supabaseUrl, key, diagnosticsSql, opts.verbose);
+  const diagnostics = (diagnosticsRows && diagnosticsRows[0]) || {};
 
   if (opts.verbose) console.log("Running production counts query...");
   const productionCounts = await execSql(supabaseUrl, key, productionCountsSql, opts.verbose);
@@ -230,10 +267,10 @@ ORDER BY em.make_name
     generated_at: new Date().toISOString(),
     source: {
       supabase_url: supabaseUrl,
-      catalog: "ecr_makes/ecr_models",
       vehicle_table: "public.vehicles",
       exclude_merged: opts.excludeMerged,
     },
+    diagnostics,
     production_counts: productionCounts,
     models_by_make: modelsByMake,
   };
@@ -241,7 +278,11 @@ ORDER BY em.make_name
   fs.writeFileSync(opts.outPath, JSON.stringify(out, null, 2));
 
   console.log(`Wrote ${opts.outPath}`);
-  console.log(`Production rows: ${productionCounts.length}`);
+  if (diagnostics?.total_vehicles !== undefined) console.log(`Vehicles (total): ${diagnostics.total_vehicles}`);
+  if (diagnostics?.distinct_makes !== undefined) console.log(`Distinct makes: ${diagnostics.distinct_makes}`);
+  if (diagnostics?.distinct_make_model_pairs !== undefined)
+    console.log(`Distinct make+model pairs: ${diagnostics.distinct_make_model_pairs}`);
+  console.log(`Production rows (make+model): ${productionCounts.length}`);
   console.log(`Makes (models_by_make rows): ${modelsByMake.length}`);
 }
 
