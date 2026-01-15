@@ -17,6 +17,7 @@
     "duplicate-worker": "tsx scripts/duplicate-detection-worker.ts",
     "detect-duplicates": "tsx scripts/detect-vehicle-duplicates.ts",
     "backfill-mailboxes": "tsx scripts/backfill-vehicle-mailboxes.ts",
+    "backfill:make-model": "tsx scripts/backfill-make-model-from-urls.ts",
     "index:bat-local-partners": "tsx scripts/index-bat-local-partners.ts",
     "enrich:bat-local-partners": "tsx scripts/enrich-bat-local-partners.ts",
     "ingest:bat": "tsx scripts/bat-seed-and-import.ts",

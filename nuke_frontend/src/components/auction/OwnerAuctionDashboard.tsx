@@ -61,7 +61,7 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
 
   const handleStartAuction = async () => {
     if (!listing) return;
-
+    
     if (!confirm('Start this auction now?')) return;
 
     try {
@@ -69,13 +69,13 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
       const { data, error: rpcError } = await supabase.rpc('activate_auction_listing', {
         p_listing_id: listingId,
         p_use_scheduled_time: false,
-      });
+    });
 
       if (rpcError) throw rpcError;
 
       if (data?.success) {
         await loadAuctionData();
-      } else {
+    } else {
         const readinessIssues = Array.isArray(data?.readiness?.issues) ? data.readiness.issues : [];
         const issueSummary = readinessIssues
           .filter((i: any) => String(i?.severity || '') === 'error')

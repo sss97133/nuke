@@ -212,7 +212,7 @@ export class AuctionService {
     if (!listing) return null;
 
     const currentBid = listing.current_high_bid_cents || 0;
-
+    
     // Mirrors DB calculate_bid_increment() semantics (cents).
     const calculateIncrementCents = (bidCents: number) => {
       if (bidCents < 100000) return 5000;     // < $1,000 -> $50

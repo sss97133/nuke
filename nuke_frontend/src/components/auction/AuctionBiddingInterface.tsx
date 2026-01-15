@@ -106,7 +106,7 @@ export default function AuctionBiddingInterface({
 
       const result = paymentsEnabled
         ? await AuctionPaymentService.placeBidWithDeposit(
-            listingId,
+        listingId,
             bidCents,
             bidCents // Using same amount for proxy max for simplicity
           )

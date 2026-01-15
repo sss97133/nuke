@@ -2010,16 +2010,18 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: '6px',
-          minHeight: '80px'
+          height: '88px', // Fixed height to prevent size variation
+          overflow: 'hidden' // Prevent content from expanding beyond fixed height
         }}>
-          {/* Title */}
+          {/* Title - with better truncation for square cards */}
           <div style={{
             fontSize: '10pt',
             fontWeight: 700,
             lineHeight: 1.2,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            flexShrink: 0
           }}>
             {vehicleTitle}
           </div>
@@ -2037,9 +2039,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             const transmissionRaw = (v?.transmission_model || v?.transmission || '').toString().trim();
             if (transmissionRaw) {
               const def = getTransmissionDefinition(transmissionRaw);
+              // Shorten transmission labels more aggressively
+              const label = def?.label || transmissionRaw;
               tokens.push({
                 kind: 'transmission',
-                label: def?.label || transmissionRaw,
+                label: label.length > 12 ? `${label.slice(0, 12)}…` : label,
                 raw: transmissionRaw,
                 clickable: true,
               });
@@ -2048,9 +2052,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             const engineRaw = (v?.engine || v?.engine_size || '').toString().trim();
             if (engineRaw) {
               const def = getEngineDefinition(engineRaw);
+              // Shorten engine labels more aggressively
+              const label = def?.label || engineRaw;
               tokens.push({
                 kind: 'engine',
-                label: def?.label || engineRaw,
+                label: label.length > 12 ? `${label.slice(0, 12)}…` : label,
                 raw: engineRaw,
                 clickable: true,
               });
@@ -2060,7 +2066,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             if (trimRaw) {
               tokens.push({
                 kind: 'trim',
-                label: trimRaw.length > 26 ? `${trimRaw.slice(0, 26)}…` : trimRaw,
+                label: trimRaw.length > 14 ? `${trimRaw.slice(0, 14)}…` : trimRaw,
                 raw: trimRaw,
                 clickable: false,
               });
@@ -2080,36 +2086,43 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               const display = getBodyStyleDisplay(bodyStyleRaw) || bodyStyleRaw;
               tokens.push({
                 kind: 'type',
-                label: display.length > 18 ? `${display.slice(0, 18)}…` : display,
+                label: display.length > 12 ? `${display.slice(0, 12)}…` : display,
                 raw: display,
                 clickable: true,
               });
             }
 
-            // Cap visible tokens to keep the card clean.
-            const visible = tokens.filter(t => t.label).slice(0, 4);
+            // Cap visible tokens to keep the card clean - limit to 3 for better fit
+            const visible = tokens.filter(t => t.label).slice(0, 3);
             if (visible.length === 0) return null;
 
             const tokenStyleBase: React.CSSProperties = {
               display: 'inline-flex',
               alignItems: 'center',
               height: 18,
-              padding: '0 6px',
-              borderRadius: 4,
+              padding: '0 5px', // Reduced padding for more compact badges
+              borderRadius: 3,
               border: '1px solid var(--border)',
               background: 'var(--grey-50)',
               color: 'var(--text)',
-              fontSize: '7pt',
+              fontSize: '6.5pt', // Slightly smaller font
               fontWeight: 700,
               lineHeight: 1,
               maxWidth: '100%',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
+              flexShrink: 0,
             };
 
             return (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              <div style={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: '4px', // Reduced gap for tighter layout
+                alignItems: 'center',
+                overflow: 'hidden' // Prevent wrapping from expanding height
+              }}>
                 {visible.map((t, idx) => {
                   const isClickable = t.clickable && (t.kind === 'engine' || t.kind === 'transmission' || t.kind === 'type');
                   const commonProps = {
@@ -2130,7 +2143,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     <button
                       type="button"
                       {...commonProps}
-                      onClick={(e) => openSpecPopover(e, (t.kind === 'type' ? 'body_style' : (t.kind as any)), t.raw)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openSpecPopover(e, (t.kind === 'type' ? 'body_style' : (t.kind as any)), t.raw);
+                      }}
                     >
                       {t.label}
                     </button>
