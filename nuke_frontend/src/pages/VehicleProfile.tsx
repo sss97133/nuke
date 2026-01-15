@@ -3495,8 +3495,8 @@ const VehicleProfile: React.FC = () => {
                 canManage={Boolean(isRowOwner || isVerifiedOwner)}
               />
               
-              {/* Structured listing data (Options / Service records / etc.) */}
-              <VehicleStructuredListingDataCard vehicle={vehicle} />
+              {/* Structured listing data (Options / Service records / etc.) - REMOVED: redundant with Basic Info */}
+              {/* <VehicleStructuredListingDataCard vehicle={vehicle} /> */}
               
               {/* Reference Documents - Upload and Display (merged) */}
               <VehicleReferenceLibrary

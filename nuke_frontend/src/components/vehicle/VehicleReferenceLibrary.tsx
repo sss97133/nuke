@@ -560,9 +560,9 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
       <section className="section" id="reference-library-section">
         <div className="card">
           <div className="card-header">
-            <h3 style={{ fontSize: '11pt', fontWeight: 700, margin: 0 }}>
+            <span style={{ fontSize: '10pt', fontWeight: 700 }}>
               Reference Documents
-            </h3>
+            </span>
           </div>
           <div className="card-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -671,13 +671,16 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                 </div>
               )}
 
-              <div>
-                <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '6px' }}>
-                  Factory Library
-                </div>
-                <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  Brochures, manuals, and parts catalogs for {year} {make} {series || model}
-                </div>
+              {/* Factory Library Section - Only show if there are books OR user is logged in */}
+              {(books.length > 0 || userId) && (
+                <div className="card" style={{ marginTop: 'var(--space-3)' }}>
+                  <div className="card-header" style={{ fontSize: '9pt', fontWeight: 700 }}>
+                    Factory Library
+                  </div>
+                  <div className="card-body">
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                      Brochures, manuals, and parts catalogs for {year} {make} {series || model}
+                    </div>
 
                 {books.length === 0 ? (
                   <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
@@ -788,14 +791,17 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                     ))}
                   </div>
                 )}
-              </div>
+                  </div>
+                </div>
+              )}
 
-              {/* Unify: show vehicle-linked + matching docs from your Profile Library (reference_documents) */}
+              {/* Your Profile Library Section - Only show if user is logged in */}
               {userId && (
-                <div>
-                  <div style={{ fontSize: '9pt', fontWeight: 700, marginBottom: '6px' }}>
+                <div className="card" style={{ marginTop: 'var(--space-3)' }}>
+                  <div className="card-header" style={{ fontSize: '9pt', fontWeight: 700 }}>
                     Your Profile Library
                   </div>
+                  <div className="card-body">
 
                   {loadingUserDocs ? (
                     <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Loading...</div>
@@ -886,6 +892,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
                       )}
                     </>
                   )}
+                  </div>
                 </div>
               )}
             </div>
