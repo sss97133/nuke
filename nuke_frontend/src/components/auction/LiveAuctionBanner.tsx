@@ -38,6 +38,36 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
     loadActiveListing();
   }, [vehicleId]);
 
+  // Live updates: keep banner "alive" as bids/timer change the listing row.
+  useEffect(() => {
+    if (!listing?.id) return;
+
+    const listingId = listing.id;
+    const channel = supabase
+      .channel(`vehicle-listing:${listingId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vehicle_listings', filter: `id=eq.${listingId}` },
+        (payload) => {
+          const row = (payload as any)?.new as any;
+          if (!row) return;
+          // If listing still visible to this user, update our snapshot immediately.
+          setListing((prev) => {
+            if (!prev) return row as any;
+            if (String(prev.id) !== String(row.id)) return prev;
+            return { ...(prev as any), ...(row as any) } as any;
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch {}
+    };
+  }, [listing?.id]);
+
   useEffect(() => {
     if (!listing?.auction_end_time) return;
 
@@ -85,6 +115,9 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
     try {
       setLoading(true);
       const nowIso = new Date().toISOString();
+      // Keep a short grace window after the countdown hits 0.
+      // The scheduler flips status to sold/expired on a 60s cadence; during that window the UI should still show "settling".
+      const graceIso = new Date(Date.now() - 2 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('vehicle_listings')
         .select('*')
@@ -92,7 +125,8 @@ const LiveAuctionBanner: React.FC<LiveAuctionBannerProps> = ({ vehicleId }) => {
         .eq('status', 'active')
         .in('sale_type', ['auction', 'live_auction'])
         // Treat as active if end time is in the future OR end time is missing (status governs liveness)
-        .or(`auction_end_time.is.null,auction_end_time.gt.${nowIso}`)
+        // Also include just-ended auctions in a small grace window while the server settles the result.
+        .or(`auction_end_time.is.null,auction_end_time.gt.${nowIso},auction_end_time.gte.${graceIso}`)
         .maybeSingle();
 
       if (error) {
