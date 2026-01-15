@@ -580,8 +580,16 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   const hasMore = comments.length > maxVisible;
 
   return (
-    <div className="card">
-      <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100%' }}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        backgroundColor: 'var(--surface)',
+        borderBottom: '1px solid var(--border)',
+        padding: '8px 12px',
+        flexShrink: 0,
+      }}>
         <span style={{ fontSize: '10px', fontWeight: 700 }}>
           Comments & Bids ({comments.length})
         </span>
@@ -595,7 +603,16 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
           </button>
         )}
       </div>
-      <div className="card-body">
+      <div 
+        className="comments-scroll-container"
+        style={{ 
+          padding: '12px', 
+          flex: '1 1 auto', 
+          minHeight: 0, 
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+      >
         {loading ? (
           <div style={{ fontSize: '8pt', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
             Loading comments...

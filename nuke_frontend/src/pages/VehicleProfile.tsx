@@ -98,6 +98,28 @@ const VehicleProfile: React.FC = () => {
   const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
   const [showMap, setShowMap] = useState(false);
   const presenceAvailableRef = React.useRef<boolean>(true);
+  const vehicleHeaderRef = React.useRef<HTMLDivElement | null>(null);
+  const [vehicleHeaderHeight, setVehicleHeaderHeight] = React.useState<number>(88);
+  
+  // Measure VehicleHeader height (including auction rail) for sticky positioning
+  useEffect(() => {
+    const updateHeaderHeight = () => {
+      if (vehicleHeaderRef.current) {
+        const height = vehicleHeaderRef.current.offsetHeight;
+        setVehicleHeaderHeight(height);
+      }
+    };
+    
+    updateHeaderHeight();
+    const resizeObserver = new ResizeObserver(updateHeaderHeight);
+    if (vehicleHeaderRef.current) {
+      resizeObserver.observe(vehicleHeaderRef.current);
+    }
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [vehicle, auctionPulse, liveSession]); // Re-measure when auction state changes
   const liveAvailableRef = React.useRef<boolean>(true);
   const [fieldAudit, setFieldAudit] = useState<FieldAudit>({
     open: false,
@@ -3522,14 +3544,31 @@ const VehicleProfile: React.FC = () => {
                 onUpdate={() => {}}
               />
 
-              {/* Comments & Bids */}
-              <div id="vehicle-comments" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 112px)' }}>
-                <VehicleCommentsCard
-                  vehicleId={vehicle.id}
-                  session={session}
-                  collapsed={isMobile}
-                  maxVisible={isMobile ? 6 : 50}
-                />
+              {/* Comments & Bids - Sticky below header/auction bar, scrollable independently */}
+              <div 
+                id="vehicle-comments" 
+                style={{ 
+                  scrollMarginTop: `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px + 8px)`,
+                  position: 'sticky',
+                  top: `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px)`,
+                  zIndex: 800,
+                  marginTop: 'var(--space-2)',
+                  marginBottom: 'var(--space-4)',
+                  maxHeight: `calc(100vh - var(--header-height, 40px) - ${vehicleHeaderHeight}px - 16px)`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  backgroundColor: 'var(--surface)',
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                }}
+              >
+                  <VehicleCommentsCard
+                    vehicleId={vehicle.id}
+                    session={session}
+                    collapsed={isMobile}
+                    maxVisible={isMobile ? 6 : 50}
+                  />
               </div>
 
               {/* Privacy Settings */}
@@ -3592,25 +3631,27 @@ const VehicleProfile: React.FC = () => {
   return (
       <div>
         {/* Vehicle Header with Price */}
-        <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
-          <VehicleHeader
-            vehicle={vehicle}
-            isOwner={isRowOwner || isVerifiedOwner}
-            canEdit={canEdit}
-            session={session}
-            permissions={permissions}
-            responsibleName={responsibleName || undefined}
-            initialValuation={(window as any).__vehicleProfileRpcData?.latest_valuation}
-            initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
-            organizationLinks={linkedOrganizations}
-            onClaimClick={() => setShowOwnershipClaim(true)}
-            userOwnershipClaim={userOwnershipClaim as any}
-            suppressExternalListing={!!userOwnershipClaim}
-            leadImageUrl={leadImageUrl}
-            liveSession={liveSession}
-            auctionPulse={auctionPulse}
-          />
-        </React.Suspense>
+        <div ref={vehicleHeaderRef}>
+          <React.Suspense fallback={<div style={{ padding: '12px' }}>Loading header...</div>}>
+            <VehicleHeader
+              vehicle={vehicle}
+              isOwner={isRowOwner || isVerifiedOwner}
+              canEdit={canEdit}
+              session={session}
+              permissions={permissions}
+              responsibleName={responsibleName || undefined}
+              initialValuation={(window as any).__vehicleProfileRpcData?.latest_valuation}
+              initialPriceSignal={(window as any).__vehicleProfileRpcData?.price_signal}
+              organizationLinks={linkedOrganizations}
+              onClaimClick={() => setShowOwnershipClaim(true)}
+              userOwnershipClaim={userOwnershipClaim as any}
+              suppressExternalListing={!!userOwnershipClaim}
+              leadImageUrl={leadImageUrl}
+              liveSession={liveSession}
+              auctionPulse={auctionPulse}
+            />
+          </React.Suspense>
+        </div>
 
         {/* BaT base-data flag banner (persisted by bat-base-data-check-runner) */}
         {vehicle && (() => {

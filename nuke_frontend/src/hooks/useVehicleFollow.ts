@@ -37,7 +37,7 @@ export function useVehicleFollow(vehicleId: string): UseVehicleFollowResult {
 
   // Check follow status and load ROI
   useEffect(() => {
-    if (!user?.id) {
+    if (!vehicleId || !user?.id) {
       setIsLoading(false);
       return;
     }

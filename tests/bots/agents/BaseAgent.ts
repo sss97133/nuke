@@ -185,19 +185,28 @@ export abstract class BaseAgent {
    * Get a finding with full context
    */
   protected async getFindingWithContext(findingId: string): Promise<FindingWithContext | null> {
+    // Simple query without complex joins to avoid RLS issues
     const { data, error } = await this.supabase
       .from('bot_findings')
-      .select(`
-        *,
-        persona:bot_personas(name, slug),
-        investigation:debug_investigations(*)
-      `)
+      .select('*')
       .eq('id', findingId)
       .single();
     
     if (error || !data) {
-      this.log('get_finding', 'failure', `Finding not found: ${findingId}`);
+      this.log('get_finding', 'failure', `Finding not found: ${findingId} - ${error?.message || 'unknown error'}`);
       return null;
+    }
+    
+    // Fetch persona separately if needed
+    if (data.persona_id) {
+      const { data: persona } = await this.supabase
+        .from('bot_personas')
+        .select('name, slug')
+        .eq('id', data.persona_id)
+        .single();
+      if (persona) {
+        (data as FindingWithContext).persona = persona;
+      }
     }
     
     return data as FindingWithContext;

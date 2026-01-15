@@ -5134,6 +5134,7 @@ const CursorHomepage: React.FC = () => {
                   viewMode="gallery"
                   infoDense={infoDense}
                   viewerUserId={session?.user?.id}
+                  showFollowButton={!!session?.user?.id}
                   thermalPricing={false} // ARCHIVED: Always disabled
                   sourceStampUrl={
                     ((vehicle as any)?.origin_organization_id ? orgWebsitesById[String((vehicle as any).origin_organization_id)] : undefined) ||
@@ -5158,6 +5159,7 @@ const CursorHomepage: React.FC = () => {
                 viewMode="grid"
                 cardSizePx={gridCardSizePx}
                 infoDense={false}
+                showFollowButton={!!session?.user?.id}
                 showDetailOverlay={false}
                 viewerUserId={session?.user?.id}
                 thermalPricing={thermalPricing}

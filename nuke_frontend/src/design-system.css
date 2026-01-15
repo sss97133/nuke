@@ -2140,6 +2140,38 @@ body {
   }
 }
 
+/* Sticky scrollable comments container */
+.comments-scroll-container {
+  /* Webkit scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.comments-scroll-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.comments-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.comments-scroll-container::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.comments-scroll-container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--border-dark);
+}
+
+/* Smooth scrolling for comments */
+.comments-scroll-container {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Commentable elements */
 .commentable {
   position: relative;
