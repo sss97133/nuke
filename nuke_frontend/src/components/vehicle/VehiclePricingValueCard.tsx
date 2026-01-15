@@ -114,8 +114,29 @@ export function VehiclePricingValueCard(props: {
     return { rate, amount: Math.round(base * rate) };
   }, [nukeValue, readinessSnapshot?.readiness_score, (valuationIntel as any)?.confidence_score]);
 
-  const sub = (left: string, right: React.ReactNode) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+  const sub = (left: string, right: React.ReactNode, onClick?: () => void) => (
+    <div 
+      style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        gap: 10,
+        cursor: onClick ? 'pointer' : 'default',
+        padding: '2px 4px',
+        borderRadius: '3px',
+        transition: 'background-color 0.12s ease'
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        if (onClick) {
+          (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--grey-100)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (onClick) {
+          (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+        }
+      }}
+    >
       <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>{left}</div>
       <div style={{ fontSize: '8pt' }}>{right}</div>
     </div>
@@ -125,8 +146,8 @@ export function VehiclePricingValueCard(props: {
     <>
       <div className="card">
         <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <div>Pricing &amp; Value</div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ flex: 1 }}>Pricing &amp; Value</div>
+          <div style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
             <button className="button button-small" onClick={() => setShowAnalysis(true)} style={{ fontSize: '8pt' }}>
               Price analysis
             </button>
@@ -146,7 +167,7 @@ export function VehiclePricingValueCard(props: {
                 {listingUrl && (
                   <>
                     {' '}·{' '}
-                    <a href={listingUrl} target="_blank" rel="noreferrer" style={{ fontSize: '8pt' }}>
+                    <a href={listingUrl} target="_blank" rel="noreferrer" style={{ fontSize: '8pt' }} onClick={(e) => e.stopPropagation()}>
                       {platformName}
                     </a>
                   </>
@@ -155,38 +176,38 @@ export function VehiclePricingValueCard(props: {
                   <span style={{ color: 'var(--text-muted)' }}> · ends {formatTs(auctionPulse.end_date) || '—'}</span>
                 )}
               </span>
-            ) : '—')}
+            ) : '—', () => liveBid && setShowAnalysis(true))}
 
-            {sub('High bid', (!liveBid && !sold && highBid) ? <span style={{ fontWeight: 700 }}>{formatUsd(highBid)}</span> : '—')}
+            {sub('High bid', (!liveBid && !sold && highBid) ? <span style={{ fontWeight: 700 }}>{formatUsd(highBid)}</span> : '—', () => highBid && setShowAnalysis(true))}
 
-            {sub('Sold for', (sold && salePrice) ? <span style={{ fontWeight: 800 }}>{formatUsd(salePrice)}</span> : '—')}
+            {sub('Sold for', (sold && salePrice) ? <span style={{ fontWeight: 800 }}>{formatUsd(salePrice)}</span> : '—', () => salePrice && setShowHistory(true))}
 
-            {sub('Outcome', sold ? 'sold' : (auctionOutcome || listingStatus || '—'))}
+            {sub('Outcome', sold ? 'sold' : (auctionOutcome || listingStatus || '—'), () => listingUrl && window.open(listingUrl, '_blank'))}
           </div>
 
           {/* Owner lane */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: '9pt', fontWeight: 800 }}>Owner (intent)</div>
-            {sub('Asking', askingPrice ? <span style={{ fontWeight: 700 }}>{formatUsd(askingPrice)}</span> : '—')}
+            {sub('Asking', askingPrice ? <span style={{ fontWeight: 700 }}>{formatUsd(askingPrice)}</span> : '—', () => askingPrice && setShowHistory(true))}
           </div>
 
           {/* Nuke lane */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: '9pt', fontWeight: 800 }}>Nuke (marks)</div>
-            {sub('Nuke value', nukeValue ? <span style={{ fontWeight: 800 }}>{formatUsd(nukeValue)}</span> : '—')}
-            {sub('Valuation confidence', (typeof (valuationIntel as any)?.confidence_score === 'number') ? `${(valuationIntel as any).confidence_score}/100` : '—')}
-            {sub('Evidence score', (typeof (valuationIntel as any)?.evidence_score === 'number') ? `${(valuationIntel as any).evidence_score}/100` : '—')}
-            {sub('Readiness', (typeof readinessSnapshot?.readiness_score === 'number') ? `${readinessSnapshot.readiness_score}/100` : '—')}
+            {sub('Nuke value', nukeValue ? <span style={{ fontWeight: 800 }}>{formatUsd(nukeValue)}</span> : '—', () => nukeValue && setShowAnalysis(true))}
+            {sub('Valuation confidence', (typeof (valuationIntel as any)?.confidence_score === 'number') ? `${(valuationIntel as any).confidence_score}/100` : '—', () => setShowAnalysis(true))}
+            {sub('Evidence score', (typeof (valuationIntel as any)?.evidence_score === 'number') ? `${(valuationIntel as any).evidence_score}/100` : '—', () => setShowAnalysis(true))}
+            {sub('Readiness', (typeof readinessSnapshot?.readiness_score === 'number') ? `${readinessSnapshot.readiness_score}/100` : '—', () => setShowAnalysis(true))}
             {sub('Missing items', (Array.isArray(readinessSnapshot?.missing_items) && readinessSnapshot!.missing_items!.length > 0)
               ? `${readinessSnapshot!.missing_items!.length} items`
-              : '—')}
+              : '—', () => readinessSnapshot?.missing_items && readinessSnapshot.missing_items.length > 0 && window.scrollTo({ top: document.getElementById('vehicle-proof-tasks')?.offsetTop || 0, behavior: 'smooth' }))}
           </div>
 
           {/* Finance preview */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ fontSize: '9pt', fontWeight: 800 }}>Finance (preview)</div>
-            {sub('Advance rate', financePreview ? `${Math.round((financePreview.rate || 0) * 100)}%` : '—')}
-            {sub('Max loan', (financePreview && financePreview.amount) ? <span style={{ fontWeight: 800 }}>{formatUsd(financePreview.amount)}</span> : '—')}
+            {sub('Advance rate', financePreview ? `${Math.round((financePreview.rate || 0) * 100)}%` : '—', () => financePreview && setShowAnalysis(true))}
+            {sub('Max loan', (financePreview && financePreview.amount) ? <span style={{ fontWeight: 800 }}>{formatUsd(financePreview.amount)}</span> : '—', () => financePreview?.amount && setShowAnalysis(true))}
             <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
               Preview only. Final finance policy will key off inspection/evidence + market liquidity + borrower history.
             </div>

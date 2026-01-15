@@ -1,0 +1,267 @@
+{
+  "generated_at": "2026-01-15T13:37:42.547Z",
+  "total_vehicles_missing_make": 7496,
+  "total_with_urls": 7373,
+  "total_without_urls": 123,
+  "sources": {
+    "ksl_automated_import": {
+      "total": 18,
+      "withUrls": 18,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 18,
+        "listing_url": 0,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": [
+        "https://cars.ksl.com/listing/10290539",
+        "https://cars.ksl.com/listing/10302276",
+        "https://cars.ksl.com/listing/10318657",
+        "https://cars.ksl.com/listing/10269335",
+        "https://cars.ksl.com/listing/10037038"
+      ]
+    },
+    "unknown": {
+      "total": 6900,
+      "withUrls": 6886,
+      "withoutUrls": 14,
+      "urlTypes": {
+        "discovery_url": 6886,
+        "listing_url": 0,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": [
+        "https://miami.craigslist.org/brw/ctd/d/fort-lauderdale-2015-chevrolet-camaro/7896739912.html",
+        "https://www.beverlyhillscarclub.com/1959-jaguar-xk150-fixed-head-coupe-c-5571.htm",
+        "https://sfbay.craigslist.org/eby/ctd/d/walnut-creek-2019-toyota-prius-le/7899879244.html",
+        "https://boston.craigslist.org/gbs/cto/d/revere-2003-audi-a6-all-road-27t-wagon/7896878125.html",
+        "https://miami.craigslist.org/pbc/ctd/d/wellington-2012-toyota-prius-mo-only/7896924618.html"
+      ]
+    },
+    "Collective Auto Group": {
+      "total": 177,
+      "withUrls": 177,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 177,
+        "listing_url": 177,
+        "bat_auction_url": 0,
+        "platform_url": 177
+      },
+      "sampleUrls": [
+        "https://collectiveauto.com/vehicles/53/2001-porsche-911-turbo",
+        "https://collectiveauto.com/vehicles/369/2008-ferrari-f430-spider",
+        "https://collectiveauto.com/vehicles/197/2018-porsche-911-gt3",
+        "https://collectiveauto.com/vehicles/56/2015-chevrolet-camaro-z-28",
+        "https://collectiveauto.com/vehicles/83/2010-porsche-911-gt3-rs"
+      ]
+    },
+    "mecum auctions_agent_extraction": {
+      "total": 137,
+      "withUrls": 137,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 122,
+        "listing_url": 137,
+        "bat_auction_url": 0,
+        "platform_url": 137
+      },
+      "sampleUrls": [
+        "https://mecum.com/lots/1163079/1972-maico-rs125-racer",
+        "https://mecum.com/lots/1163723/1948-vincent-series-b-touring-rapide",
+        "https://www.mecum.com/lots/1164169/1934-harley-davidson-cac",
+        "https://www.mecum.com/lots/1163723/1948-vincent-series-b-touring-rapide/",
+        "https://www.mecum.com/lots/1164630/1977-ducati-900-ss"
+      ]
+    },
+    "dropbox_cleanup": {
+      "total": 2,
+      "withUrls": 0,
+      "withoutUrls": 2,
+      "urlTypes": {
+        "discovery_url": 0,
+        "listing_url": 0,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": []
+    },
+    "cars & bids_agent_extraction": {
+      "total": 43,
+      "withUrls": 43,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 43,
+        "listing_url": 43,
+        "bat_auction_url": 0,
+        "platform_url": 43
+      },
+      "sampleUrls": [
+        "https://carsandbids.com/auctions/kv7pznwq/2000-daihatsu-hijet-truck",
+        "https://carsandbids.com/auctions/307oqg4p/1981-toyota-land-cruiser",
+        "https://carsandbids.com/auctions/9x5avnjz/1965-chevrolet-corvette-coupe",
+        "https://carsandbids.com/auctions/30gaey1p/2002-dodge-ram-2500-slt-4x4",
+        "https://carsandbids.com/auctions/9elmgn86/2015-ford-focus-st"
+      ]
+    },
+    "rehydrate_profile_merge": {
+      "total": 1,
+      "withUrls": 0,
+      "withoutUrls": 1,
+      "urlTypes": {
+        "discovery_url": 0,
+        "listing_url": 0,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": []
+    },
+    "craigslist_scrape_test": {
+      "total": 75,
+      "withUrls": 0,
+      "withoutUrls": 75,
+      "urlTypes": {
+        "discovery_url": 0,
+        "listing_url": 0,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": []
+    },
+    "barrett-jackson_agent_extraction": {
+      "total": 40,
+      "withUrls": 40,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 40,
+        "listing_url": 40,
+        "bat_auction_url": 0,
+        "platform_url": 40
+      },
+      "sampleUrls": [
+        "https://www.barrett-jackson.com/Events/Event/Details/2009-FORD-SHELBY-GT500KR-258669",
+        "https://www.barrett-jackson.com/Events/Event/Details/2011-PORSCHE-BOXSTER-SPYDER-258508",
+        "https://www.barrett-jackson.com/Events/Event/Details/1993-NISSAN-240SX-CONVERTIBLE-259014",
+        "https://www.barrett-jackson.com/Events/Event/Details/1987-BUICK-GRAND-NATIONAL-258544",
+        "https://barrett-jackson.com/events/event/details/1967-shelby-gt500-258675"
+      ]
+    },
+    "bringatrailer": {
+      "total": 7,
+      "withUrls": 0,
+      "withoutUrls": 7,
+      "urlTypes": {
+        "discovery_url": 0,
+        "listing_url": 0,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": []
+    },
+    "dropbox_bulk_import": {
+      "total": 25,
+      "withUrls": 1,
+      "withoutUrls": 24,
+      "urlTypes": {
+        "discovery_url": 0,
+        "listing_url": 1,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": [
+        "https://phoenix.craigslist.org/nph/cto/d/phoenix-1979-chevrolet-c10/7899772022.html"
+      ]
+    },
+    "classic_com_auction": {
+      "total": 1,
+      "withUrls": 1,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 1,
+        "listing_url": 1,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": [
+        "https://classic.com/s/2002ad-8pJl1On/"
+      ]
+    },
+    "craigslist_scrape": {
+      "total": 65,
+      "withUrls": 65,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 65,
+        "listing_url": 35,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": [
+        "https://seattle.craigslist.org/sno/cto/d/snohomish-1977-chevy-c10-longbed/7903112138.html",
+        "https://sfbay.craigslist.org/nby/cto/d/el-verano-chevrolet-c10/7901857855.html",
+        "https://sfbay.craigslist.org/sby/cto/d/gilroy-77-chevy-custom-deluxe-c20/7901012333.html",
+        "https://sfbay.craigslist.org/eby/cto/d/pleasanton-1974-chevrolet-cheyenne-10/7900748496.html",
+        "https://chicago.craigslist.org/nwc/cto/d/naperville-1979-chevrolet-c10-swb/7901838994.html"
+      ]
+    },
+    "ksl_import": {
+      "total": 1,
+      "withUrls": 1,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 1,
+        "listing_url": 0,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": [
+        "https://cars.ksl.com/listing/10325092"
+      ]
+    },
+    "classiccars_com": {
+      "total": 1,
+      "withUrls": 1,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 1,
+        "listing_url": 0,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": [
+        "https://classiccars.com/listings/view/1985175/1977-chevrolet-blazer-for-sale-in-sedona-arizona-86325"
+      ]
+    },
+    "pcarmarket": {
+      "total": 1,
+      "withUrls": 1,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 1,
+        "listing_url": 1,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": [
+        "https://pcarmarket.com/auction/2002-aston-martin-db7-v12-vantage-2"
+      ]
+    },
+    "user_import": {
+      "total": 2,
+      "withUrls": 2,
+      "withoutUrls": 0,
+      "urlTypes": {
+        "discovery_url": 2,
+        "listing_url": 0,
+        "bat_auction_url": 0,
+        "platform_url": 0
+      },
+      "sampleUrls": [
+        "https://lasvegas.craigslist.org/cto/d/pahrump-1967-chevrolet-camaro/7894419369.html",
+        "https://lasvegas.craigslist.org/cto/d/las-vegas-1970-plymouth-road-runner/7894033263.html"
+      ]
+    }
+  }
+}

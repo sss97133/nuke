@@ -1,0 +1,491 @@
+{
+  "generated_at": "2026-01-15T14:12:53.328Z",
+  "total_vehicles": 97,
+  "vehicles": [
+    {
+      "id": "640f4f19-02ae-4bf9-80a9-160e378b132a",
+      "url": "https://carsandbids.com/auctions/3onb848y/2020-bentley-continental-gtc-v8",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "1ccfee55-c494-4f27-9dee-f022666bdc75",
+      "url": "https://carsandbids.com/auctions/30wpjpp9/2017-toyota-tacoma-trd-sport-double-cab-4x4",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "5575f2c3-af00-4431-9dd3-cbd119d168a1",
+      "url": "https://classic.com/veh/1963-oldsmobile-88-635k05696-476k2xp",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "838467f1-57de-4c6a-891a-893d9885b2bf",
+      "url": "https://www.classic.com/veh/2011-porsche-911-carrera-gts-wp0cb2a93bs755263-WvvAPvW/",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "8a298611-c8d3-4563-85e4-2f9cce4de65d",
+      "url": "https://mecum.com/lots/1155661/1965-lincoln-continental-convertible/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "4c938225-bfc7-4264-9658-889ed9b66ead",
+      "url": "https://mecum.com/lots/1152862/1972-ford-bronco-gateway-custom/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "2cdbab4e-99bb-4ea3-959b-5865f08f0c36",
+      "url": "https://mecum.com/lots/1152863/1970-plymouth-superbird/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "ea3b0ad5-de5c-42a2-a01e-330b4fb5034d",
+      "url": "https://www.mecum.com/lots/1152862/1972-ford-bronco-gateway-custom/",
+      "url_type": "listing_url"
+    },
+    {
+      "id": "7c4089e5-cd72-4d69-9c5f-6be8d3f2623d",
+      "url": "https://mecum.com/lots/1164630/1977-ducati-900-ss/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "7da45d59-601a-4a6d-b8b7-ade2d502bd37",
+      "url": "https://mecum.com/lots/1154834/1950-mercury-convertible/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "7e476e90-6e11-4f71-aa5d-76b7f6b0c7a3",
+      "url": "https://mecum.com/lots/1153060/1955-chevrolet-210-hardtop/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "9fcffdda-2b50-4ef4-894d-8062746bf6c5",
+      "url": "https://mecum.com/lots/1153057/1968-chevrolet-camaro-rs-ss/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "74b71b18-9cfd-4899-b262-8830ef1728a1",
+      "url": "https://mecum.com/lots/1153058/1969-dodge-charger-r-t/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "a3b6eba7-5cbe-4d64-bf99-f350c4b034ab",
+      "url": "https://mecum.com/lots/1154832/1947-pontiac-streamliner-coupe/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "31299173-394f-493f-8fd1-531857688639",
+      "url": "https://mecum.com/lots/1154839/1957-chevrolet-150-sedan/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "bb2e5c7e-d7d4-4a47-9b7e-28ec19617bf6",
+      "url": "https://mecum.com/lots/1154887/1970-chevrolet-camaro-z28/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "fa002ce4-0e42-42d6-9046-d9662ea65316",
+      "url": "https://mecum.com/lots/1164630/1977-ducati-900-ss",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "8e7cb8ac-8c5d-4ca9-b994-324d0ac4a5f9",
+      "url": "https://mecum.com/lots/1164169/1934-harley-davidson-cac",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "2b7d14ce-ca2b-4bdc-aace-2fa84e16f452",
+      "url": "https://mecum.com/lots/1154864/1960-studebaker-lark-viii-regal-convertible/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "632c6790-3185-4616-88d7-9420c6ae25d6",
+      "url": "https://mecum.com/lots/1155415/1969-chevrolet-yenko-nova/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "3c34cfb8-db39-4d70-84de-388f90a117af",
+      "url": "https://mecum.com/lots/1153062/1965-chevrolet-impala-ss-hardtop/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "4171ae1f-2958-489f-abd6-51e2279c0d74",
+      "url": "https://mecum.com/lots/1153056/1969-chevrolet-camaro-z28/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "5a2411e0-1f3b-48f2-8914-8cd521517c60",
+      "url": "https://mecum.com/lots/1153059/1969-plymouth-gtx-hardtop/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "b1da1f33-9353-4b22-8731-2fbde76fb01a",
+      "url": "https://mecum.com/lots/1153054/1971-chevrolet-chevelle/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "1f225db4-cda7-4dbf-8fad-64105cb4811d",
+      "url": "https://mecum.com/lots/1154838/1954-austin-healey-100-4/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "65829ed2-5c37-41bd-b95f-7c6b23073f23",
+      "url": "https://mecum.com/lots/1164629/1975-ducati-750-sport/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "8cd18412-d2ab-427e-93f7-ff65ad337e87",
+      "url": "https://mecum.com/lots/1163946/1969-harley-davidson-captain-america-replica/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "ea37b311-3f6a-411c-9254-8b27a0ca89dc",
+      "url": "https://mecum.com/lots/1164598/1934-crocker-speedway",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "2604a22a-87df-49f8-97e6-e4e3d8ba0f42",
+      "url": "https://mecum.com/lots/1163079/1972-maico-rs125-racer",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "3e1d3c74-8270-455a-bb42-f2464df6f8e6",
+      "url": "https://www.mecum.com/lots/1162961/1944-harley-davidson-e-knucklehead/",
+      "url_type": "listing_url"
+    },
+    {
+      "id": "52bc2561-9c76-4e49-be53-fc2238a8fd74",
+      "url": "https://mecum.com/lots/1164629/1975-ducati-750-sport",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "785bd32c-b09f-4cf1-a46a-27cbaaf2a66b",
+      "url": "https://www.mecum.com/lots/1163946/1969-harley-davidson-captain-america-replica/",
+      "url_type": "listing_url"
+    },
+    {
+      "id": "6bf3a39c-0faa-4183-b274-8a1d8baa9332",
+      "url": "https://mecum.com/lots/1153061/1970-chevrolet-k10-pickup/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "98edfa75-f466-413f-822b-941081357d6a",
+      "url": "https://mecum.com/lots/1155957/1975-pontiac-trans-am/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "85e94ea8-d028-4b72-8443-ae3d91775b7a",
+      "url": "https://mecum.com/lots/1164665/1966-harley-davidson-panhead-captain-america-replica/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "b746a074-b9a3-46e3-b10e-1ef4f0757558",
+      "url": "https://mecum.com/lots/1163945/1937-harley-davidson-el-knucklehead",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "e905d4d9-c275-4fec-aa15-57c1a32ab80c",
+      "url": "https://www.mecum.com/lots/1164665/1966-harley-davidson-panhead-captain-america-replica/",
+      "url_type": "listing_url"
+    },
+    {
+      "id": "be61c0f0-81e2-4087-a892-33e70c45c95e",
+      "url": "https://mecum.com/lots/1162958/1949-harley-davidson-el-panhead-bobber",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "17780168-dd1c-4d96-8d5d-cb526272c034",
+      "url": "https://mecum.com/lots/1119619/1978-pontiac-trans-am/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "bca70ada-c1e0-4f25-97b9-4ec886727577",
+      "url": "https://mecum.com/lots/1112908/1968-toyota-fj-40-land-cruiser/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "d11e0d71-d4da-4bdb-8aa1-ac0f2edf3221",
+      "url": "https://mecum.com/lots/1121950/1960-chevrolet-impala/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "9e87e0cf-97bb-4a14-88f3-5824b80bc231",
+      "url": "https://mecum.com/lots/1156664/1965-ford-gt40-mki/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "ea010560-e152-4d0f-90a4-670ea1171153",
+      "url": "https://www.mecum.com/lots/1119619/1978-pontiac-trans-am/",
+      "url_type": "listing_url"
+    },
+    {
+      "id": "12617184-036c-4281-9f11-27a7e458b2a0",
+      "url": "https://mecum.com/lots/1154837/1952-hudson-hornet-sedan/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "8ff5a109-2b22-4136-bd2d-0dcad3dafa18",
+      "url": "https://www.mecum.com/lots/1164628/1974-ducati-750ss-green-frame/",
+      "url_type": "listing_url"
+    },
+    {
+      "id": "ad45c8ea-4504-4129-a19d-d6f66062eaba",
+      "url": "https://mecum.com/lots/1159821/1966-ford-gt40-mkii-factory-lightweight/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "5ab24f1c-f18e-40cc-9592-2a8e7f089fbd",
+      "url": "https://mecum.com/lots/1104641/1974-ducati-750-gt/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "bd3df91c-02ac-4812-825f-4dc35b501219",
+      "url": "https://www.mecum.com/lots/1164095/1941-harley-davidson-el-knucklehead/",
+      "url_type": "listing_url"
+    },
+    {
+      "id": "08ace65f-c268-47c1-a59b-bc096162e82b",
+      "url": "https://mecum.com/lots/1154835/1951-mercury-woody-wagon/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "58ad2439-42c6-4f7c-9c8d-127cbf26cfc1",
+      "url": "https://mecum.com/lots/1155407/1969-chevrolet-yenko-camaro-prototype/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "d1437218-bbef-4a82-b76f-ea21c62e2555",
+      "url": "https://mecum.com/lots/1161257/1971-plymouth-hemi-cuda-convertible",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "7dd76b72-70a9-43d3-96a6-744591f2c505",
+      "url": "https://mecum.com/lots/1152522/1962-ferrari-250-gto/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "3b3c83c2-fc62-49c2-aeab-6343bed50be3",
+      "url": "https://mecum.com/lots/1164095/1941-harley-davidson-el-knucklehead/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "a68ef829-0bc4-4b0f-80bd-2d02382e3a88",
+      "url": "https://www.mecum.com/lots/1163945/1937-harley-davidson-el-knucklehead",
+      "url_type": "listing_url"
+    },
+    {
+      "id": "90baca0c-7020-45fa-a3a1-158bda02a066",
+      "url": "https://collectiveauto.com/vehicles/101/2007-honda-s2000",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "764e8f38-6180-48e4-8cb7-5eecbe39f8ee",
+      "url": "https://collectiveauto.com/vehicles/432/2015-porsche-cayenne",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "e8a2681a-05b0-44ee-96bc-757c6d9f0a2f",
+      "url": "https://collectiveauto.com/vehicles/12/2004-porsche-911-turbo-6-speed-manual",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "ed4b5c8b-1cb5-4b17-a33f-39f855af7090",
+      "url": "https://collectiveauto.com/vehicles/430/2000-ferrari-360-modena",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "49221bc5-8b42-4c39-8716-88d111ae155b",
+      "url": "https://collectiveauto.com/vehicles/349/2003-porsche-911-carrera-4s",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "34cae6f6-ed87-4660-a30e-558bb5155783",
+      "url": "https://collectiveauto.com/vehicles/90/1995-porsche-911-carrera-coupe-6-speed",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "8c57fff0-ae5c-4331-87fa-f5867c4f642f",
+      "url": "https://www.collectiveauto.com/vehicles/209/1995-ford-mustang-svt-cobra",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "348ecef9-eb0e-4ec4-bb0c-89d51573dd07",
+      "url": "https://collectiveauto.com/vehicles/391/2008-porsche-911-gt2",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "1d2bb5b2-0e3e-41d9-8e42-d3d94e2c5d03",
+      "url": "https://collectiveauto.com/vehicles/248/2010-porsche-911-gt3-rs",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "508bf49d-0f71-4e0a-ad0f-c5a3aadd528a",
+      "url": "https://collectiveauto.com/vehicles/387/2004-honda-s2000",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "460df8bc-7480-4024-b689-a445136f6ec5",
+      "url": "https://collectiveauto.com/vehicles/245/2004-porsche-911-turbo-6-speed-manual",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "49923ec3-2599-4f1d-a7fe-bae3affe3566",
+      "url": "https://collectiveauto.com/vehicles/375/2008-porsche-911-turbo-6-speed-manual",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "715dbf40-8006-4bbd-8bb0-9b65db189778",
+      "url": "https://collectiveauto.com/vehicles/366/2003-porsche-911-carrera-4s-coupe",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "0132ca94-d309-40e8-8d72-190fd0623aca",
+      "url": "https://collectiveauto.com/vehicles/263/2014-mercedes-benz-g-class-g550",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "20151092-676d-4813-ae46-5f5eab95804f",
+      "url": "https://collectiveauto.com/vehicles/282/2003-porsche-911-turbo",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "e63bad44-9237-46bb-8d1a-2551abd0cff5",
+      "url": "https://collectiveauto.com/vehicles/285/2001-porsche-911-carrera-4",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "3d0e12d3-00e0-4325-a068-1dc37157cd7c",
+      "url": "https://collectiveauto.com/vehicles/357/2020-audi-a4-allroad-premium",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "501f59a7-e65f-4228-906d-ea742893e5db",
+      "url": "https://collectiveauto.com/vehicles/150/2014-ford-mustang-shelby-gt500",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "f96e72f9-1615-4058-bec2-14598c7a2423",
+      "url": "https://collectiveauto.com/vehicles/381/2010-porsche-911-turbo-6-speed-manual",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "0b297bf7-046a-4b90-8e5a-16f357ff9d4e",
+      "url": "https://collectiveauto.com/vehicles/244/1990-mercedes-benz-190e-2-5-16-evolution-ii",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "32aeba7b-e7a2-4934-9366-cac0962323d7",
+      "url": "https://collectiveauto.com/vehicles/222/2003-mercedes-benz-cl55-amg",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "8ff43109-f00b-4059-8caf-a0ebde772473",
+      "url": "https://collectiveauto.com/vehicles/3/2008-honda-s2000-2dr-conv",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "11a67842-62bd-4112-8e1e-3ee0d8db93ba",
+      "url": "https://collectiveauto.com/vehicles/2/2002-toyota-sequoia-sr5",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "e25a0641-76b5-4819-acde-631f703a9162",
+      "url": "https://collectiveauto.com/vehicles/4/2018-ford-f-150-stx-supercrew",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "443451e0-13df-495d-b2d6-5d610b4a1bc7",
+      "url": "https://collectiveauto.com/vehicles/6/2018-tesla-model-3-long-range",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "545ad5b5-2d13-4305-9ffb-153d0ef3bb27",
+      "url": "https://collectiveauto.com/vehicles/5/2007-aston-martin-vantage-coupe-manual",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "5bb12143-9fe4-495e-a9a3-c65e6221d878",
+      "url": "https://collectiveauto.com/vehicles/9/2001-porsche-911-carrera-coupe-6-speed",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "a375c0c9-8ce5-4d0c-b6c4-c6139851e56d",
+      "url": "https://collectiveauto.com/vehicles/11/2001-ford-mustang-bullitt",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "43af1929-cff3-4517-b6b3-f26552a090f7",
+      "url": "https://collectiveauto.com/vehicles/15/2002-chevrolet-corvette-z06-hardtop",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "18e72708-5dfc-41bd-84c2-f4153bc0a9a3",
+      "url": "https://collectiveauto.com/vehicles/17/1957-chevrolet-3100",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "154a8cc4-42eb-4483-904f-a3f72a117d8b",
+      "url": "https://collectiveauto.com/vehicles/24/2013-subaru-impreza-sedan-wrx-sti",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "1bc21eff-db1c-4640-89d2-9695cb9b4216",
+      "url": "https://collectiveauto.com/vehicles/26/2005-mercedes-benz-e55-amg-wagon",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "dc71bf50-1ecf-4e04-b782-be167ab8c68e",
+      "url": "https://collectiveauto.com/vehicles/29/2000-chevrolet-corvette-coupe",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "2610cd15-c4b8-4c27-8bd3-0c88a5f34076",
+      "url": "https://collectiveauto.com/vehicles/31/2002-porsche-911-turbo-x50",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "c5f05179-f063-4651-9528-8b0e118ba344",
+      "url": "https://collectiveauto.com/vehicles/35/2020-tesla-y-long-range",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "6434ca96-c729-4e3b-abba-311bee0340bc",
+      "url": "https://collectiveauto.com/vehicles/32/2007-porsche-911-turbo",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "c45c18d4-57be-4b64-8210-bd552296b481",
+      "url": "https://collectiveauto.com/vehicles/36/2005-land-rover-lr3-se",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "4cdc311f-e0a1-4d7b-ad93-8ddf52954b54",
+      "url": "https://collectiveauto.com/vehicles/37/2017-toyota-4runner-trd-pro",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "7d1f796c-e851-4311-ae1b-bdc97436804d",
+      "url": "https://collectiveauto.com/vehicles/38/2008-volkswagen-r32",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "8f2fe0f0-16e4-4b1e-acc1-084350f52126",
+      "url": "https://collectiveauto.com/vehicles/39/2020-tesla-model-3-performance",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "a1c5cf55-6be6-4f34-8e13-c2eab6bdb645",
+      "url": "https://collectiveauto.com/vehicles/43/2015-aston-martin-v8-vantage-gt",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "ee4828b0-5ebc-4734-b68e-e0a7762c45fe",
+      "url": "https://collectiveauto.com/vehicles/42/2002-porsche-911-turbo",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "406c16f2-e00a-4ffc-b162-cbbcecfa9c84",
+      "url": "https://collectiveauto.com/vehicles/44/2012-audi-tt-rs",
+      "url_type": "discovery_url"
+    }
+  ]
+}

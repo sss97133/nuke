@@ -1,0 +1,91 @@
+{
+  "generated_at": "2026-01-15T14:12:02.260Z",
+  "total_vehicles": 17,
+  "vehicles": [
+    {
+      "id": "640f4f19-02ae-4bf9-80a9-160e378b132a",
+      "url": "https://carsandbids.com/auctions/3onb848y/2020-bentley-continental-gtc-v8",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "1ccfee55-c494-4f27-9dee-f022666bdc75",
+      "url": "https://carsandbids.com/auctions/30wpjpp9/2017-toyota-tacoma-trd-sport-double-cab-4x4",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "5575f2c3-af00-4431-9dd3-cbd119d168a1",
+      "url": "https://classic.com/veh/1963-oldsmobile-88-635k05696-476k2xp",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "838467f1-57de-4c6a-891a-893d9885b2bf",
+      "url": "https://www.classic.com/veh/2011-porsche-911-carrera-gts-wp0cb2a93bs755263-WvvAPvW/",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "8a298611-c8d3-4563-85e4-2f9cce4de65d",
+      "url": "https://mecum.com/lots/1155661/1965-lincoln-continental-convertible/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "4c938225-bfc7-4264-9658-889ed9b66ead",
+      "url": "https://mecum.com/lots/1152862/1972-ford-bronco-gateway-custom/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "2cdbab4e-99bb-4ea3-959b-5865f08f0c36",
+      "url": "https://mecum.com/lots/1152863/1970-plymouth-superbird/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "ea3b0ad5-de5c-42a2-a01e-330b4fb5034d",
+      "url": "https://www.mecum.com/lots/1152862/1972-ford-bronco-gateway-custom/",
+      "url_type": "listing_url"
+    },
+    {
+      "id": "7c4089e5-cd72-4d69-9c5f-6be8d3f2623d",
+      "url": "https://mecum.com/lots/1164630/1977-ducati-900-ss/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "7da45d59-601a-4a6d-b8b7-ade2d502bd37",
+      "url": "https://mecum.com/lots/1154834/1950-mercury-convertible/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "7e476e90-6e11-4f71-aa5d-76b7f6b0c7a3",
+      "url": "https://mecum.com/lots/1153060/1955-chevrolet-210-hardtop/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "9fcffdda-2b50-4ef4-894d-8062746bf6c5",
+      "url": "https://mecum.com/lots/1153057/1968-chevrolet-camaro-rs-ss/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "74b71b18-9cfd-4899-b262-8830ef1728a1",
+      "url": "https://mecum.com/lots/1153058/1969-dodge-charger-r-t/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "a3b6eba7-5cbe-4d64-bf99-f350c4b034ab",
+      "url": "https://mecum.com/lots/1154832/1947-pontiac-streamliner-coupe/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "31299173-394f-493f-8fd1-531857688639",
+      "url": "https://mecum.com/lots/1154839/1957-chevrolet-150-sedan/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "bb2e5c7e-d7d4-4a47-9b7e-28ec19617bf6",
+      "url": "https://mecum.com/lots/1154887/1970-chevrolet-camaro-z28/sitemap.xml",
+      "url_type": "discovery_url"
+    },
+    {
+      "id": "fa002ce4-0e42-42d6-9046-d9662ea65316",
+      "url": "https://mecum.com/lots/1164630/1977-ducati-900-ss",
+      "url_type": "discovery_url"
+    }
+  ]
+}
