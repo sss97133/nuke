@@ -1844,24 +1844,25 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
       </div>
 
-      {/* Favicon in bottom-left corner (positioned relative to card, above overlay) */}
+      {/* Favicon in top-left corner (better placement, doesn't interfere with card body) */}
       {sourceFaviconUrl && (
         <div style={{
           position: 'absolute',
-          bottom: showDetailOverlay ? '52px' : '8px', // Above detail overlay if visible
-          left: '8px',
-          background: 'transparent',
-          padding: 0,
-          borderRadius: 0,
+          top: '6px',
+          left: '6px',
+          background: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(4px)',
+          padding: '3px 5px',
+          borderRadius: '4px',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '6px',
-          border: 'none',
+          gap: '4px',
+          border: '1px solid rgba(255,255,255,0.15)',
           zIndex: 10,
         }}>
-          <FaviconIcon url={sourceFaviconUrl} size={14} preserveAspectRatio={true} />
-          {orgFaviconUrl ? <FaviconIcon url={orgFaviconUrl} size={14} preserveAspectRatio={true} /> : null}
+          <FaviconIcon url={sourceFaviconUrl} size={12} preserveAspectRatio={true} />
+          {orgFaviconUrl ? <FaviconIcon url={orgFaviconUrl} size={12} preserveAspectRatio={true} /> : null}
         </div>
       )}
       
