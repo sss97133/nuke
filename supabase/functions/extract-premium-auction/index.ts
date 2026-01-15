@@ -6137,6 +6137,23 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
           .replace(/\s+/g, ' ')
           .trim();
       };
+      const normalizeDrivetrain = (raw: string): string | null => {
+        const s = String(raw || '').trim();
+        if (!s) return null;
+        const lower = s.toLowerCase();
+        if (
+          /\b4x4\b/.test(lower) ||
+          /\b4wd\b/.test(lower) ||
+          /\b4[-\s]?wheel\s*drive\b/.test(lower) ||
+          /four[-\s]?wheel\s*drive/.test(lower)
+        ) {
+          return '4WD';
+        }
+        if (/\bawd\b/.test(lower) || /all[-\s]?wheel\s*drive/.test(lower)) return 'AWD';
+        if (/\brwd\b/.test(lower) || /rear[-\s]?wheel\s*drive/.test(lower)) return 'RWD';
+        if (/\bfwd\b/.test(lower) || /front[-\s]?wheel\s*drive/.test(lower)) return 'FWD';
+        return null;
+      };
 
       const cleanBatTitle = (raw: string): string => {
         let t = stripTags(raw);
@@ -6279,19 +6296,8 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
         }
       }
       
-      // Drivetrain
-      const drivePatterns = [
-        /(?:drivetrain|drive\s*type)[:\s]*["']?(AWD|4WD|RWD|FWD|4x4|All-Wheel|Rear-Wheel|Front-Wheel|Four-Wheel)/i,
-        /\b(AWD|4WD|RWD|FWD|4x4|All-Wheel\s*Drive|Rear-Wheel\s*Drive|Front-Wheel\s*Drive|Four-Wheel\s*Drive)\b/i,
-        /"drivetrain"[:\s]*"([^"]+)"/i,
-      ];
-      for (const pattern of drivePatterns) {
-        const m = h.match(pattern);
-        if (m?.[1]) {
-          specs.drivetrain = m[1].trim();
-          break;
-        }
-      }
+      // Drivetrain is extracted from the BaT Essentials block below to avoid
+      // false positives from site chrome (e.g. "4x4" nav links).
       
       // VIN/Chassis - look for 17-character VINs (modern) OR shorter chassis numbers (vintage)
       // Vintage vehicles (pre-1981) often have chassis numbers like "70077" (5 digits) instead of 17-char VINs
@@ -6406,6 +6412,17 @@ async function extractBringATrailer(url: string, maxVehicles: number) {
               // Transmission
               if (!specs.transmission && /transmission/i.test(t) && t.length >= 6 && t.length <= 80) {
                 specs.transmission = t;
+              }
+
+              // Drivetrain (short token or labeled field)
+              if (!specs.drivetrain) {
+                const labeledMatch = t.match(/^(?:Drivetrain|Drive\s*Type|Drive\s*Train)\s*:\s*(.+)$/i);
+                const candidate = labeledMatch?.[1] ? labeledMatch[1].trim() : t;
+                const normalized = normalizeDrivetrain(candidate);
+                const looksLikeDriveToken = /(?:\bawd\b|\brwd\b|\bfwd\b|\b4wd\b|\b4x4\b|wheel\s+drive)/i.test(t);
+                if (normalized && (labeledMatch || (looksLikeDriveToken && t.length <= 32))) {
+                  specs.drivetrain = normalized;
+                }
               }
 
               // Engine (keep it conservative)

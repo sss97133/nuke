@@ -117,16 +117,24 @@ function extractBatData(html) {
     }
   }
   
-  // Drivetrain
-  const drivePatterns = [
-    /(?:drivetrain|drive\s*type)[:\s]*["']?(AWD|4WD|RWD|FWD|4x4|All-Wheel|Rear-Wheel|Front-Wheel|Four-Wheel)/i,
-    /\b(AWD|4WD|RWD|FWD|4x4|All-Wheel\s*Drive|Rear-Wheel\s*Drive|Front-Wheel\s*Drive|Four-Wheel\s*Drive)\b/i,
-  ];
-  for (const pattern of drivePatterns) {
-    const m = searchText.match(pattern);
-    if (m?.[1]) {
-      data.drivetrain = m[1].trim().toUpperCase();
-      break;
+  // Drivetrain (avoid false positives from global HTML)
+  const driveText = essentialsText || '';
+  if (driveText) {
+    const drivePatterns = [
+      /(?:drivetrain|drive\s*type|drive\s*train)[:\s]*["']?(AWD|4WD|RWD|FWD|4x4|All-Wheel|Rear-Wheel|Front-Wheel|Four-Wheel)/i,
+      /\b(AWD|4WD|RWD|FWD|4x4|All-Wheel\s*Drive|Rear-Wheel\s*Drive|Front-Wheel\s*Drive|Four-Wheel\s*Drive)\b/i,
+    ];
+    for (const pattern of drivePatterns) {
+      const m = driveText.match(pattern);
+      if (m?.[1]) {
+        data.drivetrain = m[1].trim().toUpperCase();
+        break;
+      }
+    }
+  } else {
+    const labeledDrive = h.match(/(?:drivetrain|drive\s*type|drive\s*train)[:\s]*["']?([A-Za-z0-9\s-]{2,40})/i);
+    if (labeledDrive?.[1]) {
+      data.drivetrain = labeledDrive[1].trim().toUpperCase();
     }
   }
   
