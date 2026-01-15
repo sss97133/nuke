@@ -261,3 +261,25 @@ CREATE TRIGGER trg_set_vehicle_canonical_taxonomy
   FOR EACH ROW
   EXECUTE FUNCTION public.set_vehicle_canonical_taxonomy();
 
+-- =========================
+-- 7) Best-effort backfill for existing vehicles
+-- =========================
+-- Use VIN-derived types when available; otherwise normalize existing vehicles.body_style.
+UPDATE public.vehicles v
+SET
+  canonical_body_style = public.normalize_body_style(COALESCE(v.body_style, n.body_type, n.vehicle_type)),
+  canonical_vehicle_type = public.normalize_vehicle_type(COALESCE(n.vehicle_type, v.body_style, n.body_type))
+FROM public.vin_decoded_data n
+WHERE v.vin IS NOT NULL
+  AND UPPER(v.vin) = n.vin
+  AND (v.canonical_body_style IS NULL OR v.canonical_vehicle_type IS NULL);
+
+UPDATE public.vehicles v
+SET
+  canonical_body_style = COALESCE(v.canonical_body_style, public.normalize_body_style(v.body_style)),
+  canonical_vehicle_type = COALESCE(
+    v.canonical_vehicle_type,
+    (SELECT vehicle_type FROM public.canonical_body_styles WHERE canonical_name = public.normalize_body_style(v.body_style) LIMIT 1),
+    public.normalize_vehicle_type(v.body_style)
+  )
+WHERE (v.canonical_body_style IS NULL OR v.canonical_vehicle_type IS NULL);

@@ -64,9 +64,10 @@ export default function AuctionMarketplace() {
   // Default to including 0-bid auctions so marketplace doesn't look empty while bid_count backfills.
   const [includeNoBidAuctions, setIncludeNoBidAuctions] = useState(true);
   const [hiddenNoBidCount, setHiddenNoBidCount] = useState(0);
-  const [debugCounts, setDebugCounts] = useState<{ native: number; external: number; total: number } | null>(null);
+  const [debugCounts, setDebugCounts] = useState<{ native: number; external: number; bat: number; total: number } | null>(null);
   const endingNowWindowMs = 15 * 60 * 1000;
   const endingSoonWindowMs = 2 * 60 * 60 * 1000;
+  const maxReasonableEndMs = 60 * 24 * 60 * 60 * 1000;
   const nowMs = nowTick;
 
   useEffect(() => {
@@ -119,11 +120,59 @@ export default function AuctionMarketplace() {
 
   const loadListings = async () => {
     setLoading(true);
-    const now = new Date().toISOString();
+    const nowIso = new Date().toISOString();
+    const nowMsLocal = Date.now();
+    const maxReasonableEndMs = 60 * 24 * 60 * 60 * 1000; // 60 days
+    const externalStaleMs = 6 * 60 * 60 * 1000; // 6 hours
     const allListings: AuctionListing[] = [];
     let hiddenNoBids = 0;
 
     try {
+      const normalizeEndTime = (params: {
+        raw: any;
+        source: 'native' | 'external';
+        status?: any;
+        updatedAt?: any;
+      }): { endTime: string | null; isStale: boolean } => {
+        const raw = params.raw;
+        if (!raw) return { endTime: null, isStale: false };
+        const end = new Date(raw);
+        if (!Number.isFinite(end.getTime())) return { endTime: null, isStale: false };
+        const diff = end.getTime() - nowMsLocal;
+        if (diff > maxReasonableEndMs) return { endTime: null, isStale: false };
+
+        let stale = false;
+        if (params.source === 'external') {
+          const updatedAt = params.updatedAt ? new Date(params.updatedAt) : null;
+          if (updatedAt && Number.isFinite(updatedAt.getTime())) {
+            stale = nowMsLocal - updatedAt.getTime() > externalStaleMs;
+          }
+          const status = String(params.status || '').toLowerCase();
+          if (['active', 'live'].includes(status) && diff < 0) {
+            return { endTime: null, isStale: stale };
+          }
+          if (status && !['active', 'live'].includes(status) && diff < 0) {
+            return { endTime: null, isStale: stale };
+          }
+          // If telemetry is stale and the end time is already in the past, hide it.
+          if (stale && diff < -5 * 60 * 1000) {
+            return { endTime: null, isStale: stale };
+          }
+        }
+
+        return { endTime: end.toISOString(), isStale: stale };
+      };
+
+      const isFlashAuction = (start?: string | null, end?: string | null, saleType?: string | null) => {
+        if (!start || !end) return false;
+        if (saleType !== 'live_auction') return false;
+        const s = new Date(start).getTime();
+        const e = new Date(end).getTime();
+        if (!Number.isFinite(s) || !Number.isFinite(e)) return false;
+        const durationMs = e - s;
+        return durationMs > 0 && durationMs <= 10 * 60 * 1000;
+      };
+
       const parseTitle = (title: any): { year?: number; make?: string; model?: string; trim?: string | null } => {
         const t = typeof title === 'string' ? title.trim() : '';
         // Best-effort: "<year> <make> <model> <trim...>"
@@ -195,7 +244,13 @@ export default function AuctionMarketplace() {
 
       if (!nativeError && nativeListings) {
         for (const listing of nativeListings) {
-          const nativeEndTime = (listing as any).auction_end_time ?? (listing as any).auction_end_date ?? null;
+          const nativeEndRaw = (listing as any).auction_end_time ?? (listing as any).auction_end_date ?? null;
+          const { endTime: nativeEndTime } = normalizeEndTime({
+            raw: nativeEndRaw,
+            source: 'native',
+          });
+          const endMs = nativeEndTime ? new Date(nativeEndTime).getTime() : null;
+          const isPastLong = endMs !== null && nowMsLocal - endMs > 2 * 60 * 60 * 1000;
           const vehicle = normalizeVehicle({
             vehicleId: listing.vehicle_id,
             maybeVehicle: (listing as any).vehicle,
@@ -216,7 +271,8 @@ export default function AuctionMarketplace() {
           }
 
           // Keep auctions even if end time is missing (some sources backfill it later).
-          if (!nativeEndTime || new Date(nativeEndTime) > new Date()) {
+          // Drop only if end time is far in the past (likely stuck).
+          if (!isPastLong) {
             allListings.push({
               id: listing.id,
               vehicle_id: listing.vehicle_id,
@@ -227,10 +283,14 @@ export default function AuctionMarketplace() {
               current_high_bid_cents: (listing as any).current_high_bid_cents ?? null,
               reserve_price_cents: listing.reserve_price_cents,
               bid_count: (listing as any).bid_count || 0,
+              auction_start_time: (listing as any).auction_start_time ?? null,
               auction_end_time: nativeEndTime,
               status: listing.status,
               description: listing.description,
               created_at: listing.created_at,
+              updated_at: (listing as any).updated_at ?? null,
+              telemetry_stale: false,
+              is_flash: isFlashAuction((listing as any).auction_start_time ?? null, nativeEndTime, listing.sale_type),
               vehicle
             });
           }
@@ -254,7 +314,7 @@ export default function AuctionMarketplace() {
         `)
         // Do not exclude rows with missing/stale end_date; treat 'active' status as primary signal.
         // Show rows that are explicitly active OR have a future end_date.
-        .or(`listing_status.eq.active,end_date.gt.${new Date().toISOString()}`);
+        .or(`listing_status.eq.active,end_date.gt.${nowIso}`);
 
       const { data: externalListings, error: externalError } = await externalQuery;
 
@@ -274,6 +334,13 @@ export default function AuctionMarketplace() {
           // IMPORTANT:
           // We do NOT hard-filter external auctions by end_date here.
           // Many sources (especially live auctions) can have stale/missing end_date while still being active.
+          const { endTime: effectiveEndDate, isStale: telemetryStale } = normalizeEndTime({
+            raw: listing.end_date,
+            source: 'external',
+            status: listing.listing_status,
+            updatedAt: listing.updated_at,
+          });
+
           const metaImage =
             listing?.metadata?.image_url ||
             listing?.metadata?.primary_image_url ||
@@ -284,11 +351,6 @@ export default function AuctionMarketplace() {
             fallbackTitle: listing?.metadata?.bat_title,
             fallbackImageUrl: metaImage,
           });
-
-          // If the auction is active but end_date is in the past (stale), treat end time as unknown.
-          const endDate = listing.end_date ? new Date(listing.end_date) : null;
-          const endDateOk = !!(endDate && Number.isFinite(endDate.getTime()) && endDate > new Date());
-          const effectiveEndDate = endDateOk ? listing.end_date : null;
 
           allListings.push({
             id: listing.id,
@@ -303,6 +365,9 @@ export default function AuctionMarketplace() {
             auction_end_time: effectiveEndDate,
             status: listing.listing_status,
             created_at: listing.created_at,
+            updated_at: listing.updated_at,
+            telemetry_stale: telemetryStale,
+            is_flash: false,
             vehicle
           });
         }
@@ -349,9 +414,22 @@ export default function AuctionMarketplace() {
 
       // Apply filters
       let filtered = allListings;
-      if (filter === 'ending_soon') {
-        const next24Hours = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-        filtered = filtered.filter(l => l.auction_end_time && new Date(l.auction_end_time) <= new Date(next24Hours));
+      if (filter === 'ending_now') {
+        filtered = filtered.filter((l) => {
+          if (!l.auction_end_time) return false;
+          if (l.telemetry_stale) return false;
+          const diff = new Date(l.auction_end_time).getTime() - nowMsLocal;
+          return diff >= -2 * 60 * 1000 && diff <= endingNowWindowMs;
+        });
+      } else if (filter === 'ending_soon') {
+        filtered = filtered.filter((l) => {
+          if (!l.auction_end_time) return false;
+          if (l.telemetry_stale) return false;
+          const diff = new Date(l.auction_end_time).getTime() - nowMsLocal;
+          return diff >= 0 && diff <= endingSoonWindowMs;
+        });
+      } else if (filter === 'flash') {
+        filtered = filtered.filter((l) => l.source === 'native' && l.is_flash);
       } else if (filter === 'no_reserve') {
         filtered = filtered.filter(l => !l.reserve_price_cents);
       } else if (filter === 'new_listings') {
@@ -363,6 +441,8 @@ export default function AuctionMarketplace() {
       filtered.sort((a, b) => {
         switch (sort) {
           case 'ending_soon':
+            if (a.telemetry_stale && !b.telemetry_stale) return 1;
+            if (!a.telemetry_stale && b.telemetry_stale) return -1;
             if (!a.auction_end_time) return 1;
             if (!b.auction_end_time) return -1;
             return new Date(a.auction_end_time).getTime() - new Date(b.auction_end_time).getTime();
@@ -386,9 +466,11 @@ export default function AuctionMarketplace() {
       // Show all live auctions on the page (do not truncate to 50).
       setListings(filtered);
       setHiddenNoBidCount(hiddenNoBids);
+      const batCount = (externalListings || []).filter((l: any) => String(l?.platform || '').toLowerCase() === 'bat').length;
       setDebugCounts({
         native: nativeListings?.length || 0,
         external: externalListings?.length || 0,
+        bat: batCount,
         total: filtered.length,
       });
       console.log(
@@ -411,11 +493,14 @@ export default function AuctionMarketplace() {
   };
 
   const formatTimeRemaining = (endTime: string | null) => {
-    if (!endTime) return 'N/A';
+    if (!endTime) return '—';
     const now = new Date();
     const end = new Date(endTime);
     const diff = end.getTime() - now.getTime();
 
+    if (!Number.isFinite(diff)) return '—';
+    if (diff > maxReasonableEndMs) return '—';
+    if (diff <= -6 * 60 * 60 * 1000) return '—';
     if (diff <= 0) return 'Ended';
 
     const minutes = Math.floor(diff / 60000);
@@ -434,6 +519,7 @@ export default function AuctionMarketplace() {
     const diff = end.getTime() - now.getTime();
     const hours = diff / (60 * 60 * 1000);
 
+    if (!Number.isFinite(diff) || diff <= 0 || diff > maxReasonableEndMs) return 'text-gray-600';
     if (hours < 1) return 'text-red-600 font-bold';
     if (hours < 24) return 'text-orange-600 font-semibold';
     return 'text-gray-700';
@@ -450,6 +536,15 @@ export default function AuctionMarketplace() {
       (vehicle.trim && vehicle.trim.toLowerCase().includes(query))
     );
   });
+
+  const liveNowListings = listings.filter((listing) => {
+    if (!listing.auction_end_time) return false;
+    if (listing.telemetry_stale) return false;
+    const diff = new Date(listing.auction_end_time).getTime() - nowMs;
+    return diff >= -2 * 60 * 1000 && diff <= endingNowWindowMs;
+  });
+
+  const flashListings = liveNowListings.filter((listing) => listing.is_flash);
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -534,7 +629,9 @@ export default function AuctionMarketplace() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {[
                     { id: 'all', label: 'All Auctions' },
-                    { id: 'ending_soon', label: 'Ending Soon' },
+                    { id: 'ending_now', label: 'Ending Now (≤15m)' },
+                    { id: 'ending_soon', label: 'Ending Soon (≤2h)' },
+                    { id: 'flash', label: 'Flash Auctions' },
                     { id: 'no_reserve', label: 'No Reserve' },
                     { id: 'new_listings', label: 'New Listings' }
                   ].map(option => (
@@ -580,6 +677,58 @@ export default function AuctionMarketplace() {
             </div>
           </div>
         </section>
+
+        {/* Live Now strip */}
+        {liveNowListings.length > 0 && (
+          <section className="section">
+            <div className="card">
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '9pt', fontWeight: 800, color: 'var(--text)' }}>LIVE NOW</span>
+                  <span style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    Ending in the next 15 minutes ({liveNowListings.length})
+                  </span>
+                  {flashListings.length > 0 && (
+                    <span style={{ fontSize: '7pt', fontWeight: 800, color: '#dc2626' }}>
+                      FLASH {flashListings.length}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="button button-small"
+                  style={{ fontSize: '8pt' }}
+                  onClick={() => {
+                    setFilter('ending_now');
+                    setSort('ending_soon');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  View all ending now
+                </button>
+              </div>
+              <div className="card-body">
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                    gap: '12px',
+                  }}
+                >
+                  {liveNowListings.slice(0, 6).map((listing) => (
+                    <AuctionCard
+                      key={`live-${listing.id}`}
+                      listing={listing}
+                      formatCurrency={formatCurrency}
+                      formatTimeRemaining={formatTimeRemaining}
+                      getTimeRemainingColor={getTimeRemainingColor}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Listings */}
         <section className="section">
@@ -645,6 +794,19 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
                        listing.platform === 'cars_and_bids' ? 'Cars & Bids' :
                        listing.platform === 'ebay_motors' ? 'eBay Motors' :
                        listing.platform ? listing.platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : null;
+  const isStale = Boolean(listing.telemetry_stale);
+  const endMs = listing.auction_end_time ? new Date(listing.auction_end_time).getTime() : null;
+  const statusLower = String(listing.status || '').toLowerCase();
+  const isLive = !isStale && (
+    (endMs !== null ? endMs > Date.now() : (statusLower === 'active' || statusLower === 'live'))
+  );
+  const bidCountSuspicious =
+    listing.source === 'external' &&
+    typeof listing.bid_count === 'number' &&
+    listing.bid_count > 250 &&
+    !(listing.current_high_bid_cents && listing.current_high_bid_cents > 0);
+  const bidCountDisplay = isStale || bidCountSuspicious ? '—' : listing.bid_count;
+  const bidCountLabel = isStale ? 'bids' : listing.bid_count === 1 ? 'bid' : 'bids';
 
   const imageUrl = listing.lead_image_url || vehicle.primary_image_url || null;
   const isBat = listing.platform === 'bat';
@@ -729,8 +891,57 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           </div>
         )}
 
+        {/* Top-left badges */}
+        {(!hasReserve || listing.is_flash || isStale) && (
+          <div style={{ position: 'absolute', top: '6px', left: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {!hasReserve && (
+              <div
+                style={{
+                  background: '#ea580c',
+                  color: '#fff',
+                  padding: '3px 8px',
+                  borderRadius: '3px',
+                  fontSize: '7pt',
+                  fontWeight: 700,
+                }}
+              >
+                NO RESERVE
+              </div>
+            )}
+            {listing.is_flash && (
+              <div
+                style={{
+                  background: '#dc2626',
+                  color: '#fff',
+                  padding: '3px 8px',
+                  borderRadius: '3px',
+                  fontSize: '7pt',
+                  fontWeight: 800,
+                  letterSpacing: '0.5px',
+                }}
+              >
+                FLASH
+              </div>
+            )}
+            {isStale && (
+              <div
+                style={{
+                  background: '#475569',
+                  color: '#fff',
+                  padding: '3px 8px',
+                  borderRadius: '3px',
+                  fontSize: '7pt',
+                  fontWeight: 700,
+                }}
+              >
+                STALE
+              </div>
+            )}
+          </div>
+        )}
+
         {/* LIVE badge - show for active auctions */}
-        {listing.auction_end_time && new Date(listing.auction_end_time) > new Date() && (
+        {isLive && (
           <div
             style={{
               position: 'absolute',
@@ -749,12 +960,12 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           </div>
         )}
 
-        {/* Platform badge - show below LIVE if both exist */}
-        {platformName && listing.auction_end_time && new Date(listing.auction_end_time) > new Date() && (
+        {/* Platform badge */}
+        {platformName && (
           <div
             style={{
               position: 'absolute',
-              top: '28px',
+              top: isLive ? '28px' : '6px',
               right: '6px',
               background: listing.platform === 'bat' ? '#1e40af' : '#dc2626',
               color: '#fff',
@@ -769,48 +980,6 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             title={platformName || undefined}
           >
             {platformBadgeContent}
-          </div>
-        )}
-
-        {/* Platform badge - show in top-right if not live */}
-        {platformName && (!listing.auction_end_time || new Date(listing.auction_end_time) <= new Date()) && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '6px',
-              right: '6px',
-              background: listing.platform === 'bat' ? '#1e40af' : '#dc2626',
-              color: '#fff',
-              padding: isBat ? '2px 8px' : '3px 8px',
-              borderRadius: '3px',
-              fontSize: '7pt',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            title={platformName || undefined}
-          >
-            {platformBadgeContent}
-          </div>
-        )}
-
-        {/* No Reserve badge */}
-        {!hasReserve && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '6px',
-              left: '6px',
-              background: '#ea580c',
-              color: '#fff',
-              padding: '3px 8px',
-              borderRadius: '3px',
-              fontSize: '7pt',
-              fontWeight: 700,
-            }}
-          >
-            NO RESERVE
           </div>
         )}
       </div>
@@ -859,6 +1028,11 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             <div style={{ fontSize: '10pt', fontWeight: 800, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
               {formatCurrency(listing.current_high_bid_cents)}
             </div>
+            {isStale && (
+              <div style={{ fontSize: '7pt', color: '#b45309', fontWeight: 700, marginTop: '2px' }}>
+                Telemetry stale
+              </div>
+            )}
           </div>
           <div style={{ textAlign: 'right' }}>
             <div
@@ -875,9 +1049,9 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
                 fontSize: '8pt',
                 fontWeight: 600,
               }}
-              className={getTimeRemainingColor(listing.auction_end_time)}
+              className={isStale ? 'text-gray-600' : getTimeRemainingColor(listing.auction_end_time)}
             >
-              {formatTimeRemaining(listing.auction_end_time)}
+              {isStale ? '—' : formatTimeRemaining(listing.auction_end_time)}
             </div>
           </div>
         </div>
@@ -894,7 +1068,12 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           }}
         >
           <span>
-            {listing.bid_count} {listing.bid_count === 1 ? 'bid' : 'bids'}
+            <span
+              title={bidCountSuspicious ? 'Bid count looks suspect (external telemetry). Refresh pending.' : undefined}
+              style={bidCountSuspicious ? { color: '#b45309', fontWeight: 700 } : undefined}
+            >
+              {bidCountDisplay} {bidCountLabel}
+            </span>
           </span>
           {hasReserve && <span>Reserve</span>}
         </div>
