@@ -149,7 +149,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [computedCardSize, setComputedCardSize] = React.useState(cardSizePx || 200);
   
-  // Follow system with ROI tracking
+  // Follow system with ROI tracking (only if enabled)
   const { isFollowing, isLoading: followLoading, followROI, toggleFollow } = useVehicleFollow(
     showFollowButton ? vehicle.id : ''
   );
@@ -1955,18 +1955,19 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             '...'
           ) : isFollowing ? (
             <>
-              <span>⭐</span>
-              {followROI && followROI.hypothetical_roi_pct !== null && (
+              {followROI && followROI.hypothetical_roi_pct !== null ? (
                 <span style={{
                   color: followROI.hypothetical_roi_pct > 0 ? '#10b981' : followROI.hypothetical_roi_pct < 0 ? '#ef4444' : 'inherit',
                   fontWeight: 800,
                 }}>
                   {followROI.hypothetical_roi_pct > 0 ? '+' : ''}{followROI.hypothetical_roi_pct.toFixed(1)}%
                 </span>
+              ) : (
+                'Following'
               )}
             </>
           ) : (
-            '⭐ Follow'
+            'Follow'
           )}
         </button>
       )}

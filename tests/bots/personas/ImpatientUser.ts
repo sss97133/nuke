@@ -208,8 +208,9 @@ export class ImpatientUserBot extends BotRunner {
     const page = this.getPage();
     if (!page) return;
 
-    // Start navigation
-    const navPromise = page.goto('/vehicles', { waitUntil: 'domcontentloaded' });
+    // Start navigation using the base URL
+    const baseUrl = page.url().split('/').slice(0, 3).join('/');
+    const navPromise = page.goto(`${baseUrl}/vehicles`, { waitUntil: 'domcontentloaded' });
     
     // Immediately start clicking
     await this.sleep(100);
