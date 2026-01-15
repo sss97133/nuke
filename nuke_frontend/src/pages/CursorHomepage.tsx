@@ -59,7 +59,7 @@ type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'year' | 'make' | 'model' | 'mileage' | 'newest' | 'oldest' | 'popular' | 'price_high' | 'price_low' | 'volume' | 'images' | 'events' | 'views';
 type SortDirection = 'asc' | 'desc';
 
-const DEBUG_CURSOR_HOMEPAGE = false;
+const DEBUG_CURSOR_HOMEPAGE = import.meta.env.DEV;
 
 /**
  * Image URL normalization for feed cards.
@@ -480,6 +480,7 @@ const CursorHomepage: React.FC = () => {
   const [availableBodyStyles, setAvailableBodyStyles] = useState<string[]>([]);
 
   const homepageDebugEnabled =
+    DEBUG_CURSOR_HOMEPAGE &&
     typeof window !== 'undefined' &&
     (() => {
       try {
@@ -1985,6 +1986,17 @@ const CursorHomepage: React.FC = () => {
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin
         `;
+      const selectV1EngineSize = `
+          id, year, make, model, normalized_model, series, trim,
+          engine:engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          title, vin, created_at, updated_at,
+          sale_price, current_value, purchase_price, asking_price,
+          sale_date, sale_status,
+          auction_outcome, high_bid, winning_bid, bid_count,
+          auction_end_date,
+          is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
+          discovery_url, discovery_source, profile_origin
+        `;
       const selectV2 = `
           id, year, make, model, normalized_model, series, trim,
           engine, transmission, transmission_model, drivetrain, body_style, fuel_type,
@@ -1997,34 +2009,68 @@ const CursorHomepage: React.FC = () => {
           is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
           discovery_url, discovery_source, profile_origin
         `;
+      const selectV2EngineSize = `
+          id, year, make, model, normalized_model, series, trim,
+          engine:engine_size, transmission, transmission_model, drivetrain, body_style, fuel_type,
+          canonical_vehicle_type, canonical_body_style,
+          title, vin, created_at, updated_at,
+          sale_price, current_value, purchase_price, asking_price,
+          sale_date, sale_status,
+          auction_outcome, high_bid, winning_bid, bid_count,
+          auction_end_date,
+          is_for_sale, mileage, status, is_public, primary_image_url, image_url, origin_organization_id,
+          discovery_url, discovery_source, profile_origin
+        `;
+
+      const getMissingColumn = (err: any): string | null => {
+        const message = String(err?.message || '');
+        const match =
+          message.match(/column\s+[\w.]+\.(\w+)\s+does\s+not\s+exist/i) ||
+          message.match(/column\s+(\w+)\s+does\s+not\s+exist/i);
+        return match?.[1] || null;
+      };
+
+      const runVehicleQuery = async (selectFields: string) => {
+        try {
+          return await supabase
+            .from('vehicles')
+            .select(selectFields)
+            .eq('is_public', true)
+            .neq('status', 'pending')
+            .order('created_at', { ascending: false })
+            .range(offset, offset + PAGE_SIZE - 1);
+        } catch (e) {
+          return { data: null, error: e };
+        }
+      };
 
       let vehicles: any[] | null = null;
       let error: any = null;
-      try {
-        const r2 = await supabase
-          .from('vehicles')
-          .select(selectV2)
-          .eq('is_public', true)
-          .neq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .range(offset, offset + PAGE_SIZE - 1);
-        vehicles = r2.data as any[] | null;
-        error = r2.error;
-      } catch (e) {
-        vehicles = null;
-        error = e as any;
-      }
+      const applyResult = (result: { data: any[] | null; error: any }) => {
+        vehicles = result.data as any[] | null;
+        error = result.error;
+      };
 
-      if (error && String(error?.message || '').includes('canonical_')) {
-        const r1 = await supabase
-          .from('vehicles')
-          .select(selectV1)
-          .eq('is_public', true)
-          .neq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .range(offset, offset + PAGE_SIZE - 1);
-        vehicles = r1.data as any[] | null;
-        error = r1.error;
+      let result = await runVehicleQuery(selectV2);
+      applyResult(result);
+
+      if (error) {
+        const missingColumn = getMissingColumn(error);
+        if (missingColumn?.startsWith('canonical_')) {
+          result = await runVehicleQuery(selectV1);
+          applyResult(result);
+          if (error && getMissingColumn(error) === 'engine') {
+            result = await runVehicleQuery(selectV1EngineSize);
+            applyResult(result);
+          }
+        } else if (missingColumn === 'engine') {
+          result = await runVehicleQuery(selectV2EngineSize);
+          applyResult(result);
+          if (error && getMissingColumn(error)?.startsWith('canonical_')) {
+            result = await runVehicleQuery(selectV1EngineSize);
+            applyResult(result);
+          }
+        }
       }
 
       if (error) {

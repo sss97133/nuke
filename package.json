@@ -6,6 +6,7 @@
     "audit:dry-run": "tsx scripts/run-autonomous-audit.ts --dry-run",
     "audit:verbose": "VERBOSE=true tsx scripts/run-autonomous-audit.ts",
     "audit:bat-titles": "tsx scripts/bat-title-signal-audit.ts",
+    "report:make-model-stats": "tsx scripts/report-make-model-stats.ts",
     "report:vehicle-health": "node scripts/generate-vehicle-profile-data-health-report.js",
     "report:wikipedia-production": "tsx scripts/scrape-wikipedia-production.ts",
     "monitor:scrape-quality": "tsx scripts/monitor-scrape-quality.ts",
