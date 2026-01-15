@@ -99,6 +99,41 @@ function normalizeTextArray(raw: unknown, maxItems = 25): string[] {
   return Array.from(new Set(out));
 }
 
+function sanitizeSourceName(raw: string | null | undefined, url: string): string {
+  const title = safeString(raw);
+  if (!title) {
+    return extractDomainName(url);
+  }
+  
+  // Detect error pages / search queries - use domain name instead
+  const titleLower = title.toLowerCase();
+  const isErrorPage = /^(403|404|error|forbidden|page not found|not found|you searched|page not found)/i.test(title) ||
+                      /code not found/i.test(titleLower) ||
+                      /you searched for/i.test(titleLower);
+  
+  if (isErrorPage) {
+    return extractDomainName(url);
+  }
+  
+  return title;
+}
+
+function extractDomainName(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    let domain = urlObj.hostname.replace(/^www\./, '');
+    // Convert domain to readable name
+    domain = domain.replace(/\.(com|net|org|io|co|us)$/i, '');
+    domain = domain.replace(/[._-]/g, ' ');
+    // Title case
+    return domain.split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  } catch {
+    return 'Unknown Source';
+  }
+}
+
 function normalizeDealerInfo(raw: any): DealerInfo | null {
   if (!raw || typeof raw !== 'object') return null;
 
@@ -1198,10 +1233,13 @@ Return ONLY valid JSON in this format:
         })
         .eq('id', sourceId);
     } else {
+      // Sanitize source name to avoid error page titles
+      const sourceName = dealerInfo?.name || sanitizeSourceName(metadata?.title, source_url);
+      
       const { data: newSource, error: sourceError } = await supabase
         .from('scrape_sources')
         .insert({
-          name: dealerInfo?.name || metadata?.title || new URL(source_url).hostname,
+          name: sourceName,
           url: source_url,
           source_type: scrapeSourceTypeForDb,
           inventory_url: source_url,
