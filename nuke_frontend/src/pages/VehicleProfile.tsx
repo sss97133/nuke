@@ -97,6 +97,7 @@ const VehicleProfile: React.FC = () => {
   const [ownershipVerifications, setOwnershipVerifications] = useState<any[]>([]);
   const [newEventsNotice, setNewEventsNotice] = useState<{ show: boolean; count: number; dates: string[] }>({ show: false, count: 0, dates: [] });
   const [showMap, setShowMap] = useState(false);
+  const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
   const presenceAvailableRef = React.useRef<boolean>(true);
   const vehicleHeaderRef = React.useRef<HTMLDivElement | null>(null);
   const [vehicleHeaderHeight, setVehicleHeaderHeight] = React.useState<number>(88);
@@ -145,7 +146,6 @@ const VehicleProfile: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
-  const [auctionPulse, setAuctionPulse] = useState<any | null>(null);
   const ranBatSyncRef = React.useRef<string | null>(null);
   const [batAutoImportStatus, setBatAutoImportStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
   const { lastMemeDrop } = useVehicleMemeDrops(vehicle?.id);
