@@ -9,19 +9,22 @@ interface BulkActionsToolbarProps {
   userId: string;
   onDeselectAll: () => void;
   onUpdate?: () => void;
+  onQuickFix?: (fixType: 'price' | 'vin' | 'mileage' | 'color' | 'images', vehicleIds: string[]) => void;
 }
 
 const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
   selectedVehicleIds,
   userId,
   onDeselectAll,
-  onUpdate
+  onUpdate,
+  onQuickFix
 }) => {
   const { user, loading: authLoading } = useAuth();
   const [action, setAction] = useState<string | null>(null);
   const [collectionName, setCollectionName] = useState('');
   const [showCollectionInput, setShowCollectionInput] = useState(false);
   const [showOrgAssignment, setShowOrgAssignment] = useState(false);
+  const [showDataActions, setShowDataActions] = useState(false);
   const [organizations, setOrganizations] = useState<MyOrganization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [relationshipType, setRelationshipType] = useState<string>('work_location');
@@ -395,6 +398,117 @@ const BulkActionsToolbar: React.FC<BulkActionsToolbarProps> = ({
                 {action === 'remove_collection' ? 'Removing...' : 'REMOVE FROM COLLECTION'}
               </button>
             </>
+          )}
+
+          {/* Data Refinement Actions */}
+          {onQuickFix && (
+            showDataActions ? (
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '7pt', color: 'var(--text-muted)', fontWeight: 600 }}>FIX:</span>
+                <button
+                  onClick={() => {
+                    onQuickFix('price', selectedVehicleIds);
+                    setShowDataActions(false);
+                  }}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '7pt',
+                    fontWeight: 600,
+                    border: '1px solid #15803d',
+                    background: '#dcfce7',
+                    color: '#15803d',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                >
+                  $ PRICE
+                </button>
+                <button
+                  onClick={() => {
+                    onQuickFix('vin', selectedVehicleIds);
+                    setShowDataActions(false);
+                  }}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '7pt',
+                    fontWeight: 600,
+                    border: '1px solid #15803d',
+                    background: '#dcfce7',
+                    color: '#15803d',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                >
+                  # VIN
+                </button>
+                <button
+                  onClick={() => {
+                    onQuickFix('mileage', selectedVehicleIds);
+                    setShowDataActions(false);
+                  }}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '7pt',
+                    fontWeight: 600,
+                    border: '1px solid #15803d',
+                    background: '#dcfce7',
+                    color: '#15803d',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                >
+                  MI MILEAGE
+                </button>
+                <button
+                  onClick={() => {
+                    onQuickFix('color', selectedVehicleIds);
+                    setShowDataActions(false);
+                  }}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '7pt',
+                    fontWeight: 600,
+                    border: '1px solid #15803d',
+                    background: '#dcfce7',
+                    color: '#15803d',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                >
+                  COLOR
+                </button>
+                <button
+                  onClick={() => setShowDataActions(false)}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '7pt',
+                    border: '1px solid var(--border)',
+                    background: 'var(--surface)',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                >
+                  CANCEL
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowDataActions(true)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '8pt',
+                  fontWeight: 600,
+                  border: '1px solid #15803d',
+                  background: '#15803d',
+                  color: 'white',
+                  cursor: 'pointer',
+                  borderRadius: '4px'
+                }}
+              >
+                FIX DATA
+              </button>
+            )
           )}
 
           {/* Assign to Organization */}

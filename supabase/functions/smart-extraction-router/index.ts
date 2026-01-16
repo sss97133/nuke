@@ -67,6 +67,15 @@ function determineOptimalExtractor(url: string): {
     };
   }
 
+  // DuPont Registry - Use scrape-multi-source for marketplace/auction hybrid
+  if (urlLower.includes('dupontregistry.com')) {
+    return {
+      functionName: 'scrape-multi-source',
+      reason: 'DuPont Registry detected - using multi-source extractor for marketplace/auction hybrid',
+      expectedDataQuality: 'high'
+    };
+  }
+
   // Classic.com dealer sites - Use AI extractor for structured data
   if (urlLower.includes('classic.com') ||
       urlLower.includes('classiccars.com') ||
@@ -111,7 +120,8 @@ function shouldSkipImageOnlyExtraction(url: string): boolean {
   return urlLower.includes('bringatrailer.com') ||
          urlLower.includes('carsandbids.com') ||
          urlLower.includes('mecum.com') ||
-         urlLower.includes('barrett-jackson.com');
+         urlLower.includes('barrett-jackson.com') ||
+         urlLower.includes('dupontregistry.com');
 }
 
 serve(async (req) => {
@@ -224,9 +234,24 @@ serve(async (req) => {
 
     console.log(`🎯 Smart router: ${url} → ${strategy.functionName} (${strategy.reason})`);
 
+    // Prepare function-specific payload
+    let functionPayload: any;
+    if (strategy.functionName === 'scrape-multi-source') {
+      // scrape-multi-source expects source_url
+      functionPayload = {
+        source_url: url,
+        source_type: url.toLowerCase().includes('live.dupontregistry.com') ? 'auction' : 'marketplace',
+        extract_listings: true,
+        extract_dealer_info: true,
+        max_listings: 1
+      };
+    } else {
+      functionPayload = extractionPayload;
+    }
+
     // Call the optimal extractor
     const { data, error } = await supabase.functions.invoke(strategy.functionName, {
-      body: extractionPayload
+      body: functionPayload
     });
 
     if (error) {

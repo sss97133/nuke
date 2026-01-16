@@ -9,6 +9,8 @@ import BulkActionsToolbar from '../components/vehicles/BulkActionsToolbar';
 import VehicleOrganizationToolbar from '../components/vehicles/VehicleOrganizationToolbar';
 import VehicleConfirmationQuestions from '../components/vehicles/VehicleConfirmationQuestions';
 import TitleTransferApproval from '../components/ownership/TitleTransferApproval';
+import FleetHealthOverview from '../components/vehicles/FleetHealthOverview';
+import QuickFixModal from '../components/vehicles/QuickFixModal';
 import { MyOrganizationsService, type MyOrganization } from '../services/myOrganizationsService';
 import { usePageTitle } from '../hooks/usePageTitle';
 import '../design-system.css';
@@ -104,6 +106,22 @@ const VehiclesInner: React.FC = () => {
   const [newCollectionName, setNewCollectionName] = useState('');
   const [myOrganizations, setMyOrganizations] = useState<MyOrganization[]>([]);
   const [orgDropRelationshipType, setOrgDropRelationshipType] = useState<'work_location' | 'service_provider' | 'storage' | 'consigner' | 'sold_by' | 'owner'>('work_location');
+  
+  // Fleet health and quick fix state
+  const [quickFixModal, setQuickFixModal] = useState<{
+    isOpen: boolean;
+    fixType: 'price' | 'vin' | 'mileage' | 'color' | 'images';
+    vehicleIds: string[];
+  }>({ isOpen: false, fixType: 'price', vehicleIds: [] });
+  const [healthFilter, setHealthFilter] = useState<'healthy' | 'needs_work' | 'critical' | null>(null);
+  const [fleetHealthCollapsed, setFleetHealthCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('vehicles.fleetHealthCollapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   // Default collapsed: users shouldn't have to constantly manage sidebar real estate.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -189,6 +207,14 @@ const VehiclesInner: React.FC = () => {
       // ignore
     }
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('vehicles.fleetHealthCollapsed', String(fleetHealthCollapsed));
+    } catch {
+      // ignore
+    }
+  }, [fleetHealthCollapsed]);
 
   // Handle sidebar resize
   useEffect(() => {
@@ -1269,7 +1295,7 @@ const VehiclesInner: React.FC = () => {
   };
 
   // Filter and sort current relationships
-  const filteredRelationships = currentRelationships
+  const filteredRelationships = applyHealthFilter(currentRelationships
     .filter(relationship => {
       const vehicle = relationship.vehicle;
       const prefs = vehiclePreferences.get(vehicle.id);
@@ -1313,7 +1339,7 @@ const VehiclesInner: React.FC = () => {
       }
 
       return true;
-    })
+    }))
     .sort((a, b) => {
       const aVehicle = a.vehicle;
       const bVehicle = b.vehicle;
@@ -1429,6 +1455,58 @@ const VehiclesInner: React.FC = () => {
     } catch (error) {
       console.error('Failed to link vehicles to organization:', error);
     }
+  };
+
+  // Quick fix handler
+  const handleQuickFix = (fixType: 'price' | 'vin' | 'mileage' | 'color' | 'images', vehicleIds: string[]) => {
+    setQuickFixModal({
+      isOpen: true,
+      fixType,
+      vehicleIds
+    });
+  };
+
+  // Health filter handler
+  const handleFilterByHealth = (level: 'healthy' | 'needs_work' | 'critical' | null) => {
+    setHealthFilter(level);
+  };
+
+  // Apply health filter to relationships
+  // Uses a simplified health score based on available vehicle fields
+  // FleetHealthOverview does the full calculation with image/event counts
+  const applyHealthFilter = (relationships: VehicleRelationship[]) => {
+    if (!healthFilter) return relationships;
+    
+    return relationships.filter(rel => {
+      const vehicle = rel.vehicle;
+      let score = 0;
+      
+      // Value info: +25 (matches FleetHealthOverview logic)
+      if (vehicle.current_value || vehicle.purchase_price) score += 25;
+      
+      // Basic completeness indicators (approximating images/events presence):
+      // Having VIN, mileage, color suggests active data entry
+      // These are weighted lower since we can't check actual image/event counts here
+      if (vehicle.vin && vehicle.vin.trim()) score += 15; // VIN suggests data entry activity
+      if (vehicle.mileage != null) score += 10; // Mileage suggests maintenance/usage tracking
+      if (vehicle.color && vehicle.color.trim()) score += 10; // Color suggests detail entry
+      
+      // Approximate score out of 60 (vs 100 in full calculation)
+      // Scale thresholds proportionally: healthy ~75% of max = 45+, needs_work ~50-75% = 30-44, critical <30
+      const scaledHealthy = 45; // 75% of 60
+      const scaledNeedsWork = 30; // 50% of 60
+      
+      switch (healthFilter) {
+        case 'healthy':
+          return score >= scaledHealthy;
+        case 'needs_work':
+          return score >= scaledNeedsWork && score < scaledHealthy;
+        case 'critical':
+          return score < scaledNeedsWork;
+        default:
+          return true;
+      }
+    });
   };
 
 
@@ -2023,6 +2101,64 @@ const VehiclesInner: React.FC = () => {
             </div>
 
             <div className="vehicle-library-scroll">
+              {/* Fleet Health Overview - Owner Dashboard */}
+              {session?.user?.id && allRelationships.length > 0 && (
+                <FleetHealthOverview
+                  vehicles={allRelationships}
+                  userId={session.user.id}
+                  onQuickFix={handleQuickFix}
+                  onFilterByHealth={handleFilterByHealth}
+                  collapsed={fleetHealthCollapsed}
+                  onToggleCollapse={() => setFleetHealthCollapsed(prev => !prev)}
+                />
+              )}
+
+              {/* Health filter indicator */}
+              {healthFilter && (
+                <div style={{
+                  padding: '8px 12px',
+                  marginBottom: '12px',
+                  background: healthFilter === 'healthy' ? '#dcfce7' : healthFilter === 'needs_work' ? '#fef3c7' : '#fee2e2',
+                  border: `1px solid ${healthFilter === 'healthy' ? '#86efac' : healthFilter === 'needs_work' ? '#fcd34d' : '#fca5a5'}`,
+                  borderRadius: '4px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ fontSize: '8pt', fontWeight: 600 }}>
+                    Filtering by: {healthFilter === 'healthy' ? 'Healthy (75%+)' : healthFilter === 'needs_work' ? 'Needs Work (50-74%)' : 'Critical (<50%)'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setHealthFilter(null)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '8pt',
+                      color: 'inherit',
+                      cursor: 'pointer',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+              )}
+
+              {/* Bulk Actions Toolbar */}
+              {session?.user?.id && selectedVehicleIds.size > 0 && (
+                <BulkActionsToolbar
+                  selectedVehicleIds={Array.from(selectedVehicleIds)}
+                  userId={session.user.id}
+                  onDeselectAll={() => setSelectedVehicleIds(new Set())}
+                  onUpdate={() => {
+                    loadVehicleRelationships();
+                    loadVehiclePreferences();
+                  }}
+                  onQuickFix={handleQuickFix}
+                />
+              )}
+
               {currentRelationships.length === 0 && (
                 <div className="card">
                   <div className="card-body text-center" style={{ padding: '48px 24px' }}>
@@ -2236,6 +2372,18 @@ const VehiclesInner: React.FC = () => {
           </main>
         </div>
       )}
+      {/* Quick Fix Modal */}
+      <QuickFixModal
+        isOpen={quickFixModal.isOpen}
+        onClose={() => setQuickFixModal({ ...quickFixModal, isOpen: false })}
+        fixType={quickFixModal.fixType}
+        vehicleIds={quickFixModal.vehicleIds}
+        onComplete={() => {
+          setQuickFixModal({ ...quickFixModal, isOpen: false });
+          loadVehicleRelationships();
+        }}
+      />
+
       {/* Profile relationship editor modal */}
       {relationshipModal && (
         <div

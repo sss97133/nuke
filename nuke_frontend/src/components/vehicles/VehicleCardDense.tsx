@@ -2231,8 +2231,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               }}>
                 {visible.map((t, idx) => {
                   const isClickable = t.clickable && (t.kind === 'engine' || t.kind === 'transmission' || t.kind === 'type');
+                  const tokenKey = `${t.kind}-${idx}-${t.label}`;
                   const commonProps = {
-                    key: `${t.kind}-${idx}-${t.label}`,
                     title: t.raw ? String(t.raw) : t.label,
                     style: {
                       ...tokenStyleBase,
@@ -2242,11 +2242,12 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   };
 
                   if (!isClickable) {
-                    return <span {...commonProps}>{t.label}</span>;
+                    return <span key={tokenKey} {...commonProps}>{t.label}</span>;
                   }
 
                   return (
                     <button
+                      key={tokenKey}
                       type="button"
                       {...commonProps}
                       onClick={(e) => {
