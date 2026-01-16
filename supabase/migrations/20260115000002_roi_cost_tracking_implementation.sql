@@ -114,7 +114,7 @@ INSERT INTO public.spend_attributions (
   created_by
 )
 SELECT
-  r.scope_id AS vehicle_id,
+  r.scope_id::UUID AS vehicle_id,
   r.id AS receipt_id,
   'outflow' AS direction,
   FLOOR(COALESCE(r.total, 0) * 100)::BIGINT AS amount_cents,
@@ -148,7 +148,7 @@ WHERE r.scope_type = 'vehicle'
   -- Only for vehicles that exist
   AND EXISTS (
     SELECT 1 FROM public.vehicles v
-    WHERE v.id = r.scope_id
+    WHERE v.id::TEXT = r.scope_id::TEXT
   )
 ON CONFLICT DO NOTHING;
 
@@ -171,7 +171,7 @@ SELECT
   ri.id AS receipt_item_id,
   ri.receipt_id,
   'outflow' AS direction,
-  FLOOR(COALESCE(ri.total_price, 0) * 100)::BIGINT AS amount_cents,
+  FLOOR(COALESCE(ri.line_total, 0) * 100)::BIGINT AS amount_cents,
   COALESCE(r.currency, 'USD') AS currency,
   categorize_receipt_spend(
     r.vendor_name,
@@ -193,7 +193,7 @@ SELECT
 FROM public.receipt_items ri
 JOIN public.receipts r ON r.id = ri.receipt_id
 WHERE ri.vehicle_id IS NOT NULL
-  AND COALESCE(ri.total_price, 0) > 0
+  AND COALESCE(ri.line_total, 0) > 0
   -- Only extract items that don't already have a spend_attribution
   AND NOT EXISTS (
     SELECT 1 FROM public.spend_attributions sa
@@ -202,7 +202,7 @@ WHERE ri.vehicle_id IS NOT NULL
   -- Only for vehicles that exist
   AND EXISTS (
     SELECT 1 FROM public.vehicles v
-    WHERE v.id = ri.vehicle_id
+    WHERE v.id::TEXT = ri.vehicle_id::TEXT
   )
 ON CONFLICT DO NOTHING;
 
@@ -587,7 +587,7 @@ BEGIN
     )
     AND EXISTS (
       SELECT 1 FROM public.vehicles v
-      WHERE v.id = r.scope_id
+      WHERE v.id::TEXT = r.scope_id::TEXT
     )
   ON CONFLICT DO NOTHING;
 
@@ -611,7 +611,7 @@ BEGIN
     ri.id AS receipt_item_id,
     ri.receipt_id,
     'outflow' AS direction,
-    FLOOR(COALESCE(ri.total_price, 0) * 100)::BIGINT AS amount_cents,
+    FLOOR(COALESCE(ri.line_total, 0) * 100)::BIGINT AS amount_cents,
     COALESCE(r.currency, 'USD') AS currency,
     categorize_receipt_spend(r.vendor_name, ri.description, ri.category) AS spend_category,
     CASE
@@ -629,7 +629,7 @@ BEGIN
   FROM public.receipt_items ri
   JOIN public.receipts r ON r.id = ri.receipt_id
   WHERE ri.vehicle_id IS NOT NULL
-    AND COALESCE(ri.total_price, 0) > 0
+    AND COALESCE(ri.line_total, 0) > 0
     AND NOT EXISTS (
       SELECT 1 FROM public.spend_attributions sa
       WHERE sa.receipt_item_id = ri.id

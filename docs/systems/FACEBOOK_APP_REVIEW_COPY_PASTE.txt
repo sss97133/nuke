@@ -1,0 +1,168 @@
+========================================
+FACEBOOK APP REVIEW - COPY/PASTE TEXT
+========================================
+
+IMPORTANT: Copy these texts directly into the Meta App Review forms.
+These are pre-written to match your use case.
+
+========================================
+PART 1: INSTAGRAM GRAPH API PERMISSIONS
+========================================
+
+---
+Permission: instagram_manage_insights
+---
+
+USE CASE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+Our platform connects automotive enthusiasts with their vehicles through Instagram integration. When users connect their Instagram Business accounts, we:
+
+1. Sync their Instagram posts containing vehicle images
+2. Use AI to detect vehicles in images and automatically link posts to vehicle profiles
+3. Extract location data from posts for geo-tagging (e.g., "show all red cars in Las Vegas")
+4. Analyze engagement metrics to identify high-quality automotive content creators
+5. Monitor comments to detect vehicle mentions and help users connect their social activity with their vehicle collections
+
+Example: A user posts an image of their Ferrari at a car show in Las Vegas. Our system:
+- Detects it's a Ferrari from the image
+- Extracts location "Las Vegas" from post metadata
+- Links the post to their Ferrari vehicle profile
+- Analyzes engagement to rank them as a quality creator
+--------------------------------------------------------
+
+DATA USAGE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+- Instagram post data (images, captions, location): Stored to link posts with vehicle profiles
+- Engagement metrics (likes, comments, reach): Used to identify high-quality accounts and rank content creators
+- Comment data: Analyzed to detect vehicle mentions and help users connect their social activity
+- Location data: Extracted for geo-tagging functionality (e.g., "red cars in Las Vegas")
+- Account metadata: Stored to maintain connection between Instagram accounts and vehicle profiles
+
+We do NOT:
+- Sell user data
+- Use data for advertising targeting
+- Share data with third parties
+--------------------------------------------------------
+
+
+---
+Permission: instagram_manage_comments
+---
+
+USE CASE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+We monitor comments on Instagram posts to detect vehicle mentions (make, model, year) and help users link their Instagram activity to vehicle profiles in our system.
+
+When a user comments on a vehicle-related post mentioning a specific car (e.g., "This Ferrari is beautiful!"), our system analyzes the comment text to identify vehicle references and suggests connecting the post to the appropriate vehicle profile.
+--------------------------------------------------------
+
+DATA USAGE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+- Comment text: Analyzed to detect vehicle mentions (make, model, year) using natural language processing
+- Comment metadata: Stored temporarily to identify vehicle-related discussions
+- We use this data solely to help users connect their Instagram activity with their vehicle profiles
+- Comments are not shared with third parties or used for advertising
+--------------------------------------------------------
+
+
+========================================
+PART 2: FACEBOOK LOGIN PERMISSIONS
+========================================
+
+---
+Permission: user_location
+---
+
+USE CASE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+We use the user's current city location to pre-fill location data when they're creating vehicle profiles or searching for vehicles. This enhances the geo-tagging and location-based filtering features.
+
+For example, if a user's Facebook profile shows they're located in Las Vegas, when they search for "red cars" on our platform, we can automatically filter results to show red cars in Las Vegas.
+--------------------------------------------------------
+
+DATA USAGE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+- Location data (city name only): Stored in user profiles for geo-tagging functionality
+- Used for location-based filtering (e.g., "show all red cars in Las Vegas")
+- Used to pre-fill location preferences when users create vehicle profiles
+- Location data is NOT used for advertising targeting
+- Location data is NOT shared with third parties
+--------------------------------------------------------
+
+
+---
+Permission: email
+---
+
+USE CASE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+We need email addresses for user account verification when users log in with Facebook. This ensures each user has a unique account in our platform and allows us to send important notifications about their vehicle profiles and Instagram integration.
+--------------------------------------------------------
+
+DATA USAGE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+- Email addresses are stored in our database for account authentication and communication
+- Used to send notifications about vehicle profile updates and Instagram content synchronization
+- Emails are NOT shared with third parties
+- Emails are NOT used for marketing without explicit user consent
+--------------------------------------------------------
+
+
+---
+Permission: user_photos (OPTIONAL)
+---
+
+USE CASE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+We use Facebook profile photos as default avatar images when users log in with Facebook. This provides a better user experience by using their existing social media profile picture.
+--------------------------------------------------------
+
+DATA USAGE DESCRIPTION (Copy this exactly):
+--------------------------------------------------------
+- Profile photos are downloaded and stored locally in our system
+- Used only as default avatar images for user accounts
+- Photos are NOT shared with third parties
+- Photos are NOT used for any other purpose beyond user avatars
+--------------------------------------------------------
+
+
+========================================
+PART 3: QUICK REFERENCE
+========================================
+
+WHICH PERMISSIONS TO REQUEST:
+
+INSTAGRAM (Most Important):
+✅ instagram_basic (usually auto-approved)
+✅ instagram_content_publish (if publishing)
+✅ instagram_manage_comments (REQUEST THIS)
+✅ instagram_manage_insights (REQUEST THIS - MOST IMPORTANT)
+✅ pages_read_engagement (usually auto-approved)
+
+FACEBOOK LOGIN (Secondary):
+✅ public_profile (auto-approved)
+✅ email (REQUEST IF NEEDED)
+✅ user_location (REQUEST THIS for geo-tagging)
+✅ user_photos (OPTIONAL)
+❌ SKIP: user_birthday, user_age_range, user_gender, user_hometown, user_friends, user_likes
+
+========================================
+WHERE TO PASTE THESE:
+========================================
+
+1. Go to: https://developers.facebook.com/apps/481722314992281/use_cases/
+2. Click "Instagram Graph API" use case
+3. Go to "Permissions and Features" tab
+4. For each permission, click "Actions" → "Request Permissions"
+5. Copy/paste the appropriate USE CASE and DATA USAGE text above
+6. Upload screenshots if requested (screenshot of your app showing Instagram connection)
+7. Click "Submit for Review"
+
+For Facebook Login:
+1. You're already on: https://developers.facebook.com/apps/481722314992281/use_cases/customize/?use_case_enum=FB_LOGIN
+2. Click "Actions" dropdown for each permission
+3. Click "Request Permissions"
+4. Copy/paste the appropriate text above
+5. Submit
+
+========================================

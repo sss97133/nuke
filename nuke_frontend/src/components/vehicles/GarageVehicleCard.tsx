@@ -16,9 +16,18 @@ interface GarageVehicleCardProps {
   };
   onRefresh?: () => void;
   onEditRelationship?: (vehicleId: string, currentRelationship: string | null) => void;
+  onQuickEdit?: (vehicleId: string, field: string) => void;
+  showMissingFields?: boolean;
 }
 
-const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relationship, onRefresh, onEditRelationship }) => {
+const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ 
+  vehicle, 
+  relationship, 
+  onRefresh, 
+  onEditRelationship,
+  onQuickEdit,
+  showMissingFields = true
+}) => {
   const [liveData, setLiveData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [organizationRelationships, setOrganizationRelationships] = useState<any[]>([]);
@@ -326,6 +335,19 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
   const healthScore = typeof healthScoreData === 'number' ? healthScoreData : healthScoreData.score;
   const healthBreakdown = typeof healthScoreData === 'object' && 'breakdown' in healthScoreData ? healthScoreData.breakdown : [];
 
+  // Calculate missing fields for indicator
+  const getMissingFields = () => {
+    const missing: string[] = [];
+    if (!vehicle.vin) missing.push('VIN');
+    if (!vehicle.purchase_price && !vehicle.current_value) missing.push('Price');
+    if (!vehicle.mileage) missing.push('Mileage');
+    if (!vehicle.color) missing.push('Color');
+    if (liveData && liveData.imageCount === 0) missing.push('Images');
+    return missing;
+  };
+
+  const missingFields = getMissingFields();
+
   return (
     <>
     <Link
@@ -473,6 +495,46 @@ const GarageVehicleCard: React.FC<GarageVehicleCardProps> = ({ vehicle, relation
         >
           {vehicle.year} {vehicle.make} {vehicle.model}
         </h3>
+
+        {/* Missing fields indicator */}
+        {showMissingFields && missingFields.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '4px',
+              marginBottom: '8px'
+            }}
+          >
+            {missingFields.map(field => (
+              <span
+                key={field}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onQuickEdit) {
+                    onQuickEdit(vehicle.id, field.toLowerCase());
+                  }
+                }}
+                style={{
+                  fontSize: '6pt',
+                  fontWeight: 600,
+                  padding: '3px 6px',
+                  borderRadius: '2px',
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  border: '1px solid #fcd34d',
+                  cursor: onQuickEdit ? 'pointer' : 'default',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.3px'
+                }}
+                title={`Missing ${field} - ${onQuickEdit ? 'Click to add' : 'Visit profile to add'}`}
+              >
+                No {field}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Key metrics grid */}
         {!loading && liveData && (

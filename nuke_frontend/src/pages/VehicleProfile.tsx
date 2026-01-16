@@ -1081,20 +1081,20 @@ const VehicleProfile: React.FC = () => {
           .from('external_listings')
           .select('platform, listing_url, listing_status, end_date, current_bid, bid_count, watcher_count, view_count, metadata, updated_at')
           .eq('vehicle_id', vehicle.id)
-          .eq('listing_url', auctionPulse.listing_url)
+          .eq('listing_url', auctionPulse?.listing_url || '')
           .order('updated_at', { ascending: false })
           .limit(20);
 
         const merged = buildAuctionPulseFromExternalListings(Array.isArray(listings) ? listings : [], vehicle.id);
-        const platform = String((merged as any)?.platform || auctionPulse.platform || '');
-        const listingUrl = String((merged as any)?.listing_url || auctionPulse.listing_url || '');
+        const platform = String((merged as any)?.platform || auctionPulse?.platform || '');
+        const listingUrl = String((merged as any)?.listing_url || auctionPulse?.listing_url || '');
 
         let commentCount: number | null =
           typeof (merged as any)?.comment_count === 'number'
             ? (merged as any).comment_count
-            : (typeof auctionPulse.comment_count === 'number' ? auctionPulse.comment_count : null);
-        let lastBidAt: string | null = auctionPulse.last_bid_at || null;
-        let lastCommentAt: string | null = auctionPulse.last_comment_at || null;
+            : (typeof auctionPulse?.comment_count === 'number' ? auctionPulse.comment_count : null);
+        let lastBidAt: string | null = auctionPulse?.last_bid_at || null;
+        let lastCommentAt: string | null = auctionPulse?.last_comment_at || null;
 
         try {
           const [cCount, lastBid, lastComment, lastSeller] = await Promise.all([
@@ -1149,16 +1149,16 @@ const VehicleProfile: React.FC = () => {
           setAuctionPulse({
             platform,
             listing_url: listingUrl,
-            listing_status: String((merged as any)?.listing_status || auctionPulse.listing_status || ''),
-            end_date: (merged as any)?.end_date ?? auctionPulse.end_date ?? null,
-            current_bid: typeof (merged as any)?.current_bid === 'number' ? (merged as any).current_bid : (auctionPulse.current_bid ?? null),
-            bid_count: typeof (merged as any)?.bid_count === 'number' ? (merged as any).bid_count : (auctionPulse.bid_count ?? null),
-            watcher_count: typeof (merged as any)?.watcher_count === 'number' ? (merged as any).watcher_count : (auctionPulse.watcher_count ?? null),
-            view_count: typeof (merged as any)?.view_count === 'number' ? (merged as any).view_count : (auctionPulse.view_count ?? null),
+            listing_status: String((merged as any)?.listing_status || auctionPulse?.listing_status || ''),
+            end_date: (merged as any)?.end_date ?? auctionPulse?.end_date ?? null,
+            current_bid: typeof (merged as any)?.current_bid === 'number' ? (merged as any).current_bid : (auctionPulse?.current_bid ?? null),
+            bid_count: typeof (merged as any)?.bid_count === 'number' ? (merged as any).bid_count : (auctionPulse?.bid_count ?? null),
+            watcher_count: typeof (merged as any)?.watcher_count === 'number' ? (merged as any).watcher_count : (auctionPulse?.watcher_count ?? null),
+            view_count: typeof (merged as any)?.view_count === 'number' ? (merged as any).view_count : (auctionPulse?.view_count ?? null),
             comment_count: commentCount,
             last_bid_at: lastBidAt,
             last_comment_at: lastCommentAt,
-            updated_at: (merged as any)?.updated_at ?? auctionPulse.updated_at ?? null,
+            updated_at: (merged as any)?.updated_at ?? auctionPulse?.updated_at ?? null,
             // Preserve any derived winner/seller identity from auction_comments
             winner_name: (auctionPulse as any)?.winner_name ?? null,
             seller_username: (auctionPulse as any)?.seller_username ?? null,

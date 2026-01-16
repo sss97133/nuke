@@ -252,14 +252,21 @@ export class MyOrganizationsService {
         .eq('organization_id', organizationId)
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      // Handle missing table (PGRST116), 404 Not Found, or RLS blocking access
+      if (error && error.code !== 'PGRST116' && error.code !== 'PGRST301' && error.status !== 404) {
+        // Only throw if it's a real error, not a missing resource
+        throw error;
+      }
 
       return {
         is_pinned: data?.is_pinned || false,
         display_order: data?.display_order || 0,
       };
-    } catch (error) {
-      console.error('Error loading organization preferences:', error);
+    } catch (error: any) {
+      // Only log real errors, not missing table/404/RLS issues
+      if (error?.code !== 'PGRST116' && error?.code !== 'PGRST301' && error?.status !== 404) {
+        console.error('Error loading organization preferences:', error);
+      }
       return { is_pinned: false, display_order: 0 };
     }
   }

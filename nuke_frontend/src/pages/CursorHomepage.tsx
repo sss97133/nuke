@@ -213,7 +213,6 @@ const cleanDisplayModel = (raw: any): string | null => {
   return s;
 };
 
-
 // Simple static verb - no animation to avoid performance issues
 const StaticVerbText = React.memo(function StaticVerbText() {
   return <>Building</>;
@@ -525,7 +524,9 @@ const CursorHomepage: React.FC = () => {
           hiddenSources: filters.hiddenSources
         }
       });
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:467',message:'hasActiveFilters computed',data:{result,filterFlags:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hideKsl:filters.hideKsl,hideDealerSites:filters.hideDealerSites,hideClassic:filters.hideClassic,hideDealerListings:filters.hideDealerListings,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // Debug telemetry disabled in production
+      )}).catch(()=>{});
+      }
     }
     // #endregion
     
@@ -543,7 +544,6 @@ const CursorHomepage: React.FC = () => {
 
   const isRenderTruncated =
     (hasActiveFilters || debouncedSearchText) && vehiclesToRender.length < filteredVehicles.length;
-
 
   useEffect(() => {
     loadSession();
@@ -982,7 +982,7 @@ const CursorHomepage: React.FC = () => {
           hiddenSources: filters.hiddenSources
         }
       });
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2622',message:'includedSources computed',data:{includedSources:base,activeSourcesCount:activeSources.length,activeSources:activeSources.map(s=>({domain:s.domain,key:domainToFilterKey(s.domain)})),filters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('Log fetch failed',e));
+      )),filters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('Log fetch failed',e));
     }
     // #endregion
 
@@ -1112,7 +1112,7 @@ const CursorHomepage: React.FC = () => {
         const src = classifySource(v);
         sourceBreakdown[src] = (sourceBreakdown[src] || 0) + 1;
       });
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:889',message:'Before source filter',data:{vehicleCount:beforeCount,sourceBreakdown,includedSources,filterFlags:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hideKsl:filters.hideKsl,hideDealerSites:filters.hideDealerSites,hideClassic:filters.hideClassic,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      )}).catch(()=>{});
       // #endregion
 
       // Use inclusion-based filtering: only show vehicles from included sources
@@ -1135,7 +1135,7 @@ const CursorHomepage: React.FC = () => {
             discoveryUrl: v.discovery_url,
             profileOrigin: v.profile_origin
           });
-          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:900',message:'BaT vehicle filter check',data:{src,isIncluded,includedSourcesValue:includedSources[src],includedSourcesKeys:Object.keys(includedSources),hideBat:filters.hideBat,vehicleId:v.id,discoveryUrl:v.discovery_url,profileOrigin:v.profile_origin},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch((e)=>console.error('Log fetch failed',e));
+          ,timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch((e)=>console.error('Log fetch failed',e));
         }
         // #endregion
         
@@ -1149,11 +1149,11 @@ const CursorHomepage: React.FC = () => {
         const src = classifySource(v);
         afterSourceBreakdown[src] = (afterSourceBreakdown[src] || 0) + 1;
       });
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:912',message:'After source filter',data:{vehicleCountBefore:beforeCount,vehicleCountAfter:afterCount,sourceBreakdownAfter:afterSourceBreakdown,filteredOut:beforeCount-afterCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      )}).catch(()=>{});
       // #endregion
     } else {
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:913',message:'Source filter skipped - no hide flags',data:{vehicleCount:result.length,includedSources},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      )}).catch(()=>{});
       // #endregion
     }
     
@@ -1629,7 +1629,7 @@ const CursorHomepage: React.FC = () => {
       if (countError) {
         console.error('Error loading vehicle count:', countError);
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1429',message:'Error loading vehicle count',data:{error:countError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        )}).catch(()=>{});
         // #endregion
       }
       
@@ -1643,7 +1643,7 @@ const CursorHomepage: React.FC = () => {
       if (vehiclesError) {
         console.error('Error loading vehicles for stats:', vehiclesError);
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1440',message:'Error loading vehicles for stats',data:{error:vehiclesError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        )}).catch(()=>{});
         // #endregion
         return;
       }
@@ -1744,14 +1744,14 @@ const CursorHomepage: React.FC = () => {
       });
       
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1518',message:'Setting dbStats',data:{totalVehicles:stats.totalVehicles,totalValue:stats.totalValue,forSaleCount:stats.forSaleCount,activeAuctions:stats.activeAuctions,totalCountFromQuery:totalCount,vehiclesProcessed:(allVehicles || []).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      ,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
       
       setDbStats(stats);
     } catch (error) {
       console.error('Error loading database stats:', error);
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1524',message:'Error in loadDatabaseStats catch',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      ,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
     } finally {
       setDbStatsLoading(false);
@@ -1823,7 +1823,7 @@ const CursorHomepage: React.FC = () => {
         willUseDbStats: !hasActiveFilters && !debouncedSearchText,
         dbStatsHasData: dbStats.totalVehicles > 0
       });
-      fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:1578',message:'displayStats computed',data:{hasActiveFilters,debouncedSearchText,dbStatsTotalVehicles:dbStats.totalVehicles,dbStatsTotalValue:dbStats.totalValue,filteredStatsTotalVehicles:filteredStats.totalVehicles,filteredStatsTotalValue:filteredStats.totalValue,willUseDbStats:!hasActiveFilters && !debouncedSearchText,dbStatsHasData:dbStats.totalVehicles > 0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      )}).catch(()=>{});
     }
     // #endregion
     
@@ -1877,7 +1877,6 @@ const CursorHomepage: React.FC = () => {
       }
     }
   };
-
 
   // Load accurate stats from database (not filtered feed)
   const loadAccurateStats = async () => {
@@ -1933,7 +1932,6 @@ const CursorHomepage: React.FC = () => {
       setStatsLoading(false);
     }
   };
-
 
   const getTimePeriodFilter = () => {
     const now = new Date();
@@ -2587,7 +2585,6 @@ const CursorHomepage: React.FC = () => {
     if (node) infiniteObserverRef.current.observe(node);
   }, [hasMore, loadMore, loading, loadingMore]);
 
-
   // Format currency values for display (exact numbers with commas)
   const formatCurrency = (value: number): string => {
     return new Intl.NumberFormat('en-US', {
@@ -2885,7 +2882,7 @@ const CursorHomepage: React.FC = () => {
   // For new dynamic sources, we use a hiddenSources set in filters.
   const setSourceIncluded = useCallback((kind: string, included: boolean) => {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2437',message:'setSourceIncluded called',data:{kind,included,currentFilters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    )}).catch(()=>{});
     // #endregion
 
     setFilters((prev) => {
@@ -3068,7 +3065,7 @@ const CursorHomepage: React.FC = () => {
 
     // #region agent log
     const batSources = deduplicated.filter(s => s.key === 'bat' || s.domain.toLowerCase().includes('bringatrailer') || s.domain.toLowerCase().includes('bat'));
-    fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:2651',message:'sourcePogs computed',data:{totalSourcesBefore:activeSources.length,totalSourcesAfter:deduplicated.length,batSourcesCount:batSources.length,batSources:batSources.map(s=>({domain:s.domain,title:s.title,key:s.key,included:s.included,count:s.count})),allSources:deduplicated.map(s=>({domain:s.domain,title:s.title,key:s.key})),selectedCount:deduplicated.filter((x) => x.included).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    )),selectedCount:deduplicated.filter((x) => x.included).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
     // #endregion
 
     return {
@@ -3862,7 +3859,7 @@ const CursorHomepage: React.FC = () => {
                         setSourceSearchText(text);
                         
                         // #region agent log
-                        fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:3505',message:'Source search onChange',data:{text,sourcePogsCount:sourcePogs.all.length,currentFilters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch(()=>{});
+                        )}).catch(()=>{});
                         // #endregion
                         
                         // Auto-apply filters when searching for specific sources
@@ -3875,7 +3872,7 @@ const CursorHomepage: React.FC = () => {
                           
                           // #region agent log
                           console.log('[DEBUG] Setting BaT filter', { allOtherKeys, sourcePogsKeys: sourcePogs.all.map(p=>p.key), text });
-                          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:3511',message:'Setting BaT filter',data:{allOtherKeys,sourcePogsKeys:sourcePogs.all.map(p=>p.key),text},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch((e)=>console.error('Log fetch failed',e));
+                          ,timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch((e)=>console.error('Log fetch failed',e));
                           // #endregion
                           
                           setFilters((prev) => {
@@ -3986,7 +3983,7 @@ const CursorHomepage: React.FC = () => {
                         
                         // #region agent log
                         if (sourceSearchText && sourceSearchText.toLowerCase().includes('bring')) {
-                          fetch('http://127.0.0.1:7242/ingest/4d355282-c690-469e-97e1-0114c2a0ef69',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CursorHomepage.tsx:3483',message:'Source search filter',data:{sourceSearchText,sourceDomain:p.domain,sourceTitle:p.title,sourceKey:p.key,matches},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+                          )}).catch(()=>{});
                         }
                         // #endregion
                         

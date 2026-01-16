@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { handleExpectedError } from '../../utils/errorCache';
 
 interface VehicleRelationshipMetricsProps {
   vehicleId: string;
@@ -80,18 +79,15 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
             .from('businesses')
             .select('parking_rate_per_day')
             .eq('id', organizationId)
-            .single();
+            .maybeSingle(); // Use maybeSingle to avoid 400 if not found
           
-          // Gracefully handle missing table or column
+          // Gracefully handle missing table, column, or RLS blocking
           if (!orgError && orgSettings?.parking_rate_per_day) {
             parkingCostPerDay = orgSettings.parking_rate_per_day;
-          } else if (orgError) {
-            // Silently handle missing feature
-            handleExpectedError(orgError, 'Parking Rate');
           }
+          // Silently ignore errors (missing column, RLS, 400, 404, etc.)
         } catch (error) {
           // Column or table may not exist - silently skip
-          handleExpectedError(error, 'Parking Rate');
         }
       }
 
@@ -116,16 +112,13 @@ const VehicleRelationshipMetrics: React.FC<VehicleRelationshipMetricsProps> = ({
           .eq('vehicle_id', vehicleId)
           .eq('organization_id', organizationId);
         
-        // Gracefully handle missing relationship or column
+        // Gracefully handle missing relationship, column, or RLS blocking
         if (!eventsError && data) {
           timelineEvents = data;
-        } else if (eventsError) {
-          // Silently handle missing feature
-          handleExpectedError(eventsError, 'Timeline Events Organization Filter');
         }
+        // Silently ignore errors (missing relationship, RLS, 400, etc.)
       } catch (error) {
         // Organization relationship column may not exist - silently skip
-        handleExpectedError(error, 'Timeline Events Organization Filter');
       }
 
       // Calculate totals
