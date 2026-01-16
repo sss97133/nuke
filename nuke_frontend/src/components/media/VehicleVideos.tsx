@@ -216,7 +216,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
               </button>
 
               {/* Connect options for unconnected sources */}
-              {availableSources.map(source => (
+              {availableSources.map((source, index) => (
                 <button
                   key={source.platform}
                   onClick={() => handleConnectSource(source.platform)}
@@ -226,7 +226,7 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
                     textAlign: 'left',
                     background: 'transparent',
                     border: 'none',
-                    borderBottom: source === availableSources[availableSources.length - 1] ? 'none' : '1px solid var(--border-light)',
+                    borderBottom: index === availableSources.length - 1 ? 'none' : '1px solid var(--border-light)',
                     cursor: 'pointer',
                     fontSize: '13px',
                     color: 'var(--text)',
