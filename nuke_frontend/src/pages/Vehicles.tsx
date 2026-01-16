@@ -1294,6 +1294,44 @@ const VehiclesInner: React.FC = () => {
       .filter((g) => g.items.length > 0);
   };
 
+  // Apply health filter to relationships (defined before use)
+  // Uses a simplified health score based on available vehicle fields
+  // FleetHealthOverview does the full calculation with image/event counts
+  const applyHealthFilter = (relationships: VehicleRelationship[]) => {
+    if (!healthFilter) return relationships;
+    
+    return relationships.filter(rel => {
+      const vehicle = rel.vehicle;
+      let score = 0;
+      
+      // Value info: +25 (matches FleetHealthOverview logic)
+      if (vehicle.current_value || vehicle.purchase_price) score += 25;
+      
+      // Basic completeness indicators (approximating images/events presence):
+      // Having VIN, mileage, color suggests active data entry
+      // These are weighted lower since we can't check actual image/event counts here
+      if (vehicle.vin && vehicle.vin.trim()) score += 15; // VIN suggests data entry activity
+      if (vehicle.mileage != null) score += 10; // Mileage suggests maintenance/usage tracking
+      if (vehicle.color && vehicle.color.trim()) score += 10; // Color suggests detail entry
+      
+      // Approximate score out of 60 (vs 100 in full calculation)
+      // Scale thresholds proportionally: healthy ~75% of max = 45+, needs_work ~50-75% = 30-44, critical <30
+      const scaledHealthy = 45; // 75% of 60
+      const scaledNeedsWork = 30; // 50% of 60
+      
+      switch (healthFilter) {
+        case 'healthy':
+          return score >= scaledHealthy;
+        case 'needs_work':
+          return score >= scaledNeedsWork && score < scaledHealthy;
+        case 'critical':
+          return score < scaledNeedsWork;
+        default:
+          return true;
+      }
+    });
+  };
+
   // Filter and sort current relationships
   const filteredRelationships = applyHealthFilter(currentRelationships
     .filter(relationship => {
@@ -1469,44 +1507,6 @@ const VehiclesInner: React.FC = () => {
   // Health filter handler
   const handleFilterByHealth = (level: 'healthy' | 'needs_work' | 'critical' | null) => {
     setHealthFilter(level);
-  };
-
-  // Apply health filter to relationships
-  // Uses a simplified health score based on available vehicle fields
-  // FleetHealthOverview does the full calculation with image/event counts
-  const applyHealthFilter = (relationships: VehicleRelationship[]) => {
-    if (!healthFilter) return relationships;
-    
-    return relationships.filter(rel => {
-      const vehicle = rel.vehicle;
-      let score = 0;
-      
-      // Value info: +25 (matches FleetHealthOverview logic)
-      if (vehicle.current_value || vehicle.purchase_price) score += 25;
-      
-      // Basic completeness indicators (approximating images/events presence):
-      // Having VIN, mileage, color suggests active data entry
-      // These are weighted lower since we can't check actual image/event counts here
-      if (vehicle.vin && vehicle.vin.trim()) score += 15; // VIN suggests data entry activity
-      if (vehicle.mileage != null) score += 10; // Mileage suggests maintenance/usage tracking
-      if (vehicle.color && vehicle.color.trim()) score += 10; // Color suggests detail entry
-      
-      // Approximate score out of 60 (vs 100 in full calculation)
-      // Scale thresholds proportionally: healthy ~75% of max = 45+, needs_work ~50-75% = 30-44, critical <30
-      const scaledHealthy = 45; // 75% of 60
-      const scaledNeedsWork = 30; // 50% of 60
-      
-      switch (healthFilter) {
-        case 'healthy':
-          return score >= scaledHealthy;
-        case 'needs_work':
-          return score >= scaledNeedsWork && score < scaledHealthy;
-        case 'critical':
-          return score < scaledNeedsWork;
-        default:
-          return true;
-      }
-    });
   };
 
 
