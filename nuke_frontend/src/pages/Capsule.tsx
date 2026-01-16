@@ -15,6 +15,7 @@ import APIAccessSubscription from '../components/settings/APIAccessSubscription'
 import KnowledgeLibrary from '../components/profile/KnowledgeLibrary';
 import StreamingDashboard from '../components/profile/StreamingDashboard';
 import AppearanceSpecimen from '../components/settings/AppearanceSpecimen';
+import FacebookConnectionSettings from '../components/facebook/FacebookConnectionSettings';
 
 type CapsuleTab =
   | 'dashboard'
@@ -198,6 +199,18 @@ const Capsule: React.FC = () => {
                 </div>
                 <div className="card-body">
                   <ChangePasswordForm />
+                </div>
+              </div>
+
+              {/* Connected Accounts */}
+              <div className="card">
+                <div className="card-header">
+                  <h3 className="heading-3">Connected Accounts</h3>
+                </div>
+                <div className="card-body">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <FacebookConnectionSettings userId={session.user.id} />
+                  </div>
                 </div>
               </div>
 

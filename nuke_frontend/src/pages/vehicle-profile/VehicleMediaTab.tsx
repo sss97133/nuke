@@ -1,5 +1,6 @@
 import React from 'react';
 import ImageGallery from '../../components/images/ImageGallery';
+import VehicleVideos from '../../components/media/VehicleVideos';
 import type { Vehicle, VehiclePermissions } from './types';
 
 interface VehicleMediaTabProps {
@@ -36,6 +37,12 @@ const VehicleMediaTab: React.FC<VehicleMediaTabProps> = ({
           onImagesUpdated={onImagesUpdated}
         />
       </React.Suspense>
+
+      {/* Unified Videos Section - all sources */}
+      <VehicleVideos 
+        vehicleId={vehicle.id} 
+        userId={session?.user?.id}
+      />
     </div>
   );
 };
