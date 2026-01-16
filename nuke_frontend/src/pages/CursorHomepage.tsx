@@ -525,8 +525,6 @@ const CursorHomepage: React.FC = () => {
         }
       });
       // Debug telemetry disabled in production
-      )}).catch(()=>{});
-      }
     }
     // #endregion
     
@@ -982,7 +980,7 @@ const CursorHomepage: React.FC = () => {
           hiddenSources: filters.hiddenSources
         }
       });
-      )),filters:{hideBat:filters.hideBat,hideCraigslist:filters.hideCraigslist,hiddenSources:filters.hiddenSources}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch((e)=>console.error('Log fetch failed',e));
+      // Debug telemetry disabled in production
     }
     // #endregion
 
@@ -1112,7 +1110,6 @@ const CursorHomepage: React.FC = () => {
         const src = classifySource(v);
         sourceBreakdown[src] = (sourceBreakdown[src] || 0) + 1;
       });
-      )}).catch(()=>{});
       // #endregion
 
       // Use inclusion-based filtering: only show vehicles from included sources
@@ -1135,7 +1132,6 @@ const CursorHomepage: React.FC = () => {
             discoveryUrl: v.discovery_url,
             profileOrigin: v.profile_origin
           });
-          ,timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'B'})}).catch((e)=>console.error('Log fetch failed',e));
         }
         // #endregion
         
@@ -1149,11 +1145,9 @@ const CursorHomepage: React.FC = () => {
         const src = classifySource(v);
         afterSourceBreakdown[src] = (afterSourceBreakdown[src] || 0) + 1;
       });
-      )}).catch(()=>{});
       // #endregion
     } else {
       // #region agent log
-      )}).catch(()=>{});
       // #endregion
     }
     
@@ -1629,7 +1623,6 @@ const CursorHomepage: React.FC = () => {
       if (countError) {
         console.error('Error loading vehicle count:', countError);
         // #region agent log
-        )}).catch(()=>{});
         // #endregion
       }
       
@@ -1643,7 +1636,6 @@ const CursorHomepage: React.FC = () => {
       if (vehiclesError) {
         console.error('Error loading vehicles for stats:', vehiclesError);
         // #region agent log
-        )}).catch(()=>{});
         // #endregion
         return;
       }
@@ -1744,14 +1736,12 @@ const CursorHomepage: React.FC = () => {
       });
       
       // #region agent log
-      ,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
       
       setDbStats(stats);
     } catch (error) {
       console.error('Error loading database stats:', error);
       // #region agent log
-      ,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
     } finally {
       setDbStatsLoading(false);
@@ -1823,7 +1813,6 @@ const CursorHomepage: React.FC = () => {
         willUseDbStats: !hasActiveFilters && !debouncedSearchText,
         dbStatsHasData: dbStats.totalVehicles > 0
       });
-      )}).catch(()=>{});
     }
     // #endregion
     
@@ -2882,7 +2871,6 @@ const CursorHomepage: React.FC = () => {
   // For new dynamic sources, we use a hiddenSources set in filters.
   const setSourceIncluded = useCallback((kind: string, included: boolean) => {
     // #region agent log
-    )}).catch(()=>{});
     // #endregion
 
     setFilters((prev) => {
@@ -3065,7 +3053,6 @@ const CursorHomepage: React.FC = () => {
 
     // #region agent log
     const batSources = deduplicated.filter(s => s.key === 'bat' || s.domain.toLowerCase().includes('bringatrailer') || s.domain.toLowerCase().includes('bat'));
-    )),selectedCount:deduplicated.filter((x) => x.included).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
     // #endregion
 
     return {
@@ -3859,7 +3846,6 @@ const CursorHomepage: React.FC = () => {
                         setSourceSearchText(text);
                         
                         // #region agent log
-                        )}).catch(()=>{});
                         // #endregion
                         
                         // Auto-apply filters when searching for specific sources
@@ -3872,7 +3858,6 @@ const CursorHomepage: React.FC = () => {
                           
                           // #region agent log
                           console.log('[DEBUG] Setting BaT filter', { allOtherKeys, sourcePogsKeys: sourcePogs.all.map(p=>p.key), text });
-                          ,timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'G'})}).catch((e)=>console.error('Log fetch failed',e));
                           // #endregion
                           
                           setFilters((prev) => {
@@ -3982,9 +3967,6 @@ const CursorHomepage: React.FC = () => {
                           p.key.toLowerCase().includes(sourceSearchText.toLowerCase());
                         
                         // #region agent log
-                        if (sourceSearchText && sourceSearchText.toLowerCase().includes('bring')) {
-                          )}).catch(()=>{});
-                        }
                         // #endregion
                         
                         return matches;
