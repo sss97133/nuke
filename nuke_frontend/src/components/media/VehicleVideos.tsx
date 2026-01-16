@@ -114,14 +114,26 @@ const VehicleVideos: React.FC<VehicleVideosProps> = ({ vehicleId, userId }) => {
         body: { user_id: userId, vehicle_id: vehicleId }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Error invoking ${platform} auth function:`, error);
+        throw error;
+      }
 
       if (data?.auth_url) {
         window.location.href = data.auth_url;
+      } else {
+        throw new Error('No auth URL returned');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error connecting ${platform}:`, error);
-      alert(`Failed to connect ${platform}. Please try again.`);
+      const errorMessage = error?.message || 'Unknown error';
+      
+      // Check if function doesn't exist
+      if (errorMessage.includes('404') || errorMessage.includes('not found') || error?.status === 404) {
+        alert(`${platform.charAt(0).toUpperCase() + platform.slice(1)} connection is coming soon. The edge function is not yet deployed.`);
+      } else {
+        alert(`Failed to connect ${platform}. ${errorMessage}`);
+      }
     }
   };
 
