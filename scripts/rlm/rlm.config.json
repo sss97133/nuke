@@ -1,0 +1,32 @@
+{
+  "projectRoot": ".",
+  "includePaths": [
+    "PROMPT.md",
+    "@fix_plan.md",
+    "PROGRESS_SUMMARY.md",
+    "docs/**/*.md",
+    "specs/**/*.md"
+  ],
+  "excludeGlobs": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.cursor/**"
+  ],
+  "allowedExtensions": [
+    ".md",
+    ".txt"
+  ],
+  "maxFiles": 200,
+  "maxFileBytes": 200000,
+  "maxTotalChars": 2000000,
+  "chunkSizeChars": 12000,
+  "chunkOverlapChars": 800,
+  "maxDepth": 2,
+  "maxCalls": 12,
+  "timeoutMs": 900000,
+  "claudeCommand": "claude",
+  "outputFormat": "json",
+  "goal": "Summarize the long-context documents for the Ralph task. Extract concrete tasks, blockers, decisions, and any required manual tests. Keep file references."
+}

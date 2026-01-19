@@ -166,12 +166,8 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
   }
 
   return (
-    <div className="card" style={{ marginBottom: '16px' }}>
-      <div className="card-header">
-        <h3 style={{ fontSize: '11pt', fontWeight: 700, margin: 0 }}>
-          Auction history
-        </h3>
-      </div>
+    <div className="card">
+      <div className="card-header">Auction history</div>
       <div className="card-body">
         {listings.map(listing => {
           const platformName = platformNames[listing.platform] || listing.platform;

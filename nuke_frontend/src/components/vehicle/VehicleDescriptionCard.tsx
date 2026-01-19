@@ -275,7 +275,7 @@ export const VehicleDescriptionCard: React.FC<VehicleDescriptionCardProps> = ({
   return (
     <div className="card">
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '10px', fontWeight: 700 }}>Description</span>
+        <div>Description</div>
         {isEditable && !isEditing && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button

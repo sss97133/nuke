@@ -30,6 +30,9 @@ interface VehicleCommentsCardProps {
   collapsed?: boolean;
   maxVisible?: number;
   disabled?: boolean;
+  containerId?: string;
+  containerClassName?: string;
+  containerStyle?: React.CSSProperties;
 }
 
 export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
@@ -37,7 +40,10 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   session,
   collapsed = true,
   maxVisible = 2,
-  disabled = false
+  disabled = false,
+  containerId,
+  containerClassName,
+  containerStyle,
 }) => {
   const navigate = useNavigate();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -580,19 +586,27 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
   const hasMore = comments.length > maxVisible;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100%' }}>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        backgroundColor: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-        padding: '8px 12px',
-        flexShrink: 0,
-      }}>
-        <span style={{ fontSize: '10px', fontWeight: 700 }}>
-          Comments & Bids ({comments.length})
-        </span>
+    <div
+      id={containerId}
+      className={['card', containerClassName].filter(Boolean).join(' ')}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        ...(containerStyle || {}),
+      }}
+    >
+      <div
+        className="card-header"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 8,
+          flexShrink: 0,
+        }}
+      >
+        <div>Comments &amp; Bids ({comments.length})</div>
         {hasMore && !expanded && (
           <button
             className="btn-utility"
@@ -604,9 +618,8 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
         )}
       </div>
       <div 
-        className="comments-scroll-container"
+        className="card-body comments-scroll-container"
         style={{ 
-          padding: '12px', 
           flex: '1 1 auto', 
           minHeight: 0, 
           overflowY: 'auto',
@@ -865,102 +878,108 @@ export const VehicleCommentsCard: React.FC<VehicleCommentsCardProps> = ({
             })}
           </div>
         )}
-
-        {/* Add comment input */}
-        {session?.user?.id && (
-          <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', position: 'relative' }}>
-            <textarea
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment... (Ctrl+M for memes)"
-              rows={2}
-              disabled={posting}
-              style={{
-                width: '100%',
-                fontSize: '8pt',
-                padding: '6px',
-                border: '1px solid var(--border)',
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                marginBottom: '6px'
-              }}
-            />
-            
-            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-              <button
-                className="button button-secondary"
-                style={{ fontSize: '8pt', padding: '4px 12px' }}
-                onClick={() => setMemePickerOpen(!memePickerOpen)}
-                title="Meme picker (Ctrl+M)"
-              >
-                Memes
-              </button>
-              <button
-                className="button button-primary"
-                style={{ fontSize: '8pt', padding: '4px 12px' }}
-                onClick={handlePostComment}
-                disabled={posting || !newComment.trim()}
-              >
-                {posting ? 'Posting...' : 'Post'}
-              </button>
-            </div>
-
-            {/* Meme Picker Popup */}
-            {memePickerOpen && (
-              <div style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: 0,
-                right: 0,
-                marginBottom: '4px',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                zIndex: 1000,
-                maxHeight: '240px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-              }}>
-                <div style={{
-                  padding: '4px 6px',
-                  borderBottom: '1px solid var(--border)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  background: 'var(--grey-100)',
-                }}>
-                  <span style={{ fontSize: '8pt', fontWeight: 600 }}>Select Meme</span>
-                  <button
-                    onClick={() => setMemePickerOpen(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '8pt',
-                      padding: '2px 4px',
-                    }}
-                  >
-                    X
-                  </button>
-                </div>
-                <div style={{
-                  padding: '4px',
-                  overflowY: 'auto',
-                  flex: 1,
-                }}>
-                  <VehicleMemePanel 
-                    vehicleId={vehicleId} 
-                    disabled={disabled}
-                    onMemeSelect={handleMemeSelect}
-                    pickerMode
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
+
+      {/* Add comment input (kept outside scroll area so it's always accessible) */}
+      {session?.user?.id && (
+        <div
+          className="card-footer"
+          style={{
+            position: 'relative',
+            flexShrink: 0,
+          }}
+        >
+          <textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Add a comment... (Ctrl+M for memes)"
+            rows={2}
+            disabled={posting}
+            style={{
+              width: '100%',
+              fontSize: '8pt',
+              padding: '6px',
+              border: '1px solid var(--border)',
+              resize: 'vertical',
+              fontFamily: 'inherit',
+              marginBottom: '6px'
+            }}
+          />
+          
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+            <button
+              className="button button-secondary"
+              style={{ fontSize: '8pt', padding: '4px 12px' }}
+              onClick={() => setMemePickerOpen(!memePickerOpen)}
+              title="Meme picker (Ctrl+M)"
+            >
+              Memes
+            </button>
+            <button
+              className="button button-primary"
+              style={{ fontSize: '8pt', padding: '4px 12px' }}
+              onClick={handlePostComment}
+              disabled={posting || !newComment.trim()}
+            >
+              {posting ? 'Posting...' : 'Post'}
+            </button>
+          </div>
+
+          {/* Meme Picker Popup */}
+          {memePickerOpen && (
+            <div style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: 0,
+              right: 0,
+              marginBottom: '4px',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              maxHeight: '240px',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              <div style={{
+                padding: '4px 6px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: 'var(--grey-100)',
+              }}>
+                <span style={{ fontSize: '8pt', fontWeight: 600 }}>Select Meme</span>
+                <button
+                  onClick={() => setMemePickerOpen(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '8pt',
+                    padding: '2px 4px',
+                  }}
+                >
+                  X
+                </button>
+              </div>
+              <div style={{
+                padding: '4px',
+                overflowY: 'auto',
+                flex: 1,
+              }}>
+                <VehicleMemePanel 
+                  vehicleId={vehicleId} 
+                  disabled={disabled}
+                  onMemeSelect={handleMemeSelect}
+                  pickerMode
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
