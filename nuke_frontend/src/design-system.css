@@ -2125,11 +2125,21 @@ body {
 }
 
 .vehicle-profile-left-column .card.is-collapsed .card-body {
-  display: none;
+  display: none !important;
+}
+
+.vehicle-profile-left-column .card.is-collapsed .card-footer {
+  display: none !important;
 }
 
 .vehicle-profile-left-column .card.is-collapsed .card-header {
   border-bottom: none;
+}
+
+/* Vehicle Profile: keep left-column spacing uniform (use container gap, not per-card margins) */
+.vehicle-profile-left-column > .card {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
 @media (max-width: 768px) {

@@ -3545,31 +3545,20 @@ const VehicleProfile: React.FC = () => {
               />
 
               {/* Comments & Bids - Sticky below header/auction bar, scrollable independently */}
-              <div 
-                id="vehicle-comments" 
-                style={{ 
+              <VehicleCommentsCard
+                vehicleId={vehicle.id}
+                session={session}
+                collapsed={isMobile}
+                maxVisible={isMobile ? 6 : 50}
+                containerId="vehicle-comments"
+                containerStyle={{
                   scrollMarginTop: `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px + 8px)`,
                   position: 'sticky',
                   top: `calc(var(--header-height, 40px) + ${vehicleHeaderHeight}px)`,
                   zIndex: 800,
-                  marginTop: 'var(--space-2)',
-                  marginBottom: 'var(--space-4)',
                   maxHeight: `calc(100vh - var(--header-height, 40px) - ${vehicleHeaderHeight}px - 16px)`,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  backgroundColor: 'var(--surface)',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
                 }}
-              >
-                  <VehicleCommentsCard
-                    vehicleId={vehicle.id}
-                    session={session}
-                    collapsed={isMobile}
-                    maxVisible={isMobile ? 6 : 50}
-                  />
-              </div>
+              />
 
               {/* Privacy Settings */}
               {!vehicle.isAnonymous && session && (

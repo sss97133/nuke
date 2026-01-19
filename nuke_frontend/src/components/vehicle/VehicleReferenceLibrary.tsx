@@ -559,11 +559,7 @@ const VehicleReferenceLibrary: React.FC<VehicleReferenceLibraryProps> = ({
     <>
       <section className="section" id="reference-library-section">
         <div className="card">
-          <div className="card-header">
-            <span style={{ fontSize: '10pt', fontWeight: 700 }}>
-              Reference Documents
-            </span>
-          </div>
+          <div className="card-header">Reference Documents</div>
           <div className="card-body">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* Upload Section - Only show if user is logged in */}
