@@ -14,8 +14,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
-// Organization to link discovered vehicles to (for display on org profile)
-const TARGET_ORG_ID = process.env.TARGET_ORG_ID || '20e1d1e0-06b5-43b9-a994-7b5b9accb405';
+// Organization to link discovered vehicles to (optional)
+// NOTE: Do not default this; only link when explicitly provided.
+const TARGET_ORG_ID = process.env.TARGET_ORG_ID || '';
 
 const SOURCES = [
   // BaT squarebody searches
@@ -234,12 +235,12 @@ async function scrapeHemmings(): Promise<void> {
             totalSaved++;
             console.log(`  ✅ ${vehicle.year} ${vehicle.make} ${vehicle.model} - $${vehicle.price || 'N/A'}`);
 
-            // Link to organization for discoverability
+            // Link to organization for discoverability (only when explicitly configured)
             if (TARGET_ORG_ID) {
               await supabase.from('organization_vehicles').insert({
                 organization_id: TARGET_ORG_ID,
                 vehicle_id: data.id,
-                relationship_type: 'work_location',
+                relationship_type: 'in_stock',
                 auto_tagged: true,
                 status: 'active',
               }).catch(() => {}); // Ignore if link already exists

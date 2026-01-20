@@ -1087,19 +1087,41 @@ export default function OrganizationProfile() {
       // Vehicles (simplified, load in background)
       (async () => {
         try {
-          const { data: orgVehicles, error: vehiclesError } = await supabase
-            .from('organization_vehicles')
-            .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, sale_price, listing_status, asking_price, cost_basis, days_on_lot')
-            .eq('organization_id', organizationId)
-            .or('status.eq.active,status.eq.sold,status.eq.archived')
-            .order('created_at', { ascending: false });
-          
+          const pageSize = 100;
+          let offset = 0;
+          let orgVehicles: any[] = [];
+          let vehiclesError: any = null;
+          let hasMore = true;
+
+          while (hasMore) {
+            const { data, error } = await supabase
+              .from('organization_vehicles')
+              .select('id, vehicle_id, relationship_type, status, start_date, end_date, sale_date, sale_price, listing_status, asking_price, cost_basis, days_on_lot')
+              .eq('organization_id', organizationId)
+              .or('status.eq.active,status.eq.sold,status.eq.archived')
+              .order('created_at', { ascending: false })
+              .range(offset, offset + pageSize - 1);
+
+            if (error) {
+              vehiclesError = error;
+              break;
+            }
+
+            const rows = data || [];
+            orgVehicles = orgVehicles.concat(rows);
+            if (rows.length < pageSize) {
+              hasMore = false;
+            } else {
+              offset += pageSize;
+            }
+          }
+
           if (vehiclesError) {
             setVehicles([]);
             return;
           }
-          
-                  // OPTIMIZED: Batch load all vehicle data instead of N+1 queries
+
+          // OPTIMIZED: Batch load all vehicle data instead of N+1 queries
           const vehicleIds = (orgVehicles || []).map((ov: any) => ov.vehicle_id).filter(Boolean);
           const now = new Date().toISOString();
           const nowDate = now.split('T')[0];

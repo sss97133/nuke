@@ -34,8 +34,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Known duplicate patterns
 const DUPLICATE_PATTERNS = [
   { names: ['Speed Digital', 'speed digital', 'SpeedDigital'], reason: 'Speed Digital has 4 duplicates' },
-  { names: ['Broad Arrow', 'broad arrow', 'BroadArrow'], reason: 'Broad Arrow has 2 duplicates' },
-  { names: ['duPont Registry', 'duPont Registry Live', 'dupont registry'], reason: 'duPont Registry has 2 versions' },
   { names: ['Canepa', 'canepa'], reason: 'Canepa has 3 duplicates' },
   { names: ['1600 Veloce', '1600 veloce', '1600Veloce'], reason: '1600 Veloce has 2 duplicates' },
 ];
@@ -48,6 +46,70 @@ const BAD_IMAGE_PATTERNS = [
   'chimp',
   'male.*chimp',
 ];
+
+// Names we never want to keep as canonical orgs
+const DISFAVORED_NAME_PATTERNS = [
+  /chat\s*widget/i,
+  /widget/i,
+  /test/i,
+  /sample/i,
+  /placeholder/i,
+  /import\s*queue/i,
+];
+
+function nameQualityScore(name) {
+  if (!name) return -100;
+  const n = String(name).trim();
+  if (!n) return -100;
+  if (DISFAVORED_NAME_PATTERNS.some((re) => re.test(n))) return -100;
+  return n.length; // Simple proxy: longer names tend to be real orgs
+}
+
+const ORG_ID_TABLES = [
+  'organization_contributors',
+  'organization_followers',
+  'organization_services',
+  'organization_website_mappings',
+  'organization_offerings',
+  'organization_inventory',
+  'organization_narratives',
+  'organization_ownership_verifications',
+  'organization_intelligence',
+  'organization_ingestion_queue',
+  'organization_inventory_sync_queue',
+  'organization_analysis_queue',
+];
+
+const BUSINESS_ID_TABLES = [
+  'business_user_roles',
+  'business_ownership',
+];
+
+async function safeUpdateTable(table, column, sourceId, targetId) {
+  try {
+    const { error } = await supabase
+      .from(table)
+      .update({ [column]: targetId })
+      .eq(column, sourceId);
+
+    if (error) {
+      const msg = error.message || String(error);
+      if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
+        // If a unique constraint blocks the update, delete the source rows.
+        await supabase.from(table).delete().eq(column, sourceId);
+        console.warn(`⚠️  ${table}: duplicate constraint, deleted source rows`);
+      } else if (msg.includes('cannot update view') || msg.includes('view')) {
+        console.warn(`⚠️  ${table}: view, skipped`);
+      } else if (msg.includes('does not exist')) {
+        console.warn(`⚠️  ${table}: missing table, skipped`);
+      } else {
+        console.warn(`⚠️  ${table}: ${msg}`);
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️  ${table}: ${err.message || err}`);
+  }
+}
 
 function normalizeWebsite(url) {
   if (!url) return null;
@@ -122,7 +184,7 @@ async function findDuplicates() {
 
   // Find websites with multiple orgs
   Object.entries(websiteGroups).forEach(([website, groupOrgs]) => {
-    if (groupOrgs.length > 1 && groupOrgs.some(o => !duplicates.some(d => d.orgs.some(do => do.id === o.id)))) {
+    if (groupOrgs.length > 1 && groupOrgs.some(o => !duplicates.some(d => d.orgs.some(dupOrg => dupOrg.id === o.id)))) {
       duplicates.push({
         pattern: `Same website: ${website}`,
         orgs: groupOrgs,
@@ -141,7 +203,7 @@ async function mergeOrganizations(sourceId, targetId) {
     // Get source org info
     const { data: sourceOrg } = await supabase
       .from('businesses')
-      .select('business_name')
+      .select('business_name, description, logo_url, metadata')
       .eq('id', sourceId)
       .single();
 
@@ -188,6 +250,16 @@ async function mergeOrganizations(sourceId, targetId) {
       console.warn(`    ⚠️  Timeline merge: ${timelineError.message}`);
     }
 
+    // Move related organization tables (best-effort)
+    for (const table of ORG_ID_TABLES) {
+      await safeUpdateTable(table, 'organization_id', sourceId, targetId);
+    }
+
+    // Move related business tables (best-effort)
+    for (const table of BUSINESS_ID_TABLES) {
+      await safeUpdateTable(table, 'business_id', sourceId, targetId);
+    }
+
     // Update target org with best data from source
     const { data: targetOrg } = await supabase
       .from('businesses')
@@ -214,7 +286,12 @@ async function mergeOrganizations(sourceId, targetId) {
       .update({
         business_name: `${sourceOrg?.business_name || 'Merged'} (merged)`,
         is_public: false,
-        status: 'merged'
+        status: 'merged',
+        metadata: {
+          ...(sourceOrg?.metadata || {}),
+          merged_into: targetId,
+          merged_at: new Date().toISOString(),
+        }
       })
       .eq('id', sourceId);
 
@@ -304,11 +381,14 @@ async function main() {
         console.log(`   ${i + 1}. ${org.business_name} (${org.id.substring(0, 8)}...) - ${org.total_vehicles || 0} vehicles`);
       });
 
-      // Determine target (keep the one with most vehicles, then most data, then oldest)
+      // Determine target (keep the one with most vehicles, then best name, then most data, then oldest)
       const sorted = [...dup.orgs].sort((a, b) => {
         if ((b.total_vehicles || 0) !== (a.total_vehicles || 0)) {
           return (b.total_vehicles || 0) - (a.total_vehicles || 0);
         }
+        const aNameScore = nameQualityScore(a.business_name);
+        const bNameScore = nameQualityScore(b.business_name);
+        if (bNameScore !== aNameScore) return bNameScore - aNameScore;
         const aData = [a.website, a.logo_url, a.description].filter(Boolean).length;
         const bData = [b.website, b.logo_url, b.description].filter(Boolean).length;
         if (bData !== aData) return bData - aData;

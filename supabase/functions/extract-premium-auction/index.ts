@@ -4185,6 +4185,22 @@ async function storeVehiclesInDatabase(
           origin_organization_id: sourceOrgId,
         };
 
+      // Some environments may not have `vehicles.listing_kind` yet (migration not applied).
+      // If PostgREST reports it missing, retry writes without the field.
+      const isMissingListingKindColumn = (err: any) => {
+        const code = String((err as any)?.code || "").toUpperCase();
+        const message = String((err as any)?.message || "").toLowerCase();
+        if (!message.includes("listing_kind")) return false;
+        if (code === "42703" || code === "PGRST204") return true;
+        return message.includes("does not exist") || message.includes("schema cache");
+      };
+
+      const stripListingKind = (obj: any) => {
+        const next = { ...(obj || {}) } as any;
+        delete next.listing_kind;
+        return next;
+      };
+
       // If we have a VIN, do a manual "upsert" (PostgREST cannot ON CONFLICT on partial unique indexes).
       let data: any = null;
       let error: any = null;
@@ -4288,12 +4304,20 @@ async function storeVehiclesInDatabase(
               : (existingDataForVin.trim ? existingDataForVin.trim : payload.trim),
           };
           
-          const { data: updated, error: updateErr } = await supabase
+          let { data: updated, error: updateErr } = await supabase
             .from("vehicles")
             .update(updatePayloadForVin)
             .eq("id", existing.id)
             .select("id")
             .single();
+          if (updateErr && isMissingListingKindColumn(updateErr)) {
+            ({ data: updated, error: updateErr } = await supabase
+              .from("vehicles")
+              .update(stripListingKind(updatePayloadForVin))
+              .eq("id", existing.id)
+              .select("id")
+              .single());
+          }
           data = updated;
           error = updateErr;
           if (!updateErr && updated?.id) {
@@ -4313,11 +4337,18 @@ async function storeVehiclesInDatabase(
             }
           }
         } else {
-          const { data: inserted, error: insertErr } = await supabase
+          let { data: inserted, error: insertErr } = await supabase
             .from("vehicles")
             .insert(payload)
             .select("id")
             .single();
+          if (insertErr && isMissingListingKindColumn(insertErr)) {
+            ({ data: inserted, error: insertErr } = await supabase
+              .from("vehicles")
+              .insert(stripListingKind(payload))
+              .select("id")
+              .single());
+          }
 
           const insertErrMsg = String((insertErr as any)?.message || "");
           const hitDiscoveryUrlUnique =
@@ -4414,12 +4445,20 @@ async function storeVehiclesInDatabase(
                     : ((existingDataForVin as any).trim ? (existingDataForVin as any).trim : payload.trim),
                 };
 
-                const { data: updated, error: updateErr } = await supabase
+                let { data: updated, error: updateErr } = await supabase
                   .from("vehicles")
                   .update(updatePayloadForVin)
                   .eq("id", existingId)
                   .select("id")
                   .single();
+                if (updateErr && isMissingListingKindColumn(updateErr)) {
+                  ({ data: updated, error: updateErr } = await supabase
+                    .from("vehicles")
+                    .update(stripListingKind(updatePayloadForVin))
+                    .eq("id", existingId)
+                    .select("id")
+                    .single());
+                }
 
                 data = updated;
                 error = updateErr;
@@ -4602,12 +4641,20 @@ async function storeVehiclesInDatabase(
           };
           
           // Update existing vehicle (preserving existing data when extraction is incomplete)
-          const { data: updated, error: updateErr } = await supabase
+          let { data: updated, error: updateErr } = await supabase
             .from("vehicles")
             .update(updatePayload)
             .eq("id", existingByUrl.id)
             .select("id")
             .single();
+          if (updateErr && isMissingListingKindColumn(updateErr)) {
+            ({ data: updated, error: updateErr } = await supabase
+              .from("vehicles")
+              .update(stripListingKind(updatePayload))
+              .eq("id", existingByUrl.id)
+              .select("id")
+              .single());
+          }
           data = updated;
           error = updateErr;
           if (!updateErr && updated?.id) {
@@ -4628,11 +4675,18 @@ async function storeVehiclesInDatabase(
           }
         } else {
           // Insert new vehicle
-          const { data: inserted, error: insertErr } = await supabase
+          let { data: inserted, error: insertErr } = await supabase
             .from("vehicles")
             .insert(payload)
             .select("id")
             .single();
+          if (insertErr && isMissingListingKindColumn(insertErr)) {
+            ({ data: inserted, error: insertErr } = await supabase
+              .from("vehicles")
+              .insert(stripListingKind(payload))
+              .select("id")
+              .single());
+          }
           data = inserted;
           error = insertErr;
           if (!insertErr && inserted?.id) createdIds.push(String(inserted.id));

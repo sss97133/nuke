@@ -49,49 +49,74 @@ const OrganizationVehiclesTab: React.FC<Props> = ({ organizationId, userId, canE
   const loadVehicles = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('organization_vehicles')
-        .select(`
-          id,
-          vehicle_id,
-          relationship_type,
-          linked_by_user_id,
-          auto_tagged,
-          created_at,
-          vehicles!inner(
+      const pageSize = 100;
+      let offset = 0;
+      let allRows: any[] = [];
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('organization_vehicles')
+          .select(`
             id,
-            year,
-            make,
-            model,
-            trim,
-            vin,
-            current_value,
-            mileage
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false });
+            vehicle_id,
+            relationship_type,
+            linked_by_user_id,
+            auto_tagged,
+            created_at,
+            vehicles!inner(
+              id,
+              year,
+              make,
+              model,
+              trim,
+              vin,
+              current_value,
+              mileage
+            )
+          `)
+          .eq('organization_id', organizationId)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + pageSize - 1);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      // Fetch primary images
-      const enriched = await Promise.all(
-        (data || []).map(async (v) => {
-          const { data: img } = await supabase
-            .from('vehicle_images')
-            .select('thumbnail_url, medium_url, image_url')
-            .eq('vehicle_id', v.vehicle_id)
-            .order('is_primary', { ascending: false })
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle();
+        const rows = data || [];
+        allRows = allRows.concat(rows);
+        if (rows.length < pageSize) {
+          hasMore = false;
+        } else {
+          offset += pageSize;
+        }
+      }
 
-          return {
-            ...v,
-            vehicle_image_url: img?.thumbnail_url || img?.medium_url || img?.image_url || null
-          };
-        })
-      );
+      if (allRows.length === 0) {
+        setVehicles([]);
+        return;
+      }
+
+      const vehicleIds = allRows.map((v) => v.vehicle_id).filter(Boolean);
+      const { data: imageRows } = await supabase
+        .from('vehicle_images')
+        .select('vehicle_id, thumbnail_url, medium_url, image_url, is_primary, created_at')
+        .in('vehicle_id', vehicleIds)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: true });
+
+      const imageByVehicleId = new Map<string, any>();
+      (imageRows || []).forEach((img) => {
+        if (!imageByVehicleId.has(img.vehicle_id)) {
+          imageByVehicleId.set(img.vehicle_id, img);
+        }
+      });
+
+      const enriched = allRows.map((v) => {
+        const img = imageByVehicleId.get(v.vehicle_id);
+        return {
+          ...v,
+          vehicle_image_url: img?.thumbnail_url || img?.medium_url || img?.image_url || null
+        };
+      });
 
       setVehicles(enriched as Vehicle[]);
     } catch (error) {

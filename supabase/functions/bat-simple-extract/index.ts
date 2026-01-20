@@ -214,17 +214,25 @@ function extractAuctionData(html: string): {
   }
   
   // Auction end date - from data-ends timestamp or from "on 12/27/25" text
+  // NOTE: auction_end_date column is DATE type, so we store date only
+  // Full timestamp is stored in auction_end_timestamp for accurate countdowns
   let auction_end_date: string | null = null;
-  const endMatch = html.match(/data-ends="(\d+)"/);
+  let auction_end_timestamp: string | null = null;  // Full ISO timestamp for timers
+
+  // Try data-ends (Unix timestamp)
+  const endMatch = html.match(/data-ends="(\d+)"/) || html.match(/data-until="(\d+)"/);
   if (endMatch) {
     const timestamp = parseInt(endMatch[1]);
-    auction_end_date = new Date(timestamp * 1000).toISOString().split('T')[0];
+    const endDate = new Date(timestamp * 1000);
+    auction_end_date = endDate.toISOString().split('T')[0];  // YYYY-MM-DD for DATE column
+    auction_end_timestamp = endDate.toISOString();  // Full timestamp for timers
   } else {
     // Try to parse from "on 12/27/25" format
     const dateMatch = html.match(/on (\d{1,2})\/(\d{1,2})\/(\d{2})\b/);
     if (dateMatch) {
       const [, month, day, year] = dateMatch;
       auction_end_date = `20${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      // No exact time available from text format
     }
   }
   
