@@ -9,6 +9,7 @@
 DO $$
 DECLARE
   has_listing_kind boolean;
+  has_vin_decoded_data boolean;
 BEGIN
   -- Guardrails: skip cleanly if required schema isn't present (keeps db reset resilient).
   IF NOT EXISTS (
@@ -47,16 +48,24 @@ BEGIN
     WHERE table_schema = 'public' AND table_name = 'vehicles' AND column_name = 'listing_kind'
   ) INTO has_listing_kind;
 
+  -- vin_decoded_data may not exist in some environments; keep this migration resilient.
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'vin_decoded_data'
+  ) INTO has_vin_decoded_data;
+
   -- ==========================================================================
   -- 1) Backfill canonical_body_style using VIN-decoded data when available
   -- ==========================================================================
   -- Only populate when missing (don't overwrite existing canonical assignments).
-  UPDATE public.vehicles v
-  SET canonical_body_style = public.normalize_body_style(COALESCE(v.body_style, vd.body_type, vd.vehicle_type))
-  FROM public.vin_decoded_data vd
-  WHERE v.vin IS NOT NULL
-    AND UPPER(v.vin) = vd.vin
-    AND v.canonical_body_style IS NULL;
+  IF has_vin_decoded_data THEN
+    UPDATE public.vehicles v
+    SET canonical_body_style = public.normalize_body_style(COALESCE(v.body_style, vd.body_type, vd.vehicle_type))
+    FROM public.vin_decoded_data vd
+    WHERE v.vin IS NOT NULL
+      AND UPPER(v.vin) = vd.vin
+      AND v.canonical_body_style IS NULL;
+  END IF;
 
   -- Non-VIN: derive from body_style only (missing canonical only).
   UPDATE public.vehicles v
@@ -112,54 +121,103 @@ BEGIN
   -- ==========================================================================
   DROP VIEW IF EXISTS public.body_style_audit;
   IF has_listing_kind THEN
-    CREATE VIEW public.body_style_audit AS
-    SELECT
-      v.id,
-      v.listing_kind,
-      v.listing_source,
-      v.listing_url,
-      v.year,
-      v.make,
-      v.model,
-      v.vin,
-      v.body_style,
-      v.canonical_body_style,
-      vd.body_type AS vin_decoded_body_type,
-      vd.vehicle_type AS vin_decoded_vehicle_type,
-      CASE
-        WHEN COALESCE(v.listing_kind, 'vehicle') <> 'vehicle' THEN 'non_vehicle_item'
-        WHEN v.body_style IS NULL OR btrim(v.body_style) = '' THEN 'missing_body_style'
-        WHEN v.canonical_body_style IS NULL THEN 'missing_canonical_body_style'
-        WHEN public.normalize_body_style(v.body_style) IS NULL THEN 'unrecognized_body_style_value'
-        ELSE 'ok'
-      END AS audit_status
-    FROM public.vehicles v
-    LEFT JOIN public.vin_decoded_data vd
-      ON v.vin IS NOT NULL AND UPPER(v.vin) = vd.vin;
+    IF has_vin_decoded_data THEN
+      CREATE VIEW public.body_style_audit AS
+      SELECT
+        v.id,
+        v.listing_kind,
+        v.listing_source,
+        v.listing_url,
+        v.year,
+        v.make,
+        v.model,
+        v.vin,
+        v.body_style,
+        v.canonical_body_style,
+        vd.body_type AS vin_decoded_body_type,
+        vd.vehicle_type AS vin_decoded_vehicle_type,
+        CASE
+          WHEN COALESCE(v.listing_kind, 'vehicle') <> 'vehicle' THEN 'non_vehicle_item'
+          WHEN v.body_style IS NULL OR btrim(v.body_style) = '' THEN 'missing_body_style'
+          WHEN v.canonical_body_style IS NULL THEN 'missing_canonical_body_style'
+          WHEN public.normalize_body_style(v.body_style) IS NULL THEN 'unrecognized_body_style_value'
+          ELSE 'ok'
+        END AS audit_status
+      FROM public.vehicles v
+      LEFT JOIN public.vin_decoded_data vd
+        ON v.vin IS NOT NULL AND UPPER(v.vin) = vd.vin;
+    ELSE
+      CREATE VIEW public.body_style_audit AS
+      SELECT
+        v.id,
+        v.listing_kind,
+        v.listing_source,
+        v.listing_url,
+        v.year,
+        v.make,
+        v.model,
+        v.vin,
+        v.body_style,
+        v.canonical_body_style,
+        NULL::text AS vin_decoded_body_type,
+        NULL::text AS vin_decoded_vehicle_type,
+        CASE
+          WHEN COALESCE(v.listing_kind, 'vehicle') <> 'vehicle' THEN 'non_vehicle_item'
+          WHEN v.body_style IS NULL OR btrim(v.body_style) = '' THEN 'missing_body_style'
+          WHEN v.canonical_body_style IS NULL THEN 'missing_canonical_body_style'
+          WHEN public.normalize_body_style(v.body_style) IS NULL THEN 'unrecognized_body_style_value'
+          ELSE 'ok'
+        END AS audit_status
+      FROM public.vehicles v;
+    END IF;
   ELSE
-    CREATE VIEW public.body_style_audit AS
-    SELECT
-      v.id,
-      NULL::text AS listing_kind,
-      v.listing_source,
-      v.listing_url,
-      v.year,
-      v.make,
-      v.model,
-      v.vin,
-      v.body_style,
-      v.canonical_body_style,
-      vd.body_type AS vin_decoded_body_type,
-      vd.vehicle_type AS vin_decoded_vehicle_type,
-      CASE
-        WHEN v.body_style IS NULL OR btrim(v.body_style) = '' THEN 'missing_body_style'
-        WHEN v.canonical_body_style IS NULL THEN 'missing_canonical_body_style'
-        WHEN public.normalize_body_style(v.body_style) IS NULL THEN 'unrecognized_body_style_value'
-        ELSE 'ok'
-      END AS audit_status
-    FROM public.vehicles v
-    LEFT JOIN public.vin_decoded_data vd
-      ON v.vin IS NOT NULL AND UPPER(v.vin) = vd.vin;
+    IF has_vin_decoded_data THEN
+      CREATE VIEW public.body_style_audit AS
+      SELECT
+        v.id,
+        NULL::text AS listing_kind,
+        v.listing_source,
+        v.listing_url,
+        v.year,
+        v.make,
+        v.model,
+        v.vin,
+        v.body_style,
+        v.canonical_body_style,
+        vd.body_type AS vin_decoded_body_type,
+        vd.vehicle_type AS vin_decoded_vehicle_type,
+        CASE
+          WHEN v.body_style IS NULL OR btrim(v.body_style) = '' THEN 'missing_body_style'
+          WHEN v.canonical_body_style IS NULL THEN 'missing_canonical_body_style'
+          WHEN public.normalize_body_style(v.body_style) IS NULL THEN 'unrecognized_body_style_value'
+          ELSE 'ok'
+        END AS audit_status
+      FROM public.vehicles v
+      LEFT JOIN public.vin_decoded_data vd
+        ON v.vin IS NOT NULL AND UPPER(v.vin) = vd.vin;
+    ELSE
+      CREATE VIEW public.body_style_audit AS
+      SELECT
+        v.id,
+        NULL::text AS listing_kind,
+        v.listing_source,
+        v.listing_url,
+        v.year,
+        v.make,
+        v.model,
+        v.vin,
+        v.body_style,
+        v.canonical_body_style,
+        NULL::text AS vin_decoded_body_type,
+        NULL::text AS vin_decoded_vehicle_type,
+        CASE
+          WHEN v.body_style IS NULL OR btrim(v.body_style) = '' THEN 'missing_body_style'
+          WHEN v.canonical_body_style IS NULL THEN 'missing_canonical_body_style'
+          WHEN public.normalize_body_style(v.body_style) IS NULL THEN 'unrecognized_body_style_value'
+          ELSE 'ok'
+        END AS audit_status
+      FROM public.vehicles v;
+    END IF;
   END IF;
 END;
 $$;
