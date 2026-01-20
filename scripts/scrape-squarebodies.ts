@@ -239,7 +239,7 @@ async function scrapeHemmings(): Promise<void> {
               await supabase.from('organization_vehicles').insert({
                 organization_id: TARGET_ORG_ID,
                 vehicle_id: data.id,
-                relationship_type: 'discovered',
+                relationship_type: 'work_location',
                 auto_tagged: true,
                 status: 'active',
               }).catch(() => {}); // Ignore if link already exists

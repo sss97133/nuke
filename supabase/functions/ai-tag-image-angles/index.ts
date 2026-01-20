@@ -27,6 +27,17 @@ serve(async (req) => {
   }
 
   try {
+    const paused = (() => {
+      const v = String(Deno.env.get('NUKE_ANALYSIS_PAUSED') || '').trim().toLowerCase()
+      return v === '1' || v === 'true' || v === 'yes' || v === 'on'
+    })()
+    if (paused) {
+      return new Response(
+        JSON.stringify({ success: false, paused: true, message: 'Angle tagging paused (NUKE_ANALYSIS_PAUSED)' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const { imageId, imageUrl, vehicleId } = await req.json();
 
     if (!imageId || !imageUrl) {

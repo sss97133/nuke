@@ -21,6 +21,21 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const paused = (() => {
+      const v = String(Deno.env.get("NUKE_ANALYSIS_PAUSED") || "").trim().toLowerCase();
+      return v === "1" || v === "true" || v === "yes" || v === "on";
+    })();
+    if (paused) {
+      return new Response(JSON.stringify({
+        success: false,
+        paused: true,
+        message: "Tier1 batch runner paused (NUKE_ANALYSIS_PAUSED)",
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Some projects store service-role keys under multiple names (including VITE_*).
     // We'll probe all known names and pick the first that looks like a JWT.
     const envServiceRoleKeyCandidates = [
