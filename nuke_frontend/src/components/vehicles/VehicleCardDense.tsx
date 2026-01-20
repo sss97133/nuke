@@ -148,6 +148,22 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   } | null>(null);
   const specPopoverRef = React.useRef<HTMLDivElement | null>(null);
   const [specPopoverStyle, setSpecPopoverStyle] = React.useState<React.CSSProperties | null>(null);
+  const [specEvidence, setSpecEvidence] = React.useState<{
+    loading: boolean;
+    images: Array<{
+      id: string;
+      image_url: string;
+      variants?: any;
+      thumbnail_url?: string | null;
+      medium_url?: string | null;
+      category?: string | null;
+      ai_detected_angle?: string | null;
+      ai_detected_angle_confidence?: number | null;
+      caption?: string | null;
+      created_at?: string | null;
+    }>;
+    error: string | null;
+  }>({ loading: false, images: [], error: null });
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [computedCardSize, setComputedCardSize] = React.useState(cardSizePx || 200);
   
@@ -1038,6 +1054,148 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     };
   }, [specPopover]);
 
+  // Load "proof" images for the spec popover when we have AI angle classification.
+  // This is the first step toward evidence-backed fields (e.g., "Transmission" with supporting photos).
+  React.useEffect(() => {
+    let cancelled = false;
+
+    if (!specPopover) {
+      setSpecEvidence({ loading: false, images: [], error: null });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const kind = (specPopover.def as any)?.kind;
+    if (kind !== 'engine' && kind !== 'transmission') {
+      setSpecEvidence({ loading: false, images: [], error: null });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const vehicleId = String(vehicle?.id || '').trim();
+    if (!vehicleId) return () => {
+      cancelled = true;
+    };
+
+    const token = kind === 'transmission' ? 'transmission' : 'engine';
+
+    setSpecEvidence((prev) => ({ ...prev, loading: true, error: null, images: [] }));
+
+    const isMissingColumn = (err: any): boolean => {
+      const code = String(err?.code || '').toUpperCase();
+      const msg = String(err?.message || '').toLowerCase();
+      return code === '42703' || (msg.includes('column') && msg.includes('does not exist'));
+    };
+
+    const run = async () => {
+      try {
+        // NOTE: avoid depending on optional columns in WHERE clauses (some environments drift).
+        // Fetch a small window and filter client-side.
+        const selectFields =
+          'id, image_url, variants, thumbnail_url, medium_url, category, caption, is_primary, created_at, ai_detected_angle, ai_detected_angle_confidence';
+
+        const { data, error } = await supabase
+          .from('vehicle_images')
+          .select(selectFields)
+          .eq('vehicle_id', vehicleId)
+          .order('is_primary', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(60);
+
+        if (error) throw error;
+
+        const rows = Array.isArray(data) ? (data as any[]) : [];
+        const filtered = rows.filter((img) => {
+          const angle = String(img?.ai_detected_angle || '').toLowerCase();
+          const cat = String(img?.category || '').toLowerCase();
+          const cap = String(img?.caption || '').toLowerCase();
+          const match =
+            (angle && angle.includes(token)) ||
+            (cat && cat.includes(token)) ||
+            (cap && cap.includes(token));
+
+          // Skip obvious documents/duplicates when those flags exist.
+          if ((img as any)?.is_document === true) return false;
+          if ((img as any)?.is_duplicate === true) return false;
+
+          return match;
+        });
+
+        const images = filtered.slice(0, 12).map((img) => ({
+          id: String(img?.id || ''),
+          image_url: String(img?.image_url || ''),
+          variants: (img as any)?.variants,
+          thumbnail_url: (img as any)?.thumbnail_url ?? null,
+          medium_url: (img as any)?.medium_url ?? null,
+          category: (img as any)?.category ?? null,
+          ai_detected_angle: (img as any)?.ai_detected_angle ?? null,
+          ai_detected_angle_confidence:
+            typeof (img as any)?.ai_detected_angle_confidence === 'number'
+              ? (img as any).ai_detected_angle_confidence
+              : null,
+          caption: (img as any)?.caption ?? null,
+          created_at: (img as any)?.created_at ?? null,
+        }));
+
+        if (cancelled) return;
+        setSpecEvidence({ loading: false, images, error: null });
+      } catch (e: any) {
+        // If the environment doesn't have the newer AI columns, silently fall back.
+        if (isMissingColumn(e)) {
+          try {
+            const { data: data2, error: err2 } = await supabase
+              .from('vehicle_images')
+              .select('id, image_url, variants, category, caption, is_primary, created_at')
+              .eq('vehicle_id', vehicleId)
+              .order('is_primary', { ascending: false })
+              .order('created_at', { ascending: false })
+              .limit(60);
+            if (err2) throw err2;
+
+            const rows2 = Array.isArray(data2) ? (data2 as any[]) : [];
+            const filtered2 = rows2.filter((img) => {
+              const cat = String(img?.category || '').toLowerCase();
+              const cap = String(img?.caption || '').toLowerCase();
+              const match = (cat && cat.includes(token)) || (cap && cap.includes(token));
+              if ((img as any)?.is_document === true) return false;
+              if ((img as any)?.is_duplicate === true) return false;
+              return match;
+            });
+
+            const images2 = filtered2.slice(0, 12).map((img) => ({
+              id: String(img?.id || ''),
+              image_url: String(img?.image_url || ''),
+              variants: (img as any)?.variants,
+              thumbnail_url: null,
+              medium_url: null,
+              category: (img as any)?.category ?? null,
+              ai_detected_angle: null,
+              ai_detected_angle_confidence: null,
+              caption: (img as any)?.caption ?? null,
+              created_at: (img as any)?.created_at ?? null,
+            }));
+
+            if (cancelled) return;
+            setSpecEvidence({ loading: false, images: images2, error: null });
+            return;
+          } catch {
+            // Fall through to "no evidence" state below.
+          }
+        }
+
+        if (cancelled) return;
+        setSpecEvidence({ loading: false, images: [], error: null });
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [specPopover, vehicle?.id]);
+
   const openSpecPopover = React.useCallback(
     (e: React.MouseEvent, kind: 'engine' | 'transmission' | 'body_style', raw: unknown) => {
       e.preventDefault();
@@ -1049,6 +1207,30 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             ? getTransmissionDefinition(raw)
             : getBodyStylePopoverDefinition(raw);
       if (!def) return;
+
+      // Set an initial clamped position immediately (avoid a 1-frame offscreen flash).
+      try {
+        if (typeof window !== 'undefined') {
+          const vw = window.innerWidth || 0;
+          const vh = window.innerHeight || 0;
+          const margin = 12;
+          const gap = 12;
+          const assumedW = Math.min(360, Math.max(0, vw - margin * 2));
+          const assumedH = 220; // reasonable estimate; we refine after measuring
+          const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+          const canPlaceBelow = e.clientY + gap + assumedH <= vh - margin;
+          const top = canPlaceBelow
+            ? clamp(e.clientY + gap, margin, vh - margin - assumedH)
+            : clamp(e.clientY - gap - assumedH, margin, vh - margin - assumedH);
+          const left = clamp(e.clientX - assumedW / 2, margin, vw - margin - assumedW);
+
+          setSpecPopoverStyle({ position: 'fixed', left, top, transform: 'none' });
+        }
+      } catch {
+        // ignore
+      }
+
       setSpecPopover({
         def,
         position: { x: e.clientX, y: e.clientY },
@@ -2419,9 +2601,87 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               </ul>
             )}
 
+            {/* Evidence thumbnails (AI-tagged photos) */}
+            {(specPopover.def.kind === 'engine' || specPopover.def.kind === 'transmission') && (
+              <div style={{ marginTop: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '10px' }}>
+                  <div style={{ fontSize: '8pt', fontWeight: 800, letterSpacing: '0.4px' }}>
+                    EVIDENCE
+                  </div>
+                  {!specEvidence.loading && specEvidence.images.length > 0 && (
+                    <div style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                      {specEvidence.images.length} photos
+                    </div>
+                  )}
+                </div>
+
+                {specEvidence.loading ? (
+                  <div style={{ marginTop: '6px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    Loading…
+                  </div>
+                ) : specEvidence.images.length > 0 ? (
+                  <div style={{ marginTop: '6px', display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '6px' }}>
+                    {specEvidence.images.map((img) => {
+                      const sources = [
+                        img?.variants?.thumbnail,
+                        img?.thumbnail_url,
+                        img?.variants?.medium,
+                        img?.medium_url,
+                        img?.image_url,
+                      ].filter(Boolean);
+
+                      const titleParts = [
+                        img?.ai_detected_angle ? `AI angle: ${img.ai_detected_angle}` : null,
+                        img?.category ? `Category: ${img.category}` : null,
+                        img?.caption ? `Caption: ${img.caption}` : null,
+                      ].filter(Boolean);
+
+                      return (
+                        <button
+                          key={img.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (img.image_url) {
+                              window.open(img.image_url, '_blank', 'noopener,noreferrer');
+                            }
+                          }}
+                          title={titleParts.join('\n') || 'Open image'}
+                          style={{
+                            border: '1px solid var(--border)',
+                            background: 'var(--grey-50)',
+                            padding: 0,
+                            borderRadius: 4,
+                            overflow: 'hidden',
+                            cursor: img.image_url ? 'pointer' : 'default',
+                          }}
+                        >
+                          <div style={{ width: '100%', paddingBottom: '100%', position: 'relative', background: 'var(--grey-200)' }}>
+                            <ResilientImage
+                              sources={sources}
+                              alt="Evidence image"
+                              fill={true}
+                              objectFit="cover"
+                              placeholderSrc="/n-zero.png"
+                              placeholderOpacity={0.15}
+                            />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ marginTop: '6px', fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    No AI-tagged {specPopover.def.kind === 'transmission' ? 'transmission' : 'engine'} photos yet.
+                  </div>
+                )}
+              </div>
+            )}
+
             {!specPopover.def.known && (
               <div style={{ marginTop: '8px', fontSize: '8pt', color: 'var(--text-muted)' }}>
-                Not mapped yet. As we expand canonical tables and field sources, this panel will become authoritative.
+                Unmapped token. We’ll promote it to canon once it’s seen consistently (and ideally backed by sources/photos).
               </div>
             )}
           </div>
