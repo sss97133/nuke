@@ -336,6 +336,18 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     };
   }, [cardSizePx]);
 
+  // Card size tiers: drive what we render (not just font sizes).
+  // This keeps the UI "pro level" across 1..16 cards/row by progressively disclosing details.
+  const cardTier = React.useMemo(() => {
+    const px = typeof cardSizePx === 'number' && Number.isFinite(cardSizePx) ? cardSizePx : 200;
+    if (px <= 105) return 'xs' as const; // 12–16 per row
+    if (px <= 135) return 'sm' as const; // 9–11 per row
+    if (px <= 175) return 'md' as const; // 6–8 per row
+    return 'lg' as const; // 1–5 per row
+  }, [cardSizePx]);
+
+  const isCompactCard = cardTier === 'xs' || cardTier === 'sm';
+
   const logIdentityToken = React.useCallback((kind: string, value: string, position: number) => {
     if (!viewerUserId) return;
     if (!vehicle?.id) return;
@@ -824,11 +836,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       background: 'rgba(0, 0, 0, 0.75)',
       backdropFilter: 'blur(6px)',
       color: thermalPriceColor || 'white',
-      padding: '4px 8px',
-      borderRadius: '6px',
+      padding: isCompactCard ? '3px 6px' : '4px 8px',
+      borderRadius: isCompactCard ? '5px' : '6px',
       display: 'inline-flex',
       alignItems: 'center',
-      gap: '6px',
+      gap: isCompactCard ? '4px' : '6px',
       maxWidth: '85%',
       border: borderColor ? `1px solid ${borderColor}80` : '1px solid rgba(255,255,255,0.18)',
       transformOrigin: 'center',
@@ -877,7 +889,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
       border: thermalPriceColor ? `1px solid ${thermalPriceColor}80` : border,
       animation: anim || undefined,
     };
-  }, [isAuctionSource, auctionProgress01, badgePulseSeconds, badgeExplode, thermalPriceColor, shouldShowAssetValue, vehicle, auctionEndedDaysAgo]);
+  }, [isAuctionSource, auctionProgress01, badgePulseSeconds, badgeExplode, thermalPriceColor, shouldShowAssetValue, vehicle, auctionEndedDaysAgo, isCompactCard]);
 
   // Get market value (current_value or estimated value)
   const marketValue = React.useMemo(() => {
@@ -2077,6 +2089,16 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     estimateHigh={mecumLotData.estimateHigh}
                     listingUrl={mecumLotData.listingUrl}
                   />
+                ) : isCompactCard ? (
+                  // Compact mode: single-line badge (border color already encodes SOLD/RESULT).
+                  <div style={{ fontSize: gridTypography.badge, fontWeight: 900, lineHeight: 1 }}>
+                    {(() => {
+                      if (isActiveAuction) return auctionHighBidText || 'BID';
+                      if (badgeParts.value) return badgeParts.value;
+                      if (badgeParts.label) return badgeParts.label;
+                      return badgeMainText;
+                    })()}
+                  </div>
                 ) : isActiveAuction ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
                     <div style={{ fontSize: '6.5pt', fontWeight: 800, lineHeight: 1 }}>
@@ -2135,7 +2157,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               </div>
             )}
 
-            {/* Follow Button with ROI */}
+            {/* Follow Button with ROI (compact at small card sizes) */}
             {showFollowButton && (
               <button
                 type="button"
@@ -2154,9 +2176,11 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     ? '1px solid rgba(59, 130, 246, 0.5)' 
                     : '1px solid rgba(255,255,255,0.2)',
                   color: 'white',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontSize: '7pt',
+                  padding: isCompactCard ? '0' : '4px 8px',
+                  width: isCompactCard ? '22px' : undefined,
+                  height: isCompactCard ? '22px' : undefined,
+                  borderRadius: isCompactCard ? '999px' : '4px',
+                  fontSize: isCompactCard ? '10pt' : '7pt',
                   fontWeight: 700,
                   cursor: followLoading ? 'wait' : 'pointer',
                   display: 'inline-flex',
@@ -2184,7 +2208,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   '...'
                 ) : isFollowing ? (
                   <>
-                    {followROI && followROI.hypothetical_roi_pct !== null ? (
+                    {isCompactCard ? (
+                      '★'
+                    ) : followROI && followROI.hypothetical_roi_pct !== null ? (
                       <span style={{
                         color: followROI.hypothetical_roi_pct > 0 ? '#10b981' : followROI.hypothetical_roi_pct < 0 ? '#ef4444' : 'inherit',
                         fontWeight: 800,
@@ -2196,7 +2222,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     )}
                   </>
                 ) : (
-                  'Follow'
+                  isCompactCard ? '☆' : 'Follow'
                 )}
               </button>
             )}
@@ -2205,8 +2231,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
       </div>
 
-      {/* Favicon in top-left corner (better placement, doesn't interfere with card body) */}
-      {sourceFaviconUrl && (
+      {/* Favicon in top-left corner (hide on tiniest cards; it turns into noise) */}
+      {sourceFaviconUrl && cardTier !== 'xs' && (
         <div style={{
           position: 'absolute',
           top: '6px',
@@ -2229,8 +2255,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
       {/* Follow button is rendered in the image overlay stack (top-right). */}
       
-      {/* Detail overlay on image instead of separate panel */}
-      {showDetailOverlay && (
+      {/* Detail overlay on image instead of separate panel (progressive disclosure by card size) */}
+      {showDetailOverlay && cardTier !== 'xs' && (
         <div
           style={{
             position: 'absolute',
@@ -2266,7 +2292,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 {idx === 0 ? t.value : ` ${t.value}`}
               </span>
             ))}
-            {identity.differentiators.length > 0 ? (
+            {/* Hide differentiators on small cards; they become illegible noise. */}
+            {cardTier === 'lg' && identity.differentiators.length > 0 ? (
               <span>
                 {' '}
                 {identity.differentiators.slice(0, 2).map((t, j) => (
@@ -2284,6 +2311,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
           </div>
 
           {/* Metadata row - clean by default; infoDense adds extras */}
+          {cardTier === 'lg' ? (
           <div
             style={{
               fontSize: gridTypography.meta,
@@ -2360,6 +2388,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               </span>
             )}
           </div>
+          ) : null}
         </div>
       )}
 

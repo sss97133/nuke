@@ -246,6 +246,12 @@ interface FilterState {
   showPending: boolean;
 }
 
+type RalphHomepagePreset = {
+  label: string;
+  filters: Partial<FilterState>;
+  rationale?: string;
+};
+
 const DEFAULT_FILTERS: FilterState = {
   yearMin: null,
   yearMax: null,
@@ -450,6 +456,9 @@ const CursorHomepage: React.FC = () => {
   const [filterBarMinimized, setFilterBarMinimized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [ralphPresets, setRalphPresets] = useState<RalphHomepagePreset[]>([]);
+  const [ralphLoading, setRalphLoading] = useState(false);
+  const [ralphError, setRalphError] = useState<string | null>(null);
   const [orgWebsitesById, setOrgWebsitesById] = useState<Record<string, string>>({});
   const navigate = useNavigate();
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
@@ -2659,6 +2668,42 @@ const CursorHomepage: React.FC = () => {
     }).format(value);
   };
 
+  const applyRalphPreset = useCallback((preset: RalphHomepagePreset) => {
+    const next = { ...DEFAULT_FILTERS, ...(preset?.filters || {}) } as FilterState;
+    setFilters(next);
+    setSearchText('');
+    setGenerativeFilters([]);
+    setShowFilters(true);
+    setFilterBarMinimized(false);
+  }, []);
+
+  const loadRalphPresets = useCallback(async () => {
+    if (ralphLoading) return;
+    setRalphLoading(true);
+    setRalphError(null);
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke('ralph-wiggum-rlm-homepage', {
+        body: {
+          action: 'generate_presets',
+          max_vehicles: 260,
+          max_presets: 10,
+        }
+      });
+
+      if (invokeError) throw invokeError;
+
+      const presets = data?.output?.presets;
+      if (!Array.isArray(presets)) {
+        throw new Error('Ralph returned an unexpected payload');
+      }
+      setRalphPresets(presets as RalphHomepagePreset[]);
+    } catch (e: any) {
+      setRalphError(e?.message || 'Failed to load Ralph presets');
+    } finally {
+      setRalphLoading(false);
+    }
+  }, [ralphLoading]);
+
   // Generative filters - create 10 random filters
   const generateRandomFilters = () => {
     const allVehicles = feedVehicles;
@@ -3648,6 +3693,27 @@ const CursorHomepage: React.FC = () => {
                 </div>
               </div>
               <button
+                type="button"
+                disabled={ralphLoading}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void loadRalphPresets();
+                }}
+                style={{
+                  padding: '2px 6px',
+                  fontSize: '7pt',
+                  border: '1px solid var(--border)',
+                  background: ralphPresets.length > 0 ? 'rgba(59,130,246,0.10)' : 'transparent',
+                  cursor: ralphLoading ? 'not-allowed' : 'pointer',
+                  fontFamily: '"MS Sans Serif", sans-serif',
+                  opacity: ralphLoading ? 0.6 : 1
+                }}
+                title={ralphPresets.length > 0 ? 'Refresh Ralph presets' : 'Generate Ralph presets'}
+              >
+                {ralphLoading ? 'ralph…' : (ralphPresets.length > 0 ? 'ralph ✓' : 'ralph')}
+              </button>
+              <button
                 onClick={() => {
                   setShowFilters(false);
                   setFilterBarMinimized(true);
@@ -3664,6 +3730,53 @@ const CursorHomepage: React.FC = () => {
                 hide
               </button>
             </div>
+
+            {ralphError && (
+              <div
+                style={{
+                  padding: '6px 8px',
+                  borderBottom: '1px solid var(--border)',
+                  background: 'rgba(239,68,68,0.06)',
+                  color: '#b91c1c',
+                  fontFamily: 'monospace',
+                  fontSize: '7pt'
+                }}
+              >
+                ralph: {ralphError}
+              </div>
+            )}
+
+            {ralphPresets.length > 0 && (
+              <div
+                style={{
+                  padding: '6px',
+                  borderBottom: '1px solid var(--border)',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '4px'
+                }}
+              >
+                {ralphPresets.map((p, idx) => (
+                  <button
+                    key={`${p.label}-${idx}`}
+                    type="button"
+                    className="button-win95"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      applyRalphPreset(p);
+                    }}
+                    title={p.rationale || 'Apply preset'}
+                    style={{
+                      padding: '3px 6px',
+                      fontSize: '7pt'
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Unified filter buttons row */}
             <div style={{
