@@ -73,6 +73,11 @@ function tokenize(q: string): string[] {
     .filter((t) => t.length >= 2);
 }
 
+function looksLikeUuid(q: string): boolean {
+  const t = (q || "").trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t);
+}
+
 function looksLikeImageQuery(q: string): boolean {
   const t = (q || "").toLowerCase();
   return /\b(images?|photos?|pictures?)\b/.test(t);
@@ -198,6 +203,96 @@ serve(async (req: Request) => {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Fast-path: if query is a UUID, treat it as an entity ID lookup (most commonly vehicle IDs).
+    // This makes URLs like `/search?q=<vehicle_uuid>` "just work" without relying on text matching.
+    if (looksLikeUuid(queryRaw)) {
+      try {
+        let vq = supabase
+          .from("vehicles")
+          .select("id, year, make, model, color, description, created_at, updated_at, is_for_sale, city, state")
+          .eq("id", queryRaw)
+          .limit(1);
+
+        // Be conservative for anon calls; RLS should enforce this anyway, but this avoids surprises.
+        if (isAnonRequest) {
+          vq = vq.eq("is_public", true);
+        }
+
+        const { data: v, error: vErr } = await vq.maybeSingle();
+        if (!vErr && v?.id) {
+          // Grab a primary/first image if available (best-effort).
+          let imageUrl: string | null = null;
+          try {
+            const { data: img } = await supabase
+              .from("vehicle_images")
+              .select("image_url, variants, thumbnail_url, medium_url, is_primary, position, created_at")
+              .eq("vehicle_id", v.id)
+              .order("is_primary", { ascending: false })
+              .order("position", { ascending: true })
+              .order("created_at", { ascending: true })
+              .limit(1)
+              .maybeSingle();
+
+            const variants = (img as any)?.variants as any;
+            imageUrl =
+              (variants?.thumbnail as string | undefined) ||
+              ((img as any)?.thumbnail_url as string | undefined) ||
+              (variants?.medium as string | undefined) ||
+              ((img as any)?.medium_url as string | undefined) ||
+              ((img as any)?.image_url as string | undefined) ||
+              null;
+          } catch {
+            // ignore
+          }
+
+          const title = `${(v as any).year ?? ""} ${(v as any).make ?? ""} ${(v as any).model ?? ""}`.trim() || "Vehicle";
+          const description =
+            (v as any).description ||
+            `${(v as any).color ?? ""} ${(v as any).make ?? ""} ${(v as any).model ?? ""}`.trim() ||
+            "";
+
+          const vehicleResult: SearchResult = {
+            id: String(v.id),
+            type: "vehicle",
+            title,
+            description,
+            metadata: {
+              year: (v as any).year ?? null,
+              make: (v as any).make ?? null,
+              model: (v as any).model ?? null,
+              color: (v as any).color ?? null,
+              for_sale: (v as any).is_for_sale ?? null,
+              city: (v as any).city ?? undefined,
+              state: (v as any).state ?? undefined,
+              match_reason: "id",
+              matched_query: queryRaw,
+            },
+            relevance_score: 1,
+            image_url: imageUrl || undefined,
+            created_at: (v as any).updated_at || (v as any).created_at || new Date().toISOString(),
+          };
+
+          const response: SearchResponse = {
+            results: [vehicleResult],
+            sections: { vehicles: [vehicleResult], organizations: [], users: [], images: [], sources: [] },
+            search_summary: `Found 1 result for "${queryRaw}".`,
+            answer: {
+              text: "Found a vehicle profile matching that ID.",
+              citations: [{ type: "vehicle", id: String(v.id) }],
+            },
+            debug: { fast_path: "uuid_vehicle_id" },
+          };
+
+          return new Response(JSON.stringify(response), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch {
+        // ignore and fall through to normal search
+      }
     }
 
     const terms = expandTerms(tokenize(queryRaw));

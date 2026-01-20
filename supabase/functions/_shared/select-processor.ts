@@ -105,6 +105,23 @@ export function selectProcessor(item: QueueItem): ProcessorSelection {
   }
 
   // ============================================================================
+  // Cars & Bids - Auction platform
+  // Uses process-import-queue for base extraction, comments extracted via
+  // extract-cars-and-bids-comments after vehicle profile is created
+  // ============================================================================
+  if (url.includes('carsandbids.com') || source.includes('cars_and_bids') || source.includes('carsandbids')) {
+    return {
+      functionName: 'process-import-queue',
+      parameters: {
+        batch_size: 5,
+        fast_mode: false, // C&B needs full extraction for auction data
+      },
+      reason: 'Cars & Bids auction (via process-import-queue)',
+      priority: 2,
+    };
+  }
+
+  // ============================================================================
   // Classic.com - Auction house
   // ============================================================================
   if (url.includes('classic.com') || source.includes('classic')) {

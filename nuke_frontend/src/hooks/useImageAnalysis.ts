@@ -16,6 +16,7 @@ interface AnalysisResult {
   success: boolean;
   tags: AutomatedTag[];
   source: 'cache' | 'rekognition';
+  cached?: boolean;
   error?: string;
 }
 
@@ -26,7 +27,12 @@ export const useImageAnalysis = () => {
   const analyzeImage = async (
     imageUrl: string,
     timelineEventId?: string,
-    vehicleId?: string
+    vehicleId?: string,
+    options?: {
+      imageId?: string | null;
+      userId?: string | null;
+      forceReprocess?: boolean;
+    }
   ): Promise<AnalysisResult> => {
     setAnalyzing(true);
     setAnalysisProgress('Starting image analysis...');
@@ -38,8 +44,11 @@ export const useImageAnalysis = () => {
       const { data, error } = await supabase.functions.invoke('analyze-image', {
         body: {
           image_url: imageUrl,
+          image_id: options?.imageId ?? null,
           timeline_event_id: timelineEventId,
-          vehicle_id: vehicleId
+          vehicle_id: vehicleId,
+          user_id: options?.userId ?? null,
+          force_reprocess: Boolean(options?.forceReprocess)
         }
       });
 
@@ -56,10 +65,12 @@ export const useImageAnalysis = () => {
       setAnalysisProgress('Processing AI detection results...');
 
       // The function should return the tags and insert them automatically
+      const cached = Boolean((data as any)?.cached);
       return {
-        success: data.success,
-        tags: data.tags || [],
-        source: data.source || 'rekognition'
+        success: Boolean((data as any)?.success),
+        tags: (data as any)?.tags || [],
+        source: cached ? 'cache' : 'rekognition',
+        cached
       };
 
     } catch (error) {

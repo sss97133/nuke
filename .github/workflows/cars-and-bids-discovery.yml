@@ -1,0 +1,90 @@
+# Cars & Bids Discovery - Scrapes active auctions
+# Runs every 4 hours to find new listings
+
+name: Cars & Bids Discovery
+
+on:
+  schedule:
+    - cron: '30 */4 * * *'  # Every 4 hours at :30 (offset from BaT)
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Validate Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "Missing required secret: SUPABASE_URL"
+            exit 1
+          fi
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "Missing required secret: SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          echo "All required secrets are set"
+
+      - name: Discover Cars & Bids Active Auctions
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Starting Cars & Bids discovery via scrape-multi-source..."
+
+          # Use scrape-multi-source which has C&B URL enumeration built in
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            "${SUPABASE_URL}/functions/v1/scrape-multi-source" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 120 \
+            -d '{
+              "source_url": "https://carsandbids.com/auctions/",
+              "source_type": "auction",
+              "extract_listings": true,
+              "cheap_mode": true,
+              "max_listings": 200
+            }')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY" | head -c 2000
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo ""
+            echo "Cars & Bids discovery completed successfully"
+            echo "$BODY" | grep -o '"listings_queued":[0-9]*' || echo "Response parsing skipped"
+          else
+            echo ""
+            echo "Cars & Bids discovery failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+      - name: Trigger sync-active-auctions for C&B
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Triggering sync for existing Cars & Bids listings..."
+
+          curl -sS -X POST \
+            "${SUPABASE_URL}/functions/v1/sync-active-auctions" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 60 \
+            -d '{"platforms": ["cars_and_bids", "carsandbids"], "batch_size": 30}' \
+            || echo "Sync trigger completed (may timeout, that's ok)"
+
+          echo "Sync triggered"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Cars & Bids discovery workflow completed"
+          echo "New listings queued to import_queue for processing"

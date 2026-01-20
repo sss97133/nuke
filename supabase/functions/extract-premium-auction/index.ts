@@ -2199,6 +2199,309 @@ function extractMecumStructuredSections(html: string): {
   }
 }
 
+// ============================================
+// MECUM __NEXT_DATA__ (Next.js) EXTRACTION
+// ============================================
+
+function stripHtmlToText(raw: any): string {
+  return String(raw || '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractMecumNextDataPost(html: string): any | null {
+  try {
+    const h = String(html || '');
+    const m = h.match(/<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (!m?.[1]) return null;
+    const json = JSON.parse(m[1]);
+    const post = json?.props?.pageProps?.post || null;
+    return post && typeof post === 'object' ? post : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseYearMakeModelFromTitle(title: string): { year: number | null; make: string | null; model: string | null } {
+  const t = String(title || '').trim();
+  const m = t.match(/^\s*(\d{4})\s+(.+?)\s*$/);
+  if (!m?.[1] || !m?.[2]) return { year: null, make: null, model: null };
+  const year = Number(m[1]);
+  if (!Number.isFinite(year)) return { year: null, make: null, model: null };
+  const rest = String(m[2] || '').trim();
+  const parts = rest.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { year, make: null, model: null };
+
+  // Minimal multi-word make support (fallback to first token).
+  const multiWordMakes: Record<string, string> = {
+    'alfa romeo': 'Alfa Romeo',
+    'aston martin': 'Aston Martin',
+    'land rover': 'Land Rover',
+    'mercedes benz': 'Mercedes-Benz',
+    'mercedes-benz': 'Mercedes-Benz',
+    'rolls royce': 'Rolls-Royce',
+  };
+
+  // Try the first 2 tokens as a make (common case), else first token.
+  const two = parts.slice(0, 2).join(' ').toLowerCase();
+  const make =
+    multiWordMakes[two] ||
+    parts[0] ||
+    null;
+  const modelStartIdx = multiWordMakes[two] ? 2 : 1;
+  const model = parts.slice(modelStartIdx).join(' ').trim() || null;
+  return { year, make, model };
+}
+
+type MecumHistoryEvent = {
+  raw: string;
+  date_label: string | null;
+  description: string;
+  event_date: string | null; // YYYY-MM-DD
+  date_precision: 'day' | 'month' | 'year' | 'approx' | null;
+};
+
+function parseMecumHistoryListItem(raw: string): { date_label: string | null; description: string } {
+  const t = String(raw || '').trim();
+  if (!t) return { date_label: null, description: '' };
+
+  // Split on en-dash/hyphen separators when present.
+  const sepMatch = t.match(/^\s*(.+?)\s*[–-]\s*(.+)\s*$/);
+  if (sepMatch?.[1] && sepMatch?.[2]) {
+    return { date_label: sepMatch[1].trim() || null, description: sepMatch[2].trim() };
+  }
+
+  // Common pattern: "In September 1964, ..."
+  const inMonthMatch = t.match(/^\s*(In\s+[A-Za-z]+\s+\d{4})\s*,\s*(.+)\s*$/i);
+  if (inMonthMatch?.[1] && inMonthMatch?.[2]) {
+    return { date_label: inMonthMatch[1].trim(), description: inMonthMatch[2].trim() };
+  }
+
+  return { date_label: null, description: t };
+}
+
+function ymdFromParts(y: number, m: number, d: number): string | null {
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+  const yy = String(Math.trunc(y)).padStart(4, '0');
+  const mm = String(Math.trunc(m)).padStart(2, '0');
+  const dd = String(Math.trunc(d)).padStart(2, '0');
+  if (!/^\d{4}$/.test(yy) || !/^\d{2}$/.test(mm) || !/^\d{2}$/.test(dd)) return null;
+  return `${yy}-${mm}-${dd}`;
+}
+
+function parseMecumHistoryDateToYmd(dateLabel: string | null, raw: string): { ymd: string; precision: MecumHistoryEvent['date_precision'] } | null {
+  const candidate = (dateLabel || '').trim() || String(raw || '').trim();
+  if (!candidate) return null;
+
+  // Normalize leading "In " and trailing commas.
+  const cleaned = candidate.replace(/^\s*In\s+/i, '').replace(/,\s*$/, '').trim();
+
+  // Exact date: "May 7, 1962"
+  if (/\b[A-Za-z]+\s+\d{1,2},\s*\d{4}\b/.test(cleaned)) {
+    const dt = new Date(cleaned);
+    if (Number.isFinite(dt.getTime())) {
+      const y = dt.getUTCFullYear();
+      const m = dt.getUTCMonth() + 1;
+      const d = dt.getUTCDate();
+      const ymd = ymdFromParts(y, m, d);
+      if (ymd) return { ymd, precision: 'day' };
+    }
+  }
+
+  // Approx buckets like "Late 1962"
+  const approx = cleaned.match(/^(Early|Mid|Late)\s+(\d{4})$/i);
+  if (approx?.[1] && approx?.[2]) {
+    const year = Number(approx[2]);
+    const bucket = String(approx[1]).toLowerCase();
+    const month = bucket === 'early' ? 2 : bucket === 'mid' ? 6 : 11;
+    const ymd = ymdFromParts(year, month, 15);
+    if (ymd) return { ymd, precision: 'approx' };
+  }
+
+  // Month + year: "January 1964" or "Aug 1964"
+  const monthYear = cleaned.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (monthYear?.[1] && monthYear?.[2]) {
+    const dt = new Date(`${monthYear[1]} 1, ${monthYear[2]}`);
+    if (Number.isFinite(dt.getTime())) {
+      const year = dt.getUTCFullYear();
+      const month = dt.getUTCMonth() + 1;
+      const ymd = ymdFromParts(year, month, 15);
+      if (ymd) return { ymd, precision: 'month' };
+    }
+  }
+
+  // Year-only fallback (search anywhere in the string)
+  const yearMatch = cleaned.match(/\b(19|20)\d{2}\b/);
+  if (yearMatch?.[0]) {
+    const year = Number(yearMatch[0]);
+    const ymd = ymdFromParts(year, 6, 30);
+    if (ymd) return { ymd, precision: 'year' };
+  }
+
+  return null;
+}
+
+function extractMecumHistorySectionsFromNextBlocks(blocks: any): Array<{ section_title: string; items: MecumHistoryEvent[] }> {
+  const out: Array<{ section_title: string; items: MecumHistoryEvent[] }> = [];
+  const root = Array.isArray(blocks) ? blocks : [];
+
+  const walk = (nodes: any[]) => {
+    for (const node of nodes) {
+      if (!node) continue;
+      const inner = Array.isArray(node.innerBlocks) ? node.innerBlocks : [];
+
+      // Look for: heading (contains HISTORY) + list (core/list) in the same container
+      for (let i = 0; i < inner.length; i++) {
+        const b = inner[i];
+        if (b?.name !== 'core/heading') continue;
+        const heading = stripHtmlToText(b?.attributes?.content || '');
+        if (!heading || !/history/i.test(heading)) continue;
+
+        let listItems: string[] = [];
+        for (let j = i + 1; j < inner.length; j++) {
+          const next = inner[j];
+          if (next?.name !== 'core/list') continue;
+          const items = (Array.isArray(next.innerBlocks) ? next.innerBlocks : [])
+            .filter((x: any) => x?.name === 'core/list-item')
+            .map((x: any) => stripHtmlToText(x?.attributes?.content || x?.attributes?.value || x?.attributes?.text || ''))
+            .filter((s: string) => Boolean(s));
+          if (items.length > 0) listItems = items;
+          break;
+        }
+
+        if (listItems.length > 0) {
+          const parsed: MecumHistoryEvent[] = listItems.map((raw) => {
+            const split = parseMecumHistoryListItem(raw);
+            const parsedDate = parseMecumHistoryDateToYmd(split.date_label, raw);
+            return {
+              raw,
+              date_label: split.date_label,
+              description: split.description,
+              event_date: parsedDate?.ymd || null,
+              date_precision: parsedDate?.precision || null,
+            };
+          });
+
+          out.push({ section_title: heading, items: parsed });
+        }
+      }
+
+      if (inner.length > 0) walk(inner);
+    }
+  };
+
+  walk(root);
+
+  // Dedupe sections by title + first item
+  const seen = new Set<string>();
+  const deduped: typeof out = [];
+  for (const s of out) {
+    const key = `${s.section_title}::${s.items?.[0]?.raw || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(s);
+  }
+  return deduped;
+}
+
+function extractMecumVehicleFromNextPost(post: any): {
+  vehicle: any;
+  images: string[];
+  history_sections: Array<{ section_title: string; items: MecumHistoryEvent[] }>;
+} {
+  const title = typeof post?.title === 'string' ? post.title.trim() : '';
+  const { year, make, model } = parseYearMakeModelFromTitle(title);
+
+  const vinSerial = typeof post?.vinSerial === 'string' ? post.vinSerial.trim() : null;
+  const transmission = typeof post?.transmission === 'string' ? post.transmission.trim() : null;
+  const color = typeof post?.color === 'string' ? post.color.trim() : null;
+  const interiorColor = typeof post?.interior === 'string' ? post.interior.trim() : null;
+
+  const lotNumber = typeof post?.lotNumber === 'string' ? post.lotNumber.trim() : null;
+  const onlineBiddingUrl = typeof post?.onlineBiddingUrl === 'string' ? post.onlineBiddingUrl.trim() : null;
+
+  const runDate = (() => {
+    const edges = post?.runDates?.edges;
+    const firstName = Array.isArray(edges) ? edges?.[0]?.node?.name : null;
+    const s = typeof firstName === 'string' ? firstName.trim() : null;
+    return s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+  })();
+
+  const saleResults = (() => {
+    const edges = post?.saleResults?.edges;
+    const firstName = Array.isArray(edges) ? edges?.[0]?.node?.name : null;
+    return typeof firstName === 'string' ? firstName.trim().toLowerCase() : null;
+  })();
+
+  const hammer = (() => {
+    const raw = post?.hammerPrice;
+    const s = typeof raw === 'string' ? raw.trim() : (typeof raw === 'number' ? String(raw) : '');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  })();
+
+  const salePrice = saleResults === 'sold' ? hammer : null;
+
+  const auctionMeta = (() => {
+    const node = Array.isArray(post?.auction?.nodes) ? post.auction.nodes[0] : null;
+    const fields = node?.auctionFields || {};
+    const city = typeof fields?.auctionCity === 'string' ? fields.auctionCity.trim() : null;
+    const state = typeof fields?.auctionState === 'string' ? fields.auctionState.trim() : null;
+    const venue = typeof fields?.auctionVenue === 'string' ? fields.auctionVenue.trim() : null;
+    const address = typeof fields?.auctionAddress === 'string' ? fields.auctionAddress.trim() : null;
+    const zip = typeof fields?.auctionZip === 'string' ? fields.auctionZip.trim() : null;
+    const name = typeof node?.title === 'string' ? node.title.trim() : null;
+    const location = [city, state].filter(Boolean).join(', ') || null;
+    const fullAddress = [address, city, state, zip].filter(Boolean).join(', ') || null;
+    return { name, city, state, venue, address: fullAddress, location };
+  })();
+
+  const images = (Array.isArray(post?.images) ? post.images : [])
+    .map((img: any) => (typeof img?.url === 'string' ? img.url.trim() : null))
+    .filter((u: any) => Boolean(u)) as string[];
+
+  const historySections = extractMecumHistorySectionsFromNextBlocks(post?.blocks);
+
+  const historyItemsFlat: MecumHistoryEvent[] = [];
+  for (const sec of historySections) {
+    for (const it of (sec.items || [])) {
+      historyItemsFlat.push(it);
+    }
+  }
+
+  return {
+    vehicle: {
+      title: title || null,
+      year,
+      make,
+      model,
+      vin: vinSerial || null,
+      transmission,
+      color,
+      interior_color: interiorColor,
+      lot_number: lotNumber,
+      sale_date: runDate,
+      sale_price: salePrice,
+      location: auctionMeta.location,
+      // This is stored in vehicles.origin_metadata for UI/traceability.
+      online_bidding_url: onlineBiddingUrl,
+      mecum_auction: auctionMeta,
+      mecum_history_section_title: historySections?.[0]?.section_title || null,
+      mecum_history_events: historyItemsFlat.length > 0 ? historyItemsFlat : undefined,
+    },
+    images,
+    history_sections: historySections,
+  };
+}
+
 /**
  * Extract structured vehicle specs from Mecum highlights/story text
  * Parses engine codes, transmission, colors, etc. into proper DB fields
@@ -3510,6 +3813,35 @@ async function storeVehiclesInDatabase(
 
   const nowIso = () => new Date().toISOString();
 
+  // Match DB trigger canonicalization:
+  // public.canonicalize_vehicle_url(p_url text) -> https:// + lower(host+path), no www, no query/hash, no trailing slashes
+  const canonicalizeVehicleUrl = (raw: string | null | undefined): string | null => {
+    const input = String(raw || "").trim();
+    if (!input) return null;
+    try {
+      const u = new URL(input);
+      u.hash = "";
+      u.search = "";
+      const host = u.hostname.replace(/^www\./i, "").toLowerCase();
+      const path = String(u.pathname || "").replace(/\/+$/, ""); // drop trailing slashes
+      const out = `https://${host}${path}`.toLowerCase();
+      return out === "https://" ? null : out;
+    } catch {
+      const out =
+        "https://" +
+        input
+          .trim()
+          .split("#")[0]
+          .split("?")[0]
+          .replace(/^https?:\/\//i, "")
+          .replace(/^www\./i, "")
+          .replace(/\/+$/, "")
+          .toLowerCase()
+          .trim();
+      return out === "https://" ? null : out;
+    }
+  };
+
   const preferNonEmptyArray = (candidate: any, fallback: any): any[] => {
     if (Array.isArray(candidate) && candidate.length > 0) return candidate;
     if (Array.isArray(fallback) && fallback.length > 0) return fallback;
@@ -3584,6 +3916,89 @@ async function storeVehiclesInDatabase(
     }
   };
 
+  const upsertMecumHistoryTimelineEvents = async (
+    vehicleId: string,
+    listingUrl: string | null,
+    historyEvents: MecumHistoryEvent[] | null,
+    sectionTitle: string | null,
+  ) => {
+    try {
+      const cleanUrl = (listingUrl ? String(listingUrl) : '').split('?')[0];
+      const items = Array.isArray(historyEvents) ? historyEvents : [];
+      const usable = items.filter((it) => it && typeof it.description === 'string' && it.description.trim() && typeof it.event_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(it.event_date));
+      if (!cleanUrl || usable.length === 0) return;
+
+      // Load existing Mecum-history events for this vehicle+URL to keep idempotent
+      const { data: existing, error: existingErr } = await supabase
+        .from('timeline_events')
+        .select('id,event_date,title,metadata')
+        .eq('vehicle_id', vehicleId)
+        .eq('source', 'mecum')
+        .eq('event_type', 'other')
+        .limit(2000);
+
+      if (existingErr) {
+        console.warn(`timeline_events read failed (non-fatal): ${existingErr.message}`);
+      }
+
+      const existingHashes = new Set<string>();
+      for (const row of (existing || []) as any[]) {
+        const md = (row?.metadata || {}) as any;
+        if (md?.kind !== 'mecum_history') continue;
+        if (String(md?.source_url || '') !== cleanUrl) continue;
+        const h = String(md?.content_hash || '').trim();
+        if (h) existingHashes.add(h);
+      }
+
+      const toInsert: any[] = [];
+      for (const it of usable) {
+        const desc = String(it.description || '').trim();
+        const ymd = String(it.event_date || '').trim();
+        const hash = await sha256Hex(`${cleanUrl}|${ymd}|${desc}`); // deterministic
+        if (existingHashes.has(hash)) continue;
+        existingHashes.add(hash);
+
+        const title = desc.length > 140 ? `${desc.slice(0, 140).trim()}…` : desc;
+        toInsert.push({
+          vehicle_id: vehicleId,
+          user_id: null,
+          event_type: 'other',
+          source: 'mecum',
+          source_type: 'system',
+          title,
+          description: String(it.raw || desc).trim() || null,
+          event_date: ymd,
+          confidence_score: 85,
+          metadata: {
+            kind: 'mecum_history',
+            source_url: cleanUrl,
+            section_title: sectionTitle || null,
+            raw_date: it.date_label || null,
+            date_precision: it.date_precision || null,
+            content_hash: hash,
+          },
+          created_at: nowIso(),
+          updated_at: nowIso(),
+        });
+      }
+
+      if (toInsert.length === 0) return;
+
+      const { error: insErr } = await supabase
+        .from('timeline_events')
+        .insert(toInsert);
+
+      if (insErr) {
+        console.warn(`timeline_events insert failed (non-fatal): ${insErr.message}`);
+        return;
+      }
+
+      console.log(`✅ Inserted ${toInsert.length} Mecum history timeline event(s) for vehicle ${vehicleId}`);
+    } catch (e: any) {
+      console.warn(`timeline_events Mecum history insert exception (non-fatal): ${e?.message || String(e)}`);
+    }
+  };
+
   for (const vehicle of cleaned) {
     try {
       let listingUrl = vehicle.listing_url || vehicle.platform_url || vehicle.url || null;
@@ -3602,6 +4017,12 @@ async function storeVehiclesInDatabase(
           errors.push(`Rejected /video URL after cleaning: ${listingUrl}`);
           continue;
         }
+      }
+
+      // Canonicalize to match DB discovery_url trigger (prevents duplicate inserts + makes lookup consistent).
+      if (listingUrl) {
+        const canon = canonicalizeVehicleUrl(listingUrl);
+        if (canon) listingUrl = canon;
       }
       const title = vehicle.title || vehicle.listing_title || null;
       const vinRaw = typeof vehicle.vin === "string" ? vehicle.vin.trim().toUpperCase() : "";
@@ -3704,6 +4125,11 @@ async function storeVehiclesInDatabase(
             // Store highlights and story from Mecum extraction
             highlights: Array.isArray(vehicle.highlights) ? vehicle.highlights : [],
             story: typeof vehicle.story === 'string' ? vehicle.story : null,
+            // Mecum __NEXT_DATA__ extras
+            online_bidding_url: typeof (vehicle as any)?.online_bidding_url === 'string' ? (vehicle as any).online_bidding_url : null,
+            mecum_auction: (vehicle as any)?.mecum_auction || null,
+            mecum_history_section_title: typeof (vehicle as any)?.mecum_history_section_title === 'string' ? (vehicle as any).mecum_history_section_title : null,
+            mecum_history_events: Array.isArray((vehicle as any)?.mecum_history_events) ? (vehicle as any).mecum_history_events : [],
             bid_history: Array.isArray(vehicle.bid_history) ? vehicle.bid_history : [],
             comments: Array.isArray(vehicle.comments) ? vehicle.comments : [],
             bidders: Array.isArray(vehicle.bidders) ? vehicle.bidders : [],
@@ -3759,6 +4185,17 @@ async function storeVehiclesInDatabase(
             // Store highlights and story from Mecum extraction
             highlights: Array.isArray(vehicle.highlights) ? vehicle.highlights : (existingOriginMetadata.highlights || []),
             story: typeof vehicle.story === 'string' ? vehicle.story : (existingOriginMetadata.story || null),
+            // Mecum __NEXT_DATA__ extras (prefer new data when present)
+            online_bidding_url: typeof (vehicle as any)?.online_bidding_url === 'string'
+              ? (vehicle as any).online_bidding_url
+              : (existingOriginMetadata as any)?.online_bidding_url || null,
+            mecum_auction: (vehicle as any)?.mecum_auction || (existingOriginMetadata as any)?.mecum_auction || null,
+            mecum_history_section_title: typeof (vehicle as any)?.mecum_history_section_title === 'string'
+              ? (vehicle as any).mecum_history_section_title
+              : (existingOriginMetadata as any)?.mecum_history_section_title || null,
+            mecum_history_events: (Array.isArray((vehicle as any)?.mecum_history_events) && (vehicle as any).mecum_history_events.length > 0)
+              ? (vehicle as any).mecum_history_events
+              : (Array.isArray((existingOriginMetadata as any)?.mecum_history_events) ? (existingOriginMetadata as any).mecum_history_events : []),
             bid_history: preferNonEmptyArray(vehicle.bid_history, existingOriginMetadata.bid_history),
             comments: preferNonEmptyArray(vehicle.comments, existingOriginMetadata.comments),
             bidders: preferNonEmptyArray(vehicle.bidders, existingOriginMetadata.bidders),
@@ -3847,9 +4284,141 @@ async function storeVehiclesInDatabase(
             .insert(payload)
             .select("id")
             .single();
-          data = inserted;
-          error = insertErr;
-          if (!insertErr && inserted?.id) createdIds.push(String(inserted.id));
+
+          const insertErrMsg = String((insertErr as any)?.message || "");
+          const hitDiscoveryUrlUnique =
+            insertErrMsg.includes("vehicles_discovery_url_unique") ||
+            insertErrMsg.toLowerCase().includes("discovery_url_unique");
+
+          // Idempotency: if this listing URL already exists, update that vehicle instead of failing.
+          if (insertErr && hitDiscoveryUrlUnique && listingUrl) {
+            try {
+              console.log(
+                `⚠️ Insert hit discovery_url unique constraint. Falling back to update by discovery_url: "${listingUrl}"`,
+              );
+
+              const { data: byUrlRows, error: byUrlErr } = await supabase
+                .from("vehicles")
+                .select("id, origin_metadata, mileage, color, transmission, engine_size, drivetrain, year, make, model, trim")
+                .eq("discovery_url", listingUrl)
+                .limit(1);
+
+              if (byUrlErr) {
+                error = byUrlErr;
+              } else if (byUrlRows && byUrlRows.length > 0 && byUrlRows[0]?.id) {
+                const existingId = byUrlRows[0].id;
+
+                const existingOriginMetadata = ((byUrlRows[0] as any)?.origin_metadata as any) || {};
+                const newOriginMetadata = {
+                  ...existingOriginMetadata,
+                  import_source: source.toLowerCase(),
+                  import_date: nowIso().split('T')[0],
+                  discovery_url: listingUrl,
+                  source_url: listingUrl,
+                  images: preferNonEmptyArray(vehicle.images, existingOriginMetadata.images),
+                  image_urls: preferNonEmptyArray(vehicle.images, existingOriginMetadata.image_urls),
+                  structured_sections: vehicle.structured_sections || existingOriginMetadata.structured_sections || {},
+                  // Store highlights and story from Mecum extraction
+                  highlights: Array.isArray(vehicle.highlights) ? vehicle.highlights : (existingOriginMetadata.highlights || []),
+                  story: typeof vehicle.story === 'string' ? vehicle.story : (existingOriginMetadata.story || null),
+                  // Mecum __NEXT_DATA__ extras (prefer new data when present)
+                  online_bidding_url: typeof (vehicle as any)?.online_bidding_url === 'string'
+                    ? (vehicle as any).online_bidding_url
+                    : (existingOriginMetadata as any)?.online_bidding_url || null,
+                  mecum_auction: (vehicle as any)?.mecum_auction || (existingOriginMetadata as any)?.mecum_auction || null,
+                  mecum_history_section_title: typeof (vehicle as any)?.mecum_history_section_title === 'string'
+                    ? (vehicle as any).mecum_history_section_title
+                    : (existingOriginMetadata as any)?.mecum_history_section_title || null,
+                  mecum_history_events: (Array.isArray((vehicle as any)?.mecum_history_events) && (vehicle as any).mecum_history_events.length > 0)
+                    ? (vehicle as any).mecum_history_events
+                    : (Array.isArray((existingOriginMetadata as any)?.mecum_history_events) ? (existingOriginMetadata as any).mecum_history_events : []),
+                  bid_history: preferNonEmptyArray(vehicle.bid_history, existingOriginMetadata.bid_history),
+                  comments: preferNonEmptyArray(vehicle.comments, existingOriginMetadata.comments),
+                  bidders: preferNonEmptyArray(vehicle.bidders, existingOriginMetadata.bidders),
+                  seller: deriveSellerBuyer(vehicle).seller || existingOriginMetadata.seller || null,
+                  buyer: deriveSellerBuyer(vehicle).buyer || existingOriginMetadata.buyer || null,
+                  auction_id: vehicle.auction_id || existingOriginMetadata.auction_id || null,
+                  listing_status: vehicle.listing_status || existingOriginMetadata.listing_status || 'active',
+                  // Store contributor/consignment consultant information (Broad Arrow) - prefer new data
+                  contributor: vehicle.contributor || existingOriginMetadata.contributor || null,
+                  last_updated: nowIso(),
+                };
+
+                payload.origin_metadata = newOriginMetadata;
+
+                const existingDataForVin = byUrlRows[0] || {};
+                const updatePayloadForVin: any = {
+                  ...payload,
+                  mileage: (payload.mileage !== null && payload.mileage !== undefined && payload.mileage !== 0)
+                    ? payload.mileage
+                    : ((existingDataForVin as any).mileage !== null && (existingDataForVin as any).mileage !== undefined ? (existingDataForVin as any).mileage : payload.mileage),
+                  // Never set "Unknown" - use null if extraction failed
+                  color: (payload.color && payload.color.trim() && payload.color.toLowerCase() !== "unknown")
+                    ? payload.color
+                    : ((existingDataForVin as any).color && String((existingDataForVin as any).color).trim() && String((existingDataForVin as any).color).toLowerCase() !== "unknown" ? (existingDataForVin as any).color : null),
+                  transmission: (payload.transmission && payload.transmission.trim())
+                    ? payload.transmission
+                    : ((existingDataForVin as any).transmission ? (existingDataForVin as any).transmission : payload.transmission),
+                  engine_size: (payload.engine_size && payload.engine_size.trim())
+                    ? payload.engine_size
+                    : ((existingDataForVin as any).engine_size ? (existingDataForVin as any).engine_size : payload.engine_size),
+                  drivetrain: (payload.drivetrain && payload.drivetrain.trim())
+                    ? payload.drivetrain
+                    : ((existingDataForVin as any).drivetrain ? (existingDataForVin as any).drivetrain : payload.drivetrain),
+                  year: (payload.year !== null && payload.year !== undefined && payload.year > 1900)
+                    ? payload.year
+                    : ((existingDataForVin as any).year ? (existingDataForVin as any).year : payload.year),
+                  // Never set "Unknown" - use null if extraction failed, preserve existing data if valid
+                  make: (payload.make && payload.make.trim() && payload.make.toLowerCase() !== "unknown")
+                    ? payload.make
+                    : ((existingDataForVin as any).make && String((existingDataForVin as any).make).trim() && String((existingDataForVin as any).make).toLowerCase() !== "unknown" ? (existingDataForVin as any).make : null),
+                  model: (payload.model && payload.model.trim() && payload.model.toLowerCase() !== "unknown")
+                    ? payload.model
+                    : ((existingDataForVin as any).model && String((existingDataForVin as any).model).trim() && String((existingDataForVin as any).model).toLowerCase() !== "unknown" ? (existingDataForVin as any).model : null),
+                  trim: (payload.trim && payload.trim.trim())
+                    ? payload.trim
+                    : ((existingDataForVin as any).trim ? (existingDataForVin as any).trim : payload.trim),
+                };
+
+                const { data: updated, error: updateErr } = await supabase
+                  .from("vehicles")
+                  .update(updatePayloadForVin)
+                  .eq("id", existingId)
+                  .select("id")
+                  .single();
+
+                data = updated;
+                error = updateErr;
+
+                if (!updateErr && updated?.id) {
+                  updatedIds.push(String(updated.id));
+                  // CRITICAL: Also insert images for updated vehicles (only if we found new images)
+                  if (vehicle.images && Array.isArray(vehicle.images) && vehicle.images.length > 0) {
+                    console.log(`Inserting ${vehicle.images.length} images for UPDATED vehicle ${updated.id}`);
+                    const img = await insertVehicleImages(supabase, updated.id, vehicle.images, source, listingUrl, {
+                      downloadImages,
+                      batchSize: 5,
+                      delayMs: 1000,
+                    });
+                    console.log(`Inserted ${img.inserted} images${img.downloaded ? `, downloaded ${img.downloaded}` : ''} for updated vehicle, ${img.errors.length} errors`);
+                    errors.push(...img.errors);
+                  } else {
+                    console.log(`No new images found for updated vehicle ${updated.id} - preserving existing images`);
+                  }
+                }
+              } else {
+                error = insertErr;
+              }
+            } catch (fallbackErr: any) {
+              console.warn(`Fallback update-by-discovery_url failed: ${fallbackErr?.message || String(fallbackErr)}`);
+              data = inserted;
+              error = insertErr;
+            }
+          } else {
+            data = inserted;
+            error = insertErr;
+            if (!insertErr && inserted?.id) createdIds.push(String(inserted.id));
+          }
         }
       } else {
         // Check for existing vehicle by discovery_url (canonical for listing imports)
@@ -3922,6 +4491,17 @@ async function storeVehiclesInDatabase(
             // Store highlights and story from Mecum extraction
             highlights: Array.isArray(vehicle.highlights) ? vehicle.highlights : (existingOriginMetadata.highlights || []),
             story: typeof vehicle.story === 'string' ? vehicle.story : (existingOriginMetadata.story || null),
+            // Mecum __NEXT_DATA__ extras (prefer new data when present)
+            online_bidding_url: typeof (vehicle as any)?.online_bidding_url === 'string'
+              ? (vehicle as any).online_bidding_url
+              : (existingOriginMetadata as any)?.online_bidding_url || null,
+            mecum_auction: (vehicle as any)?.mecum_auction || (existingOriginMetadata as any)?.mecum_auction || null,
+            mecum_history_section_title: typeof (vehicle as any)?.mecum_history_section_title === 'string'
+              ? (vehicle as any).mecum_history_section_title
+              : (existingOriginMetadata as any)?.mecum_history_section_title || null,
+            mecum_history_events: (Array.isArray((vehicle as any)?.mecum_history_events) && (vehicle as any).mecum_history_events.length > 0)
+              ? (vehicle as any).mecum_history_events
+              : (Array.isArray((existingOriginMetadata as any)?.mecum_history_events) ? (existingOriginMetadata as any).mecum_history_events : []),
             bid_history: preferNonEmptyArray(vehicle.bid_history, existingOriginMetadata.bid_history),
             comments: preferNonEmptyArray(vehicle.comments, existingOriginMetadata.comments),
             bidders: preferNonEmptyArray(vehicle.bidders, existingOriginMetadata.bidders),
@@ -4626,6 +5206,21 @@ async function storeVehiclesInDatabase(
           console.log(`Inserted ${videoInserted} videos, ${videoErrors.length} errors`);
           errors.push(...videoErrors);
         }
+
+        // Mecum: turn rich "History" block into timeline events (idempotent)
+        try {
+          const isMecumUrl = listingUrl && String(listingUrl).includes('mecum.com/');
+          const historyEvents = (vehicle as any)?.mecum_history_events;
+          if (isMecumUrl && Array.isArray(historyEvents) && historyEvents.length > 0) {
+            const sectionTitle =
+              typeof (vehicle as any)?.mecum_history_section_title === 'string'
+                ? String((vehicle as any).mecum_history_section_title)
+                : null;
+            await upsertMecumHistoryTimelineEvents(data.id, listingUrl, historyEvents, sectionTitle);
+          }
+        } catch {
+          // Non-fatal; ignore
+        }
       }
     } catch (e: any) {
       const msg = `vehicles insert exception (${vehicle?.listing_url || "no-url"}): ${e?.message || String(e)}`;
@@ -5303,10 +5898,16 @@ async function extractMecum(url: string, maxVehicles: number) {
   console.log("Mecum: discovering lot URLs then extracting per-lot");
 
   const normalizedUrl = String(url || "").trim();
-  const isDirectListing = normalizedUrl.includes("mecum.com/lots/detail/");
+  const cleanedUrl = normalizedUrl.split("?")[0];
+  // IMPORTANT: Mecum has multiple lot URL patterns:
+  // - /lots/<lot-id>/<slug>  (common)
+  // - /lots/detail/<...>     (alternate)
+  const isDirectListing =
+    cleanedUrl.includes("mecum.com/lots/detail/") ||
+    /mecum\.com\/lots\/\d+(?:\/|$)/i.test(cleanedUrl);
   const indexUrl = isDirectListing
-    ? normalizedUrl.split("?")[0]
-    : (normalizedUrl.includes("mecum.com/lots/") ? normalizedUrl : "https://www.mecum.com/lots/");
+    ? cleanedUrl
+    : (cleanedUrl.includes("mecum.com/lots/") ? cleanedUrl : "https://www.mecum.com/lots/");
 
   // ⚠️ FREE MODE: Firecrawl is optional - use direct fetch where possible
   const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY") || null;
@@ -5481,8 +6082,23 @@ async function extractMecum(url: string, maxVehicles: number) {
         html = await fetchTextWithTimeout(listingUrl, 30000, "Direct Mecum listing fetch");
         console.log(`✅ Got HTML via direct fetch (${html.length} chars)`);
         
-        // Extract images from HTML
         if (html) {
+          // Extract structured data from __NEXT_DATA__ (works without Firecrawl)
+          try {
+            const post = extractMecumNextDataPost(html);
+            if (post) {
+              const nextData = extractMecumVehicleFromNextPost(post);
+              // Baseline identity from Mecum (authoritative), then allow other extractors to add fields later.
+              vehicle = { ...vehicle, ...nextData.vehicle };
+              if (Array.isArray(nextData.images) && nextData.images.length > 0) {
+                images = [...images, ...nextData.images];
+              }
+            }
+          } catch {
+            // ignore
+          }
+
+          // Extract images from HTML (regex-based fallback)
           const htmlImages = extractMecumImagesFromHtml(html);
           images = [...images, ...htmlImages];
         }
@@ -5550,20 +6166,24 @@ async function extractMecum(url: string, maxVehicles: number) {
           }
           
           // Extract vehicle data if available
-          vehicle = firecrawlMarkdown?.data?.extract || {};
+          try {
+            const fcExtract = firecrawlMarkdown?.data?.extract || {};
+            // Prefer Mecum's own structured fields (from __NEXT_DATA__) for core identity.
+            // Firecrawl can still contribute missing fields (e.g., estimates, mileage).
+            vehicle = { ...(fcExtract || {}), ...vehicle };
+          } catch {
+            // ignore
+          }
         } catch (e: any) {
           console.warn(`Firecrawl failed: ${e?.message || String(e)}`);
         }
       }
-        
-        // Merge Firecrawl images if any
-        if (Array.isArray(vehicle?.images) && vehicle.images.length > 0) {
-          images = [...images, ...vehicle.images];
-        }
-      } catch (e: any) {
-        console.warn(`Firecrawl extraction failed: ${e?.message || String(e)}`);
+
+      // Merge Firecrawl images if any
+      if (Array.isArray(vehicle?.images) && vehicle.images.length > 0) {
+        images = [...images, ...vehicle.images];
       }
-      
+
       // Step 4: Try Firecrawl map API for image URL discovery
       if (images.length === 0) {
         try {

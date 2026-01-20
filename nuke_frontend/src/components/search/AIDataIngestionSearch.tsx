@@ -59,6 +59,21 @@ function isLikelyVehicleListingUrl(url: string): boolean {
   }
 }
 
+function isMecumLotUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.toLowerCase().includes('mecum.com')) return false;
+    const path = u.pathname.toLowerCase();
+    // Mecum lot pages:
+    // - /lots/<lot-id>/<slug>
+    // - /lots/detail/<...>
+    if (path.includes('/lots/detail/')) return true;
+    return /\/lots\/\d+(?:\/|$)/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
 function isLikelyOrgWebsiteUrl(url: string): boolean {
   if (isProbablyAssetOrDocumentUrl(url)) return false;
   if (isLikelyVehicleListingUrl(url)) return false;
@@ -538,6 +553,42 @@ export default function AIDataIngestionSearch() {
       if (!userId) {
         setError('Please log in to use this feature');
         setIsProcessing(false);
+        return;
+      }
+
+      // Fast-path: Mecum lot URLs should instantly create/update a profile and navigate.
+      // This bypasses the "preview/operation plan" flow and matches the desired share-a-link UX.
+      if (!attachedImage && normalizedUrl && isMecumLotUrl(normalizedUrl)) {
+        const { data, error: fnError } = await supabase.functions.invoke('extract-premium-auction', {
+          body: {
+            url: normalizedUrl,
+            max_vehicles: 1,
+          }
+        });
+
+        if (fnError) throw fnError;
+
+        const vehicleId =
+          (data as any)?.created_vehicle_ids?.[0] ||
+          (data as any)?.updated_vehicle_ids?.[0] ||
+          null;
+
+        if (!vehicleId) {
+          throw new Error((data as any)?.error || 'Import succeeded but no vehicle_id was returned');
+        }
+
+        // Clear UI state and navigate to the new profile
+        setInput('');
+        setShowPreview(false);
+        setExtractionPreview(null);
+        setActionsOpen(false);
+        setAttachedImage(null);
+        setImagePreview(null);
+        setError(null);
+        setIsProcessing(false);
+
+        showToast('Mecum lot imported → profile ready', 'success');
+        navigate(`/vehicle/${vehicleId}`);
         return;
       }
 

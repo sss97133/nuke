@@ -1,0 +1,90 @@
+# Classic.com Discovery - Scrapes active auctions
+# Runs every 6 hours to find new listings
+
+name: Classic.com Discovery
+
+on:
+  schedule:
+    - cron: '15 */6 * * *'  # Every 6 hours at :15 (offset from other scrapers)
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Validate Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "Missing required secret: SUPABASE_URL"
+            exit 1
+          fi
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "Missing required secret: SUPABASE_SERVICE_ROLE_KEY"
+            exit 1
+          fi
+          echo "All required secrets are set"
+
+      - name: Discover Classic.com Active Auctions
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Starting Classic.com auction discovery..."
+
+          # Use scrape-multi-source which has Classic.com URL enumeration built in
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            "${SUPABASE_URL}/functions/v1/scrape-multi-source" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 180 \
+            -d '{
+              "source_url": "https://classic.com/auctions/",
+              "source_type": "auction_house",
+              "extract_listings": true,
+              "cheap_mode": true,
+              "max_listings": 300
+            }')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY" | head -c 2000
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo ""
+            echo "Classic.com auction discovery completed"
+            echo "$BODY" | grep -o '"listings_queued":[0-9]*' || echo "Response parsing skipped"
+          else
+            echo ""
+            echo "Classic.com auction discovery failed (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+      - name: Discover Classic.com Sellers (dealers & auction houses)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Discovering Classic.com sellers..."
+
+          curl -sS -X POST \
+            "${SUPABASE_URL}/functions/v1/discover-classic-sellers" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 120 \
+            -d '{"filter": "all", "max_pages": 10}' \
+            || echo "Seller discovery completed or timed out"
+
+          echo "Seller discovery attempted"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "Classic.com discovery workflow completed"
+          echo "Listings queued to import_queue for processing"

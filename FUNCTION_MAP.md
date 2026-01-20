@@ -2,6 +2,20 @@
 
 **READ THIS FIRST** when working on data extraction.
 
+## AUTONOMOUS AGENTS (Ralph Wiggum Mode)
+
+These run every 2 hours and do everything automatically:
+
+| Agent | Purpose | Target |
+|-------|---------|--------|
+| `database-fill-agent` | Fill database with vehicles | 2000/cycle |
+| `autonomous-extraction-agent` | Premium auction extraction | 33k/day |
+| `unified-scraper-orchestrator` | Scrape ALL sources in `scrape_sources` table | All sources |
+
+**Source of truth:** `scrape_sources` table contains URLs to scrape.
+
+---
+
 ## The Core Pipeline
 
 ```
@@ -11,8 +25,13 @@ DISCOVERY → QUEUE → EXTRACTION → STORAGE → BACKFILL
 ### 1. DISCOVERY (Finding new listings)
 | Function | Purpose | Triggers |
 |----------|---------|----------|
-| `sync-active-auctions` | Find active BaT/C&B auctions | pipeline-orchestrator |
+| `go-grinder` | BaT discovery + extraction | bat-scrape.yml |
+| `scrape-multi-source` | Generic source discovery (C&B, Classic.com) | cars-and-bids-discovery.yml, classic-com-discovery.yml |
+| `scrape-all-craigslist-squarebodies` | Craigslist squarebody discovery | craigslist-discovery.yml |
+| `scrape-all-craigslist-2000-and-older` | Craigslist pre-2000 discovery | craigslist-discovery.yml |
+| `sync-active-auctions` | Sync existing BaT/C&B listings | pipeline-orchestrator |
 | `extract-all-orgs-inventory` | Scrape dealer inventory sites | pipeline-orchestrator |
+| `discover-classic-sellers` | Find Classic.com dealers/auction houses | classic-com-discovery.yml |
 
 ### 2. QUEUE (Pending work)
 | Table | Purpose |
@@ -52,10 +71,15 @@ DISCOVERY → QUEUE → EXTRACTION → STORAGE → BACKFILL
 
 | Workflow | Schedule | Purpose |
 |----------|----------|---------|
-| `pipeline-orchestrator.yml` | */10 * * * * | Main pipeline controller |
-| `backfill_origin_vehicle_images.yml` | */15 * * * * | Image backfill |
-| `bat-scrape.yml` | varies | BaT discovery |
-| `mecum-extraction.yml` | varies | Mecum extraction |
+| **`autonomous-agents.yml`** | **Every 2 hours** | **MAIN: Runs all autonomous agents** |
+| `pipeline-orchestrator.yml` | Every 10 min | Queue processing and routing |
+| `backfill_origin_vehicle_images.yml` | Every 15 min | Image backfill |
+| `bat-scrape.yml` | Every 6 hours | BaT discovery |
+| `cars-and-bids-discovery.yml` | Every 4 hours | Cars & Bids discovery |
+| `classic-com-discovery.yml` | Every 6 hours | Classic.com discovery |
+| `craigslist-discovery.yml` | Every 4 hours | Craigslist discovery |
+| `mecum-extraction.yml` | Every 2 hours | Mecum extraction |
+| `scrape-ksl-daily.yml` | Daily | KSL discovery |
 
 ## Common Issues & Fixes
 

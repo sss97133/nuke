@@ -162,12 +162,22 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [rotation, setRotation] = useState(0);
   const [isSensitive, setIsSensitive] = useState(false);
   const [showTagger, setShowTagger] = useState(false);
-  const [analyzingImage, setAnalyzingImage] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   
+  const formatSourceLabel = (source: any) => {
+    const s = String(source || '').trim();
+    if (!s) return 'Unknown';
+    if (s === 'bat_listing') return 'Bring a Trailer';
+    if (s === 'craigslist_scrape' || s === 'scraper') return 'Craigslist';
+    if (s === 'external_import') return 'External Import';
+    return s
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
   // Touch gesture handlers for swipe navigation + info panel
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
@@ -818,6 +828,35 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     }
   }, [imageId, vehicleId]);
 
+  const runImageAnalysis = useCallback(
+    async (opts?: { forceReprocess?: boolean }) => {
+      if (!imageUrl || !vehicleId) return;
+
+      // Without image_id we can’t reliably hit caching/persistence; skip to avoid spend.
+      if (!imageId) {
+        console.warn('[ImageLightbox] Skipping AI analysis: missing imageId');
+        return;
+      }
+
+      const userId = session?.user?.id || null;
+
+      const result = await triggerAIAnalysis(imageUrl, timelineEventId, vehicleId, {
+        imageId,
+        userId,
+        forceReprocess: Boolean(opts?.forceReprocess)
+      });
+
+      if (result.success) {
+        // Give the DB a moment to update before reloading.
+        setTimeout(() => {
+          loadTags();
+          loadImageMetadata();
+        }, 2000);
+      }
+    },
+    [imageUrl, vehicleId, imageId, session?.user?.id, triggerAIAnalysis, timelineEventId, loadTags, loadImageMetadata]
+  );
+
   useEffect(() => {
     loadImageMetadata();
     
@@ -1164,17 +1203,11 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           </button>
           
           <button 
-            onClick={async () => {
-              if (!imageUrl || !vehicleId) return;
-              const result = await triggerAIAnalysis(imageUrl, timelineEventId, vehicleId);
-              if (result.success) {
-                setTimeout(() => {
-                  loadTags();
-                  loadImageMetadata();
-                }, 2000);
-              }
+            onClick={async (e) => {
+              // Alt/Option click = explicit force reprocess
+              await runImageAnalysis({ forceReprocess: (e as any)?.altKey === true });
             }}
-            disabled={analyzing || !imageUrl || !vehicleId}
+            disabled={analyzing || !imageUrl || !vehicleId || !imageId}
             className={`px-3 py-1.5 border-2 text-[9px] font-bold uppercase tracking-wide transition-all duration-150 ${
               analyzing 
                 ? 'bg-[#2a2a2a] text-white/40 border-white/10 cursor-not-allowed' 
@@ -1654,10 +1687,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           const sourceUrl = imageMetadata?.exif_data?.source_url || 
                                           imageMetadata?.exif_data?.discovery_url ||
                                           imageMetadata?.source_url;
-                          const sourceName = attribution.source === 'craigslist_scrape' ? 'Craigslist' :
-                                           attribution.source === 'scraper' ? 'Craigslist' :
-                                           attribution.source === 'bat_listing' ? 'Bring a Trailer' :
-                                           attribution.source || 'Unknown';
+                          const sourceName = formatSourceLabel(attribution.source);
                           
                           // Get Craigslist URL for favicon if it's a Craigslist source
                           const craigslistUrl = (attribution.source === 'craigslist_scrape' || attribution.source === 'scraper') 
@@ -1834,19 +1864,47 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                   {(() => {
                     const tier1Analysis = imageMetadata?.ai_scan_metadata?.tier_1_analysis;
                     const appraiser = imageMetadata?.ai_scan_metadata?.appraiser;
-                    const hasAnalysis = tier1Analysis || appraiser || angleData?.primary_label;
+                    const hasVisionAnalysis = Boolean(
+                      tier1Analysis ||
+                        appraiser ||
+                        imageMetadata?.ai_scan_metadata?.scanned_at ||
+                        imageMetadata?.ai_scan_metadata?.appraiser?.analyzed_at
+                    );
+                    const canTriggerAnalysis = Boolean(vehicleId && imageUrl && imageId);
+                    const shouldShowSection = hasVisionAnalysis || Boolean(angleData?.primary_label) || canTriggerAnalysis;
                     
                     // Only show section if we have analysis OR if user can trigger it
-                    if (!hasAnalysis && (!vehicleId || !imageUrl)) {
+                    if (!shouldShowSection) {
                       return null;
                     }
 
                     // Helper to render a data row
                     const DataRow = ({ label, value, mono = false }: { label: string; value: any; mono?: boolean }) => {
                       if (value === null || value === undefined || value === '') return null;
-                      const displayValue = typeof value === 'boolean' ? (value ? 'true' : 'false') : 
-                                          Array.isArray(value) ? value.join(', ') :
-                                          typeof value === 'object' ? JSON.stringify(value) : String(value);
+                      if (Array.isArray(value) && value.length === 0) return null;
+                      if (typeof value === 'object' && !Array.isArray(value)) {
+                        try {
+                          if (Object.keys(value).length === 0) return null;
+                        } catch {
+                          // ignore
+                        }
+                      }
+
+                      const displayValue =
+                        typeof value === 'boolean'
+                          ? (value ? 'true' : 'false')
+                          : Array.isArray(value)
+                            ? value.join(', ')
+                            : typeof value === 'object'
+                              ? (() => {
+                                  try {
+                                    return JSON.stringify(value);
+                                  } catch {
+                                    return String(value);
+                                  }
+                                })()
+                              : String(value);
+                      if (displayValue === '') return null;
                       return (
                         <div style={{ 
                           display: 'flex', 
@@ -1878,46 +1936,25 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">AI Analysis</h4>
                         
                         {/* Analyze button if no analysis */}
-                        {!hasAnalysis && vehicleId && imageUrl && (
+                        {!hasVisionAnalysis && canTriggerAnalysis && (
                           <div style={{ marginBottom: '8px' }}>
                             <button
                               onClick={async () => {
-                                if (!vehicleId || !imageUrl) return;
-                                setAnalyzingImage(true);
-                                try {
-                                  const { data: { user } } = await supabase.auth.getUser();
-                                  const { data, error } = await supabase.functions.invoke('analyze-image', {
-                                    body: { image_url: imageUrl, image_id: imageId || null, vehicle_id: vehicleId, timeline_event_id: null, user_id: user?.id || null }
-                                  });
-                                  if (error) {
-                                    alert(`Analysis failed: ${error.message}`);
-                                  } else {
-                                    if (typeof window !== 'undefined') {
-                                      window.dispatchEvent(new CustomEvent('image_processing_complete', {
-                                        detail: { imageId, result: data, vehicleId }
-                                      }));
-                                    }
-                                    setTimeout(() => { loadImageMetadata(); loadTags(); }, 5000);
-                                  }
-                                } catch (err) {
-                                  alert(`Analysis failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-                                } finally {
-                                  setAnalyzingImage(false);
-                                }
+                                await runImageAnalysis();
                               }}
-                              disabled={analyzingImage}
+                              disabled={analyzing}
                               style={{
                                 width: '100%',
                                 padding: '8px',
                                 fontSize: '8pt',
                                 fontWeight: 'bold',
-                                backgroundColor: analyzingImage ? '#4b5563' : '#ca8a04',
+                                backgroundColor: analyzing ? '#4b5563' : '#ca8a04',
                                 color: 'white',
                                 border: 'none',
-                                cursor: analyzingImage ? 'not-allowed' : 'pointer'
+                                cursor: analyzing ? 'not-allowed' : 'pointer'
                               }}
                             >
-                              {analyzingImage ? 'ANALYZING...' : 'ANALYZE NOW'}
+                              {analyzing ? 'ANALYZING...' : 'ANALYZE NOW'}
                             </button>
                           </div>
                         )}
