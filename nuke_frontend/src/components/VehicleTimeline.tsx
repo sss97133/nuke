@@ -927,6 +927,7 @@ const VehicleTimeline: React.FC<{
 
                           <div
                             ref={yearsScrollerRef}
+                            className="no-scrollbar"
                             style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -934,8 +935,6 @@ const VehicleTimeline: React.FC<{
                               overflowX: 'auto',
                               overflowY: 'hidden',
                               WebkitOverflowScrolling: 'touch',
-                              scrollbarWidth: 'none',
-                              msOverflowStyle: 'none',
                               minWidth: 0,
                               flex: '1 1 auto',
                               paddingBottom: 2,
@@ -948,6 +947,7 @@ const VehicleTimeline: React.FC<{
                                 className={`btn-utility ${targetYear === y ? 'active' : ''}`}
                                 onClick={() => selectYear(y)}
                                 title={`View ${y}`}
+                                aria-pressed={targetYear === y}
                                 style={{
                                   padding: '2px 6px',
                                   fontSize: '8pt',

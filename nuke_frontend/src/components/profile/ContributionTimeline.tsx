@@ -138,6 +138,7 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
   
   console.log('ContributionTimeline: Year range:', { minYear, maxYear, yearIndex, contributionYears });
   const [selectedYear, setSelectedYear] = useState<number | null>(yearIndex[0] || year);
+  const yearsScrollerRef = React.useRef<HTMLDivElement | null>(null);
   
   const selectYear = (y: number) => {
     setSelectedYear(y);
@@ -249,6 +250,13 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
   const currentTopYear = yearIndex[0];
   const targetYear = selectedYear ?? currentTopYear;
 
+  const scrollYearsBy = (direction: 'left' | 'right') => {
+    const el = yearsScrollerRef.current;
+    if (!el) return;
+    const amount = Math.max(140, Math.round(el.clientWidth * 0.85));
+    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+  };
+
   // Calculate accurate totals based on actual data
   const totalHours = Array.from(daily.values()).reduce((sum, d) => sum + d.hours, 0);
   const activeDays = daily.size;
@@ -288,6 +296,92 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                     color: 'var(--text)',
                   }}
                 >
+                  {/* Year selector (horizontal, scrollable) */}
+                  {yearIndex.length > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, marginBottom: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn-utility"
+                        onClick={() => scrollYearsBy('left')}
+                        title="Scroll years left"
+                        aria-label="Scroll years left"
+                        style={{
+                          padding: 0,
+                          width: 20,
+                          height: 20,
+                          lineHeight: '18px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flex: '0 0 auto',
+                          fontSize: '9pt',
+                          fontWeight: 800,
+                        }}
+                      >
+                        ‹
+                      </button>
+
+                      <div
+                        ref={yearsScrollerRef}
+                        className="no-scrollbar"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          overflowX: 'auto',
+                          overflowY: 'hidden',
+                          WebkitOverflowScrolling: 'touch',
+                          minWidth: 0,
+                          flex: '1 1 auto',
+                          paddingBottom: 2,
+                        }}
+                      >
+                        {yearIndex.map((y) => (
+                          <button
+                            key={y}
+                            type="button"
+                            className={`btn-utility ${targetYear === y ? 'active' : ''}`}
+                            onClick={() => selectYear(y)}
+                            title={`View ${y}`}
+                            aria-pressed={targetYear === y}
+                            style={{
+                              padding: '2px 6px',
+                              fontSize: '8pt',
+                              lineHeight: '16px',
+                              height: 20,
+                              whiteSpace: 'nowrap',
+                              flex: '0 0 auto',
+                            }}
+                          >
+                            {y}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn-utility"
+                        onClick={() => scrollYearsBy('right')}
+                        title="Scroll years right"
+                        aria-label="Scroll years right"
+                        style={{
+                          padding: 0,
+                          width: 20,
+                          height: 20,
+                          lineHeight: '18px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flex: '0 0 auto',
+                          fontSize: '9pt',
+                          fontWeight: 800,
+                        }}
+                      >
+                        ›
+                      </button>
+                    </div>
+                  )}
+
                   {/* Months header positioned above everything */}
                   <div style={{ marginLeft: '30px', marginBottom: '2px' }}>
                     <div 
@@ -322,8 +416,8 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                     </div>
                   </div>
                   
-                  {/* Timeline Grid and Years in columns */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--space-3)' }}>
+                  {/* Timeline grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 'var(--space-3)' }}>
                     {/* Timeline grid column */}
                     <div>
                       {/* Vertical Day Grid: 7 days horizontal × 53 weeks vertical */}
@@ -389,34 +483,6 @@ const ContributionTimeline: React.FC<ContributionTimelineProps> = ({ contributio
                           </div>
                         );
                       })()}
-                    </div>
-                    
-                    {/* Years in columns on the right */}
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(3, auto)', 
-                      gap: 'var(--space-2)',
-                      paddingLeft: 'var(--space-2)'
-                    }}>
-                      {yearIndex.map((y, index) => (
-                        <button
-                          key={y}
-                          className={`text-small ${selectedYear === y ? 'font-bold' : 'text-muted'}`}
-                          style={{ 
-                            padding: 'var(--space-1) var(--space-2)', 
-                            fontSize: '8pt', 
-                            background: selectedYear === y ? 'var(--grey-200)' : 'transparent',
-                            border: selectedYear === y ? '1px inset var(--border-medium)' : 'none',
-                            borderRadius: '2px',
-                            cursor: 'pointer',
-                            minWidth: '45px',
-                            textAlign: 'center'
-                          }}
-                          onClick={() => selectYear(y)}
-                        >
-                          {y}
-                        </button>
-                      ))}
                     </div>
                   </div>
                 </div>

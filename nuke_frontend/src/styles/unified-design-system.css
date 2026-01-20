@@ -415,6 +415,16 @@ body {
   font-family: var(--font-mono);
 }
 
+/* Scrollbar utilities */
+.no-scrollbar {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE/Edge legacy */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;               /* Chrome/Safari */
+}
+
 /* Font Sizes (STRICT - no others allowed) */
 .text-8  { font-size: var(--fs-8); }
 .text-9  { font-size: var(--fs-9); }

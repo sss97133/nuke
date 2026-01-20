@@ -22,9 +22,8 @@ const FilterPills: React.FC<FilterPillsProps> = ({ activeFilter, onFilterChange 
         borderBottom: '1px solid var(--border)',
         overflowX: 'auto',
         WebkitOverflowScrolling: 'touch',
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none',
       }}
+      className="no-scrollbar"
     >
       {filters.map((filter) => (
         <button
