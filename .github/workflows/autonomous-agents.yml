@@ -1,0 +1,245 @@
+# Autonomous Agents - "Ralph Wiggum" Mode
+# These agents discover sources, map them, extract data, and scale automatically
+# Target: 33k+ profiles/day for 1M in 30 days
+#
+# KEY PRINCIPLE: Every URL source gets an extractor assigned.
+# Every extractor tracks success/failure.
+# When something breaks, we know exactly which sources are affected.
+
+name: Autonomous Agents (Ralph Wiggum)
+
+on:
+  schedule:
+    # Database Fill Agent: Every 2 hours (target: 2000 vehicles/cycle = 24k/day)
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: 'Which agent to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - database-fill-agent
+          - autonomous-extraction-agent
+          - source-extractor-manager
+
+concurrency:
+  group: autonomous-agents
+  cancel-in-progress: false
+
+jobs:
+  database-fill-agent:
+    if: github.event.inputs.agent == 'all' || github.event.inputs.agent == 'database-fill-agent' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Validate Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "Missing required secrets"
+            exit 1
+          fi
+          echo "Secrets validated"
+
+      - name: Run Database Fill Agent
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "DATABASE FILL AGENT - Starting"
+          echo "Target: 2000+ vehicles this cycle (24k/day)"
+          echo "========================================"
+
+          RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
+            "${SUPABASE_URL}/functions/v1/database-fill-agent" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 300 \
+            -d '{"force_run": true}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response:"
+          echo "$BODY" | head -c 3000
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo ""
+            echo "Database Fill Agent completed"
+            # Extract key metrics
+            echo "$BODY" | grep -o '"vehicles_added":[0-9]*' || true
+            echo "$BODY" | grep -o '"vehicles_queued":[0-9]*' || true
+            echo "$BODY" | grep -o '"on_target":[a-z]*' || true
+          else
+            echo ""
+            echo "Database Fill Agent failed (HTTP $HTTP_CODE)"
+            # Don't fail workflow - agent may need tuning
+          fi
+
+  autonomous-extraction-agent:
+    if: github.event.inputs.agent == 'all' || github.event.inputs.agent == 'autonomous-extraction-agent' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Validate Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "Missing required secrets"
+            exit 1
+          fi
+          echo "Secrets validated"
+
+      - name: Run Autonomous Extraction Agent
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "AUTONOMOUS EXTRACTION AGENT - Starting"
+          echo "Target: 33k profiles/day for 1M in 30 days"
+          echo "========================================"
+
+          RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
+            "${SUPABASE_URL}/functions/v1/autonomous-extraction-agent" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 240 \
+            -d '{"action": "run_autonomous_cycle"}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response:"
+          echo "$BODY" | head -c 3000
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo ""
+            echo "Autonomous Extraction Agent completed"
+            echo "$BODY" | grep -o '"vehicles_extracted":[0-9]*' || true
+            echo "$BODY" | grep -o '"on_track_for_1m":[a-z]*' || true
+          else
+            echo ""
+            echo "Autonomous Extraction Agent failed (HTTP $HTTP_CODE)"
+          fi
+
+  source-extractor-manager:
+    if: github.event.inputs.agent == 'all' || github.event.inputs.agent == 'source-extractor-manager' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Register Extractors for All Sources
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "SOURCE-EXTRACTOR MANAGER"
+          echo "========================"
+          echo "Principle: Every URL source gets an extractor assigned"
+          echo ""
+
+          # Step 1: Register extractors for sources without one
+          echo "Step 1: Registering extractors for all sources..."
+          curl -sS -X POST \
+            "${SUPABASE_URL}/functions/v1/source-extractor-manager" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 60 \
+            -d '{"action": "register_all"}' || echo "Registration completed"
+
+          echo ""
+          echo "Step 2: Checking health of all source-extractor pairs..."
+          HEALTH=$(curl -sS -X POST \
+            "${SUPABASE_URL}/functions/v1/source-extractor-manager" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 60 \
+            -d '{"action": "health_check"}')
+
+          echo "$HEALTH" | head -c 2000
+          echo ""
+          echo "Source-Extractor Manager complete"
+
+  unified-scraper-orchestrator:
+    if: github.event.inputs.agent == 'all' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [source-extractor-manager]
+
+    steps:
+      - name: Run Unified Scraper Orchestrator
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "UNIFIED SCRAPER ORCHESTRATOR - Starting"
+          echo "Reads from scrape_sources table, maps and scrapes all sources"
+          echo "========================================"
+
+          RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
+            "${SUPABASE_URL}/functions/v1/unified-scraper-orchestrator" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 300 \
+            -d '{"action": "run_cycle"}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response:"
+          echo "$BODY" | head -c 3000
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo ""
+            echo "Unified Scraper Orchestrator completed"
+            echo "$BODY" | grep -o '"sources_scraped":[0-9]*' || true
+            echo "$BODY" | grep -o '"vehicles_added":[0-9]*' || true
+          else
+            echo ""
+            echo "Unified Scraper Orchestrator failed (HTTP $HTTP_CODE)"
+          fi
+
+  agent-orchestrator:
+    if: github.event.inputs.agent == 'all' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [database-fill-agent, autonomous-extraction-agent, source-extractor-manager, unified-scraper-orchestrator]
+
+    steps:
+      - name: Run Agent Orchestrator Status Check
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "AGENT ORCHESTRATOR - Status Check"
+          echo "=================================="
+
+          curl -sS -X POST \
+            "${SUPABASE_URL}/functions/v1/agent-orchestrator" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 60 \
+            -d '{"action": "status"}' \
+            || echo "Orchestrator status check completed"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "========================================"
+          echo "AUTONOMOUS AGENTS CYCLE COMPLETE"
+          echo "========================================"
+          echo "Next run: In 2 hours"
+          echo "Target: 33k profiles/day"
+          echo "Check Supabase logs for detailed metrics"

@@ -255,6 +255,27 @@ const IntelligentSearch = ({ onSearchResults, initialQuery = '', userLocation }:
     if (!searchQuery.trim()) return;
 
     const trimmedQuery = searchQuery.trim();
+
+    // Fast-path: allow `/search?q=<uuid>` to jump directly to a vehicle profile.
+    // Without this, UUIDs won't match make/model/description searches and you'll get "No Results Found".
+    const looksLikeUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmedQuery);
+    if (looksLikeUuid) {
+      try {
+        const { data: vehicleById, error: vehicleByIdErr } = await supabase
+          .from('vehicles')
+          .select('id')
+          .eq('id', trimmedQuery)
+          .maybeSingle();
+
+        if (!vehicleByIdErr && vehicleById?.id) {
+          navigate(`/vehicle/${vehicleById.id}`);
+          return;
+        }
+      } catch {
+        // ignore; fall through to regular search
+      }
+    }
     
     // VISIBLE DEBUG - ALERT TO CONFIRM CODE IS RUNNING
     console.log('═══════════════════════════════════════════════════════');

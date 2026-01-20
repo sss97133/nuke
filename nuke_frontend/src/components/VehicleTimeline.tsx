@@ -112,10 +112,10 @@ const VehicleTimeline: React.FC<{
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [timelineEventsExpanded, setTimelineEventsExpanded] = useState<boolean>(false);
   const [vehicleOwner, setVehicleOwner] = useState<string | null>(null);
-  const [lastScrollTime, setLastScrollTime] = useState<number>(0);
   const [vehicleValueMeta, setVehicleValueMeta] = useState<{ current_value?: number|null; asking_price?: number|null; purchase_price?: number|null; msrp?: number|null } | null>(null);
   const [readyTargetHours, setReadyTargetHours] = useState<number>(100);
   const autoOpenedTodayRef = React.useRef<boolean>(false);
+  const yearsScrollerRef = React.useRef<HTMLDivElement | null>(null);
 
   // Helper: normalize any date-ish value to YYYY-MM-DD without timezone shifting.
   // - If it's already a date-only string, keep it.
@@ -850,35 +850,13 @@ const VehicleTimeline: React.FC<{
     setSelectedYear(y);
   };
 
-  const handleTimelineScroll = (e: React.WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation(); // Prevent event from bubbling up to parent elements
-    
-    // Throttle scrolling to make it much slower
-    const now = Date.now();
-    if (now - lastScrollTime < 300) { // 300ms delay between year changes
-      return;
-    }
-    setLastScrollTime(now);
-    
-    const currentIndex = yearIndex.indexOf(selectedYear ?? currentTopYear);
-    if (currentIndex === -1) return;
-    
-    let newIndex;
-    if (e.deltaY > 0) {
-      // Scroll down - go to next year (newer)
-      newIndex = Math.max(0, currentIndex - 1);
-    } else {
-      // Scroll up - go to previous year (older)
-      newIndex = Math.min(yearIndex.length - 1, currentIndex + 1);
-    }
-    
-    if (newIndex !== currentIndex) {
-      setSelectedYear(yearIndex[newIndex]);
-    }
-  };
-
   const currentTopYear = yearIndex[0];
+  const scrollYearsBy = (direction: 'left' | 'right') => {
+    const el = yearsScrollerRef.current;
+    if (!el) return;
+    const amount = Math.max(140, Math.round(el.clientWidth * 0.85));
+    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+  };
 
   return (
     <div className="card">
@@ -922,6 +900,92 @@ const VehicleTimeline: React.FC<{
                         gap: '8px'
                       }}
                     >
+                      {/* Year selector (horizontal, scrollable) */}
+                      {yearIndex.length > 1 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                          <button
+                            type="button"
+                            className="btn-utility"
+                            onClick={() => scrollYearsBy('left')}
+                            title="Scroll years left"
+                            aria-label="Scroll years left"
+                            style={{
+                              padding: 0,
+                              width: 20,
+                              height: 20,
+                              lineHeight: '18px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flex: '0 0 auto',
+                              fontSize: '9pt',
+                              fontWeight: 800,
+                            }}
+                          >
+                            ‹
+                          </button>
+
+                          <div
+                            ref={yearsScrollerRef}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              overflowX: 'auto',
+                              overflowY: 'hidden',
+                              WebkitOverflowScrolling: 'touch',
+                              scrollbarWidth: 'none',
+                              msOverflowStyle: 'none',
+                              minWidth: 0,
+                              flex: '1 1 auto',
+                              paddingBottom: 2,
+                            }}
+                          >
+                            {yearIndex.map((y) => (
+                              <button
+                                key={y}
+                                type="button"
+                                className={`btn-utility ${targetYear === y ? 'active' : ''}`}
+                                onClick={() => selectYear(y)}
+                                title={`View ${y}`}
+                                style={{
+                                  padding: '2px 6px',
+                                  fontSize: '8pt',
+                                  lineHeight: '16px',
+                                  height: 20,
+                                  whiteSpace: 'nowrap',
+                                  flex: '0 0 auto',
+                                }}
+                              >
+                                {y}
+                              </button>
+                            ))}
+                          </div>
+
+                          <button
+                            type="button"
+                            className="btn-utility"
+                            onClick={() => scrollYearsBy('right')}
+                            title="Scroll years right"
+                            aria-label="Scroll years right"
+                            style={{
+                              padding: 0,
+                              width: 20,
+                              height: 20,
+                              lineHeight: '18px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flex: '0 0 auto',
+                              fontSize: '9pt',
+                              fontWeight: 800,
+                            }}
+                          >
+                            ›
+                          </button>
+                        </div>
+                      )}
+
                       {/* Months header positioned above everything */}
                       <div style={{ marginBottom: '4px' }}>
                         <div
@@ -959,8 +1023,8 @@ const VehicleTimeline: React.FC<{
                         </div>
                       </div>
                       
-                      {/* Timeline and Years Grid in columns */}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr minmax(60px, 80px)', gap: '12px', minWidth: 0 }}>
+                      {/* Timeline grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', minWidth: 0 }}>
                         {/* Timeline grid column */}
                         <div style={{ minWidth: 0, overflow: 'hidden' }}>
 
@@ -1016,7 +1080,6 @@ const VehicleTimeline: React.FC<{
                                   gap: '2px',
                                   justifyContent: 'start'
                                 }}
-                                onWheel={handleTimelineScroll}
                               >
                                 {/* Day boxes: fill column-first (vertically down, then next column) */}
                                 {Array.from({ length: totalWeeks * 7 }, (_, idx) => {
@@ -1161,154 +1224,6 @@ const VehicleTimeline: React.FC<{
                           </div>
                         );
                       })()}
-                        </div>
-
-                        {/* Years column - moved to right side */}
-                        <div style={{ 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          alignItems: 'flex-start', 
-                          paddingLeft: '8px',
-                          paddingTop: '4px',
-                          minWidth: 0,
-                          width: '100%',
-                          overflow: 'hidden',
-                          gap: '2px'
-                        }}>
-                          {(() => {
-                            const yearsToShow = yearIndex;
-                            if (yearsToShow.length <= 5) {
-                              // Single column for 5 or fewer years
-                              return yearsToShow.map(y => (
-                                <button
-                                  key={y}
-                                  style={{
-                                    padding: '2px 4px',
-                                    fontSize: '8pt',
-                                    background: selectedYear === y ? 'var(--primary)' : 'transparent',
-                                    border: selectedYear === y ? '1px solid var(--primary)' : '1px solid transparent',
-                                    borderRadius: '3px',
-                                    lineHeight: '16px',
-                                    height: '20px',
-                                    width: '100%',
-                                    textAlign: 'left',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    color: selectedYear === y ? '#ffffff' : 'var(--text)',
-                                    fontWeight: selectedYear === y ? 700 : 500,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.12s ease'
-                                  }}
-                                  onClick={() => selectYear(y)}
-                                  onMouseEnter={(e) => {
-                                    if (selectedYear !== y) {
-                                      e.currentTarget.style.background = 'var(--surface-hover)';
-                                      e.currentTarget.style.borderColor = 'var(--border)';
-                                    }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (selectedYear !== y) {
-                                      e.currentTarget.style.background = 'transparent';
-                                      e.currentTarget.style.borderColor = 'transparent';
-                                    }
-                                  }}
-                                >
-                                  {y}
-                                </button>
-                              ));
-                            } else {
-                              // Two columns for more than 5 years
-                              const midPoint = Math.ceil(yearsToShow.length / 2);
-                              const leftColumn = yearsToShow.slice(0, midPoint);
-                              const rightColumn = yearsToShow.slice(midPoint);
-
-                              return (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', width: '100%', minWidth: 0 }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: '2px' }}>
-                                    {leftColumn.map(y => (
-                                      <button
-                                        key={y}
-                                        style={{
-                                          padding: '2px 4px',
-                                          fontSize: '8pt',
-                                          background: selectedYear === y ? 'var(--primary)' : 'transparent',
-                                          border: selectedYear === y ? '1px solid var(--primary)' : '1px solid transparent',
-                                          borderRadius: '3px',
-                                          lineHeight: '16px',
-                                          height: '20px',
-                                          width: '100%',
-                                          textAlign: 'left',
-                                          overflow: 'hidden',
-                                          textOverflow: 'ellipsis',
-                                          whiteSpace: 'nowrap',
-                                          color: selectedYear === y ? '#ffffff' : 'var(--text)',
-                                          fontWeight: selectedYear === y ? 700 : 500,
-                                          cursor: 'pointer',
-                                          transition: 'all 0.12s ease'
-                                        }}
-                                        onClick={() => selectYear(y)}
-                                        onMouseEnter={(e) => {
-                                          if (selectedYear !== y) {
-                                            e.currentTarget.style.background = 'var(--surface-hover)';
-                                            e.currentTarget.style.borderColor = 'var(--border)';
-                                          }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          if (selectedYear !== y) {
-                                            e.currentTarget.style.background = 'transparent';
-                                            e.currentTarget.style.borderColor = 'transparent';
-                                          }
-                                        }}
-                                      >
-                                        {y}
-                                      </button>
-                                    ))}
-                                  </div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: '2px' }}>
-                                    {rightColumn.map(y => (
-                                      <button
-                                        key={y}
-                                        style={{
-                                          padding: '2px 4px',
-                                          fontSize: '8pt',
-                                          background: selectedYear === y ? 'var(--primary)' : 'transparent',
-                                          border: selectedYear === y ? '1px solid var(--primary)' : '1px solid transparent',
-                                          borderRadius: '3px',
-                                          lineHeight: '16px',
-                                          height: '20px',
-                                          width: '100%',
-                                          textAlign: 'left',
-                                          overflow: 'hidden',
-                                          textOverflow: 'ellipsis',
-                                          whiteSpace: 'nowrap',
-                                          color: selectedYear === y ? '#ffffff' : 'var(--text)',
-                                          fontWeight: selectedYear === y ? 700 : 500,
-                                          cursor: 'pointer',
-                                          transition: 'all 0.12s ease'
-                                        }}
-                                        onClick={() => selectYear(y)}
-                                        onMouseEnter={(e) => {
-                                          if (selectedYear !== y) {
-                                            e.currentTarget.style.background = 'var(--surface-hover)';
-                                            e.currentTarget.style.borderColor = 'var(--border)';
-                                          }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          if (selectedYear !== y) {
-                                            e.currentTarget.style.background = 'transparent';
-                                            e.currentTarget.style.borderColor = 'transparent';
-                                          }
-                                        }}
-                                      >
-                                        {y}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            }
-                          })()}
                         </div>
                       </div>
                     </div>

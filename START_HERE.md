@@ -6,18 +6,47 @@
 
 Extracts vehicle data from auction sites (BaT, Cars & Bids, Mecum, etc.) and stores it in Supabase.
 
+## AUTONOMOUS AGENTS (Ralph Wiggum Mode)
+
+**These agents run every 2 hours and do everything automatically:**
+
+```
+autonomous-agents.yml (every 2 hours)
+├── database-fill-agent → Target: 2000 vehicles/cycle (24k/day)
+├── autonomous-extraction-agent → Target: 33k/day
+└── unified-scraper-orchestrator → Scrapes ALL sources in scrape_sources table
+```
+
+**The agents:**
+1. Read URLs from `scrape_sources` and `businesses` tables
+2. Auto-create site maps for new sources
+3. Scrape healthy sources
+4. Process the import queue
+5. Self-monitor and scale up when below target
+
+**To add a new source:** Insert it into `scrape_sources` table - the agents will find it.
+
 ## The Core Pipeline
 
 ```
-pipeline-orchestrator (every 10 min)
-    ├── sync-active-auctions → finds new listings
-    ├── extract-all-orgs-inventory → scrapes dealer sites
-    └── routes import_queue items to:
-        ├── extract-bat-core + extract-auction-comments (for BaT)
-        └── process-import-queue (for everything else)
+DISCOVERY (Scheduled Workflows - find new listings)
+├── bat-scrape.yml (every 6h) → go-grinder
+├── cars-and-bids-discovery.yml (every 4h) → scrape-multi-source
+├── classic-com-discovery.yml (every 6h) → scrape-multi-source
+├── craigslist-discovery.yml (every 4h) → scrape-all-craigslist-*
+├── mecum-extraction.yml (every 2h)
+└── scrape-ksl-daily.yml (daily)
 
-backfill-origin-vehicle-images (every 15 min)
-    └── backfill-images → downloads images to storage
+PROCESSING (pipeline-orchestrator every 10 min)
+├── sync-active-auctions → syncs existing listings
+├── extract-all-orgs-inventory → scrapes dealer sites
+└── routes import_queue items to extractors:
+    ├── extract-bat-core + extract-auction-comments (for BaT)
+    ├── import-classic-auction (for Classic.com)
+    └── process-import-queue (for everything else)
+
+IMAGE BACKFILL (every 15 min)
+└── backfill-images → downloads images to storage
 ```
 
 ## Key Functions (APPROVED)
@@ -76,9 +105,13 @@ GROUP BY 1 ORDER BY 1 DESC;
 | File | Purpose |
 |------|---------|
 | `FUNCTION_MAP.md` | Complete function reference |
-| `PIPELINE_STATUS.md` | Current issues and fixes |
-| `.github/workflows/pipeline-orchestrator.yml` | Main cron |
+| `DATA_SOURCES_STATUS.md` | Which sources are flowing data |
+| `.github/workflows/pipeline-orchestrator.yml` | Main controller cron |
+| `.github/workflows/bat-scrape.yml` | BaT discovery |
+| `.github/workflows/cars-and-bids-discovery.yml` | C&B discovery |
+| `.github/workflows/craigslist-discovery.yml` | Craigslist discovery |
 | `supabase/functions/pipeline-orchestrator/index.ts` | Main controller |
+| `supabase/functions/_shared/select-processor.ts` | URL routing logic |
 
 ## Budget
 
