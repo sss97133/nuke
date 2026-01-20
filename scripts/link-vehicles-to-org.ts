@@ -11,7 +11,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
-const TARGET_ORG_ID = process.env.TARGET_ORG_ID || '20e1d1e0-06b5-43b9-a994-7b5b9accb405';
+// Only link when explicitly configured
+const TARGET_ORG_ID = process.env.TARGET_ORG_ID || '';
 
 async function linkVehicles() {
   // Get vehicles added today that don't have org links
@@ -46,12 +47,17 @@ async function linkVehicles() {
       continue;
     }
 
+    if (!TARGET_ORG_ID) {
+      console.warn('TARGET_ORG_ID not set. Skipping link operation.');
+      return;
+    }
+
     const { data: linkData, error: linkError } = await supabase
       .from('organization_vehicles')
       .insert({
         organization_id: TARGET_ORG_ID,
         vehicle_id: vehicle.id,
-        relationship_type: 'work_location',
+        relationship_type: 'in_stock',
         auto_tagged: true,
         status: 'active',
       })
@@ -65,7 +71,7 @@ async function linkVehicles() {
     }
   }
 
-  console.log(`\nLinked ${linked} vehicles to org ${TARGET_ORG_ID}`);
+  console.log(`\nLinked ${linked} vehicles to org ${TARGET_ORG_ID || '(unset)'}`);
 }
 
 linkVehicles().catch(console.error);

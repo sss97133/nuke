@@ -788,7 +788,21 @@ serve(async (req) => {
     if (dbFields.business_license && !org.business_license) updates.business_license = dbFields.business_license;
     if (dbFields.tax_id && !org.tax_id) updates.tax_id = dbFields.tax_id;
     if (dbFields.registration_state && !org.registration_state) updates.registration_state = dbFields.registration_state;
-    if (dbFields.registration_date && !org.registration_date) updates.registration_date = dbFields.registration_date;
+    const parseDate = (val: any): string | undefined => {
+      if (!val || typeof val !== 'string') return undefined;
+      const s = val.trim();
+      if (!s) return undefined;
+      const lower = s.toLowerCase();
+      if (lower.includes('not mentioned') || lower.includes('unknown') || lower.includes('yyyy-mm-dd')) {
+        return undefined;
+      }
+      return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : undefined;
+    };
+
+    const parsedRegistrationDate = parseDate(dbFields.registration_date);
+    if (parsedRegistrationDate && !org.registration_date) {
+      updates.registration_date = parsedRegistrationDate;
+    }
     if (dbFields.years_in_business !== undefined && !org.years_in_business) updates.years_in_business = dbFields.years_in_business;
     if (dbFields.employee_count !== undefined && !org.employee_count) updates.employee_count = dbFields.employee_count;
     if (dbFields.has_lift !== undefined) updates.has_lift = dbFields.has_lift;

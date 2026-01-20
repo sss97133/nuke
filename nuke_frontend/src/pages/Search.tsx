@@ -83,6 +83,13 @@ export default function Search() {
 
     const sources: Array<{ title: string; text: string; href?: string }> = [];
     const make = detectMakeFromQuery(trimmed);
+    const isMissingListingKindColumn = (err: any) => {
+      const code = String((err as any)?.code || '').toUpperCase();
+      const message = String(err?.message || '').toLowerCase();
+      if (!message.includes('listing_kind')) return false;
+      if (code === '42703' || code === 'PGRST204') return true;
+      return message.includes('does not exist') || message.includes('schema cache');
+    };
 
     const wantsCount = looksLikeOwnershipCountQuestion(trimmed);
     const wantsNearby = looksLikeNearbyCurationQuestion(trimmed) || looksLikeVibeQuestion(trimmed);
@@ -98,19 +105,25 @@ export default function Search() {
 
     if (wantsCount && currentUserId) {
       try {
-        let queryBuilder = supabase
-          .from('vehicles')
-          .select('id', { count: 'exact', head: true })
-          .eq('listing_kind', 'vehicle');
+        const runCountQuery = async (includeListingKind: boolean) => {
+          let queryBuilder = supabase
+            .from('vehicles')
+            .select('id', { count: 'exact', head: true });
+          if (includeListingKind) queryBuilder = queryBuilder.eq('listing_kind', 'vehicle');
 
-        if (make) {
-          queryBuilder = queryBuilder.ilike('make', `%${make}%`);
+          if (make) {
+            queryBuilder = queryBuilder.ilike('make', `%${make}%`);
+          }
+
+          // Be liberal on ownership fields; schema may include owner_id, user_id, or uploaded_by.
+          queryBuilder = queryBuilder.or(`owner_id.eq.${currentUserId},user_id.eq.${currentUserId},uploaded_by.eq.${currentUserId}`);
+          return await queryBuilder;
+        };
+
+        let { count, error } = await runCountQuery(true);
+        if (error && isMissingListingKindColumn(error)) {
+          ({ count, error } = await runCountQuery(false));
         }
-
-        // Be liberal on ownership fields; schema may include owner_id, user_id, or uploaded_by.
-        queryBuilder = queryBuilder.or(`owner_id.eq.${currentUserId},user_id.eq.${currentUserId},uploaded_by.eq.${currentUserId}`);
-
-        const { count, error } = await queryBuilder;
         if (!error) {
           sources.push({
             title: make ? `Your ${make} count` : 'Your vehicle count',
@@ -130,24 +143,31 @@ export default function Search() {
       const approxLngDelta = radiusMeters / (111000 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
 
       try {
-        let vq = supabase
-          .from('vehicles')
-          .select('id, year, make, model, is_for_sale, latitude, longitude, created_at, owner_id, user_id, uploaded_by')
-          .eq('is_public', true)
-          .eq('listing_kind', 'vehicle')
-          .not('latitude', 'is', null)
-          .not('longitude', 'is', null)
-          .gte('latitude', lat - approxLatDelta)
-          .lte('latitude', lat + approxLatDelta)
-          .gte('longitude', lng - approxLngDelta)
-          .lte('longitude', lng + approxLngDelta)
-          .limit(300);
+        const runNearbyQuery = async (includeListingKind: boolean) => {
+          let vq = supabase
+            .from('vehicles')
+            .select('id, year, make, model, is_for_sale, latitude, longitude, created_at, owner_id, user_id, uploaded_by')
+            .eq('is_public', true);
+          if (includeListingKind) vq = vq.eq('listing_kind', 'vehicle');
+          vq = vq
+            .not('latitude', 'is', null)
+            .not('longitude', 'is', null)
+            .gte('latitude', lat - approxLatDelta)
+            .lte('latitude', lat + approxLatDelta)
+            .gte('longitude', lng - approxLngDelta)
+            .lte('longitude', lng + approxLngDelta)
+            .limit(300);
 
-        if (make) {
-          vq = vq.ilike('make', `%${make}%`);
+          if (make) {
+            vq = vq.ilike('make', `%${make}%`);
+          }
+          return await vq;
+        };
+
+        let { data: vehicles, error } = await runNearbyQuery(true);
+        if (error && isMissingListingKindColumn(error)) {
+          ({ data: vehicles, error } = await runNearbyQuery(false));
         }
-
-        const { data: vehicles, error } = await vq;
         if (!error && vehicles && vehicles.length > 0) {
           const withDistance = vehicles
             .map((v: any) => {

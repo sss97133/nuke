@@ -409,9 +409,14 @@ const CursorHomepage: React.FC = () => {
   // We optimistically use it, but fall back automatically if PostgREST reports it missing.
   const listingKindSupportedRef = useRef<boolean>(true);
   const isMissingListingKindColumn = useCallback((err: any) => {
-    const code = String((err as any)?.code || '');
+    const code = String((err as any)?.code || '').toUpperCase();
     const message = String(err?.message || '').toLowerCase();
-    return code === '42703' || (message.includes('listing_kind') && message.includes('does not exist'));
+    if (!message.includes('listing_kind')) return false;
+    // Postgres: "column vehicles.listing_kind does not exist" (42703)
+    if (code === '42703') return true;
+    // PostgREST schema cache: "Could not find the 'listing_kind' column of 'vehicles' in the schema cache" (PGRST204)
+    if (code === 'PGRST204') return true;
+    return message.includes('does not exist') || message.includes('schema cache');
   }, []);
   const runVehiclesQueryWithListingKindFallback = useCallback(async (builder: (includeListingKind: boolean) => any) => {
     const first = await builder(listingKindSupportedRef.current);
@@ -449,6 +454,18 @@ const CursorHomepage: React.FC = () => {
       return saved === 'original' ? 'original' : 'square';
     } catch {
       return 'square';
+    }
+  });
+
+  type ValueMetricMode = 'best_known' | 'mark' | 'ask' | 'realized' | 'cost';
+  const [valueMetricMode, setValueMetricMode] = useState<ValueMetricMode>(() => {
+    try {
+      const saved = localStorage.getItem('nuke_homepage_valueMetricMode');
+      const v = String(saved || '').trim() as ValueMetricMode;
+      if (v === 'mark' || v === 'ask' || v === 'realized' || v === 'cost' || v === 'best_known') return v;
+      return 'best_known';
+    } catch {
+      return 'best_known';
     }
   });
   const gridRef = useRef<HTMLDivElement | null>(null);
@@ -844,6 +861,14 @@ const CursorHomepage: React.FC = () => {
       // ignore
     }
   }, [thumbFitMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('nuke_homepage_valueMetricMode', valueMetricMode);
+    } catch {
+      // ignore
+    }
+  }, [valueMetricMode]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1972,6 +1997,23 @@ const CursorHomepage: React.FC = () => {
         return sum + (typeof price === 'number' && Number.isFinite(price) ? price : 0);
       }, 0);
       const salesCountToday = Array.isArray(recentSales) ? recentSales.length : 0;
+
+      // Prefer external_listings for a true "live auctions" count (end_date in the future).
+      // If RLS blocks the table, fall back to the heuristic computed from vehicles rows.
+      let activeAuctionsLive = activeAuctions;
+      try {
+        const { data: liveListings, error: liveErr } = await supabase
+          .from('external_listings')
+          .select('vehicle_id, end_date, listing_status')
+          .gt('end_date', new Date().toISOString())
+          .order('updated_at', { ascending: false })
+          .limit(5000);
+        if (!liveErr && Array.isArray(liveListings) && liveListings.length > 0) {
+          activeAuctionsLive = new Set(liveListings.map((r: any) => String(r?.vehicle_id || ''))).size;
+        }
+      } catch {
+        // ignore; keep heuristic
+      }
       
       const stats = {
         totalVehicles: totalCount || 0,
@@ -1979,7 +2021,7 @@ const CursorHomepage: React.FC = () => {
         salesVolume,
         salesCountToday,
         forSaleCount,
-        activeAuctions,
+        activeAuctions: activeAuctionsLive,
         totalBids,
         avgValue,
         vehiclesAddedToday: createdTodayCount || 0,
@@ -2095,6 +2137,22 @@ const CursorHomepage: React.FC = () => {
     // Priority 3: No filters but dbStats hasn't loaded yet - still use dbStats (will update when loaded)
     return dbStats;
   }, [hasActiveFilters, debouncedSearchText, dbStats, filteredStats]);
+
+  const headerValueMetric = useMemo(() => {
+    switch (valueMetricMode) {
+      case 'mark':
+        return { value: displayStats.valueMarkTotal || 0, label: 'mark' };
+      case 'ask':
+        return { value: displayStats.valueAskTotal || 0, label: 'ask' };
+      case 'realized':
+        return { value: displayStats.valueRealizedTotal || 0, label: 'realized' };
+      case 'cost':
+        return { value: displayStats.valueCostTotal || 0, label: 'cost' };
+      case 'best_known':
+      default:
+        return { value: displayStats.totalValue || 0, label: 'val' };
+    }
+  }, [valueMetricMode, displayStats]);
 
   const loadSession = async () => {
     const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -3477,13 +3535,28 @@ const CursorHomepage: React.FC = () => {
     const run = async () => {
       try {
         if (statsPanel === 'vehicles') {
-          const [pendingRes, nonVehicleRes, newestRes] = await Promise.all([
+          const [pendingRes, publicAllRes, allVisibleRes, nonVehicleRes, newestRes] = await Promise.all([
             runVehiclesQueryWithListingKindFallback((includeListingKind) => {
               let q = supabase
                 .from('vehicles')
                 .select('*', { count: 'exact', head: true })
                 .eq('is_public', true)
                 .eq('status', 'pending');
+              if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+              return q;
+            }),
+            runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+              let q = supabase
+                .from('vehicles')
+                .select('*', { count: 'exact', head: true })
+                .eq('is_public', true);
+              if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+              return q;
+            }),
+            runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+              let q = supabase
+                .from('vehicles')
+                .select('*', { count: 'exact', head: true });
               if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
               return q;
             }),
@@ -3512,6 +3585,8 @@ const CursorHomepage: React.FC = () => {
           if (cancelled) return;
           setStatsPanelMeta({
             pendingPublicCount: pendingRes?.count || 0,
+            publicTotalIncludingPending: publicAllRes?.count || 0,
+            totalVisibleAllRecords: allVisibleRes?.count || 0,
             publicNonVehicleItems: nonVehicleRes?.count || 0,
           });
           setStatsPanelRows(Array.isArray(newestRes?.data) ? newestRes.data : []);
@@ -3743,6 +3818,40 @@ const CursorHomepage: React.FC = () => {
                         <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                           Uses priority: sale &gt; bids &gt; ask &gt; mark &gt; cost.
                         </div>
+                        <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                          <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>HEADER:</div>
+                          {([
+                            { mode: 'best_known', label: 'val' },
+                            { mode: 'mark', label: 'mark' },
+                            { mode: 'ask', label: 'ask' },
+                            { mode: 'realized', label: 'realized' },
+                            { mode: 'cost', label: 'cost' },
+                          ] as Array<{ mode: ValueMetricMode; label: string }>).map((m) => (
+                            <button
+                              key={m.mode}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setValueMetricMode(m.mode);
+                              }}
+                              style={{
+                                padding: '2px 6px',
+                                fontSize: '7pt',
+                                border: '1px solid var(--border)',
+                                background: valueMetricMode === m.mode ? 'var(--grey-600)' : 'transparent',
+                                color: valueMetricMode === m.mode ? 'var(--white)' : 'var(--text)',
+                                cursor: 'pointer',
+                                borderRadius: 6,
+                                fontFamily: 'monospace',
+                                fontWeight: 900,
+                              }}
+                              title="Choose which value concept the header shows"
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
                         <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BREAKDOWN</div>
@@ -3772,6 +3881,8 @@ const CursorHomepage: React.FC = () => {
                       <div><b>{displayStats.totalVehicles.toLocaleString()}</b> visible vehicles</div>
                       <div><b>{displayStats.vehiclesAddedToday.toLocaleString()}</b> added today</div>
                       {statsPanelMeta?.pendingPublicCount ? <div><b>{Number(statsPanelMeta.pendingPublicCount).toLocaleString()}</b> pending</div> : null}
+                      {statsPanelMeta?.publicTotalIncludingPending ? <div><b>{Number(statsPanelMeta.publicTotalIncludingPending).toLocaleString()}</b> public total (incl pending)</div> : null}
+                      {statsPanelMeta?.totalVisibleAllRecords ? <div><b>{Number(statsPanelMeta.totalVisibleAllRecords).toLocaleString()}</b> total records (visible to you)</div> : null}
                       {statsPanelMeta?.publicNonVehicleItems ? <div><b>{Number(statsPanelMeta.publicNonVehicleItems).toLocaleString()}</b> non-vehicle items hidden</div> : null}
                     </div>
                   )}
@@ -3949,7 +4060,7 @@ const CursorHomepage: React.FC = () => {
                 </button>
               )}
               <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                {formatCurrency(displayStats.totalValue)} total value
+                {formatCurrency(headerValueMetric.value)} {headerValueMetric.label}
               </div>
               {displayStats.forSaleCount > 0 && (
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
@@ -4334,7 +4445,7 @@ const CursorHomepage: React.FC = () => {
                   color: 'var(--text)'
                 }}
               >
-                <b>{formatCurrency(displayStats.totalValue)}</b> val
+                <b>{formatCurrency(headerValueMetric.value)}</b> {headerValueMetric.label}
               </button>
               {displayStats.forSaleCount > 0 && (
                 <>
@@ -4398,7 +4509,7 @@ const CursorHomepage: React.FC = () => {
                       e.stopPropagation();
                       openStatsPanel('auctions');
                     }}
-                    title="Vehicles in auction mode (heuristic). Click to preview."
+                    title="Live auctions (prefers external listings with end_date in the future). Click to preview."
                     style={{
                       border: 'none',
                       background: 'transparent',

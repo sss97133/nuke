@@ -141,128 +141,145 @@ export class VehicleSearchService {
       // Note: Avoid PostgREST relationship join syntax (profiles:user_id)
       // because the remote schema may not have the FK cached. We fetch
       // vehicles first and then hydrate profile info in a separate query.
-      let query = supabase
-        .from('vehicles')
-        .select('*')
-        .neq('status', 'pending')
-        // Keep non-vehicle items (parts/tools/memorabilia) out of the default vehicle search.
-        .eq('listing_kind', 'vehicle');
-
       // Precompute zip coordinates if needed (used to avoid the broken "zip + radius" logic).
       let zipCoords: { latitude: number; longitude: number } | null = null;
       if (filters.zipCode && filters.radius) {
         zipCoords = await this.getZipCodeCoordinates(filters.zipCode);
       }
 
-      // Apply filters
-      if (filters.yearFrom) {
-        query = query.gte('year', filters.yearFrom);
-      }
-      if (filters.yearTo) {
-        query = query.lte('year', filters.yearTo);
-      }
-      if (filters.make) {
-        const raw = String(filters.make || '').trim();
-        if (raw) {
-          const term = escapePostgrestILike(raw);
-          // Prefer prefix match for make to avoid weird substring collisions (e.g. "Ford" matching "Oxford").
-          query = query.ilike('make', `${term}%`);
-        }
-      }
-      if (filters.model) {
-        const raw = String(filters.model || '').trim();
-        if (raw) {
-          const term = escapePostgrestILike(raw);
-          // Models are often stored with trims/variants (e.g. "911 Turbo"), so use contains match.
-          query = query.ilike('model', `%${term}%`);
-        }
-      }
-      if (filters.priceFrom) {
-        // Prices in `vehicles` are stored as DECIMAL(10,2) USD (not cents).
-        query = query.gte('asking_price', filters.priceFrom);
-      }
-      if (filters.priceTo) {
-        // Prices in `vehicles` are stored as DECIMAL(10,2) USD (not cents).
-        query = query.lte('asking_price', filters.priceTo);
-      }
-      if (filters.forSale) {
-        query = query.eq('is_for_sale', true);
-      }
-      if (filters.zipCode) {
-        // If radius is provided and we have coordinates, do NOT restrict to the exact zip.
-        // Otherwise, fallback to exact zip match (best-effort without geocoding).
-        if (!filters.radius || !zipCoords) {
-          query = query.eq('zip_code', filters.zipCode);
-        }
-      }
+      const isMissingListingKindColumn = (err: any) => {
+        const code = String((err as any)?.code || '').toUpperCase();
+        const message = String(err?.message || '').toLowerCase();
+        if (!message.includes('listing_kind')) return false;
+        if (code === '42703' || code === 'PGRST204') return true;
+        return message.includes('does not exist') || message.includes('schema cache');
+      };
 
-      // Text search across multiple fields
-      if (filters.textSearch) {
-        const normalized = normalizeTextSearchInput(filters.textSearch);
-        const extracted = extractYearFromTextSearch(normalized);
-
-        // If a year exists in the query (e.g. "1998 Ford"), treat it as a hard filter.
-        if (extracted.year) {
-          query = query.eq('year', extracted.year);
+      const runQuery = async (includeListingKind: boolean) => {
+        let query = supabase
+          .from('vehicles')
+          .select('*')
+          .neq('status', 'pending');
+        // Keep non-vehicle items (parts/tools/memorabilia) out of the default vehicle search (when available).
+        if (includeListingKind) {
+          query = query.eq('listing_kind', 'vehicle');
         }
 
-        const raw = extracted.rest || '';
-        if (raw) {
-          // Optional: map owner search (username/full name) -> user ids
-          let matchingUserIds: string[] = [];
-          const term = escapePostgrestILike(raw);
-          const idSet = new Set<string>();
-          // Be resilient across environments where profiles.username may not exist.
-          try {
-            const { data: byUsername } = await supabase
-              .from('profiles')
-              .select('id')
-              .ilike('username', `%${term}%`)
-              .limit(25);
-            (byUsername || []).forEach((p: any) => {
-              if (p?.id) idSet.add(String(p.id));
-            });
-          } catch {
-            // ignore
-          }
-          try {
-            const { data: byName } = await supabase
-              .from('profiles')
-              .select('id')
-              .ilike('full_name', `%${term}%`)
-              .limit(25);
-            (byName || []).forEach((p: any) => {
-              if (p?.id) idSet.add(String(p.id));
-            });
-          } catch {
-            // ignore
-          }
-          matchingUserIds = Array.from(idSet);
-
-          const orFilter = buildVehicleTextSearchOrFilter({ text: raw, matchingUserIds });
-          if (orFilter) {
-            query = query.or(orFilter);
+        // Apply filters
+        if (filters.yearFrom) {
+          query = query.gte('year', filters.yearFrom);
+        }
+        if (filters.yearTo) {
+          query = query.lte('year', filters.yearTo);
+        }
+        if (filters.make) {
+          const raw = String(filters.make || '').trim();
+          if (raw) {
+            const term = escapePostgrestILike(raw);
+            // Prefer prefix match for make to avoid weird substring collisions (e.g. "Ford" matching "Oxford").
+            query = query.ilike('make', `${term}%`);
           }
         }
-      }
+        if (filters.model) {
+          const raw = String(filters.model || '').trim();
+          if (raw) {
+            const term = escapePostgrestILike(raw);
+            // Models are often stored with trims/variants (e.g. "911 Turbo"), so use contains match.
+            query = query.ilike('model', `%${term}%`);
+          }
+        }
+        if (filters.priceFrom) {
+          // Prices in `vehicles` are stored as DECIMAL(10,2) USD (not cents).
+          query = query.gte('asking_price', filters.priceFrom);
+        }
+        if (filters.priceTo) {
+          // Prices in `vehicles` are stored as DECIMAL(10,2) USD (not cents).
+          query = query.lte('asking_price', filters.priceTo);
+        }
+        if (filters.forSale) {
+          query = query.eq('is_for_sale', true);
+        }
+        if (filters.zipCode) {
+          // If radius is provided and we have coordinates, do NOT restrict to the exact zip.
+          // Otherwise, fallback to exact zip match (best-effort without geocoding).
+          if (!filters.radius || !zipCoords) {
+            query = query.eq('zip_code', filters.zipCode);
+          }
+        }
 
-      // Apply a rough bounding box filter for zip+radius searches (fast pre-filter); precise filtering happens later.
-      if (filters.zipCode && filters.radius && zipCoords) {
-        const radiusMiles = filters.radius;
-        const lat = zipCoords.latitude;
-        const lng = zipCoords.longitude;
-        const latDelta = radiusMiles / 69; // ~69 miles per degree latitude
-        const lngDelta = radiusMiles / (69 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
-        query = query
-          .not('latitude', 'is', null)
-          .not('longitude', 'is', null)
-          .gte('latitude', lat - latDelta)
-          .lte('latitude', lat + latDelta)
-          .gte('longitude', lng - lngDelta)
-          .lte('longitude', lng + lngDelta);
-      }
+        // Text search across multiple fields
+        if (filters.textSearch) {
+          const normalized = normalizeTextSearchInput(filters.textSearch);
+          const extracted = extractYearFromTextSearch(normalized);
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+          // If a year exists in the query (e.g. "1998 Ford"), treat it as a hard filter.
+          if (extracted.year) {
+            query = query.eq('year', extracted.year);
+          }
+
+          const raw = extracted.rest || '';
+          if (raw) {
+            // Optional: map owner search (username/full name) -> user ids
+            let matchingUserIds: string[] = [];
+            const term = escapePostgrestILike(raw);
+            const idSet = new Set<string>();
+            // Be resilient across environments where profiles.username may not exist.
+            try {
+              const { data: byUsername } = await supabase
+                .from('profiles')
+                .select('id')
+                .ilike('username', `%${term}%`)
+                .limit(25);
+              (byUsername || []).forEach((p: any) => {
+                if (p?.id) idSet.add(String(p.id));
+              });
+            } catch {
+              // ignore
+            }
+            try {
+              const { data: byName } = await supabase
+                .from('profiles')
+                .select('id')
+                .ilike('full_name', `%${term}%`)
+                .limit(25);
+              (byName || []).forEach((p: any) => {
+                if (p?.id) idSet.add(String(p.id));
+              });
+            } catch {
+              // ignore
+            }
+            matchingUserIds = Array.from(idSet);
+
+            const orFilter = buildVehicleTextSearchOrFilter({ text: raw, matchingUserIds });
+            if (orFilter) {
+              query = query.or(orFilter);
+            }
+          }
+        }
+
+        // Apply a rough bounding box filter for zip+radius searches (fast pre-filter); precise filtering happens later.
+        if (filters.zipCode && filters.radius && zipCoords) {
+          const radiusMiles = filters.radius;
+          const lat = zipCoords.latitude;
+          const lng = zipCoords.longitude;
+          const latDelta = radiusMiles / 69; // ~69 miles per degree latitude
+          const lngDelta = radiusMiles / (69 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
+          query = query
+            .not('latitude', 'is', null)
+            .not('longitude', 'is', null)
+            .gte('latitude', lat - latDelta)
+            .lte('latitude', lat + latDelta)
+            .gte('longitude', lng - lngDelta)
+            .lte('longitude', lng + lngDelta);
+        }
+
+        return await query.order('created_at', { ascending: false });
+      };
+
+      let { data, error } = await runQuery(true);
+      if (error && isMissingListingKindColumn(error)) {
+        ({ data, error } = await runQuery(false));
+      }
 
       if (error) {
         console.error('Search error:', error);
