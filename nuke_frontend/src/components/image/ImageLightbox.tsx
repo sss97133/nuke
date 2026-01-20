@@ -765,8 +765,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       // 2.5. For auction images, infer the *origin* (seller) from listing data when available.
       // This is distinct from the ingestion action (import/scrape) and helps preserve provenance.
       let sellerInfo: any = null;
-      const isBatSource = (imgData.source === 'bat_listing' || imgData.source === 'bat_import') && vehicleId;
-      if (isBatSource) {
+      // If the vehicle has a BaT listing, treat the seller as the default origin for auction photos.
+      if (vehicleId) {
         try {
           const { data: listing } = await supabase
             .from('bat_listings')
@@ -953,6 +953,45 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     [imageUrl, vehicleId, imageId, session?.user?.id, triggerAIAnalysis, timelineEventId, loadTags, loadImageMetadata]
   );
 
+  const submitClaim = useCallback(async () => {
+    if (!claimTarget) return;
+    setClaimSubmitting(true);
+    setClaimError(null);
+
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        setClaimError('Please sign in to submit a claim.');
+        return;
+      }
+
+      const payload: any = {
+        p_platform: claimTarget.platform,
+        p_handle: claimTarget.handle,
+        p_profile_url: claimTarget.profileUrl || null,
+        p_proof_type: claimProofType,
+        p_proof_url: claimProofUrl.trim() ? claimProofUrl.trim() : null,
+        p_notes: claimNotes.trim() ? claimNotes.trim() : null
+      };
+
+      const { error } = await supabase.rpc('request_external_identity_claim', payload);
+      if (error) {
+        setClaimError(error.message);
+        return;
+      }
+
+      setClaimDialogOpen(false);
+      setClaimTarget(null);
+      setClaimProofUrl('');
+      setClaimNotes('');
+      alert('Claim request submitted. We’ll review it as soon as proof is available.');
+    } catch (err) {
+      setClaimError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setClaimSubmitting(false);
+    }
+  }, [claimTarget, claimProofType, claimProofUrl, claimNotes]);
+
   useEffect(() => {
     loadImageMetadata();
     
@@ -1055,6 +1094,12 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (claimDialogOpen) {
+          setClaimDialogOpen(false);
+          setClaimTarget(null);
+          setClaimError(null);
+          return;
+        }
         if (showTagger) {
           setShowTagger(false);
         } else {
@@ -1091,7 +1136,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('wheel', handleWheel);
     };
-  }, [onClose, onPrev, onNext, showTagger]);
+  }, [onClose, onPrev, onNext, showTagger, claimDialogOpen]);
 
   if (!isOpen) return null;
 
@@ -1838,29 +1883,17 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                                     </div>
                                   ) : (
                                     <button
-                                      onClick={async () => {
-                                        try {
-                                          const { data: { user } } = await supabase.auth.getUser();
-                                          if (!user) {
-                                            alert('Please sign in to claim this identity.');
-                                            return;
-                                          }
-                                          const { data, error } = await supabase.rpc('request_external_identity_claim', {
-                                            p_platform: 'bat',
-                                            p_handle: attribution.seller.handle,
-                                            p_profile_url: attribution.seller.profileUrl,
-                                            p_proof_type: 'profile_link',
-                                            p_proof_url: null,
-                                            p_notes: 'Claim request from image provenance panel'
-                                          } as any);
-                                          if (error) {
-                                            alert(`Claim request failed: ${error.message}`);
-                                            return;
-                                          }
-                                          alert('Claim request submitted. Add the proof link and we’ll review it.');
-                                        } catch (err) {
-                                          alert(`Claim request failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-                                        }
+                                      onClick={() => {
+                                        setClaimTarget({
+                                          platform: attribution.seller.platform || 'bat',
+                                          handle: attribution.seller.handle,
+                                          profileUrl: attribution.seller.profileUrl || null
+                                        });
+                                        setClaimProofType('profile_link');
+                                        setClaimProofUrl('');
+                                        setClaimNotes('I can prove I control this external account.');
+                                        setClaimError(null);
+                                        setClaimDialogOpen(true);
                                       }}
                                       style={{
                                         marginTop: '6px',
@@ -2514,6 +2547,175 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           />
         )}
       </div>
+
+      {/* Claim Identity Wizard (minimal) */}
+      {claimDialogOpen && claimTarget && (
+        <div
+          className="fixed inset-0"
+          style={{ zIndex: 10006, backgroundColor: 'rgba(0,0,0,0.7)' }}
+          onClick={() => {
+            if (claimSubmitting) return;
+            setClaimDialogOpen(false);
+            setClaimTarget(null);
+            setClaimError(null);
+          }}
+        >
+          <div
+            className="bg-[#111] border-2 border-white/20"
+            style={{
+              width: 'min(520px, calc(100vw - 24px))',
+              margin: '80px auto',
+              padding: '16px',
+              color: 'white',
+              fontFamily: 'Arial, sans-serif'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                Claim identity
+              </div>
+              <button
+                onClick={() => {
+                  if (claimSubmitting) return;
+                  setClaimDialogOpen(false);
+                  setClaimTarget(null);
+                  setClaimError(null);
+                }}
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  background: 'transparent',
+                  color: 'rgba(255,255,255,0.7)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  padding: '4px 8px',
+                  cursor: 'pointer',
+                  textTransform: 'uppercase'
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.7)', marginBottom: '12px' }}>
+              You’re claiming <span style={{ color: 'white', fontWeight: 700 }}>@{claimTarget.handle}</span> on{' '}
+              <span style={{ color: 'white', fontWeight: 700 }}>{claimTarget.platform}</span>. Provide proof so we can link it to your N‑Zero profile.
+            </div>
+
+            <div style={{ display: 'grid', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  Proof type
+                </div>
+                <select
+                  value={claimProofType}
+                  onChange={(e) => setClaimProofType(e.target.value as any)}
+                  disabled={claimSubmitting}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    fontSize: '10px',
+                    backgroundColor: '#0a0a0a',
+                    color: 'white',
+                    border: '1px solid rgba(255,255,255,0.2)'
+                  }}
+                >
+                  <option value="profile_link">Profile link</option>
+                  <option value="screenshot">Screenshot</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  Proof URL (optional)
+                </div>
+                <input
+                  value={claimProofUrl}
+                  onChange={(e) => setClaimProofUrl(e.target.value)}
+                  disabled={claimSubmitting}
+                  placeholder="https://..."
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    fontSize: '10px',
+                    backgroundColor: '#0a0a0a',
+                    color: 'white',
+                    border: '1px solid rgba(255,255,255,0.2)'
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  Notes
+                </div>
+                <textarea
+                  value={claimNotes}
+                  onChange={(e) => setClaimNotes(e.target.value)}
+                  disabled={claimSubmitting}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    fontSize: '10px',
+                    backgroundColor: '#0a0a0a',
+                    color: 'white',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              {claimError && (
+                <div style={{ fontSize: '9px', color: '#fca5a5' }}>
+                  {claimError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => {
+                    if (claimSubmitting) return;
+                    setClaimDialogOpen(false);
+                    setClaimTarget(null);
+                    setClaimError(null);
+                  }}
+                  disabled={claimSubmitting}
+                  style={{
+                    padding: '8px 10px',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    backgroundColor: 'transparent',
+                    color: 'rgba(255,255,255,0.7)',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    cursor: claimSubmitting ? 'not-allowed' : 'pointer',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitClaim}
+                  disabled={claimSubmitting}
+                  style={{
+                    padding: '8px 10px',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    backgroundColor: claimSubmitting ? '#374151' : '#ffffff',
+                    color: claimSubmitting ? 'rgba(255,255,255,0.6)' : '#000',
+                    border: '1px solid rgba(255,255,255,0.25)',
+                    cursor: claimSubmitting ? 'not-allowed' : 'pointer',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  {claimSubmitting ? 'Submitting…' : 'Submit claim'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );

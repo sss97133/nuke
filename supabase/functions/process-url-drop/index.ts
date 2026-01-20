@@ -7,16 +7,69 @@ const corsHeaders = {
 };
 
 /**
- * Process URL Drop
- * User pastes a URL, AI extracts data, creates profile, assigns contributor rank
+ * Process URL Drop - Universal URL Handler (v2)
+ *
+ * Handles ANY URL a user drops into the system:
+ * - Known platforms (BaT, Cars & Bids, Instagram, YouTube)
+ * - Auction houses (Mecum, RM Sotheby's, Gooding, etc.)
+ * - Events/Rallies (1000 Miglia, Dakar, Pebble Beach)
+ * - Dealers, Builders, Collections
+ * - Generic vehicle listings
+ *
+ * Creates discovery leads for the snowball system to process.
  */
 
 interface URLDropRequest {
   url: string;
-  userId: string;
+  userId?: string;
   opinion?: string;
   rating?: number;
 }
+
+// Known platforms and their types
+const KNOWN_PLATFORMS: Record<string, { type: string; business_type?: string; handler?: string }> = {
+  // Online Auction Platforms
+  'bringatrailer.com': { type: 'bat_listing', business_type: 'auction_house', handler: 'bat' },
+  'carsandbids.com': { type: 'auction_listing', business_type: 'auction_house', handler: 'cars_and_bids' },
+  'collectingcars.com': { type: 'auction_listing', business_type: 'auction_house' },
+  'pcarmarket.com': { type: 'auction_listing', business_type: 'auction_house' },
+  'hemmings.com': { type: 'auction_listing', business_type: 'auction_house' },
+
+  // Physical Auction Houses
+  'mecum.com': { type: 'auction_house', business_type: 'auction_house' },
+  'rmsothebys.com': { type: 'auction_house', business_type: 'auction_house' },
+  'goodingco.com': { type: 'auction_house', business_type: 'auction_house' },
+  'bonhams.com': { type: 'auction_house', business_type: 'auction_house' },
+  'barrett-jackson.com': { type: 'auction_house', business_type: 'auction_house' },
+  'broadarrowgroup.com': { type: 'auction_house', business_type: 'auction_house' },
+  'dupontregistry.com': { type: 'auction_listing', business_type: 'auction_house' },
+  'silverstoneauctions.com': { type: 'auction_house', business_type: 'auction_house' },
+
+  // Events & Rallies
+  '1000miglia.it': { type: 'event', business_type: 'rally_event' },
+  'dakar.com': { type: 'event', business_type: 'rally_event' },
+  'pebblebeachconcours.net': { type: 'event', business_type: 'concours' },
+  'goodwood.com': { type: 'event', business_type: 'motorsport_event' },
+  'montereycarweek.com': { type: 'event', business_type: 'concours' },
+  'semashow.com': { type: 'event', business_type: 'automotive_expo' },
+  'gumball3000.com': { type: 'event', business_type: 'rally_event' },
+
+  // Social Media
+  'instagram.com': { type: 'instagram', handler: 'instagram' },
+  'youtube.com': { type: 'youtube', handler: 'youtube' },
+  'youtu.be': { type: 'youtube', handler: 'youtube' },
+  'tiktok.com': { type: 'social_media' },
+  'facebook.com': { type: 'social_media' },
+
+  // Classifieds
+  'ebay.com': { type: 'ebay_listing' },
+  'autotrader.com': { type: 'classified_listing' },
+  'classic.com': { type: 'dealer_directory', business_type: 'dealer_aggregator' },
+  'classiccars.com': { type: 'classified_listing' },
+
+  // N-Zero internal
+  'n-zero.dev': { type: 'n-zero_internal', handler: 'n-zero' },
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -26,131 +79,221 @@ serve(async (req) => {
   try {
     const { url, userId, opinion, rating }: URLDropRequest = await req.json();
 
+    if (!url) {
+      return new Response(
+        JSON.stringify({ error: 'URL is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Detect URL type
-    const urlType = detectURLType(url);
-    console.log('Detected URL type:', urlType);
+    // 1. Detect URL type with enhanced detection
+    const detection = detectURLType(url);
+    console.log('URL Detection:', JSON.stringify(detection));
 
-    // 2. Queue the URL for processing
-    const { data: queueEntry, error: queueError } = await supabase
-      .from('url_drop_queue')
-      .insert({
-        user_id: userId,
-        dropped_url: url,
-        url_type: urlType,
-        status: 'processing'
-      })
-      .select()
-      .single();
+    if (detection.type === 'invalid_url') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid URL format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    if (queueError) throw queueError;
+    // 2. Check if we already have this URL in the system
+    const { data: existingBusiness } = await supabase
+      .from('businesses')
+      .select('id, business_name, business_type')
+      .eq('website', url)
+      .maybeSingle();
+
+    const { data: existingSource } = await supabase
+      .from('scrape_sources')
+      .select('id, name, source_type')
+      .eq('url', url)
+      .maybeSingle();
+
+    const { data: existingLead } = await supabase
+      .from('discovery_leads')
+      .select('id, status')
+      .eq('lead_url', url)
+      .maybeSingle();
 
     // 3. Process based on URL type
     let entityData: any = {};
-    let entityType: string = '';
+    let entityType: string = detection.type;
     let entityId: string | null = null;
+    let message = '';
+    let action = '';
 
-    switch (urlType) {
-      case 'n-zero_org':
-        ({ entityData, entityId } = await processNZeroOrgURL(url, supabase));
-        entityType = 'organization';
+    // Handle known handlers
+    switch (detection.handler) {
+      case 'n-zero':
+        if (detection.type === 'n-zero_org') {
+          ({ entityData, entityId } = await processNZeroOrgURL(url, supabase));
+          entityType = 'organization';
+          action = 'linked';
+        } else if (detection.type === 'n-zero_vehicle') {
+          ({ entityData, entityId } = await processNZeroVehicleURL(url, supabase));
+          entityType = 'vehicle';
+          action = 'linked';
+        }
         break;
-      
-      case 'n-zero_vehicle':
-        ({ entityData, entityId } = await processNZeroVehicleURL(url, supabase));
-        entityType = 'vehicle';
-        break;
-      
-      case 'bat_listing':
+
+      case 'bat':
         ({ entityData, entityId } = await processBaTListingURL(url, supabase));
         entityType = 'vehicle';
+        action = 'extracted';
         break;
-      
+
       case 'instagram':
         ({ entityData, entityId } = await processInstagramURL(url, supabase));
-        entityType = 'vehicle'; // Could be org too
+        entityType = 'social_reference';
+        action = 'queued';
         break;
-      
+
+      case 'youtube':
+        // Queue for YouTube extraction
+        await createDiscoveryLead(supabase, {
+          url,
+          type: 'youtube_channel',
+          suggestedType: 'youtube_channel',
+          confidence: detection.confidence,
+          userId,
+        });
+        action = 'queued_youtube';
+        message = 'YouTube URL queued for extraction';
+        break;
+
       default:
-        // Generic scrape
-        ({ entityData, entityId } = await processGenericURL(url, supabase));
-        entityType = entityData.type || 'unknown';
+        // For all other URLs, use pattern-based analysis + discovery
+        if (existingBusiness) {
+          // Already known business
+          entityType = existingBusiness.business_type || 'business';
+          entityId = existingBusiness.id;
+          entityData = existingBusiness;
+          action = 'existing';
+          message = `This is ${existingBusiness.business_name}, already in our system`;
+        } else if (existingSource) {
+          // Already a scrape source
+          entityType = existingSource.source_type || 'source';
+          entityId = existingSource.id;
+          entityData = existingSource;
+          action = 'existing_source';
+          message = `This source (${existingSource.name}) is already being tracked`;
+        } else if (existingLead && existingLead.status === 'pending') {
+          // Already queued as discovery lead
+          action = 'already_queued';
+          message = 'This URL is already queued for discovery processing';
+          entityId = existingLead.id;
+        } else {
+          // NEW URL - analyze and create discovery lead
+          const analysis = await analyzeURLWithPatterns(url, detection);
+
+          // Create discovery lead for snowball processing
+          const leadId = await createDiscoveryLead(supabase, {
+            url,
+            type: detection.type,
+            suggestedType: detection.business_type || analysis.suggestedType,
+            confidence: detection.confidence,
+            userId,
+            metadata: analysis,
+          });
+
+          entityId = leadId;
+          entityType = 'discovery_lead';
+          entityData = { ...analysis, detection };
+          action = 'discovered';
+          message = `New ${detection.business_type || detection.type} discovered! Queued for processing.`;
+
+          // If it's a known business type, also create a business record
+          if (detection.business_type && detection.confidence >= 0.8) {
+            const hostname = new URL(url).hostname.replace(/^www\./, '');
+            const businessName = analysis.name || hostname;
+
+            const { data: newBusiness, error: bizErr } = await supabase
+              .from('businesses')
+              .insert({
+                business_name: businessName,
+                business_type: detection.business_type,
+                website: url.split('?')[0], // Remove query params
+                status: 'pending_verification',
+                discovered_by: userId || 'url_drop',
+                discovered_via: 'url_drop',
+              })
+              .select('id')
+              .maybeSingle();
+
+            if (!bizErr && newBusiness) {
+              entityId = newBusiness.id;
+              entityType = 'business';
+              message = `New ${detection.business_type}: ${businessName} created!`;
+            }
+          }
+        }
     }
 
-    // 4. Calculate contributor rank (how many people already contributed?)
-    const { count: existingContributors } = await supabase
-      .from('entity_opinions')
-      .select('*', { count: 'exact', head: true })
-      .eq('entity_type', entityType)
-      .eq('entity_id', entityId);
+    // 4. Handle user contribution tracking (if userId provided)
+    let contributorRank = 1;
+    let isOriginalDiscoverer = true;
+    let pointsAwarded = 0;
 
-    const contributorRank = (existingContributors || 0) + 1;
-    const isOriginalDiscoverer = contributorRank === 1;
+    if (userId && entityId) {
+      // Calculate contributor rank
+      const { count: existingContributors } = await supabase
+        .from('entity_opinions')
+        .select('*', { count: 'exact', head: true })
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId);
 
-    // 5. Create opinion/contribution record
-    const { error: opinionError } = await supabase
-      .from('entity_opinions')
-      .insert({
-        entity_type: entityType,
-        entity_id: entityId,
-        user_id: userId,
-        opinion_text: opinion,
-        rating: rating,
-        contributor_rank: contributorRank,
-        is_original_discoverer: isOriginalDiscoverer,
-        source_url: url,
-        data_contributed: entityData,
-        contribution_score: isOriginalDiscoverer ? 100 : 50
-      });
+      contributorRank = (existingContributors || 0) + 1;
+      isOriginalDiscoverer = contributorRank === 1;
 
-    if (opinionError && opinionError.code !== '23505') { // Ignore duplicate constraint
-      console.error('Opinion error:', opinionError);
+      // Create opinion/contribution record
+      await supabase
+        .from('entity_opinions')
+        .insert({
+          entity_type: entityType,
+          entity_id: entityId,
+          user_id: userId,
+          opinion_text: opinion,
+          rating: rating,
+          contributor_rank: contributorRank,
+          is_original_discoverer: isOriginalDiscoverer,
+          source_url: url,
+          data_contributed: entityData,
+          contribution_score: isOriginalDiscoverer ? 100 : 50
+        })
+        .then(() => {})
+        .catch((err: Error) => {
+          if (!err.message?.includes('23505')) console.error('Opinion error:', err);
+        });
+
+      // Award points
+      pointsAwarded = isOriginalDiscoverer ? 100 : 50;
+      await supabase.rpc('award_points', {
+        p_user_id: userId,
+        p_category: isOriginalDiscoverer ? 'discovery' : 'data_fill',
+        p_points: pointsAwarded,
+        p_reason: `Contributed ${entityType} via URL drop`
+      }).catch(() => {}); // Non-critical
     }
-
-    // 6. Award points
-    const pointsCategory = isOriginalDiscoverer ? 'discovery' : 'data_fill';
-    const pointsAmount = isOriginalDiscoverer ? 100 : 50;
-
-    await supabase.rpc('award_points', {
-      p_user_id: userId,
-      p_category: pointsCategory,
-      p_points: pointsAmount,
-      p_reason: `Contributed to ${entityType} from ${urlType}`
-    });
-
-    // 7. Detect data gaps
-    await supabase.rpc('detect_data_gaps', {
-      p_entity_type: entityType,
-      p_entity_id: entityId
-    });
-
-    // 8. Update queue status
-    await supabase
-      .from('url_drop_queue')
-      .update({
-        status: 'completed',
-        processed_at: new Date().toISOString(),
-        extracted_data: entityData,
-        entity_type: entityType,
-        entity_id: entityId
-      })
-      .eq('id', queueEntry.id);
 
     return new Response(
       JSON.stringify({
         success: true,
+        action,
         entityType,
         entityId,
-        contributorRank,
-        isOriginalDiscoverer,
-        pointsAwarded: pointsAmount,
-        message: isOriginalDiscoverer 
-          ? `Congratulations! You discovered this ${entityType}! +${pointsAmount} points`
-          : `You're contributor #${contributorRank}! +${pointsAmount} points`
+        detection,
+        contributorRank: userId ? contributorRank : null,
+        isOriginalDiscoverer: userId ? isOriginalDiscoverer : null,
+        pointsAwarded: userId ? pointsAwarded : null,
+        message: message || (isOriginalDiscoverer
+          ? `Discovered new ${entityType}! ${pointsAwarded ? `+${pointsAwarded} points` : ''}`
+          : `Contributed to ${entityType} ${pointsAwarded ? `+${pointsAwarded} points` : ''}`)
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -165,16 +308,227 @@ serve(async (req) => {
 });
 
 // ============================================
-// URL TYPE DETECTION
+// DISCOVERY LEAD CREATION
 // ============================================
 
-function detectURLType(url: string): string {
-  if (url.includes('n-zero.dev/org/')) return 'n-zero_org';
-  if (url.includes('n-zero.dev/vehicle/')) return 'n-zero_vehicle';
-  if (url.includes('bringatrailer.com')) return 'bat_listing';
-  if (url.includes('instagram.com')) return 'instagram';
-  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-  return 'unknown';
+// Map detected types to valid discovery_leads.lead_type values
+// Allowed: organization, website, social_profile, youtube_channel, vehicle_listing, collection, event, person, article
+function mapToLeadType(detectedType: string): string {
+  const typeMap: Record<string, string> = {
+    'event': 'event',
+    'auction_house': 'organization',
+    'auction_listing': 'vehicle_listing',
+    'bat_listing': 'vehicle_listing',
+    'vehicle_listing': 'vehicle_listing',
+    'dealer': 'organization',
+    'builder': 'organization',
+    'instagram': 'social_profile',
+    'youtube': 'youtube_channel',
+    'social_media': 'social_profile',
+    'classified_listing': 'vehicle_listing',
+    'ebay_listing': 'vehicle_listing',
+    'dealer_directory': 'website',
+    'n-zero_org': 'organization',
+    'n-zero_vehicle': 'vehicle_listing',
+    'motorsport_event': 'event',
+    'concours': 'event',
+  };
+  return typeMap[detectedType] || 'website';
+}
+
+async function createDiscoveryLead(
+  supabase: any,
+  params: {
+    url: string;
+    type: string;
+    suggestedType: string | null;
+    confidence: number;
+    userId?: string;
+    metadata?: any;
+  }
+): Promise<string | null> {
+  const leadType = mapToLeadType(params.type);
+
+  const { data, error } = await supabase
+    .from('discovery_leads')
+    .insert({
+      discovered_from_type: 'manual', // User-submitted URL drop
+      discovered_from_id: null,
+      lead_type: leadType,
+      lead_url: params.url,
+      lead_name: params.metadata?.name || new URL(params.url).hostname,
+      suggested_business_type: params.suggestedType,
+      confidence_score: params.confidence,
+      status: 'pending',
+      raw_data: {
+        ...params.metadata,
+        original_detected_type: params.type,
+        submitted_by: params.userId || 'anonymous',
+        submitted_at: new Date().toISOString(),
+      },
+    })
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error creating discovery lead:', error);
+    return null;
+  }
+
+  return data?.id || null;
+}
+
+// ============================================
+// PATTERN-BASED URL ANALYSIS (No LLM cost)
+// ============================================
+
+async function analyzeURLWithPatterns(url: string, detection: URLDetectionResult): Promise<any> {
+  try {
+    // Fetch the page with a timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; NukeBot/1.0; +https://n-zero.dev)',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: controller.signal,
+      redirect: 'follow',
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      return { error: 'fetch_failed', status: response.status };
+    }
+
+    const html = await response.text();
+    const result: any = {
+      fetched: true,
+      content_length: html.length,
+    };
+
+    // Extract title
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    result.title = titleMatch?.[1]?.trim() || null;
+
+    // Extract meta description
+    const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+    result.description = descMatch?.[1]?.trim() || null;
+
+    // Try to extract business name from title or heading
+    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+    result.name = h1Match?.[1]?.trim() || result.title?.split(/[-|–]/)[0]?.trim() || null;
+
+    // Extract contact info patterns
+    const emailMatch = html.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    result.email = emailMatch?.[0] || null;
+
+    const phoneMatch = html.match(/\+?[\d\s\-().]{10,}/);
+    result.phone = phoneMatch?.[0]?.trim() || null;
+
+    // Detect social links
+    result.social = {
+      instagram: html.includes('instagram.com/'),
+      facebook: html.includes('facebook.com/'),
+      youtube: html.includes('youtube.com/'),
+      twitter: html.includes('twitter.com/') || html.includes('x.com/'),
+    };
+
+    // Content-based type detection
+    const contentLower = html.toLowerCase();
+
+    if (contentLower.includes('auction') || contentLower.includes('bidding') || contentLower.includes('lot ')) {
+      result.suggestedType = result.suggestedType || 'auction_house';
+    }
+    if (contentLower.includes('rally') || contentLower.includes('race') || contentLower.includes('motorsport')) {
+      result.suggestedType = result.suggestedType || 'motorsport_event';
+    }
+    if (contentLower.includes('dealer') || contentLower.includes('inventory') || contentLower.includes('for sale')) {
+      result.suggestedType = result.suggestedType || 'dealer';
+    }
+    if (contentLower.includes('restoration') || contentLower.includes('custom build') || contentLower.includes('fabrication')) {
+      result.suggestedType = result.suggestedType || 'builder';
+    }
+    if (contentLower.includes('concours') || contentLower.includes('show') || contentLower.includes('exhibition')) {
+      result.suggestedType = result.suggestedType || 'concours';
+    }
+
+    // Use detection's business_type as fallback
+    result.suggestedType = result.suggestedType || detection.business_type;
+
+    return result;
+
+  } catch (err) {
+    return {
+      error: 'analysis_failed',
+      message: err instanceof Error ? err.message : 'Unknown error',
+      suggestedType: detection.business_type,
+    };
+  }
+}
+
+// ============================================
+// URL TYPE DETECTION (Enhanced)
+// ============================================
+
+interface URLDetectionResult {
+  type: string;
+  platform: string | null;
+  business_type: string | null;
+  handler: string | null;
+  confidence: number;
+}
+
+function detectURLType(url: string): URLDetectionResult {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.replace(/^www\./, '').toLowerCase();
+
+    // Check N-Zero internal URLs first
+    if (hostname.includes('n-zero.dev')) {
+      if (url.includes('/org/')) return { type: 'n-zero_org', platform: 'n-zero', business_type: null, handler: 'n-zero', confidence: 1.0 };
+      if (url.includes('/vehicle/')) return { type: 'n-zero_vehicle', platform: 'n-zero', business_type: null, handler: 'n-zero', confidence: 1.0 };
+      return { type: 'n-zero_internal', platform: 'n-zero', business_type: null, handler: 'n-zero', confidence: 0.9 };
+    }
+
+    // Check known platforms
+    for (const [domain, info] of Object.entries(KNOWN_PLATFORMS)) {
+      if (hostname.includes(domain)) {
+        return {
+          type: info.type,
+          platform: domain,
+          business_type: info.business_type || null,
+          handler: info.handler || null,
+          confidence: 0.95
+        };
+      }
+    }
+
+    // Pattern-based detection for unknown URLs
+    const pathLower = parsed.pathname.toLowerCase();
+
+    // Vehicle listing patterns
+    if (pathLower.match(/\/listing|\/vehicle|\/car|\/lot|\/inventory/i)) {
+      return { type: 'vehicle_listing', platform: hostname, business_type: 'dealer', handler: null, confidence: 0.7 };
+    }
+
+    // Auction patterns
+    if (pathLower.match(/\/auction|\/bid|\/lot\d/i)) {
+      return { type: 'auction_listing', platform: hostname, business_type: 'auction_house', handler: null, confidence: 0.7 };
+    }
+
+    // Event patterns
+    if (pathLower.match(/\/event|\/race|\/rally|\/show|\/concours/i)) {
+      return { type: 'event', platform: hostname, business_type: 'motorsport_event', handler: null, confidence: 0.6 };
+    }
+
+    // Default: unknown - will create discovery lead
+    return { type: 'unknown', platform: hostname, business_type: null, handler: null, confidence: 0.3 };
+
+  } catch {
+    return { type: 'invalid_url', platform: null, business_type: null, handler: null, confidence: 0 };
+  }
 }
 
 // ============================================
@@ -308,83 +662,54 @@ async function processInstagramURL(url: string, supabase: any) {
 }
 
 // ============================================
-// GENERIC URL PROCESSOR
+// GENERIC URL PROCESSOR (Fallback - uses pattern analysis)
 // ============================================
 
 async function processGenericURL(url: string, supabase: any) {
-  // Use OpenAI to analyze the URL content
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  // Use pattern-based analysis instead of OpenAI to save costs
+  const detection = detectURLType(url);
+  const analysis = await analyzeURLWithPatterns(url, detection);
 
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
+  // If analysis suggests it's a vehicle listing with enough confidence
+  if (analysis.suggestedType === 'dealer' && analysis.title) {
+    // Try to extract vehicle info from title
+    const titleMatch = analysis.title.match(/(\d{4})\s+(\w+)\s+(.+)/);
+    if (titleMatch) {
+      const [, year, make, model] = titleMatch;
+      const { data: vehicle, error } = await supabase
+        .from('vehicles')
+        .insert({
+          year: parseInt(year),
+          make,
+          model: model.split(/[-|]/)[0].trim(),
+          vin: `VIVA-${Date.now()}`,
+          listing_url: url,
+          discovery_source: 'url_drop'
+        })
+        .select()
+        .single();
+
+      if (!error && vehicle) {
+        return {
+          entityData: vehicle,
+          entityId: vehicle.id
+        };
+      }
+    }
   }
 
-  // Fetch the page content
-  const response = await fetch(url);
-  const html = await response.text();
-
-  // Extract text content (simple version, could use Cheerio/JSDOM)
-  const textContent = html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 4000); // Limit to 4000 chars
-
-  // Ask OpenAI to extract vehicle/org data
-  const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a data extraction expert. Analyze the provided webpage content and extract vehicle or organization information. Return JSON.`
-        },
-        {
-          role: 'user',
-          content: `Extract data from this page:\n\n${textContent}\n\nReturn JSON with fields: type (vehicle/organization/unknown), year, make, model, vin, price, description, location, name, etc.`
-        }
-      ],
-      response_format: { type: 'json_object' },
-      max_tokens: 1000
-    })
+  // Otherwise, create as discovery lead for later processing
+  const leadId = await createDiscoveryLead(supabase, {
+    url,
+    type: detection.type,
+    suggestedType: analysis.suggestedType,
+    confidence: detection.confidence,
+    metadata: analysis,
   });
 
-  const aiData = await openaiResponse.json();
-  const extractedData = JSON.parse(aiData.choices[0].message.content);
-
-  // If it's a vehicle, create it
-  if (extractedData.type === 'vehicle' && extractedData.make) {
-    const { data: vehicle, error } = await supabase
-      .from('vehicles')
-      .insert({
-        year: extractedData.year,
-        make: extractedData.make,
-        model: extractedData.model,
-        vin: extractedData.vin || `VIVA-${Date.now()}`,
-        listing_url: url,
-        discovery_source: 'url_drop'
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return {
-      entityData: vehicle,
-      entityId: vehicle.id
-    };
-  }
-
   return {
-    entityData: extractedData,
-    entityId: null
+    entityData: { ...analysis, type: 'discovery_lead' },
+    entityId: leadId
   };
 }
 

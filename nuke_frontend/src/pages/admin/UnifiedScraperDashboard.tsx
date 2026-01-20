@@ -68,6 +68,9 @@ export default function UnifiedScraperDashboard() {
   const [running, setRunning] = useState(false);
   const [recentCycles, setRecentCycles] = useState<CycleResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [coordBrief, setCoordBrief] = useState<any | null>(null);
+  const [coordLoading, setCoordLoading] = useState(false);
+  const [coordError, setCoordError] = useState<string | null>(null);
 
   useEffect(() => {
     loadStatus();
@@ -138,6 +141,26 @@ export default function UnifiedScraperDashboard() {
     }
   }
 
+  async function loadCoordinationBrief() {
+    if (coordLoading) return;
+    setCoordLoading(true);
+    setCoordError(null);
+    try {
+      const { data, error: fetchError } = await supabase.functions.invoke('ralph-wiggum-rlm-extraction-coordinator', {
+        body: { action: 'brief', max_failed_samples: 250 }
+      });
+
+      if (fetchError) throw fetchError;
+      setCoordBrief(data || null);
+    } catch (err: any) {
+      console.error('Error loading coordination brief:', err);
+      setCoordError(err?.message || 'Failed to load coordination brief');
+      setCoordBrief(null);
+    } finally {
+      setCoordLoading(false);
+    }
+  }
+
   function getStatusColor(sourceStatus: string) {
     switch (sourceStatus) {
       case 'healthy': return 'text-green-600 bg-green-50';
@@ -178,6 +201,13 @@ export default function UnifiedScraperDashboard() {
         >
           {running ? 'Running...' : 'Run Cycle'}
         </button>
+        <button
+          onClick={loadCoordinationBrief}
+          disabled={coordLoading}
+          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+        >
+          {coordLoading ? 'Generating brief…' : 'AI Brief'}
+        </button>
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -193,6 +223,80 @@ export default function UnifiedScraperDashboard() {
           Refresh Now
         </button>
       </div>
+
+      {coordError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded text-red-700">
+          AI Brief Error: {coordError}
+        </div>
+      )}
+
+      {coordBrief?.output && (
+        <div className="mb-8 p-4 bg-white border border-gray-200 rounded">
+          <div className="flex items-baseline justify-between gap-4 mb-3">
+            <h2 className="text-xl font-semibold">Extraction coordination brief</h2>
+            <div className="text-xs text-gray-500">
+              model: {coordBrief.model || 'unknown'}
+            </div>
+          </div>
+
+          {Array.isArray(coordBrief.output.headlines) && coordBrief.output.headlines.length > 0 && (
+            <div className="mb-4">
+              <div className="text-sm font-semibold mb-1">Headlines</div>
+              <ul className="list-disc pl-5 text-sm text-gray-700">
+                {coordBrief.output.headlines.map((h: string, idx: number) => (
+                  <li key={idx}>{h}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {Array.isArray(coordBrief.output.priorities_now) && coordBrief.output.priorities_now.length > 0 && (
+            <div className="mb-4">
+              <div className="text-sm font-semibold mb-2">Do now</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {coordBrief.output.priorities_now.slice(0, 6).map((p: any, idx: number) => (
+                  <div key={idx} className="p-3 border border-gray-200 rounded bg-gray-50">
+                    <div className="font-semibold text-sm">{p?.title || 'Untitled'}</div>
+                    {p?.why && <div className="text-xs text-gray-600 mt-1">{p.why}</div>}
+                    {Array.isArray(p?.steps) && p.steps.length > 0 && (
+                      <ul className="list-disc pl-5 text-xs text-gray-700 mt-2">
+                        {p.steps.slice(0, 6).map((s: string, sIdx: number) => (
+                          <li key={sIdx}>{s}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {Array.isArray(coordBrief.output.priorities_next) && coordBrief.output.priorities_next.length > 0 && (
+            <div className="mb-4">
+              <div className="text-sm font-semibold mb-2">Next</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {coordBrief.output.priorities_next.slice(0, 4).map((p: any, idx: number) => (
+                  <div key={idx} className="p-3 border border-gray-200 rounded">
+                    <div className="font-semibold text-sm">{p?.title || 'Untitled'}</div>
+                    {p?.why && <div className="text-xs text-gray-600 mt-1">{p.why}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {Array.isArray(coordBrief.output.watchlist) && coordBrief.output.watchlist.length > 0 && (
+            <div className="mb-2">
+              <div className="text-sm font-semibold mb-1">Watchlist</div>
+              <ul className="list-disc pl-5 text-sm text-gray-700">
+                {coordBrief.output.watchlist.slice(0, 8).map((w: string, idx: number) => (
+                  <li key={idx}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {status && (
         <>
