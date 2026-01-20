@@ -440,105 +440,246 @@ async function processGenericLead(supabase: any, lead: any) {
 }
 
 /**
- * Fetch and analyze a page using Firecrawl + LLM
+ * Fetch and analyze a page - CONSERVATIVE MODE
+ *
+ * Strategy:
+ * 1. Try simple fetch first (FREE)
+ * 2. Only use Firecrawl for JS-heavy sites (COSTS TOKENS)
+ * 3. Use pattern matching for basic analysis (FREE)
+ * 4. Only use LLM for complex/ambiguous cases (COSTS $$$)
  */
-async function fetchAndAnalyzePage(url: string): Promise<any> {
+async function fetchAndAnalyzePage(url: string, useFirecrawl = false): Promise<any> {
   try {
-    // Use Firecrawl to fetch the page
-    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-      },
-      body: JSON.stringify({
-        url,
-        formats: ['markdown', 'links'],
-        onlyMainContent: false,
-      }),
-    });
+    let html = '';
+    let markdown = '';
+    let links: string[] = [];
 
-    if (!response.ok) {
-      console.log(`   Firecrawl failed: ${response.status}`);
-      return null;
-    }
-
-    const data = await response.json();
-    const markdown = data.data?.markdown || '';
-    const links = data.data?.links || [];
-
-    // Use LLM to analyze the page
-    if (OPENAI_API_KEY && markdown.length > 100) {
-      const analysisPrompt = `Analyze this webpage and extract information:
-
-URL: ${url}
-Content: ${markdown.substring(0, 5000)}
-
-Determine:
-1. Is this a directory page listing multiple businesses? (is_directory)
-2. Is this a car dealer or has vehicle inventory? (is_dealer, has_inventory)
-3. Extract: name, description, phone, email, city, state
-4. Detect business type: dealership, builder, auction_house, marketplace, etc.
-5. Find any dealer listings if it's a directory
-
-Return JSON:
-{
-  "name": "Business Name",
-  "description": "Brief description",
-  "phone": "xxx-xxx-xxxx",
-  "email": "email@example.com",
-  "city": "City",
-  "state": "ST",
-  "detected_type": "dealership",
-  "is_directory": false,
-  "is_dealer": true,
-  "has_inventory": true,
-  "listings": [{"name": "Dealer Name", "url": "https://...", "type": "dealership"}],
-  "social_links": {"instagram": "...", "youtube": "..."},
-  "web_developer": {"name": "SpeedDigital", "detected_via": "footer"}
-}`;
-
-      const llmResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
+    // Step 1: Try simple fetch first (FREE)
+    if (!useFirecrawl) {
+      console.log(`   Fetching with simple fetch: ${url}`);
+      const simpleResponse = await fetch(url, {
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
         },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'You are a web page analyzer. Extract structured data from webpages. Return only valid JSON.' },
-            { role: 'user', content: analysisPrompt }
-          ],
-          temperature: 0.2,
-          response_format: { type: 'json_object' }
-        }),
+        redirect: 'follow',
       });
 
-      if (llmResponse.ok) {
-        const llmData = await llmResponse.json();
-        const analysis = JSON.parse(llmData.choices[0].message.content);
-        return {
-          ...analysis,
-          raw_markdown: markdown,
-          links
-        };
+      if (simpleResponse.ok) {
+        html = await simpleResponse.text();
+        // Extract links from HTML
+        const linkMatches = html.matchAll(/href=["']([^"']+)["']/gi);
+        for (const match of linkMatches) {
+          if (match[1] && !match[1].startsWith('#') && !match[1].startsWith('javascript:')) {
+            try {
+              const fullUrl = new URL(match[1], url).href;
+              links.push(fullUrl);
+            } catch {}
+          }
+        }
+        console.log(`   Simple fetch OK: ${html.length} chars, ${links.length} links`);
+      } else {
+        console.log(`   Simple fetch failed: ${simpleResponse.status}`);
       }
     }
 
-    // Fallback: Basic parsing
-    return {
-      raw_markdown: markdown,
-      links,
-      is_directory: links.length > 20,
-      has_inventory: markdown.toLowerCase().includes('inventory') ||
-                     markdown.toLowerCase().includes('for sale')
-    };
+    // Step 2: Fall back to Firecrawl only if simple fetch failed or explicitly requested
+    if (!html && FIRECRAWL_API_KEY && useFirecrawl) {
+      console.log(`   Using Firecrawl (costs tokens): ${url}`);
+      const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        },
+        body: JSON.stringify({
+          url,
+          formats: ['markdown', 'links'],
+          onlyMainContent: false,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        markdown = data.data?.markdown || '';
+        links = data.data?.links || [];
+        html = markdown; // Use markdown as content
+      }
+    }
+
+    if (!html && !markdown) {
+      console.log(`   Could not fetch page`);
+      return null;
+    }
+
+    const content = markdown || html;
+
+    // Step 3: Use PATTERN MATCHING for basic analysis (FREE - no LLM)
+    const analysis = analyzePageWithPatterns(content, links, url);
+
+    // Step 4: Only use LLM if pattern matching has low confidence AND content is substantial
+    // DISABLED FOR NOW - too expensive. Enable selectively.
+    /*
+    if (OPENAI_API_KEY && analysis.confidence < 0.5 && content.length > 2000) {
+      console.log(`   Using LLM for complex analysis (costs $$$)`);
+      const llmAnalysis = await analyzeWithLLM(content, url);
+      if (llmAnalysis) {
+        return { ...analysis, ...llmAnalysis, links };
+      }
+    }
+    */
+
+    return { ...analysis, links, raw_content_length: content.length };
 
   } catch (error: any) {
     console.error(`   Error fetching ${url}:`, error.message);
     return null;
   }
+}
+
+/**
+ * Analyze page using pattern matching (FREE - no API calls)
+ */
+function analyzePageWithPatterns(content: string, links: string[], url: string): any {
+  const lowerContent = content.toLowerCase();
+  const analysis: any = {
+    confidence: 0.3,
+    is_directory: false,
+    is_dealer: false,
+    has_inventory: false,
+    detected_type: null,
+    listings: [],
+  };
+
+  // Detect directory pages (lists of dealers/businesses)
+  const directoryPatterns = [
+    /dealer\s*(directory|list|finder)/i,
+    /find\s*a\s*dealer/i,
+    /our\s*partners/i,
+    /member\s*dealers/i,
+    /browse\s*dealers/i,
+  ];
+  for (const pattern of directoryPatterns) {
+    if (pattern.test(content)) {
+      analysis.is_directory = true;
+      analysis.confidence = 0.7;
+      break;
+    }
+  }
+
+  // Detect dealer/inventory pages
+  const dealerPatterns = [
+    /inventory/i,
+    /for\s*sale/i,
+    /in\s*stock/i,
+    /browse\s*vehicles/i,
+    /our\s*cars/i,
+    /view\s*inventory/i,
+  ];
+  for (const pattern of dealerPatterns) {
+    if (pattern.test(content)) {
+      analysis.is_dealer = true;
+      analysis.has_inventory = true;
+      analysis.detected_type = 'dealership';
+      analysis.confidence = 0.6;
+      break;
+    }
+  }
+
+  // Detect auction houses
+  if (/auction|bid|lot\s*#|hammer\s*price|reserve/i.test(content)) {
+    analysis.detected_type = 'auction_house';
+    analysis.confidence = 0.7;
+  }
+
+  // Detect builders/restorers
+  if (/restoration|custom\s*build|restomod|coachbuild/i.test(content)) {
+    analysis.detected_type = 'builder';
+    analysis.confidence = 0.6;
+  }
+
+  // Extract name from title tag
+  const titleMatch = content.match(/<title>([^<]+)<\/title>/i);
+  if (titleMatch) {
+    analysis.name = titleMatch[1].trim().split('|')[0].split('-')[0].trim();
+  }
+
+  // Extract phone
+  const phoneMatch = content.match(/(?:\+1[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}/);
+  if (phoneMatch) {
+    analysis.phone = phoneMatch[0];
+  }
+
+  // Extract email
+  const emailMatch = content.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch && !emailMatch[0].includes('example')) {
+    analysis.email = emailMatch[0];
+  }
+
+  // Extract social links
+  analysis.social_links = {};
+  const socialPatterns = [
+    { name: 'instagram', pattern: /instagram\.com\/([a-zA-Z0-9._]+)/i },
+    { name: 'youtube', pattern: /youtube\.com\/(?:channel|c|@)\/([a-zA-Z0-9_-]+)/i },
+    { name: 'facebook', pattern: /facebook\.com\/([a-zA-Z0-9.]+)/i },
+  ];
+  for (const { name, pattern } of socialPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      analysis.social_links[name] = `https://${name}.com/${match[1]}`;
+    }
+  }
+
+  // Detect web developer/platform from common signatures
+  const platformPatterns = [
+    { name: 'SpeedDigital', pattern: /speeddigital|speed\s*digital/i },
+    { name: 'DealerFire', pattern: /dealerfire/i },
+    { name: 'FusionZone', pattern: /fusionzone/i },
+    { name: 'DealerSocket', pattern: /dealersocket/i },
+    { name: 'Dealer.com', pattern: /dealer\.com/i },
+  ];
+  for (const { name, pattern } of platformPatterns) {
+    if (pattern.test(content)) {
+      analysis.web_developer = { name, detected_via: 'content_pattern' };
+      break;
+    }
+  }
+
+  // If it's a directory, try to extract listings from links
+  if (analysis.is_directory) {
+    const seenDomains = new Set<string>();
+    for (const link of links.slice(0, 200)) {
+      try {
+        const linkUrl = new URL(link);
+        // Skip same domain, common non-dealer paths
+        if (linkUrl.hostname === new URL(url).hostname) continue;
+        if (/facebook|twitter|instagram|youtube|linkedin/i.test(linkUrl.hostname)) continue;
+        if (seenDomains.has(linkUrl.hostname)) continue;
+        seenDomains.add(linkUrl.hostname);
+
+        analysis.listings.push({
+          url: link,
+          name: linkUrl.hostname.replace(/^www\./, ''),
+          type: 'dealership',
+        });
+      } catch {}
+    }
+    if (analysis.listings.length > 5) {
+      analysis.confidence = 0.8;
+    }
+  }
+
+  return analysis;
+}
+
+/**
+ * LLM analysis - EXPENSIVE, use sparingly
+ * Currently disabled to save costs. Enable when needed for complex pages.
+ */
+async function analyzeWithLLM(content: string, url: string): Promise<any> {
+  // DISABLED - too expensive for bulk discovery
+  // Enable selectively for high-value pages that pattern matching can't handle
+  return null;
 }
 
 /**

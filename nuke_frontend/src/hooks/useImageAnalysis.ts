@@ -66,11 +66,19 @@ export const useImageAnalysis = () => {
 
       // The function should return the tags and insert them automatically
       const cached = Boolean((data as any)?.cached);
+      const success = Boolean((data as any)?.success);
+      const failureMessage =
+        !success
+          ? (typeof (data as any)?.error === 'string' && (data as any).error.trim()
+              ? String((data as any).error)
+              : 'Analysis failed')
+          : undefined;
       return {
-        success: Boolean((data as any)?.success),
+        success,
         tags: (data as any)?.tags || [],
         source: cached ? 'cache' : 'rekognition',
-        cached
+        cached,
+        error: failureMessage
       };
 
     } catch (error) {
