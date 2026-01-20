@@ -42,9 +42,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             url,
-            pageOptions: {
-              waitFor: 1000, // Wait 1 second for JS to load
-            },
+            waitFor: 1000, // Wait 1 second for JS to load
             formats: ['html', 'markdown']
           })
         })

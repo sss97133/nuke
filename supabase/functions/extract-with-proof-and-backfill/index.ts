@@ -312,7 +312,7 @@ async function performAIProofreading(
           body: JSON.stringify({
             url: url,
             formats: ['html', 'markdown'],
-            pageOptions: { waitFor: 2000 }
+            waitFor: 2000
           }),
           signal: AbortSignal.timeout(15000)
         });
@@ -485,7 +485,7 @@ async function performReExtraction(
         body: JSON.stringify({
           url: url,
           formats: ['html', 'markdown'],
-          pageOptions: { waitFor: 2000 }
+          waitFor: 2000
         }),
         signal: AbortSignal.timeout(15000)
       });

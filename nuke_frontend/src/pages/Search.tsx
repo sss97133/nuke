@@ -100,7 +100,8 @@ export default function Search() {
       try {
         let queryBuilder = supabase
           .from('vehicles')
-          .select('id', { count: 'exact', head: true });
+          .select('id', { count: 'exact', head: true })
+          .eq('listing_kind', 'vehicle');
 
         if (make) {
           queryBuilder = queryBuilder.ilike('make', `%${make}%`);
@@ -133,6 +134,7 @@ export default function Search() {
           .from('vehicles')
           .select('id, year, make, model, is_for_sale, latitude, longitude, created_at, owner_id, user_id, uploaded_by')
           .eq('is_public', true)
+          .eq('listing_kind', 'vehicle')
           .not('latitude', 'is', null)
           .not('longitude', 'is', null)
           .gte('latitude', lat - approxLatDelta)

@@ -82,7 +82,7 @@ serve(async (req) => {
     if (firecrawlKey) {
       console.log('Testing Firecrawl API...');
       try {
-        const firecrawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+        const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${firecrawlKey}`,

@@ -144,7 +144,9 @@ export class VehicleSearchService {
       let query = supabase
         .from('vehicles')
         .select('*')
-        .neq('status', 'pending');
+        .neq('status', 'pending')
+        // Keep non-vehicle items (parts/tools/memorabilia) out of the default vehicle search.
+        .eq('listing_kind', 'vehicle');
 
       // Precompute zip coordinates if needed (used to avoid the broken "zip + radius" logic).
       let zipCoords: { latitude: number; longitude: number } | null = null;

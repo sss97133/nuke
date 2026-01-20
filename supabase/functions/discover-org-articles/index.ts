@@ -192,7 +192,7 @@ async function processArticle(
     // Use Firecrawl if available, otherwise direct fetch
     let html: string;
     if (FIRECRAWL_API_KEY) {
-      const firecrawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+      const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

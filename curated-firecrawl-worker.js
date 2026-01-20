@@ -41,7 +41,7 @@ async function firecrawlExtraction(url) {
       throw new Error('FIRECRAWL_API_KEY not found in environment');
     }
 
-    const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${firecrawlApiKey}`,

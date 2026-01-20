@@ -206,7 +206,8 @@ async function analyzeSiteStructure(siteUrl: string) {
     throw new Error('Firecrawl API key not configured');
   }
   
-  const response = await fetch('https://api.firecrawl.dev/v0/crawl', {
+  // v1: use /map for fast URL discovery (v0 /crawl is deprecated)
+  const response = await fetch('https://api.firecrawl.dev/v1/map', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${firecrawlKey}`,
@@ -214,10 +215,7 @@ async function analyzeSiteStructure(siteUrl: string) {
     },
     body: JSON.stringify({
       url: siteUrl,
-      crawlerOptions: {
-        includes: ['*/inventory/*', '*/vehicles/*', '*/listings/*', '*/cars/*'],
-        limit: 10
-      }
+      limit: 10
     })
   });
   
@@ -358,7 +356,7 @@ async function testSingleExtraction(url: string, schema: any) {
   // Use Firecrawl to extract using the generated schema
   const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
   
-  const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${firecrawlKey}`,
@@ -375,12 +373,12 @@ async function testSingleExtraction(url: string, schema: any) {
   
   const result = await response.json();
   
-  const fieldsExtracted = Object.values(result.extract || {}).filter(v => v && v !== '').length;
+  const fieldsExtracted = Object.values(result.data?.extract || {}).filter(v => v && v !== '').length;
   
   return {
     success: response.ok && fieldsExtracted > 0,
     fields_extracted: fieldsExtracted,
-    extraction_data: result.extract,
+    extraction_data: result.data?.extract,
     raw_response: result
   };
 }
@@ -468,7 +466,7 @@ async function checkIfSiteMappable(siteUrl: string) {
   // Quick check if site has vehicle listings and is scrapable
   const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
   
-  const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
+  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${firecrawlKey}`,
@@ -481,7 +479,7 @@ async function checkIfSiteMappable(siteUrl: string) {
   });
   
   const result = await response.json();
-  const content = result.markdown || '';
+  const content = result.data?.markdown || '';
   
   // Check for automotive indicators
   const automotiveIndicators = [

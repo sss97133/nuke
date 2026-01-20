@@ -677,6 +677,7 @@ const CursorHomepage: React.FC = () => {
           .from('vehicles')
           .select('make')
           .eq('is_public', true)
+          .eq('listing_kind', 'vehicle')
           .not('make', 'is', null)
           .limit(5000);
 
@@ -732,6 +733,7 @@ const CursorHomepage: React.FC = () => {
           .from('vehicles')
           .select('body_style')
           .eq('is_public', true)
+          .eq('listing_kind', 'vehicle')
           .not('body_style', 'is', null)
           .limit(5000);
 
@@ -1063,6 +1065,12 @@ const CursorHomepage: React.FC = () => {
         const canon = getCanonicalBodyStyle((v as any).canonical_body_style || (v as any).body_style);
         return canon ? selectedCanon.includes(canon) : false;
       });
+    } else {
+      // Default: keep motorcycles out of the main vehicle feed unless explicitly selected.
+      result = result.filter((v: any) => {
+        const canon = getCanonicalBodyStyle((v as any).canonical_body_style || (v as any).body_style);
+        return canon !== 'MOTORCYCLE';
+      });
     }
     // 4x4/4WD/AWD filter
     if (filters.is4x4) {
@@ -1317,6 +1325,7 @@ const CursorHomepage: React.FC = () => {
           { count: 'exact' }
         )
         .eq('is_public', true)
+        .eq('listing_kind', 'vehicle')
         .neq('status', 'pending');
 
       // "Added today" filter (created_at within local day)
@@ -1685,6 +1694,7 @@ const CursorHomepage: React.FC = () => {
         .from('vehicles')
         .select('*', { count: 'exact', head: true })
         .eq('is_public', true)
+        .eq('listing_kind', 'vehicle')
         .neq('status', 'pending');
       
       if (countError) {
@@ -1698,6 +1708,7 @@ const CursorHomepage: React.FC = () => {
         .from('vehicles')
         .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome')
         .eq('is_public', true)
+        .eq('listing_kind', 'vehicle')
         .neq('status', 'pending');
       
       if (vehiclesError) {
@@ -1775,6 +1786,7 @@ const CursorHomepage: React.FC = () => {
         .from('vehicles')
         .select('*', { count: 'exact', head: true })
         .eq('is_public', true)
+        .eq('listing_kind', 'vehicle')
         .neq('status', 'pending')
         .gte('created_at', todayStart.toISOString())
         .lt('created_at', tomorrowStart.toISOString());
@@ -1791,6 +1803,7 @@ const CursorHomepage: React.FC = () => {
         .from('vehicles')
         .select('sale_price, sale_date')
         .eq('is_public', true)
+        .eq('listing_kind', 'vehicle')
         .neq('status', 'pending')
         .not('sale_price', 'is', null)
         .gte('sale_date', todayISO);
@@ -2107,6 +2120,7 @@ const CursorHomepage: React.FC = () => {
             .from('vehicles')
             .select(selectFields)
             .eq('is_public', true)
+            .eq('listing_kind', 'vehicle')
             .neq('status', 'pending')
             .order('created_at', { ascending: false })
             .range(offset, offset + PAGE_SIZE - 1);
@@ -3088,6 +3102,7 @@ const CursorHomepage: React.FC = () => {
           .from('vehicles')
           .select('discovery_url, discovery_source, profile_origin')
           .eq('is_public', true)
+          .eq('listing_kind', 'vehicle')
           .neq('status', 'pending');
 
         if (error) {

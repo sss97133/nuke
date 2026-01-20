@@ -223,7 +223,7 @@ async function analyzeSiteThoroughly(url: string, supabase: any) {
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
   
   // Crawl site structure
-  const crawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+  const crawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
@@ -238,8 +238,8 @@ async function analyzeSiteThoroughly(url: string, supabase: any) {
   });
   
   const crawlData = await crawlResponse.json();
-  const html = crawlData.html || '';
-  const markdown = crawlData.markdown || '';
+  const html = crawlData.data?.html || crawlData.html || '';
+  const markdown = crawlData.data?.markdown || crawlData.markdown || '';
   
   // Discover all page types
   const pageTypes = await discoverAllPageTypes(url, html, markdown);
@@ -367,7 +367,7 @@ async function identifyAllFields(siteAnalysis: any, supabase: any): Promise<any[
     if (pageTypeData.sample_urls && pageTypeData.sample_urls.length > 0 && FIRECRAWL_API_KEY) {
       try {
         const sampleUrl = pageTypeData.sample_urls[0];
-        const crawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+        const crawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
@@ -382,8 +382,8 @@ async function identifyAllFields(siteAnalysis: any, supabase: any): Promise<any[
         
         if (crawlResponse.ok) {
           const crawlData = await crawlResponse.json();
-          sampleHtml = (crawlData.html || '').substring(0, 50000); // Limit to 50KB
-          sampleMarkdown = (crawlData.markdown || '').substring(0, 10000); // Limit to 10KB
+          sampleHtml = ((crawlData.data?.html || crawlData.html || '') as string).substring(0, 50000); // Limit to 50KB
+          sampleMarkdown = ((crawlData.data?.markdown || crawlData.markdown || '') as string).substring(0, 10000); // Limit to 10KB
         }
       } catch (err: any) {
         console.warn(`Failed to fetch sample page: ${err.message}`);

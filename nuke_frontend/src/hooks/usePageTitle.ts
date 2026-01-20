@@ -32,9 +32,39 @@ export function getVehicleTitle(vehicle: {
   series?: string | null;
   transmission?: string | null;
   transmission_model?: string | null;
+  listing_title?: string | null;
+  listing_kind?: string | null;
 } | null): string {
   if (!vehicle) {
     return 'Vehicle Profile';
+  }
+
+  const listingKind = String((vehicle as any).listing_kind ?? vehicle.listing_kind ?? '').trim().toLowerCase();
+  const listingTitle = String((vehicle as any).listing_title ?? vehicle.listing_title ?? '').trim();
+  const make = String(vehicle.make ?? '').trim();
+  const model = String(vehicle.model ?? '').trim();
+  const isPlaceholderIdentity = (() => {
+    const m = make.toLowerCase();
+    const mo = model.toLowerCase();
+    return (
+      !make ||
+      !model ||
+      m === 'n/a' ||
+      m === 'na' ||
+      m === 'unknown' ||
+      mo === 'n/a' ||
+      mo === 'na' ||
+      mo === 'unknown'
+    );
+  })();
+
+  // For non-vehicle lots (parts/tools/memorabilia), prefer the source listing title.
+  if (listingKind === 'non_vehicle_item' && listingTitle) {
+    return listingTitle;
+  }
+  // If our year/make/model identity is obviously placeholder/polluted, prefer listing_title.
+  if (isPlaceholderIdentity && listingTitle) {
+    return listingTitle;
   }
 
   const identity = getVehicleIdentityParts(vehicle as any);

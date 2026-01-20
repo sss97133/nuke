@@ -4025,6 +4025,39 @@ async function storeVehiclesInDatabase(
         if (canon) listingUrl = canon;
       }
       const title = vehicle.title || vehicle.listing_title || null;
+      const sourceLower = String(source || "").toLowerCase();
+
+      // Normalize polluted "unknown"/"N/A" values (these often show up for non-vehicle lots).
+      const normalizeMaybeText = (v: any): string | null => {
+        const t = typeof v === "string" ? v.trim() : "";
+        if (!t) return null;
+        const lower = t.toLowerCase();
+        if (lower === "unknown" || lower === "n/a" || lower === "na") return null;
+        return t;
+      };
+
+      // Listing kind: keep non-vehicle items (parts/tools/memorabilia) out of the main vehicle feed.
+      const listingKind: "vehicle" | "non_vehicle_item" = (() => {
+        if (!listingUrl) return "vehicle";
+        try {
+          const u = new URL(listingUrl);
+          const p = u.pathname || "";
+
+          // BaT: non-vehicle items frequently do not start with `YYYY-`.
+          if (sourceLower === "bat") {
+            return /\/listing\/(?!\d{4}-)/i.test(p) ? "non_vehicle_item" : "vehicle";
+          }
+
+          // Mecum: vehicles are almost always `.../lots/<id>/<YYYY>-<make>-...`; memorabilia often isn't.
+          if (sourceLower === "mecum") {
+            const m = p.match(/\/lots\/(?:detail\/)?[^/]+\/([^/]+)/i);
+            if (m?.[1] && !/^\d{4}-/i.test(String(m[1]))) return "non_vehicle_item";
+          }
+        } catch {
+          // ignore
+        }
+        return "vehicle";
+      })();
       const vinRaw = typeof vehicle.vin === "string" ? vehicle.vin.trim().toUpperCase() : "";
       // Accept 17-character VINs (modern) OR 4-16 character chassis numbers (vintage vehicles)
       // Vintage vehicles like BMW 507 have chassis numbers like "70077" (5 digits) instead of 17-char VINs
@@ -4050,8 +4083,8 @@ async function storeVehiclesInDatabase(
       // Don't default to "Unknown" - use null if extraction failed
       // The update logic will preserve existing data if we pass null
       const payload = {
-          make: vehicle.make || null,
-          model: vehicle.model || null,
+          make: normalizeMaybeText(vehicle.make),
+          model: normalizeMaybeText(vehicle.model),
           year: Number.isFinite(vehicle.year) ? vehicle.year : null,
           trim: vehicle.trim || null,
           trim_level: vehicle.trim_level || null,
@@ -4084,7 +4117,8 @@ async function storeVehiclesInDatabase(
           description: normalizeDescriptionSummary(rawListingDescription),
           description_source: rawListingDescription ? "source_imported" : null,
           listing_url: listingUrl,
-          listing_source: source.toLowerCase(),
+          listing_source: sourceLower,
+          listing_kind: listingKind,
           listing_title: title,
           auction_end_date: vehicle.auction_end_date || null,
           sale_date: vehicle.sale_date || null,
@@ -4103,9 +4137,9 @@ async function storeVehiclesInDatabase(
           is_public: true,
           discovery_source: `${source.toLowerCase()}_agent_extraction`,
           discovery_url: listingUrl,
-          platform_source: source.toLowerCase(),
+          platform_source: sourceLower,
           platform_url: listingUrl,
-          import_source: source.toLowerCase(),
+          import_source: sourceLower,
           import_method: "scraper",
           import_metadata: {
             source,

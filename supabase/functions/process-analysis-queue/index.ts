@@ -10,10 +10,15 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-);
+const isTruthy = (v: string | null | undefined) => {
+  const s = String(v || '').trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'on';
+};
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -28,7 +33,45 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { batchSize = 5 } = await req.json().catch(() => ({}));
+    const paused =
+      isTruthy(Deno.env.get('NUKE_ANALYSIS_PAUSED')) ||
+      isTruthy(Deno.env.get('ANALYSIS_QUEUE_PAUSED'));
+
+    if (paused) {
+      return new Response(
+        JSON.stringify({
+          processed: 0,
+          paused: true,
+          message: 'Analysis queue processing paused (NUKE_ANALYSIS_PAUSED / ANALYSIS_QUEUE_PAUSED)'
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        }
+      );
+    }
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return new Response(
+        JSON.stringify({
+          processed: 0,
+          error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in function environment'
+        }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const batchSizeRaw = (body as any)?.batchSize ?? (body as any)?.batch_size ?? 5;
+    const batchSize = Math.max(1, Math.min(10, Math.floor(Number(batchSizeRaw) || 5)));
     
     console.log(`🔄 Processing analysis queue (batch size: ${batchSize})...`);
     

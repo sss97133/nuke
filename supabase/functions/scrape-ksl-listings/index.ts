@@ -85,7 +85,7 @@ serve(async (req) => {
     }
 
     console.log(`🚀 Starting KSL scrape for: ${kslSearchUrl}`);
-    console.log(`   Max listings: ${maxListings}, Import to DB: ${importToDb}`);
+    console.log(`   Max listings: ${maxListings}, Import to DB: true (always queues)`);
 
     const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
     if (!FIRECRAWL_API_KEY) {

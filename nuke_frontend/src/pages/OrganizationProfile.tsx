@@ -464,6 +464,14 @@ export default function OrganizationProfile() {
     if (s.includes('google.com/s2/favicons') || s.includes('/s2/favicons')) return true;
     if (s.includes('favicon')) return true;
     if (s.endsWith('.ico')) return true;
+    // Filter out magazine/news publication logos (they're not appropriate for organization hero images)
+    if (s.includes('vanityfair') || s.includes('vanity-fair') || s.includes('vanity_fair')) return true;
+    if (s.includes('time.com') || s.includes('time.com/')) return true;
+    if (s.includes('forbes.com') || s.includes('forbes.com/')) return true;
+    if (s.includes('wsj.com') || s.includes('wallstreetjournal')) return true;
+    if (s.includes('nytimes.com') || s.includes('nytimes')) return true;
+    if (s.includes('theatlantic.com') || s.includes('theatlantic')) return true;
+    if (s.includes('newyorker.com') || s.includes('newyorker')) return true;
     return false;
   };
   const heroCandidates = [
