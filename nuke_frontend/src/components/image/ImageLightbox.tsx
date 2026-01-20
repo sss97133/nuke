@@ -162,20 +162,44 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
   const [rotation, setRotation] = useState(0);
   const [isSensitive, setIsSensitive] = useState(false);
   const [showTagger, setShowTagger] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [claimDialogOpen, setClaimDialogOpen] = useState(false);
+  const [claimTarget, setClaimTarget] = useState<{ platform: string; handle: string; profileUrl?: string | null } | null>(null);
+  const [claimProofType, setClaimProofType] = useState<'profile_link' | 'screenshot' | 'other'>('profile_link');
+  const [claimProofUrl, setClaimProofUrl] = useState('');
+  const [claimNotes, setClaimNotes] = useState('');
+  const [claimSubmitting, setClaimSubmitting] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   
-  const formatSourceLabel = (source: any) => {
-    const s = String(source || '').trim();
+  const formatIngestionLabel = (ingestion: any) => {
+    const s = String(ingestion || '').trim();
     if (!s) return 'Unknown';
-    if (s === 'bat_listing') return 'Bring a Trailer';
-    if (s === 'craigslist_scrape' || s === 'scraper') return 'Craigslist';
-    if (s === 'external_import') return 'External Import';
+    if (s === 'craigslist_scrape' || s === 'scraper') return 'Automation v.0';
+    if (s === 'bat_listing' || s === 'bat_import') return 'BaT import';
+    if (s === 'external_import') return 'External import';
+    if (s === 'user_upload') return 'User upload';
+    if (s === 'dropbox_import') return 'Dropbox import';
     return s
       .replace(/_/g, ' ')
       .replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  const formatPlatformLabelFromUrl = (url: string) => {
+    try {
+      const u = new URL(url);
+      const host = u.hostname.replace(/^www\./, '').toLowerCase();
+      if (host.includes('bringatrailer.com')) return 'Bring a Trailer';
+      if (host.includes('carsandbids.com')) return 'Cars & Bids';
+      if (host.includes('craigslist.org')) return 'Craigslist';
+      if (host.includes('mecum.com') || host.includes('images.mecum.com')) return 'Mecum';
+      return host;
+    } catch {
+      return url;
+    }
   };
 
   // Touch gesture handlers for swipe navigation + info panel
@@ -576,6 +600,18 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     });
   }, []);
 
+  // Reset transient analysis UI state when switching images
+  useEffect(() => {
+    setAnalysisError(null);
+    setClaimDialogOpen(false);
+    setClaimTarget(null);
+    setClaimSubmitting(false);
+    setClaimError(null);
+    setClaimProofType('profile_link');
+    setClaimProofUrl('');
+    setClaimNotes('');
+  }, [imageId]);
+
   // Load Metadata & Attribution
   const loadImageMetadata = useCallback(async () => {
     if (!imageId || (!vehicleId && !organizationId)) return;
@@ -725,6 +761,52 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           };
         }
       }
+
+      // 2.5. For auction images, infer the *origin* (seller) from listing data when available.
+      // This is distinct from the ingestion action (import/scrape) and helps preserve provenance.
+      let sellerInfo: any = null;
+      const isBatSource = (imgData.source === 'bat_listing' || imgData.source === 'bat_import') && vehicleId;
+      if (isBatSource) {
+        try {
+          const { data: listing } = await supabase
+            .from('bat_listings')
+            .select(`
+              bat_listing_url,
+              seller_username,
+              seller_external_identity_id,
+              seller_identity:external_identities!bat_listings_seller_external_identity_id_fkey (
+                id,
+                platform,
+                handle,
+                profile_url,
+                display_name,
+                claimed_by_user_id,
+                claim_confidence
+              )
+            `)
+            .eq('vehicle_id', vehicleId)
+            .order('auction_end_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const handle = listing?.seller_username || (listing as any)?.seller_identity?.handle || null;
+          if (handle) {
+            const sellerIdentity = (listing as any)?.seller_identity || null;
+            sellerInfo = {
+              platform: 'bat',
+              handle,
+              displayName: sellerIdentity?.display_name || null,
+              profileUrl: sellerIdentity?.profile_url || `https://bringatrailer.com/member/${handle}/`,
+              claimedByUserId: sellerIdentity?.claimed_by_user_id || null,
+              claimConfidence: sellerIdentity?.claim_confidence || null,
+              listingUrl: listing?.bat_listing_url || null
+            };
+          }
+        } catch (err) {
+          // Non-blocking: provenance may be incomplete in some envs.
+          sellerInfo = null;
+        }
+      }
       
       // 3. Load uploader profile (person who ran the import) - only if not BAT
       // For imported images (Craigslist, etc.), user_id is the importer, not the photographer
@@ -743,6 +825,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
         photographer: photographerInfo,
         uploader: uploaderInfo || null,
         organization: organizationInfo,
+        seller: sellerInfo,
         source: imgData.source,
         created_at: imgData.created_at
       });
@@ -769,7 +852,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           ? `${organizationInfo.relationshipLabel} • ${organizationInfo.name}`
           : organizationInfo.name;
         toast.innerHTML = `
-          <div style="font-weight: bold; margin-bottom: 4px;">Source</div>
+          <div style="font-weight: bold; margin-bottom: 4px;">Linked organization</div>
           <div style="font-size: 11px; margin-bottom: 2px;">${organizationInfo.name}</div>
           ${organizationInfo.relationshipLabel ? `<div style="font-size: 10px; color: #ccc;">${organizationInfo.relationshipLabel}</div>` : ''}
           <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: transparent; color: #fff; border: none; padding: 2px 6px; font-size: 14px; cursor: pointer; font-weight: bold;">×</button>
@@ -830,14 +913,25 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
   const runImageAnalysis = useCallback(
     async (opts?: { forceReprocess?: boolean }) => {
-      if (!imageUrl || !vehicleId) return;
+      if (!imageUrl) return;
 
-      // Without image_id we can’t reliably hit caching/persistence; skip to avoid spend.
+      // Without image_id we can’t reliably hit caching/persistence.
       if (!imageId) {
-        console.warn('[ImageLightbox] Skipping AI analysis: missing imageId');
+        const msg = 'Missing image ID — cannot run analysis safely.';
+        console.warn('[ImageLightbox] Skipping AI analysis:', msg);
+        setAnalysisError(msg);
         return;
       }
 
+      // If explicitly forcing reprocess, confirm intent (can increase spend).
+      if (opts?.forceReprocess) {
+        const confirmed = window.confirm(
+          'Force reprocess this image?\n\nThis can trigger a new paid AI run even if we already have results.'
+        );
+        if (!confirmed) return;
+      }
+
+      setAnalysisError(null);
       const userId = session?.user?.id || null;
 
       const result = await triggerAIAnalysis(imageUrl, timelineEventId, vehicleId, {
@@ -852,6 +946,8 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
           loadTags();
           loadImageMetadata();
         }, 2000);
+      } else if (result.error) {
+        setAnalysisError(result.error);
       }
     },
     [imageUrl, vehicleId, imageId, session?.user?.id, triggerAIAnalysis, timelineEventId, loadTags, loadImageMetadata]
@@ -1207,7 +1303,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
               // Alt/Option click = explicit force reprocess
               await runImageAnalysis({ forceReprocess: (e as any)?.altKey === true });
             }}
-            disabled={analyzing || !imageUrl || !vehicleId || !imageId}
+            disabled={analyzing || !imageUrl || !imageId}
             className={`px-3 py-1.5 border-2 text-[9px] font-bold uppercase tracking-wide transition-all duration-150 ${
               analyzing 
                 ? 'bg-[#2a2a2a] text-white/40 border-white/10 cursor-not-allowed' 
@@ -1680,182 +1776,233 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
 
                   {attribution && (
                     <div>
-                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Source</h4>
+                      <h4 style={{ fontSize: '7pt', fontWeight: 'bold', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', marginBottom: '4px' }}>Provenance</h4>
                       <div style={{ fontSize: '8pt', color: '#fff' }}>
-                        {/* Source URL (clickable link to original) */}
                         {(() => {
-                          const sourceUrl = imageMetadata?.exif_data?.source_url || 
-                                          imageMetadata?.exif_data?.discovery_url ||
-                                          imageMetadata?.source_url;
-                          const sourceName = formatSourceLabel(attribution.source);
-                          
-                          // Get Craigslist URL for favicon if it's a Craigslist source
-                          const craigslistUrl = (attribution.source === 'craigslist_scrape' || attribution.source === 'scraper') 
-                            ? (sourceUrl || 'https://craigslist.org')
-                            : sourceUrl;
-                          
-                          return sourceUrl ? (
-                            <div style={{ marginBottom: '6px' }}>
-                              <a 
-                                href={sourceUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                style={{ 
-                                  color: '#4A9EFF', 
-                                  textDecoration: 'underline',
-                                  wordBreak: 'break-all',
-                                  fontSize: '7pt',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '3px'
-                                }}
-                              >
-                                <FaviconIcon url={craigslistUrl} matchTextSize={true} textSize={7} />
-                                {sourceName}
-                              </a>
-                            </div>
-                          ) : null;
-                        })()}
-                        
-                        {/* Triggered by (who ran the extraction) */}
-                        {attribution.uploader && (attribution.source === 'craigslist_scrape' || attribution.source === 'scraper') && (
-                          <div style={{ marginBottom: '6px' }}>
-                            <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Triggered by:</div>
-                            <button
-                              onClick={() => {
-                                const profileCard = document.createElement('div');
-                                profileCard.className = 'profile-toast';
-                                profileCard.innerHTML = `
-                                  <div style="position: fixed; top: 20px; right: 20px; z-index: 10000; background: #000; border: 2px solid #fff; padding: 12px; max-width: 280px; font-size: 8pt;">
-                                    <div style="color: #fff; font-weight: bold; margin-bottom: 6px;">
-                                      ${attribution.uploader.full_name || attribution.uploader.username || 'User'}
-                                    </div>
-                                    <div style="color: #bbb; font-size: 7pt; margin-bottom: 6px;">
-                                      @${attribution.uploader.username || 'user'}
-                                    </div>
-                                    <a href="/profile/${attribution.uploader.id}" style="color: #4A9EFF; font-size: 7pt; text-decoration: underline;">
-                                      View Profile →
-                                    </a>
-                                    <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: #fff; color: #000; border: none; padding: 2px 6px; font-size: 8pt; cursor: pointer;">
-                                      ✕
-                                    </button>
-                                  </div>
-                                `;
-                                document.body.appendChild(profileCard);
-                                setTimeout(() => profileCard.remove(), 5000);
-                              }}
-                              style={{ 
-                                color: '#4A9EFF', 
-                                textDecoration: 'underline',
-                                cursor: 'pointer',
-                                fontSize: '7pt',
-                                background: 'none',
-                                border: 'none',
-                                padding: 0
-                              }}
-                            >
-                              {attribution.uploader.full_name || attribution.uploader.username}
-                            </button>
-                          </div>
-                        )}
-                        
-                        {/* Action type */}
-                        {attribution.source && (() => {
-                          // Try multiple sources for the URL
-                          const sourceUrl = imageMetadata?.exif_data?.source_url || 
-                                          imageMetadata?.exif_data?.discovery_url ||
-                                          imageMetadata?.source_url ||
-                                          (imageMetadata?.exif_data?.metadata?.discovery_url) ||
-                                          (imageMetadata?.exif_data?.metadata?.listing_url);
-                          
-                          // For Craigslist sources, always show a clickable badge with favicon
-                          // Use the source URL if available, otherwise use generic Craigslist URL
-                          const isCraigslistSource = attribution.source === 'craigslist_scrape' || attribution.source === 'scraper';
-                          const actionUrl = isCraigslistSource 
-                            ? (sourceUrl || 'https://craigslist.org')
-                            : sourceUrl;
-                          
-                          // Format action label - replace "scrape" with "automation v.0"
-                          const formatActionLabel = (source: string) => {
-                            if (source === 'craigslist_scrape' || source === 'scraper') {
-                              return 'automation v.0';
-                            }
-                            return source.replace(/_/g, ' ');
-                          };
-                          
+                          const platformUrl =
+                            attribution?.seller?.listingUrl ||
+                            imageMetadata?.exif_data?.source_url ||
+                            imageMetadata?.exif_data?.discovery_url ||
+                            imageMetadata?.source_url ||
+                            (imageMetadata?.exif_data?.metadata?.discovery_url) ||
+                            (imageMetadata?.exif_data?.metadata?.listing_url) ||
+                            null;
+
+                          const platformLabel = platformUrl ? formatPlatformLabelFromUrl(platformUrl) : null;
+
+                          const ingestionLabel = formatIngestionLabel(attribution.source);
+                          const ingestionUrl =
+                            platformUrl ||
+                            (attribution.source === 'craigslist_scrape' || attribution.source === 'scraper'
+                              ? 'https://craigslist.org'
+                              : null);
+
                           return (
-                            <div style={{ marginBottom: '6px' }}>
-                              <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Action:</div>
-                              {actionUrl ? (
-                                <a
-                                  href={actionUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    fontSize: '7pt',
-                                    color: 'var(--text-muted)',
-                                    padding: '1px 6px',
-                                    background: 'rgba(255,255,255,0.05)',
-                                    borderRadius: '3px',
-                                    whiteSpace: 'nowrap',
-                                    textDecoration: 'none',
-                                    textTransform: 'uppercase',
-                                    cursor: 'pointer'
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                                  }}
-                                >
-                                  <FaviconIcon url={actionUrl} matchTextSize={true} textSize={7} />
-                                  {formatActionLabel(attribution.source)}
-                                </a>
-                              ) : (
-                                <div style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontSize: '7pt',
-                                  color: 'var(--text-muted)',
-                                  padding: '1px 6px',
-                                  background: 'rgba(255,255,255,0.05)',
-                                  borderRadius: '3px',
-                                  whiteSpace: 'nowrap',
-                                  textTransform: 'uppercase'
-                                }}>
-                                  {isCraigslistSource ? (
-                                    <>
-                                      <FaviconIcon url="https://craigslist.org" matchTextSize={true} textSize={7} />
-                                      {formatActionLabel(attribution.source)}
-                                    </>
+                            <>
+                              {/* Origin (photographer or seller) */}
+                              {attribution.seller?.handle && (
+                                <div style={{ marginBottom: '8px' }}>
+                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                    Origin (seller)
+                                  </div>
+                                  <a
+                                    href={attribution.seller.profileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      color: '#4A9EFF',
+                                      textDecoration: 'underline',
+                                      fontSize: '7pt',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px'
+                                    }}
+                                  >
+                                    <FaviconIcon url={attribution.seller.profileUrl} matchTextSize={true} textSize={7} />
+                                    {attribution.seller.displayName
+                                      ? `${attribution.seller.displayName} (@${attribution.seller.handle})`
+                                      : `@${attribution.seller.handle}`}
+                                  </a>
+                                  <div style={{ fontSize: '6pt', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>
+                                    Inferred from auction listing (seller-provided photos)
+                                  </div>
+                                  {attribution.seller.claimedByUserId ? (
+                                    <div style={{ fontSize: '6pt', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+                                      Claimed •{' '}
+                                      <a
+                                        href={`/profile/${attribution.seller.claimedByUserId}`}
+                                        style={{ color: '#4A9EFF', textDecoration: 'underline' }}
+                                      >
+                                        View profile →
+                                      </a>
+                                    </div>
                                   ) : (
-                                    formatActionLabel(attribution.source)
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          const { data: { user } } = await supabase.auth.getUser();
+                                          if (!user) {
+                                            alert('Please sign in to claim this identity.');
+                                            return;
+                                          }
+                                          const { data, error } = await supabase.rpc('request_external_identity_claim', {
+                                            p_platform: 'bat',
+                                            p_handle: attribution.seller.handle,
+                                            p_profile_url: attribution.seller.profileUrl,
+                                            p_proof_type: 'profile_link',
+                                            p_proof_url: null,
+                                            p_notes: 'Claim request from image provenance panel'
+                                          } as any);
+                                          if (error) {
+                                            alert(`Claim request failed: ${error.message}`);
+                                            return;
+                                          }
+                                          alert('Claim request submitted. Add the proof link and we’ll review it.');
+                                        } catch (err) {
+                                          alert(`Claim request failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                                        }
+                                      }}
+                                      style={{
+                                        marginTop: '6px',
+                                        padding: '4px 8px',
+                                        fontSize: '7pt',
+                                        fontWeight: 'bold',
+                                        backgroundColor: 'rgba(255,255,255,0.05)',
+                                        color: 'rgba(255,255,255,0.7)',
+                                        border: '1px solid rgba(255,255,255,0.2)',
+                                        cursor: 'pointer',
+                                        textTransform: 'uppercase'
+                                      }}
+                                    >
+                                      Claim
+                                    </button>
                                   )}
                                 </div>
                               )}
-                            </div>
+
+                              {attribution.photographer && (
+                                <div style={{ marginBottom: '8px' }}>
+                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                    Origin (photographer)
+                                  </div>
+                                  <div style={{ fontSize: '7pt' }}>
+                                    {attribution.photographer.name}
+                                    {attribution.photographer.camera && (
+                                      <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '4px', fontSize: '6pt' }}>
+                                        ({attribution.photographer.camera})
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Platform (listing/discovery URL) */}
+                              {platformUrl && (
+                                <div style={{ marginBottom: '8px' }}>
+                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                    Platform
+                                  </div>
+                                  <a
+                                    href={platformUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      color: '#4A9EFF',
+                                      textDecoration: 'underline',
+                                      wordBreak: 'break-all',
+                                      fontSize: '7pt',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px'
+                                    }}
+                                  >
+                                    <FaviconIcon url={platformUrl} matchTextSize={true} textSize={7} />
+                                    {platformLabel}
+                                  </a>
+                                </div>
+                              )}
+
+                              {/* Acquisition method (ingestion pipeline) */}
+                              {attribution.source && (
+                                <div style={{ marginBottom: '6px' }}>
+                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                    Acquired via
+                                  </div>
+                                  {ingestionUrl ? (
+                                    <a
+                                      href={ingestionUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontSize: '7pt',
+                                        color: 'var(--text-muted)',
+                                        padding: '1px 6px',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        borderRadius: '3px',
+                                        whiteSpace: 'nowrap',
+                                        textDecoration: 'none',
+                                        textTransform: 'uppercase'
+                                      }}
+                                    >
+                                      <FaviconIcon url={ingestionUrl} matchTextSize={true} textSize={7} />
+                                      {ingestionLabel}
+                                    </a>
+                                  ) : (
+                                    <div
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontSize: '7pt',
+                                        color: 'var(--text-muted)',
+                                        padding: '1px 6px',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        borderRadius: '3px',
+                                        whiteSpace: 'nowrap',
+                                        textTransform: 'uppercase'
+                                      }}
+                                    >
+                                      {ingestionLabel}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Imported/uploaded by (if known) */}
+                              {attribution.uploader && (
+                                <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                    Imported by
+                                  </div>
+                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.8)' }}>
+                                    {attribution.uploader.full_name || attribution.uploader.username || 'User'}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Organization relationship (not the photo source) */}
+                              {attribution.organization && (
+                                <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                                  <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
+                                    Linked organization
+                                  </div>
+                                  <div style={{ fontSize: '7pt' }}>
+                                    {attribution.organization.name}
+                                    {attribution.organization.relationshipLabel ? (
+                                      <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '4px', fontSize: '6pt' }}>
+                                        ({attribution.organization.relationshipLabel})
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           );
                         })()}
                         
-                        {/* Photographer (if known) */}
-                        {attribution.photographer && (
-                          <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                            <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>Photographer:</div>
-                            <div style={{ fontSize: '7pt' }}>
-                              {attribution.photographer.name}
-                              {attribution.photographer.camera && (
-                                <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: '4px', fontSize: '6pt' }}>
-                                  ({attribution.photographer.camera})
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}
@@ -1870,7 +2017,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                         imageMetadata?.ai_scan_metadata?.scanned_at ||
                         imageMetadata?.ai_scan_metadata?.appraiser?.analyzed_at
                     );
-                    const canTriggerAnalysis = Boolean(vehicleId && imageUrl && imageId);
+                    const canTriggerAnalysis = Boolean(imageUrl && imageId);
                     const shouldShowSection = hasVisionAnalysis || Boolean(angleData?.primary_label) || canTriggerAnalysis;
                     
                     // Only show section if we have analysis OR if user can trigger it
@@ -1959,6 +2106,18 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                           </div>
                         )}
 
+                        {/* Live progress + last error (so “nothing happened” is obvious) */}
+                        {analyzing && analysisProgress && (
+                          <div style={{ fontSize: '7pt', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>
+                            {analysisProgress}
+                          </div>
+                        )}
+                        {analysisError && (
+                          <div style={{ fontSize: '7pt', color: '#fca5a5', marginBottom: '8px' }}>
+                            {analysisError}
+                          </div>
+                        )}
+
                         {/* DB Columns Section */}
                         {imageMetadata && (
                           <div style={{ marginBottom: '12px' }}>
@@ -1976,7 +2135,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
                             }}>
                               <DataRow label="Image Category" value={imageMetadata.image_category} mono />
                               <DataRow label="Category" value={imageMetadata.category} mono />
-                              <DataRow label="Source" value={imageMetadata.source} mono />
+                              <DataRow label="Ingestion" value={imageMetadata.source} mono />
                               <DataRow label="Taken At" value={imageMetadata.taken_at ? new Date(imageMetadata.taken_at).toISOString() : null} mono />
                               <DataRow label="Primary Image" value={imageMetadata.is_primary} mono />
                               <DataRow label="Angle" value={imageMetadata.angle} mono />

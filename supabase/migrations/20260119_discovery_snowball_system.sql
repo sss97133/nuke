@@ -9,38 +9,68 @@
 -- - Builders (Icon 4x4, Ring Brothers) → portfolio → vehicles
 
 -- ==============================================================================
--- STEP 1: Expand organization types to include all entity categories
+-- STEP 1: Remove CHECK constraint - let business_type grow organically
 -- ==============================================================================
 
--- First, let's add the new business types to the check constraint
+-- PHILOSOPHY: business_type should be FREEFORM TEXT - let discovery expand it.
+-- We track known types in business_type_taxonomy for reference, but don't constrain.
+
 ALTER TABLE businesses
   DROP CONSTRAINT IF EXISTS businesses_business_type_check;
 
-ALTER TABLE businesses
-  ADD CONSTRAINT businesses_business_type_check
-  CHECK (business_type IN (
-    -- Original types
-    'sole_proprietorship', 'partnership', 'llc', 'corporation',
-    'garage', 'dealership', 'restoration_shop', 'performance_shop',
-    'body_shop', 'detailing', 'mobile_service', 'specialty_shop',
-    'parts_supplier', 'fabrication', 'racing_team',
-    -- New types for discovery snowball
-    'builder',              -- Icon 4x4, Ring Brothers, Kindred, Emory Porsche
-    'collection',           -- Private collections, museums
-    'auction_house',        -- BaT, C&B, RM Sotheby's, Mecum
-    'marketplace',          -- Classic.com, Hemmings, etc.
-    'event',                -- Monterey Car Week, Amelia Island, etc.
-    'influencer',           -- YouTube channels, Instagram accounts
-    'media',                -- Petrolicious, Jay Leno's Garage, DriveTribe
-    'registry',             -- exclusivecarregistry.com, marque registries
-    'club',                 -- Marque clubs, enthusiast organizations
-    'web_developer',        -- Dealers for dealerships (SpeedDigital, DealerFire)
-    'insurance',            -- Hagerty, Grundy
-    'finance',              -- Woodside Credit, JJ Best
-    'transport',            -- Enclosed auto transport
-    'storage',              -- Climate-controlled storage facilities
-    'other'
-  ));
+-- business_type is now freeform TEXT - discovery can add any type it finds
+
+-- ==============================================================================
+-- STEP 1b: Create taxonomy table to track discovered business types
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS business_type_taxonomy (
+    type_name TEXT PRIMARY KEY,
+    category TEXT,  -- 'service', 'sales', 'media', 'support', 'organization'
+    description TEXT,
+    example_businesses TEXT[],
+    discovery_count INTEGER DEFAULT 0,
+    first_discovered_at TIMESTAMPTZ DEFAULT NOW(),
+    last_discovered_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Seed with known types (but these are not enforced)
+INSERT INTO business_type_taxonomy (type_name, category, description) VALUES
+    ('dealership', 'sales', 'Sells vehicles'),
+    ('auction_house', 'sales', 'Auctions vehicles (BaT, C&B, RM Sothebys)'),
+    ('marketplace', 'sales', 'Online marketplace (Classic.com, Hemmings)'),
+    ('restoration_shop', 'service', 'Restores vehicles'),
+    ('performance_shop', 'service', 'Performance modifications'),
+    ('body_shop', 'service', 'Body work and paint'),
+    ('garage', 'service', 'General automotive service'),
+    ('builder', 'service', 'Custom builds (Icon 4x4, Ring Brothers, Singer)'),
+    ('fabrication', 'service', 'Metal fabrication and custom parts'),
+    ('detailing', 'service', 'Detailing and paint correction'),
+    ('parts_supplier', 'support', 'Parts and accessories'),
+    ('transport', 'support', 'Vehicle transport'),
+    ('storage', 'support', 'Vehicle storage facilities'),
+    ('insurance', 'support', 'Collector car insurance (Hagerty)'),
+    ('finance', 'support', 'Vehicle financing'),
+    ('collection', 'organization', 'Private collection or museum'),
+    ('club', 'organization', 'Marque club or enthusiast group'),
+    ('registry', 'organization', 'Vehicle registry'),
+    ('event', 'organization', 'Car shows and events'),
+    ('media', 'media', 'Automotive media (Petrolicious, DriveTribe)'),
+    ('influencer', 'media', 'Social media influencer'),
+    ('youtube_channel', 'media', 'YouTube automotive content'),
+    ('web_developer', 'support', 'Dealer website platforms (SpeedDigital, DealerFire)')
+ON CONFLICT (type_name) DO NOTHING;
+
+-- ==============================================================================
+-- STEP 1c: Link scrape_sources to businesses
+-- ==============================================================================
+
+ALTER TABLE scrape_sources
+  ADD COLUMN IF NOT EXISTS business_id UUID REFERENCES businesses(id);
+
+CREATE INDEX IF NOT EXISTS idx_scrape_sources_business ON scrape_sources(business_id) WHERE business_id IS NOT NULL;
+
+COMMENT ON COLUMN scrape_sources.business_id IS 'Links this source to a business/organization';
 
 -- ==============================================================================
 -- STEP 2: Create discovery_leads table for tracking lead chains
