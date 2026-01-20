@@ -1559,6 +1559,7 @@ const AdminMissionControl: React.FC = () => {
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
           {[
+            { label: 'RALPH BRIEF', sublabel: 'Daily triage + next steps', path: '/admin/ralph', primary: true },
             { label: 'SCRIPT CONTROL', sublabel: 'Batch operations', path: '/admin/scripts' },
             { label: 'IMAGE PROCESSING', sublabel: 'Monitor pipeline', path: '/admin/image-processing' },
             { label: 'LIVE ANALYSIS', sublabel: 'Real-time progress', path: '/admin/live-analysis', primary: true },

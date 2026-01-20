@@ -100,6 +100,9 @@ export default function AdminHome() {
                 updated {ralphUpdatedAt.toLocaleTimeString()}
               </div>
             )}
+            <Link className="button button-secondary" to="/admin/ralph">
+              Full page
+            </Link>
             <button
               className="button button-secondary"
               disabled={ralphLoading}

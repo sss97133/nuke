@@ -32,6 +32,7 @@ import HoverCardDemo from '../../../pages/admin/HoverCardDemo';
 import VehicleMakeLogosCatalog from '../../../pages/admin/VehicleMakeLogosCatalog';
 import MarketDataTools from '../../../pages/MarketDataTools';
 import BotTestDashboard from '../../../pages/admin/BotTestDashboard';
+import AdminRalphBrief from '../../../pages/admin/AdminRalphBrief';
 
 const AdminModuleRoutes = () => {
   return (
@@ -48,6 +49,7 @@ const AdminModuleRoutes = () => {
         <Route path="pending-vehicles" element={<AdminPendingVehicles />} />
 
         {/* Ops */}
+        <Route path="ralph" element={<AdminRalphBrief />} />
         <Route path="mission-control" element={<AdminMissionControl />} />
         <Route path="scripts" element={<ScriptControlCenter />} />
         <Route path="image-processing" element={<ImageProcessingDashboard />} />
