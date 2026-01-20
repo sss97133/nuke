@@ -1,86 +1,99 @@
 # START HERE - For Any LLM
 
-## Extract ONE BaT Vehicle
+**Updated:** Jan 19, 2026
 
-```bash
-./scripts/extract-bat-vehicle.sh "https://bringatrailer.com/listing/1969-chevrolet-c10-pickup-193/"
+## What This System Does
+
+Extracts vehicle data from auction sites (BaT, Cars & Bids, Mecum, etc.) and stores it in Supabase.
+
+## The Core Pipeline
+
+```
+pipeline-orchestrator (every 10 min)
+    ├── sync-active-auctions → finds new listings
+    ├── extract-all-orgs-inventory → scrapes dealer sites
+    └── routes import_queue items to:
+        ├── extract-bat-core + extract-auction-comments (for BaT)
+        └── process-import-queue (for everything else)
+
+backfill-origin-vehicle-images (every 15 min)
+    └── backfill-images → downloads images to storage
 ```
 
-## Extract MANY BaT Vehicles
+## Key Functions (APPROVED)
+
+| Function | Purpose |
+|----------|---------|
+| `pipeline-orchestrator` | Main controller, runs everything |
+| `extract-bat-core` | BaT Step 1: VIN, specs, images |
+| `extract-auction-comments` | BaT Step 2: Comments and bids |
+| `process-import-queue` | Generic URL extraction |
+| `backfill-images` | Download images to storage |
+
+## DEPRECATED - Don't Use These
+
+- ❌ `comprehensive-bat-extraction`
+- ❌ `import-bat-listing`
+- ❌ `bat-extract-complete-v*`
+- ❌ `bat-simple-extract`
+- ❌ `extract-premium-auction` (replaced by extract-bat-core)
+
+## Quick Debug
 
 ```bash
-# Edit this list, then run
-URLS=(
-  "https://bringatrailer.com/listing/url-1/"
-  "https://bringatrailer.com/listing/url-2/"
-  "https://bringatrailer.com/listing/url-3/"
-)
+# Check GitHub Actions failures
+gh run list --limit 20 --status failure
 
-for URL in "${URLS[@]}"; do
-  ./scripts/extract-bat-vehicle.sh "$URL"
-  sleep 5
-done
+# View specific failure
+gh run view <run_id> --log | tail -100
 ```
 
-## Verify It Worked
+## Check Queue Health
 
 ```sql
-SELECT v.vin, v.mileage, v.color,
-  (SELECT COUNT(*) FROM vehicle_images WHERE vehicle_id = v.id) as imgs,
-  (SELECT COUNT(*) FROM auction_comments WHERE vehicle_id = v.id) as comments
-FROM vehicles v 
-WHERE v.discovery_url = 'YOUR_BAT_URL';
+-- Queue status
+SELECT status, count(*) FROM import_queue GROUP BY status;
+SELECT status, count(*) FROM bat_extraction_queue GROUP BY status;
+
+-- Recent profiles
+SELECT date_trunc('day', created_at) as day, count(*)
+FROM vehicles
+WHERE created_at > NOW() - INTERVAL '7 days'
+GROUP BY 1 ORDER BY 1 DESC;
 ```
 
-Expect: VIN, mileage, color, imgs > 0, comments > 0
+## Common Fixes
 
-## Scale to 1000s of Vehicles
+| Problem | Fix |
+|---------|-----|
+| 504 timeout | Reduce batch_size in workflow |
+| Invalid JWT | Redeploy function with verify_jwt: false |
+| Stuck in processing | pipeline-orchestrator auto-unlocks after 15 min |
+| No data extracted | Check API keys (FIRECRAWL, OPENAI, etc.) |
 
-1. **Queue processor**: ✅ FIXED - Now uses `extract-premium-auction` + `extract-auction-comments`
+## Key Files
 
-2. **Queue all vehicles**:
-   ```sql
-   INSERT INTO bat_extraction_queue (vehicle_id, bat_auction_url, status)
-   SELECT id, discovery_url, 'pending'
-   FROM vehicles
-   WHERE discovery_url LIKE '%bringatrailer.com%';
-   ```
+| File | Purpose |
+|------|---------|
+| `FUNCTION_MAP.md` | Complete function reference |
+| `PIPELINE_STATUS.md` | Current issues and fixes |
+| `.github/workflows/pipeline-orchestrator.yml` | Main cron |
+| `supabase/functions/pipeline-orchestrator/index.ts` | Main controller |
 
-3. **Enable cron** (processes 10 every 5 minutes):
-   ```sql
-   SELECT cron.schedule(
-     'process-bat-queue', '*/5 * * * *',
-     $$SELECT net.http_post(
-       url:='https://qkgaybvrernstplzjaam.supabase.co/functions/v1/process-bat-extraction-queue',
-       headers:='{"Authorization": "Bearer SERVICE_KEY"}'::jsonb,
-       body:='{"batchSize": 10}'::jsonb
-     );$$
-   );
-   ```
+## Budget
 
-**Result**: 2,000+ vehicles/day automated
+- $500 total for extraction
+- Target: $0.003/profile
+- Use direct fetch when possible (FREE)
+- Firecrawl only when needed ($0.002/page)
 
-## Documentation
+## Rules
 
-- `docs/LLM_INSTRUCTIONS_SIMPLE.md` - Simple instructions
-- `docs/SCALE_PLAN.md` - Scale plan
-- `docs/architecture/BAT_EXTRACTION_SYSTEM_LOCKED.md` - Full system spec
-- `docs/architecture/FUNCTION_RETIREMENT_PLAN.md` - What to delete
-
-## Don't Use These (They're Broken)
-
-- `bat-extract-complete-v2`
-- `bat-extract-complete-v3`
-- `comprehensive-bat-extraction`
-- `bat-simple-extract`
-
-## Use These (They Work)
-
-- `extract-premium-auction`
-- `extract-auction-comments`
-- OR: `./scripts/extract-bat-vehicle.sh`
+1. **Fix existing functions** - don't write new ones
+2. **Check what's already built** - 200+ functions exist
+3. **Small batch sizes** - prevent timeouts
+4. **Trust FUNCTION_MAP.md** - other docs may be outdated
 
 ---
 
-**TL;DR**: Run the script. Check with SQL. Scale with queue + cron. Don't use old functions.
-
+**Don't read more docs. Fix the one thing that's broken.**
