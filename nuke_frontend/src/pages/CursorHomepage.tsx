@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase, SUPABASE_URL } from '../lib/supabase';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { UserInteractionService } from '../services/userInteractionService';
@@ -404,6 +404,23 @@ const CursorHomepage: React.FC = () => {
   const [filteredRenderLimit, setFilteredRenderLimit] = useState<number>(DEFAULT_FILTERED_RENDER_LIMIT);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [infoDense, setInfoDense] = useState<boolean>(false);
+
+  // Some environments may not have `vehicles.listing_kind` yet (migration not applied).
+  // We optimistically use it, but fall back automatically if PostgREST reports it missing.
+  const listingKindSupportedRef = useRef<boolean>(true);
+  const isMissingListingKindColumn = useCallback((err: any) => {
+    const code = String((err as any)?.code || '');
+    const message = String(err?.message || '').toLowerCase();
+    return code === '42703' || (message.includes('listing_kind') && message.includes('does not exist'));
+  }, []);
+  const runVehiclesQueryWithListingKindFallback = useCallback(async (builder: (includeListingKind: boolean) => any) => {
+    const first = await builder(listingKindSupportedRef.current);
+    if (first?.error && isMissingListingKindColumn(first.error)) {
+      listingKindSupportedRef.current = false;
+      return await builder(false);
+    }
+    return first;
+  }, [isMissingListingKindColumn]);
   
   // Location favorites state
   const [locationFavorites, setLocationFavorites] = useState<Array<{ zipCode: string; radiusMiles: number; label?: string }>>(() => {
@@ -459,6 +476,12 @@ const CursorHomepage: React.FC = () => {
   const [ralphPresets, setRalphPresets] = useState<RalphHomepagePreset[]>([]);
   const [ralphLoading, setRalphLoading] = useState(false);
   const [ralphError, setRalphError] = useState<string | null>(null);
+  type StatsPanelKind = 'vehicles' | 'value' | 'for_sale' | 'sold_today' | 'auctions';
+  const [statsPanel, setStatsPanel] = useState<StatsPanelKind | null>(null);
+  const [statsPanelLoading, setStatsPanelLoading] = useState(false);
+  const [statsPanelError, setStatsPanelError] = useState<string | null>(null);
+  const [statsPanelRows, setStatsPanelRows] = useState<any[]>([]);
+  const [statsPanelMeta, setStatsPanelMeta] = useState<any>(null);
   const [orgWebsitesById, setOrgWebsitesById] = useState<Record<string, string>>({});
   const navigate = useNavigate();
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
@@ -673,13 +696,16 @@ const CursorHomepage: React.FC = () => {
 
         // Also load distinct makes from vehicles as a fallback / augmentation.
         // We only keep "clean-looking" makes that appear more than once to reduce junk.
-        const { data: makeData } = await supabase
-          .from('vehicles')
-          .select('make')
-          .eq('is_public', true)
-          .eq('listing_kind', 'vehicle')
-          .not('make', 'is', null)
-          .limit(5000);
+        const { data: makeData } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+          let q = supabase
+            .from('vehicles')
+            .select('make')
+            .eq('is_public', true);
+          if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+          return q
+            .not('make', 'is', null)
+            .limit(5000);
+        });
 
         const makeCounts = new Map<string, number>();
         for (const row of (makeData || []) as any[]) {
@@ -729,13 +755,16 @@ const CursorHomepage: React.FC = () => {
         }
 
         // Fallback: load raw body_style values from vehicles and normalize to display buckets.
-        const { data: bodyData } = await supabase
-          .from('vehicles')
-          .select('body_style')
-          .eq('is_public', true)
-          .eq('listing_kind', 'vehicle')
-          .not('body_style', 'is', null)
-          .limit(5000);
+        const { data: bodyData } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+          let q = supabase
+            .from('vehicles')
+            .select('body_style')
+            .eq('is_public', true);
+          if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+          return q
+            .not('body_style', 'is', null)
+            .limit(5000);
+        });
 
         const counts = new Map<string, number>();
         for (const row of (bodyData || []) as any[]) {
@@ -1298,11 +1327,19 @@ const CursorHomepage: React.FC = () => {
     totalVehicles: 0,
     totalValue: 0,
     salesVolume: 0,
+    salesCountToday: 0,
     forSaleCount: 0,
     activeAuctions: 0,
     totalBids: 0,
     avgValue: 0,
     vehiclesAddedToday: 0,
+    valueMarkTotal: 0,
+    valueAskTotal: 0,
+    valueRealizedTotal: 0,
+    valueCostTotal: 0,
+    valueImportedToday: 0,
+    valueImported24h: 0,
+    valueImported7d: 0,
   });
   const [filteredStatsLoading, setFilteredStatsLoading] = useState(false);
 
@@ -1317,57 +1354,62 @@ const CursorHomepage: React.FC = () => {
       setFilteredStatsLoading(true);
       
       // Build query with filters applied
-      let query = supabase
-        .from('vehicles')
-        // Keep this payload lean: this query runs as you type/search and shouldn't pull display-only fields.
-        .select(
-          'sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, sale_date, created_at, year, make, model, title, vin, discovery_url, discovery_source, profile_origin, image_count',
-          { count: 'exact' }
-        )
-        .eq('is_public', true)
-        .eq('listing_kind', 'vehicle')
-        .neq('status', 'pending');
+      const buildFilteredStatsQuery = (includeListingKind: boolean) => {
+        let query = supabase
+          .from('vehicles')
+          // Keep this payload lean: this query runs as you type/search and shouldn't pull display-only fields.
+          .select(
+            'sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, sale_date, created_at, year, make, model, title, vin, discovery_url, discovery_source, profile_origin, image_count',
+            { count: 'exact' }
+          )
+          .eq('is_public', true)
+          .neq('status', 'pending');
+        if (includeListingKind) query = query.eq('listing_kind', 'vehicle');
 
-      // "Added today" filter (created_at within local day)
-      if (filters.addedTodayOnly) {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(start);
-        end.setDate(end.getDate() + 1);
-        query = query.gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
+        // "Added today" filter (created_at within local day)
+        if (filters.addedTodayOnly) {
+          const start = new Date();
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(start);
+          end.setDate(end.getDate() + 1);
+          query = query.gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
+        }
+
+        // Year filters
+        if (filters.yearMin) {
+          query = query.gte('year', filters.yearMin);
+        }
+        if (filters.yearMax) {
+          query = query.lte('year', filters.yearMax);
+        }
+
+        // Make filters
+        if (filters.makes.length > 0) {
+          // Use OR for multiple makes - Supabase .or() syntax
+          const makeFilters = filters.makes.map(make => `make.ilike.%${make}%`).join(',');
+          query = query.or(makeFilters);
+        }
+
+        // For sale filter
+        if (filters.forSale) {
+          query = query.eq('is_for_sale', true);
+        }
+
+        // Hide sold filter - vehicles that are NOT sold
+        if (filters.hideSold) {
+          query = query.or('sale_status.neq.sold,sale_status.is.null');
+        }
+
+        return query;
+      };
+
+      // Execute query (with listing_kind fallback if needed)
+      let query = buildFilteredStatsQuery(listingKindSupportedRef.current);
+      let { data: vehicles, count, error } = await query;
+      if (error && isMissingListingKindColumn(error)) {
+        listingKindSupportedRef.current = false;
+        ({ data: vehicles, count, error } = await buildFilteredStatsQuery(false));
       }
-
-      // Year filters
-      if (filters.yearMin) {
-        query = query.gte('year', filters.yearMin);
-      }
-      if (filters.yearMax) {
-        query = query.lte('year', filters.yearMax);
-      }
-
-      // Make filters
-      if (filters.makes.length > 0) {
-        // Use OR for multiple makes - Supabase .or() syntax
-        const makeFilters = filters.makes.map(make => `make.ilike.%${make}%`).join(',');
-        query = query.or(makeFilters);
-      }
-
-      // For sale filter
-      if (filters.forSale) {
-        query = query.eq('is_for_sale', true);
-      }
-
-      // Hide sold filter - vehicles that are NOT sold
-      if (filters.hideSold) {
-        query = query.or('sale_status.neq.sold,sale_status.is.null');
-      }
-
-      // Source filters - we'll filter by discovery_source and discovery_url patterns
-      // Note: classifySource uses discovery_url patterns, so we'll do source filtering client-side
-      // to match the exact same logic
-
-      // Execute query
-      const { data: vehicles, count, error } = await query;
 
       if (error) {
         console.error('Error loading filtered stats:', error);
@@ -1459,6 +1501,25 @@ const CursorHomepage: React.FC = () => {
       let forSaleCount = 0;
       let activeAuctions = 0;
       let totalBids = 0;
+      let salesCountToday = 0;
+      let valueMarkTotal = 0;
+      let valueAskTotal = 0;
+      let valueRealizedTotal = 0;
+      let valueCostTotal = 0;
+      let valueImportedToday = 0;
+      let valueImported24h = 0;
+      let valueImported7d = 0;
+
+      const nowMs = Date.now();
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      const startMs = start.getTime();
+      const endMs = end.getTime();
+      const todayISO = start.toISOString().split('T')[0];
+      const last24hMs = nowMs - 24 * 60 * 60 * 1000;
+      const last7dMs = nowMs - 7 * 24 * 60 * 60 * 1000;
 
       filtered.forEach((v: any) => {
         // Count for sale
@@ -1479,46 +1540,58 @@ const CursorHomepage: React.FC = () => {
           totalBids += Number(v.bid_count);
         }
 
-        // Calculate value
-        let vehiclePrice = 0;
-        if (v.sale_price && typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0) {
-          vehiclePrice = v.sale_price;
-        } else if (v.asking_price) {
-          vehiclePrice = typeof v.asking_price === 'number' && Number.isFinite(v.asking_price) ? v.asking_price : 0;
-          if (typeof v.asking_price === 'string') {
-            const parsed = parseFloat(v.asking_price);
-            vehiclePrice = Number.isFinite(parsed) ? parsed : 0;
-          }
-        } else if (v.current_value) {
-          vehiclePrice = typeof v.current_value === 'number' && Number.isFinite(v.current_value) ? v.current_value : 0;
-        } else if (v.purchase_price) {
-          vehiclePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) ? v.purchase_price : 0;
+        const currentValue = Number(v.current_value || 0) || 0;
+        if (Number.isFinite(currentValue) && currentValue > 0) valueMarkTotal += currentValue;
+
+        const purchase = Number(v.purchase_price || 0) || 0;
+        if (Number.isFinite(purchase) && purchase > 0) valueCostTotal += purchase;
+
+        const asking = Number(v.asking_price || 0) || 0;
+        if (v.is_for_sale === true && Number.isFinite(asking) && asking > 0) valueAskTotal += asking;
+
+        const salePrice = Number(v.sale_price || 0) || 0;
+        if (Number.isFinite(salePrice) && salePrice > 0) valueRealizedTotal += salePrice;
+
+        // Sold today count (sale_date is a date-ish string in many cases)
+        if (salePrice > 0 && v?.sale_date && String(v.sale_date) >= todayISO) {
+          salesCountToday += 1;
         }
+
+        // Calculate value
+        const winning = Number(v.winning_bid || 0) || 0;
+        const high = Number(v.high_bid || 0) || 0;
+        const msrp = Number(v.msrp || 0) || 0;
+        const vehiclePrice =
+          (salePrice > 0 ? salePrice : 0) ||
+          (Number.isFinite(winning) && winning > 0 ? winning : 0) ||
+          (Number.isFinite(high) && high > 0 ? high : 0) ||
+          (Number.isFinite(asking) && asking > 0 ? asking : 0) ||
+          (Number.isFinite(currentValue) && currentValue > 0 ? currentValue : 0) ||
+          (Number.isFinite(purchase) && purchase > 0 ? purchase : 0) ||
+          (Number.isFinite(msrp) && msrp > 0 ? msrp : 0) ||
+          0;
 
         if (vehiclePrice > 0) {
           totalValue += vehiclePrice;
           vehiclesWithValue++;
+
+          const createdMs = new Date(v?.created_at || 0).getTime();
+          if (Number.isFinite(createdMs)) {
+            if (createdMs >= startMs && createdMs < endMs) valueImportedToday += vehiclePrice;
+            if (createdMs >= last24hMs) valueImported24h += vehiclePrice;
+            if (createdMs >= last7dMs) valueImported7d += vehiclePrice;
+          }
         }
       });
 
       const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
 
-      // Vehicles added today within this filtered set (local day)
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 1);
-      const startMs = start.getTime();
-      const endMs = end.getTime();
       const vehiclesAddedToday = filtered.filter((v: any) => {
         const t = new Date(v?.created_at || 0).getTime();
         return Number.isFinite(t) && t >= startMs && t < endMs;
       }).length;
 
-      // Sales volume (24hrs)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayISO = today.toISOString().split('T')[0];
+      // Sales volume (sold today by sale_date)
       const salesVolume = filtered
         .filter((v: any) => Boolean(v?.sale_price) && Boolean(v?.sale_date) && String(v.sale_date) >= todayISO)
         .reduce((sum, v: any) => {
@@ -1530,11 +1603,19 @@ const CursorHomepage: React.FC = () => {
         totalVehicles: filtered.length,
         totalValue,
         salesVolume,
+        salesCountToday,
         forSaleCount,
         activeAuctions,
         totalBids,
         avgValue,
         vehiclesAddedToday,
+        valueMarkTotal,
+        valueAskTotal,
+        valueRealizedTotal,
+        valueCostTotal,
+        valueImportedToday,
+        valueImported24h,
+        valueImported7d,
       });
     } catch (error) {
       console.error('Error loading filtered stats:', error);
@@ -1557,11 +1638,19 @@ const CursorHomepage: React.FC = () => {
         totalVehicles: 0,
         totalValue: 0,
         salesVolume: 0,
+        salesCountToday: 0,
         forSaleCount: 0,
         activeAuctions: 0,
         totalBids: 0,
         avgValue: 0,
         vehiclesAddedToday: 0,
+        valueMarkTotal: 0,
+        valueAskTotal: 0,
+        valueRealizedTotal: 0,
+        valueCostTotal: 0,
+        valueImportedToday: 0,
+        valueImported24h: 0,
+        valueImported7d: 0,
       });
     }
   }, [hasActiveFilters, debouncedSearchText, filters, loadFilteredStats]);
@@ -1580,6 +1669,25 @@ const CursorHomepage: React.FC = () => {
     let forSaleCount = 0;
     let activeAuctions = 0;
     let totalBids = 0;
+    let salesCountToday = 0;
+    let valueMarkTotal = 0;
+    let valueAskTotal = 0;
+    let valueRealizedTotal = 0;
+    let valueCostTotal = 0;
+    let valueImportedToday = 0;
+    let valueImported24h = 0;
+    let valueImported7d = 0;
+
+    const nowMs = Date.now();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const todayStartMs = todayStart.getTime();
+    const tomorrowStartMs = tomorrowStart.getTime();
+    const last24hMs = nowMs - 24 * 60 * 60 * 1000;
+    const last7dMs = nowMs - 7 * 24 * 60 * 60 * 1000;
+    const todayISO = todayStart.toISOString().split('T')[0]; // YYYY-MM-DD
     
     filteredVehicles.forEach((v) => {
       // Count for sale
@@ -1599,75 +1707,85 @@ const CursorHomepage: React.FC = () => {
       if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
         totalBids += Number(v.bid_count);
       }
+
+      const currentValue = Number(v.current_value || 0) || 0;
+      if (Number.isFinite(currentValue) && currentValue > 0) valueMarkTotal += currentValue;
+
+      const purchase = Number(v.purchase_price || 0) || 0;
+      if (Number.isFinite(purchase) && purchase > 0) valueCostTotal += purchase;
+
+      const asking = Number(v.asking_price || 0) || 0;
+      if (v.is_for_sale === true && Number.isFinite(asking) && asking > 0) valueAskTotal += asking;
+
+      const salePrice = Number(v.sale_price || 0) || 0;
+      if (Number.isFinite(salePrice) && salePrice > 0) valueRealizedTotal += salePrice;
+
+      // Sold today count (sale_date is a date-ish string in many cases)
+      if (salePrice > 0 && (v as any)?.sale_date && String((v as any).sale_date) >= todayISO) {
+        salesCountToday += 1;
+      }
       
       // Calculate value - use the best/actual price per vehicle
-      // Priority: sale_price (if sold) > asking_price > current_value > purchase_price > display_price
-      let vehiclePrice = 0;
-      
-      // Priority: sale_price first (if exists, use it - sold vehicles should have sale_price)
-      if (v.sale_price && typeof v.sale_price === 'number' && Number.isFinite(v.sale_price) && v.sale_price > 0) {
-        vehiclePrice = v.sale_price;
-      }
-      // Otherwise use asking_price (only if no sale_price)
-      else if (v.asking_price) {
-        vehiclePrice = typeof v.asking_price === 'number' && Number.isFinite(v.asking_price) ? v.asking_price : 0;
-        if (typeof v.asking_price === 'string') {
-          const parsed = parseFloat(v.asking_price);
-          vehiclePrice = Number.isFinite(parsed) ? parsed : 0;
-        }
-      }
-      // Fall back to current_value
-      else if (v.current_value) {
-        vehiclePrice = typeof v.current_value === 'number' && Number.isFinite(v.current_value) ? v.current_value : 0;
-      }
-      // Then purchase_price
-      else if (v.purchase_price) {
-        vehiclePrice = typeof v.purchase_price === 'number' && Number.isFinite(v.purchase_price) ? v.purchase_price : 0;
-      }
-      // Last resort: display_price (computed)
-      else if (v.display_price) {
-        vehiclePrice = typeof v.display_price === 'number' && Number.isFinite(v.display_price) ? v.display_price : 0;
-      }
+      // Priority: sale_price > winning_bid > high_bid > asking_price > current_value > purchase_price > msrp > display_price
+      const winning = Number((v as any).winning_bid || 0) || 0;
+      const high = Number((v as any).high_bid || 0) || 0;
+      const msrp = Number((v as any).msrp || 0) || 0;
+      const display = Number((v as any).display_price || 0) || 0;
+      const vehiclePrice =
+        (salePrice > 0 ? salePrice : 0) ||
+        (Number.isFinite(winning) && winning > 0 ? winning : 0) ||
+        (Number.isFinite(high) && high > 0 ? high : 0) ||
+        (Number.isFinite(asking) && asking > 0 ? asking : 0) ||
+        (Number.isFinite(currentValue) && currentValue > 0 ? currentValue : 0) ||
+        (Number.isFinite(purchase) && purchase > 0 ? purchase : 0) ||
+        (Number.isFinite(msrp) && msrp > 0 ? msrp : 0) ||
+        (Number.isFinite(display) && display > 0 ? display : 0) ||
+        0;
       
       if (vehiclePrice > 0) {
         totalValue += vehiclePrice;
         vehiclesWithValue++;
+
+        const createdMs = new Date((v as any)?.created_at || 0).getTime();
+        if (Number.isFinite(createdMs)) {
+          if (createdMs >= todayStartMs && createdMs < tomorrowStartMs) valueImportedToday += vehiclePrice;
+          if (createdMs >= last24hMs) valueImported24h += vehiclePrice;
+          if (createdMs >= last7dMs) valueImported7d += vehiclePrice;
+        }
       }
     });
     
     const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
     
-    // Sales volume (24hrs): align semantics with dbStats (sold today), but scoped to the filtered set.
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    // Sales volume: align semantics with dbStats (sold today), but scoped to the filtered set.
     const salesVolume = filteredVehicles
       .filter((v: any) => Boolean(v?.sale_price) && Boolean(v?.sale_date) && String(v.sale_date) >= todayISO)
       .reduce((sum, v: any) => {
         const price = Number(v.sale_price || 0) || 0;
         return sum + (Number.isFinite(price) ? price : 0);
       }, 0);
-    
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(end.getDate() + 1);
-    const startMs = start.getTime();
-    const endMs = end.getTime();
     const vehiclesAddedToday = filteredVehicles.filter((v: any) => {
-      const t = new Date(v?.created_at || 0).getTime();
-      return Number.isFinite(t) && t >= startMs && t < endMs;
+      const t = new Date((v as any)?.created_at || 0).getTime();
+      return Number.isFinite(t) && t >= todayStartMs && t < tomorrowStartMs;
     }).length;
 
     return { 
       totalVehicles, 
       totalValue, 
       salesVolume,
+      salesCountToday,
       forSaleCount,
       activeAuctions,
       totalBids,
       avgValue,
       vehiclesAddedToday,
+      valueMarkTotal,
+      valueAskTotal,
+      valueRealizedTotal,
+      valueCostTotal,
+      valueImportedToday,
+      valueImported24h,
+      valueImported7d,
     };
   }, [filteredVehicles, hasActiveFilters, debouncedSearchText, filteredStatsFromDb]);
 
@@ -1676,11 +1794,19 @@ const CursorHomepage: React.FC = () => {
     totalVehicles: 0,
     totalValue: 0,
     salesVolume: 0,
+    salesCountToday: 0,
     forSaleCount: 0,
     activeAuctions: 0,
     totalBids: 0,
     avgValue: 0,
     vehiclesAddedToday: 0,
+    valueMarkTotal: 0,
+    valueAskTotal: 0,
+    valueRealizedTotal: 0,
+    valueCostTotal: 0,
+    valueImportedToday: 0,
+    valueImported24h: 0,
+    valueImported7d: 0,
   });
   const [dbStatsLoading, setDbStatsLoading] = useState(true);
 
@@ -1690,12 +1816,15 @@ const CursorHomepage: React.FC = () => {
       setDbStatsLoading(true);
       
       // Get total vehicle count (public vehicles only, excluding pending - matching the displayed count)
-      const { count: totalCount, error: countError } = await supabase
-        .from('vehicles')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_public', true)
-        .eq('listing_kind', 'vehicle')
-        .neq('status', 'pending');
+      const { count: totalCount, error: countError } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+        let q = supabase
+          .from('vehicles')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_public', true)
+          .neq('status', 'pending');
+        if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+        return q;
+      });
       
       if (countError) {
         console.error('Error loading vehicle count:', countError);
@@ -1704,12 +1833,15 @@ const CursorHomepage: React.FC = () => {
       }
       
       // Get comprehensive vehicle data for stats (public vehicles only, excluding pending)
-      const { data: allVehicles, error: vehiclesError } = await supabase
-        .from('vehicles')
-        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome')
-        .eq('is_public', true)
-        .eq('listing_kind', 'vehicle')
-        .neq('status', 'pending');
+      const { data: allVehicles, error: vehiclesError } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+        let q = supabase
+          .from('vehicles')
+          .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, created_at, sale_date')
+          .eq('is_public', true)
+          .neq('status', 'pending');
+        if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+        return q;
+      });
       
       if (vehiclesError) {
         console.error('Error loading vehicles for stats:', vehiclesError);
@@ -1725,11 +1857,29 @@ const CursorHomepage: React.FC = () => {
         return Number.isFinite(n) ? n : 0;
       };
       
+      const nowMs = Date.now();
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const tomorrowStart = new Date(todayStart);
+      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+      const todayStartMs = todayStart.getTime();
+      const tomorrowStartMs = tomorrowStart.getTime();
+      const last24hMs = nowMs - 24 * 60 * 60 * 1000;
+      const last7dMs = nowMs - 7 * 24 * 60 * 60 * 1000;
+      const todayISO = todayStart.toISOString().split('T')[0]; // YYYY-MM-DD
+
       let totalValue = 0;
       let vehiclesWithValue = 0;
       let forSaleCount = 0;
       let activeAuctions = 0;
       let totalBids = 0;
+      let valueMarkTotal = 0;
+      let valueAskTotal = 0;
+      let valueRealizedTotal = 0;
+      let valueCostTotal = 0;
+      let valueImportedToday = 0;
+      let valueImported24h = 0;
+      let valueImported7d = 0;
       
       (allVehicles || []).forEach((v) => {
         // Count for sale
@@ -1748,80 +1898,98 @@ const CursorHomepage: React.FC = () => {
         if (v.bid_count && Number.isFinite(Number(v.bid_count))) {
           totalBids += Number(v.bid_count);
         }
-        
+
+        const currentValue = safeNum((v as any).current_value);
+        if (currentValue > 0) valueMarkTotal += currentValue;
+
+        const purchase = safeNum((v as any).purchase_price);
+        if (purchase > 0) valueCostTotal += purchase;
+
+        const asking = safeNum((v as any).asking_price);
+        if (v.is_for_sale === true && asking > 0) valueAskTotal += asking;
+
+        const salePrice = safeNum((v as any).sale_price);
+        if (salePrice > 0) valueRealizedTotal += salePrice;
+
         // Calculate value - use the best/actual price per vehicle
-        let vehiclePrice = 0;
-        
-        // If sold, use sale_price
-        if (v.sale_price && (v.sale_status === 'sold' || safeNum(v.sale_price) > 0)) {
-          vehiclePrice = safeNum(v.sale_price);
-        }
-        // Otherwise use asking_price
-        else if (v.asking_price) {
-          vehiclePrice = safeNum(v.asking_price);
-        }
-        // Fall back to current_value
-        else if (v.current_value) {
-          vehiclePrice = safeNum(v.current_value);
-        }
-        // Last resort: purchase_price
-        else if (v.purchase_price) {
-          vehiclePrice = safeNum(v.purchase_price);
-        }
-        
+        const winning = safeNum((v as any).winning_bid);
+        const high = safeNum((v as any).high_bid);
+        const msrp = safeNum((v as any).msrp);
+        const vehiclePrice =
+          (salePrice > 0 ? salePrice : 0) ||
+          (winning > 0 ? winning : 0) ||
+          (high > 0 ? high : 0) ||
+          (asking > 0 ? asking : 0) ||
+          (currentValue > 0 ? currentValue : 0) ||
+          (purchase > 0 ? purchase : 0) ||
+          (msrp > 0 ? msrp : 0) ||
+          0;
+
         if (vehiclePrice > 0) {
           totalValue += vehiclePrice;
           vehiclesWithValue++;
+
+          const createdMs = new Date((v as any)?.created_at || 0).getTime();
+          if (Number.isFinite(createdMs)) {
+            if (createdMs >= todayStartMs && createdMs < tomorrowStartMs) valueImportedToday += vehiclePrice;
+            if (createdMs >= last24hMs) valueImported24h += vehiclePrice;
+            if (createdMs >= last7dMs) valueImported7d += vehiclePrice;
+          }
         }
       });
       
       const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
       
-      // Vehicles added today (local day)
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const tomorrowStart = new Date(todayStart);
-      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-      const { count: createdTodayCount, error: createdTodayErr } = await supabase
-        .from('vehicles')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_public', true)
-        .eq('listing_kind', 'vehicle')
-        .neq('status', 'pending')
-        .gte('created_at', todayStart.toISOString())
-        .lt('created_at', tomorrowStart.toISOString());
+      const { count: createdTodayCount, error: createdTodayErr } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+        let q = supabase
+          .from('vehicles')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_public', true)
+          .neq('status', 'pending');
+        if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+        return q
+          .gte('created_at', todayStart.toISOString())
+          .lt('created_at', tomorrowStart.toISOString());
+      });
       if (createdTodayErr) {
         console.warn('Error loading vehicles added today:', createdTodayErr);
       }
 
-      // Get sales volume in last 24 hours (vehicles sold today)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayISO = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-      
-      const { data: recentSales } = await supabase
-        .from('vehicles')
-        .select('sale_price, sale_date')
-        .eq('is_public', true)
-        .eq('listing_kind', 'vehicle')
-        .neq('status', 'pending')
-        .not('sale_price', 'is', null)
-        .gte('sale_date', todayISO);
+      const { data: recentSales } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+        let q = supabase
+          .from('vehicles')
+          .select('sale_price, sale_date')
+          .eq('is_public', true)
+          .neq('status', 'pending');
+        if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+        return q
+          .not('sale_price', 'is', null)
+          .gte('sale_date', todayISO);
+      });
       
       const salesVolume = (recentSales || []).reduce((sum, v) => {
         const price = v.sale_price || 0;
         return sum + (typeof price === 'number' && Number.isFinite(price) ? price : 0);
       }, 0);
+      const salesCountToday = Array.isArray(recentSales) ? recentSales.length : 0;
       
       const stats = {
         totalVehicles: totalCount || 0,
         totalValue,
         salesVolume,
+        salesCountToday,
         forSaleCount,
         activeAuctions,
         totalBids,
         avgValue,
         vehiclesAddedToday: createdTodayCount || 0,
+        valueMarkTotal,
+        valueAskTotal,
+        valueRealizedTotal,
+        valueCostTotal,
+        valueImportedToday,
+        valueImported24h,
+        valueImported7d,
       };
       
       console.log('Database stats loaded:', {
@@ -2116,12 +2284,15 @@ const CursorHomepage: React.FC = () => {
 
       const runVehicleQuery = async (selectFields: string) => {
         try {
-          return await supabase
+          let q = supabase
             .from('vehicles')
             .select(selectFields)
             .eq('is_public', true)
-            .eq('listing_kind', 'vehicle')
-            .neq('status', 'pending')
+            .neq('status', 'pending');
+          if (listingKindSupportedRef.current) {
+            q = q.eq('listing_kind', 'vehicle');
+          }
+          return await q
             .order('created_at', { ascending: false })
             .range(offset, offset + PAGE_SIZE - 1);
         } catch (e) {
@@ -2138,6 +2309,13 @@ const CursorHomepage: React.FC = () => {
 
       let result = await runVehicleQuery(selectV2);
       applyResult(result);
+
+      // Handle missing listing_kind column (migration not applied yet)
+      if (error && isMissingListingKindColumn(error)) {
+        listingKindSupportedRef.current = false;
+        result = await runVehicleQuery(selectV2);
+        applyResult(result);
+      }
 
       if (error) {
         const missingColumn = getMissingColumn(error);
@@ -3102,10 +3280,46 @@ const CursorHomepage: React.FC = () => {
           .from('vehicles')
           .select('discovery_url, discovery_source, profile_origin')
           .eq('is_public', true)
-          .eq('listing_kind', 'vehicle')
           .neq('status', 'pending');
 
         if (error) {
+          if (isMissingListingKindColumn(error)) {
+            listingKindSupportedRef.current = false;
+            const retry = await supabase
+              .from('vehicles')
+              .select('discovery_url, discovery_source, profile_origin')
+              .eq('is_public', true)
+              .neq('status', 'pending');
+            if (retry.error) {
+              console.error('Error loading source counts:', retry.error);
+              return;
+            }
+            // eslint-disable-next-line @typescript-eslint/no-shadow
+            const vehicles = retry.data as any[];
+            // Count vehicles per source key using classifySource
+            const counts: Record<string, number> = {};
+            (vehicles || []).forEach((v: any) => {
+              const sourceKey = classifySource(v);
+              counts[sourceKey] = (counts[sourceKey] || 0) + 1;
+            });
+            // Map source keys to domain keys for display
+            const domainCounts: Record<string, number> = {};
+            activeSources.forEach(source => {
+              const domainKey = domainToFilterKey(source.domain);
+              if (counts[domainKey] !== undefined) {
+                domainCounts[domainKey] = counts[domainKey];
+              } else {
+                const domainLower = source.domain.toLowerCase();
+                const matchingCount = (vehicles || []).filter((v: any) => {
+                  const url = (v.discovery_url || '').toLowerCase();
+                  return url.includes(domainLower);
+                }).length;
+                domainCounts[domainKey] = matchingCount;
+              }
+            });
+            setSourceCounts(domainCounts);
+            return;
+          }
           console.error('Error loading source counts:', error);
           return;
         }
@@ -3233,9 +3447,429 @@ const CursorHomepage: React.FC = () => {
     setSortDirection('desc');
   }, []);
 
+  const openStatsPanel = useCallback((kind: StatsPanelKind) => {
+    setStatsPanel(kind);
+  }, []);
+
+  const closeStatsPanel = useCallback(() => {
+    setStatsPanel(null);
+  }, []);
+
+  // Load lightweight preview data for stats panels (best-effort, never blocks the feed).
+  useEffect(() => {
+    if (!statsPanel) return;
+    let cancelled = false;
+
+    setStatsPanelLoading(true);
+    setStatsPanelError(null);
+    setStatsPanelRows([]);
+    setStatsPanelMeta(null);
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const todayISO = todayStart.toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+
+    const selectMini = 'id, year, make, model, created_at, sale_date, sale_price, asking_price, current_value, purchase_price, primary_image_url, image_url, discovery_url';
+
+    const run = async () => {
+      try {
+        if (statsPanel === 'vehicles') {
+          const [pendingRes, nonVehicleRes, newestRes] = await Promise.all([
+            runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+              let q = supabase
+                .from('vehicles')
+                .select('*', { count: 'exact', head: true })
+                .eq('is_public', true)
+                .eq('status', 'pending');
+              if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+              return q;
+            }),
+            runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+              if (!includeListingKind) return { data: null, error: null, count: 0 } as any;
+              return supabase
+                .from('vehicles')
+                .select('*', { count: 'exact', head: true })
+                .eq('is_public', true)
+                .neq('status', 'pending')
+                .eq('listing_kind', 'non_vehicle_item');
+            }),
+            runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+              let q = supabase
+                .from('vehicles')
+                .select(selectMini)
+                .eq('is_public', true)
+                .neq('status', 'pending')
+                .order('created_at', { ascending: false })
+                .limit(24);
+              if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+              return q;
+            }),
+          ]);
+
+          if (cancelled) return;
+          setStatsPanelMeta({
+            pendingPublicCount: pendingRes?.count || 0,
+            publicNonVehicleItems: nonVehicleRes?.count || 0,
+          });
+          setStatsPanelRows(Array.isArray(newestRes?.data) ? newestRes.data : []);
+          return;
+        }
+
+        if (statsPanel === 'value') {
+          const { data } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+            let q = supabase
+              .from('vehicles')
+              .select(selectMini)
+              .eq('is_public', true)
+              .neq('status', 'pending')
+              .order('created_at', { ascending: false })
+              .limit(24);
+            if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+            return q;
+          });
+          if (cancelled) return;
+          setStatsPanelRows(Array.isArray(data) ? (data as any[]) : []);
+          return;
+        }
+
+        if (statsPanel === 'for_sale') {
+          const { data } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+            let q = supabase
+              .from('vehicles')
+              .select(selectMini)
+              .eq('is_public', true)
+              .neq('status', 'pending')
+              .eq('is_for_sale', true)
+              .order('updated_at', { ascending: false })
+              .limit(24);
+            if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+            return q;
+          });
+          if (cancelled) return;
+          setStatsPanelRows(Array.isArray(data) ? (data as any[]) : []);
+          return;
+        }
+
+        if (statsPanel === 'sold_today') {
+          const { data } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+            let q = supabase
+              .from('vehicles')
+              .select(selectMini)
+              .eq('is_public', true)
+              .neq('status', 'pending')
+              .not('sale_price', 'is', null)
+              .gte('sale_date', todayISO)
+              .order('sale_date', { ascending: false })
+              .limit(24);
+            if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+            return q;
+          });
+          if (cancelled) return;
+          setStatsPanelRows(Array.isArray(data) ? (data as any[]) : []);
+          return;
+        }
+
+        if (statsPanel === 'auctions') {
+          // Prefer external_listings for "live" auctions (end_date in future). If RLS blocks it, fall back.
+          try {
+            const { data: listings, error: listErr } = await supabase
+              .from('external_listings')
+              .select('vehicle_id, platform, listing_status, current_bid, end_date, updated_at, listing_url')
+              .gt('end_date', nowIso)
+              .order('updated_at', { ascending: false })
+              .limit(2000);
+
+            if (!listErr && Array.isArray(listings) && listings.length > 0) {
+              const byVehicle = new Map<string, any>();
+              for (const row of listings as any[]) {
+                const vid = String(row?.vehicle_id || '');
+                if (!vid) continue;
+                if (!byVehicle.has(vid)) byVehicle.set(vid, row);
+              }
+              const ids = Array.from(byVehicle.keys()).slice(0, 50);
+              const { data: vrows } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+                let q = supabase
+                  .from('vehicles')
+                  .select(selectMini)
+                  .eq('is_public', true)
+                  .neq('status', 'pending')
+                  .in('id', ids);
+                if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+                return q;
+              });
+
+              const rows = (Array.isArray(vrows) ? vrows : []).map((v: any) => ({
+                ...v,
+                _listing: byVehicle.get(String(v?.id || '')) || null,
+              }));
+
+              if (cancelled) return;
+              setStatsPanelRows(rows);
+              setStatsPanelMeta({ listing_source: 'external_listings' });
+              return;
+            }
+          } catch {
+            // ignore and fall through
+          }
+
+          const { data } = await runVehiclesQueryWithListingKindFallback((includeListingKind) => {
+            let q = supabase
+              .from('vehicles')
+              .select(selectMini)
+              .eq('is_public', true)
+              .neq('status', 'pending')
+              .or('auction_outcome.eq.active,auction_outcome.eq.live')
+              .order('updated_at', { ascending: false })
+              .limit(24);
+            if (includeListingKind) q = q.eq('listing_kind', 'vehicle');
+            return q;
+          });
+          if (cancelled) return;
+          setStatsPanelRows(Array.isArray(data) ? (data as any[]) : []);
+          setStatsPanelMeta({ listing_source: 'vehicles.auction_outcome' });
+          return;
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+        setStatsPanelError(String(e?.message || e || 'Failed to load stats panel'));
+      } finally {
+        if (cancelled) return;
+        setStatsPanelLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [statsPanel, runVehiclesQueryWithListingKindFallback]);
+
   // Show grid immediately - no loading state blocking
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: '16px' }}>
+      {statsPanel && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.35)',
+            zIndex: 20000,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeStatsPanel();
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            style={{
+              width: 'min(980px, calc(100vw - 24px))',
+              maxHeight: 'min(82vh, 860px)',
+              overflow: 'auto',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              boxShadow: '2px 2px 14px rgba(0,0,0,0.25)',
+              borderRadius: 8,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '9pt', fontWeight: 900 }}>
+                {statsPanel === 'vehicles'
+                  ? 'Vehicles'
+                  : statsPanel === 'value'
+                  ? 'Value'
+                  : statsPanel === 'for_sale'
+                  ? 'For sale'
+                  : statsPanel === 'sold_today'
+                  ? 'Sold today'
+                  : 'Auctions'}
+              </div>
+              <div style={{ marginLeft: 'auto', display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                {statsPanel === 'vehicles' && (
+                  <button
+                    type="button"
+                    className="button-win95"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleAddedTodayOnly();
+                    }}
+                    style={{ padding: '4px 8px', fontSize: '8pt' }}
+                    title="Toggle filter: vehicles created today"
+                  >
+                    +today
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="button-win95"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeStatsPanel();
+                  }}
+                  style={{ padding: '4px 8px', fontSize: '8pt' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div style={{ padding: '12px' }}>
+              {statsPanelLoading ? (
+                <div style={{ fontSize: '9pt', color: 'var(--text-muted)' }}>Loading…</div>
+              ) : statsPanelError ? (
+                <div style={{ fontSize: '9pt', color: '#b91c1c' }}>{statsPanelError}</div>
+              ) : (
+                <>
+                  {statsPanel === 'value' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px' }}>
+                      <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BEST-KNOWN VALUE</div>
+                        <div style={{ fontSize: '12pt', fontWeight: 900 }}>{formatCurrency(displayStats.totalValue)}</div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                          Uses priority: sale &gt; bids &gt; ask &gt; mark &gt; cost.
+                        </div>
+                      </div>
+                      <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>BREAKDOWN</div>
+                        <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
+                          <div><b>{formatCurrency(displayStats.valueMarkTotal)}</b> mark (current_value)</div>
+                          <div><b>{formatCurrency(displayStats.valueAskTotal)}</b> ask (for sale)</div>
+                          <div><b>{formatCurrency(displayStats.valueRealizedTotal)}</b> realized (sale_price)</div>
+                          <div><b>{formatCurrency(displayStats.valueCostTotal)}</b> cost (purchase_price)</div>
+                        </div>
+                      </div>
+                      <div style={{ border: '1px solid var(--border)', background: 'var(--grey-50)', padding: '10px' }}>
+                        <div style={{ fontSize: '7pt', color: 'var(--text-muted)', fontFamily: 'monospace' }}>VALUE ADDED (IMPORTS)</div>
+                        <div style={{ fontSize: '8pt', lineHeight: 1.35 }}>
+                          <div><b>{formatCurrency(displayStats.valueImportedToday)}</b> today</div>
+                          <div><b>{formatCurrency(displayStats.valueImported24h)}</b> last 24h</div>
+                          <div><b>{formatCurrency(displayStats.valueImported7d)}</b> last 7d</div>
+                        </div>
+                        <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '6px' }}>
+                          Note: “Sold date” can be old, but “import date” is created_at.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {statsPanel === 'vehicles' && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                      <div><b>{displayStats.totalVehicles.toLocaleString()}</b> visible vehicles</div>
+                      <div><b>{displayStats.vehiclesAddedToday.toLocaleString()}</b> added today</div>
+                      {statsPanelMeta?.pendingPublicCount ? <div><b>{Number(statsPanelMeta.pendingPublicCount).toLocaleString()}</b> pending</div> : null}
+                      {statsPanelMeta?.publicNonVehicleItems ? <div><b>{Number(statsPanelMeta.publicNonVehicleItems).toLocaleString()}</b> non-vehicle items hidden</div> : null}
+                    </div>
+                  )}
+
+                  {(statsPanel === 'for_sale' || statsPanel === 'sold_today' || statsPanel === 'auctions' || statsPanel === 'vehicles' || statsPanel === 'value') && (
+                    <>
+                      <div style={{ fontSize: '8pt', fontWeight: 900, marginTop: statsPanel === 'value' ? '12px' : 0 }}>
+                        {statsPanel === 'vehicles'
+                          ? 'Newest profiles'
+                          : statsPanel === 'value'
+                          ? 'Newest imports (click to open)'
+                          : statsPanel === 'for_sale'
+                          ? 'For sale (preview)'
+                          : statsPanel === 'sold_today'
+                          ? 'Sold today (preview)'
+                          : 'Active auctions (preview)'}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', padding: '10px 0' }}>
+                        {(statsPanelRows || []).map((v: any) => {
+                          const title = `${v?.year ?? ''} ${v?.make ?? ''} ${v?.model ?? ''}`.trim() || 'Vehicle';
+                          const img = String(v?.primary_image_url || v?.image_url || '').trim() || '/n-zero.png';
+
+                          const salePrice = typeof v?.sale_price === 'number' ? v.sale_price : Number(v?.sale_price || 0) || 0;
+                          const ask = typeof v?.asking_price === 'number' ? v.asking_price : Number(v?.asking_price || 0) || 0;
+                          const mark = typeof v?.current_value === 'number' ? v.current_value : Number(v?.current_value || 0) || 0;
+                          const subtitle =
+                            statsPanel === 'sold_today'
+                              ? (salePrice > 0 ? `SOLD ${formatCurrency(salePrice)}` : 'SOLD')
+                              : statsPanel === 'for_sale'
+                              ? (ask > 0 ? `ASK ${formatCurrency(ask)}` : (mark > 0 ? `MARK ${formatCurrency(mark)}` : 'For sale'))
+                              : statsPanel === 'auctions'
+                              ? (() => {
+                                  const bid = Number((v as any)?._listing?.current_bid || 0) || 0;
+                                  const plat = String((v as any)?._listing?.platform || '').toUpperCase();
+                                  return bid > 0 ? `${plat ? plat + ' ' : ''}BID ${formatCurrency(bid)}` : (plat ? `${plat} LIVE` : 'Auction');
+                                })()
+                              : (mark > 0 ? `MARK ${formatCurrency(mark)}` : (ask > 0 ? `ASK ${formatCurrency(ask)}` : (salePrice > 0 ? `SOLD ${formatCurrency(salePrice)}` : '—')));
+
+                          const createdAt = v?.created_at ? String(v.created_at) : '';
+                          const saleDate = v?.sale_date ? String(v.sale_date) : '';
+                          const metaLine =
+                            statsPanel === 'value'
+                              ? `imported ${createdAt ? new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}${saleDate ? ` · sold ${new Date(saleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}`
+                              : '';
+
+                          return (
+                            <Link
+                              key={String(v?.id || Math.random())}
+                              to={`/vehicle/${v.id}`}
+                              style={{
+                                flex: '0 0 auto',
+                                width: 140,
+                                textDecoration: 'none',
+                                color: 'inherit',
+                                border: '1px solid var(--border)',
+                                background: 'var(--surface)',
+                                borderRadius: 6,
+                                overflow: 'hidden',
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                closeStatsPanel();
+                              }}
+                            >
+                              <div style={{ width: '100%', paddingBottom: '100%', background: 'var(--grey-200)', position: 'relative' }}>
+                                <img
+                                  src={img}
+                                  alt=""
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer"
+                                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              </div>
+                              <div style={{ padding: '6px' }}>
+                                <div style={{ fontSize: '8pt', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={title}>
+                                  {title}
+                                </div>
+                                <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 2 }}>{subtitle}</div>
+                                {metaLine ? <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: 2 }}>{metaLine}</div> : null}
+                              </div>
+                            </Link>
+                          );
+                        })}
+                        {(!statsPanelRows || statsPanelRows.length === 0) && (
+                          <div style={{ fontSize: '9pt', color: 'var(--text-muted)', padding: '10px 0' }}>
+                            No rows found for this panel.
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Feed Section - No stats, no filters, just vehicles */}
       <div style={{
         maxWidth: '1600px',
@@ -3327,12 +3961,12 @@ const CursorHomepage: React.FC = () => {
                   {displayStats.activeAuctions} active auctions
                 </div>
               )}
-              {displayStats.salesVolume > 0 && (
+              {displayStats.salesCountToday > 0 && (
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
-                  {formatCurrency(displayStats.salesVolume)} sales (24hrs)
+                  {displayStats.salesCountToday} sold today · {formatCurrency(displayStats.salesVolume)}
                 </div>
               )}
-              {displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
+              {(hasActiveFilters || debouncedSearchText) && displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
                 <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                   {formatCurrency(displayStats.avgValue)} avg
                 </div>
@@ -3628,7 +4262,27 @@ const CursorHomepage: React.FC = () => {
               fontSize: '7pt',
               flexWrap: 'wrap'
             }}>
-              <span><b>{displayStats.totalVehicles.toLocaleString()}</b> veh</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openStatsPanel('vehicles');
+                }}
+                title="Total visible public vehicles in the feed (excludes pending + non-vehicle items). Click for breakdown."
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  margin: 0,
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                  fontSize: '7pt',
+                  color: 'var(--text)'
+                }}
+              >
+                <b>{displayStats.totalVehicles.toLocaleString()}</b> veh
+              </button>
               {displayStats.vehiclesAddedToday > 0 && (
                 <>
                   <span style={{ opacity: 0.3 }}>|</span>
@@ -3661,29 +4315,129 @@ const CursorHomepage: React.FC = () => {
                 </>
               )}
               <span style={{ opacity: 0.3 }}>|</span>
-              <span><b>{formatCurrency(displayStats.totalValue)}</b> val</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  openStatsPanel('value');
+                }}
+                title="Portfolio value (best-known per vehicle). Click for breakdown + recent value added."
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  margin: 0,
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                  fontSize: '7pt',
+                  color: 'var(--text)'
+                }}
+              >
+                <b>{formatCurrency(displayStats.totalValue)}</b> val
+              </button>
               {displayStats.forSaleCount > 0 && (
                 <>
                   <span style={{ opacity: 0.3 }}>|</span>
-                  <span><b>{displayStats.forSaleCount.toLocaleString()}</b> sale</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openStatsPanel('for_sale');
+                    }}
+                    title="Vehicles marked for sale. Click to preview / filter."
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      margin: 0,
+                      cursor: 'pointer',
+                      fontFamily: 'monospace',
+                      fontSize: '7pt',
+                      color: 'var(--text)'
+                    }}
+                  >
+                    <b>{displayStats.forSaleCount.toLocaleString()}</b> for sale
+                  </button>
                 </>
               )}
-              {displayStats.salesVolume > 0 && (
+              {displayStats.salesCountToday > 0 && (
                 <>
                   <span style={{ opacity: 0.3 }}>|</span>
-                  <span><b>{formatCurrency(displayStats.salesVolume)}</b> 24h</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openStatsPanel('sold_today');
+                    }}
+                    title={`Sold today (by sale_date): ${displayStats.salesCountToday} sold, ${formatCurrency(displayStats.salesVolume)} total. Click to preview.`}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      margin: 0,
+                      cursor: 'pointer',
+                      fontFamily: 'monospace',
+                      fontSize: '7pt',
+                      color: 'var(--text)'
+                    }}
+                  >
+                    <b>{displayStats.salesCountToday}</b> sold · <b>{formatCurrency(displayStats.salesVolume)}</b>
+                  </button>
                 </>
               )}
               {displayStats.activeAuctions > 0 && (
                 <>
                   <span style={{ opacity: 0.3 }}>|</span>
-                  <span><b>{displayStats.activeAuctions}</b> auct</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openStatsPanel('auctions');
+                    }}
+                    title="Vehicles in auction mode (heuristic). Click to preview."
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      margin: 0,
+                      cursor: 'pointer',
+                      fontFamily: 'monospace',
+                      fontSize: '7pt',
+                      color: 'var(--text)'
+                    }}
+                  >
+                    <b>{displayStats.activeAuctions}</b> auct
+                  </button>
                 </>
               )}
-              {displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
+              {(hasActiveFilters || debouncedSearchText) && displayStats.avgValue > 0 && displayStats.totalVehicles > 1 && (
                 <>
                   <span style={{ opacity: 0.3 }}>|</span>
-                  <span><b>{formatCurrency(displayStats.avgValue)}</b> avg</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openStatsPanel('value');
+                    }}
+                    title="Average value is only meaningful when you’ve filtered the set. Click for breakdown."
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      margin: 0,
+                      cursor: 'pointer',
+                      fontFamily: 'monospace',
+                      fontSize: '7pt',
+                      color: 'var(--text-muted)'
+                    }}
+                  >
+                    <b>{formatCurrency(displayStats.avgValue)}</b> avg
+                  </button>
                 </>
               )}
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
