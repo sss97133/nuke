@@ -1,0 +1,236 @@
+# Discovery Snowball - Recursive Source Discovery
+# Finds new vehicle data sources through lead chains:
+# - Classic.com → dealers → web developers → more dealers
+# - BaT partners → investigate specialties
+# - YouTube channels → extract captions → vehicle data
+# - Collections → Instagram → collector info
+# - Builders → portfolio → vehicles
+
+name: Discovery Snowball
+
+on:
+  schedule:
+    # Run discovery every 4 hours
+    - cron: '30 */4 * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Discovery action to run'
+        required: false
+        default: 'run_cycle'
+        type: choice
+        options:
+          - run_cycle
+          - discover_dealers
+          - discover_web_developers
+          - youtube_extraction
+          - get_statistics
+
+concurrency:
+  group: discovery-snowball
+  cancel-in-progress: false
+
+jobs:
+  discovery-cycle:
+    if: github.event.inputs.action == 'run_cycle' || github.event.inputs.action == '' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Validate Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "Missing required secrets"
+            exit 1
+          fi
+          echo "Secrets validated"
+
+      - name: Run Discovery Snowball Cycle
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "DISCOVERY SNOWBALL - Starting"
+          echo "Following leads to discover new sources..."
+          echo "========================================"
+
+          RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
+            "${SUPABASE_URL}/functions/v1/discovery-snowball" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 300 \
+            -d '{"action": "run_cycle", "max_leads": 30, "max_depth": 3}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response:"
+          echo "$BODY" | head -c 3000
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo ""
+            echo "Discovery Snowball completed"
+            echo "$BODY" | grep -o '"leads_processed":[0-9]*' || true
+            echo "$BODY" | grep -o '"leads_converted":[0-9]*' || true
+            echo "$BODY" | grep -o '"new_leads_discovered":[0-9]*' || true
+            echo "$BODY" | grep -o '"new_businesses_created":[0-9]*' || true
+            echo "$BODY" | grep -o '"new_sources_created":[0-9]*' || true
+          else
+            echo ""
+            echo "Discovery Snowball failed (HTTP $HTTP_CODE)"
+          fi
+
+  discover-dealers:
+    if: github.event.inputs.action == 'discover_dealers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Discover Dealers from Directories
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "DISCOVER DEALERS - Starting"
+          echo "Crawling dealer directories..."
+          echo "========================================"
+
+          RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
+            "${SUPABASE_URL}/functions/v1/discovery-snowball" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 240 \
+            -d '{"action": "discover_dealers"}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response:"
+          echo "$BODY" | head -c 2000
+
+  discover-web-developers:
+    if: github.event.inputs.action == 'discover_web_developers'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Discover Web Developers from Existing Sites
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "DISCOVER WEB DEVELOPERS - Starting"
+          echo "Analyzing dealer sites for platform patterns..."
+          echo "========================================"
+
+          RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
+            "${SUPABASE_URL}/functions/v1/discovery-snowball" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 240 \
+            -d '{"action": "discover_web_developers"}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response:"
+          echo "$BODY" | head -c 2000
+
+  youtube-extraction:
+    if: github.event.inputs.action == 'youtube_extraction' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Extract Vehicle Data from YouTube
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "YOUTUBE EXTRACTION - Starting"
+          echo "Extracting vehicle data from YouTube videos..."
+          echo "========================================"
+
+          RESPONSE=$(curl -sS -w "\nHTTP:%{http_code}\n" -X POST \
+            "${SUPABASE_URL}/functions/v1/extract-youtube-vehicle-data" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 240 \
+            -d '{"action": "run_cycle", "max_videos": 15}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1 | sed 's/^HTTP://')
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response:"
+          echo "$BODY" | head -c 2000
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo ""
+            echo "YouTube Extraction completed"
+            echo "$BODY" | grep -o '"videos_processed":[0-9]*' || true
+            echo "$BODY" | grep -o '"vehicles_extracted":[0-9]*' || true
+          fi
+
+  get-statistics:
+    if: github.event.inputs.action == 'get_statistics'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Get Discovery Statistics
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "DISCOVERY STATISTICS"
+          echo "========================================"
+
+          RESPONSE=$(curl -sS -X POST \
+            "${SUPABASE_URL}/functions/v1/discovery-snowball" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 30 \
+            -d '{"action": "get_statistics"}')
+
+          echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+
+  summary:
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    needs: [discovery-cycle, youtube-extraction]
+
+    steps:
+      - name: Discovery Summary
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "========================================"
+          echo "DISCOVERY SNOWBALL SUMMARY"
+          echo "========================================"
+
+          # Get statistics
+          STATS=$(curl -sS -X POST \
+            "${SUPABASE_URL}/functions/v1/discovery-snowball" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            --max-time 30 \
+            -d '{"action": "get_statistics"}')
+
+          echo "Discovery Stats:"
+          echo "$STATS" | jq -r '.discovery | "  Pending leads: \(.leads_pending // 0)", "  Total leads: \(.leads_total // 0)", "  Conversion rate: \(.conversion_rate // 0)%"' 2>/dev/null || echo "  Could not parse stats"
+
+          echo ""
+          echo "Entity Counts:"
+          echo "$STATS" | jq -r '.entities | "  Businesses: \(.businesses // 0)", "  Sources: \(.scrape_sources // 0)", "  YouTube channels: \(.youtube_channels // 0)"' 2>/dev/null || echo "  Could not parse entities"
+
+          echo ""
+          echo "Next run: In 4 hours"
+          echo "========================================"

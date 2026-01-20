@@ -13,7 +13,7 @@ export default defineConfig({
   reporter: 'html',
   
   use: {
-    baseURL: 'https://n-zero.dev',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'https://n-zero.dev',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
