@@ -1601,6 +1601,18 @@ body {
 .block { display: block; }
 .inline-block { display: inline-block; }
 
+.no-scrollbar {
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE/Edge legacy */
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  /* Chrome/Safari */
+  display: none;
+}
+
 .relative { position: relative; }
 .absolute { position: absolute; }
 .fixed { position: fixed; }

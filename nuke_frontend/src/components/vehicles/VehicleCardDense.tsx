@@ -146,6 +146,8 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     def: PowertrainSpecDefinition | BodyStylePopoverDefinition;
     position: { x: number; y: number };
   } | null>(null);
+  const specPopoverRef = React.useRef<HTMLDivElement | null>(null);
+  const [specPopoverStyle, setSpecPopoverStyle] = React.useState<React.CSSProperties | null>(null);
   const cardRef = React.useRef<HTMLDivElement>(null);
   const [computedCardSize, setComputedCardSize] = React.useState(cardSizePx || 200);
   
@@ -982,6 +984,59 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [specPopover, closeSpecPopover]);
+
+  // Keep the spec popover within the viewport (prevents "off-screen" popups near edges).
+  React.useEffect(() => {
+    if (!specPopover) {
+      setSpecPopoverStyle(null);
+      return;
+    }
+    if (typeof window === 'undefined') return;
+
+    const margin = 12;
+    const gap = 12;
+
+    const measureAndClamp = () => {
+      const el = specPopoverRef.current;
+      const vw = window.innerWidth || 0;
+      const vh = window.innerHeight || 0;
+      if (!el || vw <= 0 || vh <= 0) return;
+
+      const rect = el.getBoundingClientRect();
+      const w = rect.width || Math.min(360, Math.max(0, vw - margin * 2));
+      const h = rect.height || 160;
+
+      const anchorX = specPopover.position.x;
+      const anchorY = specPopover.position.y;
+
+      const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+      // Prefer below cursor; if it would overflow, flip above.
+      const canPlaceBelow = anchorY + gap + h <= vh - margin;
+      const top = canPlaceBelow
+        ? clamp(anchorY + gap, margin, vh - margin - h)
+        : clamp(anchorY - gap - h, margin, vh - margin - h);
+
+      // Center horizontally on cursor, but clamp within viewport.
+      const left = clamp(anchorX - w / 2, margin, vw - margin - w);
+
+      setSpecPopoverStyle({
+        position: 'fixed',
+        left,
+        top,
+        transform: 'none',
+      });
+    };
+
+    // Measure immediately and on next frame (fonts/layout can settle).
+    measureAndClamp();
+    const raf = window.requestAnimationFrame(() => measureAndClamp());
+    window.addEventListener('resize', measureAndClamp);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener('resize', measureAndClamp);
+    };
+  }, [specPopover]);
 
   const openSpecPopover = React.useCallback(
     (e: React.MouseEvent, kind: 'engine' | 'transmission' | 'body_style', raw: unknown) => {
@@ -2305,10 +2360,12 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             role="dialog"
             aria-modal="true"
             style={{
-              position: 'fixed',
-              left: specPopover.position.x,
-              top: specPopover.position.y,
-              transform: 'translate(-50%, 12px)',
+              ...(specPopoverStyle || {
+                position: 'fixed',
+                left: specPopover.position.x,
+                top: specPopover.position.y,
+                transform: 'translate(-50%, 12px)',
+              }),
               width: 'min(360px, calc(100vw - 24px))',
               background: 'var(--surface)',
               border: '1px solid var(--border)',
@@ -2317,6 +2374,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
               borderRadius: 6,
               color: 'var(--text)',
             }}
+            ref={specPopoverRef}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
