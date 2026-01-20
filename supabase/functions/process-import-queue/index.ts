@@ -753,9 +753,7 @@ serve(async (req) => {
               body: JSON.stringify({
                 url: item.listing_url,
                 formats: ['html'],
-                pageOptions: {
-                  waitFor: 1000, // Reduced wait time
-                },
+                waitFor: 1000, // Reduced wait time
               }),
               signal: firecrawlController.signal
             });

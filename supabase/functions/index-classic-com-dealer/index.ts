@@ -662,7 +662,7 @@ async function extractWebsiteFavicon(website: string, supabase: any): Promise<st
           body: JSON.stringify({
             url: website,
             formats: ['html'],
-            pageOptions: { waitFor: 1000 }
+            waitFor: 1000
           }),
           signal: AbortSignal.timeout(8000)
         });
@@ -728,7 +728,7 @@ async function extractPrimaryImage(website: string, supabase: any): Promise<stri
         body: JSON.stringify({
           url: website,
           formats: ['html'],
-          pageOptions: { waitFor: 2000 }
+          waitFor: 2000
         }),
         signal: AbortSignal.timeout(10000)
       });

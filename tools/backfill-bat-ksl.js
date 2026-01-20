@@ -25,7 +25,7 @@ async function fetchHtml(url, allowFirecrawl = false) {
     throw new Error(`Fetch failed ${status} ${res.statusText}`);
   }
   // Fallback to Firecrawl to bypass blocks
-  const fc = await fetch('https://api.firecrawl.dev/v0/scrape', {
+  const fc = await fetch('https://api.firecrawl.dev/v1/scrape', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,

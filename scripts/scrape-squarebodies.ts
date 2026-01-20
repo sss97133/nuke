@@ -14,6 +14,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
+// Organization to link discovered vehicles to (for display on org profile)
+const TARGET_ORG_ID = process.env.TARGET_ORG_ID || '20e1d1e0-06b5-43b9-a994-7b5b9accb405';
+
 const SOURCES = [
   // BaT squarebody searches
   { name: 'BaT C10', url: 'https://bringatrailer.com/chevrolet/c10/', type: 'bat' },
@@ -25,16 +28,32 @@ const SOURCES = [
   // Cars & Bids
   { name: 'C&B Trucks', url: 'https://carsandbids.com/search?category=trucks', type: 'cab' },
   { name: 'C&B All', url: 'https://carsandbids.com/auctions/', type: 'cab' },
-  // Dealers
-  { name: 'Worldwide Vintage Autos', url: 'https://www.worldwidevintageautos.com/', type: 'dealer' },
-  { name: 'Classic Car Deals', url: 'https://www.classiccardeals.com/', type: 'dealer' },
-  { name: 'Arizona Classic Cars', url: 'https://www.arizonaclassiccarsales.com/', type: 'dealer' },
-  { name: 'Fast Lane Classic Cars', url: 'https://www.fastlanecars.com/inventory', type: 'dealer' },
-  { name: 'California Classic Cars', url: 'https://www.californiaclassiccars.com/', type: 'dealer' },
-  { name: 'Gateway Classic Cars', url: 'https://www.gatewayclassiccars.com/vehicles', type: 'dealer' },
-  { name: 'Streetside Classics', url: 'https://www.streetsideclassics.com/vehicles', type: 'dealer' },
-  // Collecting Cars (online auction)
-  { name: 'Collecting Cars', url: 'https://collectingcars.com/search/', type: 'auction' },
+
+  // Major Classic Car Dealers
+  { name: 'Gateway Classic Cars', url: 'https://www.gatewayclassiccars.com/vehicles?make=Chevrolet', type: 'gateway' },
+  { name: 'Gateway GMC', url: 'https://www.gatewayclassiccars.com/vehicles?make=GMC', type: 'gateway' },
+  { name: 'Streetside Classics', url: 'https://www.streetsideclassics.com/vehicles?make=Chevrolet', type: 'streetside' },
+  { name: 'Streetside GMC', url: 'https://www.streetsideclassics.com/vehicles?make=GMC', type: 'streetside' },
+  { name: 'Classic Auto Mall', url: 'https://www.classicautomall.com/vehicles?make=Chevrolet', type: 'classicautomall' },
+  { name: 'Volo Museum', url: 'https://www.volocars.com/inventory?make=Chevrolet', type: 'volo' },
+  { name: 'Restore A Muscle Car', url: 'https://www.restoreamusclecar.com/inventory/', type: 'ramc' },
+  { name: 'RK Motors', url: 'https://www.rkmotorscharlotte.com/inventory?make=Chevrolet', type: 'rk' },
+  { name: 'Worldwide Vintage Autos', url: 'https://www.worldwidevintageautos.com/inventory/', type: 'wva' },
+  { name: 'Classic Car Deals', url: 'https://www.classiccardeals.com/used-inventory/index.htm?make=Chevrolet', type: 'ccd' },
+  { name: 'Hemmings', url: 'https://www.hemmings.com/classifieds/cars-for-sale/chevrolet/c10', type: 'hemmings' },
+  { name: 'Hemmings K10', url: 'https://www.hemmings.com/classifieds/cars-for-sale/chevrolet/k10', type: 'hemmings' },
+  { name: 'Hemmings Blazer', url: 'https://www.hemmings.com/classifieds/cars-for-sale/chevrolet/blazer', type: 'hemmings' },
+
+  // Auction Houses
+  { name: 'Collecting Cars', url: 'https://collectingcars.com/search/?q=chevrolet', type: 'collecting' },
+  { name: 'eBay Motors C10', url: 'https://www.ebay.com/sch/i.html?_nkw=chevrolet+c10+squarebody&_sacat=6001', type: 'ebay' },
+  { name: 'eBay Motors K5 Blazer', url: 'https://www.ebay.com/sch/i.html?_nkw=chevrolet+k5+blazer&_sacat=6001', type: 'ebay' },
+
+  // Facebook Marketplace (limited without auth)
+  // Craigslist aggregators
+  { name: 'Autotempest C10', url: 'https://www.autotempest.com/results?make=chevrolet&model=c10&zip=90210&radius=any', type: 'autotempest' },
+  { name: 'Autotempest K10', url: 'https://www.autotempest.com/results?make=chevrolet&model=k10&zip=90210&radius=any', type: 'autotempest' },
+  { name: 'Autotempest Blazer', url: 'https://www.autotempest.com/results?make=chevrolet&model=blazer&zip=90210&radius=any', type: 'autotempest' },
 ];
 
 interface Vehicle {
@@ -69,35 +88,100 @@ async function scrapeHemmings(): Promise<void> {
       const page = await context.newPage();
       await page.goto(source.url, { waitUntil: 'networkidle', timeout: 30000 });
 
-      // Wait for listings to load
-      await page.waitForSelector('a[href*="/listing/"], a[href*="/auctions/"]', { timeout: 15000 }).catch(() => null);
+      // Wait for initial load
+      await page.waitForTimeout(2000);
 
-      // Get all listing links
-      const listings = await page.evaluate(() => {
+      // Scroll to trigger lazy loading
+      await page.evaluate(() => window.scrollTo(0, 1000));
+      await page.waitForTimeout(1000);
+      await page.evaluate(() => window.scrollTo(0, 2000));
+      await page.waitForTimeout(1500);
+
+      // Wait for listings to load - different selectors per source type
+      const waitSelectors: Record<string, string> = {
+        bat: 'a[href*="/listing/"]',
+        cab: 'a[href*="/auctions/"]',
+        gateway: 'a[href*="/vehicles/"]',
+        streetside: 'a.inventory-item',
+        classicautomall: 'a[href*="/inventory/"]',
+        volo: 'a[href*="/inventory/"]',
+        ramc: 'a[href*="/inventory/"]',
+        rk: 'a[href*="/inventory/"]',
+        wva: 'a[href*="/inventory/"]',
+        ccd: 'a[href*="/used/"]',
+        hemmings: 'a[href*="/listing/"]',
+        collecting: 'a[href*="/lot/"]',
+        ebay: '.s-item__link, a[href*="/itm/"]',
+        autotempest: '.result-item a, a[target="_blank"]',
+      };
+      const waitSelector = waitSelectors[source.type] || 'a';
+      await page.waitForSelector(waitSelector, { timeout: 10000 }).catch(() => null);
+
+      // Get all listing links based on source type
+      const listings = await page.evaluate((sourceType: string) => {
         const links: { url: string; title: string; price: string }[] = [];
 
-        // BaT listings
-        document.querySelectorAll('a[href*="/listing/"]').forEach(a => {
-          const link = a as HTMLAnchorElement;
-          const title = link.textContent?.trim() || '';
-          if (link.href && title && !links.some(l => l.url === link.href)) {
-            links.push({ url: link.href, title, price: '' });
-          }
-        });
+        // Determine selectors and pattern based on source type
+        let selectors: string[] = [];
+        let patternStr = '';
 
-        // Cars & Bids auctions
-        document.querySelectorAll('a[href*="/auctions/"]').forEach(a => {
-          const link = a as HTMLAnchorElement;
-          const card = link.closest('.auction-card, article, [class*="auction"]');
-          const title = card?.querySelector('h2, h3, [class*="title"]')?.textContent?.trim() || link.textContent?.trim() || '';
-          const price = card?.querySelector('[class*="bid"], [class*="price"]')?.textContent?.trim() || '';
-          if (link.href && title && !links.some(l => l.url === link.href)) {
-            links.push({ url: link.href, title, price });
-          }
-        });
+        switch (sourceType) {
+          case 'bat':
+            selectors = ['a[href*="/listing/"]'];
+            patternStr = '\\/listing\\/';
+            break;
+          case 'cab':
+            selectors = ['a[href*="/auctions/"]'];
+            patternStr = '\\/auctions\\/';
+            break;
+          case 'gateway':
+            selectors = ['a[href*="/vehicles/"][href*="-"]'];
+            patternStr = '\\/vehicles\\/[A-Z]{3,4}-?\\d+';
+            break;
+          case 'streetside':
+            selectors = ['a.inventory-item', 'a[href*="/vehicles/"][href*="-"]'];
+            patternStr = '\\/vehicles\\/\\d+';
+            break;
+          case 'hemmings':
+            selectors = ['a[href*="/listing/"]'];
+            patternStr = '\\/listing\\/\\d{4}-';
+            break;
+          case 'ebay':
+            selectors = ['.s-item__link', 'a[href*="/itm/"]'];
+            patternStr = '\\/itm\\/';
+            break;
+          case 'collecting':
+            selectors = ['a[href*="/lot/"]', '.auction-card a'];
+            patternStr = '\\/lot\\/';
+            break;
+          default:
+            selectors = ['a[href*="/vehicle"]', 'a[href*="/inventory"]', 'a[href*="/listing"]'];
+            patternStr = '';
+        }
+
+        const urlPattern = patternStr ? new RegExp(patternStr, 'i') : null;
+
+        // Find vehicle links
+        for (const selector of selectors) {
+          document.querySelectorAll(selector).forEach(el => {
+            const link = el.tagName === 'A' ? el as HTMLAnchorElement : el.querySelector('a') as HTMLAnchorElement;
+            if (!link?.href) return;
+            if (urlPattern && !urlPattern.test(link.href)) return;
+
+            const card = link.closest('[class*="vehicle"], [class*="card"], [class*="item"], [class*="listing"], article, li');
+            const title = card?.querySelector('h2, h3, h4, [class*="title"], [class*="name"]')?.textContent?.trim()
+              || link.textContent?.trim()
+              || '';
+            const price = card?.querySelector('[class*="price"], [class*="bid"], [class*="cost"]')?.textContent?.trim() || '';
+
+            if (title && !links.some(l => l.url === link.href)) {
+              links.push({ url: link.href, title, price });
+            }
+          });
+        }
 
         return links.slice(0, 50); // Limit to 50
-      });
+      }, source.type);
 
       console.log(`  Found ${listings.length} listings`);
       totalFound += listings.length;
@@ -141,6 +225,7 @@ async function scrapeHemmings(): Promise<void> {
               listing_url: vehicle.listing_url,
               bat_auction_url: vehicle.listing_url.includes('bringatrailer') ? vehicle.listing_url : null,
               location: vehicle.location,
+              listing_source: source.type,
             })
             .select()
             .single();
@@ -148,6 +233,17 @@ async function scrapeHemmings(): Promise<void> {
           if (data) {
             totalSaved++;
             console.log(`  ✅ ${vehicle.year} ${vehicle.make} ${vehicle.model} - $${vehicle.price || 'N/A'}`);
+
+            // Link to organization for discoverability
+            if (TARGET_ORG_ID) {
+              await supabase.from('organization_vehicles').insert({
+                organization_id: TARGET_ORG_ID,
+                vehicle_id: data.id,
+                relationship_type: 'discovered',
+                auto_tagged: true,
+                status: 'active',
+              }).catch(() => {}); // Ignore if link already exists
+            }
           } else if (error) {
             console.log(`  ❌ DB error: ${error.message}`);
           }

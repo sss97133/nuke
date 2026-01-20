@@ -239,7 +239,7 @@ async function checkNZeroSoldStatusWithFirecrawl(vehicleId) {
   }
 
   try {
-    const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -247,9 +247,9 @@ async function checkNZeroSoldStatusWithFirecrawl(vehicleId) {
       },
       body: JSON.stringify({
         url: url,
-        pageOptions: {
-          waitFor: 2000, // Wait 2 seconds for React to render
-        },
+        formats: ['html'],
+        onlyMainContent: false,
+        waitFor: 2000, // Wait 2 seconds for React to render
       }),
     });
 

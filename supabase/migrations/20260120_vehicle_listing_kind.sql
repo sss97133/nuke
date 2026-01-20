@@ -39,5 +39,36 @@ WHERE v.listing_kind = 'vehicle'
     OR lower(coalesce(v.model, '')) in ('n/a', 'na', 'unknown')
   );
 
+-- Keep aggregate counts aligned with the default browse experience.
+-- NOTE: This intentionally counts only "real" vehicles (excludes non-vehicle items).
+CREATE OR REPLACE FUNCTION public.get_total_vehicle_count(
+  make_prefix TEXT DEFAULT NULL,
+  model_contains TEXT DEFAULT NULL
+)
+RETURNS INTEGER
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COUNT(*)::int
+  FROM public.vehicles v
+  WHERE v.status <> 'pending'
+    AND v.listing_kind = 'vehicle'
+    AND (
+      make_prefix IS NULL
+      OR btrim(make_prefix) = ''
+      OR v.make ILIKE (btrim(make_prefix) || '%')
+    )
+    AND (
+      model_contains IS NULL
+      OR btrim(model_contains) = ''
+      OR v.model ILIKE ('%' || btrim(model_contains) || '%')
+    );
+$$;
+
+REVOKE ALL ON FUNCTION public.get_total_vehicle_count(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_total_vehicle_count(TEXT, TEXT) TO anon, authenticated, service_role;
+
 COMMIT;
 

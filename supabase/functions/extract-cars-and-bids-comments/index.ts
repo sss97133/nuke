@@ -7,6 +7,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
+import { firecrawlScrape } from '../_shared/firecrawl.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -251,35 +252,34 @@ serve(async (req) => {
 
       console.log('🌐 Fetching HTML with Firecrawl (JavaScript rendering fallback)...')
       
-      const firecrawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${firecrawlKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const firecrawl = await firecrawlScrape(
+        {
           url: auctionUrlNorm,
-          pageOptions: {
-            waitFor: 3000, // Wait 3 seconds for JavaScript to render
-          },
           formats: ['html'],
-        }),
-      })
-
-      if (!firecrawlResponse.ok) {
-        const errorText = await firecrawlResponse.text()
-        const errorData = JSON.parse(errorText || '{}')
-        if (errorData.error?.includes('credits') || errorData.error?.includes('Insufficient')) {
-          throw new Error(`Firecrawl account has insufficient credits. Direct fetch also failed. Please add credits to Firecrawl account or use an active auction URL.`)
+          onlyMainContent: false,
+          waitFor: 3000, // Wait 3 seconds for JavaScript to render
+        },
+        {
+          apiKey: firecrawlKey,
+          timeoutMs: 45000,
+          maxAttempts: 3,
         }
-        throw new Error(`Firecrawl failed: ${firecrawlResponse.status} ${errorText}`)
-      }
+      )
 
-      const firecrawlData = await firecrawlResponse.json()
-      html = firecrawlData?.data?.[0]?.html || firecrawlData?.html || ''
+      html = firecrawl.data?.html || ''
       
       if (!html || html.length < 1000) {
-        throw new Error(`Firecrawl returned insufficient HTML (${html.length} chars)`)
+        const rawErr = (firecrawl.raw as any)?.error
+        const errText = firecrawl.error || ''
+        const looksLikeCredits =
+          /credits/i.test(errText) ||
+          /insufficient/i.test(errText) ||
+          /credits/i.test(JSON.stringify(rawErr || '')) ||
+          /insufficient/i.test(JSON.stringify(rawErr || ''))
+        if (looksLikeCredits) {
+          throw new Error(`Firecrawl account has insufficient credits. Direct fetch also failed. Please add credits to Firecrawl account or use an active auction URL.`)
+        }
+        throw new Error(firecrawl.error || `Firecrawl returned insufficient HTML (${html.length} chars)`)
       }
       
       console.log(`✅ Firecrawl returned ${html.length} characters of HTML`)

@@ -10,6 +10,33 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const paused = (() => {
+      const v = String(Deno.env.get('NUKE_ANALYSIS_PAUSED') || '').trim().toLowerCase()
+      return v === '1' || v === 'true' || v === 'yes' || v === 'on'
+    })()
+
+    if (paused) {
+      return new Response(JSON.stringify({
+        success: false,
+        paused: true,
+        message: 'Organization image analysis paused (NUKE_ANALYSIS_PAUSED)'
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      })
+    }
+
+    if (!anthropicApiKey) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing ANTHROPIC_API_KEY',
+        message: 'Set ANTHROPIC_API_KEY in Supabase Edge Function secrets (or pause via NUKE_ANALYSIS_PAUSED)'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      })
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

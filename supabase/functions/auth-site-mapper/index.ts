@@ -113,7 +113,8 @@ async function mapPublicAreas(siteUrl: string) {
   }
   
   // Crawl public areas
-  const response = await fetch('https://api.firecrawl.dev/v0/crawl', {
+  // v1: use /map for fast URL discovery (v0 /crawl is deprecated)
+  const response = await fetch('https://api.firecrawl.dev/v1/map', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${firecrawlKey}`,
@@ -121,11 +122,7 @@ async function mapPublicAreas(siteUrl: string) {
     },
     body: JSON.stringify({
       url: siteUrl,
-      crawlerOptions: {
-        includes: ['*/auctions/*', '*/lots/*', '*/vehicles/*', '*/inventory/*'],
-        excludes: ['*/login/*', '*/account/*', '*/member/*'],
-        limit: 20
-      }
+      limit: 20
     })
   });
   
@@ -137,7 +134,7 @@ async function mapPublicAreas(siteUrl: string) {
   return new Response(JSON.stringify({
     success: true,
     data: {
-      public_urls: crawlData.results?.map(r => r.url) || [],
+      public_urls: crawlData.links || [],
       extraction_schema: publicSchema,
       coverage_estimate: calculatePublicCoverage(crawlData),
       auth_walls_detected: detectAuthWalls(crawlData)

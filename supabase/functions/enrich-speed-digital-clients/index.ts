@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
         if (firecrawlKey) {
           try {
             console.log(`   Using Firecrawl to fetch ${client.website}...`);
-            const firecrawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+            const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

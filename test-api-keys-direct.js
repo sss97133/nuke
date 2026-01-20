@@ -60,7 +60,7 @@ async function testFirecrawlAPI() {
   }
 
   try {
-    const firecrawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
+    const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${firecrawlApiKey}`,

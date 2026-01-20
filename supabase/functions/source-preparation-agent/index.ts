@@ -187,8 +187,8 @@ async function testSourceExtraction(url: string, sourceType: string, firecrawlKe
   }
 
   try {
-    // Use Firecrawl with structured extraction
-    const response = await fetch('https://api.firecrawl.dev/v0/scrape', {
+    // Use Firecrawl v1 with structured extraction
+    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${firecrawlKey}`,
@@ -196,14 +196,9 @@ async function testSourceExtraction(url: string, sourceType: string, firecrawlKe
       },
       body: JSON.stringify({
         url,
-        extractorOptions: {
-          mode: 'llm-extraction',
-          extractionSchema: schema
-        },
-        pageOptions: {
-          onlyMainContent: true,
-          includeHtml: false
-        }
+        formats: ['extract'],
+        extract: { schema },
+        onlyMainContent: true,
       })
     });
 

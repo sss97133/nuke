@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { firecrawlScrape } from "../_shared/firecrawl.ts";
 
 // Simple helpers for deterministic source-specific parsing
 const UA = 'Mozilla/5.0 (compatible; NukeBot/1.0)';
@@ -112,6 +113,7 @@ serve(async (req) => {
     let query = supabase
       .from('import_queue')
       .select('*')
+      .eq('status', 'pending')
       .order('priority', { ascending: false })
       .limit(batch_size);
 
@@ -145,6 +147,17 @@ serve(async (req) => {
       console.log(`🔄 Processing: ${item.listing_url}`);
 
       try {
+        // Best-effort: mark as processing (avoid repeat work)
+        try {
+          await supabase
+            .from('import_queue')
+            .update({ status: 'processing' })
+            .eq('id', item.id)
+            .eq('status', 'pending');
+        } catch {
+          // ignore
+        }
+
         // Source-specific deterministic extraction first
         let vehicleData: any = null;
         let usedSourceSpecific = false;
@@ -167,27 +180,24 @@ serve(async (req) => {
         }
 
         if (!usedSourceSpecific) {
-          const firecrawlResponse = await fetch('https://api.firecrawl.dev/v0/scrape', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${firecrawlApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
+          const firecrawl = await firecrawlScrape(
+            {
               url: item.listing_url,
               formats: ['markdown'],
               onlyMainContent: true,
-              waitFor: 3000
-            })
-          });
+              waitFor: 3000,
+            },
+            {
+              apiKey: firecrawlApiKey,
+              timeoutMs: 45000,
+              maxAttempts: 3,
+            }
+          );
 
-          if (!firecrawlResponse.ok) {
-            throw new Error(`Firecrawl ${firecrawlResponse.status}: ${firecrawlResponse.statusText}`);
-          }
-
-          const firecrawlData = await firecrawlResponse.json();
-          if (!firecrawlData.success) {
-            throw new Error(`Firecrawl failed: ${firecrawlData.error || 'Unknown error'}`);
+          const markdown = (firecrawl.data?.markdown || '').trim();
+          if (!markdown) {
+            // Include the normalized Firecrawl error (helps debug 401/402/429/etc.)
+            throw new Error(firecrawl.error || 'Firecrawl returned no markdown');
           }
 
           console.log(`📄 Firecrawl extracted content for: ${item.listing_url}`);
@@ -217,7 +227,7 @@ serve(async (req) => {
                 role: 'user',
                 content: `Extract vehicle info from: ${item.listing_url}
 
-Content: ${(firecrawlData.data.markdown || '').substring(0, 8000)}
+Content: ${markdown.substring(0, 8000)}
 
 Return JSON only:
 {
@@ -357,10 +367,17 @@ Return JSON only:
           vehicleId
         });
 
-        // Remove from queue after successful processing
+        // Mark as complete (avoid reprocessing)
         await supabase
           .from('import_queue')
-          .delete()
+          .update({
+            status: 'complete',
+            raw_data: {
+              ...(item.raw_data || {}),
+              processed_at: new Date().toISOString(),
+              vehicle_id: vehicleId,
+            },
+          })
           .eq('id', item.id);
 
       } catch (error: any) {
@@ -371,6 +388,23 @@ Return JSON only:
           success: false,
           error: error.message
         });
+
+        // Mark as failed so we don't fail in a loop
+        try {
+          await supabase
+            .from('import_queue')
+            .update({
+              status: 'failed',
+              raw_data: {
+                ...(item.raw_data || {}),
+                failed_at: new Date().toISOString(),
+                last_error: error?.message || String(error),
+              },
+            })
+            .eq('id', item.id);
+        } catch {
+          // ignore
+        }
       }
     }
 

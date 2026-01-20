@@ -74,6 +74,11 @@ function safeStringArray(value: any, max = 30): string[] {
   return out;
 }
 
+function isTruthy(v: string | null | undefined): boolean {
+  const s = String(v || "").trim().toLowerCase();
+  return s === "1" || s === "true" || s === "yes" || s === "on";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return okJson({ success: false, error: "Method not allowed" }, 405);
@@ -115,6 +120,70 @@ serve(async (req) => {
       .gte("created_at", iso24h);
 
     const { count: activeSources } = await supabase.from("scrape_sources").select("*", { count: "exact", head: true }).eq("is_active", true);
+
+    // Analysis queue + image analysis progress (best-effort).
+    const analysisQueueCounts: Record<string, number> = {};
+    const analysisErrorPatterns = new Map<string, number>();
+    try {
+      const statuses = ["pending", "processing", "retrying", "failed", "completed"];
+      for (const st of statuses) {
+        const { count } = await supabase.from("analysis_queue").select("*", { count: "exact", head: true }).eq("status", st);
+        analysisQueueCounts[st] = count || 0;
+      }
+
+      const { data: recentAnalysisFailures } = await supabase
+        .from("analysis_queue")
+        .select("error_message, status, updated_at")
+        .in("status", ["failed", "retrying"])
+        .order("updated_at", { ascending: false })
+        .limit(200);
+      for (const row of (recentAnalysisFailures || []) as any[]) {
+        const msg = typeof row?.error_message === "string" ? row.error_message.trim() : "";
+        if (!msg) continue;
+        const key = msg.replace(/\s+/g, " ").slice(0, 120);
+        analysisErrorPatterns.set(key, (analysisErrorPatterns.get(key) || 0) + 1);
+      }
+    } catch {
+      // ignore
+    }
+
+    const analysisTopErrors = topCounts(analysisErrorPatterns, 12);
+
+    let vehicleImageAnalysis: { total: number; analyzed: number; pending: number } | null = null;
+    try {
+      const { count: totalImages } = await supabase.from("vehicle_images").select("*", { count: "exact", head: true });
+      const { count: analyzedImages } = await supabase
+        .from("vehicle_images")
+        .select("*", { count: "exact", head: true })
+        .not("ai_scan_metadata->appraiser->primary_label", "is", null);
+      const { count: pendingImages } = await supabase
+        .from("vehicle_images")
+        .select("*", { count: "exact", head: true })
+        .is("ai_scan_metadata->appraiser->primary_label", null);
+      if (totalImages != null && analyzedImages != null && pendingImages != null) {
+        vehicleImageAnalysis = {
+          total: totalImages || 0,
+          analyzed: analyzedImages || 0,
+          pending: pendingImages || 0,
+        };
+      }
+    } catch {
+      // ignore
+    }
+
+    let orgImageAnalysis: { pending_last_7d: number } | null = null;
+    try {
+      const { count } = await supabase
+        .from("organization_images")
+        .select("*", { count: "exact", head: true })
+        .is("ai_analysis", null)
+        .gte("created_at", iso7d);
+      if (count != null) {
+        orgImageAnalysis = { pending_last_7d: count || 0 };
+      }
+    } catch {
+      // ignore
+    }
 
     // Active sources + site_maps coverage overview (best-effort; tolerate missing table/columns).
     let mappedSources = 0;
@@ -208,6 +277,13 @@ serve(async (req) => {
     const snapshot = {
       queue: { pending, processing, complete, failed, skipped },
       vehicles: { total: totalVehicles || 0, created_last_24h: vehicles24h || 0 },
+      analysis: {
+        paused_hint: isTruthy(Deno.env.get("NUKE_ANALYSIS_PAUSED")),
+        analysis_queue: analysisQueueCounts,
+        analysis_top_error_patterns: analysisTopErrors,
+        vehicle_image_analysis: vehicleImageAnalysis,
+        org_image_analysis: orgImageAnalysis,
+      },
       sources: {
         active: activeSources || 0,
         mapped_estimate: mappedSources,
@@ -239,10 +315,66 @@ serve(async (req) => {
 
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openaiKey) {
-      return okJson(
-        { success: false, error: "Missing OPENAI_API_KEY (set in Supabase Edge Function secrets)" },
-        500,
-      );
+      // Fallback: return a lightweight, non-LLM brief so admins still get clarity.
+      const analysisPending = Number(analysisQueueCounts.pending || 0) + Number(analysisQueueCounts.retrying || 0);
+      const fallback = {
+        headlines: [
+          `import_queue: ${pending} pending • ${failed} failed • ${processing} processing`,
+          `vehicles: ${Number(totalVehicles || 0).toLocaleString()} total • ${Number(vehicles24h || 0)} created/24h`,
+          ...(analysisPending > 0 ? [`analysis_queue: ${analysisPending} pending/retrying • ${analysisQueueCounts.failed || 0} failed`] : []),
+          ...(vehicleImageAnalysis ? [`vehicle_images: ${vehicleImageAnalysis.pending} pending • ${vehicleImageAnalysis.analyzed} analyzed`] : []),
+        ].slice(0, 8),
+        priorities_now: [
+          {
+            title: "Stop runaway analysis (if costs/logs are spiking)",
+            why: "Analysis can auto-queue on vehicle/image events and is often cron-triggered.",
+            steps: [
+              "Set NUKE_ANALYSIS_PAUSED=1 in Supabase Edge Function secrets (pauses cron-style analysis functions that respect it).",
+              "If needed: disable auto-queue triggers on analysis_queue in SQL (re-enable later).",
+              "Then review analysis_queue backlog + failures."
+            ],
+            estimated_impact: "Immediate cost + log volume reduction"
+          },
+          {
+            title: "Triage import_queue failures by domain",
+            why: "Repeated failures are usually one or two sources dominating the backlog.",
+            steps: [
+              `Start with: ${topFailDomains.slice(0, 5).map((d) => d.key).join(", ") || "top failing domains"}`,
+              "Decide: fix extractor vs skip permanently vs lower priority.",
+              "Clear obviously bad URLs (invalid / junk identity) to unblock throughput."
+            ],
+            estimated_impact: "Faster queue drain, less noise"
+          }
+        ],
+        priorities_next: [
+          {
+            title: "Make admin less overwhelming",
+            why: "A single daily brief reduces context switching and tech debt anxiety.",
+            steps: [
+              "Use this snapshot as the single source of truth for the day.",
+              "Pick 1-2 fixes to ship; pause everything else."
+            ]
+          }
+        ],
+        watchlist: [
+          ...(analysisTopErrors.slice(0, 5).map((e) => `analysis: ${e.key}`)),
+          ...(topErrors.slice(0, 5).map((e) => `import_queue: ${e.key}`)),
+        ].slice(0, 10),
+        suggested_sql: [
+          "SELECT status, count(*) FROM analysis_queue GROUP BY status ORDER BY 2 DESC;",
+          "SELECT jobid, jobname, schedule, active FROM cron.job WHERE jobname ILIKE '%analysis%';",
+          "SELECT status, count(*) FROM import_queue GROUP BY status ORDER BY 2 DESC;",
+        ],
+        suggested_commands: [],
+      };
+
+      return okJson({
+        success: true,
+        llm_disabled: true,
+        error: "Missing OPENAI_API_KEY (returning fallback brief)",
+        snapshot,
+        output: fallback,
+      });
     }
 
     const model = typeof body?.model === "string" && body.model.trim() ? body.model.trim() : "gpt-4o-mini";
@@ -287,7 +419,8 @@ serve(async (req) => {
       "",
       "Rules:",
       "- Keep it short and executable.",
-      "- Prefer actions aligned with the snapshot (top failing domains/errors, queue shape, stale sources).",
+      "- Prefer actions aligned with the snapshot (top failing domains/errors, queue shape, stale sources, analysis backlogs).",
+      "- If analysis is spiking, propose a safe pause plan (NUKE_ANALYSIS_PAUSED kill-switch + optional trigger disable) before expensive fixes.",
       "- If suggesting SQL, keep it safe: always include WHERE, avoid destructive operations, suggest SELECT first when possible.",
       "- If suggesting commands, prefer curl to existing edge functions (e.g. unified-scraper-orchestrator, pipeline-orchestrator) and include only placeholders for keys.",
     ].join("\n");

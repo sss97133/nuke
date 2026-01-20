@@ -206,7 +206,7 @@ export default function Organizations() {
           .select('id, business_name, business_type, description, logo_url, website, address, city, state, zip_code, latitude, longitude, is_tradable, stock_symbol, total_vehicles, total_images, total_events, created_at', { count: 'exact' })
           .eq('is_public', true)
           .order('created_at', { ascending: false })
-          .limit(20);
+          .limit(1000);
         
         console.log('[Organizations] Query result:', {
           hasError: !!orgError,

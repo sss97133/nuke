@@ -459,7 +459,14 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // Completeness scoring factors (can be extended/modified as requirements evolve)
     const completenessFactors = {
       // Basic identification (required for any tier above F)
-      hasVIN: vehicle.vin && vehicle.vin.length === 17,
+      hasVIN: (() => {
+        const raw = String(vehicle.vin || '').trim().toUpperCase();
+        if (!raw) return false;
+        // Treat placeholder/system VINs as missing.
+        if (raw.startsWith('VIVA') || raw.startsWith('TEST') || raw.startsWith('FAKE')) return false;
+        // Accept modern VINs (17) and legacy chassis/serial identifiers (4-16).
+        return /^[A-HJ-NPR-Z0-9]{4,17}$/.test(raw);
+      })(),
       hasPrice: !!(vehicle.asking_price || vehicle.current_value || vehicle.sale_price),
       hasYearMakeModel: !!(vehicle.year && vehicle.make && vehicle.model),
       

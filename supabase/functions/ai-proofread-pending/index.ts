@@ -143,7 +143,7 @@ serve(async (req) => {
               body: JSON.stringify({
                 url: item.url,
                 formats: ['html'],
-                pageOptions: { waitFor: 1000 }
+                waitFor: 1000
               }),
               signal: AbortSignal.timeout(15000)
             });
