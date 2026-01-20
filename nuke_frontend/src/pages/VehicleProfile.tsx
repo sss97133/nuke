@@ -3427,6 +3427,32 @@ const VehicleProfile: React.FC = () => {
       );
     }
 
+    const importMeta = (vehicle as any)?.import_metadata || {};
+    const evidenceUrls = Array.isArray(importMeta.evidence_urls) ? importMeta.evidence_urls : [];
+    const rawSources = [
+      importMeta.listing_url,
+      (vehicle as any)?.discovery_url,
+      (vehicle as any)?.platform_url,
+      (vehicle as any)?.bat_auction_url,
+      ...(evidenceUrls || [])
+    ];
+    const dataSources = Array.from(
+      new Set(
+        rawSources
+          .map((u) => String(u || '').trim())
+          .filter((u) => u.startsWith('http'))
+      )
+    );
+    const sourceLabel = (url: string) => {
+      try {
+        const parsed = new URL(url);
+        const path = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '';
+        return `${parsed.hostname}${path}`;
+      } catch {
+        return url;
+      }
+    };
+
     return (
       <>
         {/* Primary Image and Timeline - Full width top section (one column) */}
@@ -3543,6 +3569,38 @@ const VehicleProfile: React.FC = () => {
                 isEditable={canEdit}
                 onUpdate={() => {}}
               />
+
+              {/* Data sources / evidence */}
+              <div className="card">
+                <div className="card-header">DATA SOURCES</div>
+                <div className="card-body">
+                  {(importMeta.builder || importMeta.seller) && (
+                    <div className="text-small text-muted" style={{ marginBottom: '8px' }}>
+                      {importMeta.builder ? `Builder: ${importMeta.builder}` : null}
+                      {importMeta.builder && importMeta.seller ? ' • ' : null}
+                      {importMeta.seller ? `Seller: ${importMeta.seller}` : null}
+                    </div>
+                  )}
+                  {dataSources.length === 0 ? (
+                    <div className="text-small text-muted">No external sources attached yet.</div>
+                  ) : (
+                    <details open={dataSources.length <= 6}>
+                      <summary className="text-small" style={{ cursor: 'pointer' }}>
+                        {dataSources.length} source{dataSources.length === 1 ? '' : 's'}
+                      </summary>
+                      <ul style={{ margin: '8px 0 0', paddingLeft: '18px' }}>
+                        {dataSources.map((url) => (
+                          <li key={url} className="text-small">
+                            <a href={url} target="_blank" rel="noreferrer">
+                              {sourceLabel(url)}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              </div>
 
               {/* Comments & Bids - Sticky below header/auction bar, scrollable independently */}
               <VehicleCommentsCard
