@@ -227,6 +227,7 @@ interface FilterState {
   priceMin: number | null;
   priceMax: number | null;
   hasImages: boolean;
+  addedTodayOnly: boolean; // Only vehicles created today
   forSale: boolean;
   hideSold: boolean;
   privateParty: boolean; // Filter for private party listings
@@ -254,6 +255,7 @@ const DEFAULT_FILTERS: FilterState = {
   priceMin: null,
   priceMax: null,
   hasImages: false,
+  addedTodayOnly: false,
   forSale: false,
   hideSold: false,
   privateParty: false,
@@ -497,6 +499,7 @@ const CursorHomepage: React.FC = () => {
       ((filters.bodyStyles?.length || 0) > 0) ||
       filters.is4x4 ||
       ((filters.locations && filters.locations.length > 0) || (filters.zipCode && filters.radiusMiles > 0)) ||
+      filters.addedTodayOnly ||
       filters.forSale ||
       filters.hideSold ||
       filters.showPending ||
@@ -1017,6 +1020,20 @@ const CursorHomepage: React.FC = () => {
     }
 
     // Apply filters
+    if (filters.addedTodayOnly) {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      const startMs = start.getTime();
+      const endMs = end.getTime();
+
+      result = result.filter((v: any) => {
+        const t = new Date(v.created_at || 0).getTime();
+        return Number.isFinite(t) && t >= startMs && t < endMs;
+      });
+    }
+
     if (filters.yearMin) {
       result = result.filter(v => (v.year || 0) >= filters.yearMin!);
     }
@@ -1242,6 +1259,7 @@ const CursorHomepage: React.FC = () => {
     if (filters.priceMin !== DEFAULT_FILTERS.priceMin) n++;
     if (filters.priceMax !== DEFAULT_FILTERS.priceMax) n++;
     if (filters.hasImages !== DEFAULT_FILTERS.hasImages) n++;
+    if (filters.addedTodayOnly !== DEFAULT_FILTERS.addedTodayOnly) n++;
     if (filters.forSale !== DEFAULT_FILTERS.forSale) n++;
     if (filters.hideSold !== DEFAULT_FILTERS.hideSold) n++;
     if (filters.privateParty !== DEFAULT_FILTERS.privateParty) n++;
@@ -1266,7 +1284,8 @@ const CursorHomepage: React.FC = () => {
     forSaleCount: 0,
     activeAuctions: 0,
     totalBids: 0,
-    avgValue: 0
+    avgValue: 0,
+    vehiclesAddedToday: 0,
   });
   const [filteredStatsLoading, setFilteredStatsLoading] = useState(false);
 
@@ -1284,9 +1303,21 @@ const CursorHomepage: React.FC = () => {
       let query = supabase
         .from('vehicles')
         // Keep this payload lean: this query runs as you type/search and shouldn't pull display-only fields.
-        .select('sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, sale_date', { count: 'exact' })
+        .select(
+          'sale_price, sale_status, asking_price, current_value, purchase_price, msrp, winning_bid, high_bid, is_for_sale, bid_count, auction_outcome, sale_date, created_at, year, make, model, title, vin, discovery_url, discovery_source, profile_origin, image_count',
+          { count: 'exact' }
+        )
         .eq('is_public', true)
         .neq('status', 'pending');
+
+      // "Added today" filter (created_at within local day)
+      if (filters.addedTodayOnly) {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 1);
+        query = query.gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
+      }
 
       // Year filters
       if (filters.yearMin) {
@@ -1454,6 +1485,18 @@ const CursorHomepage: React.FC = () => {
 
       const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
 
+      // Vehicles added today within this filtered set (local day)
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      const startMs = start.getTime();
+      const endMs = end.getTime();
+      const vehiclesAddedToday = filtered.filter((v: any) => {
+        const t = new Date(v?.created_at || 0).getTime();
+        return Number.isFinite(t) && t >= startMs && t < endMs;
+      }).length;
+
       // Sales volume (24hrs)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -1472,7 +1515,8 @@ const CursorHomepage: React.FC = () => {
         forSaleCount,
         activeAuctions,
         totalBids,
-        avgValue
+        avgValue,
+        vehiclesAddedToday,
       });
     } catch (error) {
       console.error('Error loading filtered stats:', error);
@@ -1498,7 +1542,8 @@ const CursorHomepage: React.FC = () => {
         forSaleCount: 0,
         activeAuctions: 0,
         totalBids: 0,
-        avgValue: 0
+        avgValue: 0,
+        vehiclesAddedToday: 0,
       });
     }
   }, [hasActiveFilters, debouncedSearchText, filters, loadFilteredStats]);
@@ -1585,6 +1630,17 @@ const CursorHomepage: React.FC = () => {
         return sum + (Number.isFinite(price) ? price : 0);
       }, 0);
     
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    const vehiclesAddedToday = filteredVehicles.filter((v: any) => {
+      const t = new Date(v?.created_at || 0).getTime();
+      return Number.isFinite(t) && t >= startMs && t < endMs;
+    }).length;
+
     return { 
       totalVehicles, 
       totalValue, 
@@ -1592,7 +1648,8 @@ const CursorHomepage: React.FC = () => {
       forSaleCount,
       activeAuctions,
       totalBids,
-      avgValue
+      avgValue,
+      vehiclesAddedToday,
     };
   }, [filteredVehicles, hasActiveFilters, debouncedSearchText, filteredStatsFromDb]);
 
@@ -1604,7 +1661,8 @@ const CursorHomepage: React.FC = () => {
     forSaleCount: 0,
     activeAuctions: 0,
     totalBids: 0,
-    avgValue: 0
+    avgValue: 0,
+    vehiclesAddedToday: 0,
   });
   const [dbStatsLoading, setDbStatsLoading] = useState(true);
 
@@ -1699,6 +1757,22 @@ const CursorHomepage: React.FC = () => {
       
       const avgValue = vehiclesWithValue > 0 ? totalValue / vehiclesWithValue : 0;
       
+      // Vehicles added today (local day)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const tomorrowStart = new Date(todayStart);
+      tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+      const { count: createdTodayCount, error: createdTodayErr } = await supabase
+        .from('vehicles')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_public', true)
+        .neq('status', 'pending')
+        .gte('created_at', todayStart.toISOString())
+        .lt('created_at', tomorrowStart.toISOString());
+      if (createdTodayErr) {
+        console.warn('Error loading vehicles added today:', createdTodayErr);
+      }
+
       // Get sales volume in last 24 hours (vehicles sold today)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -1724,7 +1798,8 @@ const CursorHomepage: React.FC = () => {
         forSaleCount,
         activeAuctions,
         totalBids,
-        avgValue
+        avgValue,
+        vehiclesAddedToday: createdTodayCount || 0,
       };
       
       console.log('Database stats loaded:', {
@@ -3089,6 +3164,15 @@ const CursorHomepage: React.FC = () => {
     });
   }, []);
 
+  const toggleAddedTodayOnly = useCallback(() => {
+    setFilters((prev) => ({
+      ...prev,
+      addedTodayOnly: !prev.addedTodayOnly,
+    }));
+    setSortBy('newest');
+    setSortDirection('desc');
+  }, []);
+
   // Show grid immediately - no loading state blocking
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', paddingTop: '16px' }}>
@@ -3133,6 +3217,43 @@ const CursorHomepage: React.FC = () => {
               <div style={{ fontSize: '8pt', fontWeight: 900, color: 'var(--text)' }}>
                 {displayStats.totalVehicles.toLocaleString()} vehicles
               </div>
+              {displayStats.vehiclesAddedToday > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleAddedTodayOnly();
+                  }}
+                  title={
+                    filters.addedTodayOnly
+                      ? 'Showing vehicles added today (click to clear)'
+                      : 'Show vehicles added today'
+                  }
+                  style={{
+                    padding: '1px 8px',
+                    borderRadius: '999px',
+                    border: filters.addedTodayOnly
+                      ? '1px solid rgba(16,185,129,0.55)'
+                      : '1px solid rgba(16,185,129,0.25)',
+                    background: filters.addedTodayOnly ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.10)',
+                    color: '#10b981',
+                    fontSize: '7pt',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                    fontFamily: '"MS Sans Serif", sans-serif',
+                    flex: '0 0 auto',
+                    lineHeight: 1.4,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(16,185,129,0.22)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = filters.addedTodayOnly ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.10)';
+                  }}
+                >
+                  +{displayStats.vehiclesAddedToday} today
+                </button>
+              )}
               <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
                 {formatCurrency(displayStats.totalValue)} total value
               </div>
@@ -3448,6 +3569,37 @@ const CursorHomepage: React.FC = () => {
               flexWrap: 'wrap'
             }}>
               <span><b>{displayStats.totalVehicles.toLocaleString()}</b> veh</span>
+              {displayStats.vehiclesAddedToday > 0 && (
+                <>
+                  <span style={{ opacity: 0.3 }}>|</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleAddedTodayOnly();
+                    }}
+                    title={
+                      filters.addedTodayOnly
+                        ? 'Showing vehicles added today (click to clear)'
+                        : 'Show vehicles added today'
+                    }
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      padding: 0,
+                      margin: 0,
+                      color: '#10b981',
+                      fontWeight: 900,
+                      cursor: 'pointer',
+                      fontFamily: 'monospace',
+                      fontSize: '7pt',
+                    }}
+                  >
+                    +{displayStats.vehiclesAddedToday} today
+                  </button>
+                </>
+              )}
               <span style={{ opacity: 0.3 }}>|</span>
               <span><b>{formatCurrency(displayStats.totalValue)}</b> val</span>
               {displayStats.forSaleCount > 0 && (
@@ -5139,7 +5291,7 @@ const CursorHomepage: React.FC = () => {
                 cardSizePx={gridCardSizePx}
                 infoDense={false}
                 showFollowButton={!!session?.user?.id}
-                showDetailOverlay={false}
+                  showDetailOverlay={true}
                 viewerUserId={session?.user?.id}
                 thermalPricing={thermalPricing}
                 thumbnailFit={thumbFitMode === 'original' ? 'contain' : 'cover'}

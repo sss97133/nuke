@@ -9,11 +9,23 @@
 # 2. Identify broken extractors
 # 3. Attempt fixes
 # 4. Track progress toward 100% source coverage
-# 5. Log everything for human review
+# 5. Run discovery snowball to find NEW sources
+# 6. Extract vehicle data from YouTube channels
+# 7. Log everything for human review
+#
+# The Snowball Effect:
+# - Classic.com → dealers → web developers → more dealers
+# - BaT partners → investigate specialties
+# - YouTube channels → extract captions → vehicle data
+# - Collections → Instagram → collector info
+# - Builders → portfolio → vehicles
 #
 # Usage:
-#   ./ralph-wiggum.sh              # Run once
+#   ./ralph-wiggum.sh              # Run once (extraction only)
 #   ./ralph-wiggum.sh --loop       # Run continuously
+#   ./ralph-wiggum.sh --full       # Run with discovery snowball
+#   ./ralph-wiggum.sh --discover   # Run discovery only
+#   ./ralph-wiggum.sh --youtube    # Process YouTube videos only
 #   ./ralph-wiggum.sh --status     # Check current status
 #   ./ralph-wiggum.sh --watch      # Watch logs in real-time
 #
@@ -76,13 +88,14 @@ get_count() {
 
   local url="${SUPABASE_URL}/rest/v1/${table}?select=id${filter:+&$filter}"
 
-  curl -sS "$url" \
+  local response
+  response=$(curl -sS -I "$url" \
     -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
     -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
     -H "Prefer: count=exact" \
-    -H "Range: 0-0" \
-    -w "%{header}" \
-    -o /dev/null 2>/dev/null | grep -i "content-range" | sed 's/.*\///' | tr -d '\r\n'
+    -H "Range: 0-0" 2>/dev/null)
+
+  echo "$response" | grep -i "content-range" | sed 's/.*\///' | tr -d '\r\n '
 }
 
 # Get current health metrics
@@ -231,6 +244,126 @@ run_cycle() {
   echo "$final_health"
 }
 
+# Discovery snowball cycle - find NEW sources
+run_discovery_cycle() {
+  local cycle_num="${1:-1}"
+
+  log_info "=========================================="
+  log_info "DISCOVERY SNOWBALL CYCLE $cycle_num"
+  log_info "=========================================="
+  log_info "Following leads to discover new sources..."
+  log_info ""
+
+  # Step 1: Run discovery snowball
+  log_info "Step 1: Processing discovery leads..."
+  local discovery_result=$(api_call "discovery-snowball" '{"action": "run_cycle", "max_leads": 20, "max_depth": 3}')
+  local leads_processed=$(echo "$discovery_result" | jq -r '.results.leads_processed // 0')
+  local leads_converted=$(echo "$discovery_result" | jq -r '.results.leads_converted // 0')
+  local new_leads=$(echo "$discovery_result" | jq -r '.results.new_leads_discovered // 0')
+  local new_businesses=$(echo "$discovery_result" | jq -r '.results.new_businesses_created // 0')
+  local new_sources=$(echo "$discovery_result" | jq -r '.results.new_sources_created // 0')
+
+  log_info "  Leads processed: $leads_processed"
+  log_info "  Leads converted: $leads_converted"
+  log_info "  New leads discovered: $new_leads"
+  log_info "  New businesses: $new_businesses"
+  log_info "  New sources: $new_sources"
+
+  # Step 2: Get discovery statistics
+  log_info ""
+  log_info "Step 2: Discovery statistics..."
+  local stats_result=$(api_call "discovery-snowball" '{"action": "get_statistics"}')
+  local pending_leads=$(echo "$stats_result" | jq -r '.discovery.leads_pending // 0')
+  local total_leads=$(echo "$stats_result" | jq -r '.discovery.leads_total // 0')
+  local conversion_rate=$(echo "$stats_result" | jq -r '.discovery.conversion_rate // 0')
+
+  log_info "  Total leads: $total_leads"
+  log_info "  Pending leads: $pending_leads"
+  log_info "  Conversion rate: ${conversion_rate}%"
+
+  log_info ""
+  log_info "DISCOVERY CYCLE $cycle_num COMPLETE"
+  log_info ""
+}
+
+# YouTube extraction cycle
+run_youtube_cycle() {
+  local cycle_num="${1:-1}"
+
+  log_info "=========================================="
+  log_info "YOUTUBE EXTRACTION CYCLE $cycle_num"
+  log_info "=========================================="
+  log_info "Extracting vehicle data from YouTube..."
+  log_info ""
+
+  # Step 1: Process pending videos
+  log_info "Step 1: Processing pending videos..."
+  local youtube_result=$(api_call "extract-youtube-vehicle-data" '{"action": "run_cycle", "max_videos": 10}')
+  local videos_processed=$(echo "$youtube_result" | jq -r '.results.videos_processed // 0')
+  local vehicles_extracted=$(echo "$youtube_result" | jq -r '.results.vehicles_extracted // 0')
+
+  log_info "  Videos processed: $videos_processed"
+  log_info "  Vehicles extracted: $vehicles_extracted"
+
+  # Step 2: List channels
+  log_info ""
+  log_info "Step 2: YouTube channel status..."
+  local channels_result=$(api_call "extract-youtube-vehicle-data" '{"action": "list_channels"}')
+  local channel_count=$(echo "$channels_result" | jq -r '.channels | length')
+  local total_channel_vehicles=$(echo "$channels_result" | jq -r '[.channels[].vehicles_extracted] | add // 0')
+
+  log_info "  Active channels: $channel_count"
+  log_info "  Total vehicles from YouTube: $total_channel_vehicles"
+
+  log_info ""
+  log_info "YOUTUBE CYCLE $cycle_num COMPLETE"
+  log_info ""
+}
+
+# Full cycle - extraction + discovery + youtube
+run_full_cycle() {
+  local cycle_num="${1:-1}"
+
+  log_info "=========================================="
+  log_info "RALPH WIGGUM FULL CYCLE $cycle_num"
+  log_info "=========================================="
+  log_info "Running extraction, discovery, and YouTube..."
+  log_info ""
+
+  # Run extraction cycle
+  run_cycle "$cycle_num"
+
+  # Run discovery cycle (every 3rd cycle to not overwhelm)
+  if [[ $((cycle_num % 3)) -eq 1 ]]; then
+    run_discovery_cycle "$cycle_num"
+  else
+    log_info "Skipping discovery (runs every 3rd cycle)"
+  fi
+
+  # Run YouTube cycle (every 2nd cycle)
+  if [[ $((cycle_num % 2)) -eq 0 ]]; then
+    run_youtube_cycle "$cycle_num"
+  else
+    log_info "Skipping YouTube (runs every 2nd cycle)"
+  fi
+
+  # Get final summary
+  local final_health=$(get_health)
+  local total_vehicles=$(echo "$final_health" | jq -r '.total_vehicles')
+  local stats_result=$(api_call "discovery-snowball" '{"action": "get_statistics"}')
+  local total_businesses=$(echo "$stats_result" | jq -r '.entities.businesses // 0')
+  local total_sources=$(echo "$stats_result" | jq -r '.entities.scrape_sources // 0')
+
+  log_info "=========================================="
+  log_info "FULL CYCLE $cycle_num SUMMARY"
+  log_info "=========================================="
+  log_info "  Total vehicles: $total_vehicles"
+  log_info "  Total businesses: $total_businesses"
+  log_info "  Total sources: $total_sources"
+  log_info "=========================================="
+  log_info ""
+}
+
 # Loop mode
 run_loop() {
   local cycle=1
@@ -250,11 +383,43 @@ run_loop() {
   done
 }
 
+# Full loop mode (extraction + discovery + youtube)
+run_full_loop() {
+  local cycle=1
+
+  log_info "Starting Ralph Wiggum in FULL LOOP mode"
+  log_info "Includes: Extraction + Discovery Snowball + YouTube"
+  log_info "Interval: ${LOOP_INTERVAL}s between cycles"
+  log_info "Press Ctrl+C to stop"
+  log_info ""
+
+  while true; do
+    run_full_cycle "$cycle"
+
+    log_info "Sleeping ${LOOP_INTERVAL}s until next cycle..."
+    sleep "$LOOP_INTERVAL"
+
+    ((cycle++))
+  done
+}
+
 # Main
 main() {
   case "${1:-}" in
     --loop)
       run_loop
+      ;;
+    --full)
+      run_full_cycle 1
+      ;;
+    --full-loop)
+      run_full_loop
+      ;;
+    --discover)
+      run_discovery_cycle 1
+      ;;
+    --youtube)
+      run_youtube_cycle 1
       ;;
     --status)
       show_status
@@ -265,11 +430,25 @@ main() {
     --help)
       echo "Ralph Wiggum - Autonomous Source Extraction Manager"
       echo ""
+      echo "\"I'm helping!\""
+      echo ""
       echo "Usage:"
-      echo "  $0              Run single cycle"
-      echo "  $0 --loop       Run continuously"
-      echo "  $0 --status     Show current status"
-      echo "  $0 --watch      Watch logs in real-time"
+      echo "  $0                Run single extraction cycle"
+      echo "  $0 --loop         Run extraction continuously"
+      echo "  $0 --full         Run full cycle (extraction + discovery + youtube)"
+      echo "  $0 --full-loop    Run full cycle continuously"
+      echo "  $0 --discover     Run discovery snowball only"
+      echo "  $0 --youtube      Run YouTube extraction only"
+      echo "  $0 --status       Show current status"
+      echo "  $0 --watch        Watch logs in real-time"
+      echo ""
+      echo "Discovery Snowball:"
+      echo "  Follows leads across platforms to find new sources:"
+      echo "  - Classic.com → dealers → web developers → more dealers"
+      echo "  - BaT partners → investigate specialties"
+      echo "  - YouTube channels → extract captions → vehicle data"
+      echo "  - Collections → Instagram → collector info"
+      echo "  - Builders → portfolio → vehicles"
       echo ""
       ;;
     *)
