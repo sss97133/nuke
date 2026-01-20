@@ -38,6 +38,21 @@ serve(async (req) => {
   // ... (CORS and Setup remain same)
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
+  const paused = (() => {
+    const v = String(Deno.env.get('NUKE_ANALYSIS_PAUSED') || '').trim().toLowerCase()
+    return v === '1' || v === 'true' || v === 'yes' || v === 'on'
+  })()
+  if (paused) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        paused: true,
+        message: 'AI image analysis paused (NUKE_ANALYSIS_PAUSED)'
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    )
+  }
+
   try {
     const startedAt = Date.now()
     const supabase = createClient(

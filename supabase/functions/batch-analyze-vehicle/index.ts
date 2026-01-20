@@ -18,9 +18,31 @@ serve(async (req) => {
   }
 
   try {
+    const paused = (() => {
+      const v = String(Deno.env.get('NUKE_ANALYSIS_PAUSED') || '').trim().toLowerCase()
+      return v === '1' || v === 'true' || v === 'yes' || v === 'on'
+    })()
+    if (paused) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          paused: true,
+          message: 'Batch image analysis paused (NUKE_ANALYSIS_PAUSED)'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      )
+    }
+
+    const serviceRoleKey =
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
+      Deno.env.get('SERVICE_ROLE_KEY') ||
+      Deno.env.get('SUPABASE_SERVICE_KEY') ||
+      Deno.env.get('SUPABASE_KEY') ||
+      ''
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SERVICE_ROLE_KEY') ?? '',
+      serviceRoleKey,
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
