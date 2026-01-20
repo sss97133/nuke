@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
 import { getVehicleIdentityParts } from '../utils/vehicleIdentity';
+import ProxyBidModal from '../components/ProxyBidModal';
 import '../design-system.css';
 
 // Add pulse animation for LIVE badge
@@ -46,6 +47,12 @@ interface AuctionListing {
     trim: string | null;
     mileage: number | null;
     primary_image_url: string | null;
+    body_style?: string | null;
+    canonical_vehicle_type?: string | null;
+    canonical_body_style?: string | null;
+    listing_kind?: string | null;
+    bat_comments?: number | null;
+    bat_views?: number | null;
   };
 }
 
@@ -64,6 +71,11 @@ export default function AuctionMarketplace() {
   // Default to including 0-bid auctions so marketplace doesn't look empty while bid_count backfills.
   const [includeNoBidAuctions, setIncludeNoBidAuctions] = useState(true);
   const [hiddenNoBidCount, setHiddenNoBidCount] = useState(0);
+  const [hiddenBadDataCount, setHiddenBadDataCount] = useState(0);
+  const [hiddenExcludedTypeCount, setHiddenExcludedTypeCount] = useState(0);
+  const [includeBadDataListings, setIncludeBadDataListings] = useState(false);
+  const [includeStaleAuctions, setIncludeStaleAuctions] = useState(false);
+  const [hiddenStaleCount, setHiddenStaleCount] = useState(0);
   const [debugCounts, setDebugCounts] = useState<{ native: number; external: number; bat: number; total: number } | null>(null);
   const endingNowWindowMs = 15 * 60 * 1000;
   const endingSoonWindowMs = 2 * 60 * 60 * 1000;
@@ -110,7 +122,7 @@ export default function AuctionMarketplace() {
     return () => {
       channel.unsubscribe();
     };
-  }, [filter, sort, includeNoBidAuctions]);
+  }, [filter, sort, includeNoBidAuctions, includeBadDataListings, includeStaleAuctions]);
 
   // Refresh time-left labels + "ending soon" buckets.
   useEffect(() => {
@@ -126,6 +138,9 @@ export default function AuctionMarketplace() {
     const externalStaleMs = 6 * 60 * 60 * 1000; // 6 hours
     const allListings: AuctionListing[] = [];
     let hiddenNoBids = 0;
+    let hiddenBadData = 0;
+    let hiddenExcludedType = 0;
+    let hiddenStale = 0;
 
     try {
       const normalizeEndTime = (params: {
@@ -193,6 +208,41 @@ export default function AuctionMarketplace() {
         };
       };
 
+      const titleFromListingUrl = (listingUrl?: string | null): string | null => {
+        if (!listingUrl) return null;
+        try {
+          const u = new URL(listingUrl);
+          const parts = u.pathname.split('/').filter(Boolean);
+          if (parts.length === 0) return null;
+          let slug = parts[parts.length - 1] || '';
+          if (!slug || slug.endsWith('.xml') || slug === 'listing' || slug === 'lots' || slug === 'auctions') {
+            return null;
+          }
+          if (/^\d+$/.test(slug)) return null;
+          slug = slug.replace(/[-_]+/g, ' ').trim();
+          if (!/^(19|20)\d{2}\b/.test(slug)) return null;
+          return slug;
+        } catch {
+          return null;
+        }
+      };
+
+      const getListingFallbackTitle = (listing: any): string | null => {
+        const metadata = listing?.metadata || {};
+        return (
+          metadata?.bat_title ||
+          metadata?.title ||
+          metadata?.listing_title ||
+          metadata?.vehicle_title ||
+          metadata?.auction_title ||
+          metadata?.name ||
+          listing?.title ||
+          listing?.listing_title ||
+          titleFromListingUrl(listing?.listing_url) ||
+          null
+        );
+      };
+
       const normalizeVehicle = (params: {
         vehicleId: string;
         maybeVehicle: any;
@@ -201,14 +251,22 @@ export default function AuctionMarketplace() {
       }) => {
         const v = params.maybeVehicle || null;
         const titleParts = parseTitle(params.fallbackTitle);
+        const rawYear = typeof v?.year === 'number' ? v.year : Number(v?.year);
+        const year = Number.isFinite(rawYear) && rawYear > 0 ? rawYear : (titleParts.year || 0);
         return {
           id: (v?.id as string) || params.vehicleId,
-          year: (typeof v?.year === 'number' && v.year > 0 ? v.year : titleParts.year || 0),
+          year,
           make: (typeof v?.make === 'string' && v.make ? v.make : titleParts.make || 'Unknown'),
           model: (typeof v?.model === 'string' && v.model ? v.model : titleParts.model || 'Vehicle'),
           trim: (v?.trim ?? titleParts.trim ?? null) as string | null,
           mileage: (typeof v?.mileage === 'number' ? v.mileage : null) as number | null,
           primary_image_url: (v?.primary_image_url ?? params.fallbackImageUrl ?? null) as string | null,
+          body_style: (typeof v?.body_style === 'string' ? v.body_style : null) as string | null,
+          canonical_vehicle_type: (typeof v?.canonical_vehicle_type === 'string' ? v.canonical_vehicle_type : null) as string | null,
+          canonical_body_style: (typeof v?.canonical_body_style === 'string' ? v.canonical_body_style : null) as string | null,
+          listing_kind: (typeof v?.listing_kind === 'string' ? v.listing_kind : null) as string | null,
+          bat_comments: (typeof v?.bat_comments === 'number' ? v.bat_comments : null) as number | null,
+          bat_views: (typeof v?.bat_views === 'number' ? v.bat_views : null) as number | null,
         };
       };
 
@@ -222,25 +280,110 @@ export default function AuctionMarketplace() {
         return Number.isFinite(bidCents) && bidCents > 0;
       };
 
-      // 1. Load native vehicle_listings (N-Zero auctions)
-      let nativeQuery = supabase
-        .from('vehicle_listings')
-        .select(`
-          *,
-          vehicle:vehicles (
+      const nowYear = new Date().getFullYear();
+      const isNonVehicleListing = (vehicle: AuctionListing['vehicle']) => {
+        const kind = String(vehicle?.listing_kind || '').trim().toLowerCase();
+        return Boolean(kind && kind !== 'vehicle');
+      };
+      const isMotorcycleListing = (vehicle: AuctionListing['vehicle']) => {
+        const canonicalType = String(vehicle?.canonical_vehicle_type || '').trim().toUpperCase();
+        if (canonicalType === 'MOTORCYCLE') return true;
+        const canonicalBody = String(vehicle?.canonical_body_style || '').trim().toUpperCase();
+        if (canonicalBody === 'MOTORCYCLE') return true;
+        const bodyStyle = String(vehicle?.body_style || '').trim().toLowerCase();
+        if (!bodyStyle) return false;
+        return bodyStyle.includes('motorcycle') || bodyStyle.includes('motor bike') || bodyStyle === 'bike';
+      };
+      const isIdentityUsable = (vehicle: AuctionListing['vehicle']) => {
+        const make = String(vehicle?.make || '').trim();
+        const model = String(vehicle?.model || '').trim();
+        const makeLower = make.toLowerCase();
+        const modelLower = model.toLowerCase();
+        const yearNum = Number(vehicle?.year);
+        const yearOk = Number.isFinite(yearNum) && yearNum >= 1885 && yearNum <= nowYear + 1;
+        const badTokens = ['navigation', 'menu', 'login', 'register', 'sign in', 'search', 'home', 'about', 'contact', 'inventory'];
+        const badTokenHit = badTokens.some((token) => makeLower.includes(token) || modelLower.includes(token));
+        const stopModelTokens = new Set(['in', 'for', 'with', 'and']);
+        const makeOk = make.length > 0 && !['unknown', 'n/a', 'na', 'none'].includes(makeLower) && !badTokenHit;
+        const modelOk =
+          model.length > 1 &&
+          !['vehicle', 'unknown', 'n/a', 'na', 'none'].includes(modelLower) &&
+          !stopModelTokens.has(modelLower) &&
+          !badTokenHit;
+        return makeOk && modelOk && yearOk;
+      };
+      const getExclusionReason = (
+        listing: AuctionListing
+      ): 'missing_vehicle' | 'non_vehicle' | 'motorcycle' | 'identity' | null => {
+        if (!listing?.vehicle?.id) return 'missing_vehicle';
+        if (isNonVehicleListing(listing.vehicle)) return 'non_vehicle';
+        if (isMotorcycleListing(listing.vehicle)) return 'motorcycle';
+        if (!includeBadDataListings && !isIdentityUsable(listing.vehicle)) return 'identity';
+        return null;
+      };
+
+      const baseVehicleSelect = `
             id,
             year,
             make,
             model,
             trim,
             mileage,
-            primary_image_url
-          )
-        `)
-        .eq('status', 'active')
-        .in('sale_type', ['auction', 'live_auction']);
+            primary_image_url,
+            body_style,
+            bat_comments,
+            bat_views
+          `;
+      const extendedVehicleSelect = `
+            ${baseVehicleSelect},
+            canonical_vehicle_type,
+            canonical_body_style,
+            listing_kind
+          `;
+      const getMissingColumn = (err: any): string | null => {
+        const message = String(err?.message || '');
+        const match =
+          message.match(/column\s+[\w.]+\.(\w+)\s+does\s+not\s+exist/i) ||
+          message.match(/column\s+(\w+)\s+does\s+not\s+exist/i);
+        return match?.[1] || null;
+      };
+      const runWithVehicleFallback = async (runner: (selectFields: string) => Promise<any>) => {
+        let result = await runner(extendedVehicleSelect);
+        if (result.error) {
+          const missing = getMissingColumn(result.error);
+          if (missing && ['canonical_vehicle_type', 'canonical_body_style', 'listing_kind'].includes(missing)) {
+            result = await runner(baseVehicleSelect);
+          }
+        }
+        return result;
+      };
+      const runNativeQuery = (selectFields: string) =>
+        supabase
+          .from('vehicle_listings')
+          .select(`
+            *,
+            vehicle:vehicles (
+              ${selectFields}
+            )
+          `)
+          .eq('status', 'active')
+          .in('sale_type', ['auction', 'live_auction']);
 
-      const { data: nativeListings, error: nativeError } = await nativeQuery;
+      const runExternalQuery = (selectFields: string) =>
+        supabase
+          .from('external_listings')
+          .select(`
+            *,
+            vehicle:vehicles (
+              ${selectFields}
+            )
+          `)
+          // Do not exclude rows with missing/stale end_date; treat 'active' status as primary signal.
+          // Show rows that are explicitly active OR have a future end_date.
+          .or(`listing_status.eq.active,end_date.gt.${nowIso}`);
+
+      // 1. Load native vehicle_listings (N-Zero auctions)
+      const { data: nativeListings, error: nativeError } = await runWithVehicleFallback(runNativeQuery);
 
       if (!nativeError && nativeListings) {
         for (const listing of nativeListings) {
@@ -273,7 +416,7 @@ export default function AuctionMarketplace() {
           // Keep auctions even if end time is missing (some sources backfill it later).
           // Drop only if end time is far in the past (likely stuck).
           if (!isPastLong) {
-            allListings.push({
+            const normalizedListing: AuctionListing = {
               id: listing.id,
               vehicle_id: listing.vehicle_id,
               seller_id: listing.seller_id,
@@ -292,31 +435,23 @@ export default function AuctionMarketplace() {
               telemetry_stale: false,
               is_flash: isFlashAuction((listing as any).auction_start_time ?? null, nativeEndTime, listing.sale_type),
               vehicle
-            });
+            };
+            const exclusionReason = getExclusionReason(normalizedListing);
+            if (exclusionReason) {
+              if (exclusionReason === 'non_vehicle' || exclusionReason === 'motorcycle') {
+                hiddenExcludedType += 1;
+              } else {
+                hiddenBadData += 1;
+              }
+              continue;
+            }
+            allListings.push(normalizedListing);
           }
         }
       }
 
       // 2. Load external_listings (BaT, Cars & Bids, eBay Motors, etc.)
-      let externalQuery = supabase
-        .from('external_listings')
-        .select(`
-          *,
-          vehicle:vehicles (
-            id,
-            year,
-            make,
-            model,
-            trim,
-            mileage,
-            primary_image_url
-          )
-        `)
-        // Do not exclude rows with missing/stale end_date; treat 'active' status as primary signal.
-        // Show rows that are explicitly active OR have a future end_date.
-        .or(`listing_status.eq.active,end_date.gt.${nowIso}`);
-
-      const { data: externalListings, error: externalError } = await externalQuery;
+      const { data: externalListings, error: externalError } = await runWithVehicleFallback(runExternalQuery);
 
       if (!externalError && externalListings) {
         for (const listing of externalListings) {
@@ -348,11 +483,11 @@ export default function AuctionMarketplace() {
           const vehicle = normalizeVehicle({
             vehicleId: listing.vehicle_id,
             maybeVehicle: (listing as any).vehicle,
-            fallbackTitle: listing?.metadata?.bat_title,
+            fallbackTitle: getListingFallbackTitle(listing),
             fallbackImageUrl: metaImage,
           });
 
-          allListings.push({
+          const normalizedListing: AuctionListing = {
             id: listing.id,
             vehicle_id: listing.vehicle_id,
             source: 'external',
@@ -369,7 +504,17 @@ export default function AuctionMarketplace() {
             telemetry_stale: telemetryStale,
             is_flash: false,
             vehicle
-          });
+          };
+          const exclusionReason = getExclusionReason(normalizedListing);
+          if (exclusionReason) {
+            if (exclusionReason === 'non_vehicle' || exclusionReason === 'motorcycle') {
+              hiddenExcludedType += 1;
+            } else {
+              hiddenBadData += 1;
+            }
+            continue;
+          }
+          allListings.push(normalizedListing);
         }
       }
 
@@ -414,6 +559,22 @@ export default function AuctionMarketplace() {
 
       // Apply filters
       let filtered = allListings;
+      if (!includeStaleAuctions) {
+        filtered = filtered.filter((l) => {
+          if (l.telemetry_stale) {
+            hiddenStale += 1;
+            return false;
+          }
+          if (l.source === 'external') {
+            const statusLower = String(l.status || '').toLowerCase();
+            if (statusLower && !['active', 'live'].includes(statusLower)) {
+              hiddenStale += 1;
+              return false;
+            }
+          }
+          return true;
+        });
+      }
       if (filter === 'ending_now') {
         filtered = filtered.filter((l) => {
           if (!l.auction_end_time) return false;
@@ -466,6 +627,9 @@ export default function AuctionMarketplace() {
       // Show all live auctions on the page (do not truncate to 50).
       setListings(filtered);
       setHiddenNoBidCount(hiddenNoBids);
+      setHiddenBadDataCount(hiddenBadData);
+      setHiddenExcludedTypeCount(hiddenExcludedType);
+      setHiddenStaleCount(hiddenStale);
       const batCount = (externalListings || []).filter((l: any) => String(l?.platform || '').toLowerCase() === 'bat').length;
       setDebugCounts({
         native: nativeListings?.length || 0,
@@ -480,6 +644,9 @@ export default function AuctionMarketplace() {
       console.error('Error loading listings:', error);
       setListings([]);
       setHiddenNoBidCount(0);
+      setHiddenBadDataCount(0);
+      setHiddenExcludedTypeCount(0);
+      setHiddenStaleCount(0);
       setDebugCounts(null);
     }
 
@@ -546,6 +713,17 @@ export default function AuctionMarketplace() {
 
   const flashListings = liveNowListings.filter((listing) => listing.is_flash);
 
+  // Proxy bid modal state
+  const [proxyBidListing, setProxyBidListing] = useState<AuctionListing | null>(null);
+
+  const handleBidClick = (listing: AuctionListing) => {
+    if (!user) {
+      navigate('/login?redirect=/auctions');
+      return;
+    }
+    setProxyBidListing(listing);
+  };
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: 'var(--space-4)' }}>
@@ -566,6 +744,21 @@ export default function AuctionMarketplace() {
                 {!loading && hiddenNoBidCount > 0 && !includeNoBidAuctions && (
                   <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
                     {hiddenNoBidCount} live auctions hidden (0 bids). Enable "Include 0-bid" to show them.
+                  </div>
+                )}
+                {!loading && hiddenBadDataCount > 0 && !includeBadDataListings && (
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {hiddenBadDataCount} listings hidden due to incomplete profiles. Enable "Include incomplete" to review.
+                  </div>
+                )}
+                {!loading && hiddenExcludedTypeCount > 0 && (
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {hiddenExcludedTypeCount} listings hidden (motorcycles or non-vehicle items).
+                  </div>
+                )}
+                {!loading && hiddenStaleCount > 0 && !includeStaleAuctions && (
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {hiddenStaleCount} stale listings hidden. Enable "Include stale" to show them.
                   </div>
                 )}
               </div>
@@ -623,6 +816,42 @@ export default function AuctionMarketplace() {
                     style={{ transform: 'translateY(0.5px)' }}
                   />
                   Include 0-bid auctions
+                </label>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '8pt',
+                    color: 'var(--text-secondary)',
+                    userSelect: 'none',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeBadDataListings}
+                    onChange={(e) => setIncludeBadDataListings(e.target.checked)}
+                    style={{ transform: 'translateY(0.5px)' }}
+                  />
+                  Include incomplete profiles
+                </label>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '8pt',
+                    color: 'var(--text-secondary)',
+                    userSelect: 'none',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeStaleAuctions}
+                    onChange={(e) => setIncludeStaleAuctions(e.target.checked)}
+                    style={{ transform: 'translateY(0.5px)' }}
+                  />
+                  Include stale auctions
                 </label>
 
                 {/* Filter buttons */}
@@ -722,6 +951,7 @@ export default function AuctionMarketplace() {
                       formatCurrency={formatCurrency}
                       formatTimeRemaining={formatTimeRemaining}
                       getTimeRemainingColor={getTimeRemainingColor}
+                      onBidClick={handleBidClick}
                     />
                   ))}
                 </div>
@@ -768,6 +998,7 @@ export default function AuctionMarketplace() {
                       formatCurrency={formatCurrency}
                       formatTimeRemaining={formatTimeRemaining}
                       getTimeRemainingColor={getTimeRemainingColor}
+                      onBidClick={handleBidClick}
                     />
                   ))}
                 </div>
@@ -776,6 +1007,31 @@ export default function AuctionMarketplace() {
           </div>
         </section>
       </div>
+
+      {/* Proxy Bid Modal */}
+      {proxyBidListing && (
+        <ProxyBidModal
+          isOpen={true}
+          onClose={() => setProxyBidListing(null)}
+          listing={{
+            id: proxyBidListing.id,
+            vehicle_id: proxyBidListing.vehicle_id,
+            platform: proxyBidListing.platform || '',
+            listing_url: proxyBidListing.listing_url || '',
+            current_bid_cents: proxyBidListing.current_high_bid_cents,
+            vehicle: {
+              year: proxyBidListing.vehicle.year,
+              make: proxyBidListing.vehicle.make,
+              model: proxyBidListing.vehicle.model,
+              primary_image_url: proxyBidListing.lead_image_url || proxyBidListing.vehicle.primary_image_url,
+            }
+          }}
+          onBidPlaced={(bidId) => {
+            console.log('Proxy bid placed:', bidId);
+            setProxyBidListing(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -785,15 +1041,36 @@ interface AuctionCardProps {
   formatCurrency: (cents: number | null) => string;
   formatTimeRemaining: (endTime: string | null) => string;
   getTimeRemainingColor: (endTime: string | null) => string;
+  onBidClick?: (listing: AuctionListing) => void;
 }
 
-function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRemainingColor }: AuctionCardProps) {
+// Platform configuration for badges and colors
+const PLATFORM_CONFIG: Record<string, { name: string; short: string; color: string; textColor: string }> = {
+  bat: { name: 'Bring a Trailer', short: 'BaT', color: '#1e40af', textColor: '#fff' },
+  cars_and_bids: { name: 'Cars & Bids', short: 'C&B', color: '#dc2626', textColor: '#fff' },
+  pcarmarket: { name: 'PCarMarket', short: 'PCM', color: '#0d9488', textColor: '#fff' },
+  collecting_cars: { name: 'Collecting Cars', short: 'CC', color: '#7c3aed', textColor: '#fff' },
+  broad_arrow: { name: 'Broad Arrow', short: 'BA', color: '#0369a1', textColor: '#fff' },
+  rmsothebys: { name: 'RM Sothebys', short: 'RM', color: '#b91c1c', textColor: '#fff' },
+  gooding: { name: 'Gooding & Co', short: 'G&C', color: '#166534', textColor: '#fff' },
+  sbx: { name: 'SBX Cars', short: 'SBX', color: '#ea580c', textColor: '#fff' },
+  ebay_motors: { name: 'eBay Motors', short: 'eBay', color: '#0064d2', textColor: '#fff' },
+  facebook_marketplace: { name: 'Facebook', short: 'FB', color: '#1877f2', textColor: '#fff' },
+  autotrader: { name: 'Autotrader', short: 'AT', color: '#ff6600', textColor: '#fff' },
+  hemmings: { name: 'Hemmings', short: 'HEM', color: '#8b4513', textColor: '#fff' },
+  classic_com: { name: 'Classic.com', short: 'CLC', color: '#4b5563', textColor: '#fff' },
+  craigslist: { name: 'Craigslist', short: 'CL', color: '#5c2d91', textColor: '#fff' },
+  copart: { name: 'Copart', short: 'COP', color: '#00529b', textColor: '#fff' },
+  iaai: { name: 'IAA', short: 'IAA', color: '#003366', textColor: '#fff' },
+};
+
+function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRemainingColor, onBidClick }: AuctionCardProps) {
   const vehicle = listing.vehicle;
   const hasReserve = listing.reserve_price_cents !== null;
-  const platformName = listing.platform === 'bat' ? 'BaT' : 
-                       listing.platform === 'cars_and_bids' ? 'Cars & Bids' :
-                       listing.platform === 'ebay_motors' ? 'eBay Motors' :
-                       listing.platform ? listing.platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : null;
+  const platformConfig = listing.platform ? PLATFORM_CONFIG[listing.platform] : null;
+  const platformName = platformConfig?.name || (listing.platform ? listing.platform.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : null);
+  const platformShort = platformConfig?.short || platformName;
+  const platformColor = platformConfig?.color || '#64748b';
   const isStale = Boolean(listing.telemetry_stale);
   const endMs = listing.auction_end_time ? new Date(listing.auction_end_time).getTime() : null;
   const statusLower = String(listing.status || '').toLowerCase();
@@ -807,28 +1084,25 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
     !(listing.current_high_bid_cents && listing.current_high_bid_cents > 0);
   const bidCountDisplay = isStale || bidCountSuspicious ? '—' : listing.bid_count;
   const bidCountLabel = isStale ? 'bids' : listing.bid_count === 1 ? 'bid' : 'bids';
+  const commentCount = vehicle.bat_comments;
 
   const imageUrl = listing.lead_image_url || vehicle.primary_image_url || null;
   const isBat = listing.platform === 'bat';
   const [batIconOk, setBatIconOk] = useState(true);
-  const platformBadgeContent = isBat ? (
-    batIconOk ? (
-      <img
-        src="/vendor/bat/favicon.ico"
-        alt="BaT"
-        style={{
-          width: 12,
-          height: 12,
-          display: 'block',
-          imageRendering: 'auto',
-        }}
-        onError={() => setBatIconOk(false)}
-      />
-    ) : (
-      'BaT'
-    )
+  const platformBadgeContent = isBat && batIconOk ? (
+    <img
+      src="/vendor/bat/favicon.ico"
+      alt="BaT"
+      style={{
+        width: 12,
+        height: 12,
+        display: 'block',
+        imageRendering: 'auto',
+      }}
+      onError={() => setBatIconOk(false)}
+    />
   ) : (
-    platformName
+    platformShort
   );
 
   return (
@@ -967,15 +1241,16 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
               position: 'absolute',
               top: isLive ? '28px' : '6px',
               right: '6px',
-              background: listing.platform === 'bat' ? '#1e40af' : '#dc2626',
+              background: platformColor,
               color: '#fff',
-              padding: isBat ? '2px 8px' : '3px 8px',
+              padding: isBat && batIconOk ? '2px 8px' : '3px 8px',
               borderRadius: '3px',
               fontSize: '7pt',
               fontWeight: 700,
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              minWidth: '28px',
             }}
             title={platformName || undefined}
           >
@@ -1056,7 +1331,7 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
           </div>
         </div>
 
-        {/* Footer row with bids / reserve */}
+        {/* Footer row with bids / comments / reserve */}
         <div
           style={{
             display: 'flex',
@@ -1067,18 +1342,57 @@ function AuctionCard({ listing, formatCurrency, formatTimeRemaining, getTimeRema
             color: 'var(--text-secondary)',
           }}
         >
-          <span>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <span
               title={bidCountSuspicious ? 'Bid count looks suspect (external telemetry). Refresh pending.' : undefined}
               style={bidCountSuspicious ? { color: '#b45309', fontWeight: 700 } : undefined}
             >
               {bidCountDisplay} {bidCountLabel}
             </span>
-          </span>
+            {typeof commentCount === 'number' && commentCount > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                {commentCount}
+              </span>
+            )}
+          </div>
           {hasReserve && <span>Reserve</span>}
         </div>
 
-        {listing.listing_url && (
+        {/* Bid button for external listings */}
+        {listing.source === 'external' && listing.listing_url && onBidClick && (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <button
+              type="button"
+              className="button button-primary button-small"
+              style={{ flex: 1, fontSize: '8pt' }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onBidClick(listing);
+              }}
+            >
+              Bid
+            </button>
+            <button
+              type="button"
+              className="button button-small"
+              style={{ fontSize: '8pt', padding: '4px 8px' }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(listing.listing_url!, '_blank');
+              }}
+              title={`View on ${platformName || 'source'}`}
+            >
+              ↗
+            </button>
+          </div>
+        )}
+        {/* View button only for non-external listings */}
+        {listing.source !== 'external' && listing.listing_url && (
           <button
             type="button"
             className="button button-small"

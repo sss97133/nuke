@@ -1,0 +1,552 @@
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
+import BuyerAgencyAgreement from './BuyerAgencyAgreement';
+import '../design-system.css';
+
+interface ProxyBidModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  listing: {
+    id: string;
+    vehicle_id: string;
+    platform: string;
+    listing_url: string;
+    current_bid_cents: number | null;
+    vehicle: {
+      year: number;
+      make: string;
+      model: string;
+      primary_image_url?: string | null;
+    };
+  };
+  onBidPlaced?: (bidId: string) => void;
+}
+
+export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }: ProxyBidModalProps) {
+  const { user } = useAuth();
+  const [step, setStep] = useState<'check' | 'agreement' | 'bid' | 'confirm' | 'success'>('check');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [hasActiveAgreement, setHasActiveAgreement] = useState(false);
+  const [agreementId, setAgreementId] = useState<string | null>(null);
+
+  // Bid form
+  const [maxBid, setMaxBid] = useState<string>('');
+  const [bidStrategy, setBidStrategy] = useState<'proxy_auto' | 'snipe_last_minute'>('proxy_auto');
+  const [agreedToDeposit, setAgreedToDeposit] = useState(false);
+
+  const currentBid = listing.current_bid_cents ? listing.current_bid_cents / 100 : 0;
+  const minBid = currentBid > 0 ? currentBid + 100 : 1000; // Minimum $100 increment or $1000 start
+  const depositAmount = maxBid ? Math.round(parseFloat(maxBid) * 0.1) : 0;
+  const commissionAmount = maxBid ? Math.round(parseFloat(maxBid) * 0.04) : 0;
+
+  // Check for existing agreement
+  useEffect(() => {
+    if (!isOpen || !user) return;
+
+    const checkAgreement = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('buyer_agency_agreements')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .gte('expiration_date', new Date().toISOString().split('T')[0])
+          .limit(1)
+          .single();
+
+        if (data && !error) {
+          setHasActiveAgreement(true);
+          setAgreementId(data.id);
+          setStep('bid');
+        } else {
+          setHasActiveAgreement(false);
+          setStep('agreement');
+        }
+      } catch (err) {
+        setHasActiveAgreement(false);
+        setStep('agreement');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAgreement();
+  }, [isOpen, user]);
+
+  const handleAgreementComplete = (newAgreementId: string) => {
+    setAgreementId(newAgreementId);
+    setHasActiveAgreement(true);
+    setStep('bid');
+  };
+
+  const handleSubmitBid = async () => {
+    if (!user || !agreementId || !maxBid) return;
+
+    const maxBidCents = Math.round(parseFloat(maxBid) * 100);
+
+    if (maxBidCents < minBid * 100) {
+      setError(`Minimum bid is $${minBid.toLocaleString()}`);
+      return;
+    }
+
+    setStep('confirm');
+  };
+
+  const handleConfirmBid = async () => {
+    if (!user || !agreementId || !maxBid) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const maxBidCents = Math.round(parseFloat(maxBid) * 100);
+      const depositCents = Math.round(maxBidCents * 0.1);
+
+      // Create proxy bid request
+      const { data, error: insertError } = await supabase
+        .from('proxy_bid_requests')
+        .insert({
+          user_id: user.id,
+          agency_agreement_id: agreementId,
+          external_listing_id: listing.id,
+          vehicle_id: listing.vehicle_id,
+          platform: listing.platform,
+          external_auction_url: listing.listing_url,
+          max_bid_cents: maxBidCents,
+          bid_strategy: bidStrategy,
+          deposit_amount_cents: depositCents,
+          deposit_status: 'pending',
+          status: 'pending',
+          commission_rate: 4.00,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // TODO: Create Stripe PaymentIntent for deposit hold
+      // For now, we'll skip actual payment and mark as pending
+
+      setStep('success');
+      onBidPlaced?.(data.id);
+    } catch (err: any) {
+      setError(err.message || 'Failed to place bid');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getPlatformName = (platform: string) => {
+    const names: Record<string, string> = {
+      bat: 'Bring a Trailer',
+      cars_and_bids: 'Cars & Bids',
+      pcarmarket: 'PCarMarket',
+      collecting_cars: 'Collecting Cars',
+      broad_arrow: 'Broad Arrow',
+      rmsothebys: 'RM Sothebys',
+      gooding: 'Gooding & Company',
+      sbx: 'SBX Cars',
+    };
+    return names[platform] || platform;
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px'
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          background: 'var(--surface)',
+          borderRadius: '8px',
+          maxWidth: step === 'agreement' ? '750px' : '500px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflow: 'auto'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <h2 style={{ margin: 0, fontSize: '12pt', fontWeight: 700 }}>
+            {step === 'agreement' ? 'Buyer Agency Agreement' : 'Place Proxy Bid'}
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '16pt',
+              cursor: 'pointer',
+              padding: '0 4px',
+              color: 'var(--text-muted)'
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: '20px' }}>
+          {error && (
+            <div style={{
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              color: '#991b1b',
+              padding: '10px 12px',
+              borderRadius: '4px',
+              marginBottom: '16px',
+              fontSize: '9pt'
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Loading state */}
+          {step === 'check' && loading && (
+            <div style={{ textAlign: 'center', padding: '40px', fontSize: '9pt', color: 'var(--text-muted)' }}>
+              Checking your account...
+            </div>
+          )}
+
+          {/* Agreement step */}
+          {step === 'agreement' && (
+            <BuyerAgencyAgreement
+              onComplete={handleAgreementComplete}
+              onCancel={onClose}
+            />
+          )}
+
+          {/* Bid form step */}
+          {step === 'bid' && (
+            <div>
+              {/* Vehicle info */}
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                marginBottom: '20px',
+                padding: '12px',
+                background: 'var(--surface-hover)',
+                borderRadius: '4px'
+              }}>
+                {listing.vehicle.primary_image_url && (
+                  <img
+                    src={listing.vehicle.primary_image_url}
+                    alt=""
+                    style={{
+                      width: '80px',
+                      height: '60px',
+                      objectFit: 'cover',
+                      borderRadius: '4px'
+                    }}
+                  />
+                )}
+                <div>
+                  <div style={{ fontSize: '10pt', fontWeight: 700 }}>
+                    {listing.vehicle.year} {listing.vehicle.make} {listing.vehicle.model}
+                  </div>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                    on {getPlatformName(listing.platform)}
+                  </div>
+                  {currentBid > 0 && (
+                    <div style={{ fontSize: '9pt', marginTop: '4px' }}>
+                      Current bid: <strong>${currentBid.toLocaleString()}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Max bid input */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '4px' }}>
+                  Maximum Bid Amount *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{
+                    position: 'absolute',
+                    left: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    fontSize: '9pt',
+                    color: 'var(--text-muted)'
+                  }}>$</span>
+                  <input
+                    type="number"
+                    value={maxBid}
+                    onChange={(e) => setMaxBid(e.target.value)}
+                    placeholder={minBid.toLocaleString()}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 24px',
+                      border: '1px solid var(--border)',
+                      fontSize: '11pt',
+                      fontWeight: 600
+                    }}
+                  />
+                </div>
+                <p style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Minimum bid: ${minBid.toLocaleString()}. We'll bid up to this amount on your behalf.
+                </p>
+              </div>
+
+              {/* Bid strategy */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '8pt', fontWeight: 600, marginBottom: '8px' }}>
+                  Bidding Strategy
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    padding: '10px 12px',
+                    background: bidStrategy === 'proxy_auto' ? 'var(--accent-dim)' : 'var(--surface-hover)',
+                    border: `2px solid ${bidStrategy === 'proxy_auto' ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="radio"
+                      name="strategy"
+                      checked={bidStrategy === 'proxy_auto'}
+                      onChange={() => setBidStrategy('proxy_auto')}
+                      style={{ marginTop: '2px' }}
+                    />
+                    <div>
+                      <div style={{ fontSize: '9pt', fontWeight: 600 }}>Standard Proxy</div>
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        Bid incrementally as needed to stay winning
+                      </div>
+                    </div>
+                  </label>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    padding: '10px 12px',
+                    background: bidStrategy === 'snipe_last_minute' ? 'var(--accent-dim)' : 'var(--surface-hover)',
+                    border: `2px solid ${bidStrategy === 'snipe_last_minute' ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}>
+                    <input
+                      type="radio"
+                      name="strategy"
+                      checked={bidStrategy === 'snipe_last_minute'}
+                      onChange={() => setBidStrategy('snipe_last_minute')}
+                      style={{ marginTop: '2px' }}
+                    />
+                    <div>
+                      <div style={{ fontSize: '9pt', fontWeight: 600 }}>Last-Minute Snipe</div>
+                      <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>
+                        Place bid in the final minutes of the auction
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Cost breakdown */}
+              {maxBid && parseFloat(maxBid) > 0 && (
+                <div style={{
+                  background: 'var(--surface-hover)',
+                  padding: '12px',
+                  borderRadius: '4px',
+                  marginBottom: '16px',
+                  fontSize: '8pt'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span>Maximum bid:</span>
+                    <span>${parseFloat(maxBid).toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span>Refundable deposit (10%):</span>
+                    <span>${depositAmount.toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '6px' }}>
+                    <span>Commission if won (4%):</span>
+                    <span>${commissionAmount.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Deposit agreement */}
+              <label style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px',
+                marginBottom: '16px',
+                cursor: 'pointer'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={agreedToDeposit}
+                  onChange={(e) => setAgreedToDeposit(e.target.checked)}
+                  style={{ marginTop: '2px' }}
+                />
+                <span style={{ fontSize: '8pt', color: 'var(--text-secondary)' }}>
+                  I authorize N-Zero to hold a refundable deposit of ${depositAmount.toLocaleString()} (10% of max bid).
+                  This will be refunded if I don't win, or applied toward my commission if I do win.
+                </span>
+              </label>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={onClose}
+                  style={{ fontSize: '9pt' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={handleSubmitBid}
+                  disabled={!maxBid || !agreedToDeposit || parseFloat(maxBid) < minBid}
+                  style={{ fontSize: '9pt', flex: 1 }}
+                >
+                  Review Bid
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Confirmation step */}
+          {step === 'confirm' && (
+            <div>
+              <div style={{
+                background: '#fef3c7',
+                border: '1px solid #fcd34d',
+                padding: '12px',
+                borderRadius: '4px',
+                marginBottom: '16px',
+                fontSize: '9pt'
+              }}>
+                <strong>Please confirm your proxy bid:</strong>
+              </div>
+
+              <div style={{
+                background: 'var(--surface-hover)',
+                padding: '16px',
+                borderRadius: '4px',
+                marginBottom: '16px'
+              }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Vehicle</div>
+                  <div style={{ fontSize: '10pt', fontWeight: 600 }}>
+                    {listing.vehicle.year} {listing.vehicle.make} {listing.vehicle.model}
+                  </div>
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Platform</div>
+                  <div style={{ fontSize: '9pt' }}>{getPlatformName(listing.platform)}</div>
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Maximum Bid</div>
+                  <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--accent)' }}>
+                    ${parseFloat(maxBid).toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Strategy</div>
+                  <div style={{ fontSize: '9pt' }}>
+                    {bidStrategy === 'proxy_auto' ? 'Standard Proxy' : 'Last-Minute Snipe'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Deposit to Authorize</div>
+                  <div style={{ fontSize: '10pt', fontWeight: 600 }}>${depositAmount.toLocaleString()}</div>
+                </div>
+              </div>
+
+              <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                By confirming, you authorize N-Zero to bid up to ${parseFloat(maxBid).toLocaleString()} on
+                this vehicle. A deposit hold of ${depositAmount.toLocaleString()} will be placed on your
+                payment method.
+              </p>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setStep('bid')}
+                  disabled={loading}
+                  style={{ fontSize: '9pt' }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={handleConfirmBid}
+                  disabled={loading}
+                  style={{ fontSize: '9pt', flex: 1 }}
+                >
+                  {loading ? 'Placing Bid...' : 'Confirm & Place Bid'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Success step */}
+          {step === 'success' && (
+            <div style={{ textAlign: 'center', padding: '20px' }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                background: '#dcfce7',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                fontSize: '24pt'
+              }}>
+                ✓
+              </div>
+              <h3 style={{ fontSize: '12pt', fontWeight: 700, marginBottom: '8px' }}>
+                Proxy Bid Placed!
+              </h3>
+              <p style={{ fontSize: '9pt', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                We'll bid on your behalf up to ${parseFloat(maxBid).toLocaleString()}.
+                You'll receive notifications as the auction progresses.
+              </p>
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={onClose}
+                style={{ fontSize: '9pt' }}
+              >
+                Done
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
