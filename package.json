@@ -40,6 +40,7 @@
     "ingest:bat-live-auctions": "tsx scripts/bat-import-live-auctions.ts",
     "detective:live-auctions": "tsx scripts/auction-live-detective.ts",
     "detective:live-auctions:dry": "tsx scripts/auction-live-detective.ts --dry-run",
+    "detective:vehicle": "tsx scripts/ai-detective-vehicle.ts",
     "ingest:classic-auctions": "tsx scripts/classic-import-auctions.ts",
     "extract-all-orgs": "tsx scripts/extract-all-orgs.ts",
     "extract-inventory": "node scripts/invoke-extract-inventory.js",

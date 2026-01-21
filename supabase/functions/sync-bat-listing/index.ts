@@ -99,29 +99,54 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Extract bid count - multiple patterns
+    // Extract bid count - IMPORTANT: use specific patterns to avoid matching unrelated numbers
+    // The pattern /(\d+)\s+bids?/i was too greedy and matched views/watchers counts
     let bidCount = listing.bid_count;
-    const bidCountPatterns = [
-      /(\d+)\s+bids?/i,
-      /number-bids-value[^>]*>(\d+)/i,
-      /"bidCount":\s*(\d+)/i
-    ];
-    
-    for (const pattern of bidCountPatterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        bidCount = asInt(match[1]) ?? bidCount;
-        break;
+
+    // Method 1: Count actual "bid placed by" occurrences in comments (most accurate)
+    const bidPlacedMatches = html.match(/\b(?:USD\s*)?\$[\d,]+\s+bid placed by\b/gi);
+    if (bidPlacedMatches && bidPlacedMatches.length > 0) {
+      bidCount = bidPlacedMatches.length;
+    } else {
+      // Method 2: BaT stats element with data-stats-item attribute
+      const statsMatch = html.match(/data-stats-item="bids"[^>]*>\s*([\d,]+)\s*bids?\s*</i);
+      if (statsMatch && statsMatch[1]) {
+        bidCount = asInt(statsMatch[1]) ?? bidCount;
+      } else {
+        // Method 3: JSON-LD schema bidCount
+        const jsonMatch = html.match(/"bidCount":\s*(\d+)/i);
+        if (jsonMatch && jsonMatch[1]) {
+          bidCount = asInt(jsonMatch[1]) ?? bidCount;
+        } else {
+          // Method 4: Fallback - look for bid count near "bids" link with word boundaries
+          // Only match if it looks like a stats display (small number, followed by "bids")
+          const fallbackMatch = html.match(/>\s*([\d,]+)\s*<\/?\w*>\s*bids?\s*</i);
+          if (fallbackMatch && fallbackMatch[1]) {
+            const n = asInt(fallbackMatch[1]);
+            // Sanity check: BaT auctions rarely have more than 200 bids
+            if (n !== null && n <= 500) {
+              bidCount = n;
+            }
+          }
+        }
       }
     }
 
-    // Extract watcher count
-    const watcherMatch = html.match(/(\d+)\s+watchers?/i);
-    const watcherCount = watcherMatch ? (asInt(watcherMatch[1]) ?? listing.watcher_count) : listing.watcher_count;
+    // Extract watcher count - use specific patterns
+    let watcherCount = listing.watcher_count;
+    const watcherStatsMatch = html.match(/data-stats-item="watchers?"[^>]*>\s*([\d,]+)/i) ||
+                              html.match(/>\s*([\d,]+)\s*<\/?\w*>\s*watchers?\s*</i);
+    if (watcherStatsMatch && watcherStatsMatch[1]) {
+      watcherCount = asInt(watcherStatsMatch[1]) ?? watcherCount;
+    }
 
-    // Extract view count
-    const viewMatch = html.match(/([\d,]+)\s+views?/i);
-    const viewCount = viewMatch ? (asInt(viewMatch[1]) ?? listing.view_count) : listing.view_count;
+    // Extract view count - use specific patterns
+    let viewCount = listing.view_count;
+    const viewStatsMatch = html.match(/data-stats-item="views?"[^>]*>\s*([\d,]+)/i) ||
+                           html.match(/>\s*([\d,]+)\s*<\/?\w*>\s*views?\s*</i);
+    if (viewStatsMatch && viewStatsMatch[1]) {
+      viewCount = asInt(viewStatsMatch[1]) ?? viewCount;
+    }
 
     // Check if sold
     const soldMatch = html.match(/Sold (?:for|to).*?\$([\\d,]+)/i);
