@@ -99,7 +99,12 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   const [buyerProfileLink, setBuyerProfileLink] = useState<{ url: string; isExternal: boolean } | null>(null);
   const [sellerProfileLink, setSellerProfileLink] = useState<{ url: string; isExternal: boolean } | null>(null);
   const [marketData, setMarketData] = useState<{ prices: number[]; mean: number; stdDev: number } | null>(null);
-  
+  const [recentBids, setRecentBids] = useState<Array<{ id: string; author: string; amount: number; posted_at: string }>>([]);
+  const [sellerUsername, setSellerUsername] = useState<string | null>(null);
+
+  // Check if this is a live auction
+  const isLiveAuction = ['active', 'live'].includes(String(context?.listing_status || '').toLowerCase());
+
   // Helper to calculate days/years since sale
   const calculateTimeSinceSale = (saleDate: string | null | undefined): string | null => {
     if (!saleDate) return null;
@@ -123,6 +128,7 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
   useEffect(() => {
     loadProvenance();
     loadMarketData();
+    loadRecentBids();
   }, []);
 
   const loadMarketData = async () => {
@@ -182,6 +188,47 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
       }
     } catch (error) {
       console.error('Error loading market data:', error);
+    }
+  };
+
+  // Load recent bids for live auctions
+  const loadRecentBids = async () => {
+    if (!isLiveAuction) return;
+    try {
+      // Get recent bids from auction_comments
+      const { data: bids } = await supabase
+        .from('auction_comments')
+        .select('id, author_username, bid_amount, posted_at, is_seller')
+        .eq('vehicle_id', vehicleId)
+        .not('bid_amount', 'is', null)
+        .order('posted_at', { ascending: false })
+        .limit(10);
+
+      if (bids && bids.length > 0) {
+        setRecentBids(
+          bids.map(b => ({
+            id: b.id,
+            author: b.author_username || 'Anonymous',
+            amount: b.bid_amount || 0,
+            posted_at: b.posted_at || '',
+          }))
+        );
+      }
+
+      // Get seller username from a seller comment
+      const { data: sellerComment } = await supabase
+        .from('auction_comments')
+        .select('author_username')
+        .eq('vehicle_id', vehicleId)
+        .eq('is_seller', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (sellerComment?.author_username) {
+        setSellerUsername(sellerComment.author_username);
+      }
+    } catch (error) {
+      console.error('Error loading recent bids:', error);
     }
   };
 
@@ -1087,6 +1134,123 @@ export const ValueProvenancePopup: React.FC<ValueProvenancePopupProps> = ({
 
           {/* Evidence (at minimum, the listing URL counts as evidence for auction telemetry) */}
           {/* Evidence link removed - keeping users on site */}
+
+          {/* Live Auction Activity - Show recent bids for active auctions */}
+          {isLiveAuction && (recentBids.length > 0 || sellerUsername) && (
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{
+                fontSize: '7pt',
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                marginBottom: '8px',
+                letterSpacing: '0.6px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: '#22c55e',
+                    animation: 'pulse 1.5s ease-in-out infinite',
+                    boxShadow: '0 0 6px #22c55e',
+                  }}
+                />
+                Live Auction Activity
+              </div>
+
+              {/* Seller info */}
+              {sellerUsername && (
+                <div style={{
+                  fontSize: '9pt',
+                  marginBottom: '8px',
+                  padding: '6px 10px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '8pt' }}>Seller:</span>
+                  <span style={{ fontWeight: 600 }}>{sellerUsername}</span>
+                </div>
+              )}
+
+              {/* Recent bids */}
+              {recentBids.length > 0 && (
+                <div style={{
+                  background: 'var(--grey-100)',
+                  borderRadius: '4px',
+                  padding: '8px',
+                  maxHeight: '180px',
+                  overflowY: 'auto'
+                }}>
+                  <div style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
+                    Recent Bids ({recentBids.length})
+                  </div>
+                  {recentBids.slice(0, 8).map((bid, idx) => (
+                    <div
+                      key={bid.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '4px 0',
+                        borderBottom: idx < Math.min(recentBids.length - 1, 7) ? '1px solid var(--border)' : 'none',
+                        fontSize: '9pt'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: 999,
+                            background: idx === 0 ? 'var(--primary)' : 'var(--surface)',
+                            border: '1px solid var(--border)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '8px',
+                            fontWeight: 700,
+                            color: idx === 0 ? 'white' : 'var(--text)',
+                          }}
+                        >
+                          {bid.author.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span style={{ fontWeight: idx === 0 ? 700 : 400 }}>{bid.author}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{
+                          fontWeight: 700,
+                          color: idx === 0 ? 'var(--success)' : 'var(--text)',
+                          fontFamily: 'monospace'
+                        }}>
+                          ${bid.amount.toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: '7pt', color: 'var(--text-muted)' }}>
+                          {(() => {
+                            if (!bid.posted_at) return '';
+                            const d = new Date(bid.posted_at);
+                            const now = Date.now();
+                            const diff = now - d.getTime();
+                            if (diff < 60000) return 'just now';
+                            if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+                            if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+                            return d.toLocaleDateString();
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Evidence Count */}
           {evidence.length > 0 && (

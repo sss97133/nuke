@@ -116,14 +116,45 @@ async function runBatRepair(options: RepairOptions = {}) {
   let repaired = 0;
   let failed = 0;
 
-  for (const c of candidates) {
-    console.log(`Repairing: ${c.title}...`);
+  // Helper: delay with jitter to avoid rate limiting
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms + Math.random() * 1000));
+
+  // Helper: retry with exponential backoff
+  async function withRetry<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelayMs: number = 2000
+  ): Promise<T> {
+    let lastError: any;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (err: any) {
+        lastError = err;
+        const isRateLimit = /429|rate|limit|too many/i.test(err?.message || '');
+        const isTimeout = /timeout|ETIMEDOUT|ECONNRESET/i.test(err?.message || '');
+
+        if (attempt < maxRetries - 1 && (isRateLimit || isTimeout)) {
+          const backoff = baseDelayMs * Math.pow(2, attempt);
+          console.log(`    ↻ Retry ${attempt + 1}/${maxRetries} after ${backoff}ms (${isRateLimit ? 'rate limit' : 'timeout'})`);
+          await delay(backoff);
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    console.log(`[${i + 1}/${candidates.length}] Repairing: ${c.title}...`);
 
     try {
-      // Step 1: Extract core vehicle data
-      const { data: step1Data, error: step1Err } = await supabase.functions.invoke('extract-bat-core', {
-        body: { url: c.url, max_vehicles: 1 },
-      });
+      // Step 1: Extract core vehicle data (with retry)
+      const { data: step1Data, error: step1Err } = await withRetry(() =>
+        supabase.functions.invoke('extract-bat-core', {
+          body: { url: c.url, max_vehicles: 1 },
+        })
+      );
 
       if (step1Err) throw new Error(`extract-bat-core: ${step1Err.message}`);
 
@@ -133,11 +164,18 @@ async function runBatRepair(options: RepairOptions = {}) {
 
       console.log(`  ✓ Core extraction done (vehicle: ${vehicleId})`);
 
-      // Step 2: Extract comments
+      // Delay between steps to be respectful to BaT
+      await delay(1500);
+
+      // Step 2: Extract comments (with retry, non-critical)
       try {
-        await supabase.functions.invoke('extract-auction-comments', {
-          body: { auction_url: c.url, vehicle_id: vehicleId },
-        });
+        await withRetry(() =>
+          supabase.functions.invoke('extract-auction-comments', {
+            body: { auction_url: c.url, vehicle_id: vehicleId },
+          }),
+          2, // fewer retries for comments
+          1500
+        );
         console.log(`  ✓ Comments extraction done`);
       } catch (commentErr: any) {
         console.log(`  ⚠ Comments extraction failed (non-critical): ${commentErr?.message}`);
@@ -159,6 +197,22 @@ async function runBatRepair(options: RepairOptions = {}) {
     } catch (err: any) {
       console.log(`  ✗ Failed: ${err?.message}`);
       failed++;
+
+      // Record failure in origin_metadata
+      await supabase.from('vehicles').update({
+        origin_metadata: {
+          bat_repair: {
+            last_attempt_at: new Date().toISOString(),
+            last_ok: false,
+            last_error: String(err?.message || 'Unknown error').slice(0, 200),
+          },
+        },
+      }).eq('id', c.id).catch(() => {});
+    }
+
+    // Delay between vehicles to avoid rate limiting (3-5 seconds)
+    if (i < candidates.length - 1) {
+      await delay(3000);
     }
   }
 

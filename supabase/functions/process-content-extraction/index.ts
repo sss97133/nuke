@@ -23,6 +23,62 @@ interface QueueItem {
   comment_table?: string;
 }
 
+const todayYmd = (): string => new Date().toISOString().slice(0, 10);
+
+const toDateOnly = (raw: any): string => {
+  if (!raw) return todayYmd();
+  const s = String(raw).trim();
+  if (!s) return todayYmd();
+  const isoMatch = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch?.[1]) return isoMatch[1];
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return todayYmd();
+};
+
+const clampToToday = (ymd: string): string => {
+  try {
+    const today = todayYmd();
+    if (ymd > today) return today;
+  } catch {
+    return todayYmd();
+  }
+  return ymd;
+};
+
+const safeEventDate = (raw: any): string => clampToToday(toDateOnly(raw));
+
+async function insertTimelineEvent(
+  supabase: any,
+  payload: {
+    vehicle_id: string;
+    user_id?: string | null;
+    event_type?: string;
+    event_date?: any;
+    title: string;
+    description?: string | null;
+    source?: string;
+    metadata?: Record<string, any>;
+    image_urls?: string[] | null;
+  }
+) {
+  const { error } = await supabase
+    .from('timeline_events')
+    .insert({
+      vehicle_id: payload.vehicle_id,
+      user_id: payload.user_id || null,
+      event_type: payload.event_type || 'other',
+      event_date: safeEventDate(payload.event_date),
+      title: payload.title,
+      description: payload.description || null,
+      source: payload.source || 'comment_extraction',
+      metadata: payload.metadata || {},
+      image_urls: payload.image_urls || null
+    });
+
+  return error;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -293,22 +349,23 @@ async function processListingURL(supabase: any, item: QueueItem) {
     const updates = fieldsUpdated;
 
     // Create timeline event for the listing discovery
-    await supabase
-      .from('vehicle_timeline_events')
-      .insert({
-        vehicle_id: item.vehicle_id,
-        user_id: item.user_id,
-        event_type: 'listing_discovered',
-        event_date: scrapedData.sold_date || scrapedData.listing_date || new Date().toISOString(),
-        description: `Listing discovered: ${item.raw_content}`,
-        metadata: {
-          source: scrapeResult.source,
-          listing_url: item.raw_content,
-          images_imported: imageCount,
-          fields_updated: Object.keys(updates),
-          comment_id: item.comment_id
-        }
-      });
+    await insertTimelineEvent(supabase, {
+      vehicle_id: item.vehicle_id,
+      user_id: item.user_id,
+      event_type: 'other',
+      event_date: scrapedData.sold_date || scrapedData.listing_date || new Date().toISOString(),
+      title: 'Listing discovered',
+      description: `Listing discovered: ${item.raw_content}`,
+      source: scrapeResult.source || 'comment_extraction',
+      metadata: {
+        kind: 'listing_discovered',
+        source: scrapeResult.source,
+        listing_url: item.raw_content,
+        images_imported: imageCount,
+        fields_updated: Object.keys(updates),
+        comment_id: item.comment_id
+      }
+    });
 
     // Calculate points
     let points = 10; // Base points for finding a listing
@@ -351,25 +408,43 @@ async function processYouTubeVideo(supabase: any, item: QueueItem) {
 
   const videoId = videoIdMatch[1];
   
-  // Store video link in vehicle metadata
-  const { error } = await supabase
-    .from('vehicle_timeline_events')
-    .insert({
-      vehicle_id: item.vehicle_id,
-      user_id: item.user_id,
-      event_type: 'video_added',
-      event_date: new Date().toISOString(),
-      description: `Video link added: ${item.context}`,
-      metadata: {
-        video_url: item.raw_content,
-        video_id: videoId,
-        platform: 'youtube',
-        comment_id: item.comment_id
-      }
-    });
+  const error = await insertTimelineEvent(supabase, {
+    vehicle_id: item.vehicle_id,
+    user_id: item.user_id,
+    event_type: 'other',
+    event_date: new Date().toISOString(),
+    title: 'Video added',
+    description: `Video link added: ${item.context}`,
+    source: 'youtube',
+    metadata: {
+      kind: 'video_added',
+      video_url: item.raw_content,
+      video_id: videoId,
+      platform: 'youtube',
+      comment_id: item.comment_id
+    }
+  });
 
   if (error) {
     return { success: false, error: error.message };
+  }
+
+  const eventError = await insertTimelineEvent(supabase, {
+    vehicle_id: item.vehicle_id,
+    user_id: item.user_id,
+    event_type: 'vin_added',
+    event_date: new Date().toISOString(),
+    title: 'VIN/chassis added',
+    description: `VIN/chassis identifier added from comment extraction`,
+    source: 'comment_extraction',
+    metadata: {
+      vin,
+      comment_id: item.comment_id,
+      confidence: vinResult?.consensus?.consensus_confidence || 90
+    }
+  });
+  if (eventError) {
+    console.warn('VIN timeline event insert failed:', eventError.message);
   }
 
   return {
@@ -448,20 +523,20 @@ async function processSpecs(supabase: any, item: QueueItem) {
   // Extract spec field and value from metadata
   const field = item.raw_content; // e.g., "350 hp"
   
-  // Create timeline event for specs
-  const { error } = await supabase
-    .from('vehicle_timeline_events')
-    .insert({
-      vehicle_id: item.vehicle_id,
-      user_id: item.user_id,
-      event_type: 'specs_added',
-      event_date: new Date().toISOString(),
-      description: `Specification added: ${field}`,
-      metadata: {
-        spec_field: field,
-        comment_id: item.comment_id
-      }
-    });
+  const error = await insertTimelineEvent(supabase, {
+    vehicle_id: item.vehicle_id,
+    user_id: item.user_id,
+    event_type: 'other',
+    event_date: new Date().toISOString(),
+    title: 'Specification noted',
+    description: `Specification added: ${field}`,
+    source: 'comment_extraction',
+    metadata: {
+      kind: 'specs_added',
+      spec_field: field,
+      comment_id: item.comment_id
+    }
+  });
 
   if (error) {
     return { success: false, error: error.message };
@@ -524,19 +599,19 @@ async function processPriceData(supabase: any, item: QueueItem) {
  * Process timeline event
  */
 async function processTimelineEvent(supabase: any, item: QueueItem) {
-  const { error } = await supabase
-    .from('vehicle_timeline_events')
-    .insert({
-      vehicle_id: item.vehicle_id,
-      user_id: item.user_id,
-      event_type: 'maintenance',
-      event_date: new Date().toISOString(),
-      description: item.raw_content,
-      metadata: {
-        source: 'comment_extraction',
-        comment_id: item.comment_id
-      }
-    });
+  const error = await insertTimelineEvent(supabase, {
+    vehicle_id: item.vehicle_id,
+    user_id: item.user_id,
+    event_type: 'other',
+    event_date: new Date().toISOString(),
+    title: 'Timeline note',
+    description: item.raw_content,
+    source: 'comment_extraction',
+    metadata: {
+      kind: 'timeline_event',
+      comment_id: item.comment_id
+    }
+  });
 
   if (error) {
     return { success: false, error: error.message };
@@ -584,20 +659,20 @@ async function processImageURL(supabase: any, item: QueueItem) {
  * Process document URL
  */
 async function processDocumentURL(supabase: any, item: QueueItem) {
-  // Store document reference in timeline
-  const { error } = await supabase
-    .from('vehicle_timeline_events')
-    .insert({
-      vehicle_id: item.vehicle_id,
-      user_id: item.user_id,
-      event_type: 'document_added',
-      event_date: new Date().toISOString(),
-      description: `Document added: ${item.context}`,
-      metadata: {
-        document_url: item.raw_content,
-        comment_id: item.comment_id
-      }
-    });
+  const error = await insertTimelineEvent(supabase, {
+    vehicle_id: item.vehicle_id,
+    user_id: item.user_id,
+    event_type: 'other',
+    event_date: new Date().toISOString(),
+    title: 'Document added',
+    description: `Document added: ${item.context}`,
+    source: 'comment_extraction',
+    metadata: {
+      kind: 'document_added',
+      document_url: item.raw_content,
+      comment_id: item.comment_id
+    }
+  });
 
   if (error) {
     return { success: false, error: error.message };
