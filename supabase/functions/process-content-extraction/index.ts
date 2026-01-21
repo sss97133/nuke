@@ -59,6 +59,121 @@ const shortUrl = (raw: string): string => {
   }
 };
 
+const INSTAGRAM_POST_PATH = /\/(p|reel|tv)\/([A-Za-z0-9_-]+)/i;
+
+const decodeHtmlEntities = (value: string): string =>
+  value
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+
+const extractMeta = (html: string, key: string, attr = 'property'): string | null => {
+  const re = new RegExp(`<meta[^>]+${attr}=["']${key}["'][^>]+content=["']([^"']+)["']`, 'i');
+  const match = html.match(re);
+  if (!match?.[1]) return null;
+  return decodeHtmlEntities(match[1].trim());
+};
+
+const extractMetaAll = (html: string, key: string, attr = 'property'): string[] => {
+  const re = new RegExp(`<meta[^>]+${attr}=["']${key}["'][^>]+content=["']([^"']+)["']`, 'gi');
+  const out: string[] = [];
+  for (const match of html.matchAll(re)) {
+    if (match?.[1]) out.push(decodeHtmlEntities(match[1].trim()));
+  }
+  return Array.from(new Set(out));
+};
+
+const parseInstagramUrl = (raw: string): { kind: 'post' | 'profile' | 'unknown'; shortcode?: string; handle?: string } | null => {
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.replace(/^www\./, '').toLowerCase();
+    if (!/(^|\.)instagram\.com$/i.test(host)) return null;
+    const postMatch = u.pathname.match(INSTAGRAM_POST_PATH);
+    if (postMatch?.[2]) {
+      return { kind: 'post', shortcode: postMatch[2] };
+    }
+    const parts = u.pathname.split('/').filter(Boolean);
+    if (parts.length > 0) {
+      return { kind: 'profile', handle: parts[0] };
+    }
+    return { kind: 'unknown' };
+  } catch {
+    return null;
+  }
+};
+
+const extractInstagramHandle = (title?: string | null, description?: string | null): string | null => {
+  const titleMatch = title?.match(/\(@([a-zA-Z0-9._]+)\)/);
+  if (titleMatch?.[1]) return titleMatch[1];
+  const descMatch = description?.match(/-\s*([a-zA-Z0-9._]+)\s+on\s/i);
+  if (descMatch?.[1]) return descMatch[1];
+  return null;
+};
+
+const extractInstagramCaption = (description?: string | null): string | null => {
+  if (!description) return null;
+  const cleaned = description.trim();
+  const quoteMatch = cleaned.match(/:\s*[“"]([^”"]+)[”"]\s*$/);
+  if (quoteMatch?.[1]) return quoteMatch[1].trim();
+  const colonIdx = cleaned.indexOf(':');
+  if (colonIdx !== -1) {
+    const candidate = cleaned.slice(colonIdx + 1).trim();
+    const stripped = candidate.replace(/^["“”]+|["“”]+$/g, '').trim();
+    return stripped || null;
+  }
+  return null;
+};
+
+const extractDateFromRaw = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const asNumber = Number(trimmed);
+  if (Number.isFinite(asNumber) && asNumber > 1000000000) {
+    const d = new Date(asNumber * 1000);
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  const d = new Date(trimmed);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return null;
+};
+
+const extractInstagramDate = (description?: string | null, metaDate?: string | null): string | null => {
+  const metaParsed = extractDateFromRaw(metaDate);
+  if (metaParsed) return metaParsed;
+  if (!description) return null;
+  const onMatch = description.match(/\bon\s+([A-Za-z]+ \d{1,2}, \d{4})/);
+  const dateStr = onMatch?.[1] || description.match(/\b([A-Za-z]+ \d{1,2}, \d{4})\b/)?.[1];
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return null;
+};
+
+const fetchHtml = async (url: string, timeoutMs = 15000): Promise<string> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9'
+      },
+      redirect: 'follow',
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+    return await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 async function insertTimelineEvent(
   supabase: any,
   payload: {
@@ -281,12 +396,136 @@ serve(async (req) => {
 });
 
 /**
+ * Process Instagram sources (posts/profiles)
+ */
+async function processInstagramSource(supabase: any, item: QueueItem) {
+  const rawUrl = item.raw_content;
+  const igInfo = parseInstagramUrl(rawUrl);
+  const kind = igInfo?.kind || 'unknown';
+
+  let html: string | null = null;
+  let fetchError: string | null = null;
+
+  try {
+    html = await fetchHtml(rawUrl);
+  } catch (err: any) {
+    fetchError = err?.message || String(err);
+  }
+
+  const ogTitle = html ? extractMeta(html, 'og:title') : null;
+  const ogDescription = html
+    ? (extractMeta(html, 'og:description') || extractMeta(html, 'description', 'name'))
+    : null;
+  const ogImages = html ? extractMetaAll(html, 'og:image') : [];
+  const ogImage = ogImages[0] || null;
+  const ogVideo =
+    html ? (extractMeta(html, 'og:video:secure_url') || extractMeta(html, 'og:video')) : null;
+  const metaDate = html
+    ? (extractMeta(html, 'og:updated_time') || extractMeta(html, 'article:published_time'))
+    : null;
+  const caption = extractInstagramCaption(ogDescription);
+  const handle = igInfo?.handle || extractInstagramHandle(ogTitle, ogDescription);
+  const eventDate = extractInstagramDate(ogDescription, metaDate);
+
+  const summaryParts: string[] = [];
+  if (caption) summaryParts.push(caption);
+  if (!caption && ogDescription) summaryParts.push(ogDescription);
+  if (!summaryParts.length && fetchError) summaryParts.push(`Instagram fetch failed: ${fetchError}`);
+  const summary = summaryParts.length > 0
+    ? summaryParts.join(' ').slice(0, 900)
+    : null;
+  const sourceType =
+    kind === 'profile' ? 'instagram_profile' : kind === 'post' ? 'instagram_post' : 'instagram_source';
+  const titleKind = kind === 'profile' ? 'profile' : kind === 'post' ? 'post' : 'source';
+
+  await upsertResearchItem(supabase, {
+    vehicle_id: item.vehicle_id,
+    created_by: item.user_id,
+    item_type: 'source',
+    status: 'open',
+    title: `Instagram ${titleKind}: ${shortUrl(rawUrl)}`,
+    summary,
+    source_url: rawUrl,
+    source_type: sourceType,
+    event_date: eventDate || null,
+    date_precision: eventDate ? 'day' : 'unknown',
+    confidence: caption || ogImage ? 65 : 45,
+    metadata: {
+      kind,
+      shortcode: igInfo?.shortcode || null,
+      handle,
+      og_title: ogTitle,
+      og_description: ogDescription,
+      og_image: ogImage,
+      og_video: ogVideo,
+      fetch_error: fetchError || null
+    }
+  });
+
+  let imageCount = 0;
+  if (kind === 'post' && ogImages.length > 0) {
+    try {
+      const backfillResp = await fetch(
+        `${Deno.env.get('SUPABASE_URL')}/functions/v1/backfill-images`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+          },
+          body: JSON.stringify({
+            vehicle_id: item.vehicle_id,
+            image_urls: ogImages.slice(0, 5),
+            source: 'instagram',
+            run_analysis: false
+          })
+        }
+      );
+
+      if (backfillResp.ok) {
+        const backfillResult = await backfillResp.json().catch(() => null);
+        imageCount = Number(backfillResult?.uploaded || 0);
+      } else {
+        console.warn(`backfill-images failed for instagram: ${backfillResp.status}`);
+      }
+    } catch (err) {
+      console.warn('Instagram image backfill error:', err);
+    }
+  }
+
+  const points = 5 + imageCount * 2 + (caption ? 2 : 0);
+  const qualityScore = imageCount > 0 ? 0.7 : caption ? 0.6 : 0.4;
+
+  return {
+    success: true,
+    data: {
+      instagram_kind: kind,
+      handle,
+      shortcode: igInfo?.shortcode || null,
+      caption,
+      images_imported: imageCount,
+      og_title: ogTitle,
+      og_description: ogDescription,
+      og_image: ogImage,
+      og_video: ogVideo,
+      fetch_error: fetchError
+    },
+    points,
+    quality_score: qualityScore
+  };
+}
+
+/**
  * Process listing URL (BaT, Mecum, KSL, etc.)
  */
 async function processListingURL(supabase: any, item: QueueItem) {
   console.log(`Processing listing URL: ${item.raw_content}`);
   
   try {
+    if (parseInstagramUrl(item.raw_content)) {
+      return await processInstagramSource(supabase, item);
+    }
+
     // Call the existing scrape-vehicle function
     const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-vehicle`, {
       method: 'POST',
