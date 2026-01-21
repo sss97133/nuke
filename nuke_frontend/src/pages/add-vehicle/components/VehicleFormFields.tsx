@@ -159,7 +159,7 @@ const VehicleFormFields: React.FC<VehicleFormFieldsProps> = memo(({
 
         <div className="form-grid grid-3">
           {renderNumberField('year', 'Year', 'e.g., 1972', 1900, new Date().getFullYear() + 1)}
-          {renderField('vin', 'VIN', 'text', '17-character VIN number')}
+          {renderField('vin', 'VIN', 'text', 'VIN or chassis ID (4-17 characters)')}
           {renderField('license_plate', 'License Plate')}
         </div>
 

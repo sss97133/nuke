@@ -1578,7 +1578,7 @@ export const PersonalPhotoLibrary: React.FC = () => {
               title="Convert Album to Vehicle"
               message="Enter the VIN (optional but recommended):"
               defaultValue={vehicleConversionDialog.values.vin || ''}
-              placeholder="17-character VIN"
+              placeholder="VIN or chassis ID (4-17 chars)"
               onConfirm={handleVehicleConversionStep}
               onCancel={() => setVehicleConversionDialog({ isOpen: false, album: null, step: 'year', values: {} })}
               confirmLabel="Create Vehicle"

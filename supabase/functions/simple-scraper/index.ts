@@ -123,7 +123,7 @@ serve(async (req) => {
         const s = String(raw).trim()
         if (!s) return null
         const cleaned = s.toUpperCase().replace(/[^A-Z0-9]/g, '')
-        if (cleaned.length !== 17) return null
+        if (cleaned.length < 4 || cleaned.length > 17) return null
         if (/[IOQ]/.test(cleaned)) return null
         if (!/\d/.test(cleaned)) return null
         return cleaned
@@ -133,7 +133,7 @@ serve(async (req) => {
         try {
           const h = String(html || '')
           // Prefer context where the page explicitly labels VIN.
-          const labeled = /(?:\bVIN\b|Vehicle Identification Number)\D{0,80}([A-HJ-NPR-Z0-9]{17})/gi
+          const labeled = /(?:\bVIN\b|Vehicle Identification Number|Chassis(?:\s*(?:No|Number))?)\D{0,80}([A-HJ-NPR-Z0-9]{4,17})/gi
           let m: RegExpExecArray | null
           while ((m = labeled.exec(h)) !== null) {
             const v = sanitizeVin(m?.[1])

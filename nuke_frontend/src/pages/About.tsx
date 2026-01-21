@@ -333,7 +333,7 @@ PARALLEL PROCESSING:
     │
     ├─ VIN Tag Detection (GPT-4o Vision)
     │   └─ Detects VIN plates/tags
-    │   └─ OCR extraction of 17-character VIN
+    │   └─ OCR extraction of VIN/chassis identifier (4-17 chars)
     │   └─ Authenticity assessment
     │   └─ Auto-updates vehicle if VIN missing
     │

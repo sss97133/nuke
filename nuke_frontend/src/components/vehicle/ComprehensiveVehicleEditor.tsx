@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import UniversalFieldEditor from './UniversalFieldEditor';
 import EditHistoryViewer from './EditHistoryViewer';
 import DealerTransactionInput from './DealerTransactionInput';
+import vinDecoderService from '../../services/vinDecoder';
 
 interface ComprehensiveVehicleEditorProps {
   vehicleId: string;
@@ -122,8 +123,15 @@ export const ComprehensiveVehicleEditor: React.FC<ComprehensiveVehicleEditorProp
             fieldLabel="VIN"
             currentValue={vehicle.vin}
             canEdit={canEdit}
-            placeholder="17-character VIN"
-            validator={(v) => (v && v.length !== 17) ? 'VIN must be 17 characters' : null}
+            placeholder="VIN or chassis ID (4-17 chars)"
+            validator={(v) => {
+              if (!v) return null;
+              const res = vinDecoderService.validateVIN(v);
+              if (!res.valid || !/\d/.test(res.normalized)) {
+                return 'VIN/chassis must be 4-17 characters, no I/O/Q, and include a digit';
+              }
+              return null;
+            }}
             onSaved={() => handleFieldSaved('vin')}
           />
         </div>

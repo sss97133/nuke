@@ -36,6 +36,7 @@ import { PartsQuoteGenerator } from '../components/PartsQuoteGenerator';
 import WiringQueryContextBar from '../components/wiring/WiringQueryContextBar';
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
 import LiveAuctionBanner from '../components/auction/LiveAuctionBanner';
+import ExternalAuctionLiveBanner from '../components/auction/ExternalAuctionLiveBanner';
 import TransactionHistory from '../components/vehicle/TransactionHistory';
 import ValidationPopupV2 from '../components/vehicle/ValidationPopupV2';
 import { BATListingManager } from '../components/vehicle/BATListingManager';
@@ -3736,9 +3737,27 @@ const VehicleProfile: React.FC = () => {
           );
         })()}
 
-        {/* Live Auction Banner - Show if vehicle has active auction */}
+        {/* Live Auction Banner - Show if vehicle has active N-Zero auction */}
         {vehicle && (
           <LiveAuctionBanner vehicleId={vehicle.id} />
+        )}
+
+        {/* External Auction Live Banner - Show if vehicle has active BaT/C&B/etc auction */}
+        {vehicle && auctionPulse?.listing_url && ['active', 'live'].includes(String(auctionPulse?.listing_status || '').toLowerCase()) && (
+          <div style={{ padding: '0 var(--space-4)', maxWidth: '1600px', margin: 'var(--space-2) auto 0' }}>
+            <ExternalAuctionLiveBanner
+              externalListingId={auctionPulse?.external_listing_id || null}
+              platform={auctionPulse?.platform || 'bat'}
+              listingUrl={auctionPulse?.listing_url || ''}
+              currentBid={typeof auctionPulse?.current_bid === 'number' ? auctionPulse.current_bid : null}
+              bidCount={typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count : null}
+              watcherCount={typeof auctionPulse?.watcher_count === 'number' ? auctionPulse.watcher_count : null}
+              commentCount={typeof auctionPulse?.comment_count === 'number' ? auctionPulse.comment_count : null}
+              endDate={auctionPulse?.end_date || null}
+              listingStatus={auctionPulse?.listing_status || null}
+              lastUpdatedAt={auctionPulse?.updated_at || null}
+            />
+          </div>
         )}
 
         {/* Orphaned Vehicle Banner - Visible to all users */}

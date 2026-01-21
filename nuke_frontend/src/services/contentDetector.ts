@@ -159,7 +159,7 @@ export class ContentDetector {
   }
 
   /**
-   * Detect VIN numbers (17-character alphanumeric)
+   * Detect VIN numbers (17-character) and legacy chassis identifiers (4-16)
    */
   private static detectVINs(text: string): DetectedContent[] {
     const detected: DetectedContent[] = [];
@@ -196,6 +196,37 @@ export class ContentDetector {
           vin: vin
         }
       });
+    }
+
+    // Legacy chassis identifiers: only accept when explicitly labeled
+    const labeledPatterns = [
+      /(?:\bvin\b|vehicle identification|chassis(?:\s*(?:no|number))?|serial(?:\s*(?:no|number))?)\D{0,40}([A-HJ-NPR-Z0-9]{4,16})/gi,
+      /\bchassis\s+([A-HJ-NPR-Z0-9]{4,16})\b/gi,
+    ];
+
+    for (const pattern of labeledPatterns) {
+      const labeledMatches = text.matchAll(pattern);
+      for (const match of labeledMatches) {
+        const candidate = match[1]?.toUpperCase();
+        if (!candidate) continue;
+        if (/[IOQ]/.test(candidate)) continue;
+        if (!/\d/.test(candidate)) continue;
+        const contextStart = Math.max(0, match.index! - 50);
+        const contextEnd = Math.min(text.length, match.index! + candidate.length + 50);
+        const context = text.substring(contextStart, contextEnd);
+
+        detected.push({
+          type: 'vin_data',
+          content: candidate,
+          context,
+          confidence: 0.85,
+          source: 'regex',
+          metadata: {
+            vin: candidate,
+            legacy: true
+          }
+        });
+      }
     }
     
     return detected;

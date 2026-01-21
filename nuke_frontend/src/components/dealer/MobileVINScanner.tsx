@@ -25,9 +25,19 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const extractVINFromText = (text: string): string | null => {
-    // VIN pattern: 17 alphanumeric (no I, O, Q)
+    const upper = text.toUpperCase();
+    // Prefer labeled VIN/Chassis identifiers (legacy-friendly)
+    const labeledPattern = /(?:\bVIN\b|CHASSIS(?:\s*(?:NO|NUMBER))?|SERIAL(?:\s*(?:NO|NUMBER))?)\D{0,20}([A-HJ-NPR-Z0-9]{4,17})/gi;
+    const labeledMatches = upper.matchAll(labeledPattern);
+    for (const match of labeledMatches) {
+      const candidate = match[1];
+      const res = vinDecoderService.validateVIN(candidate);
+      if (res.valid && /\d/.test(res.normalized)) return res.normalized;
+    }
+
+    // Fallback: strict 17-character VINs
     const vinPattern = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
-    const matches = text.toUpperCase().match(vinPattern) || [];
+    const matches = upper.match(vinPattern) || [];
     for (const m of matches) {
       const res = vinDecoderService.validateVIN(m);
       // Reject garbage strings that happen to match the character class (must include digits).
@@ -103,7 +113,7 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
     try {
       const res = vinDecoderService.validateVIN(extractedVIN);
       if (!res.valid || !/\d/.test(res.normalized)) {
-        alert('Invalid VIN. Must be 17 characters, no I/O/Q, and include at least one digit.');
+        alert('Invalid VIN/chassis ID. Must be 4-17 characters, no I/O/Q, and include at least one digit.');
         return;
       }
       const { error } = await supabase
@@ -130,11 +140,11 @@ export const MobileVINScanner: React.FC<MobileVINScannerProps> = ({
   };
 
   const handleManualVINEntry = async () => {
-    const manualVIN = prompt('Enter VIN manually (17 characters):');
+    const manualVIN = prompt('Enter VIN/chassis manually (4-17 characters):');
     if (!manualVIN) return;
     const res = vinDecoderService.validateVIN(manualVIN);
     if (!res.valid || !/\d/.test(res.normalized)) {
-      alert('Invalid VIN. Must be 17 characters, no I/O/Q, and include at least one digit.');
+      alert('Invalid VIN/chassis ID. Must be 4-17 characters, no I/O/Q, and include at least one digit.');
       return;
     }
 

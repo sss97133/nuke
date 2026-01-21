@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import vinDecoderService from '../services/vinDecoder';
 // import * as XLSX from 'xlsx'; // Optional dependency - install with: npm install xlsx
 
 interface BulkVehicle {
@@ -148,8 +149,11 @@ const DealerBulkEditor: React.FC = () => {
     if (!vehicle.model || vehicle.model.trim() === '') {
       errors.push('Model required');
     }
-    if (vehicle.vin && vehicle.vin.length !== 17) {
-      errors.push('VIN must be 17 characters');
+    if (vehicle.vin) {
+      const res = vinDecoderService.validateVIN(vehicle.vin);
+      if (!res.valid || !/\d/.test(res.normalized)) {
+        errors.push('VIN/chassis must be 4-17 characters, no I/O/Q, and include a digit');
+      }
     }
     
     return errors;
@@ -485,7 +489,7 @@ const DealerBulkEditor: React.FC = () => {
                       border: '1px solid var(--border)',
                       fontFamily: 'monospace'
                     }}
-                    placeholder="17-char VIN"
+                    placeholder="VIN/chassis ID"
                     maxLength={17}
                   />
                 </td>

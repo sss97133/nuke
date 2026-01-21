@@ -10,12 +10,16 @@ import { useVINDecoder } from '../../hooks/useVINDecoder';
 export const VINDecoderDemo: React.FC = () => {
   const [vinInput, setVinInput] = useState('');
   const { decodeVIN, validateVIN, getRecalls, decoding, result, recalls, error } = useVINDecoder();
+  const validation = vinInput ? validateVIN(vinInput) : null;
+  const canDecode = !!validation?.valid;
   
   const handleDecode = async () => {
     if (!vinInput.trim()) return;
     await decodeVIN(vinInput);
     // Also fetch recalls in background
-    getRecalls(vinInput).catch(console.error);
+    if (validation?.valid && validation.normalized.length === 17) {
+      getRecalls(vinInput).catch(console.error);
+    }
   };
   
   const handleValidate = () => {
@@ -43,7 +47,7 @@ export const VINDecoderDemo: React.FC = () => {
             type="text"
             value={vinInput}
             onChange={(e) => setVinInput(e.target.value.toUpperCase())}
-            placeholder="Enter 17-character VIN"
+            placeholder="Enter VIN/chassis (4-17 chars)"
             maxLength={17}
             style={{
               flex: 1,
@@ -56,7 +60,7 @@ export const VINDecoderDemo: React.FC = () => {
           />
           <button
             onClick={handleDecode}
-            disabled={decoding || vinInput.length !== 17}
+            disabled={decoding || !canDecode}
             style={{
               padding: '0.75rem 2rem',
               background: decoding ? '#999' : '#007bff',

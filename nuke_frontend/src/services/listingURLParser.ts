@@ -56,7 +56,7 @@ class ListingURLParserService {
   }
 
   /**
-   * Extract VIN from text content
+   * Extract VIN or legacy chassis identifier from text content
    */
   private extractVIN(text: string): string | null {
     const vinPattern = /\b([A-HJ-NPR-Z0-9]{17})\b/gi;
@@ -70,6 +70,23 @@ class ListingURLParserService {
         if (!/[IOQ]/.test(vin)) {
           return vin;
         }
+      }
+    }
+
+    // Legacy chassis identifiers: only accept when explicitly labeled
+    const labeledPatterns = [
+      /(?:\bvin\b|vehicle identification|chassis(?:\s*(?:no|number))?|serial(?:\s*(?:no|number))?)\D{0,40}([A-HJ-NPR-Z0-9]{4,16})/gi,
+      /\bchassis\s+([A-HJ-NPR-Z0-9]{4,16})\b/gi,
+    ];
+
+    for (const pattern of labeledPatterns) {
+      const labeledMatches = text.matchAll(pattern);
+      for (const match of labeledMatches) {
+        const candidate = String(match[1] || '').toUpperCase();
+        if (!candidate) continue;
+        if (/[IOQ]/.test(candidate)) continue;
+        if (!/\d/.test(candidate)) continue;
+        return candidate;
       }
     }
     
@@ -434,12 +451,42 @@ class ListingURLParserService {
     const result: Partial<ParsedListing> = {};
 
     // Extract from URL pattern: /veh/YEAR-MAKE-MODEL-VIN-/
-    const urlMatch = url.match(/\/veh\/(\d{4})-([^-]+)-([^-]+)-([^-]+)-/);
-    if (urlMatch) {
-      result.year = parseInt(urlMatch[1]);
-      result.make = urlMatch[2].replace(/-/g, ' ');
-      result.model = urlMatch[3].replace(/-/g, ' ');
-      result.vin = urlMatch[4].toUpperCase();
+    const slugMatch = url.match(/\/veh\/([^/?#]+)/i);
+    if (slugMatch) {
+      const slug = slugMatch[1];
+      const parts = slug.split('-').filter(Boolean);
+      const yearPart = parts[0];
+
+      if (yearPart && /^\d{4}$/.test(yearPart)) {
+        result.year = parseInt(yearPart, 10);
+      }
+      if (parts[1]) {
+        result.make = parts[1].replace(/-/g, ' ');
+      }
+      if (parts[2]) {
+        result.model = parts[2].replace(/-/g, ' ');
+      }
+
+      const slugCandidates = parts
+        .map((part, index) => {
+          if (index < 3) return null;
+          const cleaned = part.toUpperCase().replace(/[^A-Z0-9]/g, '');
+          if (!cleaned) return null;
+          if (/[IOQ]/.test(cleaned)) return null;
+          if (!/\d/.test(cleaned)) return null;
+          if (cleaned.length < 4 || cleaned.length > 17) return null;
+          const hasLetters = /[A-Z]/.test(cleaned);
+          if (hasLetters && cleaned.length < 8) return null;
+          if (index === 0 && /^\d{4}$/.test(cleaned)) return null;
+          const score = (cleaned.length === 17 ? 100 : cleaned.length) + (hasLetters ? 5 : 0);
+          return { value: cleaned, score };
+        })
+        .filter((candidate): candidate is { value: string; score: number } => Boolean(candidate));
+
+      if (slugCandidates.length > 0) {
+        slugCandidates.sort((a, b) => b.score - a.score);
+        result.vin = slugCandidates[0].value;
+      }
     }
 
     // Extract title
@@ -569,7 +616,7 @@ class ListingURLParserService {
       const scrapedData = data.data || {};
 
       // Extract HTML from response (simple-scraper doesn't return full HTML, just extracted data)
-      const html = scrapedData.raw_html || '';
+      const html = scrapedData.raw_html || scrapedData.html || '';
 
       let parsed: Partial<ParsedListing> = {
         source,

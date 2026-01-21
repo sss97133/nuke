@@ -148,7 +148,7 @@ class AIDataIngestionService {
       return 'url';
     }
     
-    // Check for VIN (17 characters, alphanumeric, no I/O/Q)
+    // Check for VIN (17 characters) or legacy chassis identifiers (4-16)
     const vinPattern = /^[A-HJ-NPR-Z0-9]{17}$/i;
     const cleanedVIN = trimmed.replace(/[^A-Z0-9]/gi, '').toUpperCase();
     if (vinPattern.test(cleanedVIN) && !/[IOQ]/.test(cleanedVIN)) {

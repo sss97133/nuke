@@ -346,7 +346,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
     }
 
     if (!validateVinFormat(submittedVin)) {
-      setError('Invalid VIN format. VIN must be exactly 17 characters and contain only valid characters (no I, O, Q)');
+      setError('Invalid VIN/chassis format. Must be 4-17 characters and contain only valid characters (no I, O, Q)');
       return;
     }
 
@@ -518,7 +518,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
   const renderVerifyStep = () => (
     <div className="vin-validator-step">
       <h3 className="text-large font-bold" style={{ marginBottom: '16px' }}>
-        Enter VIN Number
+        Enter VIN / Chassis Number
       </h3>
       <p className="text-muted" style={{ marginBottom: '24px' }}>
         Please enter the VIN number exactly as it appears in your photo.
@@ -535,13 +535,13 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
       )}
 
       <div style={{ marginBottom: '24px' }}>
-        <label className="form-label">VIN Number (17 characters)</label>
+        <label className="form-label">VIN / Chassis Number (4-17 characters)</label>
         <input
           type="text"
           className="form-input"
           value={submittedVin}
           onChange={(e) => setSubmittedVin(e.target.value.toUpperCase())}
-          placeholder="Enter 17-character VIN"
+          placeholder="Enter VIN or chassis ID"
           maxLength={17}
           style={{ 
             fontFamily: 'monospace', 
@@ -550,7 +550,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
           }}
         />
         <div className="form-help">
-          VIN must be exactly 17 characters (letters and numbers, no I, O, or Q)
+          VIN/chassis must be 4-17 characters (letters and numbers, no I, O, or Q)
         </div>
       </div>
 
@@ -570,7 +570,7 @@ export const VINPhotoValidator: React.FC<VINPhotoValidatorProps> = ({
         <button 
           className="button button-primary" 
           onClick={submitVinValidation}
-          disabled={loading || submittedVin.length !== 17}
+          disabled={loading || !validateVinFormat(submittedVin)}
         >
           {loading ? 'Submitting...' : 'Submit for Validation'}
         </button>
