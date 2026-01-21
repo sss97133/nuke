@@ -356,6 +356,31 @@ async function extractCarsAndBidsDetails(page: Page, url: string): Promise<Parti
   }
 }
 
+/**
+ * Extract detailed data from an RM Sotheby's listing page
+ * Focuses on gallery images (critical for full photo coverage)
+ */
+async function extractRMSothebysDetails(page: Page, url: string): Promise<Partial<DetailedAuctionProfile>> {
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(3000);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(2000);
+
+    const html = await page.content();
+    const matches = Array.from(html.matchAll(/https:\/\/cdn\.rmsothebys\.com\/[^\s"'<>]+/gi)).map(m => m[0]);
+    const imageUrls = Array.from(new Set(matches)).filter((src) => {
+      const lower = src.toLowerCase();
+      return !lower.includes('logo') && !lower.includes('icon') && !lower.includes('avatar');
+    });
+
+    return { image_urls: imageUrls };
+  } catch (error: any) {
+    console.log(`    ⚠️ RM Sotheby's extraction timeout/error: ${error.message.substring(0, 80)}`);
+    return {};
+  }
+}
+
 // Auction sources configuration
 const AUCTION_SOURCES = {
   'Bring a Trailer': {
@@ -1215,6 +1240,8 @@ function getDetailExtractor(source: string): ((page: Page, url: string) => Promi
       return extractBatListingDetails;
     case 'Cars & Bids':
       return extractCarsAndBidsDetails;
+    case 'RM Sothebys':
+      return extractRMSothebysDetails;
     default:
       return null;
   }

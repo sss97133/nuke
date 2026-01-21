@@ -444,6 +444,59 @@ async function processListingURL(supabase: any, item: QueueItem) {
       }
     });
 
+    // Create timeline events for event mentions in listing narratives (best-effort).
+    try {
+      const eventMentions = Array.isArray((scrapedData as any)?.event_mentions)
+        ? (scrapedData as any).event_mentions
+        : [];
+      if (eventMentions.length > 0) {
+        const listingHost = (() => {
+          try { return new URL(item.raw_content).hostname.replace(/^www\./, ''); } catch { return null; }
+        })();
+
+        for (const mention of eventMentions.slice(0, 25)) {
+          const name = String(mention?.name || '').trim();
+          const year = Number(mention?.year);
+          const eventDate = String(mention?.event_date || '').trim();
+          if (!name || !Number.isFinite(year) || !eventDate) continue;
+
+          const dedupeSignature = {
+            source_url: item.raw_content,
+            event_name: name,
+            event_year: year
+          };
+
+          const { data: existing } = await supabase
+            .from('timeline_events')
+            .select('id')
+            .eq('vehicle_id', item.vehicle_id)
+            .contains('metadata', dedupeSignature)
+            .maybeSingle();
+
+          if (existing?.id) continue;
+
+          await insertTimelineEvent(supabase, {
+            vehicle_id: item.vehicle_id,
+            user_id: item.user_id,
+            event_type: 'other',
+            event_date: eventDate,
+            title: 'Event appearance',
+            description: `${name} (${year})`,
+            source: listingHost || scrapeResult.source || 'comment_extraction',
+            metadata: {
+              ...dedupeSignature,
+              context: mention?.context || null,
+              date_precision: 'year',
+              provenance: 'listing_event_mention',
+              comment_id: item.comment_id
+            }
+          });
+        }
+      }
+    } catch (eventErr: any) {
+      console.warn(`timeline_events event-mention insert failed (non-fatal): ${eventErr.message}`);
+    }
+
     // Calculate points
     let points = 10; // Base points for finding a listing
     points += imageCount * 2; // 2 points per image

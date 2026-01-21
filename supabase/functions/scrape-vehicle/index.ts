@@ -1548,7 +1548,10 @@ serve(async (req) => {
       data.doors = typeof firecrawlExtract.doors === 'number' ? firecrawlExtract.doors : tableData?.doors || data.doors
       data.fuel_type = firecrawlExtract.fuel_type ? String(firecrawlExtract.fuel_type).trim() : tableData?.fuelType || data.fuel_type
       data.location = firecrawlExtract.location ? String(firecrawlExtract.location).trim() : null
-      data.description = firecrawlExtract.description ? String(firecrawlExtract.description).trim() : ''
+      const firecrawlDescription = firecrawlExtract.description ? String(firecrawlExtract.description).trim() : ''
+      if (firecrawlDescription) {
+        data.description = firecrawlDescription
+      }
       data.thumbnail_url = firecrawlExtract.thumbnail_url ? String(firecrawlExtract.thumbnail_url).trim() : null
 
       const imgs = normalizeImageUrls([
