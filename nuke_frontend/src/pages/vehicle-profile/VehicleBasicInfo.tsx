@@ -8,6 +8,7 @@ import { FaviconIcon } from '../../components/common/FaviconIcon';
 import type { VehicleBasicInfoProps} from './types';
 import { useToast } from '../../components/ui/Toast';
 import { supabase } from '../../lib/supabase';
+import { getPlatformDisplayName, normalizePlatform } from '../../services/platformNomenclature';
 
 async function getEdgeFunctionErrorMessage(err: any): Promise<string> {
   try {
@@ -227,11 +228,6 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     return null;
   }, [(vehicle as any).bat_seller, (vehicle as any).sale_status, (vehicle as any).sale_price]);
 
-  const listingSourceLabel = React.useMemo(() => {
-    const rawSource = (vehicle.listing_source || vehicle.discovery_source || '').toString();
-    return rawSource.toLowerCase();
-  }, [vehicle.listing_source, vehicle.discovery_source]);
-
   const listingUrl = React.useMemo(() => {
     return (vehicle.listing_url || vehicle.discovery_url || '') as string;
   }, [vehicle.listing_url, vehicle.discovery_url]);
@@ -246,13 +242,44 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
     }
   }, [listingUrl]);
 
+  const rawListingSource = React.useMemo(() => {
+    return (vehicle.listing_source || vehicle.discovery_source || (vehicle as any)?.auction_source || '').toString().trim();
+  }, [vehicle.listing_source, vehicle.discovery_source, (vehicle as any)?.auction_source]);
+
+  const listingSourceKey = React.useMemo(() => {
+    const rawLower = rawListingSource.toLowerCase();
+    const internalMarkers = [
+      'auction_extractor',
+      'live_auction_extractor',
+      'intelligent_extractor',
+      'url_scraper',
+      'comment_extraction',
+      'auto_import'
+    ];
+    const isInternal = internalMarkers.some((marker) => rawLower.includes(marker));
+    if (isInternal || !rawListingSource) {
+      return listingHost || rawListingSource;
+    }
+    return rawListingSource;
+  }, [listingHost, rawListingSource]);
+
+  const listingPlatform = React.useMemo(() => {
+    return normalizePlatform(listingSourceKey || listingHost || rawListingSource);
+  }, [listingHost, listingSourceKey, rawListingSource]);
+
+  const listingSourceLabel = React.useMemo(() => {
+    const label = getPlatformDisplayName(listingSourceKey || listingHost || rawListingSource);
+    if (label && label !== 'Unknown') return label;
+    return listingHost || listingSourceKey || '';
+  }, [listingHost, listingSourceKey, rawListingSource]);
+
   const listingCapturedDate = React.useMemo(() => {
     return vehicle.listing_posted_at || vehicle.listing_updated_at || vehicle.created_at || null;
   }, [vehicle.listing_posted_at, vehicle.listing_updated_at, vehicle.created_at]);
 
   const isCraigslistListing = React.useMemo(() => {
-    return listingSourceLabel.includes('craigslist');
-  }, [listingSourceLabel]);
+    return listingPlatform === 'craigslist';
+  }, [listingPlatform]);
 
   const isBringATrailerListing = React.useMemo(() => {
     return typeof listingUrl === 'string' && listingUrl.toLowerCase().includes('bringatrailer.com');

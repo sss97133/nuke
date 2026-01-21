@@ -45,7 +45,8 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
 
   const currentBid = listing.current_bid_cents ? listing.current_bid_cents / 100 : 0;
   const minBid = currentBid > 0 ? currentBid + 100 : 1000; // Minimum $100 increment or $1000 start
-  const parsedMaxBid = maxBid ? parseFloat(maxBid) : 0;
+  const trimmedMaxBid = maxBid.trim();
+  const parsedMaxBid = trimmedMaxBid ? parseFloat(trimmedMaxBid) : 0;
   const maxBidAmount = Number.isFinite(parsedMaxBid) ? parsedMaxBid : 0;
   const maxBidCents = maxBidAmount > 0 ? Math.round(maxBidAmount * 100) : 0;
   const depositCents = maxBidCents ? Math.round(maxBidCents * 0.1) : 0;
@@ -99,9 +100,12 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
   };
 
   const handleSubmitBid = async () => {
-    if (!user || !agreementId || !maxBid) return;
+    if (!user || !agreementId) return;
 
-    const maxBidCents = Math.round(parseFloat(maxBid) * 100);
+    if (!maxBidCents) {
+      setError('Enter a valid maximum bid amount.');
+      return;
+    }
 
     if (maxBidCents < minBid * 100) {
       setError(`Minimum bid is $${minBid.toLocaleString()}`);
@@ -112,13 +116,17 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
   };
 
   const handleConfirmBid = async () => {
-    if (!user || !agreementId || !maxBid) return;
+    if (!user || !agreementId) return;
+
+    if (!maxBidCents) {
+      setError('Enter a valid maximum bid amount.');
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      const maxBidCents = Math.round(parseFloat(maxBid) * 100);
       const depositCents = Math.round(maxBidCents * 0.1);
 
       // Create proxy bid request
@@ -385,7 +393,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
               </div>
 
               {/* Cost breakdown */}
-              {maxBid && parseFloat(maxBid) > 0 && (
+              {maxBidCents > 0 && (
                 <div style={{
                   background: 'var(--surface-hover)',
                   padding: '12px',
@@ -395,18 +403,18 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span>Maximum bid:</span>
-                    <span>${parseFloat(maxBid).toLocaleString()}</span>
+                    <span>${maxBidAmount.toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span>Refundable deposit (10%):</span>
                     <span>${depositAmount.toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '6px' }}>
-                    <span>Risk-adjusted commission ({commissionRateDisplay}%):</span>
+                    <span>Estimated commission ({commissionRateDisplay}%):</span>
                     <span>${commissionAmount.toLocaleString()}</span>
                   </div>
                   <div style={{ fontSize: '7pt', color: 'var(--text-muted)', marginTop: '6px' }}>
-                    Risk tier: {commissionTier.label}. Final commission is based on the winning price.
+                    Risk tier: {commissionTier.label} — {commissionTier.description}. Final commission is based on the winning price.
                   </div>
                 </div>
               )}
@@ -444,7 +452,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   type="button"
                   className="button button-primary"
                   onClick={handleSubmitBid}
-                  disabled={!maxBid || !agreedToDeposit || parseFloat(maxBid) < minBid}
+                  disabled={!maxBidCents || !agreedToDeposit || maxBidCents < minBid * 100}
                   style={{ fontSize: '9pt', flex: 1 }}
                 >
                   Review Bid
@@ -486,7 +494,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Maximum Bid</div>
                   <div style={{ fontSize: '12pt', fontWeight: 700, color: 'var(--accent)' }}>
-                    ${parseFloat(maxBid).toLocaleString()}
+                    ${maxBidAmount.toLocaleString()}
                   </div>
                 </div>
                 <div style={{ marginBottom: '12px' }}>
@@ -499,10 +507,18 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                   <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Deposit to Authorize</div>
                   <div style={{ fontSize: '10pt', fontWeight: 600 }}>${depositAmount.toLocaleString()}</div>
                 </div>
+                {maxBidCents > 0 && (
+                  <div style={{ marginTop: '12px' }}>
+                    <div style={{ fontSize: '8pt', color: 'var(--text-muted)' }}>Estimated Commission</div>
+                    <div style={{ fontSize: '10pt', fontWeight: 600 }}>
+                      ${commissionAmount.toLocaleString()} ({commissionRateDisplay}% · {commissionTier.label})
+                    </div>
+                  </div>
+                )}
               </div>
 
               <p style={{ fontSize: '8pt', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                By confirming, you authorize N-Zero to bid up to ${parseFloat(maxBid).toLocaleString()} on
+                By confirming, you authorize N-Zero to bid up to ${maxBidAmount.toLocaleString()} on
                 this vehicle. A deposit hold of ${depositAmount.toLocaleString()} will be placed on your
                 payment method.
               </p>
@@ -550,7 +566,7 @@ export default function ProxyBidModal({ isOpen, onClose, listing, onBidPlaced }:
                 Proxy Bid Placed!
               </h3>
               <p style={{ fontSize: '9pt', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-                We'll bid on your behalf up to ${parseFloat(maxBid).toLocaleString()}.
+                We'll bid on your behalf up to ${maxBidAmount.toLocaleString()}.
                 You'll receive notifications as the auction progresses.
               </p>
               <button
