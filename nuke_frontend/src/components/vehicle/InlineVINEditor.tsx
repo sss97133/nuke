@@ -38,7 +38,7 @@ export const InlineVINEditor: React.FC<InlineVINEditorProps> = ({
     const vinUpper = editedVIN.toUpperCase().trim();
     
     if (!validateVIN(vinUpper)) {
-      setError('Invalid VIN. Must be 17 characters, no I/O/Q, and include at least one digit.');
+      setError('Invalid VIN/chassis ID. Must be 4-17 characters, no I/O/Q, and include at least one digit.');
       return;
     }
 
@@ -181,7 +181,7 @@ export const InlineVINEditor: React.FC<InlineVINEditorProps> = ({
             if (error) setError('');
           }}
           maxLength={17}
-          placeholder="Enter 17-character VIN"
+          placeholder="Enter VIN or chassis ID (4-17 chars)"
           autoFocus
           className="form-input"
           style={{

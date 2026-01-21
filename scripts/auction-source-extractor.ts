@@ -55,49 +55,205 @@ interface DetailedAuctionProfile extends AuctionProfile {
   description: string | null;
 }
 
-// Target: 8+ profiles per source
-const TARGET_COUNT = 8;
+// Target: 50 profiles per source for full extraction
+const TARGET_COUNT = 50;
 
 // Whether to fetch full details from individual listing pages
 const FETCH_DETAILS = true;
 
+// Helper to strip HTML tags
+function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * Extract detailed data from a BaT listing page
+ * Uses patterns from extract-bat-core edge function for reliable extraction
  */
 async function extractBatListingDetails(page: Page, url: string): Promise<Partial<DetailedAuctionProfile>> {
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForTimeout(2000);
 
-    // Extract essentials using locators instead of page.evaluate
     const result: Partial<DetailedAuctionProfile> = {};
+    const html = await page.content();
 
-    // Get essentials section
-    const essentialsItems = await page.locator('.essentials li').all();
-    for (const li of essentialsItems) {
-      const text = await li.textContent();
-      if (!text) continue;
-      const match = text.match(/^([A-Za-z][A-Za-z\s\/]+)\s*:\s*(.+)$/);
-      if (!match) continue;
+    // === LISTING DETAILS EXTRACTION (from extract-bat-core patterns) ===
+    // BaT uses "<strong>Listing Details</strong>" followed by a <ul> with specs
+    const essentialsIdx = html.indexOf('<div class="essentials"');
+    const win = essentialsIdx >= 0 ? html.slice(essentialsIdx, essentialsIdx + 300000) : html;
 
-      const key = match[1].toLowerCase().trim();
-      const value = match[2].trim();
-
-      if (key === 'seller') result.seller_username = value;
-      if (key === 'location') result.location = value;
-      if (key === 'vin' || key === 'chassis') result.vin = value;
-      // BaT uses various labels for mileage: "Mileage", "Miles", "TMU Indicated", "Indicated", etc.
-      if (key.includes('mileage') || key.includes('miles') || key.includes('indicated') || key === 'tmu') {
-        const m = value.match(/([\d,]+)/);
-        if (m) result.mileage = parseInt(m[0].replace(/,/g, ''));
+    // Method 1: Parse "Listing Details" section (most reliable)
+    const detailsUlMatch = win.match(/<strong>Listing Details<\/strong>[\s\S]*?<ul>([\s\S]*?)<\/ul>/i);
+    if (detailsUlMatch?.[1]) {
+      const ulHtml = detailsUlMatch[1];
+      const liRe = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+      let m: RegExpExecArray | null;
+      const items: string[] = [];
+      while ((m = liRe.exec(ulHtml)) !== null) {
+        const t = stripTags(m[1]);
+        if (t) items.push(t);
       }
-      if (key.includes('engine')) result.engine = value;
-      if (key.includes('transmission') || key.includes('drivetrain')) result.transmission = value;
-      if (key.includes('exterior') || key === 'color') result.exterior_color = value;
-      if (key.includes('interior')) result.interior_color = value;
+
+      for (const t of items) {
+        // VIN/Chassis extraction
+        if (!result.vin) {
+          const idMatch = t.match(/^(?:VIN|Chassis)\s*:\s*([A-HJ-NPR-Z0-9]{4,17})\b/i);
+          if (idMatch?.[1]) result.vin = idMatch[1].toUpperCase().trim();
+        }
+
+        // Mileage extraction (multiple formats)
+        if (!result.mileage) {
+          const milesMatch = t.match(/\b([0-9,]+)\s*Miles?\b/i) || t.match(/\b~\s*([0-9,]+)\s*Miles?\b/i);
+          const milesKMatch = t.match(/\b(\d+(?:\.\d+)?)\s*k\s*Miles?\b/i) || t.match(/\b(\d+(?:\.\d+)?)k\s*Miles?\b/i);
+
+          if (milesMatch?.[1]) {
+            const n = parseInt(milesMatch[1].replace(/,/g, ''), 10);
+            if (Number.isFinite(n) && n > 0 && n < 10000000) result.mileage = n;
+          } else if (milesKMatch?.[1]) {
+            const n = Math.round(parseFloat(milesKMatch[1]) * 1000);
+            if (Number.isFinite(n) && n > 0 && n < 10000000) result.mileage = n;
+          }
+        }
+
+        // Transmission extraction
+        if (!result.transmission) {
+          const looksLikeTransmission =
+            t.length <= 80 &&
+            !/(miles|paint|upholstery|chassis|vin|engine)\b/i.test(t) &&
+            (
+              /\btransmission\b/i.test(t) ||
+              /\btransaxle\b/i.test(t) ||
+              /\bgearbox\b/i.test(t) ||
+              /\bcvt\b/i.test(t) ||
+              /\bdct\b/i.test(t) ||
+              /\bdual[-\s]?clutch\b/i.test(t) ||
+              (
+                /\b(manual|automatic)\b/i.test(t) &&
+                (/\b(\d{1,2}-speed|four-speed|five-speed|six-speed|seven-speed|eight-speed|nine-speed|ten-speed)\b/i.test(t) || /\btransaxle\b/i.test(t))
+              )
+            );
+          if (looksLikeTransmission) result.transmission = t;
+        }
+
+        // Engine extraction
+        if (!result.engine) {
+          const looksLikeEngine =
+            (
+              /\b\d+(?:\.\d+)?-?\s*Liter\b/i.test(t) ||
+              /\b\d+(?:\.\d+)?\s*L\b/i.test(t) ||
+              /\bV\d\b/i.test(t) ||
+              /\b[0-9,]{3,5}\s*cc\b/i.test(t) ||
+              /\b\d{2,3}\s*ci\b/i.test(t) ||
+              /\bcubic\s+inch\b/i.test(t) ||
+              /\bflat[-\s]?four\b/i.test(t) ||
+              /\bflat[-\s]?six\b/i.test(t) ||
+              /\binline[-\s]?(?:three|four|five|six)\b/i.test(t) ||
+              /\binline[-\s]?\d\b/i.test(t) ||
+              /\bv-?twin\b/i.test(t)
+            ) && !/exhaust|wheels|brakes/i.test(t);
+          if (looksLikeEngine) result.engine = t;
+        }
+
+        // Exterior color extraction
+        if (!result.exterior_color) {
+          const paintMatch = t.match(/^(.+?)\s+Paint\b/i);
+          if (paintMatch?.[1]) result.exterior_color = paintMatch[1].trim();
+          if (!result.exterior_color) {
+            const repMatch = t.match(/\bRepainted\s+in\s+(.+)\b/i);
+            if (repMatch?.[1] && repMatch[1].trim().length <= 60) result.exterior_color = repMatch[1].trim();
+          }
+          if (!result.exterior_color) {
+            const finMatch = t.match(/\bFinished\s+in\s+(.+)\b/i);
+            if (finMatch?.[1] && finMatch[1].trim().length <= 60) result.exterior_color = finMatch[1].trim();
+          }
+        }
+
+        // Interior color extraction
+        if (!result.interior_color) {
+          const upMatch = t.match(/^(.+?)\s+Upholstery\b/i);
+          if (upMatch?.[1]) result.interior_color = upMatch[1].trim();
+          if (!result.interior_color) {
+            const intMatch = t.match(/^(.+?)\s+(?:Leather\s+)?Interior\b/i);
+            if (intMatch?.[1] && intMatch[1].trim().length <= 60) result.interior_color = intMatch[1].trim();
+          }
+        }
+      }
     }
 
-    // Extract gallery images - use page.evaluate with a simple function
+    // Method 2: Fallback to essentials section parsing (older format)
+    if (!result.vin || !result.mileage || !result.transmission || !result.engine) {
+      const essentialsItems = await page.locator('.essentials li').all();
+      for (const li of essentialsItems) {
+        const text = await li.textContent();
+        if (!text) continue;
+        const textLower = text.toLowerCase().trim();
+
+        // Key:value format (e.g., "Chassis: WDBEA36E1PB925391")
+        const kvMatch = text.match(/^([A-Za-z][A-Za-z\s\/]+)\s*:\s*(.+)$/);
+        if (kvMatch) {
+          const key = kvMatch[1].toLowerCase().trim();
+          const value = kvMatch[2].trim();
+          if ((key === 'vin' || key === 'chassis') && !result.vin) result.vin = value.toUpperCase();
+          if (key === 'seller' && !result.seller_username) result.seller_username = value;
+          if (key === 'location' && !result.location) result.location = value;
+        }
+
+        // Descriptive mileage fallback
+        if (!result.mileage) {
+          const mileageMatch = textLower.match(/^~?([\d,]+)k?\s*miles?\b/i);
+          if (mileageMatch) {
+            let miles = parseInt(mileageMatch[1].replace(/,/g, ''));
+            if (textLower.includes('k ') || textLower.includes('k miles')) miles *= 1000;
+            result.mileage = miles;
+          }
+        }
+      }
+    }
+
+    // === SELLER/LOCATION EXTRACTION ===
+    if (!result.seller_username) {
+      const sellerMatch =
+        win.match(/<strong>Seller<\/strong>:\s*<a[^>]*href=["'][^"']*\/member\/([^"\/]+)\/?["'][^>]*>([^<]+)<\/a>/i) ||
+        win.match(/<strong>Seller<\/strong>:\s*<a[^>]*>([^<]+)<\/a>/i);
+      result.seller_username = sellerMatch ? stripTags(String(sellerMatch[2] || sellerMatch[1] || '')) || null : null;
+    }
+    if (!result.location) {
+      const locationMatch =
+        win.match(/<strong>Location<\/strong>:\s*<a[^>]*>([^<]+)<\/a>/i) ||
+        html.match(/"location"[:\s]*"([^"]+)"/i);
+      result.location = locationMatch?.[1] ? stripTags(locationMatch[1]) : null;
+    }
+
+    // === COMMENT/VIEW/BID COUNTS ===
+    const commentHeaderMatch = html.match(/<span class="info-value">(\d+)<\/span>\s*<span class="info-label">Comments<\/span>/i);
+    result.comment_count = commentHeaderMatch?.[1] ? parseInt(commentHeaderMatch[1], 10) : 0;
+
+    const viewMatch = html.match(/data-stats-item="views">([0-9,]+)/i);
+    result.view_count = viewMatch?.[1] ? parseInt(viewMatch[1].replace(/,/g, ''), 10) : 0;
+
+    const bidCountMatch = html.match(/"type":"bat-bid"/g);
+    result.bid_count = bidCountMatch ? bidCountMatch.length : 0;
+
+    // === MILEAGE FROM TITLE FALLBACK ===
+    if (!result.mileage) {
+      const titleMatch = html.match(/<h1[^>]*class="[^"]*post-title[^"]*"[^>]*>([^<]+)<\/h1>/i) ||
+                        html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      if (titleMatch?.[1]) {
+        const mileMatch = titleMatch[1].match(/^([\d,]+)[- ]?(?:Mile|K)/i);
+        if (mileMatch) {
+          const miles = mileMatch[1].replace(/,/g, '');
+          const parsed = parseInt(miles);
+          if (mileMatch[0].toLowerCase().includes('k') && parsed < 1000) {
+            result.mileage = parsed * 1000;
+          } else {
+            result.mileage = parsed;
+          }
+        }
+      }
+    }
+
+    // === IMAGE GALLERY EXTRACTION ===
     const imageUrls = await page.evaluate(() => {
       var urls: string[] = [];
       var galleryDiv = document.getElementById('bat_listing_page_photo_gallery');
@@ -143,44 +299,11 @@ async function extractBatListingDetails(page: Page, url: string): Promise<Partia
 
     result.image_urls = imageUrls;
 
-    // Extract description
+    // === DESCRIPTION EXTRACTION ===
     const descEl = await page.locator('.post-excerpt, .listing-post-content').first();
     const descText = await descEl.textContent().catch(() => null);
     if (descText) {
       result.description = descText.trim().substring(0, 4000);
-    }
-
-    // Try to extract mileage from title if not found in essentials
-    // BaT titles often start with mileage: "4,300-Mile 2022 Porsche..."
-    if (!result.mileage) {
-      const titleEl = await page.locator('h1.post-title, h1').first();
-      const titleText = await titleEl.textContent().catch(() => null);
-      if (titleText) {
-        const mileMatch = titleText.match(/^([\d,]+)[- ]?(?:Mile|K)/i);
-        if (mileMatch) {
-          const miles = mileMatch[1].replace(/,/g, '');
-          const parsed = parseInt(miles);
-          // Handle "K" suffix (e.g., "4K-Mile")
-          if (mileMatch[0].toLowerCase().includes('k') && parsed < 1000) {
-            result.mileage = parsed * 1000;
-          } else {
-            result.mileage = parsed;
-          }
-        }
-      }
-    }
-
-    // Extract comment count from page
-    const pageText = await page.content();
-    const commentMatch = pageText.match(/(\d+)\s*comments?/i);
-    if (commentMatch) {
-      result.comment_count = parseInt(commentMatch[1]);
-    }
-
-    // Extract bid count
-    const bidMatch = pageText.match(/(\d+)\s*bids?/i);
-    if (bidMatch) {
-      result.bid_count = parseInt(bidMatch[1]);
     }
 
     return result;
@@ -192,65 +315,43 @@ async function extractBatListingDetails(page: Page, url: string): Promise<Partia
 
 /**
  * Extract detailed data from a Cars & Bids listing page
+ * Note: C&B uses heavy client-side rendering, limiting what we can extract
  */
 async function extractCarsAndBidsDetails(page: Page, url: string): Promise<Partial<DetailedAuctionProfile>> {
   try {
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+    // Use 'load' instead of 'networkidle' to avoid timeouts
+    await page.goto(url, { waitUntil: 'load', timeout: 30000 });
     await page.waitForTimeout(2000);
 
     return await page.evaluate(() => {
       const result: any = {};
 
-      // Extract specs from the spec table
-      const specRows = document.querySelectorAll('.quick-facts tr, .specs tr, [class*="spec"] tr');
-      for (const row of Array.from(specRows)) {
-        const cells = row.querySelectorAll('td, th');
-        if (cells.length >= 2) {
-          const key = cells[0]?.textContent?.toLowerCase().trim() || '';
-          const value = cells[1]?.textContent?.trim() || '';
-
-          if (key.includes('vin')) result.vin = value;
-          if (key.includes('mileage') || key.includes('miles')) {
-            const m = value.match(/[\d,]+/);
-            if (m) result.mileage = parseInt(m[0].replace(/,/g, ''));
-          }
-          if (key.includes('engine')) result.engine = value;
-          if (key.includes('transmission')) result.transmission = value;
-          if (key.includes('exterior')) result.exterior_color = value;
-          if (key.includes('interior')) result.interior_color = value;
-          if (key.includes('location')) result.location = value;
-          if (key.includes('seller')) result.seller_username = value;
-        }
-      }
-
-      // Extract all gallery images
+      // Extract all images from the page
       const imageUrls: string[] = [];
-      const galleryImages = document.querySelectorAll('.gallery img, .carousel img, [class*="gallery"] img');
-      for (const img of Array.from(galleryImages)) {
+      const images = document.querySelectorAll('img');
+      for (const img of Array.from(images)) {
         const src = (img as HTMLImageElement).src || (img as HTMLImageElement).getAttribute('data-src');
-        if (src && src.includes('carsandbids.com') && !src.includes('logo') && !src.includes('icon')) {
+        if (src && src.includes('carsandbids') && !src.includes('logo') && !src.includes('icon') && !src.includes('avatar')) {
           imageUrls.push(src);
         }
       }
       result.image_urls = [...new Set(imageUrls)];
 
-      // Extract description
-      const descEl = document.querySelector('.description, .vehicle-description, [class*="description"]');
-      if (descEl) {
-        result.description = descEl.textContent?.trim().substring(0, 4000) || null;
-      }
+      // Try to extract any visible specs from the page
+      const pageText = document.body.innerText || '';
 
-      // Comment count
-      const commentEl = document.querySelector('.comments-count, [class*="comment-count"]');
-      if (commentEl) {
-        const m = commentEl.textContent?.match(/(\d+)/);
-        if (m) result.comment_count = parseInt(m[1]);
-      }
+      // Look for VIN pattern (17 alphanumeric chars)
+      const vinMatch = pageText.match(/\b[A-HJ-NPR-Z0-9]{17}\b/);
+      if (vinMatch) result.vin = vinMatch[0];
+
+      // Look for mileage pattern
+      const mileMatch = pageText.match(/(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)\b/i);
+      if (mileMatch) result.mileage = parseInt(mileMatch[1].replace(/,/g, ''));
 
       return result;
     });
   } catch (error: any) {
-    console.log(`    ⚠️ Failed to extract details: ${error.message}`);
+    console.log(`    ⚠️ C&B extraction timeout/error: ${error.message.substring(0, 50)}`);
     return {};
   }
 }
@@ -659,10 +760,12 @@ const AUCTION_SOURCES = {
   },
 
   'Gooding & Company': {
-    url: 'https://www.goodingco.com/lots/',
+    url: 'https://www.goodingco.com/auctions/',
+    // NOTE: Gooding is event-based (Pebble Beach, Amelia Island, etc.)
+    // They only have lots during specific auction events
     extract: async (page: Page): Promise<AuctionProfile[]> => {
-      // Gooding uses /lots/ page for current auction inventory
-      await page.goto('https://www.goodingco.com/lots/', { waitUntil: 'networkidle', timeout: 60000 });
+      // Try the auctions page first (lists events with lots)
+      await page.goto('https://www.goodingco.com/auctions/', { waitUntil: 'domcontentloaded', timeout: 45000 });
       await page.waitForTimeout(3000);
 
       // Scroll to load more
@@ -1192,10 +1295,18 @@ async function main() {
             console.log(`     📥 Fetching details...`);
             try {
               const details = await detailExtractor(detailPage, profile.url);
-              if (details && (details.image_urls?.length || details.vin || details.mileage)) {
+              if (details && (details.image_urls?.length || details.vin || details.mileage || details.engine || details.transmission)) {
                 await saveDetailedData(vehicleId, details);
                 const imageCount = details.image_urls?.length || 0;
-                console.log(`     ✅ Details: ${imageCount} images, VIN: ${details.vin || 'N/A'}, Miles: ${details.mileage || 'N/A'}`);
+                const specs = [
+                  details.vin ? `VIN:${details.vin.substring(0, 8)}...` : null,
+                  details.mileage ? `${details.mileage.toLocaleString()}mi` : null,
+                  details.engine ? `Eng:✓` : null,
+                  details.transmission ? `Trans:✓` : null,
+                  details.exterior_color ? `Ext:✓` : null,
+                  details.interior_color ? `Int:✓` : null,
+                ].filter(Boolean).join(' | ');
+                console.log(`     ✅ ${imageCount} imgs | ${specs || 'minimal data'}`);
               } else {
                 console.log(`     ⚠️ No additional details found`);
               }

@@ -619,7 +619,7 @@ Respond with JSON including INDIVIDUAL CONFIDENCE SCORES for each field:
               content: [
                 {
                   type: 'text',
-                  text: 'Look for a VIN (Vehicle Identification Number) in this image. VINs are 17-character alphanumeric codes. Respond with JSON: {"hasVIN": boolean, "vin": string, "confidence": number 0-100}'
+                  text: 'Look for a VIN or chassis/serial identifier in this image. Modern VINs are 17-character alphanumeric codes (no I/O/Q). Pre-1981 vehicles may have shorter 4-16 character chassis IDs. Respond with JSON: {"hasVIN": boolean, "vin": string, "confidence": number 0-100}'
                 },
                 {
                   type: 'image_url',

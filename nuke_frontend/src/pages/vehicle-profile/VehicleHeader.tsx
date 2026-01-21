@@ -3167,7 +3167,7 @@ const VehicleHeader: React.FC<VehicleHeaderProps> = ({
                           >
                             Edit Vehicle
                           </button>
-                          {' '}and enter the 17-character VIN
+                          {' '}and enter the VIN or chassis identifier
                         </li>
                       )}
                       {needsImages && (

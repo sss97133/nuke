@@ -43,7 +43,7 @@ export interface VINDecodeResult {
   brake_system?: string;
   
   // Metadata
-  provider: 'nhtsa' | 'commercial' | 'cached';
+  provider: 'nhtsa' | 'commercial' | 'cached' | 'legacy';
   confidence: number;
   decoded_at: string;
   error_message?: string;
@@ -91,22 +91,32 @@ class VINDecoderService {
     // Clean VIN
     const cleaned = String(vin).toUpperCase().replace(/[^A-Z0-9]/g, '');
     
-    // Check length
-    if (cleaned.length !== 17) {
-      return { 
-        valid: false, 
-        normalized: cleaned, 
-        error: `VIN must be 17 characters (got ${cleaned.length})`, 
-        confidence: 0 
-      };
-    }
-    
     // Check for invalid characters (I, O, Q not used in VINs)
     if (/[IOQ]/.test(cleaned)) {
       return { 
         valid: false, 
         normalized: cleaned, 
         error: 'VIN contains invalid characters (I, O, Q)', 
+        confidence: 0 
+      };
+    }
+
+    // Legacy/collector chassis identifiers can be 4-16 characters.
+    if (cleaned.length >= 4 && cleaned.length <= 16) {
+      return {
+        valid: true,
+        normalized: cleaned,
+        error: 'Legacy chassis/serial identifier (check digit not validated)',
+        confidence: 0.6
+      };
+    }
+
+    // Check length for modern VINs
+    if (cleaned.length !== 17) {
+      return { 
+        valid: false, 
+        normalized: cleaned, 
+        error: `VIN must be 17 characters (modern) or 4-16 characters (legacy chassis)`,
         confidence: 0 
       };
     }
@@ -165,6 +175,19 @@ class VINDecoderService {
         error_message: validation.error,
         provider: 'nhtsa',
         confidence: 0,
+        decoded_at: new Date().toISOString()
+      };
+    }
+
+    // Legacy chassis identifiers (non-17) are valid but not decodable via NHTSA.
+    if (validation.normalized.length !== 17) {
+      return {
+        vin: vin,
+        normalized_vin: validation.normalized,
+        valid: true,
+        error_message: validation.error || 'Legacy chassis/serial identifier (no decode available)',
+        provider: 'legacy',
+        confidence: validation.confidence || 0.6,
         decoded_at: new Date().toISOString()
       };
     }
@@ -298,6 +321,15 @@ class VINDecoderService {
     if (!validation.valid) {
       return {
         vin: vin,
+        recalls: [],
+        recall_count: 0
+      };
+    }
+
+    // Recalls are only available for modern 17-character VINs.
+    if (validation.normalized.length !== 17) {
+      return {
+        vin: validation.normalized,
         recalls: [],
         recall_count: 0
       };
