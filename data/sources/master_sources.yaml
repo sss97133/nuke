@@ -1,5 +1,5 @@
 version: 1
-last_updated: "2025-12-21"
+last_updated: "2026-01-21"
 notes:
   - "Seed list: expand continuously. This file is the canonical inventory of online sources."
   - "For each source, fill in access/compliance constraints before building extraction."
@@ -258,6 +258,23 @@ sources:
     notes:
       - "Inventory index: https://www.tbtfw.com/inventory"
       - "Vehicle detail pages use /am-inventory/<slug> and often include VIN/stock in-page."
+
+  - id: gr_auto_gallery
+    name: "GR Auto Gallery"
+    website: "https://www.grautogallery.com"
+    kind: "dealer"
+    region: "US"
+    access: "public"
+    extraction_plan_status: "planned"
+    monitoring_priority: "medium"
+    typical_data: ["dealer_inventory", "vdp_pages", "photos", "vin", "price", "mileage"]
+    recommended_strategy: "firecrawl_schema_then_fallback"
+    notes:
+      - "Inventory index: https://www.grautogallery.com/vehicles/current"
+      - "Sold inventory: https://www.grautogallery.com/vehicles/sold"
+      - "Events: https://www.grautogallery.com/events-shows"
+      - "Locations: https://www.grautogallery.com/locations"
+      - "Instagram: https://www.instagram.com/grautogallery"
 
   - id: offerup
     name: "OfferUp"
